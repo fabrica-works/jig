@@ -37,7 +37,7 @@ fn a_draft_kept_across_a_reload_stays_unsent_on_the_actual_engine() {
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
     assert!(outcome.judged.0 > 0);
     assert!(world.kept(client).iter().any(|record| matches!(record,
-        jig_client_test_domain::store::Record::Jig(jig_domain_client::store::Record::Draft { words, .. })
+        jig_client_test_domain::store::Record::Jig(jig_client_view::store::Record::Draft { words, .. })
         if words.bytes() == b"Unsent draft")));
     assert!(
         world
@@ -360,7 +360,7 @@ fn a_watch_ended_as_the_engine_stops_reaches_the_client_as_stopping() {
     let mut callbacks = world.front().session.poll(now, wall).expect("stopping watch terminals");
     callbacks.extend(world.front().session.poll(now, wall).expect("pending watch terminal"));
     assert!(callbacks.iter().any(|(owner, event)| matches!(event,
-        jig_client_test_domain::Event::Jig(jig_domain_client::Event::Ended {
+        jig_client_test_domain::Event::Jig(jig_client_view::Event::Ended {
             end: jig_client_domain::contract::WatchEnd::Stopping, ..
         }) if *owner == client)));
 }

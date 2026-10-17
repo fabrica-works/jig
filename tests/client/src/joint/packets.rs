@@ -9,7 +9,7 @@ use crate::harness::ClientId;
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
 use jig_client_test_domain::{Answered, Event, connector_values::ConnectorLimits, family};
-use jig_domain_client::Limits;
+use jig_client_view::Limits;
 use jig_domain_people as people;
 use jig_test_connector::ApplicationOutcome;
 use skein_lib::{RequestEnvelope, Token, Wall};
@@ -144,7 +144,7 @@ pub fn document(
     assert!(transport.delivered(watcher, Pace::Document), "validated owner route");
     Ok(Incoming::Callback {
         client,
-        event: Event::Jig(jig_domain_client::Event::Watch { watch, event: client::WatchEvent::Delivered(delivery) }),
+        event: Event::Jig(jig_client_view::Event::Watch { watch, event: client::WatchEvent::Delivered(delivery) }),
     })
 }
 
@@ -165,7 +165,7 @@ pub fn stream(
     assert!(transport.delivered(watcher, Pace::Stream), "validated owner route");
     Ok(Incoming::Callback {
         client,
-        event: Event::Jig(jig_domain_client::Event::Watch { watch, event: client::WatchEvent::Delivered(delivery) }),
+        event: Event::Jig(jig_client_view::Event::Watch { watch, event: client::WatchEvent::Delivered(delivery) }),
     })
 }
 
@@ -208,7 +208,7 @@ pub fn dropped(transport: &mut Transport, watcher: Token) -> Result<Incoming, In
 fn terminal(transport: &mut Transport, watcher: Token, end: client::WatchEnd) -> Result<Incoming, Invalid> {
     let route = transport.watch(watcher).ok_or(Invalid::MissingRoute)?.clone();
     let event = match route.subject {
-        Watched::Jig(_) => Event::Jig(jig_domain_client::Event::Ended { watch: route.native, end }),
+        Watched::Jig(_) => Event::Jig(jig_client_view::Event::Ended { watch: route.native, end }),
         Watched::Application { .. } => {
             let end = match end {
                 client::WatchEnd::Closed => family::WatchEnd::Closed,
@@ -479,7 +479,7 @@ mod tests {
         let mut transport = transport();
         transport.signed_in(ClientId(1), u64::MAX, u64::MAX);
         let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
-        let limits = jig_domain_client::Limits { document_bytes: 0, ..crate::test::limits().jig };
+        let limits = jig_client_view::Limits { document_bytes: 0, ..crate::test::limits().jig };
         let source = people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         assert!(matches!(people_reply(&mut transport, to, source, &limits), Err(Invalid::Payload)));
         assert!(transport.reply(to).is_some(), "failed whole admission leaves the original exchange intact");
@@ -515,7 +515,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_domain_client::Event::Watch {
+                Event::Jig(jig_client_view::Event::Watch {
                     watch,
                     event: client::WatchEvent::Delivered(client::Delivery::Task(value)),
                 }),
@@ -565,7 +565,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_domain_client::Event::Watch {
+                Event::Jig(jig_client_view::Event::Watch {
                     watch,
                     event: client::WatchEvent::Delivered(client::Delivery::OwnerTree(value)),
                 }),
@@ -604,7 +604,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_domain_client::Event::Watch {
+                Event::Jig(jig_client_view::Event::Watch {
                     watch,
                     event: client::WatchEvent::Delivered(client::Delivery::OwnerInbox(value)),
                 }),
@@ -642,7 +642,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_domain_client::Event::Watch {
+                Event::Jig(jig_client_view::Event::Watch {
                     watch,
                     event: client::WatchEvent::Delivered(client::Delivery::Conversations(value)),
                 }),
@@ -665,7 +665,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_domain_client::Event::Watch {
+                Event::Jig(jig_client_view::Event::Watch {
                     watch,
                     event: client::WatchEvent::Delivered(client::Delivery::Goals(value)),
                 }),
@@ -723,7 +723,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_domain_client::Event::Watch {
+                Event::Jig(jig_client_view::Event::Watch {
                     watch,
                     event: client::WatchEvent::Delivered(client::Delivery::Tasks(value)),
                 }),
@@ -750,7 +750,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_domain_client::Event::Watch {
+                Event::Jig(jig_client_view::Event::Watch {
                     watch,
                     event: client::WatchEvent::Delivered(client::Delivery::RunState(state)),
                 }),
@@ -772,7 +772,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_domain_client::Event::Watch {
+                Event::Jig(jig_client_view::Event::Watch {
                     watch,
                     event: client::WatchEvent::Delivered(client::Delivery::Run(text)),
                 }),
@@ -836,7 +836,7 @@ mod tests {
             assert!(transport.delivered(watcher, Pace::Stream));
             let Incoming::Callback {
                 client: ClientId(0),
-                event: Event::Jig(jig_domain_client::Event::Ended { watch, end }),
+                event: Event::Jig(jig_client_view::Event::Ended { watch, end }),
             } = ended(&mut transport, watcher, why).expect("actual terminal")
             else {
                 panic!("original terminal");

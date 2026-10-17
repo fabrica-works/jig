@@ -89,7 +89,7 @@ impl Joint {
     pub fn up(&mut self, now: Time, wall: Wall, owners: &[jig_client::Spoken]) -> Vec<(ClientId, jig_client::Up)> {
         let mut up = Vec::new();
         for (client, event) in Front::<Test>::poll(self, now, wall) {
-            if let Event::Jig(jig_domain_client::Event::Hello { served }) = &event {
+            if let Event::Jig(jig_client_view::Event::Hello { served }) = &event {
                 up.push((
                     client,
                     jig_client::Up::Served { served: *served, versions: Some(self.session.driver.transport.served()) },
@@ -414,7 +414,7 @@ mod tests {
         Front::<Test>::bind(&mut front, ClientId(0), 1);
         let callbacks = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
         assert_eq!(callbacks.len(), 1);
-        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Hello { .. }))));
+        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. }))));
         let observations = Front::<Test>::observed(&mut front);
         assert!(matches!(observations.first(), Some(Observed::Durable { at: Time::ZERO, .. })));
         assert!(Front::<Test>::observed(&mut front).is_empty());
@@ -466,7 +466,7 @@ mod tests {
         let mut front = front_with_limits(&owner_limits);
         Front::<Test>::bind(&mut front, ClientId(0), 1);
         let initial = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
-        assert!(matches!(initial.as_slice(), [(ClientId(0), Event::Jig(jig_domain_client::Event::Hello { .. }))]));
+        assert!(matches!(initial.as_slice(), [(ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. }))]));
         let _ = Front::<Test>::observed(&mut front);
         front.busy_pressure(pressure_party);
         front.try_fault(Time::ZERO, &FrontFault::Busy).expect("actual scripted source");
@@ -637,9 +637,9 @@ mod tests {
         let callbacks = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
         assert!(matches!(
             callbacks.as_slice(),
-            [(ClientId(0), Event::Jig(jig_domain_client::Event::Hello { served: false }))]
+            [(ClientId(0), Event::Jig(jig_client_view::Event::Hello { served: false }))]
         ));
-        assert_eq!(front.session.driver.transport.hello(), jig_domain_client::Event::Hello { served: false });
+        assert_eq!(front.session.driver.transport.hello(), jig_client_view::Event::Hello { served: false });
         assert_eq!(front.session.driver.world.store.rows, rows);
         assert!(Front::<Test>::observed(&mut front).is_empty());
     }
@@ -660,7 +660,7 @@ mod tests {
         assert!(Front::<Test>::observed(&mut front).is_empty());
         let until = Time::ZERO.saturating_add(span);
         let callbacks = Front::<Test>::poll(&mut front, until, clock(until));
-        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Jig(jig_domain_client::Event::Hello { .. }))]));
+        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. }))]));
         assert!(matches!(Front::<Test>::observed(&mut front).first(), Some(Observed::Reachable { live: true })));
         assert!(Front::<Test>::observed(&mut front).is_empty());
     }

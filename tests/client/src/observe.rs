@@ -197,46 +197,46 @@ pub fn received(event: &Event) -> Vec<Receipt> {
 }
 /// Observe delivered jig documents and sign-in state before the root callback.
 #[must_use]
-pub fn jig_received(event: &jig_domain_client::Event) -> Vec<Receipt> {
+pub fn jig_received(event: &jig_client_view::Event) -> Vec<Receipt> {
     match event {
-        jig_domain_client::Event::Start { .. } => vec![Receipt::Started],
-        jig_domain_client::Event::Hello { served } => {
+        jig_client_view::Event::Start { .. } => vec![Receipt::Started],
+        jig_client_view::Event::Hello { served } => {
             if *served {
                 vec![]
             } else {
                 vec![Receipt::OutOfDate]
             }
         }
-        jig_domain_client::Event::Read { result: ReadResult::Value(value), .. } => read(value),
-        jig_domain_client::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => {
+        jig_client_view::Event::Read { result: ReadResult::Value(value), .. } => read(value),
+        jig_client_view::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => {
             vec![task(value)]
         }
-        jig_domain_client::Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(value)) } => {
+        jig_client_view::Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(value)) } => {
             frame(value, Some(*watch))
         }
-        jig_domain_client::Event::Ended { watch, end } => {
+        jig_client_view::Event::Ended { watch, end } => {
             let mut receipts = vec![Receipt::WatchEnded { watch: *watch }];
             if *end == WatchEnd::SignedOut {
                 receipts.push(Receipt::Parked);
             }
             receipts
         }
-        jig_domain_client::Event::SignedOut
-        | jig_domain_client::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. } => vec![Receipt::Parked],
-        jig_domain_client::Event::SignOutLost
-        | jig_domain_client::Event::Kept { .. }
-        | jig_domain_client::Event::KeptGone { .. }
-        | jig_domain_client::Event::Went { .. }
-        | jig_domain_client::Event::Act { .. }
-        | jig_domain_client::Event::Ask { .. }
-        | jig_domain_client::Event::Progress { .. }
-        | jig_domain_client::Event::Answered { .. }
-        | jig_domain_client::Event::Read { .. }
-        | jig_domain_client::Event::Watch { .. }
-        | jig_domain_client::Event::ShowObjects { .. }
-        | jig_domain_client::Event::ShowSections { .. }
-        | jig_domain_client::Event::ObjectsLeft
-        | jig_domain_client::Event::Frame { .. } => vec![],
+        jig_client_view::Event::SignedOut
+        | jig_client_view::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. } => vec![Receipt::Parked],
+        jig_client_view::Event::SignOutLost
+        | jig_client_view::Event::Kept { .. }
+        | jig_client_view::Event::KeptGone { .. }
+        | jig_client_view::Event::Went { .. }
+        | jig_client_view::Event::Act { .. }
+        | jig_client_view::Event::Ask { .. }
+        | jig_client_view::Event::Progress { .. }
+        | jig_client_view::Event::Answered { .. }
+        | jig_client_view::Event::Read { .. }
+        | jig_client_view::Event::Watch { .. }
+        | jig_client_view::Event::ShowObjects { .. }
+        | jig_client_view::Event::ShowSections { .. }
+        | jig_client_view::Event::ObjectsLeft
+        | jig_client_view::Event::Frame { .. } => vec![],
     }
 }
 
@@ -410,7 +410,7 @@ mod link_tests;
 #[must_use]
 pub fn window_changed(event: &Event) -> bool {
     let act = match event {
-        Event::Act { action: domain::Action::Jig(act) } | Event::Jig(jig_domain_client::Event::Act { act }) => act,
+        Event::Act { action: domain::Action::Jig(act) } | Event::Jig(jig_client_view::Event::Act { act }) => act,
         Event::Start { .. }
         | Event::Went { .. }
         | Event::Act { action: domain::Action::First(_) }
@@ -423,30 +423,29 @@ pub fn window_changed(event: &Event) -> bool {
 }
 /// Only decoded jig person acts explain a changed displayed window (QUESTIONS 34).
 #[must_use]
-pub fn jig_window_changed(act: &jig_domain_client::action::Act) -> bool {
+pub fn jig_window_changed(act: &jig_client_view::action::Act) -> bool {
     // Settings review and explicit service role selection keep the current windows.
     if matches!(
         act,
-        jig_domain_client::action::Act::ProjectSettings { .. }
-            | jig_domain_client::action::Act::ProjectServiceRole { .. }
+        jig_client_view::action::Act::ProjectSettings { .. } | jig_client_view::action::Act::ProjectServiceRole { .. }
     ) {
         return false;
     }
     matches!(
         act,
-        jig_domain_client::action::Act::Go { .. }
-            | jig_domain_client::action::Act::Fold { .. }
-            | jig_domain_client::action::Act::FoldCall { .. }
-            | jig_domain_client::action::Act::FoldCurrentCall { .. }
-            | jig_domain_client::action::Act::Filter { .. }
-            | jig_domain_client::action::Act::More { .. }
-            | jig_domain_client::action::Act::FilterInbox { .. }
-            | jig_domain_client::action::Act::FilterTasks { .. }
-            | jig_domain_client::action::Act::FilterNotes { .. }
-            | jig_domain_client::action::Act::FilterPlan { .. }
-            | jig_domain_client::action::Act::HistoryScope { .. }
-            | jig_domain_client::action::Act::OpenEnded { .. }
-            | jig_domain_client::action::Act::OpenUpdates
+        jig_client_view::action::Act::Go { .. }
+            | jig_client_view::action::Act::Fold { .. }
+            | jig_client_view::action::Act::FoldCall { .. }
+            | jig_client_view::action::Act::FoldCurrentCall { .. }
+            | jig_client_view::action::Act::Filter { .. }
+            | jig_client_view::action::Act::More { .. }
+            | jig_client_view::action::Act::FilterInbox { .. }
+            | jig_client_view::action::Act::FilterTasks { .. }
+            | jig_client_view::action::Act::FilterNotes { .. }
+            | jig_client_view::action::Act::FilterPlan { .. }
+            | jig_client_view::action::Act::HistoryScope { .. }
+            | jig_client_view::action::Act::OpenEnded { .. }
+            | jig_client_view::action::Act::OpenUpdates
     )
 }
 

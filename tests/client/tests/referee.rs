@@ -494,8 +494,8 @@ const WATCH_ENDS: &[jig_client_domain::contract::WatchEnd] = &[
 #[test]
 fn a_frame_after_its_watchs_end_is_no_evidence() {
     use jig_client_domain::contract::{Delivery, WatchEvent};
+    use jig_client_view::Event;
     use jig_client_world::observe::jig_received;
-    use jig_domain_client::Event;
     const WATCH: Token = Token::new(1);
     for end in WATCH_ENDS {
         let span = Duration::from_millis(10);

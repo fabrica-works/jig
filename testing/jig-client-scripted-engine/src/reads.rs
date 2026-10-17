@@ -319,7 +319,7 @@ impl<A: crate::Application> Engine<A> {
                 }
             }).collect();
                 rows.sort_by(|a, b| {
-                    let order = if jig_domain_client::pages::inbox::needs(a.group) { a.at.cmp(&b.at) } else { b.at.cmp(&a.at) };
+                    let order = if jig_client_view::page::inbox::needs(a.group) { a.at.cmp(&b.at) } else { b.at.cmp(&a.at) };
                     order.then(a.object.cmp(&b.object))
                 });
                 Rows::Inbox(rows)

@@ -246,9 +246,9 @@ fn a_person_answers_a_choice_between_two_reports() {
     world.person(
         member,
         vec![Step::Go {
-            address: jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
+            address: jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Project {
                 project: 1,
-                section: jig_domain_client::address::ProjectSection::Overview,
+                section: jig_client_view::address::ProjectSection::Overview,
             }),
         }],
     );

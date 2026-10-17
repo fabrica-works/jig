@@ -4,7 +4,7 @@ use crate::{Scripted, Settings, Test, World, scripted::Family, test::list};
 use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{Bounds, Script, Truth};
 use jig_client_test_domain::Address as RootAddress;
-use jig_domain_client::address::Address;
+use jig_client_view::address::Address;
 use skein_lib::{Duration, Wall};
 pub mod client_construction;
 pub mod person_confirmation;
@@ -291,7 +291,7 @@ pub fn conversation() -> RootAddress {
 /// Names the initial chat’s activity page.
 #[must_use]
 pub fn chat() -> RootAddress {
-    RootAddress::Jig(Address::Task { task: 9, section: jig_domain_client::address::TaskSection::Activity })
+    RootAddress::Jig(Address::Task { task: 9, section: jig_client_view::address::TaskSection::Activity })
 }
 /// Starts with the initial chat already durable.
 #[must_use]

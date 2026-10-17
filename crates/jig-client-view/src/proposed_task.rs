@@ -6,10 +6,10 @@ use crate::{JigBindings, JigMeaning, Owner};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, SlotRef};
 
-use jig_client_domain::contract::{
+use crate::Limits;
+use jig_client::contract::{
     Funder, OwnerExecutor, OwnerPart, OwnerPartKey, OwnerPartKind, PersonAddress, TaskContractDocument,
 };
-use jig_domain_client::Limits;
 
 pub fn text(b: &mut Builder, words: &Words, phrase: ProposedPhrase, holes: &[Hole]) {
     let saying = words.book.say(words.language, phrase.id(), holes).expect("exact member words were checked");

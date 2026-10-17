@@ -3,8 +3,8 @@ use crate::front::Side;
 use jig_client_protocol_link as link;
 use jig_client_shell_native::{Settings, Shell};
 use jig_client_test_domain::{self as client, Request};
+use jig_client_view::address::{Address, TaskSection};
 use jig_client_world::{App, Test};
-use jig_domain_client::address::{Address, TaskSection};
 use link::Signing;
 use skein_fake_person::{Doing, Find, Next, Person, Step, TreeFace};
 use skein_io::kernel::{Complete, Fd, Submit};
@@ -156,11 +156,11 @@ impl NativeClient {
             client::Event::Answer { attempt, answer: Some(client::Answered::Jig(answer)), .. } => {
                 self.received.push(Received::Answer { attempt: *attempt, answer: answer.clone() });
             }
-            client::Event::Jig(jig_domain_client::Event::Watch {
+            client::Event::Jig(jig_client_view::Event::Watch {
                 event: jig_client_domain::contract::WatchEvent::Delivered(delivery),
                 ..
             }) => self.received.push(Received::Delivery(delivery.clone())),
-            client::Event::Jig(jig_domain_client::Event::Read { result, .. }) => {
+            client::Event::Jig(jig_client_view::Event::Read { result, .. }) => {
                 self.received.push(Received::Read(result.clone()));
             }
             client::Event::Answer { .. }

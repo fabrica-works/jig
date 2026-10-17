@@ -1,7 +1,7 @@
 //! Complete moved-hold facts without requiring an object slot; contract.md, 4.
 use super::{Words, name};
 use crate::phrases::jig::JigPhrase;
-use jig_client_domain::contract::{HoldCategory, HoldFailure, HoldReason, Part};
+use jig_client::contract::{HoldCategory, HoldFailure, HoldReason, Part};
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 impl Words {
@@ -25,7 +25,7 @@ impl Words {
             HoldCategory::Stopped => self.text(b, JigPhrase::HoldStopped, &[]),
             HoldCategory::StoppedBy { party } => {
                 self.text(b, JigPhrase::HoldStopped, &[]);
-                self.actor(b, jig_client_domain::contract::Actor::Party(party));
+                self.actor(b, jig_client::contract::Actor::Party(party));
             }
             HoldCategory::Drift => self.text(b, JigPhrase::HoldDrift, &[]),
             HoldCategory::Effects => self.text(b, JigPhrase::HoldEffects, &[]),
@@ -136,10 +136,10 @@ impl Words {
             }
             Part::Outbox { scope, entry, .. } => {
                 match scope {
-                    jig_client_domain::contract::PartScope::Project(project) => {
+                    jig_client::contract::PartScope::Project(project) => {
                         self.text(b, JigPhrase::PartProject, &[Hole::Number(u64::from(*project))]);
                     }
-                    jig_client_domain::contract::PartScope::Deployment => self.text(b, JigPhrase::Deployment, &[]),
+                    jig_client::contract::PartScope::Deployment => self.text(b, JigPhrase::Deployment, &[]),
                 }
                 self.text(b, JigPhrase::OutboxEntry, &[Hole::Number(*entry)]);
             }
@@ -149,8 +149,8 @@ impl Words {
             }
             Part::Effect { proposal, .. } => {
                 let (phrase, maker) = match proposal.proposer {
-                    jig_client_domain::contract::Proposer::Task(task) => (JigPhrase::PartProposalTask, task),
-                    jig_client_domain::contract::Proposer::Party(party) => (JigPhrase::PartProposalParty, party),
+                    jig_client::contract::Proposer::Task(task) => (JigPhrase::PartProposalTask, task),
+                    jig_client::contract::Proposer::Party(party) => (JigPhrase::PartProposalParty, party),
                 };
                 self.text(b, phrase, &[Hole::Number(maker), Hole::Number(proposal.number)]);
             }

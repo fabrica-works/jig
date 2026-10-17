@@ -11,11 +11,11 @@ use crate::JigBindings;
 use crate::phrases::english;
 use crate::phrases::jig::{JigPhrase, shapes};
 use crate::words::Words;
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain,
     objects::{Object, question::facts},
 };
+use jig_client::contract::*;
 use skein_lib::{Id, List, Wall, bytes::copy_of};
 use skein_ui::phrases::{HoleKind, PhraseLimits, Phrasebook, Segment, WallFormat};
 use skein_ui::{Builder, Tree};
@@ -216,7 +216,7 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
                 <= usize::try_from(w.book.capacity(phrase.id()).unwrap()).unwrap()
         );
     }
-    assert!(crate::question_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }).is_none());
+    assert!(crate::question_nodes(&crate::Limits { rows: u32::MAX, ..CLIENT }).is_none());
 }
 
 const UTF8_TEXTS: [&[u8]; 3] = [b"w~\0^?", &[b'x'; 128], &[b't'; 128]];

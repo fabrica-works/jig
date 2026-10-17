@@ -10,8 +10,8 @@ use crate::{JigBindings, cards, decode};
 use skein_ui::Act;
 use skein_ui::{Builder, Role, State, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::{Domain, Event, Request, action::Act as Action, fields::Purpose, objects::Object};
+use crate::{Domain, Event, Request, action::Act as Action, fields::Purpose, objects::Object};
+use jig_client::contract::*;
 use skein_lib::{Duration, Id, List, Wall};
 
 fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
@@ -192,14 +192,14 @@ pub(super) fn render(d: &Domain, id: Id<Object>, words: &crate::words::Words, bi
     assert!(tree.len() <= crate::card_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
     let facts = d.objects().get(id).unwrap();
     match facts.card {
-        jig_domain_client::objects::Card::Deciding { .. } => {
+        crate::objects::Card::Deciding { .. } => {
             assert!(tree.nodes().iter().any(|node| node.styles.as_slice().contains(&crate::JigStyle::Card.token())
                 && node.states.as_slice().contains(&State::Busy)));
         }
-        jig_domain_client::objects::Card::Open
-        | jig_domain_client::objects::Card::Refused { .. }
-        | jig_domain_client::objects::Card::Unknown { .. }
-        | jig_domain_client::objects::Card::Leaving { .. } => {}
+        crate::objects::Card::Open
+        | crate::objects::Card::Refused { .. }
+        | crate::objects::Card::Unknown { .. }
+        | crate::objects::Card::Leaving { .. } => {}
     }
     tree
 }
@@ -710,10 +710,7 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
         .unwrap();
     assert_eq!(
         bindings.address(link.token),
-        Some(jig_domain_client::address::Address::Task {
-            task: 9,
-            section: jig_domain_client::address::TaskSection::Activity
-        })
+        Some(crate::address::Address::Task { task: 9, section: crate::address::TaskSection::Activity })
     );
     assert_eq!(decode(&mut bindings, link.token, Act::Press), Some(Action::OpenChat { task: 9 }));
     let mut root = chip();
@@ -1027,7 +1024,7 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
     changed_dialog_scenario(words, bindings);
 }
 fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings) {
-    use jig_domain_client::address::{Address, Place, ProjectSection};
+    use crate::address::{Address, Place, ProjectSection};
     let (mut d, frame) = start();
     let mut doc = document();
     doc.charters.get_mut(0).unwrap().goals =
@@ -1076,7 +1073,7 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
         &mut d,
         Event::Act {
             act: Action::GoalForm {
-                form: jig_domain_client::pages::project::goals::GoalForm {
+                form: crate::page::project::goals::GoalForm {
                     project: 4,
                     executor: GoalExecutor::Charter(1),
                     budget: 21,
@@ -1095,10 +1092,10 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
     assert_eq!(press(&tree, b"Confirm", bindings), Action::Confirm);
 }
 fn notice_scenarios(words: &crate::words::Words) {
-    use jig_domain_client::notices::Kind;
+    use crate::notices::kept::Kind;
     for kind in [
-        Kind::Link(jig_domain_client::link::Link::Offline),
-        Kind::Link(jig_domain_client::link::Link::Live),
+        Kind::Link(crate::link::Link::Offline),
+        Kind::Link(crate::link::Link::Live),
         Kind::Answer { object: ObjectKey::Task(8), answer: Answer::Done(Outcome::Changed) },
         Kind::PageAnswer {
             answer: Answer::Refused(Refusal::Authority {
@@ -1107,7 +1104,7 @@ fn notice_scenarios(words: &crate::words::Words) {
             }),
         },
         Kind::Unknown { object: ObjectKey::Escalation(8), act: ActKind::Release },
-        Kind::PageUnknown { purpose: jig_domain_client::pages::IntentPurpose::SetGoal },
+        Kind::PageUnknown { purpose: crate::page::IntentPurpose::SetGoal },
         Kind::Refused(Limit::Objects),
     ] {
         let mut b = Builder::new(&limits());
@@ -1119,7 +1116,7 @@ fn notice_scenarios(words: &crate::words::Words) {
         assert!(tree.len() > 1);
     }
     let (mut d, _) = start();
-    jig_domain_client::notices::show(&mut d, Kind::Refused(Limit::Objects));
+    crate::notices::kept::show(&mut d, Kind::Refused(Limit::Objects));
     let mut b = Builder::new(&limits());
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
     crate::notices::notices(&mut b, &d, words, &mut bindings);
@@ -1132,7 +1129,7 @@ fn notice_scenarios(words: &crate::words::Words) {
 }
 
 fn note_loaded(note: Note) -> (Domain, Id<Object>) {
-    use jig_domain_client::address::{Address, Place, ProjectSection};
+    use crate::address::{Address, Place, ProjectSection};
     let number = note.number;
     let (mut d, frame) = start();
     drive(&mut d, Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
@@ -1532,7 +1529,7 @@ fn retained_task_facts_keep_person_revision_taker_and_full_executor_identity_ind
         value.person_revision = person_revision;
         value.taken_by = taken_by;
         let (domain, object, _) = loaded_with_watch(ObjectKey::Task(8), ReadValue::Task(Box::new(value)));
-        let Some(jig_domain_client::objects::Body::Task(retained)) = &domain.objects().get(object).unwrap().body else {
+        let Some(crate::objects::Body::Task(retained)) = &domain.objects().get(object).unwrap().body else {
             panic!("the actual task document remains retained");
         };
         assert_eq!(retained.chip.executor, executor);

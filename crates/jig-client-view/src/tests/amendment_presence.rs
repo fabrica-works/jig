@@ -1,6 +1,6 @@
 //! Selected amendments are independent of displayed source facts (client.md, 9).
 use super::*;
-use jig_domain_client::objects::Body;
+use crate::objects::Body;
 
 fn empty() -> Amendment {
     Amendment { addressed: None, spec: None, instructions: None, wake: None, dependencies: None, authority: None }

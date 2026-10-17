@@ -25,7 +25,7 @@ fn escalation_read_retains_original_reply_until_whole_identity_and_reserved_enve
     let Incoming::Callback {
         client: actual_client,
         event:
-            Event::Jig(jig_domain_client::Event::Read {
+            Event::Jig(jig_client_view::Event::Read {
                 read: actual,
                 result: client::ReadResult::Value(client::ReadValue::OwnerEscalation(value)),
             }),

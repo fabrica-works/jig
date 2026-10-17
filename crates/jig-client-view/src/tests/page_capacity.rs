@@ -12,12 +12,12 @@ use super::{
 use crate::{JigBindings, Owner, words::Words};
 use skein_ui::{Builder, Role, SlotRef, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Event, Request,
     action::Act,
     address::{Address, Place, ProjectSection, TaskSection},
 };
+use jig_client::contract::*;
 use skein_lib::List;
 use skein_lib::{Token, Wall};
 fn full() -> Text {
@@ -302,7 +302,7 @@ fn project_pages(words: &Words) {
                 &mut d,
                 Event::Act {
                     act: Act::GoalForm {
-                        form: jig_domain_client::pages::project::goals::GoalForm {
+                        form: crate::page::project::goals::GoalForm {
                             project: 4,
                             executor: GoalExecutor::Charter(1),
                             budget: u64::MAX,
@@ -312,10 +312,7 @@ fn project_pages(words: &Words) {
                     },
                 },
             );
-            drive(
-                &mut d,
-                Event::Act { act: Act::Edit { field: jig_domain_client::fields::Purpose::NewGoal, text: full() } },
-            );
+            drive(&mut d, Event::Act { act: Act::Edit { field: crate::fields::Purpose::NewGoal, text: full() } });
         }
         render(&d, words);
     }
@@ -482,14 +479,14 @@ fn inbox(words: &Words) {
 fn not_the_work(words: &Words) {
     let mut d = Domain::new(&CLIENT, 1);
     for number in [1, 2] {
-        d.provider(jig_domain_client::signin::Provider { number, name: full() }).unwrap();
+        d.provider(crate::signin::Provider { number, name: full() }).unwrap();
     }
     drive(
         &mut d,
         Event::Start {
             address: Address::Inbox { project: None },
             kept: list([]),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: crate::boundary::Offset { minutes: 0 },
         },
     );
     drive(&mut d, Event::SignedOut);
@@ -531,7 +528,7 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
     let extra = crate::limits::compose(
         &CLIENT,
         words,
-        &jig_domain_client::pages::Arrangement::none(),
+        &crate::page::Arrangement::none(),
         largest.checked_add(7).unwrap(),
         9,
         2,
@@ -540,10 +537,7 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
     assert_eq!(extra.nodes, limits.nodes.checked_add(16).unwrap());
     assert_eq!(extra.depth, limits.depth.checked_add(2).unwrap());
     assert_eq!(crate::page_nodes(&CLIENT, 9), largest.checked_add(9));
-    assert!(
-        crate::limits::compose(&CLIENT, words, &jig_domain_client::pages::Arrangement::none(), u32::MAX, 0, 0)
-            .is_none()
-    );
+    assert!(crate::limits::compose(&CLIENT, words, &crate::page::Arrangement::none(), u32::MAX, 0, 0).is_none());
     assert!(crate::page_nodes(&CLIENT, u32::MAX).is_none());
     let mut huge = CLIENT;
     huge.rows = u32::MAX;
@@ -609,7 +603,7 @@ fn fill_tree(d: &mut Domain, watch: Token) {
     deliver(
         d,
         watch,
-        Delivery::Tree(Box::new(jig_client_domain::contract::Tree {
+        Delivery::Tree(Box::new(jig_client::contract::Tree {
             task: 8,
             nodes: list([node(9, None), node(10, Some(9))]),
             folded: PhaseCounts {
@@ -660,7 +654,7 @@ fn fill_activity(d: &mut Domain, read: Token) {
                 d,
                 Event::Act {
                     act: Act::FoldCall {
-                        name: jig_domain_client::conversation::CallName { attempt: 1, turn: number, call },
+                        name: crate::conversation::CallName { attempt: 1, turn: number, call },
                         open: true,
                     },
                 },
@@ -885,7 +879,7 @@ fn an_arranged_task_page_counts_the_sum_of_its_sections() {
         (crate::task_header_nodes(&CLIENT).unwrap(), counts),
         (42_352, [182_751, 1_124_529, 311_099, 13_778, 60, 94])
     );
-    let arrangement = jig_domain_client::pages::Arrangement { task: list(sections), project: list([]) };
+    let arrangement = crate::page::Arrangement { task: list(sections), project: list([]) };
     assert_eq!(
         crate::arranged_nodes(&CLIENT, 0, &arrangement),
         Some(42_352 + 182_751 + 1_124_529 + 311_099 + 13_778 + 60 + 94)
@@ -894,7 +888,7 @@ fn an_arranged_task_page_counts_the_sum_of_its_sections() {
 #[test]
 fn no_arrangement_keeps_each_page_bound() {
     each_page_bound_keeps_its_value_at_the_client_limits();
-    let arrangement = jig_domain_client::pages::Arrangement::none();
+    let arrangement = crate::page::Arrangement::none();
     assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_166_881));
     assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_166_890));
 }
@@ -917,10 +911,7 @@ fn most_owed_cards() -> Domain {
         drive(
             &mut d,
             Event::Act {
-                act: Act::Edit {
-                    field: jig_domain_client::fields::Purpose::Reason,
-                    text: super::cards::text(b"cancel"),
-                },
+                act: Act::Edit { field: crate::fields::Purpose::Reason, text: super::cards::text(b"cancel") },
             },
         );
         if number < CLIENT.objects {
@@ -937,7 +928,7 @@ fn the_most_owed_cards_fit_the_pages_bound() {
         assert!(d.owes(*id));
     }
     assert_eq!(d.objects().len(), CLIENT.objects);
-    let limits = crate::limits::of(&CLIENT, &jig_domain_client::pages::Arrangement::none()).unwrap();
+    let limits = crate::limits::of(&CLIENT, &crate::page::Arrangement::none()).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);

@@ -6,12 +6,12 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{
+use crate::Limits;
+use jig_client::contract::{
     DocumentText, OwnerHistoryChange, OwnerHistoryHolder, OwnerHistoryLine, OwnerMessageProposalKind,
     OwnerProposalHistory, OwnerProposalHistoryState, OwnerRetainedAction, OwnerRetainedAmendment, ParameterDocument,
     PersonAddress, ProposedTask, SpecificationDocument, TaskContractDocument,
 };
-use jig_domain_client::Limits;
 
 /// Checked storage for the whole history and every nested retained fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

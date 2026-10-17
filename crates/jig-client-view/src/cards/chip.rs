@@ -7,8 +7,8 @@ use crate::words::{Words, name};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use jig_client_domain::contract::{Chip, ChipPhase, FailureClass};
-use jig_domain_client::{Domain, action::Act, address::Address, objects::Body};
+use crate::{Domain, action::Act, address::Address, objects::Body};
+use jig_client::contract::{Chip, ChipPhase, FailureClass};
 
 /// The task's named link and copied title, with its executor kind in words.
 pub fn head(b: &mut Builder, chip: &Chip, words: &Words, bindings: &mut JigBindings) {
@@ -57,7 +57,7 @@ pub fn chip(b: &mut Builder, client: &Domain, chip: &Chip, words: &Words, bindin
     }
 }
 fn kept(client: &Domain, task: u64) -> Option<&Chip> {
-    let object = client.objects().get(client.objects().find(jig_client_domain::contract::ObjectKey::Task(task))?)?;
+    let object = client.objects().get(client.objects().find(jig_client::contract::ObjectKey::Task(task))?)?;
     match &object.body {
         Some(Body::Chip(chip)) => Some(chip),
         Some(Body::Task(task)) => Some(&task.chip),
@@ -115,7 +115,7 @@ pub fn details(
     match phase {
         ChipPhase::Owner { phase, details: _ } => {
             crate::chip_phase::brief(b, phase, words);
-            if let jig_client_domain::contract::OwnerChipPhase::Waiting { dependencies, .. } = phase {
+            if let jig_client::contract::OwnerChipPhase::Waiting { dependencies, .. } = phase {
                 dependencies_list(b, client, dependencies, words, bindings, pending, seen);
             }
         }
@@ -192,12 +192,7 @@ pub fn details(
     }
 }
 /// Show the wake policy verbatim; which news is enabled comes from the document.
-pub fn wake(
-    b: &mut Builder,
-    wake: &jig_client_domain::contract::WakePolicy,
-    words: &Words,
-    bindings: &mut JigBindings,
-) {
+pub fn wake(b: &mut Builder, wake: &jig_client::contract::WakePolicy, words: &Words, bindings: &mut JigBindings) {
     if wake.words {
         words.text(b, JigPhrase::WakeInbox, &[]);
     }

@@ -5,12 +5,12 @@
     reason = "ordinary view proofs drive public events and inspect selected semantic trees"
 )]
 use super::cards::{CLIENT, contains, text};
-use crate::{owner_chip, owner_chip_words::ChipPhrase as P, words::Words};
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Request,
     address::{Address, TaskSection},
 };
+use crate::{owner_chip, owner_chip_words::ChipPhrase as P, words::Words};
+use jig_client::contract::*;
 use skein_lib::{Token, Wall, bytes::copy_of};
 use skein_ui::{Builder, Tree};
 
@@ -164,7 +164,7 @@ fn owner_work_activity_without_synthetic_context_shows_all_seven_reports_and_ind
                 | OwnerChipWork::Ending => {}
             }
             let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
-            let Some(jig_domain_client::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
+            let Some(crate::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
                 panic!("whole task retained");
             };
             assert_eq!(retained.as_ref(), &doc);
@@ -275,18 +275,10 @@ fn owner_work_fragment_checks_raw_limits_exact_six_leaves_bytes_and_one_under_st
         std::panic::catch_unwind(|| fragment(&value, &smaller)).unwrap_err();
     }
     assert!(
-        owner_chip::observation_required(
-            &value,
-            &jig_domain_client::Limits { text: CLIENT.text - 1, ..CLIENT },
-            words()
-        )
-        .is_none()
+        owner_chip::observation_required(&value, &crate::Limits { text: CLIENT.text - 1, ..CLIENT }, words()).is_none()
     );
-    assert!(
-        owner_chip::observation_required(&value, &jig_domain_client::Limits { text: u32::MAX, ..CLIENT }, words())
-            .is_none()
-    );
-    assert!(crate::task_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }, 0).is_none());
+    assert!(owner_chip::observation_required(&value, &crate::Limits { text: u32::MAX, ..CLIENT }, words()).is_none());
+    assert!(crate::task_nodes(&crate::Limits { rows: u32::MAX, ..CLIENT }, 0).is_none());
     assert_eq!(crate::task_nodes(&CLIENT, 7).unwrap(), crate::task_nodes(&CLIENT, 0).unwrap() + 7);
 }
 #[test]

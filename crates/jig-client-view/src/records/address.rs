@@ -1,6 +1,6 @@
 //! The reference UI's places as its own records.
 use super::w;
-use jig_domain_client::address::{Address, ProjectSection, TaskSection};
+use crate::address::{Address, ProjectSection, TaskSection};
 fn project_section(value: ProjectSection) -> w::ProjectSection {
     match value {
         ProjectSection::Overview => w::ProjectSection::Overview,

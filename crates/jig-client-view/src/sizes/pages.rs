@@ -2,10 +2,10 @@
 //! Counts include the shared cards and loading slot fallbacks. `slot_nodes`
 //! is the sum of the owners' fragment bounds for the page, including navigation.
 use super::{authority, card_nodes, chip_nodes, markdown};
-use jig_domain_client::{
+use crate::{
     Limits,
     address::{ProjectSection, TaskSection},
-    pages::Arrangement,
+    page::Arrangement,
 };
 fn runtime_in(l: &Limits, chip: u32) -> Option<u32> {
     chip.checked_mul(l.rows)?.checked_add(l.rows.checked_mul(5)?)?.checked_add(24)

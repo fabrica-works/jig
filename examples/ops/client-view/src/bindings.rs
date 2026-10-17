@@ -11,7 +11,7 @@ pub enum Meaning {
     Until { object: Token, revision: Revision },
     NativeUntil { object: Token, revision: Revision },
     Object(ObjectKey),
-    Section(jig_domain_client::pages::Section),
+    Section(jig_client_view::page::Section),
 }
 #[derive(Debug)]
 struct Entry {
@@ -55,7 +55,7 @@ impl Bindings {
         None
     }
     #[must_use]
-    pub fn section(&self, token: Token) -> Option<jig_domain_client::pages::Section> {
+    pub fn section(&self, token: Token) -> Option<jig_client_view::page::Section> {
         for entry in &self.entries {
             if entry.token == token {
                 return match &entry.meaning {

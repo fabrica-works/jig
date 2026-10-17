@@ -2,7 +2,7 @@
 //! Shown links and optional complete results remain independent source facts.
 use super::{chips, offers, owner, results};
 use jig_client_domain::contract as client;
-use jig_domain_client::Limits;
+use jig_client_view::Limits;
 use jig_domain_core::documents;
 
 /// # Errors

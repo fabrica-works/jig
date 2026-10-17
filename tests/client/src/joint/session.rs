@@ -212,7 +212,7 @@ impl Session {
     pub fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
         self.stopping().expect("whole original stopped routes");
         if self.offline() {
-            self.callbacks.push((client, Event::Jig(jig_domain_client::Event::SignOutLost)));
+            self.callbacks.push((client, Event::Jig(jig_client_view::Event::SignOutLost)));
             return;
         }
         let Some(sign_in) = self.driver.transport.sign_in(client) else { return };
@@ -405,7 +405,7 @@ impl Session {
                 if self.unsigned.contains(&client) {
                     let event = match &request {
                         Request::Jig(jig_client_test_domain::JigOut::Open { watch, .. }) => {
-                            Some(Event::Jig(jig_domain_client::Event::Ended {
+                            Some(Event::Jig(jig_client_view::Event::Ended {
                                 watch: *watch,
                                 end: client::WatchEnd::SignedOut,
                             }))
@@ -443,7 +443,7 @@ impl Session {
             Incoming::Callback { client, event } => {
                 if matches!(
                     event,
-                    Event::Jig(jig_domain_client::Event::Watch { .. } | jig_domain_client::Event::Ended { .. })
+                    Event::Jig(jig_client_view::Event::Watch { .. } | jig_client_view::Event::Ended { .. })
                         | Event::First(jig_client_test_domain::first::Event::Watch { .. })
                 ) {
                     self.stream_event(client, now);
@@ -499,10 +499,9 @@ impl Session {
                 continue;
             }
             let event = match watch.subject {
-                super::transport::Watched::Jig(_) => Event::Jig(jig_domain_client::Event::Watch {
-                    watch: watch.native,
-                    event: client::WatchEvent::Alive,
-                }),
+                super::transport::Watched::Jig(_) => {
+                    Event::Jig(jig_client_view::Event::Watch { watch: watch.native, event: client::WatchEvent::Alive })
+                }
                 super::transport::Watched::Application { .. } => {
                     Event::First(jig_client_test_domain::first::Event::Watch {
                         watch: watch.native,
@@ -587,7 +586,7 @@ impl Session {
             Incoming::Callback {
                 client,
                 event:
-                    Event::Jig(jig_domain_client::Event::Watch {
+                    Event::Jig(jig_client_view::Event::Watch {
                         event: client::WatchEvent::Delivered(client::Delivery::Task(native)),
                         ..
                     }),
@@ -858,8 +857,7 @@ impl Session {
     /// A normal callback taken by the shell releases only its normal flight.
     pub fn received(&mut self, client: ClientId, now: Time, wall: Wall, event: &Event) {
         self.stopping().expect("whole original stopped routes");
-        if let Event::Jig(jig_domain_client::Event::Watch { watch, event: client::WatchEvent::Delivered(value) }) =
-            event
+        if let Event::Jig(jig_client_view::Event::Watch { watch, event: client::WatchEvent::Delivered(value) }) = event
             && !matches!(value, client::Delivery::Run(_))
             && let Some(watcher) = self.driver.transport.watch_token(client, *watch)
         {
@@ -965,7 +963,7 @@ mod tests {
         session.send(client, now, wall, frame(native)).expect("actual frame watch");
         let callbacks = session.poll(now, wall).expect("actual root delivery");
         assert!(callbacks.iter().any(|(owner, event)| *owner == client && matches!(event,
-            Event::Jig(jig_domain_client::Event::Watch { watch, event: client::WatchEvent::Delivered(_) }) if *watch == native)));
+            Event::Jig(jig_client_view::Event::Watch { watch, event: client::WatchEvent::Delivered(_) }) if *watch == native)));
         let watcher = session.driver.transport.watch_token(client, native).expect("original owner route");
         session.driver.referee.consumed(watcher);
         let acknowledgement = session.driver.transport.taken(client, native).expect("shell actually took the frame");
@@ -995,7 +993,7 @@ mod tests {
             .expect("actual close");
         let mut callbacks = session.poll(now, wall).expect("discard late body and finish actual flight");
         callbacks.extend(session.poll(now, wall).expect("actual owning terminal"));
-        assert!(matches!(callbacks.as_slice(), [(owner, Event::Jig(jig_domain_client::Event::Ended {
+        assert!(matches!(callbacks.as_slice(), [(owner, Event::Jig(jig_client_view::Event::Ended {
             watch, end: client::WatchEnd::Closed,
         }))] if *owner == client && *watch == native));
         assert!(session.driver.transport.watch(original).is_none());
@@ -1003,7 +1001,7 @@ mod tests {
         let replacement = session.driver.transport.watch_token(client, native).expect("replacement route");
         assert_ne!(replacement, original);
         let callbacks = session.poll(now, wall).expect("replacement body");
-        assert!(matches!(callbacks.as_slice(), [(owner, Event::Jig(jig_domain_client::Event::Watch {
+        assert!(matches!(callbacks.as_slice(), [(owner, Event::Jig(jig_client_view::Event::Watch {
             watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(_)),
         }))] if *owner == client && *watch == native));
     }
@@ -1024,7 +1022,7 @@ mod tests {
                 .iter()
                 .filter(|(_, event)| matches!(
                     event,
-                    Event::Jig(jig_domain_client::Event::Watch {
+                    Event::Jig(jig_client_view::Event::Watch {
                         event: client::WatchEvent::Delivered(client::Delivery::Frame(_)),
                         ..
                     })
@@ -1041,11 +1039,11 @@ mod tests {
         let comments = session.poll(due, wall).expect("actual quiet-stream comment");
         assert_eq!(comments.len(), 2);
         assert!(comments.iter().all(|(owner, event)| *owner == client
-            && matches!(event, Event::Jig(jig_domain_client::Event::Watch { event: client::WatchEvent::Alive, .. }))));
+            && matches!(event, Event::Jig(jig_client_view::Event::Watch { event: client::WatchEvent::Alive, .. }))));
         let mut tokens: Vec<_> = comments
             .iter()
             .filter_map(|(_, event)| match event {
-                Event::Jig(jig_domain_client::Event::Watch { watch, .. }) => Some(*watch),
+                Event::Jig(jig_client_view::Event::Watch { watch, .. }) => Some(*watch),
                 Event::Start { .. }
                 | Event::Went { .. }
                 | Event::Act { .. }
@@ -1067,7 +1065,7 @@ mod tests {
         let _ = session.poll(due, wall).expect("original close");
         let next = due.saturating_add(Duration::from_millis(50));
         let comments = session.poll(next, wall).expect("remaining original route");
-        assert!(matches!(comments.as_slice(), [(owner, Event::Jig(jig_domain_client::Event::Watch {
+        assert!(matches!(comments.as_slice(), [(owner, Event::Jig(jig_client_view::Event::Watch {
             watch, event: client::WatchEvent::Alive,
         }))] if *owner == client && *watch == Token::new(u64::MAX)));
         session.detach(client, next, wall);
@@ -1159,7 +1157,7 @@ mod tests {
         assert_eq!(session.driver.transport.watch_token(ClientId(0), native), None);
         let callbacks = session.poll(now, wall).expect("Hello is protocol-owned");
         assert_eq!(callbacks.len(), 1, "actual callbacks: {callbacks:?}");
-        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Hello { served: true }))));
+        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Hello { served: true }))));
         assert!(session.driver.withhold_completion().expect("actual authentication becomes durable").is_none());
         assert!(session.poll(now, wall).expect("completion withheld").is_empty());
         assert_eq!(session.observed(), vec![Observed::Durable { commit: session.driver.world.store.applied, at: now }]);
@@ -1169,7 +1167,7 @@ mod tests {
         assert_eq!(callbacks.len(), 1, "actual callbacks: {callbacks:?}");
         let (client, event) = &callbacks[0];
         assert_eq!(*client, ClientId(0));
-        let Event::Jig(jig_domain_client::Event::Watch {
+        let Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: client::WatchEvent::Delivered(client::Delivery::Frame(value)),
         }) = event
@@ -1205,7 +1203,7 @@ mod tests {
         let callbacks = session.poll(now, wall).expect("old route cannot deliver late");
         assert_eq!(callbacks.len(), 1, "actual callbacks: {callbacks:?}");
         assert!(
-            matches!(&callbacks[0], (ClientId(1), Event::Jig(jig_domain_client::Event::Watch { watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(_)) })) if *watch == native),
+            matches!(&callbacks[0], (ClientId(1), Event::Jig(jig_client_view::Event::Watch { watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(_)) })) if *watch == native),
             "actual callbacks: {callbacks:?}"
         );
         assert!(session.driver.transport.watch(first).is_none());
@@ -1232,7 +1230,7 @@ mod tests {
         let callbacks = session.poll(now, wall).expect("actual volatile terminal");
         assert_eq!(callbacks.len(), 1, "actual callbacks: {callbacks:?}");
         assert!(
-            matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Ended { watch, end: client::WatchEnd::Unknown })) if *watch == native),
+            matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Ended { watch, end: client::WatchEnd::Unknown })) if *watch == native),
             "actual callbacks: {callbacks:?}"
         );
         assert!(session.driver.transport.watch_token(ClientId(0), native).is_none());
@@ -1266,13 +1264,13 @@ mod tests {
         assert_ne!(old, reopened);
         let callbacks = session.poll(now, wall).expect("actual fresh Frame plus untouched sibling");
         assert_eq!(callbacks.len(), 3);
-        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Hello { .. }))));
+        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. }))));
         let owners: Vec<_> = callbacks
             .iter()
             .filter_map(|(client, event)| {
                 if matches!(
                     event,
-                    Event::Jig(jig_domain_client::Event::Watch {
+                    Event::Jig(jig_client_view::Event::Watch {
                         event: client::WatchEvent::Delivered(client::Delivery::Frame(_)),
                         ..
                     })
@@ -1303,7 +1301,7 @@ mod tests {
         assert!(session.poll(Time::from_nanos(999), wall).expect("before supplied deadline").is_empty());
         let callbacks = session.poll(until, wall).expect("same whole actual Frame released");
         assert_eq!(callbacks.len(), 1);
-        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Watch {
+        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Watch {
             watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(value)),
         })) if *watch == native && value.party.number == 1));
         session.received(ClientId(0), until, wall, &callbacks[0].1);
@@ -1329,10 +1327,10 @@ mod tests {
         let callbacks = session.poll(now, wall).expect("late original Frame is discarded");
         assert_eq!(callbacks.len(), 2);
         assert!(
-            matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Ended { watch, end: client::WatchEnd::Dropped })) if *watch == native)
+            matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Ended { watch, end: client::WatchEnd::Dropped })) if *watch == native)
         );
         assert!(
-            matches!(&callbacks[1], (ClientId(1), Event::Jig(jig_domain_client::Event::Watch { watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(_)) })) if *watch == native)
+            matches!(&callbacks[1], (ClientId(1), Event::Jig(jig_client_view::Event::Watch { watch, event: client::WatchEvent::Delivered(client::Delivery::Frame(_)) })) if *watch == native)
         );
         assert!(session.driver.transport.watch(dropped).is_none());
         assert!(session.driver.transport.watch(sibling).is_some());
@@ -1366,7 +1364,7 @@ mod tests {
         session.send(ClientId(0), now, wall, request(Token::new(31))).expect("actual owner submit");
         assert!(session.driver.world.stopped, "existing Failed completion stops the real root");
         let callbacks = session.poll(now, wall).expect("actual connection departure");
-        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Jig(jig_domain_client::Event::Ended {
+        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Jig(jig_client_view::Event::Ended {
             watch, end: client::WatchEnd::Dropped }))] if *watch == native));
         assert!(session.driver.transport.watch(watcher).is_none());
         assert!(session.driver.transport.taken(ClientId(0), native).is_none());
@@ -1386,7 +1384,7 @@ mod tests {
         let callbacks = session.poll(until, wall).expect("real restart and original retry");
         assert!(callbacks.iter().any(|(client, value)| *client == ClientId(0)
             && matches!(value, Event::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(_), .. } if *attempt == retry)));
-        assert!(matches!(callbacks.first(), Some((ClientId(0), Event::Jig(jig_domain_client::Event::Hello { .. })))));
+        assert!(matches!(callbacks.first(), Some((ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. })))));
         assert_eq!(
             session
                 .observed()
@@ -1498,7 +1496,7 @@ mod tests {
         let corrected_wall = Wall::from_nanos(wall.as_nanos() - 1);
         let callbacks = session.poll(until, corrected_wall).expect("actual recovery replays retained key");
         assert!(!session.offline());
-        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_domain_client::Event::Hello { .. }))));
+        assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. }))));
         assert_eq!(callbacks.iter().filter(|(_, value)| matches!(value, Event::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(_), .. } if *attempt == retry)).count(), 1);
         assert!(
             session
@@ -1531,7 +1529,7 @@ mod tests {
         let dropped = session.poll(now, wall).expect("only original departed watches");
         assert_eq!(dropped.len(), 2);
         for client in [ClientId(0), ClientId(1)] {
-            assert!(dropped.iter().any(|(actual, value)| *actual == client && matches!(value, Event::Jig(jig_domain_client::Event::Ended { watch, end: client::WatchEnd::Dropped }) if *watch == native)));
+            assert!(dropped.iter().any(|(actual, value)| *actual == client && matches!(value, Event::Jig(jig_client_view::Event::Ended { watch, end: client::WatchEnd::Dropped }) if *watch == native)));
             assert!(session.driver.transport.watch_token(client, native).is_none());
             session.send(client, now, wall, open()).expect("replacement open is parked");
         }
@@ -1544,7 +1542,7 @@ mod tests {
                 *client == ClientId(0)
                     && matches!(
                         value,
-                        Event::Jig(jig_domain_client::Event::Watch { event: client::WatchEvent::Delivered(_), .. })
+                        Event::Jig(jig_client_view::Event::Watch { event: client::WatchEvent::Delivered(_), .. })
                     )
             })
             .expect("new frame");

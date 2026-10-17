@@ -1,0 +1,3149 @@
+//! Page policies exercised through the client boundary.
+mod conversation_merge;
+mod owner_effect_proposals;
+mod task_proposals;
+use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
+use crate::{
+    Domain, Event, Request,
+    address::{Address, Place, ProjectSection, TaskSection},
+    link::Link,
+    page::{
+        Arrangement, Page, Section,
+        navigation::{Destination, Navigation},
+    },
+};
+use jig_client::contract::*;
+use skein_lib::{List, Time};
+fn text(value: &[u8]) -> Text {
+    Text::new(Box::from(value), LIMITS.text).unwrap()
+}
+pub(super) fn project(number: u32, _chats: bool) -> ProjectRole {
+    ProjectRole {
+        project: number,
+        name: Some(DocumentText::complete(text(b"shop"))),
+        role: HeldRole::Policy { role: 1 },
+        chat_budget: 10,
+        pool: Some(PoolLedger {
+            source: Funder::Pool { project: number, person: 7, period: 1 },
+            parent: None,
+            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+            left: 20,
+            closed: false,
+            began: None,
+            next: None,
+        }),
+    }
+}
+pub(super) fn offers(number: u32, chats: bool) -> OfferedCharters {
+    let mut charters = List::with_capacity(1);
+    if chats {
+        charters.push(Charter { number: 1, name: Some(DocumentText::complete(text(b"guide"))) }).unwrap();
+    }
+    OfferedCharters { project: number, chats: charters, goals: List::with_capacity(0), cut: false }
+}
+fn budget() -> Budget {
+    Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(7) }
+}
+fn the_frame_counts_needs_exactly_and_caps_updates_on_every_page() {
+    let mut domain = Domain::new(&LIMITS, 1);
+    let f = start(&mut domain, List::with_capacity(0));
+    let mut value = frame(7);
+    value.needs = Needs { questions: u32::MAX, proposals: 2, escalations: 3, person_tasks: 4 };
+    value.needs_total = u32::MAX;
+    value.updates = Count { value: 100, limited: false };
+    delivered(&mut domain, Time::ZERO, f, value.clone());
+    let summary = domain.frame_summary();
+    assert_eq!(summary.needs, u64::from(u32::MAX) + 9);
+    assert_eq!(summary.updates, Count { value: 99, limited: true });
+    assert_eq!(summary.party, Some(7));
+    assert_eq!(summary.link, Link::Live);
+    drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    assert_eq!(domain.frame_summary().needs, summary.needs);
+    value.updates = Count { value: 99, limited: false };
+    delivered(&mut domain, Time::ZERO, f, value.clone());
+    assert_eq!(domain.frame_summary().updates, Count { value: 99, limited: false });
+    value.updates.limited = true;
+    delivered(&mut domain, Time::ZERO, f, value);
+    assert!(domain.frame_summary().updates.limited);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Overview }) },
+    );
+    assert_eq!(domain.frame_summary().project, Some(1));
+    assert_eq!(Address::task(42), Address::Task { task: 42, section: TaskSection::Overview });
+}
+fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    let mut navigation = Navigation::new(8);
+    assert_eq!(navigation.home, Destination::Jig(Address::Inbox { project: None }));
+    let own = Destination::Application { owner: 1, number: 3 };
+    let chat = Destination::Jig(Address::Conversations { project: None });
+    let deployment = Destination::Jig(Address::Deployment);
+    navigation.home = own;
+    for destination in [own, chat, deployment] {
+        navigation.entries.push(destination).unwrap();
+    }
+    domain.configure_navigation(navigation).unwrap();
+    let f = start(&mut domain, List::with_capacity(0));
+    let mut value = frame(7);
+    value.deployment_role = None;
+    delivered(&mut domain, Time::ZERO, f, value.clone());
+    assert_eq!(domain.navigation().entries.as_slice(), &[own, chat, deployment]);
+    assert!(domain.navigation().offered(own, domain.frame().document.as_ref()));
+    assert!(!domain.navigation().offered(chat, domain.frame().document.as_ref()));
+    assert!(!domain.navigation().offered(deployment, domain.frame().document.as_ref()));
+    value.projects = List::with_capacity(2);
+    value.projects.push(project(1, false)).unwrap();
+    value.projects.push(project(2, true)).unwrap();
+    value.charters = List::with_capacity(2);
+    value.charters.push(offers(1, false)).unwrap();
+    value.charters.push(offers(2, true)).unwrap();
+    value.deployment_role = Some(HeldRole::Policy { role: 1 });
+    delivered(&mut domain, Time::ZERO, f, value);
+    assert!(domain.navigation().offered(chat, domain.frame().document.as_ref()));
+    assert!(
+        !domain
+            .navigation()
+            .offered(Destination::Jig(Address::Conversations { project: Some(1) }), domain.frame().document.as_ref())
+    );
+    assert!(domain.navigation().offered(deployment, domain.frame().document.as_ref()));
+    assert!(domain.configure_navigation(Navigation::new(0)).is_err());
+    let mut fresh = Domain::new(&LIMITS, 3);
+    assert!(fresh.configure_navigation(Navigation::new(9)).is_err());
+    assert_eq!(own.place(), Place::Elsewhere);
+}
+fn arrangement(task: &[TaskSection], project: &[ProjectSection]) -> Arrangement {
+    let mut value = Arrangement { task: List::with_capacity(7), project: List::with_capacity(11) };
+    for section in task {
+        value.task.push(*section).unwrap();
+    }
+    for section in project {
+        value.project.push(*section).unwrap();
+    }
+    value
+}
+#[test]
+fn an_arrangement_given_before_the_start_is_kept() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    assert_eq!(domain.arrangement(), &Arrangement::none());
+    assert_eq!(domain.arrangement().task.capacity(), 0);
+    assert_eq!(domain.arrangement().project.capacity(), 0);
+    let value = arrangement(&[TaskSection::Plan, TaskSection::History], &[ProjectSection::Goals]);
+    assert_eq!(domain.configure_arrangement(value.clone()), Ok(()));
+    start(&mut domain, List::with_capacity(0));
+    assert_eq!(domain.arrangement(), &value);
+}
+#[test]
+fn each_malformed_arrangement_is_refused() {
+    let rows = [
+        ("seven task sections", arrangement(&[TaskSection::Overview; 7], &[])),
+        ("eleven project sections", arrangement(&[], &[ProjectSection::Overview; 11])),
+        ("Plan twice", arrangement(&[TaskSection::Plan; 2], &[])),
+        ("Goals twice", arrangement(&[], &[ProjectSection::Goals; 2])),
+        ("Settings with Resources", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Resources])),
+        ("Settings with Policy", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Policy])),
+        ("Settings with Roles", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Roles])),
+        ("Settings with Spend", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Spend])),
+        ("Settings with Recurring", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Recurring])),
+    ];
+    let mut domain = Domain::new(&LIMITS, 2);
+    for (label, value) in rows {
+        assert_eq!(domain.configure_arrangement(value.clone()), Err(value), "{label}");
+        assert_eq!(domain.arrangement(), &Arrangement::none(), "{label}");
+    }
+    start(&mut domain, List::with_capacity(0));
+    let value = arrangement(&[TaskSection::Plan], &[]);
+    assert_eq!(domain.configure_arrangement(value.clone()), Err(value), "after the start");
+}
+fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility() {
+    let mut domain = Domain::new(&LIMITS, 4);
+    let f = start(&mut domain, List::with_capacity(0));
+    assert_eq!(domain.page(), &Page::Starting);
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    drive(&mut domain, Time::ZERO, Event::Went { place: Place::Missing });
+    assert_eq!(domain.page(), &Page::Missing);
+    drive(&mut domain, Time::ZERO, Event::SignedOut);
+    assert_eq!(domain.page(), &Page::SigningIn);
+    for end in [WatchEnd::Unknown, WatchEnd::NotAllowed] {
+        let mut domain = Domain::new(&LIMITS, 5);
+        let f = start(&mut domain, List::with_capacity(0));
+        delivered(&mut domain, Time::ZERO, f, frame(7));
+        let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(42)) });
+        let output = drive(&mut domain, Time::ZERO, Event::Ended { watch: open_token(&opened), end });
+        if end == WatchEnd::Unknown {
+            let mut read = None;
+            for request in &output {
+                if let Request::Read { read: token, what: Read::Task { task: 42 } } = request {
+                    assert!(read.replace(*token).is_none());
+                }
+            }
+            let read = read.expect("an absent live task is checked in retained work");
+            let Page::Work { address, .. } = domain.page() else {
+                panic!("task page awaits its retained read");
+            };
+            assert_eq!(*address, Address::task(42));
+            drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::None(ReadNone::Unknown) });
+        } else {
+            for request in &output {
+                if let Request::Read { .. } = request {
+                    panic!("a forbidden task must not probe retained work");
+                }
+            }
+        }
+        assert_eq!(domain.page(), &Page::Missing);
+    }
+    let mut old = Domain::new(&LIMITS, 6);
+    let f = start(&mut old, List::with_capacity(0));
+    drive(&mut old, Time::ZERO, Event::Hello { served: false });
+    assert!(delivered(&mut old, Time::ZERO, f, frame(7)).is_empty());
+    assert_eq!(old.page(), &Page::OutOfDate);
+    let mut other = Domain::new(&LIMITS, 7);
+    let mut kept = List::with_capacity(1);
+    kept.push(crate::store::Record::Draft {
+        version: crate::store::STORE_VERSION,
+        party: 8,
+        task: 42,
+        words: text(b"secret"),
+        touched: 1,
+    })
+    .unwrap();
+    let f = start(&mut other, kept);
+    delivered(&mut other, Time::ZERO, f, frame(7));
+    assert_eq!(other.page(), &Page::SomeoneElse);
+}
+fn deployment_without_a_role_is_missing_and_never_watched() {
+    let mut domain = Domain::new(&LIMITS, 8);
+    let f = start(&mut domain, List::with_capacity(0));
+    let mut value = frame(7);
+    value.deployment_role = None;
+    delivered(&mut domain, Time::ZERO, f, value);
+    let out = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
+    assert_eq!(domain.page(), &Page::Missing);
+    for request in &out {
+        if let Request::Open { subject, .. } = request {
+            assert_ne!(*subject, Subject::Deployment);
+        }
+    }
+}
+
+fn entry(task: u64, group: InboxGroup, at: u64) -> InboxEntry {
+    InboxEntry {
+        reply: None,
+        object: ObjectKey::Task(task),
+        project: 1,
+        group,
+        position: task,
+        at: skein_lib::Wall::from_nanos(at),
+        lineage: List::with_capacity(0),
+        goal: Some(9),
+        recipient: Some(Recipient::Role { project: 1, role: 2 }),
+        stall: Some(skein_lib::Wall::from_nanos(100)),
+    }
+}
+fn inbox(entries: List<InboxEntry>) -> Inbox {
+    Inbox {
+        entries,
+        needs: Needs { questions: 0, proposals: 2, escalations: 0, person_tasks: 0 },
+        updates: Count { value: 100, limited: true },
+        results_seen: 0,
+        replies_seen: List::with_capacity(0),
+        more: false,
+    }
+}
+pub(super) fn finish_initial_inbox_reads(domain: &mut Domain, out: &[Request]) {
+    for request in out {
+        if let Request::Read { read, what: Read::Inbox { .. } } = request {
+            drive(
+                domain,
+                Time::ZERO,
+                Event::Read {
+                    read: *read,
+                    result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                        cut: false,
+                        rows: List::with_capacity(0),
+                        before: None,
+                        after: None,
+                    }))),
+                },
+            );
+        }
+    }
+    domain.reclaim();
+}
+fn live_inbox(seed: u64) -> (Domain, skein_lib::Token) {
+    let mut domain = Domain::new(&LIMITS, seed);
+    let f = start(&mut domain, List::with_capacity(0));
+    let out = delivered(&mut domain, Time::ZERO, f, frame(7));
+    let page = open_token(&out);
+    finish_initial_inbox_reads(&mut domain, &out);
+    (domain, page)
+}
+fn inbox_delivery(domain: &mut Domain, page: skein_lib::Token, entries: List<InboxEntry>) -> Box<[Request]> {
+    drive(
+        domain,
+        Time::ZERO,
+        Event::Watch { watch: page, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox(entries)))) },
+    )
+}
+fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
+    ConversationLine {
+        cached_replies: 0,
+        chip: Chip {
+            task,
+            title: DocumentText::complete(text(b"held checkout")),
+            executor: Executor::Agent { charter: 1 },
+            phase,
+            details: Box::new(super::objects::phase_details(phase)),
+        },
+        project: 1,
+        first_words: DocumentText::complete(text(b"help checkout")),
+        unread: Some(Count { value: 1, limited: false }),
+        seen: 2,
+        last_reply: 3,
+        changed: Some(skein_lib::Wall::from_nanos(changed)),
+        runtime: Some(Runtime::WaitingForWords { attempt: 1, since: skein_lib::Wall::EPOCH }),
+        delegates: 2,
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 20, spent: 5, spent_below: 1, reserved: 2 },
+            left: 12,
+            funder: Funder::Pool { project: 1, person: 7, period: 3 },
+            deadline: None,
+        },
+    }
+}
+fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder() {
+    for group in [InboxGroup::Proposals, InboxGroup::Results] {
+        let (mut domain, page) = live_inbox(20);
+        let mut rows = List::with_capacity(2);
+        rows.push(entry(8, group, 20)).unwrap();
+        rows.push(entry(7, group, 10)).unwrap();
+        inbox_delivery(&mut domain, page, rows);
+        let first = if crate::page::inbox::needs(group) { 7 } else { 8 };
+        assert_eq!(domain.inbox().rows.get(0).unwrap().card_key(), ObjectKey::Task(first));
+        let InboxRow::Entry(row) = domain.inbox().rows.get(0).unwrap() else {
+            panic!("supplied Inbox row");
+        };
+        assert_eq!(row.recipient, Some(Recipient::Role { project: 1, role: 2 }));
+        assert_eq!(domain.inbox().updates, Count { value: 100, limited: true });
+        assert_eq!(crate::page::inbox::address(ObjectKey::Task(first)), Some(Address::task(first)));
+        for filter in [
+            crate::page::inbox::Filter { project: Some(2), kind: None, goal: None },
+            crate::page::inbox::Filter { project: None, kind: Some(InboxGroup::Questions), goal: None },
+            crate::page::inbox::Filter { project: None, kind: None, goal: Some(10) },
+        ] {
+            let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::FilterInbox { filter } });
+            assert!(domain.inbox().rows.is_empty());
+            let mut groups = List::with_capacity(2);
+            for request in &out {
+                if let Request::Read { what: Read::Inbox { group, project, kind, goal, after }, .. } = request {
+                    assert_eq!(*project, filter.project);
+                    assert_eq!(*kind, filter.kind);
+                    assert_eq!(*goal, filter.goal);
+                    assert!(after.is_none());
+                    groups.push(*group).unwrap();
+                }
+            }
+            assert_eq!(groups.len(), if filter.kind.is_some() { 1 } else { 2 });
+            assert_eq!(*groups.get(0).unwrap(), InboxReadGroup::Needs);
+            if filter.kind.is_none() {
+                assert_eq!(*groups.get(1).unwrap(), InboxReadGroup::Updates);
+            }
+            finish_initial_inbox_reads(&mut domain, &out);
+        }
+    }
+    for party in [7, 8] {
+        let mut domain = Domain::new(&LIMITS, party);
+        let f = start(&mut domain, List::with_capacity(0));
+        let page = open_token(&delivered(&mut domain, Time::ZERO, f, frame(party)));
+        let mut rows = List::with_capacity(1);
+        rows.push(entry(7, InboxGroup::Proposals, 10)).unwrap();
+        inbox_delivery(&mut domain, page, rows);
+        inbox_delivery(&mut domain, page, List::with_capacity(0));
+        assert!(domain.inbox().rows.is_empty());
+    }
+}
+fn opening_updates_sends_one_mark_seen_for_the_newest_result_displayed() {
+    let (mut domain, page) = live_inbox(21);
+    drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenUpdates });
+    let mut rows = List::with_capacity(2);
+    rows.push(entry(7, InboxGroup::Results, 10)).unwrap();
+    rows.push(entry(8, InboxGroup::Results, 20)).unwrap();
+    let out = inbox_delivery(&mut domain, page, rows.clone());
+    let mut count = 0_u32;
+    for request in &out {
+        if let Request::Send { ask, .. } = request {
+            assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Results { through: 8 } });
+            count = count.checked_add(1).expect("bounded emitted requests");
+        }
+    }
+    assert_eq!(count, 1);
+    let out = inbox_delivery(&mut domain, page, rows);
+    for request in &out {
+        if let Request::Send { .. } = request {
+            panic!("passive delivery does not mark read again");
+        }
+    }
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenUpdates }).is_empty());
+}
+fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() {
+    let (mut domain, _) = live_inbox(22);
+    let entered =
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
+    let mut read = None;
+    for request in &entered {
+        if let Request::Read { read: token, what: Read::Conversations { .. } } = request {
+            read = Some(*token);
+        }
+    }
+    let mut rows = List::with_capacity(2);
+    rows.push(list_entry(7, Phase::Done, 30)).unwrap();
+    rows.push(list_entry(8, Phase::Idle, 10)).unwrap();
+    let cursor = Cursor::new(Box::from(b"next".as_slice()), 1024).expect("bounded opaque cursor");
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read.unwrap(),
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                cut: false,
+                rows,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().chip.task, 8);
+    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().delegates, 2);
+    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().budget.numbers.spent, 5);
+    domain.reclaim();
+    let out = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act {
+            act: crate::action::Act::More {
+                window: skein_lib::Token::new(crate::page::conversations::CONVERSATIONS_WINDOW),
+                end: crate::action::End::After,
+            },
+        },
+    );
+    let mut found = false;
+    for request in &out {
+        if let Request::Read { what, .. } = request {
+            assert_eq!(*what, Read::Conversations { after: Some(cursor.clone()) });
+            found = true;
+        }
+    }
+    assert!(found);
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenChat { task: 8 } });
+    let mut mark = false;
+    for request in &out {
+        if let Request::Send { ask, .. } = request {
+            assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 3 } });
+            mark = true;
+        }
+    }
+    assert!(mark);
+}
+fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
+    let mut about = Domain::new(&LIMITS, 24);
+    let f = start(&mut about, List::with_capacity(0));
+    let mut value = frame(7);
+    value.projects = List::with_capacity(1);
+    value.projects.push(project(1, true)).unwrap();
+    value.charters = List::with_capacity(1);
+    value.charters.push(offers(1, true)).unwrap();
+    let page = open_token(&delivered(&mut about, Time::ZERO, f, value));
+    let mut rows = List::with_capacity(1);
+    rows.push(entry(8, InboxGroup::Escalations, 10)).unwrap();
+    inbox_delivery(&mut about, page, rows);
+    assert!(about.objects.put(ObjectKey::Task(8), crate::objects::Body::Chip(list_entry(8, Phase::Held, 10).chip)));
+    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::page::conversations::about(&mut about, &super::spine::env(Time::ZERO), ObjectKey::Task(8), &mut out);
+    let requests = super::spine::drain(out);
+    assert_eq!(requests.len(), 1);
+    let Request::Send { ask, .. } = &requests[0] else {
+        panic!("chat about the held task");
+    };
+    assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"held checkout") });
+    let mut domain = Domain::new(&LIMITS, 23);
+    let f = start(&mut domain, List::with_capacity(0));
+    let mut value = frame(7);
+    value.projects = List::with_capacity(1);
+    value.projects.push(project(1, true)).unwrap();
+    value.charters = List::with_capacity(1);
+    value.charters.push(offers(1, true)).unwrap();
+    delivered(&mut domain, Time::ZERO, f, value);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: crate::action::Act::Edit { field: crate::fields::Purpose::NewChat, text: text(b"help") } },
+    );
+    for refused in [true, false] {
+        let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::StartChat { project: 1 } });
+        let mut token = None;
+        for request in &out {
+            if let Request::Send { request: sent, ask, .. } = request {
+                assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"help") });
+                token = Some(*sent);
+            }
+        }
+        assert!(
+            drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::StartChat { project: 1 } }).is_empty()
+        );
+        assert_eq!(
+            domain.page(),
+            &Page::Work {
+                address: Address::Inbox { project: None },
+                generation: 0,
+                behind: false,
+                excess: 0,
+                refused: None
+            }
+        );
+        let answer = if refused {
+            Answer::Refused(Refusal::Authority { lacking: Lacking::Budget { needed: 10, left: 2 }, proposable: None })
+        } else {
+            Answer::Done(Outcome::Made { what: Made::Chat { task: 42 } })
+        };
+        drive(&mut domain, Time::ZERO, Event::Answered { request: token.unwrap(), answer });
+        if refused {
+            assert!(domain.chats().refusal.is_some());
+        } else {
+            let Page::Work { address, .. } = domain.page() else {
+                panic!("chat opened");
+            };
+            assert_eq!(*address, Address::Task { task: 42, section: TaskSection::Activity });
+            assert!(domain.fields().get(crate::fields::Purpose::NewChat).unwrap().text.bytes().is_empty());
+        }
+        domain.reclaim();
+    }
+}
+
+fn task_sections_and_activity_sources_follow_the_executor() {
+    use crate::{address::TaskSection, page::task};
+    for executor in [
+        Executor::Agent { charter: 1 },
+        Executor::Procedure { connector: 2, kind: 3 },
+        Executor::Party { party: 7 },
+        Executor::Role { project: 1, role: 1 },
+    ] {
+        let mut document = super::confirmation::task();
+        document.chip.executor = executor;
+        let sections = task::offers(&document);
+        for section in [TaskSection::Overview, TaskSection::Activity, TaskSection::History, TaskSection::Budget] {
+            assert!(task::offered(&sections, section));
+        }
+        assert!(!task::offered(&sections, TaskSection::Plan));
+        let mut domain = Domain::new(&LIMITS, 22);
+        let f = start(&mut domain, List::with_capacity(0));
+        let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+        finish_initial_inbox_reads(&mut domain, &initial);
+        let opened = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Activity }) },
+        );
+        let watch = open_token(&opened);
+        let requests = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+        );
+        assert!(domain.task_page().header.is_some());
+        match executor {
+            Executor::Agent { .. } => {
+                assert_eq!(requests.len(), 2);
+                let Request::Open { subject: Subject::Run { task: 8, turn: None, offset: 0 }, .. } = requests[0] else {
+                    panic!("agent run watch");
+                };
+                let Request::Read { what: Read::Activity { task: 8, before: None }, .. } = requests[1] else {
+                    panic!("agent activity read");
+                };
+            }
+            Executor::Procedure { connector, .. } => {
+                assert_eq!(
+                    requests.as_ref(),
+                    &[Request::ShowPart {
+                        part: Part::Panel { connector, task: 8 },
+                        generation: 1,
+                        scope: PartScope::Project(1)
+                    }]
+                );
+            }
+            Executor::Party { .. } | Executor::Role { .. } => {
+                let Request::Read { what: Read::PersonTask { task: 8 }, .. } = requests[0] else {
+                    panic!("person task card read");
+                };
+                assert_eq!(requests.len(), 1);
+            }
+        }
+    }
+}
+fn tree_node(number: u64, phase: Phase, held: u32) -> TreeNode {
+    let mut chip = super::objects::chip(number);
+    chip.phase = phase;
+    *chip.details = super::objects::phase_details(phase);
+    TreeNode {
+        chip,
+        parent: Some(8),
+        dependencies: List::with_capacity(0),
+        proposals: List::with_capacity(0),
+        spend: 0,
+        folded: empty_phase_counts(),
+        held_below: held,
+    }
+}
+fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
+    use crate::page::task::{self, PlanFilter};
+    let mut limits = LIMITS;
+    limits.rows = 2;
+    let mut domain = Domain::new(&limits, 22);
+    let mut nodes = List::with_capacity(3);
+    nodes.push(tree_node(9, Phase::Done, 3)).unwrap();
+    nodes.push(tree_node(10, Phase::Running, 0)).unwrap();
+    nodes.push(tree_node(11, Phase::Held, 0)).unwrap();
+    task::tree(&mut domain, Tree { task: 8, nodes, folded: empty_phase_counts(), held_below: 4 });
+    let plan = &domain.task_page().plan;
+    assert_eq!(plan.nodes.len(), 2);
+    assert_eq!(plan.folded.held, 1);
+    assert_eq!(plan.held_below, 4);
+    task::filter(&mut domain, PlanFilter::Held);
+    let plan = &domain.task_page().plan;
+    assert!(plan.visible(&plan.nodes.as_slice()[0]));
+    assert!(!plan.visible(&plan.nodes.as_slice()[1]));
+    task::filter(&mut domain, PlanFilter::Live);
+    let plan = &domain.task_page().plan;
+    assert!(!plan.visible(&plan.nodes.as_slice()[0]));
+    assert!(plan.visible(&plan.nodes.as_slice()[1]));
+    task::filter(&mut domain, PlanFilter::All);
+    assert_eq!(domain.task_page().plan.nodes.len(), 2);
+    let mut domain = Domain::new(&LIMITS, 22);
+    let f = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) },
+    );
+    let watch = open_token(&opened);
+    let mut document = super::confirmation::task();
+    document.context.as_mut().unwrap().impact.tasks.waiting = 1;
+    let tree_open = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+    );
+    let tree_watch = open_token(&tree_open);
+    let mut nodes = List::with_capacity(1);
+    nodes.push(tree_node(9, Phase::Done, 3)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch: tree_watch,
+            event: WatchEvent::Delivered(Delivery::Tree(Box::new(Tree {
+                task: 8,
+                nodes,
+                folded: empty_phase_counts(),
+                held_below: 3,
+            }))),
+        },
+    );
+    let asked = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenEnded { task: 9 } });
+    let Request::Read { read, what: Read::Ended { task: 9, after: None } } = asked[0] else {
+        panic!("ended subtree read");
+    };
+    let cursor = Cursor::new(Box::from(b"opaque subtree".as_slice()), 1024).expect("bounded opaque cursor");
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Ended(Box::new(ObjectPage {
+                cut: false,
+                rows: List::with_capacity(0),
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    let more = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act {
+            act: crate::action::Act::More {
+                window: skein_lib::Token::new(task::ENDED_WINDOW),
+                end: crate::action::End::After,
+            },
+        },
+    );
+    let Request::Read { what, .. } = &more[0] else {
+        panic!("ended subtree continuation");
+    };
+    assert_eq!(*what, Read::Ended { task: 9, after: Some(cursor) });
+}
+fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
+    use crate::{
+        action::{Act, End},
+        address::TaskSection,
+        page::task::HISTORY_WINDOW,
+    };
+    let mut domain = Domain::new(&LIMITS, 22);
+    let f = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::History }) },
+    );
+    let Request::Read { read: own, .. } = opened[3] else {
+        panic!("own history read");
+    };
+    let requests = drive(&mut domain, Time::ZERO, Event::Act { act: Act::HistoryScope { subtree: true } });
+    let Request::Read { read, what: Read::History { subtree: true, .. } } = requests[0] else {
+        panic!("subtree read");
+    };
+    let cursor = Cursor::new(Box::from(b"opaque history edge".as_slice()), 1024).expect("bounded opaque cursor");
+    let mut rows = List::with_capacity(1);
+    rows.push(HistoryRow::Line(Box::new(HistoryLine {
+        position: 1,
+        task: 9,
+        by: Actor::Party(7),
+        at: skein_lib::Wall::EPOCH,
+        change: HistoryChange::Released,
+    })))
+    .unwrap();
+    let page = HistoryPage { cut: false, rows, before: None, after: Some(cursor.clone()) };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read: own, result: ReadResult::Value(ReadValue::History(Box::new(page.clone()))) },
+    );
+    assert!(domain.history_rows().rows.is_empty());
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::History(Box::new(page))) });
+    assert_eq!(domain.history_rows().rows.len(), 1);
+    let more = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(HISTORY_WINDOW), end: End::After } },
+    );
+    let Request::Read { what, .. } = &more[0] else {
+        panic!("next history page");
+    };
+    assert_eq!(*what, Read::History { task: 8, subtree: true, after: Some(cursor) });
+}
+fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
+    use crate::address::TaskSection;
+    let mut domain = Domain::new(&LIMITS, 22);
+    let f = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Overview }) },
+    );
+    let watch = open_token(&opened);
+    let mut document = super::confirmation::task();
+    document.resources = List::with_capacity(1);
+    let resource = Part::Resource { connector: 2, path: resource_path(b"resource") };
+    document.resources.push(TaskResource::Part(resource.clone())).unwrap();
+    let context = document.context.as_mut().expect("supplied task context");
+    context.parts = List::with_capacity(1);
+    context.parts.push(Part::Panel { connector: 3, task: 8 }).unwrap();
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+    );
+    assert_eq!(requests.as_ref(), &[Request::ShowPart { part: resource, generation: 1, scope: PartScope::Project(1) }]);
+    let left = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    assert!(left.contains(&Request::PartsLeft { generation: 1 }));
+    assert!(domain.task_page().header.is_none());
+}
+
+fn empty_phase_counts() -> PhaseCounts {
+    PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
+}
+
+fn project_document() -> Project {
+    let mut acts = List::with_capacity(1);
+    let mut charters = List::with_capacity(1);
+    charters.push(1).unwrap();
+    acts.push(Offered {
+        act: ActKind::SetGoal,
+        admission: Admission::Bounded {
+            within: Bounds::Goal {
+                pool_left: 20,
+                procedures: List::with_capacity(0),
+                charters,
+                latest: None,
+                budget: 20,
+                maximum_budget: 100,
+                maximum_deadline: None,
+            },
+            beyond: Beyond::Proposed { to: Recipient::Party(9) },
+        },
+    })
+    .unwrap();
+    Project {
+        number: 1,
+        period: 1,
+        spend_lines: List::with_capacity(0),
+        name: text(b"shop"),
+        policy: Policy {
+            ceiling: super::objects::authority(),
+            period: 1,
+            spend: 0,
+            roles: List::with_capacity(0),
+            requirements: List::with_capacity(0),
+            deciders: List::with_capacity(0),
+        },
+        roles: List::with_capacity(0),
+        spend: budget(),
+        pools: List::with_capacity(0),
+        resources: List::with_capacity(0),
+        services: List::with_capacity(0),
+        recurring: List::with_capacity(0),
+        parts: List::with_capacity(0),
+        acts,
+    }
+}
+fn project_open(section: ProjectSection) -> (Domain, Box<[Request]>) {
+    let mut domain = Domain::new(&LIMITS, 22);
+    let f = start(&mut domain, List::with_capacity(0));
+    let mut value = frame(7);
+    let role = project(1, true);
+    let mut offered = offers(1, true);
+    offered.goals = List::with_capacity(1);
+    offered.goals.push(Charter { number: 1, name: Some(DocumentText::complete(text(b"lead"))) }).unwrap();
+    value.charters = List::with_capacity(1);
+    value.charters.push(offered).unwrap();
+    value.projects = List::with_capacity(1);
+    value.projects.push(role).unwrap();
+    let out = delivered(&mut domain, Time::ZERO, f, value);
+    finish_initial_inbox_reads(&mut domain, &out);
+    let opened =
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Project { project: 1, section }) });
+    (domain, opened)
+}
+fn project_read(requests: &[Request]) -> skein_lib::Token {
+    for request in requests {
+        if let Request::Read { read, what: Read::Project { project: 1 } } = request {
+            return *read;
+        }
+    }
+    panic!("project read")
+}
+fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine {
+    let mut chip = super::objects::chip(number);
+    chip.phase = phase;
+    *chip.details = super::objects::phase_details(phase);
+    GoalLine {
+        chip,
+        priority,
+        progress: OwnerPhaseCounts::ZERO,
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
+            left: 20,
+            funder: Funder::Pool { project: 1, person: 7, period: 3 },
+            deadline: None,
+        },
+        held_below: 2,
+        changed: Some(skein_lib::Wall::from_nanos(changed)),
+    }
+}
+fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
+    use crate::{
+        action::{Act, End},
+        page::project::GOALS_WINDOW,
+    };
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let project_read = project_read(&opened);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read: project_read, result: ReadResult::Value(ReadValue::Project(Box::new(project_document()))) },
+    );
+    let watch = open_token(&opened);
+    let mut rows = List::with_capacity(2);
+    rows.push(goal_line(9, 20, Phase::Waiting, 1)).unwrap();
+    rows.push(goal_line(8, 1, Phase::Running, 2)).unwrap();
+    let facts = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows, more: true }))),
+        },
+    );
+    assert_eq!(domain.project_page().goals.as_slice()[0].chip.task, 8);
+    assert_eq!(domain.project_page().goals.as_slice()[1].chip.task, 9);
+    assert!(domain.project_page().goals_more);
+    assert!(domain.objects().find(ObjectKey::Task(8)).is_some());
+    let Request::Read { read, what: Read::Task { task: 8 } } = facts[0] else {
+        panic!("goal task facts read");
+    };
+    let mut task = super::confirmation::task();
+    task.goal = Some(task.chip.task);
+    task.priority = Some(1);
+    task.acts = List::with_capacity(1);
+    task.acts.push(Offered { act: ActKind::Prioritise, admission: Admission::Allowed }).unwrap();
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Task(Box::new(task))) });
+    let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
+    assert_eq!(crate::acts::offered(domain.objects().get(id).unwrap(), ActKind::Prioritise), Admission::Allowed);
+
+    let mut rows = List::with_capacity(2);
+    rows.push(goal_line(8, 1, Phase::Running, 2)).unwrap();
+    rows.push(goal_line(9, 2, Phase::Running, 1)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows, more: false }))),
+        },
+    );
+    assert_eq!(domain.project_page().goals.as_slice()[0].chip.task, 9);
+    let Request::Read { read, what } = &opened[3] else { panic!("goals read from start") };
+    assert_eq!(*what, Read::Goals { project: 1, after: None });
+    let read = *read;
+    let mut rows = List::with_capacity(2);
+    rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
+    rows.push(goal_line(9, 2, Phase::Done, 2)).unwrap();
+    let cursor = Cursor::new(Box::from(b"ended goals edge".as_slice()), 1024).expect("bounded opaque cursor");
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
+                cut: false,
+                rows,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.project_page().ended.as_slice()[0].chip.task, 9);
+    assert_eq!(domain.project_page().listed_goals.len(), 2);
+    let winner = domain.project_page().listed_goals.as_slice()[0].clone();
+    assert_eq!(winner.chip.task, 9);
+    assert_eq!(winner.priority, 2, "live watch row wins over the read duplicate");
+    assert_eq!(winner.chip.phase, Phase::Running);
+    domain.reclaim();
+    let more = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(GOALS_WINDOW), end: End::After } },
+    );
+    let Request::Read { what, .. } = &more[0] else { panic!("ended goals continuation") };
+    assert_eq!(*what, Read::Goals { project: 1, after: Some(cursor) });
+    project_task_filters_and_spend_pages();
+}
+fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
+    use crate::{action::Act, fields::Purpose, page::project::goals::GoalForm};
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let read = project_read(&opened);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(project_document()))) },
+    );
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"new goal") } });
+    let form = GoalForm { project: 1, executor: GoalExecutor::Charter(1), budget: 21, deadline: None, priority: 2 };
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    let opened = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert!(opened.is_empty());
+    let confirmation = domain.project_page().form.confirmation.as_ref().unwrap();
+    assert!(confirmation.proposed);
+    assert_eq!(confirmation.pool_left, 20);
+    assert!(domain.confirmation().is_none());
+    let mut task = super::confirmation::task();
+    task.acts = List::with_capacity(1);
+    task.acts.push(Offered { act: ActKind::Write, admission: Admission::Allowed }).unwrap();
+    let id =
+        domain.objects.name(ObjectKey::Task(8), crate::objects::Source::Window { generation: 1, number: 99 }).unwrap();
+    assert!(domain.objects.put(ObjectKey::Task(8), crate::objects::Body::Task(Box::new(task))));
+    crate::confirm::open(&mut domain, &super::spine::env(Time::ZERO), id, ActKind::Write);
+    assert!(domain.project_page().form.confirmation.is_none());
+    assert!(domain.confirmation().is_some());
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert!(domain.project_page().form.confirmation.is_some());
+    assert!(domain.confirmation().is_none());
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let Request::Send { request, ask, .. } = &sent[0] else { panic!("one goal intent") };
+    assert_eq!(
+        **ask,
+        Ask::SetGoal {
+            project: 1,
+            spec: text(b"new goal"),
+            executor: GoalExecutor::Charter(1),
+            budget: 21,
+            priority: 2,
+            deadline: None
+        }
+    );
+    assert_eq!(sent.len(), 1);
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    let request = *request;
+    drive(&mut domain, Time::ZERO, Event::Answered { request, answer: Answer::Refused(Refusal::NotOffered) });
+    assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
+    assert_eq!(domain.fields().get(Purpose::NewGoal).unwrap().text, text(b"new goal"));
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let Request::Send { request, .. } = sent[0] else { panic!("retry goal") };
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"later words") } },
+    );
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Answered { request, answer: Answer::Done(Outcome::Made { what: Made::Goal { task: 42 } }) },
+    );
+    assert_eq!(domain.address, Address::task(42));
+    assert_eq!(domain.fields().get(Purpose::NewGoal).unwrap().text, text(b"later words"));
+}
+#[test]
+fn bounded_goal_facts_control_charter_deadline_budget_and_refusal_without_frame_inference() {
+    use crate::{action::Act, fields::Purpose, page::project::goals::GoalForm};
+    use skein_lib::Wall;
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let read = project_read(&opened);
+    let mut doc = project_document();
+    let latest = Wall::from_nanos(100);
+    doc.acts.get_mut(0).unwrap().admission = Admission::Bounded {
+        within: Bounds::Goal {
+            pool_left: 20,
+            procedures: List::with_capacity(0),
+            charters: {
+                let mut rows = List::with_capacity(1);
+                rows.push(99).unwrap();
+                rows
+            },
+            latest: Some(latest),
+            budget: 3,
+            maximum_budget: 100,
+            maximum_deadline: None,
+        },
+        beyond: Beyond::Refused(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) }),
+    };
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"bounded") } });
+    for (charter, budget, deadline, allowed) in [
+        (99, 3, Some(latest), true),
+        (99, 4, Some(latest), false),
+        (99, 101, Some(latest), false),
+        (1, 3, Some(latest), false),
+        (99, 3, Some(Wall::from_nanos(101)), false),
+        (99, 3, None, false),
+    ] {
+        let form = GoalForm { project: 1, executor: GoalExecutor::Charter(charter), budget, deadline, priority: 1 };
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+        assert_eq!(domain.project_page().form.confirmation.is_some(), allowed);
+        if allowed {
+            let open = domain.project_page().form.confirmation.as_ref().unwrap();
+            assert_eq!(open.pool_left, 20);
+            assert!(!open.proposed);
+        } else {
+            assert_eq!(
+                domain.project_page().form.refusal,
+                Some(if charter == 1 || budget > 100 {
+                    Refusal::NotOffered
+                } else {
+                    Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) }
+                })
+            );
+            assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+        }
+    }
+    let form =
+        GoalForm { project: 1, executor: GoalExecutor::Charter(99), budget: 3, deadline: Some(latest), priority: 1 };
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert!(domain.project_page().form.confirmation.is_some());
+    let mut moved = domain.project_page().document.as_ref().unwrap().clone();
+    match &mut moved.acts.get_mut(0).unwrap().admission {
+        Admission::Bounded { within: Bounds::Goal { maximum_deadline, .. }, .. } => {
+            *maximum_deadline = Some(Wall::from_nanos(99));
+        }
+        Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } | Admission::Refused(_) => {
+            panic!("bounded goal")
+        }
+    }
+    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::page::project::document(&mut domain, &super::spine::env(Time::ZERO), moved, &mut out);
+    assert!(domain.project_page().form.confirmation.is_none());
+    assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    let mut refused = domain.project_page().document.as_ref().unwrap().clone();
+    refused.acts.get_mut(0).unwrap().admission =
+        Admission::Refused(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) });
+    crate::page::project::document(&mut domain, &super::spine::env(Time::ZERO), refused, &mut out);
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert_eq!(domain.project_page().form.refusal, Some(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) }));
+    bounded_goal_nobody_accepts(&mut domain, latest, &mut out);
+}
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "whole existing story preserves every assertion and explicit page-loss fields"
+)]
+fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
+    use crate::{action::Act, objects::Body};
+    let (mut domain, opened) = project_open(ProjectSection::Notes);
+    let Request::Read { read, .. } = opened[2] else { panic!("notes read") };
+    let mut acts = List::with_capacity(2);
+    acts.push(Offered { act: ActKind::EditNote, admission: Admission::Allowed }).unwrap();
+    acts.push(Offered { act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
+    let note = Note {
+        number: 3,
+        revision: Revision { value: 1 },
+        scope: NoteScope::Project(1),
+        description: DocumentText::complete(text(b"description")),
+        body: DocumentText::complete(text(b"body")),
+        writer: NoteAuthor::Party { party: 7 },
+        tasks: List::with_capacity(0),
+        changed: Some(skein_lib::Wall::EPOCH),
+        acts,
+        cut: false,
+    };
+    let mut rows = List::with_capacity(1);
+    rows.push(note.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                cut: false,
+                rows,
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    let id = domain.project_page().notes.as_slice()[0];
+    assert_eq!(crate::acts::offered(domain.objects().get(id).unwrap(), ActKind::EditNote), Admission::Allowed);
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::DeleteNote } });
+    assert_eq!(domain.confirmation().unwrap().revision, Some(Revision { value: 1 }));
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let Request::Send { request, .. } = sent[0] else { panic!("delete note request") };
+    let refresh = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Answered {
+            request,
+            answer: Answer::Refused(Refusal::Moved { now: Revision { value: 2 }, what: Moved::Note }),
+        },
+    );
+    let Request::Read { read, .. } = refresh[0] else { panic!("moved note read") };
+    let mut newer = note;
+    newer.revision = Revision { value: 2 };
+    newer.body = DocumentText::complete(text(b"new body"));
+    let mut rows = List::with_capacity(1);
+    rows.push(newer).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                cut: false,
+                rows,
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    let Some(Body::Note { document, .. }) = &domain.objects().get(id).unwrap().body else { panic!("updated note") };
+    assert_eq!(document.revision, Revision { value: 2 });
+    assert_eq!(document.body, DocumentText::complete(text(b"new body")));
+    assert_eq!(domain.project_page().notes.as_slice()[0], id);
+    domain.reclaim();
+    let moved = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Settings }) },
+    );
+    let read = project_read(&moved);
+    let mut doc = project_document();
+    let resource = Part::Resource { connector: 1, path: resource_path(b"resource") };
+    doc.resources = List::with_capacity(1);
+    doc.resources.push(resource.clone()).unwrap();
+    let shown = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) },
+    );
+    assert_eq!(shown.as_ref(), &[Request::ShowPart { part: resource, generation: 2, scope: PartScope::Project(1) }]);
+    assert_eq!(domain.project_page().document.as_ref().unwrap().period, 1);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
+    let watch = open_token(&opened);
+    let part = Part::Deployment { connector: 1 };
+    let mut parts = List::with_capacity(1);
+    parts.push(part.clone()).unwrap();
+    let doc = Deployment {
+        hosts: List::with_capacity(0),
+        accounts: List::with_capacity(0),
+        capacity: List::with_capacity(0),
+        proposals: 3,
+        refusals: List::with_capacity(0),
+        parts,
+    };
+    let shown = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Deployment(Box::new(doc))) },
+    );
+    assert_eq!(shown.as_ref(), &[Request::ShowPart { part, generation: 3, scope: PartScope::Deployment }]);
+    assert_eq!(domain.deployment_page().document.as_ref().unwrap().proposals, 3);
+}
+
+fn project_task_filters_and_spend_pages() {
+    use crate::{
+        action::{Act, End},
+        page::project::SPEND_WINDOW,
+    };
+    let (mut domain, opened) = project_open(ProjectSection::Tasks);
+    let watch = open_token(&opened);
+    let filter = domain.project_page().task_filter;
+    let mut rows = List::with_capacity(2);
+    rows.push(TaskLine {
+        chip: tree_node(8, Phase::Running, 0).chip,
+        goal: Some(10),
+        requester: OwnerRequester::Person(7),
+        asked_by_me: true,
+        changed: skein_lib::Wall::from_nanos(1),
+    })
+    .unwrap();
+    rows.push(TaskLine {
+        chip: tree_node(9, Phase::Running, 0).chip,
+        goal: Some(10),
+        requester: OwnerRequester::Person(8),
+        asked_by_me: false,
+        changed: skein_lib::Wall::from_nanos(2),
+    })
+    .unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks {
+                project: 1,
+                filter,
+                rows: rows.clone(),
+                more: true,
+            }))),
+        },
+    );
+    assert_eq!(domain.project_page().tasks.as_slice()[0].chip.task, 9);
+    assert!(domain.project_page().tasks_more);
+    let filter = TaskFilter {
+        phase: Some(Phase::Running),
+        executor: Some(Executor::Party { party: 7 }),
+        goal: Some(10),
+        asked_by_me: true,
+    };
+    let opened = drive(&mut domain, Time::ZERO, Event::Act { act: Act::FilterTasks { filter } });
+    let watch = open_token(&opened);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { project: 1, filter, rows, more: false }))),
+        },
+    );
+    assert_eq!(domain.project_page().tasks.len(), 1);
+    assert!(!domain.project_page().tasks_more);
+    assert_eq!(domain.project_page().tasks.as_slice()[0].chip.task, 8);
+    let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
+    assert_eq!(domain.objects().get(id).unwrap().project, Some(1));
+    let (mut domain, opened) = project_open(ProjectSection::Spend);
+    let Request::Read { read, what: Read::Spend { project: 1, .. } } = opened[2] else { panic!("past spend read") };
+    let mut rows = List::with_capacity(1);
+    rows.push(SpendPeriod {
+        period: 1,
+        budget: budget(),
+        pools: List::with_capacity(0),
+        tasks: List::with_capacity(0),
+    })
+    .unwrap();
+    let cursor = Cursor::new(Box::from(b"past period edge".as_slice()), 1024).expect("bounded opaque cursor");
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Spend(Box::new(SpendPage {
+                cut: false,
+                rows,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.project_page().spend.as_slice()[0].period, 1);
+    let more = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(SPEND_WINDOW), end: End::After } },
+    );
+    let Request::Read { what, .. } = &more[0] else { panic!("past spend continuation") };
+    assert_eq!(*what, Read::Spend { project: 1, after: Some(cursor) });
+}
+
+// One process per page family keeps startup costs within this session's share;
+// each scenario above still allocates its own state and retains every assertion.
+#[test]
+fn frame_navigation_and_non_work_pages_follow_owner_facts() {
+    the_frame_counts_needs_exactly_and_caps_updates_on_every_page();
+    navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages();
+    non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility();
+    deployment_without_a_role_is_missing_and_never_watched();
+}
+#[test]
+fn inbox_and_conversation_pages_preserve_context_order_and_request_lifetimes() {
+    inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder();
+    opening_updates_sends_one_mark_seen_for_the_newest_result_displayed();
+    conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor();
+    starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer();
+}
+#[test]
+fn task_pages_preserve_executor_sections_tree_history_and_part_lifetimes() {
+    task_sections_and_activity_sources_follow_the_executor();
+    task_plan_keeps_folded_held_counts_and_filters_without_losing_rows();
+    task_history_pages_and_scope_changes_discard_old_scope_reads();
+    task_parts_follow_the_section_and_leave_with_the_page_generation();
+}
+#[test]
+fn project_and_deployment_pages_preserve_facts_confirmations_and_revision_checks() {
+    project_board_orders_live_waiting_and_ended_goals_and_names_task_cards();
+    a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once();
+    project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts();
+}
+
+fn read_named(requests: &[Request], expected: &Read) -> skein_lib::Token {
+    for request in requests {
+        if let Request::Read { read, what } = request
+            && what == expected
+        {
+            return *read;
+        }
+    }
+    panic!("expected the named read");
+}
+fn reply_entry(task: u64, seen: u64, last: u64) -> InboxEntry {
+    let mut row = entry(task, InboxGroup::Replies, last);
+    let mut line = list_entry(task, Phase::Idle, last);
+    line.seen = seen;
+    line.last_reply = last;
+    line.unread = Some(Count { value: u32::try_from(last.saturating_sub(seen)).unwrap(), limited: false });
+    row.reply = Some(Box::new(line));
+    row
+}
+#[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "whole existing story preserves every assertion and explicit page-loss fields"
+)]
+fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_requests() {
+    use crate::{action::Act, objects::Body, page::inbox::Filter};
+    let (mut domain, page) = live_inbox(45);
+    let mut rows = List::with_capacity(1);
+    rows.push(reply_entry(8, 4, 7)).unwrap();
+    let out = inbox_delivery(&mut domain, page, rows);
+    let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
+    let object = domain.objects().get(id).unwrap();
+    assert_eq!(object.project, Some(1));
+    assert_eq!(object.reply.as_ref().unwrap().first_words.bytes(), b"help checkout");
+    assert_eq!(object.reply.as_ref().unwrap().first_unread, 5);
+    let Some(Body::Chip(chip)) = &object.body else {
+        panic!("whole committed chat chip");
+    };
+    assert_eq!(chip.title.bytes(), b"held checkout");
+    assert_eq!(object.sources.len(), 1);
+    assert!(domain.conversation_rows().rows.is_empty());
+
+    let mut task = super::confirmation::task();
+    task.chip.task = 8;
+    task.chip.title = DocumentText::complete(text(b"current task title"));
+    task.spec = specification(text(b"whole task specification"));
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&out, &Read::Task { task: 8 }),
+            result: ReadResult::Value(ReadValue::Task(Box::new(task.clone()))),
+        },
+    );
+    domain.reclaim();
+    let filter = Filter { project: Some(1), kind: Some(InboxGroup::Replies), goal: None };
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::FilterInbox { filter } });
+    let what = Read::Inbox {
+        group: InboxReadGroup::Updates,
+        project: filter.project,
+        kind: filter.kind,
+        goal: filter.goal,
+        after: None,
+    };
+    let mut rows = List::with_capacity(1);
+    rows.push(reply_entry(8, 6, 9)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&out, &what),
+            result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                cut: false,
+                rows,
+                before: Some(Cursor::new(Box::from(b"back".as_slice()), 1024).expect("bounded opaque cursor")),
+                after: None,
+            }))),
+        },
+    );
+    assert_eq!(
+        domain.objects().get(id).unwrap().reply.as_ref().unwrap().first_unread,
+        5,
+        "live watch row wins over read duplicate"
+    );
+    inbox_delivery(&mut domain, page, List::with_capacity(0));
+    domain.reclaim();
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::FilterInbox { filter } });
+    let mut rows = List::with_capacity(1);
+    rows.push(reply_entry(8, 6, 9)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&out, &what),
+            result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                cut: false,
+                rows,
+                before: Some(Cursor::new(Box::from(b"back".as_slice()), 1024).expect("bounded opaque cursor")),
+                after: None,
+            }))),
+        },
+    );
+    let object = domain.objects().get(id).unwrap();
+    assert_eq!(object.reply.as_ref().unwrap().first_unread, 7);
+    assert_eq!(object.sources.len(), 1, "watch and read share the displayed row owner");
+    let Some(Body::Task(kept)) = &object.body else {
+        panic!("task document retained");
+    };
+    assert_eq!(**kept, task, "reply receipts do not replace the task's facts");
+    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::OpenChat { task: 8 } });
+    let mut marked = false;
+    for request in &out {
+        if let Request::Send { ask, .. } = request {
+            assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 9 } });
+            marked = true;
+        }
+    }
+    assert!(marked, "an inbox-only reply marks its committed last position");
+    assert!(domain.objects().get(id).is_none(), "leaving drops unretained page objects");
+
+    let (mut domain, page) = live_inbox(46);
+    let mut bad = reply_entry(8, 1, 2);
+    bad.reply.as_mut().unwrap().chip.task = 9;
+    let mut rows = List::with_capacity(1);
+    rows.push(bad).unwrap();
+    inbox_delivery(&mut domain, page, rows);
+    assert!(domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap().reply.is_none());
+    assert!(domain.objects().find(ObjectKey::Task(9)).is_none(), "mismatched facts cannot name another chat");
+}
+fn live_conversation_page(seed: u64) -> (Domain, skein_lib::Token, skein_lib::Token) {
+    let (mut domain, _) = live_inbox(seed);
+    let entered =
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
+    let watch = open_token(&entered);
+    let first_read = read_named(&entered, &Read::Conversations { after: None });
+    (domain, watch, first_read)
+}
+#[test]
+fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen_facts() {
+    use crate::{
+        action::{Act, End},
+        objects::{Body, Source},
+    };
+    let (mut domain, watch, first_read) = live_conversation_page(47);
+    let mut rows = List::with_capacity(2);
+    rows.push(list_entry(8, Phase::Idle, 10)).unwrap();
+    rows.push(list_entry(9, Phase::Idle, 9)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows.clone(), true)) },
+    );
+    let eight = domain.objects().find(ObjectKey::Task(8)).unwrap();
+    let nine = domain.objects().find(ObjectKey::Task(9)).unwrap();
+    assert_eq!(domain.objects().get(eight).unwrap().reply.as_ref().unwrap().first_unread, 3);
+    assert!(domain.objects().get(eight).unwrap().sources.contains(&Source::Watch(skein_lib::Id::from_token(watch))));
+    let mut task = super::confirmation::task();
+    task.chip.task = 9;
+    task.spec = specification(text(b"retained full document"));
+    assert!(domain.objects.put(ObjectKey::Task(9), Body::Task(Box::new(task.clone()))));
+    rows.get_mut(1).unwrap().seen = 3;
+    rows.get_mut(1).unwrap().unread.as_mut().unwrap().value = 0;
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows.clone(), true)) },
+    );
+    assert!(domain.objects().get(nine).unwrap().reply.is_none(), "committed seen facts remove stale unread metadata");
+    let cursor = Cursor::new(Box::from(b"older".as_slice()), 1024).expect("bounded opaque cursor");
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: first_read,
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                cut: false,
+                rows,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.objects().get(eight).unwrap().sources.len(), 1);
+    domain.reclaim();
+    let out = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act {
+            act: Act::More {
+                window: skein_lib::Token::new(crate::page::conversations::CONVERSATIONS_WINDOW),
+                end: End::After,
+            },
+        },
+    );
+    let mut rows = List::with_capacity(1);
+    rows.push(list_entry(10, Phase::Done, 8)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&out, &Read::Conversations { after: Some(cursor) }),
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                cut: false,
+                rows,
+                before: Some(Cursor::new(Box::from(b"back".as_slice()), 1024).expect("bounded opaque cursor")),
+                after: None,
+            }))),
+        },
+    );
+    assert!(domain.objects().find(ObjectKey::Task(8)).is_none(), "a dropped row has no obsolete watch name");
+    assert_eq!(domain.objects().get(nine).unwrap().sources.len(), 1);
+    let Some(Body::Task(kept)) = &domain.objects().get(nine).unwrap().body else {
+        panic!("task retained");
+    };
+    assert_eq!(**kept, task);
+    let ten = domain.objects().find(ObjectKey::Task(10)).unwrap();
+    assert_eq!(domain.objects().get(ten).unwrap().reply.as_ref().unwrap().first_words.bytes(), b"help checkout");
+    let out = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    assert!(domain.objects().find(ObjectKey::Task(9)).is_none());
+    assert!(domain.objects().find(ObjectKey::Task(10)).is_none());
+    let mut closed = false;
+    for request in &out {
+        if let Request::Close { watch: old } = request {
+            closed |= *old == watch;
+        }
+    }
+    assert!(closed);
+}
+
+#[test]
+fn bounded_goal_keeps_every_supplied_policy_recipient_in_order() {
+    use crate::{action::Act, fields::Purpose, page::project::goals::GoalForm};
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let read = project_read(&opened);
+    let mut roles = List::with_capacity(2);
+    roles.push(7).unwrap();
+    roles.push(2).unwrap();
+    let recipient = Recipient::Roles { project: 1, roles };
+    let mut doc = project_document();
+    let Admission::Bounded { beyond, .. } = &mut doc.acts.get_mut(0).unwrap().admission else {
+        panic!("bounded goal offer");
+    };
+    *beyond = Beyond::Proposed { to: recipient.clone() };
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"collective") } },
+    );
+    let form = GoalForm { project: 1, executor: GoalExecutor::Charter(1), budget: 21, deadline: None, priority: 1 };
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    let open = domain.project_page().form.confirmation.as_ref().unwrap();
+    assert_eq!(open.to, Some(recipient));
+    assert!(open.proposed);
+    let emitted = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    assert_eq!(emitted.len(), 1);
+    let Request::Send { ask, .. } = &emitted[0] else { panic!("one goal intent") };
+    assert_eq!(
+        **ask,
+        Ask::SetGoal {
+            project: 1,
+            spec: text(b"collective"),
+            executor: GoalExecutor::Charter(1),
+            budget: 21,
+            priority: 1,
+            deadline: None,
+        }
+    );
+}
+
+fn specification(words: Text) -> SpecificationDocument {
+    SpecificationDocument::complete(Specification {
+        words,
+        parameters: List::with_capacity(0),
+        inputs: List::with_capacity(0),
+    })
+}
+
+fn bounded_goal_nobody_accepts(domain: &mut Domain, latest: skein_lib::Wall, out: &mut skein_lib::Queue<Request>) {
+    use crate::{action::Act, fields::Purpose, page::project::goals::GoalForm};
+    let nobody = Refusal::Authority { lacking: Lacking::Approver, proposable: Some(false) };
+    let mut refused = domain.project_page().document.as_ref().unwrap().clone();
+    refused.acts.get_mut(0).unwrap().admission = Admission::Bounded {
+        within: Bounds::Goal {
+            pool_left: 20,
+            procedures: List::with_capacity(0),
+            charters: {
+                let mut rows = List::with_capacity(1);
+                rows.push(99).unwrap();
+                rows
+            },
+            latest: Some(latest),
+            budget: 3,
+            maximum_budget: 100,
+            maximum_deadline: None,
+        },
+        beyond: Beyond::Refused(nobody.clone()),
+    };
+    crate::page::project::document(domain, &super::spine::env(Time::ZERO), refused, out);
+    let form =
+        GoalForm { project: 1, executor: GoalExecutor::Charter(99), budget: 4, deadline: Some(latest), priority: 1 };
+    drive(domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    let emitted = drive(domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    assert!(emitted.is_empty());
+    assert_eq!(domain.project_page().form.refusal, Some(nobody));
+    assert!(domain.project_page().form.confirmation.is_none());
+    assert!(drive(domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+}
+
+#[test]
+fn goal_read_from_start_merges_live_watch_by_key() {
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let watch = open_token(&opened);
+    let mut live = List::with_capacity(1);
+    live.push(goal_line(9, 2, Phase::Running, 2)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows: live, more: false }))),
+        },
+    );
+    let query = Read::Goals { project: 1, after: None };
+    let mut rows = List::with_capacity(2);
+    rows.push(goal_line(9, 99, Phase::Running, 1)).unwrap();
+    rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&opened, &query),
+            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
+                cut: false,
+                rows,
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    assert_eq!(domain.project_page().listed_goals.len(), 2);
+    assert_eq!(domain.project_page().listed_goals.get(0).unwrap().chip.task, 9);
+    assert_eq!(domain.project_page().listed_goals.get(0).unwrap().priority, 2);
+    assert_eq!(domain.project_page().listed_goals.get(1).unwrap().chip.phase, Phase::Done);
+    let Some(crate::objects::Body::Chip(chip)) =
+        &domain.objects().get(domain.objects().find(ObjectKey::Task(9)).unwrap()).unwrap().body
+    else {
+        panic!("live goal chip");
+    };
+    assert_eq!(chip.phase, Phase::Running);
+}
+fn assert_only_inbox_read(requests: &[Request], expected: &Read) {
+    let mut count = 0_u32;
+    for request in requests {
+        if let Request::Read { what: query @ Read::Inbox { .. }, .. } = request {
+            assert_eq!(query, expected);
+            count = count.checked_add(1).expect("bounded request count");
+        }
+    }
+    assert_eq!(count, 1, "only the selected group's exact query is emitted");
+}
+#[test]
+fn inbox_group_pages_keep_orders_cursors_and_live_precedence() {
+    check_inbox_group_pages_keep_orders_cursors_and_live_precedence();
+}
+#[expect(
+    clippy::too_many_lines,
+    reason = "one scenario follows both independent cursor positions and watch precedence"
+)]
+fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
+    use crate::{
+        action::{Act, End},
+        page::conversations::{INBOX_UPDATES_WINDOW, INBOX_WINDOW},
+        page::inbox::Filter,
+    };
+    let mut limits = LIMITS;
+    limits.rows = 4;
+    limits.objects = 8;
+    limits.reads = 16;
+    let send = |domain: &mut Domain, event| {
+        let mut out = skein_lib::Queue::with_capacity(crate::max_out(&limits));
+        crate::step(domain, &skein_lib::Env { now: Time::ZERO, wall: skein_lib::Wall::EPOCH, limits }, event, &mut out);
+        super::spine::drain(out)
+    };
+    let row = |number, group, at| {
+        let mut row = entry(number, group, at);
+        row.object = match group {
+            InboxGroup::Escalations => ObjectKey::Escalation(number),
+            InboxGroup::Questions => ObjectKey::Question { task: number, message: 1 },
+            InboxGroup::Results => ObjectKey::Result(number),
+            InboxGroup::Proposals | InboxGroup::PersonTasks | InboxGroup::Replies => unreachable!("fixture kinds"),
+        };
+        row
+    };
+    let mut domain = Domain::new(&limits, 88);
+    let f = open_token(&send(
+        &mut domain,
+        Event::Start {
+            address: Address::Inbox { project: None },
+            kept: List::with_capacity(0),
+            offset: crate::boundary::Offset { minutes: 0 },
+        },
+    ));
+    send(&mut domain, Event::Hello { served: true });
+    let entered =
+        send(&mut domain, Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) });
+    let watch = open_token(&entered);
+    let mut live = List::with_capacity(1);
+    live.push(row(7, InboxGroup::Escalations, 1)).unwrap();
+    send(&mut domain, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox(live)))) });
+    let mut needs_query =
+        Read::Inbox { group: InboxReadGroup::Needs, project: None, kind: None, goal: None, after: None };
+    let mut updates_query =
+        Read::Inbox { group: InboxReadGroup::Updates, project: None, kind: None, goal: None, after: None };
+    let mut needs = List::with_capacity(3);
+    needs.push(row(7, InboxGroup::Escalations, 99)).unwrap();
+    needs.push(row(9, InboxGroup::Questions, 3)).unwrap();
+    needs.push(row(8, InboxGroup::Questions, 2)).unwrap();
+    let mut updates = List::with_capacity(2);
+    updates.push(row(10, InboxGroup::Results, 4)).unwrap();
+    updates.push(row(11, InboxGroup::Results, 5)).unwrap();
+    let needs_after = Cursor::new(Box::from(b"needs-next".as_slice()), 1024).expect("bounded opaque cursor");
+    let updates_after = Cursor::new(Box::from(b"updates-next".as_slice()), 1024).expect("bounded opaque cursor");
+    for (query, rows, cursor) in [(&needs_query, needs, &needs_after), (&updates_query, updates, &updates_after)] {
+        send(
+            &mut domain,
+            Event::Read {
+                read: read_named(&entered, query),
+                result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                    cut: false,
+                    rows,
+                    before: None,
+                    after: Some(cursor.clone()),
+                }))),
+            },
+        );
+    }
+    assert_eq!(domain.inbox().rows.len(), 5);
+    for (index, key) in [
+        (0, ObjectKey::Escalation(7)),
+        (1, ObjectKey::Question { task: 8, message: 1 }),
+        (2, ObjectKey::Question { task: 9, message: 1 }),
+        (3, ObjectKey::Result(11)),
+        (4, ObjectKey::Result(10)),
+    ] {
+        assert_eq!(domain.inbox().rows.get(index).unwrap().card_key(), key);
+    }
+    assert_eq!(domain.inbox().rows.get(0).unwrap().at(), Some(skein_lib::Wall::from_nanos(1)));
+    domain.reclaim();
+    let out = send(
+        &mut domain,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(INBOX_WINDOW), end: End::After } },
+    );
+    if let Read::Inbox { after, .. } = &mut needs_query {
+        *after = Some(needs_after);
+    }
+    assert_only_inbox_read(&out, &needs_query);
+    assert_eq!(domain.inbox().updates_window.after, Some(updates_after.clone()));
+    send(
+        &mut domain,
+        Event::Read {
+            read: read_named(&out, &needs_query),
+            result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
+                cut: false,
+                rows: List::with_capacity(0),
+                before: Some(Cursor::new(Box::from(b"needs-back".as_slice()), 1024).expect("bounded opaque cursor")),
+                after: None,
+            }))),
+        },
+    );
+    assert!(!domain.inbox().needs_window.more);
+    assert!(domain.inbox().updates_window.more);
+    assert_eq!(domain.inbox().rows.len(), 3);
+    domain.reclaim();
+    let out = send(
+        &mut domain,
+        Event::Act { act: Act::More { window: skein_lib::Token::new(INBOX_UPDATES_WINDOW), end: End::After } },
+    );
+    if let Read::Inbox { after, .. } = &mut updates_query {
+        *after = Some(updates_after);
+    }
+    assert_only_inbox_read(&out, &updates_query);
+    let out = send(
+        &mut domain,
+        Event::Act {
+            act: Act::FilterInbox {
+                filter: Filter { project: Some(1), kind: Some(InboxGroup::Results), goal: Some(9) },
+            },
+        },
+    );
+    assert_only_inbox_read(
+        &out,
+        &Read::Inbox {
+            group: InboxReadGroup::Updates,
+            project: Some(1),
+            kind: Some(InboxGroup::Results),
+            goal: Some(9),
+            after: None,
+        },
+    );
+    send(
+        &mut domain,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox(List::with_capacity(0))))) },
+    );
+}
+#[test]
+fn conversations_address_project_preselects_form_without_filtering_rows() {
+    let (mut domain, _) = live_inbox(89);
+    let entered =
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: Some(1) }) });
+    let query = Read::Conversations { after: None };
+    let mut rows = List::with_capacity(2);
+    rows.push(list_entry(7, Phase::Idle, 1)).unwrap();
+    let mut other = list_entry(8, Phase::Idle, 2);
+    other.project = 2;
+    rows.push(other).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&entered, &query),
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                cut: false,
+                rows,
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    assert_eq!(domain.conversation_rows().rows.len(), 2);
+    assert_eq!(domain.conversation_rows().rows.get(0).unwrap().project, 2);
+    assert_eq!(domain.address, Address::Conversations { project: Some(1) });
+}
+
+#[test]
+fn procedure_goal_pairs_and_current_bounds_control_confirmation_and_exact_departure() {
+    use crate::{action::Act, fields::Purpose, page::project::goals::GoalForm};
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let read = project_read(&opened);
+    let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    let until = skein_lib::Wall::from_nanos(100);
+    let doc = procedure_goal_document(until);
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"numeric procedure") } },
+    );
+    for (executor, budget, deadline, predicted) in [
+        (exact, 3, Some(until), Admission::Allowed),
+        (exact, 4, Some(until), Admission::Proposed { to: Recipient::Party(9) }),
+        (exact, 3, Some(skein_lib::Wall::from_nanos(101)), Admission::Proposed { to: Recipient::Party(9) }),
+        (
+            GoalExecutor::Procedure { connector: 6, code: u32::MAX },
+            3,
+            Some(until),
+            Admission::Refused(Refusal::NotOffered),
+        ),
+        (
+            GoalExecutor::Procedure { connector: u16::MAX, code: 7 },
+            3,
+            Some(until),
+            Admission::Refused(Refusal::NotOffered),
+        ),
+        (GoalExecutor::Charter(1), 3, Some(until), Admission::Refused(Refusal::NotOffered)),
+        (exact, 11, Some(until), Admission::Refused(Refusal::NotOffered)),
+        (exact, 3, None, Admission::Refused(Refusal::NotOffered)),
+    ] {
+        let form = GoalForm { project: 1, executor, budget, deadline, priority: 8 };
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } }).is_empty());
+        match predicted {
+            Admission::Allowed => assert!(!domain.project_page().form.confirmation.as_ref().unwrap().proposed),
+            Admission::Proposed { to } => {
+                assert_eq!(domain.project_page().form.confirmation.as_ref().unwrap().to, Some(to));
+            }
+            Admission::Refused(why) => {
+                assert_eq!(domain.project_page().form.refusal, Some(why));
+                assert!(domain.project_page().form.confirmation.is_none());
+                assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+            }
+            Admission::Bounded { .. } => panic!("concrete prediction"),
+        }
+    }
+    let form = GoalForm { project: 1, executor: exact, budget: 4, deadline: Some(until), priority: 8 };
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    let mut moved = domain.project_page().document.as_ref().unwrap().clone();
+    let Admission::Bounded { within: Bounds::Goal { procedures, .. }, .. } =
+        &mut moved.acts.get_mut(0).unwrap().admission
+    else {
+        panic!("goal bounds");
+    };
+    procedures.clear();
+    procedures.push(GoalProcedure { connector: 7, code: u32::MAX }).unwrap();
+    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::page::project::document(&mut domain, &super::spine::env(Time::ZERO), moved, &mut out);
+    assert!(domain.project_page().form.confirmation.is_none());
+    assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    let mut restored = domain.project_page().document.as_ref().unwrap().clone();
+    let Admission::Bounded { within: Bounds::Goal { procedures, .. }, .. } =
+        &mut restored.acts.get_mut(0).unwrap().admission
+    else {
+        panic!("goal bounds");
+    };
+    procedures.push(GoalProcedure { connector: u16::MAX, code: u32::MAX }).unwrap();
+    crate::page::project::document(&mut domain, &super::spine::env(Time::ZERO), restored, &mut out);
+    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    assert_eq!(sent.len(), 1);
+    let Request::Send { ask, .. } = &sent[0] else {
+        panic!("goal request");
+    };
+    assert_eq!(
+        **ask,
+        Ask::SetGoal {
+            project: 1,
+            spec: text(b"numeric procedure"),
+            executor: exact,
+            budget: 4,
+            priority: 8,
+            deadline: Some(until)
+        }
+    );
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+}
+
+fn procedure_goal_document(until: skein_lib::Wall) -> Project {
+    let mut doc = project_document();
+    doc.acts.get_mut(0).unwrap().admission = Admission::Bounded {
+        within: Bounds::Goal {
+            pool_left: 50,
+            charters: List::with_capacity(0),
+            procedures: {
+                let mut pairs = List::with_capacity(2);
+                pairs.push(GoalProcedure { connector: u16::MAX, code: u32::MAX }).unwrap();
+                pairs.push(GoalProcedure { connector: 7, code: u32::MAX }).unwrap();
+                pairs
+            },
+            latest: Some(until),
+            budget: 3,
+            maximum_budget: 10,
+            maximum_deadline: Some(skein_lib::Wall::from_nanos(200)),
+        },
+        beyond: Beyond::Proposed { to: Recipient::Party(9) },
+    };
+    doc
+}
+
+#[test]
+fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers_whole() {
+    use crate::{action::Act, fields::Purpose, notices::kept::Kind};
+    for away in [false, true] {
+        let mut domain = Domain::new(&LIMITS, 123);
+        let token = start(&mut domain, List::with_capacity(0));
+        let mut value = frame(7);
+        value.projects = List::with_capacity(1);
+        value.projects.push(project(1, true)).unwrap();
+        value.charters = List::with_capacity(1);
+        value.charters.push(offers(1, true)).unwrap();
+        delivered(&mut domain, Time::ZERO, token, value);
+        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::NewChat, text: text(b"start") } });
+        let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::StartChat { project: 1 } });
+        let mut request = None;
+        for row in &sent {
+            if let Request::Send { request: sent, ask, .. } = row {
+                assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"start") });
+                assert!(request.replace(*sent).is_none(), "one original start request");
+            }
+        }
+        let request = request.unwrap();
+        if away {
+            drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+        }
+        let answer = Answer::Done(Outcome::Owner(OwnerOutcome::Started { task: u64::MAX }));
+        drive(&mut domain, Time::ZERO, Event::Answered { request, answer: answer.clone() });
+        assert!(domain.chats().starting.is_none());
+        assert!(domain.fields().get(Purpose::NewChat).unwrap().text.bytes().is_empty());
+        if away {
+            assert_eq!(domain.notices.ids().len(), 1);
+            for (notice, ()) in domain.notices.ids() {
+                assert_eq!(
+                    domain.notices.get(*notice).unwrap().kind,
+                    Kind::Answer { object: ObjectKey::Task(u64::MAX), answer: answer.clone() }
+                );
+            }
+            assert_eq!(domain.page(), &Page::Elsewhere);
+        } else {
+            let Page::Work { address, .. } = domain.page() else { panic!("actual chat task") };
+            assert_eq!(*address, Address::Task { task: u64::MAX, section: TaskSection::Activity });
+        }
+    }
+}
+
+#[test]
+fn owner_goal_answers_preserve_numeric_proposals_and_late_started_task_facts() {
+    use crate::{action::Act, fields::Purpose, notices::kept::Kind, page::project::goals::GoalForm};
+    for away in [false, true] {
+        for proposed in [false, true] {
+            let (mut domain, opened) = project_open(ProjectSection::Goals);
+            let read = project_read(&opened);
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(project_document()))) },
+            );
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Act { act: Act::Edit { field: Purpose::NewGoal, text: text(b"goal") } },
+            );
+            let form =
+                GoalForm { project: 1, executor: GoalExecutor::Charter(1), budget: 21, deadline: None, priority: 2 };
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::GoalForm { form } });
+            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Submit { field: Purpose::NewGoal } });
+            let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+            let Request::Send { request, .. } = sent[0] else { panic!("original goal request") };
+            if away {
+                drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+            }
+            let outcome = Outcome::Owner(if proposed {
+                OwnerOutcome::GoalProposed { proposal: u64::MAX }
+            } else {
+                OwnerOutcome::GoalStarted { task: u64::MAX }
+            });
+            let answer = Answer::Done(outcome.clone());
+            drive(&mut domain, Time::ZERO, Event::Answered { request, answer: answer.clone() });
+            assert_eq!(domain.project_page().form.answer, Some(outcome));
+            assert!(domain.project_page().form.pending.is_none());
+            assert!(domain.fields().get(Purpose::NewGoal).unwrap().text.bytes().is_empty());
+            if away || proposed {
+                assert_eq!(domain.notices.ids().len(), 1);
+                for (notice, ()) in domain.notices.ids() {
+                    assert_eq!(domain.notices.get(*notice).unwrap().kind, Kind::PageAnswer { answer: answer.clone() });
+                }
+                if away {
+                    assert_eq!(domain.page(), &Page::Elsewhere);
+                }
+            } else {
+                let Page::Work { address, .. } = domain.page() else { panic!("actual goal task") };
+                assert_eq!(*address, Address::task(u64::MAX));
+            }
+        }
+    }
+}
+
+fn resource_path(bytes: &[u8]) -> List<Box<[u8]>> {
+    let mut rows = List::with_capacity(1);
+    rows.push(Box::from(bytes)).unwrap();
+    rows
+}
+
+#[test]
+fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_slots() {
+    use crate::address::TaskSection;
+    let mut domain = Domain::new(&LIMITS, 77);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Overview }) },
+    );
+    let watch = open_token(&opened);
+    let mut first = List::with_capacity(2);
+    first.push(Box::<[u8]>::from(*b"a/b")).unwrap();
+    first.push(Box::<[u8]>::from(*b"c")).unwrap();
+    let mut second = List::with_capacity(2);
+    second.push(Box::<[u8]>::from(*b"a")).unwrap();
+    second.push(Box::<[u8]>::from(*b"/bc")).unwrap();
+    let one = Part::Resource { connector: 2, path: first };
+    let two = Part::Resource { connector: 2, path: second };
+    assert_ne!(one, two, "equal concatenated bytes are different segmented names");
+    let mut doc = super::confirmation::task();
+    doc.resources = List::with_capacity(2);
+    doc.resources.push(TaskResource::Part(one.clone())).unwrap();
+    doc.resources.push(TaskResource::Part(two.clone())).unwrap();
+    doc.authority.authority.grants = List::with_capacity(1);
+    doc.authority
+        .authority
+        .grants
+        .push(OwnerGrant {
+            connector: 2,
+            kind: 9,
+            pattern: OwnerPattern { segments: resource_path(b"a/b"), last: OwnerPatternEnd::Open(Box::from(*b"c")) },
+        })
+        .unwrap();
+    let shown = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc.clone()))) },
+    );
+    let mut parts = List::with_capacity(2);
+    for request in &shown {
+        if let Request::ShowPart { part, scope, .. } = request {
+            assert_eq!(*scope, PartScope::Project(1));
+            parts.push(part.clone()).unwrap();
+        }
+    }
+    assert_eq!(parts.as_slice(), &[one, two]);
+    let budget_opened = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Budget }) },
+    );
+    let budget_watch = open_token(&budget_opened);
+    let budget = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch: budget_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc))) },
+    );
+    let mut parts = List::with_capacity(1);
+    for request in &budget {
+        if let Request::ShowPart { part, scope, .. } = request {
+            assert_eq!(*scope, PartScope::Project(1));
+            parts.push(part.clone()).unwrap();
+        }
+    }
+    assert_eq!(parts.as_slice(), &[Part::Kind { connector: 2, kind: 9 }], "an open pattern is not a resource name");
+}
+
+#[test]
+fn goal_note_scope_keeps_its_supplied_project_instead_of_the_parent_page() {
+    let mut domain = Domain::new(&LIMITS, 88);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Notes }) },
+    );
+    let scope = NoteScope::Goal { project: u32::MAX, goal: u64::MAX };
+    let output = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Act {
+            act: crate::action::Act::FilterNotes {
+                filter: crate::page::project::NoteFilter { scope: scope.clone(), description: Some(text(b"supplied")) },
+            },
+        },
+    );
+    let mut reads = List::with_capacity(1);
+    for request in &output {
+        if let Request::Read { what: Read::Notes { scope, description, after }, .. } = request {
+            reads.push((scope.clone(), description.clone(), after.clone())).unwrap();
+        }
+    }
+    assert_eq!(reads.as_slice(), &[(scope.clone(), Some(text(b"supplied")), None)]);
+    assert_eq!(domain.project_page().note_filter.as_ref().unwrap().scope, scope);
+}
+
+#[test]
+fn note_reads_keep_full_writer_identity_and_optional_time_without_changing_the_named_revision() {
+    for writer in [NoteAuthor::Party { party: u64::MAX }, NoteAuthor::Task { task: u64::MAX, attempt: u64::MAX }] {
+        for changed in [None, Some(skein_lib::Wall::EPOCH)] {
+            let (mut domain, opened) = project_open(ProjectSection::Notes);
+            let Request::Read { read, .. } = opened[2] else { panic!("notes read") };
+            let mut acts = List::with_capacity(1);
+            acts.push(Offered { act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
+            let note = Note {
+                number: 3,
+                revision: Revision { value: u64::MAX },
+                scope: NoteScope::Project(1),
+                description: DocumentText::complete(text(b"description")),
+                body: DocumentText { bytes: text(b"body"), cut: true },
+                writer,
+                tasks: List::with_capacity(0),
+                changed,
+                acts,
+                cut: true,
+            };
+            let mut rows = List::with_capacity(1);
+            rows.push(note.clone()).unwrap();
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Read {
+                    read,
+                    result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
+                        cut: false,
+                        rows,
+                        before: None,
+                        after: None,
+                    }))),
+                },
+            );
+            let id = domain.project_page().notes.as_slice()[0];
+            let Some(crate::objects::Body::Note { document, .. }) = &domain.objects().get(id).unwrap().body else {
+                panic!("whole supplied note");
+            };
+            assert_eq!(**document, note);
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::DeleteNote } },
+            );
+            assert_eq!(domain.confirmation().unwrap().revision, Some(note.revision));
+            let output = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm });
+            let mut requests = List::with_capacity(1);
+            for request in &output {
+                if let Request::Send { ask, .. } = request {
+                    requests.push(ask.as_ref().clone()).unwrap();
+                }
+            }
+            assert_eq!(
+                requests.as_slice(),
+                &[Ask::DeleteNote { project: 1, note: 3, scope: note.scope, revision: note.revision }]
+            );
+        }
+    }
+}
+
+#[test]
+fn task_watch_replacements_preserve_requester_kinds_and_missing_link_facts_with_aggregate_loss() {
+    let mut domain = Domain::new(&LIMITS, 77);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    let mut supplied = super::confirmation::task();
+    let mut chip = supplied.chip.clone();
+    chip.task = u64::MAX;
+    for requester in [
+        OwnerRequester::Task(u64::MAX),
+        OwnerRequester::Person(u64::MAX),
+        OwnerRequester::Deployment { project: u32::MAX },
+    ] {
+        for cut in [false, true] {
+            supplied.requester = requester;
+            supplied.cut = cut;
+            supplied.inputs = List::with_capacity(2);
+            supplied.inputs.push(OwnerTaskLink::Stored { number: u64::MAX, status: None }).unwrap();
+            supplied.dependencies = List::with_capacity(2);
+            supplied.dependencies.push(OwnerTaskLink::Retained { chip: chip.clone(), at: None }).unwrap();
+            supplied.references = List::with_capacity(2);
+            supplied.references.push(OwnerTaskLink::Live(chip.clone())).unwrap();
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(supplied.clone()))) },
+            );
+            let id = domain.task_page().header.unwrap();
+            let Some(crate::objects::Body::Task(document)) = &domain.objects().get(id).unwrap().body else {
+                panic!("whole watched task");
+            };
+            assert_eq!(**document, supplied);
+            assert_eq!(document.inputs.capacity(), 2);
+            assert_eq!(document.dependencies.get(0).unwrap().number(), u64::MAX);
+            assert_eq!(document.references.get(0).unwrap().number(), u64::MAX);
+            assert_eq!(document.inputs.get(0), Some(&OwnerTaskLink::Stored { number: u64::MAX, status: None }));
+            assert_eq!(document.dependencies.get(0), Some(&OwnerTaskLink::Retained { chip: chip.clone(), at: None }));
+        }
+    }
+}
+
+#[test]
+fn watched_task_policies_replace_every_channel_without_merging_standing_interests() {
+    let mut domain = Domain::new(&LIMITS, 77);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    let mut supplied = super::confirmation::task();
+    for rule in [
+        WakeRule::Never,
+        WakeRule::Immediate,
+        WakeRule::Batch { count: u32::MAX, age: skein_lib::Duration::from_nanos(u64::MAX) },
+    ] {
+        for results in [ResultsWake::Never, ResultsWake::Each, ResultsWake::LastOrFailure] {
+            supplied.wake = OwnerWakePolicy {
+                words: rule,
+                notices: rule,
+                news: rule,
+                results,
+                questions: true,
+                answers: false,
+                timers: true,
+            };
+            supplied.subscriptions.entries = List::with_capacity(2);
+            supplied
+                .subscriptions
+                .entries
+                .push(Subscription {
+                    number: u64::MAX,
+                    kind: SubscriptionKind::Topic { connector: u16::MAX, topic: u64::MAX },
+                })
+                .unwrap();
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(supplied.clone()))) },
+            );
+            let id = domain.task_page().header.unwrap();
+            let Some(crate::objects::Body::Task(document)) = &domain.objects().get(id).unwrap().body else {
+                panic!("whole task policy");
+            };
+            assert_eq!(**document, supplied);
+            assert_eq!(document.subscriptions.entries.capacity(), 2);
+            supplied.subscriptions.entries = List::with_capacity(2);
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(supplied.clone()))) },
+            );
+            let Some(crate::objects::Body::Task(document)) = &domain.objects().get(id).unwrap().body else {
+                panic!("new empty interests");
+            };
+            assert_eq!(**document, supplied);
+            assert_eq!(document.subscriptions.entries.capacity(), 2);
+            assert!(document.subscriptions.entries.is_empty());
+            assert_eq!(document.wake.words, rule);
+        }
+    }
+}
+
+#[test]
+fn task_watch_replacements_keep_served_goal_identity_and_whole_contract_loss_independent() {
+    let mut domain = Domain::new(&LIMITS, 94);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    let mut choices = List::with_capacity(2);
+    let mut fields = List::with_capacity(2);
+    fields.push(FieldRule { name: Box::from(*b"\xff\0/"), max: u32::MAX }).unwrap();
+    choices.push(VerdictChoice { code: u32::MAX, words: u32::MAX, followups: u32::MAX, fields }).unwrap();
+    let part = OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Result, key: OwnerPartKey::Number(u64::MAX) };
+    for (goal, contract) in [
+        (Some(8), TaskContractDocument::Report { words: u32::MAX }),
+        (Some(u64::MAX), TaskContractDocument::Approval { state: Box::from(*b"\xff\0/"), part }),
+        (None, TaskContractDocument::Verdict { choices, cut: true }),
+        (Some(0), TaskContractDocument::Change { connector: u16::MAX, kind: u16::MAX, words: u32::MAX }),
+    ] {
+        let mut row = super::confirmation::task();
+        row.goal = goal;
+        row.result_contract = contract;
+        row.spec.specification.words = DocumentText::complete(text(b""));
+        row.cut = false;
+        let expected = row.clone();
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row))) },
+        );
+        let id = domain.task_page().header.unwrap();
+        let Some(crate::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
+            panic!("whole task remains retained");
+        };
+        assert_eq!(**retained, expected);
+        assert!(!retained.cut, "contract loss is not aggregate task-list loss");
+        let sections = crate::page::task::offers(retained);
+        assert!(crate::page::task::offered(&sections, TaskSection::Overview));
+    }
+}
+
+#[test]
+fn task_authority_watch_replacements_keep_bitmap_pattern_and_loss_facts_whole() {
+    let mut domain = Domain::new(&LIMITS, 77);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    let mut row = super::confirmation::task();
+    row.authority.authority.tools = u64::MAX;
+    row.authority.authority.notes = u8::MAX;
+    row.authority.authority.delegation.kinds = List::with_capacity(2);
+    row.authority.authority.delegation.kinds.push(OwnerAuthorityExecutor::Role(u32::MAX)).unwrap();
+    let mut segments = List::with_capacity(2);
+    segments.push(Box::from(*b"a/b")).unwrap();
+    segments.push(Box::from(*b"\xff\0")).unwrap();
+    row.authority.authority.grants = List::with_capacity(2);
+    row.authority
+        .authority
+        .grants
+        .push(OwnerGrant {
+            connector: u16::MAX,
+            kind: u16::MAX,
+            pattern: OwnerPattern { segments, last: OwnerPatternEnd::Open(Box::from(*b"c/")) },
+        })
+        .unwrap();
+    for cut in [false, true, false] {
+        row.authority.cut = cut;
+        row.cut = !cut;
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row.clone()))) },
+        );
+        let id = domain.task_page().header.unwrap();
+        let Some(crate::objects::Body::Task(actual)) = &domain.objects().get(id).unwrap().body else {
+            panic!("whole watched task");
+        };
+        assert_eq!(**actual, row);
+        assert_eq!(actual.authority.cut, cut);
+        assert_eq!(actual.cut, !cut);
+        assert_eq!(actual.authority.authority.grants.capacity(), 2);
+        assert_eq!(actual.authority.authority.grants.get(0).unwrap().pattern.segments.get(0).unwrap().as_ref(), b"a/b");
+    }
+}
+
+#[test]
+fn task_budget_watch_replacements_keep_all_owner_numbers_funders_and_optional_deadlines() {
+    let mut domain = Domain::new(&LIMITS, 78);
+    let frame_watch = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    let watch = open_token(&opened);
+    for funder in [
+        Funder::Task(u64::MAX),
+        Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX - 1 },
+        Funder::Recurring { project: u32::MAX, task: u64::MAX, period: u64::MAX - 2 },
+        Funder::Period { project: u32::MAX, period: u64::MAX },
+    ] {
+        for deadline in [None, Some(skein_lib::Wall::EPOCH), Some(skein_lib::Wall::from_nanos(u64::MAX))] {
+            let mut row = super::confirmation::task();
+            row.budget = OwnerBudget {
+                numbers: OwnerNumbers { budget: u64::MAX, spent: u64::MAX - 1, spent_below: 7, reserved: 11 },
+                left: 17,
+                funder,
+                deadline,
+            };
+            row.authority.authority.deadline = Some(skein_lib::Wall::from_nanos(123));
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row.clone()))) },
+            );
+            let id = domain.task_page().header.unwrap();
+            let Some(crate::objects::Body::Task(actual)) = &domain.objects().get(id).unwrap().body else {
+                panic!("whole watched task");
+            };
+            assert_eq!(**actual, row);
+            assert_eq!(actual.budget.left, 17, "availability is supplied independently of the numbers");
+            assert_eq!(actual.budget.deadline, deadline, "authority is a separate supplied fact");
+            assert!(crate::page::task::offered(&crate::page::task::offers(actual), TaskSection::Budget));
+        }
+    }
+}
+
+#[test]
+fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_reply_positions() {
+    let (mut domain, watch, read) = live_conversation_page(3101);
+    let mut old = list_entry(8, Phase::Idle, 99);
+    old.cached_replies = 17;
+    let mut rows = List::with_capacity(1);
+    rows.push(old.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows, false)) },
+    );
+    let mut current = old.clone();
+    current.runtime = None;
+    current.changed = None;
+    current.unread = None;
+    current.first_words = DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true };
+    current.cached_replies = u32::MAX;
+    current.seen = 0;
+    current.last_reply = u64::MAX;
+    let mut rows = List::with_capacity(1);
+    rows.push(current.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows, true)) },
+    );
+    let reply =
+        domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap().reply.as_ref().unwrap();
+    assert_eq!(reply.first_words, current.first_words);
+    assert_eq!(reply.chat, 8);
+    assert_eq!(reply.first_unread, 1);
+    let mut rows = List::with_capacity(1);
+    rows.push(old).unwrap();
+    let cursor = Cursor::new(Box::from(UTF8_TEXTS[1]), 1024).expect("bounded opaque cursor");
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read,
+            result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
+                rows,
+                cut: true,
+                before: None,
+                after: Some(cursor.clone()),
+            }))),
+        },
+    );
+    assert_eq!(domain.conversation_rows().rows.get(0), Some(&current));
+    assert!(domain.conversation_rows().cut);
+    assert_eq!(domain.conversation_rows().edges.after, crate::windows::Edge::More(cursor));
+    let mut zero = current.clone();
+    zero.unread = Some(Count { value: 0, limited: false });
+    zero.runtime = Some(Runtime::Idle);
+    zero.changed = Some(skein_lib::Wall::EPOCH);
+    zero.first_words = DocumentText::complete(text(b""));
+    let mut rows = List::with_capacity(1);
+    rows.push(zero.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows, false)) },
+    );
+    assert_eq!(domain.conversation_rows().rows.get(0), Some(&zero));
+}
+
+#[test]
+fn owner_conversation_order_keeps_missing_clock_rows_in_source_order_and_supplied_clocks_newest_first() {
+    for absent in [true, false] {
+        let (mut domain, watch, _) = live_conversation_page(3102);
+        let mut first = list_entry(8, Phase::Idle, 1);
+        let second = list_entry(9, Phase::Idle, 99);
+        if absent {
+            first.changed = None;
+        }
+        let mut rows = List::with_capacity(2);
+        rows.push(first).unwrap();
+        rows.push(second).unwrap();
+        drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Watch { watch, event: WatchEvent::Delivered(conversation_delivery(rows, false)) },
+        );
+        assert_eq!(domain.conversation_rows().rows.get(0).unwrap().chip.task, if absent { 8 } else { 9 });
+    }
+}
+
+#[test]
+fn owner_goal_read_and_watch_keep_all_ten_counters_absent_clock_and_exact_budget_by_key() {
+    let (mut domain, opened) = project_open(ProjectSection::Goals);
+    let watch = open_token(&opened);
+    let mut row = goal_line(9, u32::MAX, Phase::Running, 9);
+    row.changed = None;
+    row.held_below = u32::MAX;
+    row.progress = OwnerPhaseCounts {
+        waiting: u32::MAX,
+        idle: u32::MAX - 1,
+        starting: u32::MAX - 2,
+        running: u32::MAX - 3,
+        backing_off: u32::MAX - 4,
+        closing: u32::MAX - 5,
+        held: u32::MAX - 6,
+        done: u32::MAX - 7,
+        failed: u32::MAX - 8,
+        cancelled: u32::MAX - 9,
+    };
+    row.budget.funder = Funder::Task(u64::MAX);
+    row.budget.deadline = Some(skein_lib::Wall::from_nanos(u64::MAX));
+    let mut rows = List::with_capacity(1);
+    rows.push(row.clone()).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows, more: false }))),
+        },
+    );
+    let mut duplicate = row.clone();
+    duplicate.changed = Some(skein_lib::Wall::EPOCH);
+    duplicate.progress = OwnerPhaseCounts::ZERO;
+    let mut rows = List::with_capacity(2);
+    rows.push(duplicate).unwrap();
+    rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Read {
+            read: read_named(&opened, &Read::Goals { project: 1, after: None }),
+            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
+                rows,
+                cut: false,
+                before: None,
+                after: None,
+            }))),
+        },
+    );
+    assert_eq!(domain.project_page().listed_goals.get(0), Some(&row));
+    assert_eq!(domain.project_page().listed_goals.len(), 2);
+}
+
+fn conversation_delivery(rows: List<ConversationLine>, more: bool) -> Delivery {
+    Delivery::Conversations(Box::new(Conversations {
+        rows,
+        more,
+        after: Cursor::new(Box::from(b"fixture-watch-after".as_slice()), 1024).expect("bounded opaque cursor"),
+    }))
+}
+
+const UTF8_TEXTS: [&[u8]; 2] = [b"~\0whole", b"~\0opaque-row"];
+
+#[test]
+fn the_inbox_shows_both_groups_of_its_filter() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    for project in [None, Some(3)] {
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Inbox { project }) });
+        assert_eq!(
+            domain.sections(),
+            &[
+                Section::Inbox { group: InboxReadGroup::Needs, project },
+                Section::Inbox { group: InboxReadGroup::Updates, project },
+            ],
+            "{project:?}"
+        );
+    }
+}
+#[test]
+fn a_task_address_shows_its_own_section_alone() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Task { task: 9, section: TaskSection::Plan }) },
+    );
+    assert_eq!(domain.sections(), &[Section::Task { task: 9, section: TaskSection::Plan }]);
+}
+#[test]
+fn a_page_not_about_the_work_shows_no_section() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    assert_eq!(domain.sections(), &[]);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    for place in [Place::Elsewhere, Place::Missing] {
+        drive(&mut domain, Time::ZERO, Event::Went { place });
+        assert_eq!(domain.sections(), &[], "{place:?}");
+    }
+}
+
+#[test]
+fn an_application_page_shows_no_task_after_a_task_page() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(9)) });
+    assert_eq!(domain.shown_task(), Some(9));
+    drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    assert_eq!(domain.shown_task(), None);
+}
+
+#[test]
+fn no_two_windows_of_a_page_share_a_token() {
+    use crate::page::{conversations::*, project::*, task::*};
+    let mut numbers = [
+        crate::conversation::routing::ACTIVITY_WINDOW,
+        INBOX_WINDOW,
+        INBOX_UPDATES_WINDOW,
+        CONVERSATIONS_WINDOW,
+        HISTORY_WINDOW,
+        ENDED_WINDOW,
+        GOALS_WINDOW,
+        NOTES_WINDOW,
+        SPEND_WINDOW,
+    ];
+    numbers.sort_unstable();
+    for pair in numbers.windows(2) {
+        assert_ne!(pair[0], pair[1], "{numbers:?}");
+    }
+}
+#[test]
+fn no_two_reads_of_a_page_share_a_number() {
+    use crate::page::{conversations::*, project::*, task::*};
+    let mut numbers = [
+        crate::conversation::routing::ACTIVITY_READ,
+        INBOX_NEEDS_READ,
+        INBOX_UPDATES_READ,
+        CONVERSATIONS_READ,
+        CONVERSATIONS_BEFORE_READ,
+        REPLAY_READ,
+        HISTORY_READ,
+        ENDED_READ,
+        PERSON_TASK_READ,
+        GOALS_READ,
+        NOTES_READ,
+        SPEND_READ,
+        PROJECT_READ,
+        crate::ui::FINAL_TASK_READ,
+    ];
+    numbers.sort_unstable();
+    for pair in numbers.windows(2) {
+        assert_ne!(pair[0], pair[1], "{numbers:?}");
+    }
+}
+
+#[test]
+fn the_inbox_opens_its_watch_once_for_both_groups() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let requests = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Inbox { project: None }) });
+    let mut inbox_watches = 0_u32;
+    for request in &requests {
+        if let Request::Open { subject: Subject::Inbox { .. }, .. } = request {
+            inbox_watches += 1;
+        }
+    }
+    assert_eq!(inbox_watches, 1);
+}
+
+#[test]
+fn an_arranged_task_page_lists_every_section_in_order() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    domain
+        .configure_arrangement(arrangement(
+            &[
+                TaskSection::Panels,
+                TaskSection::History,
+                TaskSection::Budget,
+                TaskSection::Plan,
+                TaskSection::Overview,
+                TaskSection::Activity,
+            ],
+            &[],
+        ))
+        .unwrap();
+    let f = start(&mut domain, List::with_capacity(0));
+    delivered(&mut domain, Time::ZERO, f, frame(7));
+    let address = Address::Task { task: 8, section: TaskSection::Plan };
+    drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(address) });
+    assert_eq!(domain.address, address);
+    assert_eq!(
+        domain.sections(),
+        &[
+            Section::Task { task: 8, section: TaskSection::Overview },
+            Section::Task { task: 8, section: TaskSection::Activity },
+            Section::Task { task: 8, section: TaskSection::Plan },
+            Section::Task { task: 8, section: TaskSection::History },
+            Section::Task { task: 8, section: TaskSection::Budget },
+            Section::Task { task: 8, section: TaskSection::Panels },
+        ]
+    );
+}
+#[test]
+fn settings_stand_for_its_five_on_an_arranged_project_page() {
+    let rows: [(&str, ProjectSection, &[ProjectSection]); 2] = [
+        (
+            "address Settings",
+            ProjectSection::Settings,
+            &[
+                ProjectSection::Recurring,
+                ProjectSection::Spend,
+                ProjectSection::Roles,
+                ProjectSection::Policy,
+                ProjectSection::Resources,
+            ],
+        ),
+        ("arranged Settings", ProjectSection::Policy, &[ProjectSection::Settings]),
+    ];
+    for (label, own, sections) in rows {
+        let mut domain = Domain::new(&LIMITS, 2);
+        let mut value = arrangement(&[], sections);
+        value.project.push(ProjectSection::Goals).unwrap();
+        value.project.push(ProjectSection::Overview).unwrap();
+        domain.configure_arrangement(value).unwrap();
+        let f = start(&mut domain, List::with_capacity(0));
+        delivered(&mut domain, Time::ZERO, f, frame(7));
+        let address = Address::Project { project: 1, section: own };
+        drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(address) });
+        assert_eq!(domain.address, address, "{label}");
+        assert_eq!(
+            domain.sections(),
+            &[
+                Section::Project { project: 1, section: ProjectSection::Overview },
+                Section::Project { project: 1, section: ProjectSection::Goals },
+                Section::Project { project: 1, section: ProjectSection::Settings },
+            ],
+            "{label}"
+        );
+    }
+}
+#[test]
+fn an_arranged_task_section_its_document_does_not_offer_is_not_shown() {
+    for section in [TaskSection::Plan, TaskSection::Budget, TaskSection::Panels] {
+        for own in [TaskSection::Overview, section] {
+            let mut domain = Domain::new(&LIMITS, 2);
+            domain.configure_arrangement(arrangement(&[section], &[])).unwrap();
+            let f = start(&mut domain, List::with_capacity(0));
+            delivered(&mut domain, Time::ZERO, f, frame(7));
+            let opened = drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Went { place: Place::Jig(Address::Task { task: 8, section: own }) },
+            );
+            let value = Section::Task { task: 8, section };
+            assert!(domain.shows(value), "{own:?}, {section:?}: loading");
+            let mut document = super::confirmation::task();
+            document.chip.executor = Executor::Party { party: 7 };
+            document.budget.numbers = OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 };
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Watch {
+                    watch: open_token(&opened),
+                    event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
+                },
+            );
+            assert!(domain.sections().contains(&value), "{own:?}, {section:?}: fixed list");
+            assert!(!domain.shows(value), "{own:?}, {section:?}: document received");
+        }
+    }
+}
+
+fn source_requests(requests: &[Request]) -> (List<Subject>, List<Read>) {
+    let mut watches = List::with_capacity(LIMITS.watches);
+    let mut reads = List::with_capacity(LIMITS.reads);
+    for request in requests {
+        if let Request::Open { subject, .. } = request {
+            watches.push(subject.clone()).unwrap();
+        }
+        if let Request::Read { what, .. } = request {
+            reads.push(what.clone()).unwrap();
+        }
+    }
+    (watches, reads)
+}
+fn arranged_task() -> (Domain, Box<[Request]>) {
+    let mut domain = Domain::new(&LIMITS, 2);
+    domain
+        .configure_arrangement(arrangement(
+            &[
+                TaskSection::Overview,
+                TaskSection::Activity,
+                TaskSection::Plan,
+                TaskSection::History,
+                TaskSection::Budget,
+                TaskSection::Panels,
+            ],
+            &[],
+        ))
+        .unwrap();
+    let f = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
+    for request in &opened {
+        if let Request::Close { watch } = request {
+            drive(&mut domain, Time::ZERO, Event::Ended { watch: *watch, end: WatchEnd::Closed });
+        }
+    }
+    domain.reclaim();
+    (domain, opened)
+}
+#[test]
+fn an_arranged_task_page_opens_its_watch_once() {
+    let rows: [(Executor, Phase, &[Subject], &[Read]); 3] = [
+        (
+            Executor::Agent { charter: 1 },
+            Phase::Running,
+            &[Subject::Tree { task: 8, window: LIMITS.rows }, Subject::Run { task: 8, turn: None, offset: 0 }],
+            &[Read::Activity { task: 8, before: None }],
+        ),
+        (
+            Executor::Party { party: 7 },
+            Phase::Held,
+            &[Subject::Tree { task: 8, window: LIMITS.rows }],
+            &[Read::PersonTask { task: 8 }],
+        ),
+        (
+            Executor::Party { party: 7 },
+            Phase::Done,
+            &[],
+            &[Read::Ended { task: 8, after: None }, Read::PersonTask { task: 8 }],
+        ),
+    ];
+    for (executor, phase, watches, reads) in rows {
+        let (mut domain, opened) = arranged_task();
+        let (actual_watches, actual_reads) = source_requests(&opened);
+        assert_eq!(actual_watches.as_slice(), &[Subject::Task { task: 8 }], "{executor:?}");
+        assert_eq!(actual_reads.as_slice(), &[Read::History { task: 8, subtree: false, after: None }], "{executor:?}");
+        let mut document = super::confirmation::task();
+        document.chip.executor = executor;
+        document.chip.phase = phase;
+        document.context.as_mut().unwrap().impact.tasks.waiting = 1;
+        let delivery = Event::Watch {
+            watch: open_token(&opened),
+            event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
+        };
+        let requests = drive(&mut domain, Time::ZERO, delivery.clone());
+        let (actual_watches, actual_reads) = source_requests(&requests);
+        assert_eq!(actual_watches.as_slice(), watches, "{executor:?}");
+        assert_eq!(actual_reads.as_slice(), reads, "{executor:?}");
+        let again = drive(&mut domain, Time::ZERO, delivery);
+        let (actual_watches, actual_reads) = source_requests(&again);
+        assert_eq!(actual_watches.as_slice(), &[], "{executor:?}: repeated delivery");
+        assert_eq!(actual_reads.as_slice(), &[], "{executor:?}: repeated delivery");
+    }
+}
+#[test]
+fn an_arranged_project_page_opens_the_goals_watch_once() {
+    let mut domain = Domain::new(&LIMITS, 2);
+    domain.configure_arrangement(arrangement(&[], &[ProjectSection::Goals, ProjectSection::Overview])).unwrap();
+    let f = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Overview }) },
+    );
+    let (watches, reads) = source_requests(&requests);
+    assert_eq!(watches.as_slice(), &[Subject::Goals { project: 1 }, Subject::Inbox { window: LIMITS.rows }]);
+    assert_eq!(reads.as_slice(), &[Read::Project { project: 1 }, Read::Goals { project: 1, after: None }]);
+}
+#[test]
+fn an_arranged_task_document_opens_its_parts_once() {
+    let (mut domain, opened) = arranged_task();
+    let mut document = super::confirmation::task();
+    let resource = Part::Resource { connector: 2, path: resource_path(b"resource") };
+    let panel = Part::Panel { connector: 3, task: 8 };
+    document.resources = List::with_capacity(1);
+    document.resources.push(TaskResource::Part(resource.clone())).unwrap();
+    let context = document.context.as_mut().unwrap();
+    context.parts = List::with_capacity(1);
+    context.parts.push(panel.clone()).unwrap();
+    let requests = drive(
+        &mut domain,
+        Time::ZERO,
+        Event::Watch { watch: open_token(&opened), event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+    );
+    let mut parts = List::with_capacity(LIMITS.parts);
+    for request in &requests {
+        if let Request::ShowPart { .. } = request {
+            parts.push(request.clone()).unwrap();
+        }
+    }
+    assert_eq!(
+        parts.as_slice(),
+        &[
+            Request::ShowPart { part: resource, generation: 1, scope: PartScope::Project(1) },
+            Request::ShowPart { part: panel, generation: 1, scope: PartScope::Project(1) },
+        ]
+    );
+}
+
+#[test]
+fn an_object_no_source_names_is_owed_while_deciding() {
+    let mut domain = Domain::new(&LIMITS, 1);
+    let source = crate::objects::Source::Window { generation: 0, number: 0 };
+    let id = domain.objects.name(ObjectKey::Task(8), source).unwrap();
+    domain.objects.get_mut(id).unwrap().card =
+        crate::objects::Card::Deciding { request: None, progress: crate::intents::Progress::Confirming };
+    domain.objects.replace(source, &[]);
+    assert!(domain.owes(id));
+}
+
+fn application_page() -> Domain {
+    let mut domain = Domain::new(&LIMITS, 1);
+    let f = start(&mut domain, List::with_capacity(0));
+    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    finish_initial_inbox_reads(&mut domain, &initial);
+    let left = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    for request in &left {
+        if let Request::Close { watch } = request {
+            drive(&mut domain, Time::ZERO, Event::Ended { watch: *watch, end: WatchEnd::Closed });
+        }
+    }
+    domain.reclaim();
+    domain
+}
+fn show_sections(domain: &mut Domain, values: &[Section]) -> Box<[Request]> {
+    let mut sections = List::with_capacity(u32::try_from(values.len()).unwrap());
+    for section in values {
+        sections.push(*section).unwrap();
+    }
+    drive(domain, Time::ZERO, Event::ShowSections { sections })
+}
+#[test]
+fn an_application_page_naming_a_tasks_plan_opens_its_watch() {
+    let mut domain = application_page();
+    let opened = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    let (watches, reads) = source_requests(&opened);
+    assert_eq!(watches.as_slice(), &[Subject::Task { task: 8 }]);
+    assert_eq!(reads.as_slice(), &[]);
+    let id = skein_lib::Id::from_token(open_token(&opened));
+    assert_eq!(domain.watches.get(id).unwrap().owner, crate::watches::Owner::Sections { generation: 1 });
+}
+#[test]
+fn naming_objects_anew_never_closes_a_sections_watch() {
+    let mut domain = application_page();
+    let opened = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    let watch = open_token(&opened);
+    for keys in [&[ObjectKey::Task(8)][..], &[][..]] {
+        let mut objects = List::with_capacity(u32::try_from(keys.len()).unwrap());
+        for key in keys {
+            objects.push(*key).unwrap();
+        }
+        let requests = drive(&mut domain, Time::ZERO, Event::ShowObjects { objects });
+        assert!(!requests.contains(&Request::Close { watch }));
+    }
+    assert!(!drive(&mut domain, Time::ZERO, Event::ObjectsLeft).contains(&Request::Close { watch }));
+}
+#[test]
+fn a_section_naming_a_second_task_is_not_shown() {
+    let mut domain = application_page();
+    let first = Section::Task { task: 8, section: TaskSection::Plan };
+    let second = Section::Task { task: 9, section: TaskSection::Plan };
+    show_sections(&mut domain, &[first, second]);
+    assert_eq!(domain.sections(), &[first]);
+    assert!(!domain.shows(second));
+}
+#[test]
+fn an_empty_list_closes_every_sections_watch() {
+    let mut domain = application_page();
+    let opened = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    assert_eq!(show_sections(&mut domain, &[]).as_ref(), &[Request::Close { watch: open_token(&opened) }]);
+}
+
+#[test]
+fn naming_sections_anew_never_closes_an_objects_watch() {
+    let mut domain = application_page();
+    let mut objects = List::with_capacity(1);
+    objects.push(ObjectKey::Task(8)).unwrap();
+    let opened = drive(&mut domain, Time::ZERO, Event::ShowObjects { objects });
+    let watch = open_token(&opened);
+    show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    assert!(!show_sections(&mut domain, &[]).contains(&Request::Close { watch }));
+}
+#[test]
+fn replacing_sections_keeps_their_shared_subject_watch() {
+    let mut domain = application_page();
+    show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Overview }]);
+    let requests = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    assert_eq!(requests.as_ref(), &[]);
+}
+#[test]
+fn naming_the_same_sections_opens_nothing_again() {
+    let mut domain = application_page();
+    let sections = [Section::Task { task: 8, section: TaskSection::Plan }];
+    show_sections(&mut domain, &sections);
+    assert_eq!(show_sections(&mut domain, &sections).as_ref(), &[]);
+}
+#[test]
+fn leaving_an_application_page_closes_its_sections() {
+    let mut domain = application_page();
+    let opened = show_sections(&mut domain, &[Section::Task { task: 8, section: TaskSection::Plan }]);
+    let requests = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
+    assert_eq!(
+        requests.as_ref(),
+        &[Request::Close { watch: open_token(&opened) }, Request::PartsLeft { generation: 1 }]
+    );
+}
+
+#[test]
+fn a_section_whose_task_is_not_allowed_says_it_is_missing() {
+    let mut domain = application_page();
+    let section = Section::Task { task: 8, section: TaskSection::Plan };
+    let opened = show_sections(&mut domain, &[section]);
+    drive(&mut domain, Time::ZERO, Event::Ended { watch: open_token(&opened), end: WatchEnd::NotAllowed });
+    assert_eq!(
+        domain.section_status(section),
+        Some(crate::page::SectionStatus { behind: false, excess: 0, refused: None, missing: true })
+    );
+    assert_eq!(domain.page(), &Page::Elsewhere);
+}
+#[test]
+fn a_sections_dropped_watch_shows_that_section_behind() {
+    let mut domain = application_page();
+    let section = Section::Task { task: 8, section: TaskSection::Plan };
+    let opened = show_sections(&mut domain, &[section, Section::Deployment]);
+    drive(&mut domain, Time::ZERO, Event::Ended { watch: open_token(&opened), end: WatchEnd::Dropped });
+    let clear = crate::page::SectionStatus { behind: false, excess: 0, refused: None, missing: false };
+    assert_eq!(domain.section_status(section), Some(crate::page::SectionStatus { behind: true, ..clear }));
+    assert_eq!(domain.section_status(Section::Deployment), Some(clear));
+}
+#[test]
+fn a_sections_missing_read_keeps_the_application_page() {
+    let mut domain = application_page();
+    let section = Section::Project { project: 1, section: ProjectSection::Goals };
+    let opened = show_sections(&mut domain, &[section]);
+    let mut project_read = None;
+    for request in &opened {
+        if let Request::Read { read, what: Read::Project { .. } } = request {
+            project_read = Some(*read);
+        }
+    }
+    let read = project_read.unwrap();
+    drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::None(ReadNone::Unknown) });
+    assert_eq!(
+        domain.section_status(section),
+        Some(crate::page::SectionStatus { behind: false, excess: 0, refused: None, missing: true })
+    );
+    assert_eq!(domain.page(), &Page::Elsewhere);
+}
+
+fn section_with_an_unrelated_section() -> (Domain, Section) {
+    let mut domain = application_page();
+    let section = Section::Task { task: 8, section: TaskSection::Plan };
+    show_sections(&mut domain, &[section, Section::Deployment]);
+    crate::page::shown::context_subject(&mut domain, &Subject::Tree { task: 8, window: LIMITS.rows });
+    (domain, section)
+}
+#[test]
+fn a_sections_limit_refusal_stays_with_that_section() {
+    let (mut domain, section) = section_with_an_unrelated_section();
+    crate::page::routing::refuse(&mut domain, Limit::Reads);
+    assert_eq!(domain.section_status(section).unwrap().refused, Some(Limit::Reads));
+    assert_eq!(domain.section_status(Section::Deployment).unwrap().refused, None);
+}
+#[test]
+fn a_sections_excess_rows_stay_with_that_section() {
+    let (mut domain, section) = section_with_an_unrelated_section();
+    crate::page::routing::excess(&mut domain, 3);
+    assert_eq!(domain.section_status(section).unwrap().excess, 3);
+    assert_eq!(domain.section_status(Section::Deployment).unwrap().excess, 0);
+}

@@ -7,7 +7,7 @@ use crate::family::{self, Document, Kind, Scope, Subject};
 pub use crate::family::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
 use alloc::boxed::Box;
 use jig_client_domain::contract::{Part, Revision};
-use jig_domain_client::{frame::FrameShown, link::Link};
+use jig_client_view::{frame::me::FrameShown, link::Link};
 use skein_lib::{Env, Id, List, Map, Queue, RequestProgress, Slab, Time, Token};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Address {
@@ -66,7 +66,7 @@ pub enum Request {
     Send { request: Token, scope: u64, ask: Ask },
     Out(Out),
     ShowObjects { objects: List<jig_client_domain::contract::ObjectKey> },
-    ShowSections { sections: List<jig_domain_client::pages::Section> },
+    ShowSections { sections: List<jig_client_view::page::Section> },
     ObjectsLeft,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

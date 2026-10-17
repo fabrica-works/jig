@@ -94,8 +94,7 @@ fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repe
                 assert_eq!(raw_slots, 1);
                 assert_eq!(choices, if uncertain { vec![true, false] } else { vec![] });
                 assert!(!contains(&tree, b"whole report"));
-                let Some(jig_domain_client::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body
-                else {
+                let Some(crate::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
                     panic!("whole task")
                 };
                 assert_eq!(retained.hold, Some(TaskHold::Owner(Box::new(held))));

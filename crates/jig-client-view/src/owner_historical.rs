@@ -7,14 +7,14 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
+use crate::{Domain, Limits};
 use alloc::boxed::Box;
-use jig_client_domain::contract::{
+use jig_client::contract::{
     Chip, ChipPhase, OwnerEscalationDecision, OwnerGoalHolding, OwnerHistorical, OwnerHistoricalValue,
     OwnerMessageProposalKind, OwnerPattern, OwnerPatternEnd, OwnerPersonProposalGoal, OwnerPersonProposalState,
     OwnerProposalChoice, OwnerProposalDecision, OwnerRequester, OwnerTaskLink, Parameter, ParameterDocument, Proposer,
     Result, Specification, Task, TaskContractDocument, TaskResource, TaskResult, Text,
 };
-use jig_domain_client::{Domain, Limits};
 use skein_lib::{Id, Wall};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -245,12 +245,12 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerHistorical, words: 
 pub(crate) fn card(
     b: &mut Builder,
     client: &Domain,
-    object: Id<jig_domain_client::objects::Object>,
+    object: Id<crate::objects::Object>,
     place: &crate::cards::Place,
     words: &Words,
     bindings: &mut JigBindings,
 ) -> bool {
-    use jig_domain_client::objects::{Body, Card, Left};
+    use crate::objects::{Body, Card, Left};
     let Some(fact) = client.objects().get(object) else {
         return false;
     };

@@ -8,12 +8,12 @@ use super::{
     pages::{build, named_binding},
     work_pages::{entered, list, project_doc},
 };
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Event, Request,
     action::Act,
     address::{Address, ProjectSection},
 };
+use jig_client::contract::*;
 
 #[test]
 fn recurring_keeps_every_template_member_overlap_period_fact_and_last_batch_link() {

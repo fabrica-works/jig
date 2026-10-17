@@ -3,18 +3,18 @@ use super::{cards, owner_history as fixture};
 use crate::{JigBindings, Owner, words::Words};
 use skein_ui::{Builder, Key, Role, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Event, Request,
     address::{Address, TaskSection},
     boundary::Offset,
 };
+use jig_client::contract::*;
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
 fn drive(domain: &mut Domain, event: Event) -> List<Request> {
     let limits = fixture::client_limits();
-    let mut out = Queue::with_capacity(jig_domain_client::max_out(&limits));
-    jig_domain_client::step(domain, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event, &mut out);
-    let mut values = List::with_capacity(jig_domain_client::max_out(&limits));
+    let mut out = Queue::with_capacity(crate::max_out(&limits));
+    crate::step(domain, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event, &mut out);
+    let mut values = List::with_capacity(crate::max_out(&limits));
     while let Some(request) = out.pop() {
         values.push(request).unwrap();
     }
@@ -110,8 +110,7 @@ fn populated() -> Domain {
         Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) },
     );
     let read = history_read(
-        drive(&mut domain, Event::Act { act: jig_domain_client::action::Act::HistoryScope { subtree: true } })
-            .as_slice(),
+        drive(&mut domain, Event::Act { act: crate::action::Act::HistoryScope { subtree: true } }).as_slice(),
     );
     drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::History(Box::new(history_page()))) });
     domain

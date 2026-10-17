@@ -7,7 +7,7 @@ use super::{
 };
 use jig_client_domain::contract as client;
 use jig_client_test_domain::Event;
-use jig_domain_client::Limits;
+use jig_client_view::Limits;
 use jig_domain_core::{documents, reads};
 use skein_lib::Token;
 
@@ -127,7 +127,7 @@ pub fn read_with_codec(
         }
     };
     transport.take_reply(to).expect("validated original read route");
-    Ok(Incoming::Callback { client, event: Event::Jig(jig_domain_client::Event::Read { read, result }) })
+    Ok(Incoming::Callback { client, event: Event::Jig(jig_client_view::Event::Read { read, result }) })
 }
 
 fn escalation(
@@ -219,7 +219,7 @@ mod tests {
         assert!(transport.reply(to).is_some());
         let Incoming::Callback {
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: actual,
                     result: client::ReadResult::Value(client::ReadValue::OwnerProposal(value)),
                 }),
@@ -261,7 +261,7 @@ mod tests {
         assert!(transport.reply(to).is_some());
         let Incoming::Callback {
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: actual,
                     result: client::ReadResult::Value(client::ReadValue::OwnerPersonTask(value)),
                 }),
@@ -299,7 +299,7 @@ mod tests {
         assert!(transport.reply(to).is_some());
         let Incoming::Callback {
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: actual,
                     result: client::ReadResult::Value(client::ReadValue::Task(value)),
                 }),
@@ -338,7 +338,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: actual,
                     result: client::ReadResult::Value(client::ReadValue::Question(value)),
                 }),
@@ -403,7 +403,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: actual,
                     result: client::ReadResult::Value(client::ReadValue::OwnerInbox(value)),
                 }),
@@ -458,7 +458,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: actual,
                     result: client::ReadResult::Value(client::ReadValue::Result(value)),
                 }),
@@ -490,7 +490,7 @@ mod tests {
                 .into_token();
             let Incoming::Callback {
                 client: ClientId(0),
-                event: Event::Jig(jig_domain_client::Event::Read { read: actual, result }),
+                event: Event::Jig(jig_client_view::Event::Read { read: actual, result }),
             } = read(&mut transport, to, &reads::Answer::None(why), &crate::test::limits().jig)
                 .expect("actual terminal")
             else {
@@ -531,7 +531,7 @@ mod tests {
         assert!(transport.reply(to).is_some());
         let Incoming::Callback {
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: actual,
                     result: client::ReadResult::Value(client::ReadValue::Activity(page)),
                 }),
@@ -596,7 +596,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: original,
                     result: client::ReadResult::Value(client::ReadValue::Notes(value)),
                 }),
@@ -665,7 +665,7 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: actual,
                     result: client::ReadResult::Value(client::ReadValue::History(page)),
                 }),

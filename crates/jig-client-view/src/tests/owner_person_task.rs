@@ -12,8 +12,8 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, State, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::{Domain, Event, action::Act, fields::Purpose};
+use crate::{Domain, Event, action::Act, fields::Purpose};
+use jig_client::contract::*;
 use skein_lib::{Duration, List, Wall, bytes::copy_of};
 fn rows<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     let values: Vec<_> = values.into_iter().collect();
@@ -89,13 +89,13 @@ fn value() -> OwnerPersonTask {
         ]),
     }
 }
-fn client_limits() -> jig_domain_client::Limits {
-    jig_domain_client::Limits { rows: 8, ..CLIENT }
+fn client_limits() -> crate::Limits {
+    crate::Limits { rows: 8, ..CLIENT }
 }
 fn limits(words: &Words) -> Limits {
     limits_for(&client_limits(), words)
 }
-fn limits_for(client: &jig_domain_client::Limits, words: &Words) -> Limits {
+fn limits_for(client: &crate::Limits, words: &Words) -> Limits {
     let f = view::worst_case(client, words).unwrap();
     Limits {
         nodes: f.nodes,
@@ -273,7 +273,7 @@ fn person_owner_approval_renders_opaque_parts_without_inventing_application_scop
         }
     );
 }
-fn full_value(l: &jig_domain_client::Limits) -> OwnerPersonTask {
+fn full_value(l: &crate::Limits) -> OwnerPersonTask {
     let mut value = value();
     value.task.title = doc(UTF8_TEXTS[1]);
     value.spec.specification.words = doc(UTF8_TEXTS[2]);
@@ -384,11 +384,11 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
         language: 1,
         offset_minutes: 0,
     };
-    let l = jig_domain_client::Limits { rows: 3, ..client_limits() };
+    let l = crate::Limits { rows: 3, ..client_limits() };
     let value = full_value(&l);
     let untouched = value.clone();
     if selected_dimension == Some(5) {
-        assert_eq!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..client_limits() }), None);
+        assert_eq!(view::max_nodes(&crate::Limits { rows: u32::MAX, ..client_limits() }), None);
         let mut over = value.clone();
         over.results = List::with_capacity(9);
         assert!(view::required(&over, &client_limits(), &w).is_none());
@@ -472,7 +472,7 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
 
 #[test]
 fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result_rows() {
-    let l = jig_domain_client::Limits { rows: 3, ..client_limits() };
+    let l = crate::Limits { rows: 3, ..client_limits() };
     let w = words();
     let mut value = value();
     value.results = rows([OwnerShownResult {

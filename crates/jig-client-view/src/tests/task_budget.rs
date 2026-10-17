@@ -1,5 +1,5 @@
 use super::*;
-use jig_domain_client::address::{Address, TaskSection};
+use crate::address::{Address, TaskSection};
 
 fn budget_page(row: Task) -> Tree {
     let (mut domain, out) = super::super::work_pages::entered(Address::Task { task: 8, section: TaskSection::Budget });

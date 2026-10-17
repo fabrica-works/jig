@@ -10,8 +10,8 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::Domain;
+use crate::Domain;
+use jig_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), CLIENT.text).unwrap(), cut }
@@ -330,7 +330,7 @@ fn historical_ended_view_exact_node_depth_text_binding_and_slot_storage_refuses_
     let mut text_over = page.clone();
     text_over.after = Some(Cursor::new(copy_of(&[0; 129]), 129).unwrap());
     assert!(view::ended_required(&text_over, &CLIENT, &w).is_none());
-    assert!(view::ended_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }).is_none());
+    assert!(view::ended_nodes(&crate::Limits { rows: u32::MAX, ..CLIENT }).is_none());
 }
 #[test]
 fn historical_funding_view_exact_geometry_and_reserved_empty_rows_remain_independent_of_scalar_values() {
@@ -374,7 +374,7 @@ fn historical_funding_view_exact_geometry_and_reserved_empty_rows_remain_indepen
 )]
 fn historical_public_plan_keeps_owner_tree_early_return_and_companion_ended_read_reset() {
     use super::cards::{document, drive, start};
-    use jig_domain_client::{
+    use crate::{
         Event, Request,
         action::Act,
         address::{Address, Place, TaskSection},

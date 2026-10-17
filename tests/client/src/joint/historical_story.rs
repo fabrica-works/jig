@@ -128,7 +128,7 @@ fn a_person_revisits_the_whole_historical_task_and_result_by_its_fresh_public_ad
     world.person(
         client,
         vec![
-            Step::Go { address: jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::task(task)) },
+            Step::Go { address: jig_client_test_domain::Address::Jig(jig_client_view::address::Address::task(task)) },
             Step::See { find: Find::named(Role::Region, b"Historical object"), within },
             Step::See { find: Find::text(b"finished"), within },
         ],

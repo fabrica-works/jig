@@ -50,7 +50,7 @@ record TableEntry { asker: u32 number: u64 key: fixed 16 scope: u64 first_sent: 
 # A read value preserves the contract variant as well as its existing document (ruling 208).
 enum ReadValue { owner_project: OwnerProject, historical: boxed OwnerHistorical, frame: Frame, task: Task, proposal: Proposal, owner_proposal: OwnerProposal, escalation: Escalation, owner_escalation: OwnerEscalation, question: Question, person_task: PersonTask, owner_person_task: OwnerPersonTask, result: ResultDocument, ended: ObjectPage, owner_ended: OwnerEndedPage, history: HistoryPage, activity: ActivityPage, inbox: InboxPage, owner_inbox: OwnerInboxPage, conversations: ConversationPage, goals: GoalPage, spend: SpendPage, owner_spend: OwnerSpendPage, project: Project, notes: NotePage, deployment: Deployment, owner_deployment: OwnerDeployment }
 
-# Chips.rows and OwnerInbox.needs/updates/selection: jig_domain_client::Limits::document_bytes; each item is a length-prefixed piece (rulings 182 and 184).
+# Chips.rows and OwnerInbox.needs/updates/selection: jig_client_view::Limits::document_bytes; each item is a length-prefixed piece (rulings 182 and 184).
 record Chips { rows: bytes 16777216 }
 record OwnerInbox { party: u64 needs: bytes 16777216 updates: bytes 16777216 next: option OwnerInboxCursor cached_needs: u32 cached_updates: Count results_seen: u64 updates_time_complete: bool selection: option bytes 16777216 }
 

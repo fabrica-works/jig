@@ -6,10 +6,10 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{
+use crate::{Domain, Limits};
+use jig_client::contract::{
     ChipPhase, DocumentText, OwnerChipHold, OwnerHoldEscalation, OwnerProposal, OwnerProposalAction, OwnerTaskLink,
 };
-use jig_domain_client::{Domain, Limits};
 /// Finite storage for the entire supplied proposal fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProposalFragment {
@@ -63,7 +63,7 @@ fn hold_fits(value: &OwnerChipHold, limits: &Limits) -> Option<()> {
 #[must_use]
 pub fn required(value: &OwnerProposal, limits: &Limits, words: &Words) -> Option<ProposalFragment> {
     text_fits(&value.reason, limits)?;
-    if value.funding.capacity() > limits.rows || value.acts.capacity() > jig_client_domain::contract::MAX_OFFERED_ACTS {
+    if value.funding.capacity() > limits.rows || value.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS {
         return None;
     }
     match &value.action {

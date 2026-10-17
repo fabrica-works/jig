@@ -1,5 +1,5 @@
+use jig_client_view::address::{Address, ProjectSection as P, TaskSection as T};
 use jig_client_world::{Settings, Until, stories};
-use jig_domain_client::address::{Address, ProjectSection as P, TaskSection as T};
 use skein_lib::{Time, Wall};
 use skein_world::domain::heap::Counting;
 #[global_allocator]
@@ -267,23 +267,23 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
     }
     // Each field reaches its text envelope, then one more proves refusal is bounded.
     for field in [
-        jig_domain_client::fields::Purpose::NewChat,
-        jig_domain_client::fields::Purpose::Answer,
-        jig_domain_client::fields::Purpose::Reason,
-        jig_domain_client::fields::Purpose::Amendment,
-        jig_domain_client::fields::Purpose::Instructions,
+        jig_client_view::fields::Purpose::NewChat,
+        jig_client_view::fields::Purpose::Answer,
+        jig_client_view::fields::Purpose::Reason,
+        jig_client_view::fields::Purpose::Amendment,
+        jig_client_view::fields::Purpose::Instructions,
     ] {
         w.event(
             c,
-            jig_client_test_domain::Event::Jig(jig_domain_client::Event::Act {
-                act: jig_domain_client::action::Act::Edit { field, text: stories::text(&[b'f'; 32]) },
+            jig_client_test_domain::Event::Jig(jig_client_view::Event::Act {
+                act: jig_client_view::action::Act::Edit { field, text: stories::text(&[b'f'; 32]) },
             }),
         );
     }
     // The added owner count reaches every distinct restored-scope slot too.
     let counted = w.client(7, stories::inbox());
     for scope in [7, 8, 9, 10] {
-        w.event(counted, jig_client_test_domain::Event::Jig(jig_domain_client::Event::Kept { scope, requests: 1 }));
+        w.event(counted, jig_client_test_domain::Event::Jig(jig_client_view::Event::Kept { scope, requests: 1 }));
     }
     let result = w.run(Until::Steps(2));
     eprintln!("full client fixture: heap peak {} bytes, bound {} bytes", result.heap_peak, result.heap_bound);

@@ -3,8 +3,8 @@
 use super::{Document, Ops, OpsScript, Subject};
 use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{self as engine, ApplicationScope, Envelope, Up};
+use jig_client_view::{self as client};
 use jig_client_world::{harness::*, observe};
-use jig_domain_client::{self as client};
 use jig_ops_client_domain::{self as domain, Event, JigOut, Request, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
 use sha2::{Digest, Sha256};
@@ -561,7 +561,7 @@ impl Front<Ops> for Scripted {
     }
     fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
         if self.recovery.is_some_and(|at| now < at) {
-            self.shell.push((client, Event::Jig(jig_domain_client::Event::SignOutLost)));
+            self.shell.push((client, Event::Jig(jig_client_view::Event::SignOutLost)));
             return;
         }
         let sign_in = self.parties[&client];

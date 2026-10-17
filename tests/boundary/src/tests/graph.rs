@@ -110,10 +110,7 @@ fn client_view_links_only_its_domain_and_foundation() {
             manifest
                 .dependencies
                 .iter()
-                .filter(|name| {
-                    !["skein-codec", "skein-lib", "skein-ui", "jig-domain-client", "jig-client-domain"]
-                        .contains(&name.as_str())
-                })
+                .filter(|name| !["jig-client", "skein-codec", "skein-lib", "skein-ui"].contains(&name.as_str()))
                 .map(|name| format!("{}: {name}", manifest.path.display()))
                 .collect::<Vec<_>>()
         })
@@ -125,12 +122,12 @@ fn client_view_links_only_its_domain_and_foundation() {
 fn client_domain_depends_on_foundation_alone() {
     let failures: Vec<_> = manifests()
         .into_iter()
-        .filter(|manifest| manifest.name.as_deref() == Some("jig-domain-client"))
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-client-view"))
         .flat_map(|manifest| {
             manifest
                 .dependencies
                 .iter()
-                .filter(|name| !["skein-lib", "jig-client-domain"].contains(&name.as_str()))
+                .filter(|name| !["jig-client", "skein-codec", "skein-lib", "skein-ui"].contains(&name.as_str()))
                 .map(|name| format!("{}: {name}", manifest.path.display()))
                 .collect::<Vec<_>>()
         })
@@ -142,7 +139,6 @@ fn client_step(name: &str) -> bool {
     matches!(
         name,
         "jig-client"
-            | "jig-domain-client"
             | "jig-client-domain"
             | "jig-client-view"
             | "jig-protocol-transcript"
@@ -179,7 +175,6 @@ fn client_and_engine_step_crates_share_no_dependencies() {
 
 #[test]
 fn client_roles_cover_step_crates_and_exclude_the_world() {
-    assert!(client_step("jig-domain-client"));
     assert!(client_step("jig-client-view"));
     assert!(client_step("jig-protocol-transcript"));
     assert!(client_step("jig-client-test-domain"));
@@ -230,7 +225,7 @@ fn scripted_engine_links_only_the_client_and_foundation() {
             manifest
                 .dependencies
                 .iter()
-                .all(|name| ["skein-lib", "jig-domain-client", "jig-client-domain"].contains(&name.as_str())),
+                .all(|name| ["skein-lib", "jig-client-view", "jig-client-domain"].contains(&name.as_str())),
             "{}",
             manifest.path.display()
         );
@@ -246,7 +241,7 @@ fn test_client_domain_links_only_its_child_owner_vocabulary_and_foundation() {
     dependencies.sort();
     assert_eq!(
         dependencies,
-        ["jig-client-domain", "jig-domain-client", "jig-test-connector", "skein-lib"],
+        ["jig-client-domain", "jig-client-view", "jig-test-connector", "skein-lib"],
         "the client root depends only on its client child, pure owner vocabulary and foundation"
     );
     let source = fs::read_to_string(kit_root().join("testing/jig-client-test-domain/src/lib.rs"))
@@ -280,14 +275,7 @@ fn test_client_view_links_only_client_children_and_foundation() {
     dependencies.sort();
     assert_eq!(
         dependencies,
-        [
-            "jig-client-domain",
-            "jig-client-test-domain",
-            "jig-client-view",
-            "jig-domain-client",
-            "skein-lib",
-            "skein-ui"
-        ]
+        ["jig-client-domain", "jig-client-test-domain", "jig-client-view", "skein-lib", "skein-ui"]
     );
     let source = fs::read_to_string(kit_root().join("testing/jig-client-test-view/src/lib.rs"))
         .expect("view source is readable");
@@ -307,11 +295,10 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 "jig-client",
                 "jig-client-domain",
                 "jig-client-protocol-link",
-                "jig-domain-client",
+                "jig-client-view",
                 // Whole committed turns use the existing below-domain codec.
                 "jig-protocol-transcript",
                 "smith-transcript",
-                "jig-client-view",
                 "skein-ui",
                 "skein-ui-text",
                 "jig-client-test-domain",
@@ -364,7 +351,7 @@ fn ops_client_domain_is_step_code_with_only_client_and_connector_vocabulary() {
     assert_eq!(roots.len(), 1);
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-client-domain", "jig-domain-client", "jig-ops-domain-connectors", "skein-lib"]);
+    assert_eq!(dependencies, ["jig-client-domain", "jig-client-view", "jig-ops-domain-connectors", "skein-lib"]);
     let source = fs::read_to_string(kit_root().join("examples/ops/client-domain/src/lib.rs")).expect("domain source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));
     assert!(source.contains("forbid(unsafe_code)"));
@@ -381,7 +368,6 @@ fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
         [
             "jig-client-domain",
             "jig-client-view",
-            "jig-domain-client",
             "jig-ops-client-domain",
             "jig-ops-domain-connectors",
             "skein-lib",
@@ -469,7 +455,6 @@ fn client_engine_breaches(manifests: &[CrateManifest]) -> Vec<String> {
             manifest.name.as_deref(),
             Some(
                 "jig-client"
-                    | "jig-domain-client"
                     | "jig-client-view"
                     | "jig-client-protocol-wire"
                     | "jig-client-protocol-link"
@@ -644,7 +629,7 @@ fn the_identity_dependency_is_allowed_for_the_test_service_alone() {
 }
 
 /// Client crates outside the prefix until the client's restructuring removes them.
-const PENDING: [&str; 1] = ["jig-domain-client"];
+const PENDING: [&str; 0] = [];
 
 #[test]
 fn client_crates_carry_the_client_prefix() {

@@ -42,9 +42,9 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
     let mut world = configured_with_bounds(8524, vec![], 1, procedure_configuration, family_limits());
     let owner = world.client_with(
         1,
-        jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
+        jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Project {
             project: 1,
-            section: jig_domain_client::address::ProjectSection::Goals,
+            section: jig_client_view::address::ProjectSection::Goals,
         }),
         family_limits(),
         family_client,
@@ -106,9 +106,9 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
         owner,
         vec![
             Step::Go {
-                address: jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Task {
+                address: jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Task {
                     task,
-                    section: jig_domain_client::address::TaskSection::Activity,
+                    section: jig_client_view::address::TaskSection::Activity,
                 }),
             },
             Step::See { find: Find::exactly_named(Role::Region, b"Procedure panel"), within },

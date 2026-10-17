@@ -6,7 +6,7 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_client_domain::contract::*;
+use jig_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn text(bytes: &[u8]) -> Text {
     Text::new(copy_of(bytes), u32::try_from(bytes.len()).unwrap()).unwrap()
@@ -31,8 +31,8 @@ fn fixture(kind: OwnerMessageKind) -> OwnerWord {
 fn activity(line: OwnerActivity) -> OwnerActivityLine {
     OwnerActivityLine { task: u64::MAX, position: u64::MAX, at: Wall::from_nanos(u64::MAX), line }
 }
-fn client_limits() -> jig_domain_client::Limits {
-    jig_domain_client::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
+fn client_limits() -> crate::Limits {
+    crate::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
 }
 fn phrase_limits() -> PhraseLimits {
     PhraseLimits {
@@ -592,10 +592,10 @@ fn owner_activity_selected_normal_language_and_full_opaque_tree_envelope_refuse_
     for phrase in data::ALL {
         assert!(selected.book.capacity(phrase.id()).is_some());
     }
-    assert!(view::required(&value, &jig_domain_client::Limits { text: 7, ..client_limits() }, &selected).is_none());
-    assert!(view::required(&value, &jig_domain_client::Limits { rows: 2, ..client_limits() }, &selected).is_none());
-    assert!(view::worst_case(&jig_domain_client::Limits { rows: u32::MAX, ..client_limits() }, &selected).is_none());
-    assert!(view::worst_case(&jig_domain_client::Limits { text: u32::MAX, ..client_limits() }, &selected).is_none());
+    assert!(view::required(&value, &crate::Limits { text: 7, ..client_limits() }, &selected).is_none());
+    assert!(view::required(&value, &crate::Limits { rows: 2, ..client_limits() }, &selected).is_none());
+    assert!(view::worst_case(&crate::Limits { rows: u32::MAX, ..client_limits() }, &selected).is_none());
+    assert!(view::worst_case(&crate::Limits { text: u32::MAX, ..client_limits() }, &selected).is_none());
     let reserved =
         fixture(OwnerMessageKind::Result(OwnerWordResult::Verdict { code: 1, fields: List::with_capacity(4) }));
     assert!(view::word_required(&reserved, &client_limits(), &selected).is_none());
@@ -631,9 +631,7 @@ fn assert_each_text_bound(words: &Words) {
         let saved = value.clone();
         assert!(view::word_required(&value, &client_limits(), words).is_none());
         assert!(view::required(&activity(OwnerActivity::Heard(value.clone())), &client_limits(), words).is_none());
-        assert!(
-            view::word_required(&value, &jig_domain_client::Limits { text: 9, ..client_limits() }, words).is_some()
-        );
+        assert!(view::word_required(&value, &crate::Limits { text: 9, ..client_limits() }, words).is_some());
         assert_eq!(value, saved);
     }
     for capacity in [0_u32, 1, 3] {

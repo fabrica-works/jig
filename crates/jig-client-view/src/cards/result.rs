@@ -5,12 +5,12 @@ use crate::words::{Words, name};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{Result as ResultDocument, ResultValue};
-use jig_domain_client::{
+use crate::{
     Domain,
     action::Act,
     objects::{Object, result::facts as document},
 };
+use jig_client::contract::{Result as ResultDocument, ResultValue};
 use skein_lib::Id;
 /// Build a result's shared card and all its contract payloads.
 pub fn result(
@@ -69,7 +69,7 @@ pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words:
                 super::chip::chip(b, client, task, words, bindings);
             }
             if let Some(key) = proposal
-                && let Some(id) = client.objects().find(jig_client_domain::contract::ObjectKey::Proposal(*key))
+                && let Some(id) = client.objects().find(jig_client::contract::ObjectKey::Proposal(*key))
             {
                 super::proposal::proposal(b, client, id, &super::Place::Conversation, words, bindings);
             }
@@ -103,8 +103,8 @@ pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words:
 fn verdict_payload(
     b: &mut Builder,
     verdict: u32,
-    explanation: &jig_client_domain::contract::DocumentText,
-    fields: &skein_lib::List<jig_client_domain::contract::ResultField>,
+    explanation: &jig_client::contract::DocumentText,
+    fields: &skein_lib::List<jig_client::contract::ResultField>,
     words: &Words,
 ) {
     words.text(b, JigPhrase::Verdict, &[Hole::Number(u64::from(verdict))]);
@@ -134,19 +134,19 @@ pub fn reply(
         return false;
     }
     match &fact.body {
-        Some(jig_domain_client::objects::Body::Chip(chip)) => super::chip::chip(b, client, chip, words, bindings),
-        Some(jig_domain_client::objects::Body::Task(task)) => super::chip::chip(b, client, &task.chip, words, bindings),
+        Some(crate::objects::Body::Chip(chip)) => super::chip::chip(b, client, chip, words, bindings),
+        Some(crate::objects::Body::Task(task)) => super::chip::chip(b, client, &task.chip, words, bindings),
         Some(
-            jig_domain_client::objects::Body::Historical(_)
-            | jig_domain_client::objects::Body::Proposal(_)
-            | jig_domain_client::objects::Body::OwnerProposal(_)
-            | jig_domain_client::objects::Body::Escalation(_)
-            | jig_domain_client::objects::Body::OwnerEscalation(_)
-            | jig_domain_client::objects::Body::Question(_)
-            | jig_domain_client::objects::Body::PersonTask(_)
-            | jig_domain_client::objects::Body::OwnerPersonTask(_)
-            | jig_domain_client::objects::Body::Result(_)
-            | jig_domain_client::objects::Body::Note { .. },
+            crate::objects::Body::Historical(_)
+            | crate::objects::Body::Proposal(_)
+            | crate::objects::Body::OwnerProposal(_)
+            | crate::objects::Body::Escalation(_)
+            | crate::objects::Body::OwnerEscalation(_)
+            | crate::objects::Body::Question(_)
+            | crate::objects::Body::PersonTask(_)
+            | crate::objects::Body::OwnerPersonTask(_)
+            | crate::objects::Body::Result(_)
+            | crate::objects::Body::Note { .. },
         )
         | None => words.text(b, JigPhrase::ContextTask, &[Hole::Number(reply.chat)]),
     }

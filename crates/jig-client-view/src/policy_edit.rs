@@ -5,7 +5,7 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{OwnerPattern, OwnerPatternEnd, PolicyEdit, PolicyGuard};
+use jig_client::contract::{OwnerPattern, OwnerPatternEnd, PolicyEdit, PolicyGuard};
 
 /// Allocation required for one complete review fragment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

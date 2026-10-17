@@ -69,7 +69,7 @@ fn a_configured_deployment_owner_reads_capacity_account_and_connector_facts_from
 
 fn configured_deployment_owner_reads_capacity_account_and_connector_facts() {
     let mut world = world();
-    let client = world.client(1, jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Deployment));
+    let client = world.client(1, jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Deployment));
     let within = Duration::from_secs(1);
     world.person(
         client,

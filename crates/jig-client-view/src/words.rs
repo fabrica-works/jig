@@ -5,11 +5,9 @@ mod held;
 mod lacking;
 mod refusals;
 use crate::phrases::jig::JigPhrase;
+use crate::{intents::Progress, link::Link};
 use alloc::boxed::Box;
-use jig_client_domain::contract::{
-    Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome, ProposalKey, Proposer,
-};
-use jig_domain_client::{intents::Progress, link::Link};
+use jig_client::contract::{Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome, ProposalKey, Proposer};
 use skein_lib::{Duration, Wall, bytes::copy_of};
 use skein_ui::phrases::{Hole, Phrasebook};
 use skein_ui::{Builder, Role, Run};

@@ -1,5 +1,5 @@
 use super::*;
-use jig_domain_client::address::{Address, TaskSection};
+use crate::address::{Address, TaskSection};
 
 pub(super) fn page(row: Task) -> (Tree, JigBindings) {
     let (mut domain, out) = super::super::work_pages::entered(Address::task(8));

@@ -206,8 +206,8 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     view.render.finish(builder, shown, out);
 }
 
-fn arranged_task(client: &jig_domain_client::Domain) -> Option<u64> {
-    use jig_domain_client::{address::Address, pages::Page};
+fn arranged_task(client: &jig_client_view::Domain) -> Option<u64> {
+    use jig_client_view::{address::Address, page::Page};
     match client.page() {
         Page::Work { address, .. } => match address {
             Address::Task { task, .. } => Some(*task),
@@ -224,13 +224,13 @@ fn arranged_task(client: &jig_domain_client::Domain) -> Option<u64> {
 // The application's arrangement keeps jig's outline and its whole sections (pages.md, 12.3).
 fn task_page(
     b: &mut Builder,
-    client: &jig_domain_client::Domain,
+    client: &jig_client_view::Domain,
     task: u64,
     words: &jig_client_view::words::Words,
     bindings: &mut JigBindings,
 ) {
     use jig_client_view::phrases::jig::JigPhrase;
-    use jig_domain_client::{address::TaskSection, pages::Section};
+    use jig_client_view::{address::TaskSection, page::Section};
     use skein_ui::phrases::Hole;
     jig_client_view::frame::banner(b, client, words, bindings);
     jig_client_view::frame::navigation(b, client, observability::NAV, words, bindings);
@@ -253,7 +253,7 @@ fn infrastructure_part(bindings: &JigBindings, token: skein_lib::Token) -> Optio
     match bindings.part(token) {
         Some(part) => Some(part.clone()),
         None => match bindings.owner_part(token) {
-            Some(part) => jig_domain_client::application::owner_effect(part),
+            Some(part) => jig_client_view::application::owner_effect(part),
             None => None,
         },
     }

@@ -18,11 +18,8 @@ fn a_draft_round_trips_through_the_small_store() {
 }
 #[test]
 fn a_record_of_another_version_is_dropped() {
-    let record = Record::Place {
-        version: u16::MAX,
-        party: fixtures::PARTY,
-        address: jig_domain_client::address::Address::Deployment,
-    };
+    let record =
+        Record::Place { version: u16::MAX, party: fixtures::PARTY, address: crate::address::Address::Deployment };
     let (key, bytes) = records::encode(&record);
     assert_eq!(records::decode(&key, &bytes), None);
 }
@@ -44,7 +41,7 @@ fn a_draft_at_its_ceiling_round_trips_unchanged() {
         version: records::RECORDS_VERSION,
         party: fixtures::PARTY,
         task: fixtures::TASK,
-        words: jig_client_domain::contract::Text::new(skein_lib::bytes::zeroed(65536), 65536).unwrap(),
+        words: jig_client::contract::Text::new(skein_lib::bytes::zeroed(65536), 65536).unwrap(),
         touched: u64::MAX,
     };
     round_trip(record);

@@ -8,23 +8,23 @@
 use crate::phrases::english;
 use crate::phrases::jig::{JigPhrase, shapes};
 use crate::words::Words;
-use crate::{JigBindings, JigMeaning, Owner, decode};
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Event, Request,
     action::Act as Action,
     address::Address,
     boundary::Offset,
     intents::Progress,
-    limits::Backoff,
+    limits::ui::Backoff,
     objects::{Card, Left, Source},
 };
+use crate::{JigBindings, JigMeaning, Owner, decode};
+use jig_client::contract::*;
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 use skein_ui::Act;
 use skein_ui::phrases::{Hole, PhraseLimits, Phrasebook};
 use skein_ui::{Builder, Role, SlotRef, Tree};
 
-pub(super) const CLIENT: jig_domain_client::Limits = jig_domain_client::Limits {
+pub(super) const CLIENT: crate::Limits = crate::Limits {
     watches: 8,
     notices: 2,
     notice_life: Duration::from_secs(5),
@@ -80,7 +80,7 @@ pub(super) fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), CLIENT.text).unwrap()
 }
 pub(super) fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
-    let mut q = Queue::with_capacity(jig_domain_client::max_out(&CLIENT));
+    let mut q = Queue::with_capacity(crate::max_out(&CLIENT));
     let starting = match &event {
         Event::Start { .. } => true,
         Event::Hello { .. }
@@ -101,9 +101,9 @@ pub(super) fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
         | Event::SignedOut
         | Event::Frame { .. } => false,
     };
-    jig_domain_client::step(d, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT }, event, &mut q);
+    crate::step(d, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT }, event, &mut q);
     if starting {
-        jig_domain_client::step(
+        crate::step(
             d,
             &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT },
             Event::Hello { served: true },
@@ -165,9 +165,9 @@ pub(super) fn document() -> Frame {
     }
 }
 pub(super) fn start() -> (Domain, Token) {
-    start_arranged(jig_domain_client::pages::Arrangement::none())
+    start_arranged(crate::page::Arrangement::none())
 }
-pub(super) fn start_arranged(arrangement: jig_domain_client::pages::Arrangement) -> (Domain, Token) {
+pub(super) fn start_arranged(arrangement: crate::page::Arrangement) -> (Domain, Token) {
     let mut d = Domain::new(&CLIENT, 1);
     d.configure_arrangement(arrangement).unwrap();
     let out = drive(
@@ -237,7 +237,7 @@ fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_
     let (mut d, frame_watch) = start();
     let source = Source::Window { generation: 0, number: 1 };
     // The public object collection is read-only in Domain; build states through its shared entry point.
-    let mut objects = jig_domain_client::objects::Objects::new(2, 8);
+    let mut objects = crate::objects::Objects::new(2, 8);
     let id = objects.name(ObjectKey::Task(7), source).unwrap();
     let words = words();
     let mut bindings = JigBindings::new(64, 128);
@@ -389,14 +389,14 @@ fn every_binding_kind_decodes_and_old_tokens_are_retired() {
     let object = Token::new(7);
     let actions = [
         Action::Go { address: Address::task(1) },
-        Action::Submit { field: jig_domain_client::fields::Purpose::Answer },
+        Action::Submit { field: crate::fields::Purpose::Answer },
         Action::Intend { object, act: ActKind::Cancel },
         Action::Choose { option: 2 },
         Action::Confirm,
         Action::Dismiss,
         Action::Fold { object, open: true },
         Action::Filter { group: InboxGroup::Questions, project: None },
-        Action::More { window: object, end: jig_domain_client::action::End::Before },
+        Action::More { window: object, end: crate::action::End::Before },
         Action::SignIn { provider: 1 },
     ];
     for action in actions {
@@ -404,7 +404,7 @@ fn every_binding_kind_decodes_and_old_tokens_are_retired() {
         assert_eq!(decode(&mut bindings, token, Act::Press), Some(action));
         assert_eq!(decode(&mut bindings, token, Act::Input { value: Box::new([]) }), None);
     }
-    let field = jig_domain_client::fields::Purpose::Answer;
+    let field = crate::fields::Purpose::Answer;
     let token = bindings.insert(JigMeaning::Field(field)).token;
     assert_eq!(
         decode(&mut bindings, token, Act::Input { value: b"yes".as_slice().into() }),

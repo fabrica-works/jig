@@ -5,8 +5,8 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use jig_client_domain::contract::{Recurring, RecurringOverlap};
-use jig_domain_client::{Domain, action::Act, address::Address};
+use crate::{Domain, action::Act, address::Address};
+use jig_client::contract::{Recurring, RecurringOverlap};
 
 pub(super) fn recurring(b: &mut Builder, client: &Domain, row: &Recurring, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Region);

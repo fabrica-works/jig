@@ -1,5 +1,5 @@
 use super::*;
-use jig_domain_client::address::{Address, TaskSection};
+use crate::address::{Address, TaskSection};
 
 #[test]
 fn task_pages_keep_owner_requesters_and_live_retained_stored_links_without_filling_missing_facts() {

@@ -3,9 +3,9 @@
 use jig_client_domain::contract::Outcome;
 use jig_client_domain::contract::*;
 use jig_client_view::Owner;
+use jig_client_view::boundary::Offset;
 use jig_client_world::harness::Seen;
 use jig_client_world::{harness::*, observe};
-use jig_domain_client::boundary::Offset;
 use jig_ops_client_domain::{
     self as domain, Action, Address, Event, JigOut, Request, infrastructure as infra, observability as obs,
 };
@@ -27,7 +27,7 @@ pub struct Ops;
 #[must_use]
 pub fn limits() -> domain::Limits {
     domain::Limits {
-        jig: jig_domain_client::Limits {
+        jig: jig_client_view::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -54,7 +54,7 @@ pub fn limits() -> domain::Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_domain_client::limits::Backoff {
+            backoff: jig_client_view::limits::ui::Backoff {
                 first: Duration::from_millis(10),
                 most: Duration::from_millis(80),
             },
@@ -164,7 +164,7 @@ impl App for Ops {
         domain::configure_arrangement(&mut root, view::arrangement()).expect("ops arrangement before start");
         domain::provider(
             &mut root,
-            jig_domain_client::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },
+            jig_client_view::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },
         )
         .expect("provider fits");
         (root, view::View::new(&bounds, &limits, jig, obs, infra, 1))
@@ -235,10 +235,10 @@ impl App for Ops {
                 Some(Event::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None })
             }
             Request::Jig(JigOut::Read { read, .. }) => {
-                Some(Event::Jig(jig_domain_client::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
+                Some(Event::Jig(jig_client_view::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
             }
             Request::Jig(JigOut::Open { watch, .. } | JigOut::Continue { watch, .. } | JigOut::Close { watch }) => {
-                Some(Event::Jig(jig_domain_client::Event::Ended { watch, end: WatchEnd::Dropped }))
+                Some(Event::Jig(jig_client_view::Event::Ended { watch, end: WatchEnd::Dropped }))
             }
             Request::Observability(obs::Out::Read { read, .. }) => {
                 Some(Event::Observability(obs::Event::Read { read, result: obs::ReadResult::Busy }))
@@ -283,7 +283,7 @@ impl App for Ops {
     }
     fn window_changed(event: &Event) -> bool {
         match event {
-            Event::Act { action: Action::Jig(act) } | Event::Jig(jig_domain_client::Event::Act { act }) => {
+            Event::Act { action: Action::Jig(act) } | Event::Jig(jig_client_view::Event::Act { act }) => {
                 observe::jig_window_changed(act)
             }
             Event::Act {

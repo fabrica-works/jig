@@ -49,7 +49,7 @@ fn a_draft_is_kept_across_a_reload() {
         ],
     );
     w.run(Until::Done);
-    assert!(w.kept(c).iter().any(|r| matches!(r,jig_client_test_domain::store::Record::Jig(jig_domain_client::store::Record::Draft { words,.. }) if words.bytes()==b"Unsent draft")));
+    assert!(w.kept(c).iter().any(|r| matches!(r,jig_client_test_domain::store::Record::Jig(jig_client_view::store::Record::Draft { words,.. }) if words.bytes()==b"Unsent draft")));
     assert!(w.tree(c).nodes().iter().any(|n| n.value.as_ref().is_some_and(|v| v.text.as_ref() == b"Unsent draft")));
 }
 
@@ -201,9 +201,9 @@ fn a_goal_beyond_the_allotment_is_proposed_as_the_confirmation_said() {
         let mut w = stories::goal_world(seed);
         let c = w.client(
             7,
-            jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
+            jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Project {
                 project: 1,
-                section: jig_domain_client::address::ProjectSection::Goals,
+                section: jig_client_view::address::ProjectSection::Goals,
             }),
         );
         w.person(
@@ -243,9 +243,9 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
         let mut w = stories::procedure_goal_world(seed);
         let c = w.client(
             7,
-            jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
+            jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Project {
                 project: 1,
-                section: jig_domain_client::address::ProjectSection::Goals,
+                section: jig_client_view::address::ProjectSection::Goals,
             }),
         );
         w.person(

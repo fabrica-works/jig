@@ -9,7 +9,7 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_client_domain::contract::*;
+use jig_client::contract::*;
 use skein_lib::{Duration, List, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), 8).unwrap(), cut }
@@ -87,8 +87,8 @@ fn fixture() -> OwnerAmendmentState {
         cut: false,
     }
 }
-fn client_limits() -> jig_domain_client::Limits {
-    jig_domain_client::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
+fn client_limits() -> crate::Limits {
+    crate::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
 }
 fn phrase_limits() -> PhraseLimits {
     PhraseLimits {
@@ -388,11 +388,11 @@ fn owner_amendment_whole_tree_envelope_checks_full_nested_capacities_and_overflo
         let mut larger = value.clone();
         mutate(&mut larger);
         assert!(view::required(&larger, &limits, words).is_none());
-        assert!(view::required(&larger, &jig_domain_client::Limits { rows: 4, ..limits }, words).is_some());
+        assert!(view::required(&larger, &crate::Limits { rows: 4, ..limits }, words).is_some());
     }
-    assert!(view::required(&value, &jig_domain_client::Limits { text: 4, ..limits }, words).is_none());
-    assert!(view::worst_case(&jig_domain_client::Limits { text: u32::MAX, ..limits }, words).is_none());
-    assert!(view::worst_case(&jig_domain_client::Limits { rows: u32::MAX, ..limits }, words).is_none());
+    assert!(view::required(&value, &crate::Limits { text: 4, ..limits }, words).is_none());
+    assert!(view::worst_case(&crate::Limits { text: u32::MAX, ..limits }, words).is_none());
+    assert!(view::worst_case(&crate::Limits { rows: u32::MAX, ..limits }, words).is_none());
     let mut full = value;
     full.instructions = Some(doc(b"12345678", true));
     full.spec.specification.words = doc(b"12345678", true);

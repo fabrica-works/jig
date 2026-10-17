@@ -2,8 +2,8 @@
 use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{Change, Rows, Source};
 use jig_client_test_domain::{Address as RootAddress, family};
+use jig_client_view::address::{Address, TaskSection};
 use jig_client_world::{Scripted, Test, Until, World, stories};
-use jig_domain_client::address::{Address, TaskSection};
 use skein_fake_person::{Find, Step};
 use skein_lib::{Duration, Wall};
 use skein_ui::Role;

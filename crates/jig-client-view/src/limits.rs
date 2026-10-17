@@ -7,7 +7,7 @@ use skein_ui::Limits;
 /// fragments and application pages use `compose`. Custom
 /// languages use `of_words` to include their checked saying capacities.
 #[must_use]
-pub fn of(client: &jig_domain_client::Limits, arrangement: &jig_domain_client::pages::Arrangement) -> Option<Limits> {
+pub fn of(client: &crate::Limits, arrangement: &crate::page::Arrangement) -> Option<Limits> {
     let phrase = client.text.max(64).checked_mul(3)?.checked_add(256)?;
     with_phrase_bytes(client, phrase, arrangement, 0, 0, 0)
 }
@@ -15,9 +15,9 @@ pub fn of(client: &jig_domain_client::Limits, arrangement: &jig_domain_client::p
 /// The same renderer envelope using the largest checked saying across
 /// every loaded language; the root may switch language without resizing.
 #[must_use]
-pub fn of_words(client: &jig_domain_client::Limits, words: &crate::words::Words) -> Option<Limits> {
+pub fn of_words(client: &crate::Limits, words: &crate::words::Words) -> Option<Limits> {
     let phrase = crate::phrases::jig_capacity(&words.book)?;
-    with_phrase_bytes(client, phrase, &jig_domain_client::pages::Arrangement::none(), 0, 0, 0)
+    with_phrase_bytes(client, phrase, &crate::page::Arrangement::none(), 0, 0, 0)
 }
 
 /// Compose shared siblings around the larger jig or application page.
@@ -26,9 +26,9 @@ pub fn of_words(client: &jig_domain_client::Limits, words: &crate::words::Words)
 /// own fragments when those exceed jig's checked saying envelope.
 #[must_use]
 pub fn compose(
-    client: &jig_domain_client::Limits,
+    client: &crate::Limits,
     words: &crate::words::Words,
-    arrangement: &jig_domain_client::pages::Arrangement,
+    arrangement: &crate::page::Arrangement,
     application_nodes: u32,
     slot_nodes: u32,
     slot_depth: u32,
@@ -37,9 +37,9 @@ pub fn compose(
     with_phrase_bytes(client, phrase, arrangement, application_nodes, slot_nodes, slot_depth)
 }
 fn with_phrase_bytes(
-    client: &jig_domain_client::Limits,
+    client: &crate::Limits,
     phrase: u32,
-    arrangement: &jig_domain_client::pages::Arrangement,
+    arrangement: &crate::page::Arrangement,
     application_nodes: u32,
     slot_nodes: u32,
     slot_depth: u32,
@@ -54,9 +54,9 @@ fn with_phrase_bytes(
 /// supplies its own node, binding, slot, text and patch capacities.
 #[must_use]
 pub fn envelope(
-    client: &jig_domain_client::Limits,
+    client: &crate::Limits,
     phrase: u32,
-    arrangement: &jig_domain_client::pages::Arrangement,
+    arrangement: &crate::page::Arrangement,
     application_nodes: u32,
     slot_nodes: u32,
     slot_depth: u32,
@@ -101,3 +101,5 @@ pub fn envelope(
 pub fn jig_worst_case(limits: &Limits) -> Option<u64> {
     skein_ui::worst_case(limits)?.checked_add(crate::pages::scratch(limits)?)
 }
+
+pub mod ui;

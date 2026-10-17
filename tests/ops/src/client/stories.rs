@@ -4,13 +4,13 @@ use super::{Document, Ops, OpsScript, Scripted, Subject};
 use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{Bounds, Script, Truth};
 use jig_client_view::Owner;
+use jig_client_view::address::{Address as JigAddress, TaskSection};
 use jig_client_world::{
     Settings, World,
     harness::{CardKey, CardSeen, Seen},
     observe,
     stories::{frame, party, proposal, task, text},
 };
-use jig_domain_client::address::{Address as JigAddress, TaskSection};
 use jig_ops_client_domain::{Address, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
 use skein_fake_person::{Face, Find, Found, TreeFace};

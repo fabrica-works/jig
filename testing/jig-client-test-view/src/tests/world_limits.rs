@@ -70,7 +70,7 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
     let base = jig_client_view::limits::compose(
         &domain.jig,
         jig,
-        &jig_domain_client::pages::Arrangement::none(),
+        &jig_client_view::page::Arrangement::none(),
         u32::try_from(application).unwrap(),
         0,
         owner.depth + 4,
@@ -83,7 +83,7 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
         jig_client_view::limits::compose(
             &domain.jig,
             jig,
-            &jig_domain_client::pages::Arrangement::none(),
+            &jig_client_view::page::Arrangement::none(),
             u32::try_from(application).unwrap(),
             u32::try_from(slots).unwrap(),
             owner.depth + 4,
@@ -110,7 +110,7 @@ fn bounded_world_storage_survives_the_jig_envelopes_text_overflow() {
     let envelope = jig_client_view::limits::envelope(
         &domain.jig,
         jig_client_view::phrases::jig_capacity(&jig.book).unwrap(),
-        &jig_domain_client::pages::Arrangement::none(),
+        &jig_client_view::page::Arrangement::none(),
         0,
         0,
         0,

@@ -164,7 +164,7 @@ impl Document {
     }
     /// The incident's lead's plan, as jig's whole section (examples.md, 8).
     #[must_use]
-    pub fn sections(&self) -> List<jig_domain_client::pages::Section> {
+    pub fn sections(&self) -> List<jig_client_view::page::Section> {
         let lead = match self {
             Self::Incident(incident) => incident.lead,
             Self::Native(document) => match &document.value {
@@ -180,9 +180,9 @@ impl Document {
         let mut sections = List::with_capacity(1);
         if let Some(task) = lead {
             sections
-                .push(jig_domain_client::pages::Section::Task {
+                .push(jig_client_view::page::Section::Task {
                     task,
-                    section: jig_domain_client::address::TaskSection::Plan,
+                    section: jig_client_view::address::TaskSection::Plan,
                 })
                 .expect("one lead section fits");
         }

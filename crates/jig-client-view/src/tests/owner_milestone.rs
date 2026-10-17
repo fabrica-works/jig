@@ -4,8 +4,8 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::Domain;
+use crate::Domain;
+use jig_client::contract::*;
 use skein_lib::{
     List, Wall,
     bytes::{copy_of, find},
@@ -25,8 +25,8 @@ fn part(capacity: u32) -> OwnerPart {
 fn line(phase: OwnerMilestonePhase) -> OwnerMilestoneLine {
     OwnerMilestoneLine { task: u64::MAX, position: u64::MAX, phase, at: None }
 }
-fn limits() -> jig_domain_client::Limits {
-    jig_domain_client::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
+fn limits() -> crate::Limits {
+    crate::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
 }
 fn words(selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
@@ -397,8 +397,8 @@ fn owner_milestone_whole_view_refuses_each_nested_reserved_list_text_and_opaque_
     });
     let unchanged = exact.clone();
     assert!(view::required(&exact, &base, &w).is_some());
-    assert!(view::required(&exact, &jig_domain_client::Limits { rows: 2, ..base }, &w).is_none());
-    assert!(view::required(&exact, &jig_domain_client::Limits { text: 7, ..base }, &w).is_none());
+    assert!(view::required(&exact, &crate::Limits { rows: 2, ..base }, &w).is_none());
+    assert!(view::required(&exact, &crate::Limits { text: 7, ..base }, &w).is_none());
     assert_eq!(exact, unchanged);
     for phase in [
         OwnerMilestonePhase::Ended(OwnerChipEnding::Done(ResultValue::Approved {
@@ -409,7 +409,7 @@ fn owner_milestone_whole_view_refuses_each_nested_reserved_list_text_and_opaque_
     ] {
         let value = line(phase);
         assert!(view::required(&value, &base, &w).is_some());
-        assert!(view::required(&value, &jig_domain_client::Limits { text: 7, ..base }, &w).is_none());
+        assert!(view::required(&value, &crate::Limits { text: 7, ..base }, &w).is_none());
     }
     let empty = line(OwnerMilestonePhase::Held {
         before: OwnerPriorPhase::Waiting,
@@ -418,8 +418,8 @@ fn owner_milestone_whole_view_refuses_each_nested_reserved_list_text_and_opaque_
         ending: None,
     });
     assert!(view::required(&empty, &base, &w).is_none());
-    assert!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..base }).is_none());
-    assert!(view::worst_case(&jig_domain_client::Limits { text: u32::MAX, ..base }, &w).is_none());
+    assert!(view::max_nodes(&crate::Limits { rows: u32::MAX, ..base }).is_none());
+    assert!(view::worst_case(&crate::Limits { text: u32::MAX, ..base }, &w).is_none());
 }
 #[test]
 fn owner_milestone_second_checked_language_and_full_fragment_preserve_raw_slots_and_reject_wrong_holes() {

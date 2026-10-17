@@ -63,8 +63,7 @@ pub fn page(builder: &mut Builder, side: &observability::Side, words: &Words, bi
     builder.close();
 }
 fn plan_slot(builder: &mut Builder, task: u64, words: &Words, bindings: &mut Bindings) {
-    let section =
-        jig_domain_client::pages::Section::Task { task, section: jig_domain_client::address::TaskSection::Plan };
+    let section = jig_client_view::page::Section::Task { task, section: jig_client_view::address::TaskSection::Plan };
     let binding = bindings.insert(Meaning::Section(section));
     builder.slot(SlotRef { owner: Owner::Jig.opaque(), token: binding.token }, &words.say(Word::Loading, &[]));
 }

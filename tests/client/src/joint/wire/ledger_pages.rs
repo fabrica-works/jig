@@ -4,7 +4,7 @@
 use super::{chips, cursor, owner, pages::Invalid, results};
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
-use jig_domain_client::Limits;
+use jig_client_view::Limits;
 use jig_domain_core::reads;
 use jig_domain_tasks as tasks;
 use skein_lib::List;

@@ -7,12 +7,12 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use jig_client_domain::contract::Chip;
-use jig_domain_client::{
+use crate::{
     Domain,
     action::Act,
     objects::{Card, Left, Object},
 };
+use jig_client::contract::Chip;
 use skein_lib::{Id, List};
 
 /// The context line chosen by the page that shows this same object.
@@ -142,26 +142,26 @@ pub fn card(
         return rendered;
     }
     match &facts.body {
-        Some(jig_domain_client::objects::Body::Historical(_)) => return false,
-        Some(jig_domain_client::objects::Body::OwnerProposal(_)) => {
+        Some(crate::objects::Body::Historical(_)) => return false,
+        Some(crate::objects::Body::OwnerProposal(_)) => {
             proposal::owner_proposal(b, client, object, place, words, bindings);
         }
-        Some(jig_domain_client::objects::Body::Proposal(_)) => {
+        Some(crate::objects::Body::Proposal(_)) => {
             proposal::proposal(b, client, object, place, words, bindings);
         }
-        Some(jig_domain_client::objects::Body::Question(_)) => {
+        Some(crate::objects::Body::Question(_)) => {
             question::question(b, client, object, place, words, bindings);
         }
-        Some(jig_domain_client::objects::Body::OwnerPersonTask(_)) => {
+        Some(crate::objects::Body::OwnerPersonTask(_)) => {
             crate::owner_person_task::card(b, client, object, place, words, bindings);
         }
-        Some(jig_domain_client::objects::Body::PersonTask(_)) => {
+        Some(crate::objects::Body::PersonTask(_)) => {
             person::person_task(b, client, object, place, words, bindings);
         }
-        Some(jig_domain_client::objects::Body::Result(_)) => {
+        Some(crate::objects::Body::Result(_)) => {
             result::result(b, client, object, place, words, bindings);
         }
-        Some(jig_domain_client::objects::Body::Chip(chip)) => {
+        Some(crate::objects::Body::Chip(chip)) => {
             let title =
                 words.say(JigPhrase::ChipNumber, &[Hole::Number(chip.task), crate::words::name(chip.title.bytes())]);
             if open(b, client, object, place, &title, words, bindings) {
@@ -169,7 +169,7 @@ pub fn card(
                 close(b);
             }
         }
-        Some(jig_domain_client::objects::Body::Task(task)) => {
+        Some(crate::objects::Body::Task(task)) => {
             let title = words.say(
                 JigPhrase::ChipNumber,
                 &[Hole::Number(task.chip.task), crate::words::name(task.chip.title.bytes())],
@@ -183,13 +183,13 @@ pub fn card(
                 close(b);
             }
         }
-        Some(jig_domain_client::objects::Body::OwnerEscalation(_)) => {
+        Some(crate::objects::Body::OwnerEscalation(_)) => {
             return owner_escalation::card(b, client, object, place, words, bindings);
         }
-        Some(jig_domain_client::objects::Body::Escalation(_)) => {
+        Some(crate::objects::Body::Escalation(_)) => {
             escalation::escalation(b, client, object, place, words, bindings);
         }
-        Some(jig_domain_client::objects::Body::Note { document, .. }) => {
+        Some(crate::objects::Body::Note { document, .. }) => {
             if open(b, client, object, place, document.description.bytes(), words, bindings) {
                 crate::document_text::loss(b, &document.description, words);
                 crate::document_text::markdown(b, &document.body, words);
@@ -197,10 +197,10 @@ pub fn card(
                     words.text(b, JigPhrase::NoteReferencesCut, &[]);
                 }
                 match document.writer {
-                    jig_client_domain::contract::NoteAuthor::Party { party } => {
+                    jig_client::contract::NoteAuthor::Party { party } => {
                         words.text(b, JigPhrase::NoteWriterParty, &[Hole::Number(party)]);
                     }
-                    jig_client_domain::contract::NoteAuthor::Task { task, attempt } => {
+                    jig_client::contract::NoteAuthor::Task { task, attempt } => {
                         words.text(b, JigPhrase::NoteWriterTask, &[Hole::Number(task), Hole::Number(attempt)]);
                     }
                 }
@@ -217,7 +217,7 @@ pub fn card(
                         Role::Link,
                         JigPhrase::TaskPage,
                         &[Hole::Number(*task)],
-                        Act::Go { address: jig_domain_client::address::Address::task(*task) },
+                        Act::Go { address: crate::address::Address::task(*task) },
                     );
                 }
                 common::answer(b, facts, words);
@@ -253,7 +253,7 @@ fn received_card(
     None
 }
 /// A refusal without a current object remains a named card of its whole facts.
-pub fn refusal(b: &mut Builder, refusal: &jig_client_domain::contract::Refusal, words: &Words) {
+pub fn refusal(b: &mut Builder, refusal: &jig_client::contract::Refusal, words: &Words) {
     b.open(Role::Region);
     b.name(&words.say(JigPhrase::Refused, &[]));
     words.refusal(b, refusal);

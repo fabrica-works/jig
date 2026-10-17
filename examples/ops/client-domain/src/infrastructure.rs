@@ -16,7 +16,7 @@ use alloc::boxed::Box;
 pub use documents::{Answer, Ask};
 pub use documents::{Document, Kind, ReadResult, Scope, Subject, WatchEnd, WatchEvent};
 use jig_client_domain::contract::{Part, Revision};
-use jig_domain_client::{frame::FrameShown, link::Link};
+use jig_client_view::{frame::me::FrameShown, link::Link};
 use skein_lib::{Env, Id, List, Map, Queue, RequestProgress, Slab, Time, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Address {

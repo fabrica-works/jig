@@ -5,8 +5,8 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{HistoryChange, HistoryRow};
-use jig_domain_client::{Domain, action::Act};
+use crate::{Domain, action::Act};
+use jig_client::contract::{HistoryChange, HistoryRow};
 pub(super) fn history(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
     for (subtree, phrase) in [(false, JigPhrase::OwnHistory), (true, JigPhrase::SubtreeHistory)] {
         crate::pages::work::control(
@@ -38,13 +38,7 @@ pub(super) fn history(b: &mut Builder, client: &Domain, words: &Words, bindings:
     }
     b.close();
     crate::pages::cut(b, words, client.history_rows().cut);
-    crate::pages::edges(
-        b,
-        words,
-        bindings,
-        &client.history_rows().edges,
-        jig_domain_client::pages::task::HISTORY_WINDOW,
-    );
+    crate::pages::edges(b, words, bindings, &client.history_rows().edges, crate::page::task::HISTORY_WINDOW);
 }
 
 fn task_link(b: &mut Builder, task: u64, words: &Words, bindings: &mut JigBindings) {
@@ -55,10 +49,10 @@ fn task_link(b: &mut Builder, task: u64, words: &Words, bindings: &mut JigBindin
         Role::Link,
         JigPhrase::TaskPage,
         &[Hole::Number(task)],
-        Act::Go { address: jig_domain_client::address::Address::task(task) },
+        Act::Go { address: crate::address::Address::task(task) },
     );
 }
-fn line(b: &mut Builder, row: &jig_client_domain::contract::HistoryLine, words: &Words, bindings: &mut JigBindings) {
+fn line(b: &mut Builder, row: &jig_client::contract::HistoryLine, words: &Words, bindings: &mut JigBindings) {
     b.key(skein_ui::Key { owner: crate::Owner::Jig.opaque(), kind: 21, a: row.task, b: row.position });
     crate::frame::control(
         b,
@@ -67,7 +61,7 @@ fn line(b: &mut Builder, row: &jig_client_domain::contract::HistoryLine, words: 
         Role::Link,
         JigPhrase::TaskPage,
         &[Hole::Number(row.task)],
-        Act::Go { address: jig_domain_client::address::Address::task(row.task) },
+        Act::Go { address: crate::address::Address::task(row.task) },
     );
     words.actor(b, row.by);
     words.wall(b, row.at);

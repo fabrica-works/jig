@@ -1,6 +1,6 @@
 use jig_client_test_domain::{Address as RootAddress, Event, Place};
+use jig_client_view::address::{Address, ProjectSection};
 use jig_client_world::{ClientId, Fault, FrontFault, Scripted, Test, Until, World, stories};
-use jig_domain_client::address::{Address, ProjectSection};
 use skein_fake_person::{Find, Step};
 use skein_lib::{Duration, Time, Wall};
 use skein_ui::Act;

@@ -2,7 +2,7 @@
 use crate::{phrases::jig::JigPhrase, words::Words};
 use skein_ui::{Builder, Run};
 
-use jig_client_domain::contract::DocumentText;
+use jig_client::contract::DocumentText;
 
 /// Show the exact supplied bytes and that value's own loss marker.
 pub fn plain(b: &mut Builder, value: &DocumentText, words: &Words) {

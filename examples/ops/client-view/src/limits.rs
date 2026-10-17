@@ -3,13 +3,13 @@
 use crate::{bindings, drawing, words::Words};
 /// Every task section is visible together (examples.md, 8).
 #[must_use]
-pub fn arrangement() -> jig_domain_client::pages::Arrangement {
-    use jig_domain_client::address::TaskSection::{Activity, Budget, History, Overview, Panels, Plan};
+pub fn arrangement() -> jig_client_view::page::Arrangement {
+    use jig_client_view::address::TaskSection::{Activity, Budget, History, Overview, Panels, Plan};
     let mut task = skein_lib::List::with_capacity(6);
     for section in [Overview, Activity, Plan, History, Budget, Panels] {
         task.push(section).expect("six task sections fit");
     }
-    jig_domain_client::pages::Arrangement { task, project: skein_lib::List::with_capacity(0) }
+    jig_client_view::page::Arrangement { task, project: skein_lib::List::with_capacity(0) }
 }
 /// Bounds for the composed tree and owner bindings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,7 +48,7 @@ impl Limits {
             .checked_mul(8)?;
         let jig_nodes = jig_client_view::limits::of_words(&domain.jig, jig)?.nodes;
         let jig_cards = jig_client_view::card_nodes(&domain.jig)?.checked_mul(rows.checked_add(1)?)?.checked_add(
-            jig_client_view::task_section_nodes(&domain.jig, jig_domain_client::address::TaskSection::Plan)?
+            jig_client_view::task_section_nodes(&domain.jig, jig_client_view::address::TaskSection::Plan)?
                 .checked_add(4)?,
         )?;
         let slot_nodes = documents

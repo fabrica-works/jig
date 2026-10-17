@@ -1,7 +1,7 @@
 //! P and Q use the composed public client under the common shell referee.
 use jig_client_domain::contract::{ObjectKey, ReadValue};
+use jig_client_view::address::{Address as JigAddress, TaskSection};
 use jig_client_world::{Until, harness::App};
-use jig_domain_client::address::{Address as JigAddress, TaskSection};
 use jig_ops_client_domain::{Address, observability as obs};
 use jig_ops_world::client::{Ops, stories};
 use skein_fake_person::{Find, Step};

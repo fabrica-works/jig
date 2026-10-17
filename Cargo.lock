@@ -259,7 +259,6 @@ dependencies = [
  "jig-client-view",
  "jig-client-world",
  "jig-core-world",
- "jig-domain-client",
  "jig-domain-core",
  "jig-domain-people",
  "jig-domain-tasks",
@@ -287,7 +286,7 @@ name = "jig-client-scripted-engine"
 version = "0.0.0"
 dependencies = [
  "jig-client-domain",
- "jig-domain-client",
+ "jig-client-view",
  "skein-lib",
 ]
 
@@ -312,7 +311,7 @@ name = "jig-client-test-domain"
 version = "0.0.0"
 dependencies = [
  "jig-client-domain",
- "jig-domain-client",
+ "jig-client-view",
  "jig-test-connector",
  "skein-lib",
 ]
@@ -350,7 +349,6 @@ dependencies = [
  "jig-client-domain",
  "jig-client-test-domain",
  "jig-client-view",
- "jig-domain-client",
  "skein-lib",
  "skein-ui",
 ]
@@ -359,8 +357,7 @@ dependencies = [
 name = "jig-client-view"
 version = "0.0.0"
 dependencies = [
- "jig-client-domain",
- "jig-domain-client",
+ "jig-client",
  "skein-codec",
  "skein-lib",
  "skein-ui",
@@ -400,7 +397,6 @@ dependencies = [
  "jig-core-world",
  "jig-domain-accounts",
  "jig-domain-authority",
- "jig-domain-client",
  "jig-domain-core",
  "jig-domain-fleet",
  "jig-domain-notes",
@@ -503,14 +499,6 @@ dependencies = [
 name = "jig-domain-brief"
 version = "0.0.0"
 dependencies = [
- "skein-lib",
-]
-
-[[package]]
-name = "jig-domain-client"
-version = "0.0.0"
-dependencies = [
- "jig-client-domain",
  "skein-lib",
 ]
 
@@ -703,7 +691,7 @@ name = "jig-ops-client-domain"
 version = "0.0.0"
 dependencies = [
  "jig-client-domain",
- "jig-domain-client",
+ "jig-client-view",
  "jig-ops-domain-connectors",
  "skein-lib",
 ]
@@ -714,7 +702,6 @@ version = "0.0.0"
 dependencies = [
  "jig-client-domain",
  "jig-client-view",
- "jig-domain-client",
  "jig-ops-client-domain",
  "jig-ops-domain-connectors",
  "skein-lib",
@@ -784,7 +771,6 @@ dependencies = [
  "jig-core-world",
  "jig-domain-accounts",
  "jig-domain-authority",
- "jig-domain-client",
  "jig-domain-core",
  "jig-domain-fleet",
  "jig-domain-host",
@@ -905,9 +891,9 @@ dependencies = [
  "jig-client-protocol-link",
  "jig-client-protocol-wire",
  "jig-client-test-records",
+ "jig-client-view",
  "jig-domain-accounts",
  "jig-domain-authority",
- "jig-domain-client",
  "jig-domain-core",
  "jig-domain-fleet",
  "jig-domain-notes",

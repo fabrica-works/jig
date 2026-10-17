@@ -3,8 +3,8 @@ use super::cards::{CLIENT, contains, document, drive, limits, start, text, words
 use crate::{JigBindings, Owner, phrases::jig::JigPhrase};
 use skein_ui::{Builder, Role, SlotRef, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::{Domain, Event};
+use crate::{Domain, Event};
+use jig_client::contract::*;
 use skein_lib::{List, Token, Wall};
 fn tree(domain: &Domain) -> Tree {
     frame_tree(domain, words())
@@ -127,11 +127,7 @@ fn chat_forms_join_membership_only_by_supplied_project_and_preserve_optional_cha
     let mut domain = ready(source.clone());
     drive(
         &mut domain,
-        Event::Went {
-            place: jig_domain_client::address::Place::Jig(jig_domain_client::address::Address::Conversations {
-                project: None,
-            }),
-        },
+        Event::Went { place: crate::address::Place::Jig(crate::address::Address::Conversations { project: None }) },
     );
     let shown = super::pages::build(&domain, 1, words()).0;
     for bytes in
@@ -143,11 +139,7 @@ fn chat_forms_join_membership_only_by_supplied_project_and_preserve_optional_cha
     let mut mismatched = ready(source);
     drive(
         &mut mismatched,
-        Event::Went {
-            place: jig_domain_client::address::Place::Jig(jig_domain_client::address::Address::Conversations {
-                project: None,
-            }),
-        },
+        Event::Went { place: crate::address::Place::Jig(crate::address::Address::Conversations { project: None }) },
     );
     let shown = super::pages::build(&mismatched, 1, words()).0;
     assert!(!contains(&shown, b"Budget 123"));
@@ -168,19 +160,19 @@ fn choosing_sign_out_keeps_the_frame_until_the_shell_answers() {
     let source = sign_out_frame(PartyKind::Person);
     let mut domain = ready(source.clone());
     let out = choose_sign_out(&mut domain);
-    assert_eq!(out.as_ref(), &[jig_domain_client::Request::SignOut]);
+    assert_eq!(out.as_ref(), &[crate::Request::SignOut]);
     assert_eq!(domain.frame().document.as_ref(), Some(&source));
     assert!(offers_sign_out(&sign_out_tree(&domain)));
     drive(&mut domain, Event::SignedOut);
     assert!(domain.frame().document.is_none());
-    assert_eq!(domain.page(), &jig_domain_client::pages::Page::SigningIn);
+    assert_eq!(domain.page(), &crate::page::Page::SigningIn);
 }
 
 fn offers_sign_out(shown: &Tree) -> bool {
     shown.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Sign out"))
 }
-fn choose_sign_out(domain: &mut Domain) -> Box<[jig_domain_client::Request]> {
-    drive(domain, Event::Act { act: jig_domain_client::action::Act::SignOut }).into_boxed_slice()
+fn choose_sign_out(domain: &mut Domain) -> Box<[crate::Request]> {
+    drive(domain, Event::Act { act: crate::action::Act::SignOut }).into_boxed_slice()
 }
 
 fn sign_out_frame(kind: PartyKind) -> Frame {

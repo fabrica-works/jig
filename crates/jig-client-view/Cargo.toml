@@ -8,10 +8,9 @@ publish.workspace = true
 
 [dependencies]
 skein-codec.workspace = true
-jig-client-domain.workspace = true
+jig-client.workspace = true
 skein-ui.workspace = true
 skein-lib.workspace = true
-jig-domain-client.workspace = true
 
 [lints]
 workspace = true

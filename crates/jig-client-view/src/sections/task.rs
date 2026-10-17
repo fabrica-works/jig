@@ -5,13 +5,13 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use jig_client_domain::contract::{Executor, ObjectKey, Task};
-use jig_domain_client::{
+use crate::{
     Domain,
     action::Act,
     address::{Address, TaskSection},
     objects::Body,
 };
+use jig_client::contract::{Executor, ObjectKey, Task};
 mod history;
 mod plan;
 /// The task's shared card and context, while any of its sections shows.
@@ -61,11 +61,11 @@ fn shown(client: &Domain) -> Option<u64> {
     for section in client.sections() {
         if client.shows(*section) {
             match section {
-                jig_domain_client::pages::Section::Task { task, .. } => return Some(*task),
-                jig_domain_client::pages::Section::Inbox { .. }
-                | jig_domain_client::pages::Section::Conversations { .. }
-                | jig_domain_client::pages::Section::Project { .. }
-                | jig_domain_client::pages::Section::Deployment => {}
+                crate::page::Section::Task { task, .. } => return Some(*task),
+                crate::page::Section::Inbox { .. }
+                | crate::page::Section::Conversations { .. }
+                | crate::page::Section::Project { .. }
+                | crate::page::Section::Deployment => {}
             }
         }
     }
@@ -99,7 +99,7 @@ pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     let Some(doc) = document(client, number) else {
         return false;
     };
-    let sections = jig_domain_client::pages::task::offers(doc);
+    let sections = crate::page::task::offers(doc);
     b.open(Role::Tabs);
     b.region(crate::regions::JigRegion::TaskTabs.region());
     b.name(&words.say(JigPhrase::TaskPage, &[Hole::Number(number)]));
@@ -112,13 +112,13 @@ pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
             section_phrase(*offered),
             Act::Go { address },
             match client.page() {
-                jig_domain_client::pages::Page::Work { address: own, .. } => own == &address,
-                jig_domain_client::pages::Page::Starting
-                | jig_domain_client::pages::Page::SigningIn
-                | jig_domain_client::pages::Page::Elsewhere
-                | jig_domain_client::pages::Page::Missing
-                | jig_domain_client::pages::Page::OutOfDate
-                | jig_domain_client::pages::Page::SomeoneElse => false,
+                crate::page::Page::Work { address: own, .. } => own == &address,
+                crate::page::Page::Starting
+                | crate::page::Page::SigningIn
+                | crate::page::Page::Elsewhere
+                | crate::page::Page::Missing
+                | crate::page::Page::OutOfDate
+                | crate::page::Page::SomeoneElse => false,
             },
         );
     }
@@ -132,8 +132,8 @@ pub(crate) fn all_shown(client: &Domain) -> bool {
     let Some(doc) = document(client, number) else {
         return false;
     };
-    for section in &jig_domain_client::pages::task::offers(doc).offered {
-        if !client.shows(jig_domain_client::pages::Section::Task { task: number, section: *section }) {
+    for section in &crate::page::task::offers(doc).offered {
+        if !client.shows(crate::page::Section::Task { task: number, section: *section }) {
             return false;
         }
     }
@@ -147,12 +147,12 @@ pub(crate) fn section(
     task: u64,
     section: TaskSection,
 ) -> bool {
-    if !client.shows(jig_domain_client::pages::Section::Task { task, section }) {
+    if !client.shows(crate::page::Section::Task { task, section }) {
         return false;
     }
     crate::pages::work::section(b, words, section_phrase(section), region(section));
     crate::pages::mark_current(b, client, Address::Task { task, section });
-    super::status(b, client, words, jig_domain_client::pages::Section::Task { task, section });
+    super::status(b, client, words, crate::page::Section::Task { task, section });
     if let Some(doc) = document(client, task) {
         match section {
             TaskSection::Overview => overview(b, client, doc, words, bindings),
@@ -201,17 +201,17 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
         .expect("bounded task parts")
         .checked_add(1)
         .expect("result slot fits");
-    for part in &jig_domain_client::pages::task::parts(doc, section, count) {
+    for part in &crate::page::task::parts(doc, section, count) {
         cards::common::part(b, part, words, bindings);
     }
     match section {
         TaskSection::Overview | TaskSection::Panels => {
             for resource in &doc.resources {
                 match resource {
-                    jig_client_domain::contract::TaskResource::Owner(value) => {
+                    jig_client::contract::TaskResource::Owner(value) => {
                         crate::owner_chip::resource(b, value, words, bindings);
                     }
-                    jig_client_domain::contract::TaskResource::Part(_) => {}
+                    jig_client::contract::TaskResource::Part(_) => {}
                 }
             }
         }
@@ -219,7 +219,7 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
     }
 }
 pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
-    if let jig_client_domain::contract::ChipPhase::Owner { details, .. } = doc.chip.details.as_ref() {
+    if let jig_client::contract::ChipPhase::Owner { details, .. } = doc.chip.details.as_ref() {
         crate::owner_chip::render(b, details, client, words, bindings);
     }
     crate::specification::document(b, &doc.spec, words);
@@ -282,15 +282,14 @@ pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Wor
 fn task_link(
     b: &mut Builder,
     client: &Domain,
-    link: &jig_client_domain::contract::OwnerTaskLink,
+    link: &jig_client::contract::OwnerTaskLink,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
     crate::owner_result::link(b, client, link, words, bindings);
     match link {
-        jig_client_domain::contract::OwnerTaskLink::Live(_)
-        | jig_client_domain::contract::OwnerTaskLink::Retained { .. } => {}
-        jig_client_domain::contract::OwnerTaskLink::Stored { number, .. } => crate::frame::control(
+        jig_client::contract::OwnerTaskLink::Live(_) | jig_client::contract::OwnerTaskLink::Retained { .. } => {}
+        jig_client::contract::OwnerTaskLink::Stored { number, .. } => crate::frame::control(
             b,
             words,
             bindings,
@@ -302,7 +301,7 @@ fn task_link(
     }
 }
 fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
-    use jig_client_domain::contract::ChipPhase;
+    use jig_client::contract::ChipPhase;
     match doc.chip.executor {
         Executor::Agent { .. } => {
             match doc.chip.details.as_ref() {

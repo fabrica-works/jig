@@ -5,8 +5,8 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
-use jig_client_domain::contract::{ObjectKey, TreeNode};
-use jig_domain_client::{Domain, action::Act, pages::task::PlanFilter};
+use crate::{Domain, action::Act, page::task::PlanFilter};
+use jig_client::contract::{ObjectKey, TreeNode};
 use skein_lib::{Set, Stack};
 #[derive(Clone, Copy, Debug)]
 enum Visit {
@@ -31,7 +31,7 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
             bindings,
             client.task_page().ended_before.as_ref(),
             client.task_page().ended_after.as_ref(),
-            jig_domain_client::pages::task::ENDED_WINDOW,
+            crate::page::task::ENDED_WINDOW,
         );
         owner_ended(b, client, words, bindings);
         return;
@@ -94,7 +94,7 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
         bindings,
         client.task_page().ended_before.as_ref(),
         client.task_page().ended_after.as_ref(),
-        jig_domain_client::pages::task::ENDED_WINDOW,
+        crate::page::task::ENDED_WINDOW,
     );
     owner_ended(b, client, words, bindings);
 }
@@ -124,7 +124,7 @@ fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words
             cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
         }
     }
-    if !jig_domain_client::pages::conversations::live(node.chip.phase) {
+    if !crate::page::conversations::live(node.chip.phase) {
         crate::frame::control(
             b,
             words,
@@ -149,7 +149,7 @@ fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words
                 Role::Link,
                 JigPhrase::TaskPage,
                 &[Hole::Number(*task)],
-                Act::Go { address: jig_domain_client::address::Address::task(*task) },
+                Act::Go { address: crate::address::Address::task(*task) },
             );
         }
     }

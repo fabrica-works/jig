@@ -5,8 +5,8 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use jig_client_domain::contract::{Executor, ObjectKey, Phase, Project};
-use jig_domain_client::{Domain, action::Act};
+use crate::{Domain, action::Act};
+use jig_client::contract::{Executor, ObjectKey, Phase, Project};
 pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings) {
     let filter = client.project_page().task_filter;
     crate::pages::work::control(
@@ -15,12 +15,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
         bindings,
         JigPhrase::AllTasks,
         Act::FilterTasks {
-            filter: jig_client_domain::contract::TaskFilter {
-                phase: None,
-                executor: None,
-                goal: None,
-                asked_by_me: false,
-            },
+            filter: jig_client::contract::TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false },
         },
         filter.phase.is_none() && filter.executor.is_none() && filter.goal.is_none() && !filter.asked_by_me,
     );
@@ -29,9 +24,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
         words,
         bindings,
         JigPhrase::AskedByMe,
-        Act::FilterTasks {
-            filter: jig_client_domain::contract::TaskFilter { asked_by_me: !filter.asked_by_me, ..filter },
-        },
+        Act::FilterTasks { filter: jig_client::contract::TaskFilter { asked_by_me: !filter.asked_by_me, ..filter } },
         filter.asked_by_me,
     );
     for phase in [
@@ -55,7 +48,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
             words,
             bindings,
             phrase(phase),
-            Act::FilterTasks { filter: jig_client_domain::contract::TaskFilter { phase: Some(phase), ..filter } },
+            Act::FilterTasks { filter: jig_client::contract::TaskFilter { phase: Some(phase), ..filter } },
             filter.phase == Some(phase),
         );
     }
@@ -71,9 +64,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
             words,
             bindings,
             phrase,
-            Act::FilterTasks {
-                filter: jig_client_domain::contract::TaskFilter { executor: Some(*executor), ..filter },
-            },
+            Act::FilterTasks { filter: jig_client::contract::TaskFilter { executor: Some(*executor), ..filter } },
             filter.executor == Some(*executor),
         );
     }
@@ -95,7 +86,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
                 Role::Button,
                 JigPhrase::OnlyGoal,
                 &[Hole::Number(goal)],
-                Act::FilterTasks { filter: jig_client_domain::contract::TaskFilter { goal: Some(goal), ..filter } },
+                Act::FilterTasks { filter: jig_client::contract::TaskFilter { goal: Some(goal), ..filter } },
             );
         }
         b.close();

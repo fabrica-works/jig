@@ -5,11 +5,11 @@ use crate::words::Words;
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
-use jig_client_domain::contract::{Hold, Phase, SpendLine};
-use jig_domain_client::{
+use crate::{
     Domain,
     objects::{Body, Object},
 };
+use jig_client::contract::{Hold, Phase, SpendLine};
 use skein_lib::{Id, List};
 /// Build the held task's card in any place, preserving prior result and holders.
 pub fn escalation(

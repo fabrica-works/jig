@@ -12,11 +12,11 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
         let reason = tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Your reason")).unwrap();
         assert_eq!(reason.role, Role::TextArea);
         assert!(reason.binding.is_some());
-        assert_eq!(domain.confirmation().unwrap().reason_input, jig_domain_client::confirm::ReasonInput::Missing);
+        assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
         drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
         assert_eq!(
             domain.confirmation().unwrap().missing,
-            Some(jig_domain_client::confirm::Missing::Words { field: Purpose::Reason })
+            Some(crate::confirm::Missing::Words { field: Purpose::Reason })
         );
         assert!(drive(&mut domain, Event::Act { act: Action::Confirm }).is_empty());
         drive(&mut domain, Event::Act { act: input(&tree, b"Your reason", bytes, &mut bindings) });
@@ -72,7 +72,7 @@ fn reason_checked_binding_rejects_over_limit_without_establishing_presence() {
     let token =
         tree.nodes().iter().find(|node| node.name.as_deref() == Some(b"Your reason")).unwrap().binding.unwrap().token;
     assert_eq!(decode(&mut bindings, token, Act::Input { value: Box::from(UTF8_TEXTS[1]) }), None);
-    assert_eq!(domain.confirmation().unwrap().reason_input, jig_domain_client::confirm::ReasonInput::Missing);
+    assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
     assert!(domain.fields().get(Purpose::Reason).is_none());
     assert!(tree.len() <= crate::confirmation_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
 }

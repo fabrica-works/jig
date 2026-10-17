@@ -18,16 +18,16 @@ pub enum Answered {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
-    Jig(jig_domain_client::action::Act),
+    Jig(jig_client_view::action::Act),
     First(first::Act),
 }
 #[derive(Debug)]
 pub enum Event {
-    Start { address: Address, kept: List<Record>, offset: jig_domain_client::boundary::Offset },
+    Start { address: Address, kept: List<Record>, offset: jig_client_view::boundary::Offset },
     Went { place: Place },
     Act { action: Action },
     Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered> },
-    Jig(jig_domain_client::Event),
+    Jig(jig_client_view::Event),
     First(first::Event),
     SignedOut,
 }
@@ -42,7 +42,7 @@ pub enum JigOut {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
-    Jig(jig_domain_client::facts::Fact),
+    Jig(jig_client_view::facts::Fact),
     TableFull,
     PartsFull,
     InvalidRecord,

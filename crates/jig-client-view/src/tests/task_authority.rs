@@ -1,6 +1,6 @@
 //! Whole owner authority remains independent of selected changes and document loss.
 use super::*;
-use jig_domain_client::address::{Address, TaskSection};
+use crate::address::{Address, TaskSection};
 
 fn supplied() -> OwnerAuthorityDocument {
     let mut segments = List::with_capacity(CLIENT.rows);
@@ -88,7 +88,7 @@ fn task_authority_forms_preserve_all_permissions_and_selected_delta_without_reco
             })
             .collect();
         assert_eq!(sent, vec![&expected]);
-        let Some(jig_domain_client::objects::Body::Task(actual)) = &domain.objects().get(id).unwrap().body else {
+        let Some(crate::objects::Body::Task(actual)) = &domain.objects().get(id).unwrap().body else {
             panic!("whole source remains");
         };
         assert_eq!(**actual, before);
@@ -130,7 +130,7 @@ fn task_budget_section_renders_exact_bitmap_delegation_and_literal_authority_los
             assert_eq!(contains(&tree, b"Authority document is cut"), cut);
             assert!(tree.len() <= crate::task_nodes(&CLIENT, 0).unwrap());
             let id = domain.task_page().header.unwrap();
-            let Some(jig_domain_client::objects::Body::Task(actual)) = &domain.objects().get(id).unwrap().body else {
+            let Some(crate::objects::Body::Task(actual)) = &domain.objects().get(id).unwrap().body else {
                 panic!("whole source remains");
             };
             assert_eq!(**actual, row);

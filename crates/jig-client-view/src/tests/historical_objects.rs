@@ -9,8 +9,8 @@ use crate::{JigBindings, owner_historical as view};
 use skein_ui::Limits;
 use skein_ui::{Builder, Role, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::Domain;
+use crate::Domain;
+use jig_client::contract::*;
 use skein_lib::{List, Wall};
 fn task() -> Task {
     let mut task = super::cards_objects::task_doc(&[ActKind::Cancel]);
@@ -282,13 +282,13 @@ fn historical_whole_receiving_refuses_reserved_paths_and_nested_text_excess_with
     let value = person();
     let original = value.clone();
     assert!(view::required(&value, &CLIENT, words()).is_some());
-    assert!(view::required(&value, &jig_domain_client::Limits { rows: 1, ..CLIENT }, words()).is_none());
+    assert!(view::required(&value, &crate::Limits { rows: 1, ..CLIENT }, words()).is_none());
     let mut large = value.clone();
     let OwnerHistoricalValue::PersonProposal { proposal, .. } = &mut large.value else { panic!("raw proposal") };
     proposal.goal.spec.words = Text::new(Box::from(UTF8_TEXTS[1]), 129).unwrap();
     assert!(view::required(&large, &CLIENT, words()).is_none());
     assert_eq!(value, original);
-    assert!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }).is_none());
+    assert!(view::max_nodes(&crate::Limits { rows: u32::MAX, ..CLIENT }).is_none());
 }
 #[test]
 fn historical_passive_card_retains_named_whole_departure_and_does_not_bind_current_question_actions() {
@@ -306,26 +306,16 @@ fn historical_passive_card_retains_named_whole_departure_and_does_not_bind_curre
     assert!(contains(&tree, b"Historical question"));
     assert!(!contains(&tree, b"Answer not supplied"));
     assert!(tree.nodes().iter().all(|node| node.role != Role::Button));
-    let jig_domain_client::objects::Card::Leaving {
-        how: jig_domain_client::objects::Left::Historical { facts }, ..
-    } = &d.objects().get(id).unwrap().card
+    let crate::objects::Card::Leaving { how: crate::objects::Left::Historical { facts }, .. } =
+        &d.objects().get(id).unwrap().card
     else {
         panic!("whole historical departure")
     };
     assert_eq!(facts.as_ref(), &value);
 }
-fn step(
-    domain: &mut Domain,
-    l: &jig_domain_client::Limits,
-    event: jig_domain_client::Event,
-) -> Vec<jig_domain_client::Request> {
-    let mut out = skein_lib::Queue::with_capacity(jig_domain_client::max_out(l));
-    jig_domain_client::step(
-        domain,
-        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits: *l },
-        event,
-        &mut out,
-    );
+fn step(domain: &mut Domain, l: &crate::Limits, event: crate::Event) -> Vec<crate::Request> {
+    let mut out = skein_lib::Queue::with_capacity(crate::max_out(l));
+    crate::step(domain, &skein_lib::Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits: *l }, event, &mut out);
     let mut rows = Vec::new();
     while let Some(value) = out.pop() {
         rows.push(value);
@@ -333,16 +323,16 @@ fn step(
     rows
 }
 fn presence(mask: u8) {
-    use jig_domain_client::{Event, Request};
-    let l = jig_domain_client::Limits { objects: 4, reads: 8, ..CLIENT };
+    use crate::{Event, Request};
+    let l = crate::Limits { objects: 4, reads: 8, ..CLIENT };
     let mut domain = Domain::new(&l, 1);
     let first = step(
         &mut domain,
         &l,
         Event::Start {
-            address: jig_domain_client::address::Address::Inbox { project: None },
+            address: crate::address::Address::Inbox { project: None },
             kept: List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: crate::boundary::Offset { minutes: 0 },
         },
     );
     let watch = first
@@ -431,8 +421,8 @@ fn presence(mask: u8) {
     }
     presence_finish(&mut domain, &l, task_read.unwrap(), mask);
 }
-fn presence_finish(domain: &mut Domain, l: &jig_domain_client::Limits, task_read: skein_lib::Token, mask: u8) {
-    use jig_domain_client::Event;
+fn presence_finish(domain: &mut Domain, l: &crate::Limits, task_read: skein_lib::Token, mask: u8) {
+    use crate::Event;
     let mut doc = task();
     doc.inputs = List::with_capacity(l.rows);
     for _ in 0..l.rows {

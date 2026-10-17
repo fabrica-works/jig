@@ -24,7 +24,7 @@ fn historical_six_reads_keep_original_client_query_and_token_until_whole_value_a
         let Incoming::Callback {
             client: actual,
             event:
-                Event::Jig(jig_domain_client::Event::Read {
+                Event::Jig(jig_client_view::Event::Read {
                     read: original,
                     result: client::ReadResult::Value(client::ReadValue::Historical(_)),
                 }),

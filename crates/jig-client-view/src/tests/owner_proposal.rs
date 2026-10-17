@@ -8,8 +8,8 @@ use crate::{JigBindings, owner_proposal as view};
 use skein_ui::phrases::{Hole, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::Domain;
+use crate::Domain;
+use jig_client::contract::*;
 use skein_lib::{
     List, Wall,
     bytes::{copy_of, find},
@@ -17,8 +17,8 @@ use skein_lib::{
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), 32).unwrap(), cut }
 }
-fn limits() -> jig_domain_client::Limits {
-    jig_domain_client::Limits { rows: 3, text: 32, ..super::cards::CLIENT }
+fn limits() -> crate::Limits {
+    crate::Limits { rows: 3, text: 32, ..super::cards::CLIENT }
 }
 fn part() -> OwnerPart {
     let mut segments = List::with_capacity(3);
@@ -406,11 +406,11 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
     let f = view::required(&v, &limits(), &w).unwrap();
     assert_eq!(f, view::worst_case(&limits(), &w).unwrap());
     assert_eq!(f.nodes, view::max_nodes(&limits()).unwrap());
-    assert!(view::required(&v, &jig_domain_client::Limits { rows: 2, ..limits() }, &w).is_none());
-    assert!(view::required(&v, &jig_domain_client::Limits { text: 31, ..limits() }, &w).is_none());
+    assert!(view::required(&v, &crate::Limits { rows: 2, ..limits() }, &w).is_none());
+    assert!(view::required(&v, &crate::Limits { text: 31, ..limits() }, &w).is_none());
     assert_eq!(v, unchanged);
-    assert!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..limits() }).is_none());
-    assert!(view::worst_case(&jig_domain_client::Limits { text: u32::MAX, ..limits() }, &w).is_none());
+    assert!(view::max_nodes(&crate::Limits { rows: u32::MAX, ..limits() }).is_none());
+    assert!(view::worst_case(&crate::Limits { text: u32::MAX, ..limits() }, &w).is_none());
     let id = crate::owner_proposal_words::ProposalPhrase::Attempt.id();
     assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::EPOCH)]).unwrap_err(), skein_ui::phrases::Invalid::Values { id });
     assert_eq!(w.book.say(1, id, &[Hole::Number(u64::MAX)]).unwrap().text.as_ref(), b"second 18446744073709551615");
@@ -425,7 +425,7 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
 }
 #[test]
 fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current_facts_and_checked_confirmation() {
-    use jig_domain_client::{Event, action::Act};
+    use crate::{Event, action::Act};
     let w = words(false);
     let mut chip = super::cards_objects::task_doc(&[]).chip;
     chip.title = doc(b"supplied linked title", true);
@@ -488,7 +488,7 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
             } else {
                 expected = Some(key);
             }
-            assert_eq!(jig_domain_client::objects::proposal::owner_facts(client.objects().get(id).unwrap()), Some(&v));
+            assert_eq!(crate::objects::proposal::owner_facts(client.objects().get(id).unwrap()), Some(&v));
         }
         maker_keys.push(expected.unwrap()).unwrap();
         super::cards::drive(&mut client, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Accept } });
@@ -541,10 +541,7 @@ fn whole_linked_owner_carrier(w: &Words) {
         ObjectKey::Proposal(linked.key),
         ReadValue::OwnerProposal(Box::new(linked.clone())),
     );
-    assert_eq!(
-        jig_domain_client::objects::proposal::owner_facts(linked_client.objects().get(linked_id).unwrap()),
-        Some(&linked),
-    );
+    assert_eq!(crate::objects::proposal::owner_facts(linked_client.objects().get(linked_id).unwrap()), Some(&linked),);
 }
 
 const UTF8_TEXTS: [&[u8]; 1] = [&[b'~'; 32]];

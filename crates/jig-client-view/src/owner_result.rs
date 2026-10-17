@@ -6,8 +6,8 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, Proposer, ResultDetails};
-use jig_domain_client::Domain;
+use crate::Domain;
+use jig_client::contract::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, Proposer, ResultDetails};
 
 fn text(b: &mut Builder, words: &Words, phrase: ResultPhrase, holes: &[Hole]) {
     let saying = words.book.say(words.language, phrase.id(), holes).expect("result words and typed holes checked");
@@ -92,7 +92,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &ResultDetails, words: &W
 }
 /// Configured envelope for both full link lists, contract and scalar metadata.
 #[must_use]
-pub fn nodes(limits: &jig_domain_client::Limits) -> Option<u32> {
+pub fn nodes(limits: &crate::Limits) -> Option<u32> {
     crate::chip_nodes(limits)?
         .checked_add(2)?
         .checked_mul(limits.rows)?
@@ -102,7 +102,7 @@ pub fn nodes(limits: &jig_domain_client::Limits) -> Option<u32> {
 }
 /// Reserve saying, escaped opaque byte and linked chip storage before rendering.
 #[must_use]
-pub fn limits(client: &jig_domain_client::Limits, words: &Words) -> Option<skein_ui::Limits> {
+pub fn limits(client: &crate::Limits, words: &Words) -> Option<skein_ui::Limits> {
     let nodes = nodes(client)?;
     let phrase = crate::phrases::jig_capacity(&words.book)?;
     let text_per_node = phrase.checked_mul(2)?.checked_add(crate::literal_segment::max_bytes(client.text)?)?;

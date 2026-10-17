@@ -1,5 +1,5 @@
 use super::*;
-use jig_domain_client::address::Address;
+use crate::address::Address;
 
 #[test]
 fn whole_wake_channel_edits_preserve_batched_rules_flags_and_separate_subscriptions() {
@@ -49,7 +49,7 @@ fn whole_wake_channel_edits_preserve_batched_rules_flags_and_separate_subscripti
                 ResultsWake::Each | ResultsWake::LastOrFailure => ResultsWake::Never,
             };
             assert_eq!(domain.confirmation().unwrap().choices.change.as_ref().unwrap().wake, Some(expected));
-            let Some(jig_domain_client::objects::Body::Task(supplied)) = &domain.objects().get(id).unwrap().body else {
+            let Some(crate::objects::Body::Task(supplied)) = &domain.objects().get(id).unwrap().body else {
                 panic!("whole supplied task remains present");
             };
             assert_eq!(**supplied, initial);
@@ -120,7 +120,7 @@ fn task_overview_renders_numbered_standing_interests_independently_of_activation
         }
         assert!(tree.len() <= crate::task_nodes(&CLIENT, 0).unwrap());
         let id = domain.task_page().header.unwrap();
-        let Some(jig_domain_client::objects::Body::Task(supplied)) = &domain.objects().get(id).unwrap().body else {
+        let Some(crate::objects::Body::Task(supplied)) = &domain.objects().get(id).unwrap().body else {
             panic!("supplied task remains whole");
         };
         assert_eq!(**supplied, row);

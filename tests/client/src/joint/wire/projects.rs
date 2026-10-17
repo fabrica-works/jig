@@ -3,8 +3,8 @@
 //! infers a project name nor admits a public Project watch.
 use super::{chips, history, offers, owner};
 use jig_client_domain::contract as client;
+use jig_client_view::Limits;
 use jig_domain_authority as authority;
-use jig_domain_client::Limits;
 use jig_domain_core::documents;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;

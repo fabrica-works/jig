@@ -7,13 +7,13 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{
+use crate::{Domain, Limits};
+use jig_client::contract::{
     ClosingStage, DocumentText, HoldCategory, HoldFailure, OwnerChipDetails, OwnerChipEnding, OwnerChipHold,
     OwnerChipObservation, OwnerChipWork, OwnerEscalationHolder, OwnerHoldEscalation, OwnerPart, OwnerPartKey,
     OwnerPersonWait, OwnerPriorPhase, OwnerRequester, OwnerResourceLine, OwnerResourceWriter, ResultValue, RetryNotice,
     RunStage,
 };
-use jig_domain_client::{Domain, Limits};
 use skein_lib::Wall;
 
 /// Maximum bounded storage for the supplied metadata and its existing result fragments.
@@ -92,8 +92,8 @@ pub(crate) fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> 
         }
         ResultValue::Connector { summary, part } => {
             text_fits(summary, limits)?;
-            if let jig_client_domain::contract::Part::Resource { path, .. } = part
-                && !jig_client_domain::contract::resource_path_fits(path, limits.rows, limits.text)
+            if let jig_client::contract::Part::Resource { path, .. } = part
+                && !jig_client::contract::resource_path_fits(path, limits.rows, limits.text)
             {
                 return None;
             }

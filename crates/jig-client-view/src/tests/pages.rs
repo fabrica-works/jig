@@ -6,12 +6,12 @@
 )]
 use super::cards::{CLIENT, contains, document, drive, start, text, words};
 use crate::JigBindings;
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Event, Request,
     address::{Address, Place},
-    pages::Page,
+    page::Page,
 };
+use jig_client::contract::*;
 use skein_lib::{List, Token};
 use skein_ui::{Builder, Role, Tree};
 pub(super) fn build(d: &Domain, kind: u8, words: &crate::words::Words) -> (Tree, JigBindings) {
@@ -49,20 +49,20 @@ pub(super) fn special_pages(words: &crate::words::Words) {
     drive(&mut d, Event::SignedOut);
     assert_eq!(d.page(), &Page::SigningIn);
     let mut d = Domain::new(&CLIENT, 1);
-    d.provider(jig_domain_client::signin::Provider { number: 3, name: text(b"Organization") }).unwrap();
+    d.provider(crate::signin::Provider { number: 3, name: text(b"Organization") }).unwrap();
     drive(
         &mut d,
         Event::Start {
             address: Address::Inbox { project: None },
             kept: List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: crate::boundary::Offset { minutes: 0 },
         },
     );
     drive(&mut d, Event::SignedOut);
     let (tree, mut bindings) = build(&d, 2, words);
     assert_eq!(
         crate::decode(&mut bindings, named_binding(&tree, b"Sign in with Organization"), skein_ui::Act::Press),
-        Some(jig_domain_client::action::Act::SignIn { provider: 3 })
+        Some(crate::action::Act::SignIn { provider: 3 })
     );
     let (mut d, f) = start();
     drive(&mut d, Event::Hello { served: false });
@@ -70,8 +70,8 @@ pub(super) fn special_pages(words: &crate::words::Words) {
     assert!(contains(&build(&d, 2, words).0, b"update or reload"));
     let mut d = Domain::new(&CLIENT, 9);
     let mut kept = List::with_capacity(1);
-    kept.push(jig_domain_client::store::Record::Draft {
-        version: jig_domain_client::store::STORE_VERSION,
+    kept.push(crate::store::Record::Draft {
+        version: crate::store::STORE_VERSION,
         party: 2,
         task: 1,
         words: text(b"private"),
@@ -83,7 +83,7 @@ pub(super) fn special_pages(words: &crate::words::Words) {
         Event::Start {
             address: Address::Inbox { project: None },
             kept,
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: crate::boundary::Offset { minutes: 0 },
         },
     );
     let f = out
@@ -166,15 +166,15 @@ fn inbox_edges(words: &crate::words::Words) {
     }
     assert_eq!(
         crate::decode(&mut bindings, named_binding(&tree, b"Read later"), skein_ui::Act::Press),
-        Some(jig_domain_client::action::Act::More {
-            window: Token::new(jig_domain_client::pages::conversations::INBOX_WINDOW),
-            end: jig_domain_client::action::End::After
+        Some(crate::action::Act::More {
+            window: Token::new(crate::page::conversations::INBOX_WINDOW),
+            end: crate::action::End::After
         })
     );
     assert_eq!(
         crate::decode(&mut bindings, named_binding(&tree, b"Goal 7"), skein_ui::Act::Press),
-        Some(jig_domain_client::action::Act::FilterInbox {
-            filter: jig_domain_client::pages::inbox::Filter { project: None, kind: None, goal: Some(7) }
+        Some(crate::action::Act::FilterInbox {
+            filter: crate::page::inbox::Filter { project: None, kind: None, goal: Some(7) }
         })
     );
 }
@@ -212,14 +212,14 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
     };
     deliver(&mut d, page, Delivery::Inbox(Box::new(value.clone())));
     assert!(contains(&build(&d, 0, words).0, b"New"));
-    drive(&mut d, Event::Act { act: jig_domain_client::action::Act::OpenUpdates });
+    drive(&mut d, Event::Act { act: crate::action::Act::OpenUpdates });
     assert!(contains(&build(&d, 0, words).0, b"New"));
     let mut committed = value;
     committed.results_seen = 4;
     deliver(&mut d, page, Delivery::Inbox(Box::new(committed)));
     assert!(!contains(&build(&d, 0, words).0, b"New"));
-    let filter = jig_domain_client::pages::inbox::Filter { project: None, kind: None, goal: None };
-    drive(&mut d, Event::Act { act: jig_domain_client::action::Act::FilterInbox { filter } });
+    let filter = crate::page::inbox::Filter { project: None, kind: None, goal: None };
+    drive(&mut d, Event::Act { act: crate::action::Act::FilterInbox { filter } });
     let read = out
         .iter()
         .find_map(|r| match r {
@@ -274,7 +274,7 @@ fn conversations_form(words: &crate::words::Words) {
     }
     assert_eq!(
         crate::decode(&mut bindings, named_binding(&tree, b"Start a conversation"), skein_ui::Act::Press),
-        Some(jig_domain_client::action::Act::StartChat { project: 4 })
+        Some(crate::action::Act::StartChat { project: 4 })
     );
     let edit = crate::decode(
         &mut bindings,
@@ -283,7 +283,7 @@ fn conversations_form(words: &crate::words::Words) {
     )
     .unwrap();
     drive(&mut d, Event::Act { act: edit });
-    let out = drive(&mut d, Event::Act { act: jig_domain_client::action::Act::StartChat { project: 4 } });
+    let out = drive(&mut d, Event::Act { act: crate::action::Act::StartChat { project: 4 } });
     let request = out
         .iter()
         .find_map(|r| match r {
@@ -399,7 +399,7 @@ fn conversation_states(words: &crate::words::Words) {
         assert_eq!(keyed[1].a, 1);
         assert_eq!(
             crate::decode(&mut bindings, named_binding(&tree, b"Task 2: Help"), skein_ui::Act::Press),
-            Some(jig_domain_client::action::Act::OpenChat { task: 2 })
+            Some(crate::action::Act::OpenChat { task: 2 })
         );
     }
 }
@@ -455,13 +455,13 @@ fn inbox_group_controls_decode_independent_windows() {
     assert_eq!(
         acts.as_slice(),
         &[
-            jig_domain_client::action::Act::More {
-                window: Token::new(jig_domain_client::pages::conversations::INBOX_WINDOW),
-                end: jig_domain_client::action::End::After
+            crate::action::Act::More {
+                window: Token::new(crate::page::conversations::INBOX_WINDOW),
+                end: crate::action::End::After
             },
-            jig_domain_client::action::Act::More {
-                window: Token::new(jig_domain_client::pages::conversations::INBOX_UPDATES_WINDOW),
-                end: jig_domain_client::action::End::After
+            crate::action::Act::More {
+                window: Token::new(crate::page::conversations::INBOX_UPDATES_WINDOW),
+                end: crate::action::End::After
             }
         ]
     );
@@ -500,7 +500,7 @@ fn whole_page(d: &Domain) -> Tree {
 
 #[test]
 fn each_of_jigs_pages_keeps_the_outline() {
-    use jig_domain_client::address::{ProjectSection, TaskSection};
+    use crate::address::{ProjectSection, TaskSection};
     let rows = [
         ("inbox", Place::Jig(Address::Inbox { project: None })),
         ("conversations", Place::Jig(Address::Conversations { project: None })),
@@ -545,18 +545,12 @@ fn domain_with_an_owed_card() -> Domain {
         }
     }
     let id = d.objects().find(ObjectKey::Task(8)).unwrap();
-    drive(
-        &mut d,
-        Event::Act { act: jig_domain_client::action::Act::Intend { object: id.token(), act: ActKind::Cancel } },
-    );
+    drive(&mut d, Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::Cancel } });
     assert_eq!(
         d.objects().get(id).unwrap().card,
-        jig_domain_client::objects::Card::Deciding {
-            request: None,
-            progress: jig_domain_client::intents::Progress::Confirming
-        }
+        crate::objects::Card::Deciding { request: None, progress: crate::intents::Progress::Confirming }
     );
-    drive(&mut d, Event::Act { act: jig_domain_client::action::Act::Confirm });
+    drive(&mut d, Event::Act { act: crate::action::Act::Confirm });
     drive(&mut d, Event::ObjectsLeft);
     d
 }
@@ -587,7 +581,7 @@ fn the_inbox_header_shows_with_either_group() {
             &d,
             words(),
             &mut bindings,
-            jig_domain_client::pages::Section::Inbox { group, project: None }
+            crate::page::Section::Inbox { group, project: None }
         ));
         b.close();
         let tree = b.finish();
@@ -644,8 +638,7 @@ fn a_missing_section_says_so_in_its_own_region() {
     let (mut domain, frame) = start();
     deliver(&mut domain, frame, Delivery::Frame(Box::new(document())));
     drive(&mut domain, Event::Went { place: Place::Elsewhere });
-    let section =
-        jig_domain_client::pages::Section::Task { task: 8, section: jig_domain_client::address::TaskSection::Plan };
+    let section = crate::page::Section::Task { task: 8, section: crate::address::TaskSection::Plan };
     let mut sections = List::with_capacity(1);
     sections.push(section).unwrap();
     let opened = drive(&mut domain, Event::ShowSections { sections });

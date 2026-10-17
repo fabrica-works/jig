@@ -9,7 +9,7 @@ use crate::{
 use skein_lib::{Env, Queue, RequestAnswered, RequestOut, RequestProgress, RequestTable, Rng, Time};
 #[derive(Debug)]
 pub struct Domain {
-    pub(crate) jig: jig_domain_client::Domain,
+    pub(crate) jig: jig_client_view::Domain,
     pub(crate) first: first::Side,
     pub(crate) second: crate::second::Side,
     pub(crate) table: RequestTable<Owner, Held>,
@@ -19,7 +19,7 @@ pub fn new(limits: &Limits, seed: u64) -> Domain {
     assert!(crate::worst_case(limits).is_some(), "root capacities are checked");
     let mut rng = Rng::new(seed);
     Domain {
-        jig: jig_domain_client::Domain::new(&limits.jig, rng.next_u64()),
+        jig: jig_client_view::Domain::new(&limits.jig, rng.next_u64()),
         first: first::Side::new(&limits.first, rng.next_u64()),
         second: crate::second::Side::new(limits.second_parts, limits.first.rows, limits.first.text, rng.next_u64()),
         table: RequestTable::new(&limits.table, rng.next_u64()),
@@ -27,7 +27,7 @@ pub fn new(limits: &Limits, seed: u64) -> Domain {
 }
 impl Domain {
     #[must_use]
-    pub const fn jig(&self) -> &jig_domain_client::Domain {
+    pub const fn jig(&self) -> &jig_client_view::Domain {
         &self.jig
     }
     #[must_use]
@@ -43,8 +43,8 @@ pub fn step(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<
     route::event(root, env, event, out);
 }
 pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
-    let mut child = Queue::with_capacity(jig_domain_client::max_out(&env.limits.jig));
-    jig_domain_client::fire(&mut root.jig, &route::jig_env(env), &mut child);
+    let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
+    jig_client_view::fire(&mut root.jig, &route::jig_env(env), &mut child);
     route::route_jig(root, env, &mut child, out);
     let mut child = Queue::with_capacity(first::max_out(&env.limits.first));
     first::fire(&mut root.first, &Env { now: env.now, wall: env.wall, limits: env.limits.first }, &mut child);
@@ -53,7 +53,7 @@ pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 }
 #[must_use]
 pub fn next_deadline(root: &Domain) -> Option<Time> {
-    let mut next = jig_domain_client::next_deadline(&root.jig);
+    let mut next = jig_client_view::next_deadline(&root.jig);
     for deadline in [first::next_deadline(&root.first), root.table.next_deadline()].into_iter().flatten() {
         next = match next {
             Some(old) => Some(old.min(deadline)),
@@ -86,7 +86,7 @@ pub fn take(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         route::progress(root, env, owner, progress, out);
     }
     root.table.reclaim();
-    jig_domain_client::reclaim(&mut root.jig);
+    jig_client_view::reclaim(&mut root.jig);
     first::reclaim(&mut root.first);
 }
 #[must_use]
@@ -110,7 +110,7 @@ pub(crate) fn answered(
         RequestAnswered::Final(owner) => match owner {
             Owner::Jig(request) => match answer {
                 Some(crate::Answered::Jig(answer)) => {
-                    route::jig(root, env, jig_domain_client::Event::Answered { request, answer }, out);
+                    route::jig(root, env, jig_client_view::Event::Answered { request, answer }, out);
                 }
                 Some(crate::Answered::First(_)) | None => out.push(Request::Fact { fact: Fact::InvalidAnswer }),
             },
@@ -122,11 +122,11 @@ pub(crate) fn answered(
             },
             Owner::Kept { scope } => {
                 out.push(Request::Fact { fact: Fact::KeptAnswered });
-                route::jig(root, env, jig_domain_client::Event::KeptGone { scope }, out);
+                route::jig(root, env, jig_client_view::Event::KeptGone { scope }, out);
             }
         },
         RequestAnswered::Pending => match envelope {
-            skein_lib::RequestEnvelope::SignedOut => route::jig(root, env, jig_domain_client::Event::SignedOut, out),
+            skein_lib::RequestEnvelope::SignedOut => route::jig(root, env, jig_client_view::Event::SignedOut, out),
             skein_lib::RequestEnvelope::Final
             | skein_lib::RequestEnvelope::Again
             | skein_lib::RequestEnvelope::Lost => {}
@@ -158,15 +158,15 @@ pub(crate) fn ask_size(limits: &Limits, ask: &Ask) -> u64 {
 /// Installs application-configured provider words before Start (client.md, 12).
 pub fn provider(
     root: &mut Domain,
-    provider: jig_domain_client::signin::Provider,
-) -> Result<(), jig_domain_client::signin::Provider> {
+    provider: jig_client_view::signin::Provider,
+) -> Result<(), jig_client_view::signin::Provider> {
     root.jig.provider(provider)
 }
 
 /// Installs the application's arrangement before Start; jig validates it.
 pub fn configure_arrangement(
     root: &mut Domain,
-    arrangement: jig_domain_client::pages::Arrangement,
-) -> Result<(), jig_domain_client::pages::Arrangement> {
+    arrangement: jig_client_view::page::Arrangement,
+) -> Result<(), jig_client_view::page::Arrangement> {
     root.jig.configure_arrangement(arrangement)
 }

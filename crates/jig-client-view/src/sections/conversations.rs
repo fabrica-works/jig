@@ -5,8 +5,8 @@ use crate::{JigBindings, Owner, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Key, Role, Run, State};
 
-use jig_client_domain::contract::Runtime;
-use jig_domain_client::{Domain, action::Act, fields::Purpose};
+use crate::{Domain, action::Act, fields::Purpose};
+use jig_client::contract::Runtime;
 /// Render committed chat facts, window edges and the projects' offered chat forms.
 pub(crate) fn section(
     b: &mut Builder,
@@ -15,11 +15,11 @@ pub(crate) fn section(
     bindings: &mut JigBindings,
     project: Option<u32>,
 ) -> bool {
-    if !client.shows(jig_domain_client::pages::Section::Conversations { project }) {
+    if !client.shows(crate::page::Section::Conversations { project }) {
         return false;
     }
     crate::pages::work::section(b, words, JigPhrase::Conversations, crate::regions::JigRegion::Conversations);
-    super::status(b, client, words, jig_domain_client::pages::Section::Conversations { project });
+    super::status(b, client, words, crate::page::Section::Conversations { project });
     b.open(Role::List);
     for row in &client.conversation_rows().rows {
         b.open(Role::Item);
@@ -42,7 +42,7 @@ pub(crate) fn section(
             runtime(b, client, value, words, bindings);
             match value {
                 Runtime::Held { .. } => {
-                    if let Some(id) = client.objects().find(jig_client_domain::contract::ObjectKey::Task(row.chip.task))
+                    if let Some(id) = client.objects().find(jig_client::contract::ObjectKey::Task(row.chip.task))
                         && !client.owes(id)
                     {
                         cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
@@ -84,7 +84,7 @@ pub(crate) fn section(
         words,
         bindings,
         &client.conversation_rows().edges,
-        jig_domain_client::pages::conversations::CONVERSATIONS_WINDOW,
+        crate::page::conversations::CONVERSATIONS_WINDOW,
     );
     let state = client.chats();
     if let Some(token) = state.starting {
@@ -204,7 +204,7 @@ pub(crate) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words
 }
 
 // Ended rows already render the complete chip, including its title-loss caption.
-fn title_loss(b: &mut Builder, title: &jig_client_domain::contract::DocumentText, runtime: &Runtime, words: &Words) {
+fn title_loss(b: &mut Builder, title: &jig_client::contract::DocumentText, runtime: &Runtime, words: &Words) {
     match runtime {
         Runtime::Ended => {}
         Runtime::Active(_)

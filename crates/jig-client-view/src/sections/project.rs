@@ -5,12 +5,12 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{ObjectKey, Project};
-use jig_domain_client::{
+use crate::{
     Domain,
     action::Act,
     address::{Address, ProjectSection},
 };
+use jig_client::contract::{ObjectKey, Project};
 pub mod goals;
 mod notes;
 pub mod owner;
@@ -62,13 +62,13 @@ pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     ] {
         let address = Address::Project { project: number, section };
         let current = match client.page() {
-            jig_domain_client::pages::Page::Work { address: own, .. } => own == &address,
-            jig_domain_client::pages::Page::Starting
-            | jig_domain_client::pages::Page::SigningIn
-            | jig_domain_client::pages::Page::Elsewhere
-            | jig_domain_client::pages::Page::Missing
-            | jig_domain_client::pages::Page::OutOfDate
-            | jig_domain_client::pages::Page::SomeoneElse => false,
+            crate::page::Page::Work { address: own, .. } => own == &address,
+            crate::page::Page::Starting
+            | crate::page::Page::SigningIn
+            | crate::page::Page::Elsewhere
+            | crate::page::Page::Missing
+            | crate::page::Page::OutOfDate
+            | crate::page::Page::SomeoneElse => false,
         };
         crate::pages::work::tab(b, words, bindings, phrase(section), Act::Go { address }, current);
     }
@@ -80,11 +80,11 @@ pub(crate) fn all_shown(client: &Domain) -> bool {
         return false;
     };
     for section in [ProjectSection::Overview, ProjectSection::Goals, ProjectSection::Tasks, ProjectSection::Notes] {
-        if !client.shows(jig_domain_client::pages::Section::Project { project, section }) {
+        if !client.shows(crate::page::Section::Project { project, section }) {
             return false;
         }
     }
-    if client.shows(jig_domain_client::pages::Section::Project { project, section: ProjectSection::Settings }) {
+    if client.shows(crate::page::Section::Project { project, section: ProjectSection::Settings }) {
         return true;
     }
     for section in [
@@ -94,7 +94,7 @@ pub(crate) fn all_shown(client: &Domain) -> bool {
         ProjectSection::Spend,
         ProjectSection::Recurring,
     ] {
-        if !client.shows(jig_domain_client::pages::Section::Project { project, section }) {
+        if !client.shows(crate::page::Section::Project { project, section }) {
             return false;
         }
     }
@@ -108,12 +108,12 @@ pub(crate) fn section(
     project: u32,
     selected: ProjectSection,
 ) -> bool {
-    if !client.shows(jig_domain_client::pages::Section::Project { project, section: selected }) {
+    if !client.shows(crate::page::Section::Project { project, section: selected }) {
         return false;
     }
     crate::pages::work::section(b, words, phrase(selected), region(selected));
     crate::pages::mark_current(b, client, Address::Project { project, section: selected });
-    super::status(b, client, words, jig_domain_client::pages::Section::Project { project, section: selected });
+    super::status(b, client, words, crate::page::Section::Project { project, section: selected });
     if let Some(doc) = &client.project_page().owner {
         owner::section(b, doc, selected, client, words, bindings);
         b.close();
@@ -185,7 +185,7 @@ fn slots(b: &mut Builder, doc: &Project, section: ProjectSection, words: &Words,
         .expect("bounded parts")
         .checked_add(doc.policy.requirements.len())
         .expect("bounded parts");
-    for part in &jig_domain_client::pages::project::parts(doc, section, count) {
+    for part in &crate::page::project::parts(doc, section, count) {
         cards::common::part(b, part, words, bindings);
     }
 }
@@ -242,7 +242,7 @@ fn settings(
                 bindings,
                 client.project_page().spend_before.as_ref(),
                 client.project_page().spend_after.as_ref(),
-                jig_domain_client::pages::project::SPEND_WINDOW,
+                crate::page::project::SPEND_WINDOW,
             );
         }
         ProjectSection::Recurring => {
@@ -261,8 +261,8 @@ fn settings(
 fn period(
     b: &mut Builder,
     number: u64,
-    budget: &jig_client_domain::contract::Budget,
-    pools: &skein_lib::List<jig_client_domain::contract::Pool>,
+    budget: &jig_client::contract::Budget,
+    pools: &skein_lib::List<jig_client::contract::Pool>,
     words: &Words,
 ) {
     words.text(b, JigPhrase::Period, &[Hole::Number(number)]);
@@ -275,7 +275,7 @@ fn period(
 fn task_spend(
     b: &mut Builder,
     client: &Domain,
-    tasks: &skein_lib::List<jig_client_domain::contract::TaskSpend>,
+    tasks: &skein_lib::List<jig_client::contract::TaskSpend>,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
@@ -300,10 +300,10 @@ fn inbox_cards(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
                 client,
                 id,
                 &match entry {
-                    jig_client_domain::contract::InboxRow::Entry(value) => {
+                    jig_client::contract::InboxRow::Entry(value) => {
                         cards::Place::Inbox { lineage: value.lineage.clone() }
                     }
-                    jig_client_domain::contract::InboxRow::Owner(_) => cards::Place::Elsewhere,
+                    jig_client::contract::InboxRow::Owner(_) => cards::Place::Elsewhere,
                 },
                 words,
                 bindings,
@@ -329,7 +329,7 @@ fn historical_spend(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         bindings,
         page.spend_before.as_ref(),
         page.spend_after.as_ref(),
-        jig_domain_client::pages::project::SPEND_WINDOW,
+        crate::page::project::SPEND_WINDOW,
     );
 }
 

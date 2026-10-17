@@ -5,12 +5,12 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
-use jig_client_domain::contract::{Call, CurrentCall, LiveCall, TurnName};
-use jig_domain_client::{
+use crate::{
     Domain,
     action::Act,
     conversation::{CallName, Fold},
 };
+use jig_client::contract::{Call, CurrentCall, LiveCall, TurnName};
 pub(super) fn call(
     b: &mut Builder,
     client: &Domain,

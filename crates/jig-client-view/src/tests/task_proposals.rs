@@ -11,11 +11,11 @@ use super::{
     work_pages::{entered, list, part},
 };
 use crate::JigBindings;
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Event, Request,
     address::{Address, Place, TaskSection},
 };
+use jig_client::contract::*;
 use skein_lib::{Token, Wall};
 use skein_ui::{Builder, Role, Tree};
 fn key(proposer: Proposer) -> ProposalKey {
@@ -277,7 +277,7 @@ fn leaving_plan(with_chat: bool) -> (Domain, ProposalKey) {
     let k = key(Proposer::Task(8));
     let (mut d, opened) = super::work_pages::entered_arranged(
         Address::Task { task: 8, section: TaskSection::Plan },
-        jig_domain_client::pages::Arrangement { task: list([TaskSection::Activity]), project: list([]) },
+        crate::page::Arrangement { task: list([TaskSection::Activity]), project: list([]) },
     );
     let watch = opened
         .iter()
@@ -292,11 +292,8 @@ fn leaving_plan(with_chat: bool) -> (Domain, ProposalKey) {
         committed_proposal(&mut d, &out, k);
     }
     let id = d.objects().find(ObjectKey::Proposal(k)).unwrap();
-    drive(
-        &mut d,
-        Event::Act { act: jig_domain_client::action::Act::Intend { object: id.token(), act: ActKind::Accept } },
-    );
-    drive(&mut d, Event::Act { act: jig_domain_client::action::Act::Confirm });
+    drive(&mut d, Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::Accept } });
+    drive(&mut d, Event::Act { act: crate::action::Act::Confirm });
     let tree = opened
         .iter()
         .chain(out.iter())

@@ -2,12 +2,12 @@
 use crate::{JigBindings, phrases::jig::JigPhrase, words::Words};
 use skein_ui::Builder;
 
-use jig_client_domain::contract::OwnerRequester;
-use jig_domain_client::{
+use crate::{
     Domain,
     fields::Purpose,
     objects::{Object, question::facts},
 };
+use jig_client::contract::OwnerRequester;
 use skein_lib::Id;
 /// Build the shared question; its answer field belongs to its open confirmation.
 pub fn question(

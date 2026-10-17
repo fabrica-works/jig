@@ -4,7 +4,7 @@ use crate::harness::*;
 use jig_client_domain::contract::*;
 use jig_client_test_domain::{self as domain, Address, Event, JigOut, Request, first};
 use jig_client_test_view as view;
-use jig_domain_client::boundary::Offset;
+use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time};
 use skein_ui::Act;
 use skein_ui::{NodeId, Patch, Tree};
@@ -18,7 +18,7 @@ pub struct Test;
 #[must_use]
 pub fn limits() -> jig_client_test_domain::Limits {
     jig_client_test_domain::Limits {
-        jig: jig_domain_client::Limits {
+        jig: jig_client_view::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -44,7 +44,7 @@ pub fn limits() -> jig_client_test_domain::Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_domain_client::limits::Backoff {
+            backoff: jig_client_view::limits::ui::Backoff {
                 first: Duration::from_millis(10),
                 most: Duration::from_millis(80),
             },
@@ -139,19 +139,16 @@ fn from_fixture(
 ) -> (domain::Domain, view::View<'static>) {
     let (words, family) = fixture.books;
     let mut root = domain::new(limits, seed);
-    domain::provider(&mut root, jig_domain_client::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
+    domain::provider(&mut root, jig_client_view::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
         .expect("provider fits");
-    domain::provider(
-        &mut root,
-        jig_domain_client::signin::Provider { number: 2, name: crate::stories::text(b"Other") },
-    )
-    .expect("second provider fits");
+    domain::provider(&mut root, jig_client_view::signin::Provider { number: 2, name: crate::stories::text(b"Other") })
+        .expect("second provider fits");
     (root, view::View::new(&fixture.bounds, limits, words, family, first::Address { project: 1, item: 1 }))
 }
 /// Constructs the one arranged client used by the all-sections story.
 #[must_use]
 pub fn arranged(seed: u64) -> (domain::Domain, view::View<'static>) {
-    use jig_domain_client::{address::TaskSection, pages::Arrangement};
+    use jig_client_view::{address::TaskSection, page::Arrangement};
     let limits = limits();
     let (mut root, view) = from_fixture(&limits, seed, fixture_with(&limits, true));
     domain::configure_arrangement(
@@ -245,10 +242,10 @@ impl App for Test {
                 Some(Event::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None })
             }
             Request::Jig(JigOut::Read { read, .. }) => {
-                Some(Event::Jig(jig_domain_client::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
+                Some(Event::Jig(jig_client_view::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
             }
             Request::Jig(JigOut::Open { watch, .. } | JigOut::Continue { watch, .. } | JigOut::Close { watch }) => {
-                Some(Event::Jig(jig_domain_client::Event::Ended { watch, end: WatchEnd::Dropped }))
+                Some(Event::Jig(jig_client_view::Event::Ended { watch, end: WatchEnd::Dropped }))
             }
             Request::First(first::Out::Read { read, .. }) => {
                 Some(Event::First(first::Event::Read { read, result: first::ReadResult::Busy }))

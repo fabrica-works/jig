@@ -7,11 +7,11 @@ use crate::{JigBindings, JigMeaning, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
+use crate::{Domain, Limits, action::Act, page::project::owner_form};
 use alloc::boxed::Box;
-use jig_client_domain::contract::{
+use jig_client::contract::{
     Ask, OwnerProject, OwnerProjectPolicy, OwnerProjectResourceRole, PartyKind, PolicyEdit, PolicyEditRole, PolicyGuard,
 };
-use jig_domain_client::{Domain, Limits, action::Act, pages::project::owner_form};
 
 /// Complete standalone fragment including bindings and connector slots.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -56,7 +56,7 @@ pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<A
             Field::Requests | Field::Decides | Field::Name => return None,
         },
         Ask::MakeService { name, .. } => match field {
-            Field::Name => *name = jig_client_domain::contract::Text::new(bytes, text).ok()?,
+            Field::Name => *name = jig_client::contract::Text::new(bytes, text).ok()?,
             Field::Spend | Field::Requests | Field::Decides => return None,
         },
         Ask::SetRoles { .. }
@@ -147,7 +147,7 @@ pub fn worst_case(l: &Limits, words: &Words) -> Option<ProjectFragment> {
 /// Check every reserved row, raw path and nested authority/template before allocation.
 #[must_use]
 pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<ProjectFragment> {
-    if value.acts.capacity() > jig_client_domain::contract::MAX_OFFERED_ACTS
+    if value.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS
         || value.resources.capacity() > l.rows
         || value.members.capacity() > l.rows
         || value.pools.capacity() > l.rows
@@ -200,7 +200,7 @@ pub fn required(value: &OwnerProject, l: &Limits, words: &Words) -> Option<Proje
     }
     worst_case(l, words)
 }
-fn pattern_fits(value: &jig_client_domain::contract::OwnerPattern, l: &Limits) -> Option<()> {
+fn pattern_fits(value: &jig_client::contract::OwnerPattern, l: &Limits) -> Option<()> {
     if value.segments.capacity() > l.rows {
         return None;
     }
@@ -210,34 +210,35 @@ fn pattern_fits(value: &jig_client_domain::contract::OwnerPattern, l: &Limits) -
         }
     }
     let last = match &value.last {
-        jig_client_domain::contract::OwnerPatternEnd::Exact(bytes)
-        | jig_client_domain::contract::OwnerPatternEnd::Open(bytes) => bytes,
+        jig_client::contract::OwnerPatternEnd::Exact(bytes) | jig_client::contract::OwnerPatternEnd::Open(bytes) => {
+            bytes
+        }
     };
     if u32::try_from(last.len()).ok()? > l.text {
         return None;
     }
     Some(())
 }
-fn chip_fits(value: &jig_client_domain::contract::Chip, l: &Limits, words: &Words) -> Option<()> {
+fn chip_fits(value: &jig_client::contract::Chip, l: &Limits, words: &Words) -> Option<()> {
     if !value.title.bytes.fits(l.text) {
         return None;
     }
     match value.details.as_ref() {
-        jig_client_domain::contract::ChipPhase::Owner { details, .. } => {
+        jig_client::contract::ChipPhase::Owner { details, .. } => {
             crate::owner_chip::required(details, l, words)?;
         }
-        jig_client_domain::contract::ChipPhase::Active(_)
-        | jig_client_domain::contract::ChipPhase::Waiting { .. }
-        | jig_client_domain::contract::ChipPhase::Idle { .. }
-        | jig_client_domain::contract::ChipPhase::Starting
-        | jig_client_domain::contract::ChipPhase::Running { .. }
-        | jig_client_domain::contract::ChipPhase::WaitingForWords { .. }
-        | jig_client_domain::contract::ChipPhase::BackingOff { .. }
-        | jig_client_domain::contract::ChipPhase::Procedure { .. }
-        | jig_client_domain::contract::ChipPhase::Person { .. }
-        | jig_client_domain::contract::ChipPhase::Closing(_)
-        | jig_client_domain::contract::ChipPhase::Held { .. }
-        | jig_client_domain::contract::ChipPhase::Ended { .. } => {}
+        jig_client::contract::ChipPhase::Active(_)
+        | jig_client::contract::ChipPhase::Waiting { .. }
+        | jig_client::contract::ChipPhase::Idle { .. }
+        | jig_client::contract::ChipPhase::Starting
+        | jig_client::contract::ChipPhase::Running { .. }
+        | jig_client::contract::ChipPhase::WaitingForWords { .. }
+        | jig_client::contract::ChipPhase::BackingOff { .. }
+        | jig_client::contract::ChipPhase::Procedure { .. }
+        | jig_client::contract::ChipPhase::Person { .. }
+        | jig_client::contract::ChipPhase::Closing(_)
+        | jig_client::contract::ChipPhase::Held { .. }
+        | jig_client::contract::ChipPhase::Ended { .. } => {}
     }
     Some(())
 }
@@ -320,32 +321,17 @@ pub fn render(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Wo
         b,
         words,
         JigPhrase::Resources,
-        super::region(jig_domain_client::address::ProjectSection::Resources),
+        super::region(crate::address::ProjectSection::Resources),
     );
     resources(b, value, client, words, bindings);
     b.close();
-    crate::pages::work::section(
-        b,
-        words,
-        JigPhrase::Policy,
-        super::region(jig_domain_client::address::ProjectSection::Policy),
-    );
+    crate::pages::work::section(b, words, JigPhrase::Policy, super::region(crate::address::ProjectSection::Policy));
     policy_section(b, value, client, words, bindings);
     b.close();
-    crate::pages::work::section(
-        b,
-        words,
-        JigPhrase::Roles,
-        super::region(jig_domain_client::address::ProjectSection::Roles),
-    );
+    crate::pages::work::section(b, words, JigPhrase::Roles, super::region(crate::address::ProjectSection::Roles));
     members(b, value, client, words, bindings);
     b.close();
-    crate::pages::work::section(
-        b,
-        words,
-        JigPhrase::Spend,
-        super::region(jig_domain_client::address::ProjectSection::Spend),
-    );
+    crate::pages::work::section(b, words, JigPhrase::Spend, super::region(crate::address::ProjectSection::Spend));
     ledgers(b, value, client, words, bindings);
     configured_ledgers(b, value, words);
     spend(b, value, client, words, bindings);
@@ -354,7 +340,7 @@ pub fn render(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Wo
         b,
         words,
         JigPhrase::Recurring,
-        super::region(jig_domain_client::address::ProjectSection::Recurring),
+        super::region(crate::address::ProjectSection::Recurring),
     );
     recurring(b, value, client, words, bindings);
     b.close();
@@ -458,7 +444,7 @@ fn recurring(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Wor
 fn whole_recurring(
     b: &mut Builder,
     client: &Domain,
-    row: &jig_client_domain::contract::Recurring,
+    row: &jig_client::contract::Recurring,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
@@ -474,8 +460,8 @@ fn whole_recurring(
     words.text(
         b,
         match row.overlap {
-            jig_client_domain::contract::RecurringOverlap::Skip => JigPhrase::RecurringSkip,
-            jig_client_domain::contract::RecurringOverlap::Wait => JigPhrase::RecurringWait,
+            jig_client::contract::RecurringOverlap::Skip => JigPhrase::RecurringSkip,
+            jig_client::contract::RecurringOverlap::Wait => JigPhrase::RecurringWait,
         },
         &[],
     );
@@ -505,7 +491,7 @@ fn whole_recurring(
             Role::Link,
             JigPhrase::TaskPage,
             &[Hole::Number(*task)],
-            Act::Go { address: jig_domain_client::address::Address::task(*task) },
+            Act::Go { address: crate::address::Address::task(*task) },
         );
     }
     if row.cut {
@@ -517,12 +503,12 @@ fn whole_recurring(
 pub(super) fn section(
     b: &mut Builder,
     value: &OwnerProject,
-    selected: jig_domain_client::address::ProjectSection,
+    selected: crate::address::ProjectSection,
     client: &Domain,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
-    use jig_domain_client::address::ProjectSection;
+    use crate::address::ProjectSection;
     match selected {
         ProjectSection::Settings => {
             render(b, value, client, words, bindings);
@@ -565,7 +551,7 @@ pub(super) fn section(
                 bindings,
                 client.project_page().ended_before.as_ref(),
                 client.project_page().ended_after.as_ref(),
-                jig_domain_client::pages::project::GOALS_WINDOW,
+                crate::page::project::GOALS_WINDOW,
             );
             super::owner_goals::form(b, client, value, words, bindings);
         }
@@ -659,7 +645,7 @@ fn spend_request(ask: &Ask) -> Option<u64> {
         | PolicyEdit::Permissions { .. } => None,
     }
 }
-fn requirements_request(ask: &Ask) -> Option<&skein_lib::List<jig_client_domain::contract::PolicyRequirement>> {
+fn requirements_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::PolicyRequirement>> {
     match policy_request(ask)? {
         PolicyEdit::Requirements { requirements } => Some(requirements),
         PolicyEdit::ProjectSpend { .. }
@@ -668,7 +654,7 @@ fn requirements_request(ask: &Ask) -> Option<&skein_lib::List<jig_client_domain:
         | PolicyEdit::Permissions { .. } => None,
     }
 }
-fn projections_request(ask: &Ask) -> Option<&skein_lib::List<jig_client_domain::contract::OwnerGrant>> {
+fn projections_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::OwnerGrant>> {
     match policy_request(ask)? {
         PolicyEdit::Projections { grants } => Some(grants),
         PolicyEdit::ProjectSpend { .. }
@@ -677,7 +663,7 @@ fn projections_request(ask: &Ask) -> Option<&skein_lib::List<jig_client_domain::
         | PolicyEdit::Permissions { .. } => None,
     }
 }
-fn permissions_request(ask: &Ask) -> Option<&skein_lib::List<jig_client_domain::contract::PolicyPermission>> {
+fn permissions_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::PolicyPermission>> {
     match policy_request(ask)? {
         PolicyEdit::Permissions { mappings } => Some(mappings),
         PolicyEdit::ProjectSpend { .. }
@@ -686,7 +672,7 @@ fn permissions_request(ask: &Ask) -> Option<&skein_lib::List<jig_client_domain::
         | PolicyEdit::Projections { .. } => None,
     }
 }
-fn holdings_request(ask: &Ask) -> Option<&skein_lib::List<jig_client_domain::contract::Holding>> {
+fn holdings_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::Holding>> {
     match ask {
         Ask::SetRoles { holdings, .. } => Some(holdings),
         Ask::StartChat { .. }
@@ -740,7 +726,7 @@ fn pool_request(ask: &Ask) -> bool {
         | Ask::MakeService { .. } => false,
     }
 }
-fn service_request(ask: &Ask) -> Option<(&jig_client_domain::contract::Text, jig_client_domain::contract::HeldRole)> {
+fn service_request(ask: &Ask) -> Option<(&jig_client::contract::Text, jig_client::contract::HeldRole)> {
     match ask {
         Ask::MakeService { name, role, .. } => Some((name, *role)),
         Ask::StartChat { .. }
@@ -933,7 +919,7 @@ fn holding_forms(
     let mut holdings = skein_lib::List::with_capacity(value.members.capacity());
     for member in &value.members {
         holdings
-            .push(jig_client_domain::contract::Holding { party: member.party, role: member.role })
+            .push(jig_client::contract::Holding { party: member.party, role: member.role })
             .expect("whole member capacity");
     }
     let roles = Ask::SetRoles { project: value.number, holdings };
@@ -944,10 +930,10 @@ fn holding_forms(
                 let member = holdings.get(remove).expect("bounded holding");
                 region(b, words, P::Member, &[Hole::Number(member.party)]);
                 for role in [
-                    jig_client_domain::contract::HeldRole::Owner,
-                    jig_client_domain::contract::HeldRole::Maintainer,
-                    jig_client_domain::contract::HeldRole::Member,
-                    jig_client_domain::contract::HeldRole::Observer,
+                    jig_client::contract::HeldRole::Owner,
+                    jig_client::contract::HeldRole::Maintainer,
+                    jig_client::contract::HeldRole::Member,
+                    jig_client::contract::HeldRole::Observer,
                 ] {
                     holding_control(b, value.number, holdings, remove, role, words, bindings);
                 }
@@ -957,7 +943,7 @@ fn holding_forms(
                         value.number,
                         holdings,
                         remove,
-                        jig_client_domain::contract::HeldRole::Policy { role: role.number },
+                        jig_client::contract::HeldRole::Policy { role: role.number },
                         words,
                         bindings,
                     );
@@ -1019,26 +1005,26 @@ fn pool_forms(
         let mut budget = None;
         for pool in &value.configured_pools {
             match pool.source {
-                jig_client_domain::contract::Funder::Pool { project, person, period }
+                jig_client::contract::Funder::Pool { project, person, period }
                     if project == value.number && person == member.party && period == value.configured_period =>
                 {
                     budget = Some(pool.numbers.budget);
                     break;
                 }
-                jig_client_domain::contract::Funder::Pool { .. }
-                | jig_client_domain::contract::Funder::Task(_)
-                | jig_client_domain::contract::Funder::Period { .. }
-                | jig_client_domain::contract::Funder::Recurring { .. } => {}
+                jig_client::contract::Funder::Pool { .. }
+                | jig_client::contract::Funder::Task(_)
+                | jig_client::contract::Funder::Period { .. }
+                | jig_client::contract::Funder::Recurring { .. } => {}
             }
         }
         let mut offered = false;
         for offer in &value.acts {
-            if offer.act == jig_client_domain::contract::ActKind::SetPool {
+            if offer.act == jig_client::contract::ActKind::SetPool {
                 offered = match &offer.admission {
-                    jig_client_domain::contract::Admission::Allowed
-                    | jig_client_domain::contract::Admission::Proposed { .. } => true,
-                    jig_client_domain::contract::Admission::Refused(_)
-                    | jig_client_domain::contract::Admission::Bounded { .. } => false,
+                    jig_client::contract::Admission::Allowed | jig_client::contract::Admission::Proposed { .. } => true,
+                    jig_client::contract::Admission::Refused(_) | jig_client::contract::Admission::Bounded { .. } => {
+                        false
+                    }
                 };
                 break;
             }
@@ -1072,20 +1058,20 @@ fn named_region(b: &mut Builder, words: &Words, phrase: JigPhrase, holes: &[Hole
     b.open(Role::Region);
     b.name(&words.say(phrase, holes));
 }
-fn role_label(words: &Words, role: jig_client_domain::contract::HeldRole) -> Box<[u8]> {
+fn role_label(words: &Words, role: jig_client::contract::HeldRole) -> Box<[u8]> {
     match role {
-        jig_client_domain::contract::HeldRole::Owner => words.say(JigPhrase::HeldOwner, &[]),
-        jig_client_domain::contract::HeldRole::Maintainer => words.say(JigPhrase::HeldMaintainer, &[]),
-        jig_client_domain::contract::HeldRole::Member => words.say(JigPhrase::HeldMember, &[]),
-        jig_client_domain::contract::HeldRole::Observer => words.say(JigPhrase::HeldObserver, &[]),
-        jig_client_domain::contract::HeldRole::Policy { role } => {
+        jig_client::contract::HeldRole::Owner => words.say(JigPhrase::HeldOwner, &[]),
+        jig_client::contract::HeldRole::Maintainer => words.say(JigPhrase::HeldMaintainer, &[]),
+        jig_client::contract::HeldRole::Member => words.say(JigPhrase::HeldMember, &[]),
+        jig_client::contract::HeldRole::Observer => words.say(JigPhrase::HeldObserver, &[]),
+        jig_client::contract::HeldRole::Policy { role } => {
             words.say(JigPhrase::HeldPolicy, &[Hole::Number(u64::from(role))])
         }
     }
 }
 fn role_control(
     b: &mut Builder,
-    role: jig_client_domain::contract::HeldRole,
+    role: jig_client::contract::HeldRole,
     action: Act,
     words: &Words,
     bindings: &mut JigBindings,
@@ -1100,9 +1086,9 @@ fn role_control(
 fn holding_control(
     b: &mut Builder,
     project: u32,
-    source: &skein_lib::List<jig_client_domain::contract::Holding>,
+    source: &skein_lib::List<jig_client::contract::Holding>,
     index: u32,
-    role: jig_client_domain::contract::HeldRole,
+    role: jig_client::contract::HeldRole,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
@@ -1122,15 +1108,15 @@ fn service_form(
     }
     named_region(b, words, JigPhrase::ActMakeService, &[]);
     for role in [
-        jig_client_domain::contract::HeldRole::Owner,
-        jig_client_domain::contract::HeldRole::Maintainer,
-        jig_client_domain::contract::HeldRole::Member,
-        jig_client_domain::contract::HeldRole::Observer,
+        jig_client::contract::HeldRole::Owner,
+        jig_client::contract::HeldRole::Maintainer,
+        jig_client::contract::HeldRole::Member,
+        jig_client::contract::HeldRole::Observer,
     ] {
         role_control(b, role, Act::ProjectServiceRole { role }, words, bindings);
     }
     for row in &value.policy.roles {
-        let role = jig_client_domain::contract::HeldRole::Policy { role: row.number };
+        let role = jig_client::contract::HeldRole::Policy { role: row.number };
         role_control(b, role, Act::ProjectServiceRole { role }, words, bindings);
     }
     if let Some(role) = state.service_role {
@@ -1163,12 +1149,12 @@ fn render_request(b: &mut Builder, ask: &Ask, words: &Words) {
         Ask::ChangePolicy { edit, .. } => crate::policy_edit::render(b, edit, words),
         Ask::SetRoles { holdings, .. } => {
             for row in holdings {
-                words.actor(b, jig_client_domain::contract::Actor::Party(row.party));
+                words.actor(b, jig_client::contract::Actor::Party(row.party));
                 words.held_role(b, Some(row.role));
             }
         }
         Ask::SetPool { party, budget, .. } => {
-            words.actor(b, jig_client_domain::contract::Actor::Party(*party));
+            words.actor(b, jig_client::contract::Actor::Party(*party));
             words.amount(b, *budget);
         }
         Ask::MakeService { name, role, .. } => {

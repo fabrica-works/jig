@@ -72,10 +72,7 @@ fn maximum_card_envelope() {
     super::super::cards_access::check(&tree);
     assert!(tree.len() <= bound);
     assert!(contains(&tree, &whole));
-    assert_eq!(
-        domain.objects().get(id).unwrap().body,
-        Some(jig_domain_client::objects::Body::OwnerEscalation(Box::new(original)))
-    );
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(crate::objects::Body::OwnerEscalation(Box::new(original))));
 }
 
 #[test]
@@ -99,10 +96,7 @@ fn owner_escalation_named_card_keeps_current_holder_prior_stage_and_whole_task_w
     assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Release")));
     assert!(!tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Stop")));
     assert!(tree.len() <= crate::sizes::owner_escalation_nodes(&CLIENT).unwrap() + 1);
-    assert_eq!(
-        domain.objects().get(id).unwrap().body,
-        Some(jig_domain_client::objects::Body::OwnerEscalation(Box::new(row)))
-    );
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(crate::objects::Body::OwnerEscalation(Box::new(row))));
 }
 
 #[test]
@@ -144,7 +138,7 @@ fn owner_escalation_amendment_inputs_keep_whole_source_baselines_and_selected_de
         }
         assert_eq!(
             domain.objects().get(id).unwrap().body,
-            Some(jig_domain_client::objects::Body::OwnerEscalation(Box::new(original)))
+            Some(crate::objects::Body::OwnerEscalation(Box::new(original)))
         );
     }
 }
@@ -229,9 +223,9 @@ fn check_exact_storage(row: &OwnerEscalation, allocation: skein_ui::Limits, tree
     }
 }
 
-fn presence_step(domain: &mut Domain, l: jig_domain_client::Limits, event: Event) -> Vec<Request> {
-    let mut queue = skein_lib::Queue::with_capacity(jig_domain_client::max_out(&l));
-    jig_domain_client::step(
+fn presence_step(domain: &mut Domain, l: crate::Limits, event: Event) -> Vec<Request> {
+    let mut queue = skein_lib::Queue::with_capacity(crate::max_out(&l));
+    crate::step(
         domain,
         &skein_lib::Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits: l },
         event,
@@ -289,15 +283,15 @@ fn presence_person(result: &Result, owner: bool) -> ReadValue {
     }))
 }
 
-fn presence_domain(l: jig_domain_client::Limits, documents: &[(ObjectKey, Option<ReadValue>)]) -> Domain {
+fn presence_domain(l: crate::Limits, documents: &[(ObjectKey, Option<ReadValue>)]) -> Domain {
     let mut domain = Domain::new(&l, 1);
     let mut requests = presence_step(
         &mut domain,
         l,
         Event::Start {
-            address: jig_domain_client::address::Address::Inbox { project: None },
+            address: crate::address::Address::Inbox { project: None },
             kept: List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 60 },
+            offset: crate::boundary::Offset { minutes: 60 },
         },
     );
     requests.extend(presence_step(&mut domain, l, Event::Hello { served: true }));
@@ -367,7 +361,7 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
             documents.push((ObjectKey::Task(number), Some(ReadValue::Task(Box::new(task)))));
         }
     }
-    let l = jig_domain_client::Limits { objects: u32::try_from(documents.len()).unwrap(), ..CLIENT };
+    let l = crate::Limits { objects: u32::try_from(documents.len()).unwrap(), ..CLIENT };
     let domain = presence_domain(l, &documents);
     let id = domain.objects().find(ObjectKey::Escalation(8)).unwrap();
     let bound = crate::sizes::owner_escalation_nodes(&l).unwrap().checked_add(1).unwrap();
@@ -410,10 +404,7 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
             assert!(repetitions >= 4);
         }
     }
-    assert_eq!(
-        domain.objects().get(id).unwrap().body,
-        Some(jig_domain_client::objects::Body::OwnerEscalation(Box::new(row)))
-    );
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(crate::objects::Body::OwnerEscalation(Box::new(row))));
 }
 
 fn check_presence_envelopes(result: bool, part: u32) {
@@ -560,7 +551,7 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
         assert_eq!(row, original);
         assert_eq!(
             domain.objects().get(id).unwrap().body,
-            Some(jig_domain_client::objects::Body::OwnerEscalation(Box::new(original)))
+            Some(crate::objects::Body::OwnerEscalation(Box::new(original)))
         );
     }
     let mut oversized = escalation();
@@ -574,9 +565,6 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
     assert!(!cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, w, &mut bindings));
     builder.close();
     assert_eq!(builder.finish().len(), 1);
-    assert_eq!(
-        domain.objects().get(id).unwrap().body,
-        Some(jig_domain_client::objects::Body::OwnerEscalation(Box::new(original)))
-    );
-    assert_eq!(crate::sizes::owner_escalation_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }), None);
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(crate::objects::Body::OwnerEscalation(Box::new(original))));
+    assert_eq!(crate::sizes::owner_escalation_nodes(&crate::Limits { rows: u32::MAX, ..CLIENT }), None);
 }

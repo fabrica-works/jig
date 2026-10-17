@@ -8,8 +8,8 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
-use jig_client_domain::contract::{Chip, ObjectKey, OwnerPhaseCounts, OwnerTree, OwnerTreeRow, Proposer};
-use jig_domain_client::{Domain, Limits, action::Act, pages::task::Plan};
+use crate::{Domain, Limits, action::Act, page::task::Plan};
+use jig_client::contract::{Chip, ObjectKey, OwnerPhaseCounts, OwnerTree, OwnerTreeRow, Proposer};
 use skein_lib::{Set, Stack};
 /// Finite complete subtree fragment and its temporary traversal storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -76,9 +76,9 @@ pub fn required(value: &OwnerTree, l: &Limits, words: &Words) -> Option<TreeFrag
         chip_fits(&row.chip, l, words)?;
         for link in &row.dependencies {
             match link {
-                jig_client_domain::contract::OwnerTaskLink::Live(chip)
-                | jig_client_domain::contract::OwnerTaskLink::Retained { chip, .. } => chip_fits(chip, l, words)?,
-                jig_client_domain::contract::OwnerTaskLink::Stored { .. } => {}
+                jig_client::contract::OwnerTaskLink::Live(chip)
+                | jig_client::contract::OwnerTaskLink::Retained { chip, .. } => chip_fits(chip, l, words)?,
+                jig_client::contract::OwnerTaskLink::Stored { .. } => {}
             }
         }
         if row.proposals.capacity() > l.rows || row.dependencies.capacity() > l.rows {
@@ -92,21 +92,21 @@ fn chip_fits(chip: &Chip, limits: &Limits, words: &Words) -> Option<()> {
         return None;
     }
     match chip.details.as_ref() {
-        jig_client_domain::contract::ChipPhase::Owner { details, .. } => {
+        jig_client::contract::ChipPhase::Owner { details, .. } => {
             crate::owner_chip::required(details, limits, words)?;
         }
-        jig_client_domain::contract::ChipPhase::Active(_)
-        | jig_client_domain::contract::ChipPhase::Waiting { .. }
-        | jig_client_domain::contract::ChipPhase::Idle { .. }
-        | jig_client_domain::contract::ChipPhase::Starting
-        | jig_client_domain::contract::ChipPhase::Running { .. }
-        | jig_client_domain::contract::ChipPhase::WaitingForWords { .. }
-        | jig_client_domain::contract::ChipPhase::BackingOff { .. }
-        | jig_client_domain::contract::ChipPhase::Procedure { .. }
-        | jig_client_domain::contract::ChipPhase::Person { .. }
-        | jig_client_domain::contract::ChipPhase::Closing(_)
-        | jig_client_domain::contract::ChipPhase::Held { .. }
-        | jig_client_domain::contract::ChipPhase::Ended { .. } => {}
+        jig_client::contract::ChipPhase::Active(_)
+        | jig_client::contract::ChipPhase::Waiting { .. }
+        | jig_client::contract::ChipPhase::Idle { .. }
+        | jig_client::contract::ChipPhase::Starting
+        | jig_client::contract::ChipPhase::Running { .. }
+        | jig_client::contract::ChipPhase::WaitingForWords { .. }
+        | jig_client::contract::ChipPhase::BackingOff { .. }
+        | jig_client::contract::ChipPhase::Procedure { .. }
+        | jig_client::contract::ChipPhase::Person { .. }
+        | jig_client::contract::ChipPhase::Closing(_)
+        | jig_client::contract::ChipPhase::Held { .. }
+        | jig_client::contract::ChipPhase::Ended { .. } => {}
     }
     Some(())
 }
@@ -175,7 +175,7 @@ fn row(
         text(b, words, P::RowCut, &[]);
     }
     control(b, client, &value.chip, expanded, words, bindings);
-    if !jig_domain_client::pages::conversations::live(value.chip.phase) {
+    if !crate::page::conversations::live(value.chip.phase) {
         crate::frame::control(
             b,
             words,

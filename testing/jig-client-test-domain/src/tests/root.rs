@@ -10,9 +10,9 @@ use crate::{Address, Answered, Ask, Domain, Event, JigOut, Limits, Request, firs
 use jig_client_domain::contract::{
     self, Answer, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, Outcome, PartyKind, WatchEnd, WatchEvent,
 };
-use jig_domain_client::{boundary::Offset, limits::Backoff, link::Link};
+use jig_client_view::{boundary::Offset, limits::ui::Backoff, link::Link};
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time, Token, Wall};
-const JIG: jig_domain_client::Limits = jig_domain_client::Limits {
+const JIG: jig_client_view::Limits = jig_client_view::Limits {
     watches: 4,
     notices: 2,
     notice_life: Duration::from_secs(5),
@@ -96,7 +96,7 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
     let rows = drive(
         root,
         Event::Start {
-            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
+            address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             kept,
             offset: Offset { minutes: 0 },
         },
@@ -109,7 +109,7 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
         .unwrap()
 }
 fn confirm(root: &mut Domain, watch: Token, party: u64) {
-    drive(root, Event::Jig(jig_domain_client::Event::Hello { served: true }));
+    drive(root, Event::Jig(jig_client_view::Event::Hello { served: true }));
     let frame = Frame {
         party: FrameParty {
             number: party,
@@ -130,7 +130,7 @@ fn confirm(root: &mut Domain, watch: Token, party: u64) {
     };
     drive(
         root,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))),
         }),
@@ -139,8 +139,8 @@ fn confirm(root: &mut Domain, watch: Token, party: u64) {
 fn ask(root: &mut Domain, asked: Token) -> Vec<Request> {
     drive(
         root,
-        Event::Jig(jig_domain_client::Event::Ask {
-            ask: jig_domain_client::intents::ByValue {
+        Event::Jig(jig_client_view::Event::Ask {
+            ask: jig_client_view::intents::ByValue {
                 asked,
                 scope: 7,
                 ask: Box::new(contract::Ask::Stop { project: 1, task: 9 }),
@@ -252,7 +252,7 @@ fn link_and_confirmation_reach_both_children_and_park_the_table() {
     assert_eq!(root.first().party(), Some(7));
     assert_eq!(root.second().party(), Some(7));
     ask(&mut root, Token::new(42));
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Ended { watch, end: WatchEnd::Dropped }));
+    drive(&mut root, Event::Jig(jig_client_view::Event::Ended { watch, end: WatchEnd::Dropped }));
     assert_eq!(root.first().link(), Link::Offline);
     assert_eq!(root.second().link(), Link::Offline);
     for row in taken(&mut root) {
@@ -330,7 +330,7 @@ fn a_jig_page_routes_every_part_kind_and_forgets_its_generation() {
     let mut root = ready(21);
     let opened = drive(
         &mut root,
-        Event::Went { place: crate::Place::Address(Address::Jig(jig_domain_client::address::Address::Deployment)) },
+        Event::Went { place: crate::Place::Address(Address::Jig(jig_client_view::address::Address::Deployment)) },
     );
     let watch = opened
         .iter()
@@ -360,7 +360,7 @@ fn a_jig_page_routes_every_part_kind_and_forgets_its_generation() {
     let expected = parts.clone();
     let rows = drive(
         &mut root,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Deployment(Box::new(contract::Deployment {
                 hosts: List::with_capacity(0),
@@ -394,7 +394,7 @@ fn a_jig_page_routes_every_part_kind_and_forgets_its_generation() {
     let rows = drive(
         &mut root,
         Event::Went {
-            place: crate::Place::Address(Address::Jig(jig_domain_client::address::Address::Inbox { project: None })),
+            place: crate::Place::Address(Address::Jig(jig_client_view::address::Address::Inbox { project: None })),
         },
     );
     for part in &expected.as_slice()[..8] {
@@ -560,7 +560,7 @@ fn closing_family_watches_keep_their_terminal_obligation_and_stale_tokens_do_not
     drive(
         &mut root,
         Event::Went {
-            place: crate::Place::Address(Address::Jig(jig_domain_client::address::Address::Inbox { project: None })),
+            place: crate::Place::Address(Address::Jig(jig_client_view::address::Address::Inbox { project: None })),
         },
     );
     drive(&mut root, Event::First(first::Event::Watch { watch, event: first::WatchEvent::Delivered(item(2)) }));
@@ -655,8 +655,8 @@ fn restored_requests(count: u32) -> List<crate::store::Record> {
     for n in 0..count {
         drive(
             &mut old,
-            Event::Jig(jig_domain_client::Event::Ask {
-                ask: jig_domain_client::intents::ByValue {
+            Event::Jig(jig_client_view::Event::Ask {
+                ask: jig_client_view::intents::ByValue {
                     asked: Token::new(u64::from(n)),
                     scope: 7,
                     ask: Box::new(contract::Ask::Stop { project: 1, task: 9 + u64::from(n) }),
@@ -677,7 +677,7 @@ fn restored_foreign_scope_counts_are_routed_without_root_page_policy() {
     let mut root = new(&limits(), 31);
     let watch = start(&mut root, restored_requests(2));
     confirm(&mut root, watch, 8);
-    assert_eq!(root.jig().page(), &jig_domain_client::pages::Page::SomeoneElse);
+    assert_eq!(root.jig().page(), &jig_client_view::page::Page::SomeoneElse);
     assert_eq!(root.first().party(), Some(8));
     assert!(taken(&mut root).is_empty());
     confirm(&mut root, watch, 7);
@@ -727,7 +727,7 @@ fn retention_unknown_retires_the_last_foreign_scope_and_clears_its_warning() {
     let mut root = new(&limits(), 33);
     let watch = start(&mut root, restored_requests(1));
     confirm(&mut root, watch, 8);
-    assert_eq!(root.jig().page(), &jig_domain_client::pages::Page::SomeoneElse);
+    assert_eq!(root.jig().page(), &jig_client_view::page::Page::SomeoneElse);
     let mut future = env();
     future.now = Time::from_nanos(1_002_000_000_000);
     future.wall = Wall::from_nanos(1_002_000_000_000);
@@ -738,15 +738,15 @@ fn retention_unknown_retires_the_last_foreign_scope_and_clears_its_warning() {
     assert!(work_page(root.jig().page()));
 }
 
-fn work_page(page: &jig_domain_client::pages::Page) -> bool {
+fn work_page(page: &jig_client_view::page::Page) -> bool {
     match page {
-        jig_domain_client::pages::Page::Work { .. } => true,
-        jig_domain_client::pages::Page::Starting
-        | jig_domain_client::pages::Page::Elsewhere
-        | jig_domain_client::pages::Page::SigningIn
-        | jig_domain_client::pages::Page::Missing
-        | jig_domain_client::pages::Page::OutOfDate
-        | jig_domain_client::pages::Page::SomeoneElse => false,
+        jig_client_view::page::Page::Work { .. } => true,
+        jig_client_view::page::Page::Starting
+        | jig_client_view::page::Page::Elsewhere
+        | jig_client_view::page::Page::SigningIn
+        | jig_client_view::page::Page::Missing
+        | jig_client_view::page::Page::OutOfDate
+        | jig_client_view::page::Page::SomeoneElse => false,
     }
 }
 
@@ -810,7 +810,7 @@ fn outbox_entries_route_as_scoped_numeric_subjects_independently_of_effect_propo
     let mut root = ready(121);
     let opened = drive(
         &mut root,
-        Event::Went { place: crate::Place::Address(Address::Jig(jig_domain_client::address::Address::Deployment)) },
+        Event::Went { place: crate::Place::Address(Address::Jig(jig_client_view::address::Address::Deployment)) },
     );
     let watch = opened
         .iter()
@@ -833,7 +833,7 @@ fn outbox_entries_route_as_scoped_numeric_subjects_independently_of_effect_propo
     }
     let rows = drive(
         &mut root,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Deployment(Box::new(contract::Deployment {
                 hosts: List::with_capacity(0),
@@ -863,7 +863,7 @@ fn outbox_entries_route_as_scoped_numeric_subjects_independently_of_effect_propo
     drive(
         &mut root,
         Event::Went {
-            place: crate::Place::Address(Address::Jig(jig_domain_client::address::Address::Inbox { project: None })),
+            place: crate::Place::Address(Address::Jig(jig_client_view::address::Address::Inbox { project: None })),
         },
     );
     for part in &parts {

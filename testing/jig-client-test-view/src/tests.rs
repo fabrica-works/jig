@@ -19,7 +19,7 @@ use skein_ui::{NodeId, Patch, Role};
 use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
 fn limits() -> jig_client_test_domain::Limits {
     jig_client_test_domain::Limits {
-        jig: jig_domain_client::Limits {
+        jig: jig_client_view::Limits {
             watches: 8,
             notices: 2,
             notice_life: Duration::from_secs(5),
@@ -45,7 +45,7 @@ fn limits() -> jig_client_test_domain::Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_domain_client::limits::Backoff {
+            backoff: jig_client_view::limits::ui::Backoff {
                 first: Duration::from_nanos(10),
                 most: Duration::from_nanos(80),
             },
@@ -104,9 +104,9 @@ fn ready() -> Domain {
     let rows = drive(
         &mut root,
         Event::Start {
-            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
+            address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             kept: List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: jig_client_view::boundary::Offset { minutes: 0 },
         },
     );
     let watch = rows
@@ -116,10 +116,10 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { served: true }));
+    drive(&mut root, Event::Jig(jig_client_view::Event::Hello { served: true }));
     drive(
         &mut root,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
                 party: FrameParty {
@@ -342,7 +342,7 @@ fn load_cards(root: &mut Domain, rows: Vec<Request>) {
                 _ => continue,
             };
             let parts =
-                drive(root, Event::Jig(jig_domain_client::Event::Read { read, result: ReadResult::Value(value) }));
+                drive(root, Event::Jig(jig_client_view::Event::Read { read, result: ReadResult::Value(value) }));
             for row in parts {
                 if let Request::First(first::Out::Read { read, subject }) = row {
                     let parameters = match subject.kind {
@@ -477,7 +477,7 @@ fn buttons_and_parameter_fields_decode_to_their_owner_and_departed_nodes_are_sta
     assert_eq!(decode(&mut view, field, Act::Input { value: b"22".as_slice().into() }), None);
     drive(
         &mut root,
-        Event::Went { place: Place::Address(Address::Jig(jig_domain_client::address::Address::Deployment)) },
+        Event::Went { place: Place::Address(Address::Jig(jig_client_view::address::Address::Deployment)) },
     );
     patches(&mut view, &root);
     assert_eq!(decode(&mut view, button, Act::Press), None);
@@ -570,7 +570,7 @@ fn check_outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
     let mut root = ready();
     let opened = drive(
         &mut root,
-        Event::Went { place: Place::Address(Address::Jig(jig_domain_client::address::Address::Deployment)) },
+        Event::Went { place: Place::Address(Address::Jig(jig_client_view::address::Address::Deployment)) },
     );
     let watch = opened
         .iter()
@@ -583,10 +583,10 @@ fn check_outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
     for scope in [PartScope::Project(3), PartScope::Project(4), PartScope::Deployment] {
         parts.push(Part::Outbox { connector: jig_client_test_domain::FIRST, scope, entry }).unwrap();
     }
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { served: true }));
+    drive(&mut root, Event::Jig(jig_client_view::Event::Hello { served: true }));
     drive(
         &mut root,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
                 hosts: list([]),
@@ -631,7 +631,7 @@ fn effect_family_keys_keep_equal_task_and_party_makers_in_distinct_public_items(
     let mut root = ready();
     let opened = drive(
         &mut root,
-        Event::Went { place: Place::Address(Address::Jig(jig_domain_client::address::Address::Deployment)) },
+        Event::Went { place: Place::Address(Address::Jig(jig_client_view::address::Address::Deployment)) },
     );
     let watch = opened
         .iter()
@@ -643,7 +643,7 @@ fn effect_family_keys_keep_equal_task_and_party_makers_in_distinct_public_items(
     let parts = list(keys.map(|proposal| Part::Effect { connector: jig_client_test_domain::FIRST, proposal }));
     let reads = drive(
         &mut root,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
                 hosts: list([]),
@@ -875,7 +875,7 @@ fn family_with_plan(second: Option<u64>) -> Domain {
     document.context.as_mut().unwrap().impact.tasks.waiting = 1;
     drive(
         &mut root,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
         }),
@@ -902,7 +902,7 @@ fn a_second_tasks_section_slot_says_it_cannot_be_shown() {
     let mut view = view();
     patches(&mut view, &root);
     let section =
-        jig_domain_client::pages::Section::Task { task: 10, section: jig_domain_client::address::TaskSection::Plan };
+        jig_client_view::page::Section::Task { task: 10, section: jig_client_view::address::TaskSection::Plan };
     let (index, slot) = view
         .tree()
         .nodes()

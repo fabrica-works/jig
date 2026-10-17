@@ -5,11 +5,11 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use jig_client_domain::contract::{Amendment, ProposalAction, ProposedTask};
-use jig_domain_client::{
+use crate::{
     Domain,
     objects::{Object, proposal::facts},
 };
+use jig_client::contract::{Amendment, ProposalAction, ProposedTask};
 use skein_lib::Id;
 /// Build the one proposal card at any place, using the document's acts only.
 pub fn proposal(
@@ -132,9 +132,9 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, _bindings: 
 }
 
 /// A named person revision and exact closed destination; the ask owns its project scope.
-pub(crate) fn address_change(b: &mut Builder, change: &jig_client_domain::contract::AddressChange, words: &Words) {
+pub(crate) fn address_change(b: &mut Builder, change: &jig_client::contract::AddressChange, words: &Words) {
     words.text(b, JigPhrase::PersonAddressRevision, &[Hole::Number(change.revision.value)]);
-    crate::proposed_task::executor(b, jig_client_domain::contract::OwnerExecutor::Person(change.address), words);
+    crate::proposed_task::executor(b, jig_client::contract::OwnerExecutor::Person(change.address), words);
 }
 
 /// The same keyed card for the independently supplied pending owner document.
@@ -150,19 +150,19 @@ pub fn owner_proposal(
         return false;
     };
     let document = match &facts.body {
-        Some(jig_domain_client::objects::Body::OwnerProposal(document)) => document,
+        Some(crate::objects::Body::OwnerProposal(document)) => document,
         Some(
-            jig_domain_client::objects::Body::Historical(_)
-            | jig_domain_client::objects::Body::Chip(_)
-            | jig_domain_client::objects::Body::Task(_)
-            | jig_domain_client::objects::Body::Proposal(_)
-            | jig_domain_client::objects::Body::Escalation(_)
-            | jig_domain_client::objects::Body::OwnerEscalation(_)
-            | jig_domain_client::objects::Body::Question(_)
-            | jig_domain_client::objects::Body::PersonTask(_)
-            | jig_domain_client::objects::Body::OwnerPersonTask(_)
-            | jig_domain_client::objects::Body::Result(_)
-            | jig_domain_client::objects::Body::Note { .. },
+            crate::objects::Body::Historical(_)
+            | crate::objects::Body::Chip(_)
+            | crate::objects::Body::Task(_)
+            | crate::objects::Body::Proposal(_)
+            | crate::objects::Body::Escalation(_)
+            | crate::objects::Body::OwnerEscalation(_)
+            | crate::objects::Body::Question(_)
+            | crate::objects::Body::PersonTask(_)
+            | crate::objects::Body::OwnerPersonTask(_)
+            | crate::objects::Body::Result(_)
+            | crate::objects::Body::Note { .. },
         )
         | None => return false,
     };

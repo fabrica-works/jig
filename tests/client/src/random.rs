@@ -3,7 +3,7 @@ use crate::{Outcome, Scripted, Test, Until, World, stories};
 use jig_client_domain::contract::{ObjectKey, ReadValue};
 use jig_client_scripted_engine::Change;
 use jig_client_test_domain::{Address as RootAddress, family};
-use jig_domain_client::address::{Address, ProjectSection, TaskSection};
+use jig_client_view::address::{Address, ProjectSection, TaskSection};
 use skein_lib::{Rng, Wall};
 
 /// Independently replayable story starting states for a random person.

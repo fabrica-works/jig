@@ -7,9 +7,7 @@ fn jigs_view_decodes_an_act_on_a_drawing_into_nothing() {
     for meaning in [
         crate::JigMeaning::TaskNumber,
         crate::JigMeaning::Priority,
-        crate::JigMeaning::Action(jig_domain_client::action::Act::Go {
-            address: jig_domain_client::address::Address::Inbox { project: None },
-        }),
+        crate::JigMeaning::Action(crate::action::Act::Go { address: crate::address::Address::Inbox { project: None } }),
         crate::JigMeaning::ProjectPoolBudget { project: 1, party: 2 },
     ] {
         let binding = bindings.insert(meaning);

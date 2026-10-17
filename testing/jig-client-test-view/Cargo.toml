@@ -9,7 +9,6 @@ publish.workspace = true
 jig-client-domain.workspace = true
 skein-ui.workspace = true
 skein-lib.workspace = true
-jig-domain-client.workspace = true
 jig-client-view.workspace = true
 jig-client-test-domain.workspace = true
 [lints]

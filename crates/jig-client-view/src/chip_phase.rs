@@ -5,7 +5,7 @@ use crate::words::Words;
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
-use jig_client_domain::contract::{ClosingStage, OwnerChipPhase, RunStage};
+use jig_client::contract::{ClosingStage, OwnerChipPhase, RunStage};
 
 pub(crate) fn brief(b: &mut Builder, phase: &OwnerChipPhase, words: &Words) {
     match phase {
@@ -29,7 +29,7 @@ pub(crate) fn brief(b: &mut Builder, phase: &OwnerChipPhase, words: &Words) {
             }
         },
         OwnerChipPhase::Person { address, taken_by, since } => {
-            crate::proposed_task::executor(b, jig_client_domain::contract::OwnerExecutor::Person(*address), words);
+            crate::proposed_task::executor(b, jig_client::contract::OwnerExecutor::Person(*address), words);
             if let Some(party) = taken_by {
                 words.text(b, JigPhrase::TakenByNumber, &[Hole::Number(*party)]);
             }

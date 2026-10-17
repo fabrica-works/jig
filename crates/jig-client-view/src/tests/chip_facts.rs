@@ -6,8 +6,8 @@
 )]
 use super::cards::{CLIENT, contains, shared_words as words, text};
 use crate::JigBindings;
-use jig_client_domain::contract::*;
-use jig_domain_client::{Domain, Request, address::Address};
+use crate::{Domain, Request, address::Address};
+use jig_client::contract::*;
 use skein_lib::List;
 use skein_ui::{Builder, Tree};
 fn list<T>(items: impl IntoIterator<Item = T>) -> List<T> {

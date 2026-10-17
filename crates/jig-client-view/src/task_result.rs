@@ -2,8 +2,8 @@
 use crate::{JigBindings, words::Words};
 use skein_ui::Builder;
 
-use jig_client_domain::contract::TaskResult;
-use jig_domain_client::Domain;
+use crate::Domain;
+use jig_client::contract::TaskResult;
 
 pub(crate) fn render(b: &mut Builder, client: &Domain, value: &TaskResult, words: &Words, bindings: &mut JigBindings) {
     match value {
@@ -12,6 +12,6 @@ pub(crate) fn render(b: &mut Builder, client: &Domain, value: &TaskResult, words
     }
 }
 /// The complete owner result plus the largest cancellation reason and scalar captions.
-pub(crate) fn nodes(limits: &jig_domain_client::Limits) -> Option<u32> {
+pub(crate) fn nodes(limits: &crate::Limits) -> Option<u32> {
     crate::result_nodes(limits)?.checked_add(skein_ui::markdown::max_nodes(limits.text)?)?.checked_add(8)
 }

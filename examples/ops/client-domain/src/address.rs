@@ -3,7 +3,7 @@
 /// An application destination tagged with its owning child.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Address {
-    Jig(jig_domain_client::address::Address),
+    Jig(jig_client_view::address::Address),
     Infrastructure(crate::infrastructure::Address),
     Observability(crate::observability::Address),
 }

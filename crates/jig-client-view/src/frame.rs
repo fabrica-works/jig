@@ -9,7 +9,7 @@ use crate::{JigBindings, JigMeaning};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, SlotRef, State};
 
-use jig_domain_client::{Domain, action::Act, address::Address, pages::navigation::Destination};
+use crate::{Domain, action::Act, address::Address, page::navigation::Destination};
 
 /// The connection's state, on every page.
 pub fn link(b: &mut Builder, client: &Domain, words: &Words, _bindings: &mut JigBindings) {
@@ -58,7 +58,7 @@ pub fn party(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
     match &client.frame().document {
         Some(frame) => {
             crate::frame_facts::identity(b, words, &frame.party);
-            if frame.party.kind == jig_client_domain::contract::PartyKind::Person {
+            if frame.party.kind == jig_client::contract::PartyKind::Person {
                 control(b, words, bindings, Role::Button, JigPhrase::SignOut, &[], Act::SignOut);
             }
         }
@@ -167,7 +167,7 @@ pub fn control(
 
 fn membership(
     b: &mut Builder,
-    project: &jig_client_domain::contract::ProjectRole,
+    project: &jig_client::contract::ProjectRole,
     selected_project: Option<u32>,
     words: &Words,
     bindings: &mut JigBindings,
@@ -181,12 +181,11 @@ fn membership(
         b.state(State::Current);
     }
     b.bind(bindings.insert(JigMeaning::Action(Act::Go {
-        address: Address::Project {
-            project: project.project,
-            section: jig_domain_client::address::ProjectSection::Overview,
-        },
+        address: Address::Project { project: project.project, section: crate::address::ProjectSection::Overview },
     })));
     b.close();
     crate::frame_facts::project_loss(b, words, project);
     crate::frame_facts::membership(b, words, project);
 }
+
+pub mod me;

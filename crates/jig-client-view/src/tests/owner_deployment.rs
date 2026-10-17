@@ -14,11 +14,11 @@ use crate::{JigBindings, owner_deployment as view};
 use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Event, Request,
     address::{Address, Place},
 };
+use jig_client::contract::*;
 use skein_lib::{Duration, List, Wall, bytes::copy_of};
 fn list<T>(values: Vec<T>) -> List<T> {
     let mut list = List::with_capacity(u32::try_from(values.len()).unwrap());
@@ -452,7 +452,7 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
     let mut oversized = untouched.clone();
     oversized.hosts = List::with_capacity(CLIENT.rows + 1);
     assert!(view::required(&oversized, &CLIENT, w).is_none());
-    assert!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }).is_none());
+    assert!(view::max_nodes(&crate::Limits { rows: u32::MAX, ..CLIENT }).is_none());
     assert_eq!(client.deployment_page().owner.as_deref(), Some(&untouched));
 }
 fn genuine_owner_chip_fixture(number: u64) -> Chip {

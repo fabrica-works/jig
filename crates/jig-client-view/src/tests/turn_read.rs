@@ -4,8 +4,8 @@ use super::{
     turns::ready,
     work_pages::list,
 };
-use jig_client_domain::contract::*;
-use jig_domain_client::Event;
+use crate::Event;
+use jig_client::contract::*;
 use skein_lib::Wall;
 
 fn unread_page(why: TurnProblem) -> ActivityPage {

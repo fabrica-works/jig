@@ -3,7 +3,7 @@
 //! chip metadata and cached replies never substitute for them.
 use super::{chips, owner};
 use jig_client_domain::contract as client;
-use jig_domain_client::Limits;
+use jig_client_view::Limits;
 use jig_domain_core::documents;
 
 /// # Errors

@@ -1,6 +1,6 @@
 //! Seeded random people in both Ops starting states, judged by the shared referee.
+use jig_client_view::address::Address as JigAddress;
 use jig_client_world::Until;
-use jig_domain_client::address::Address as JigAddress;
 use jig_ops_client_domain::{Address, observability as obs};
 use jig_ops_world::client::stories;
 use skein_world::domain::{Verdict, heap::Counting};

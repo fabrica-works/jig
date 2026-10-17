@@ -80,9 +80,9 @@ fn a_slow_reader_gets_fewer_deliveries_and_others_are_answered() {
     let (mut world, first) = bytes::two_clients(fixtures::SEED);
     let second = world.client(
         1,
-        jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Task {
+        jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Task {
             task: 1,
-            section: jig_domain_client::address::TaskSection::Activity,
+            section: jig_client_view::address::TaskSection::Activity,
         }),
     );
     world.person(

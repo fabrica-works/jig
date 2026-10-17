@@ -97,15 +97,15 @@ impl Document {
         }
     }
     #[must_use]
-    pub fn sections(&self) -> List<jig_domain_client::pages::Section> {
+    pub fn sections(&self) -> List<jig_client_view::page::Section> {
         let mut sections = List::with_capacity(2);
         match self {
             Self::Item(item) => {
                 for task in [Some(item.task), item.second].into_iter().flatten() {
                     sections
-                        .push(jig_domain_client::pages::Section::Task {
+                        .push(jig_client_view::page::Section::Task {
                             task,
-                            section: jig_domain_client::address::TaskSection::Plan,
+                            section: jig_client_view::address::TaskSection::Plan,
                         })
                         .expect("two section names fit");
                 }

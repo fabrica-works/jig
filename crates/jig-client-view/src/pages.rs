@@ -5,7 +5,7 @@ use crate::{JigBindings, words::Words};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_domain_client::{
+use crate::{
     Domain,
     action::{Act, End},
     windows::{Edge, Edges},
@@ -59,30 +59,30 @@ fn edge(b: &mut Builder, words: &Words, bindings: &mut JigBindings, edge: &Edge,
 /// Show the page's excess rows and admission refusal after its sections.
 pub fn excess(b: &mut Builder, client: &Domain, words: &Words) {
     match client.page() {
-        jig_domain_client::pages::Page::Work { excess, refused, .. } => {
+        crate::page::Page::Work { excess, refused, .. } => {
             if *excess > 0 {
                 words.status(b, JigPhrase::MoreRows, &[]);
             }
             if let Some(which) = refused {
-                words.refusal(b, &jig_client_domain::contract::Refusal::Limit { which: *which });
+                words.refusal(b, &jig_client::contract::Refusal::Limit { which: *which });
             }
         }
-        jig_domain_client::pages::Page::Starting
-        | jig_domain_client::pages::Page::Elsewhere
-        | jig_domain_client::pages::Page::SigningIn
-        | jig_domain_client::pages::Page::Missing
-        | jig_domain_client::pages::Page::OutOfDate
-        | jig_domain_client::pages::Page::SomeoneElse => {}
+        crate::page::Page::Starting
+        | crate::page::Page::Elsewhere
+        | crate::page::Page::SigningIn
+        | crate::page::Page::Missing
+        | crate::page::Page::OutOfDate
+        | crate::page::Page::SomeoneElse => {}
     }
 }
 
-pub(crate) fn object_key(object: jig_client_domain::contract::ObjectKey) -> skein_ui::Key {
-    use jig_client_domain::contract::ObjectKey;
+pub(crate) fn object_key(object: jig_client::contract::ObjectKey) -> skein_ui::Key {
+    use jig_client::contract::ObjectKey;
     let (kind, a, b) = match object {
         ObjectKey::Task(task) => (0, task, 0),
         ObjectKey::Proposal(key) => match key.proposer {
-            jig_client_domain::contract::Proposer::Task(task) => (1, task, key.number),
-            jig_client_domain::contract::Proposer::Party(party) => (29, party, key.number),
+            jig_client::contract::Proposer::Task(task) => (1, task, key.number),
+            jig_client::contract::Proposer::Party(party) => (29, party, key.number),
         },
         ObjectKey::Escalation(task) => (2, task, 0),
         ObjectKey::Question { task, message } => (3, task, message),
@@ -95,7 +95,7 @@ pub(crate) fn object_key(object: jig_client_domain::contract::ObjectKey) -> skei
 
 /// Build the current jig page; an application's own page returns false.
 pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
-    use jig_domain_client::{address::Address, pages::Page};
+    use crate::{address::Address, page::Page};
     match client.page() {
         Page::Elsewhere => return false,
         Page::Work { address, .. } => {
@@ -181,7 +181,7 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
     // owner retains it on this page until the pending answer or linger ends.
     let mut owed = false;
     match client.page() {
-        jig_domain_client::pages::Page::Work { .. } | jig_domain_client::pages::Page::Elsewhere => {
+        crate::page::Page::Work { .. } | crate::page::Page::Elsewhere => {
             for (_, id) in client.objects().ids() {
                 if client.owes(*id) {
                     if !owed {
@@ -193,11 +193,11 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
                 }
             }
         }
-        jig_domain_client::pages::Page::Starting
-        | jig_domain_client::pages::Page::SigningIn
-        | jig_domain_client::pages::Page::Missing
-        | jig_domain_client::pages::Page::OutOfDate
-        | jig_domain_client::pages::Page::SomeoneElse => {}
+        crate::page::Page::Starting
+        | crate::page::Page::SigningIn
+        | crate::page::Page::Missing
+        | crate::page::Page::OutOfDate
+        | crate::page::Page::SomeoneElse => {}
     }
     if owed {
         b.close();
@@ -208,23 +208,23 @@ pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mu
 
 pub(crate) fn scratch(limits: &skein_ui::Limits) -> Option<u64> {
     crate::sections::task::scratch(limits.depth)?
-        .checked_add(skein_lib::List::<jig_client_domain::contract::Part>::worst_case(limits.slots)?)?
+        .checked_add(skein_lib::List::<jig_client::contract::Part>::worst_case(limits.slots)?)?
         .checked_add(u64::from(limits.slots).checked_mul(u64::from(limits.text_per_node))?.checked_mul(2)?)?
         .checked_add(skein_lib::List::<u8>::worst_case(limits.text_per_node)?)
 }
 
-pub(crate) fn mark_current(b: &mut Builder, client: &Domain, address: jig_domain_client::address::Address) {
+pub(crate) fn mark_current(b: &mut Builder, client: &Domain, address: crate::address::Address) {
     match client.page() {
-        jig_domain_client::pages::Page::Work { address: own, .. } => {
+        crate::page::Page::Work { address: own, .. } => {
             if client.sections().len() > 1 && own == &address {
                 b.state(skein_ui::State::Current);
             }
         }
-        jig_domain_client::pages::Page::Starting
-        | jig_domain_client::pages::Page::SigningIn
-        | jig_domain_client::pages::Page::Elsewhere
-        | jig_domain_client::pages::Page::Missing
-        | jig_domain_client::pages::Page::OutOfDate
-        | jig_domain_client::pages::Page::SomeoneElse => {}
+        crate::page::Page::Starting
+        | crate::page::Page::SigningIn
+        | crate::page::Page::Elsewhere
+        | crate::page::Page::Missing
+        | crate::page::Page::OutOfDate
+        | crate::page::Page::SomeoneElse => {}
     }
 }

@@ -1,7 +1,7 @@
 //! Whole held-task escalation with its independent decisions (contract.md, 5.1–5.3).
 use super::{documents::Invalid, offers, task};
 use jig_client_domain::contract as client;
-use jig_domain_client::Limits;
+use jig_client_view::Limits;
 use jig_domain_core::documents;
 
 /// # Errors
@@ -58,7 +58,7 @@ pub(crate) mod tests {
         assert!(actual.task.context.is_none());
         assert!(actual.task.cut);
         assert_eq!(actual.task.as_ref(), &task::document(&source.task, &limits).expect("same whole task contract"));
-        let body = jig_domain_client::objects::Body::OwnerEscalation(Box::new(actual));
+        let body = jig_client_view::objects::Body::OwnerEscalation(Box::new(actual));
         assert_eq!(body.ending(), None);
         assert_eq!(body.terminal(), None);
         assert_eq!(source, original);

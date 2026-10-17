@@ -7,14 +7,14 @@ use crate::{JigBindings, Owner};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Key, Role, Run};
 
+use crate::{Domain, Limits};
 use hello::hello;
-use jig_client_domain::contract::{
+use jig_client::contract::{
     AdmissionLimit, Chip, ChipPhase, Funder, OwnerAccountPlace, OwnerAccountState, OwnerAccountUnread,
     OwnerAttemptState, OwnerCapacity, OwnerChipPhase, OwnerDeployment, OwnerHelloRefusal, OwnerHelloRefusalLine,
     OwnerHostKind, OwnerHostRun, OwnerPersonCapacityAction, OwnerPersonCapacityCause, OwnerRunLocation,
     OwnerTaskCapacityAction, OwnerTaskCapacityCause, OwnerTaskLink, Proposer, Seen,
 };
-use jig_domain_client::{Domain, Limits};
 use skein_lib::{Duration, Wall};
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
     let saying = words.book.say(words.language, phrase.id(), holes).expect("deployment sayings checked");
@@ -632,7 +632,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: 
     for connector in &value.connectors {
         crate::cards::common::part(
             b,
-            &jig_client_domain::contract::Part::Deployment { connector: *connector },
+            &jig_client::contract::Part::Deployment { connector: *connector },
             words,
             bindings,
         );

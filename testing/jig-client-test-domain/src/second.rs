@@ -1,7 +1,7 @@
 //! The second connector owns resource/kind words and the shared link only.
 use alloc::boxed::Box;
 use jig_client_domain::contract::Part;
-use jig_domain_client::link::Link;
+use jig_client_view::link::Link;
 use skein_lib::List;
 #[derive(Debug)]
 pub struct Side {

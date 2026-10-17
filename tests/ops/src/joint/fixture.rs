@@ -91,7 +91,7 @@ pub fn client(seed: u64) -> (client::Domain, view::View) {
     client::configure_arrangement(&mut domain, view::arrangement()).expect("ops arrangement before start");
     client::provider(
         &mut domain,
-        jig_domain_client::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },
+        jig_client_view::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },
     )
     .expect("actual provider display");
     let mut view =

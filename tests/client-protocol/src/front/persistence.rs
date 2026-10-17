@@ -32,10 +32,10 @@ pub(crate) fn encode_one(record: client::store::Record) -> link::Record {
     match record {
         client::store::Record::Jig(record) => {
             let record = match record {
-                jig_domain_client::store::Record::Place { version, party, address } => {
+                jig_client_view::store::Record::Place { version, party, address } => {
                     ui::Record::Place { version, party, address }
                 }
-                jig_domain_client::store::Record::Draft { version, party, task, words, touched } => {
+                jig_client_view::store::Record::Draft { version, party, task, words, touched } => {
                     ui::Record::Draft { version, party, task, words, touched }
                 }
             };
@@ -62,10 +62,10 @@ pub(crate) fn child_record(record: &link::Record) -> Option<client::store::Recor
     }
     match ui::decode(&record.key, &record.bytes)? {
         ui::Record::Place { version, party, address } => {
-            Some(client::store::Record::Jig(jig_domain_client::store::Record::Place { version, party, address }))
+            Some(client::store::Record::Jig(jig_client_view::store::Record::Place { version, party, address }))
         }
         ui::Record::Draft { version, party, task, words, touched } => {
-            Some(client::store::Record::Jig(jig_domain_client::store::Record::Draft {
+            Some(client::store::Record::Jig(jig_client_view::store::Record::Draft {
                 version,
                 party,
                 task,
@@ -79,8 +79,8 @@ pub(crate) fn erased(key: client::store::Key) -> Box<[u8]> {
     use jig_client_view::records::RecordKey;
     match key {
         client::store::Key::Jig(key) => match key {
-            jig_domain_client::store::StoreKey::Place => RecordKey::Place.encode(),
-            jig_domain_client::store::StoreKey::Draft { task } => RecordKey::Draft { task }.encode(),
+            jig_client_view::store::StoreKey::Place => RecordKey::Place.encode(),
+            jig_client_view::store::StoreKey::Draft { task } => RecordKey::Draft { task }.encode(),
         },
         client::store::Key::First(_) => Box::from(b"first.place".as_slice()),
         client::store::Key::Table(key) => Box::new(key),

@@ -7,11 +7,11 @@ use crate::{JigBindings, JigMeaning};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
+use crate::{Domain, Limits, action::Act, fields::Purpose, objects::Object};
 use alloc::boxed::Box;
-use jig_client_domain::contract::{
+use jig_client::contract::{
     Chip, ChipPhase, OwnerPersonTask, OwnerTaskLink, ParameterDocument, PersonAddress, TaskContractDocument,
 };
-use jig_domain_client::{Domain, Limits, action::Act, fields::Purpose, objects::Object};
 use skein_lib::Id;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PersonFragment {
@@ -120,7 +120,7 @@ fn contract_fits(contract: &TaskContractDocument, l: &Limits) -> Option<()> {
 /// keep their existing envelopes rather than expanding through task pages.
 #[must_use]
 pub fn required(value: &OwnerPersonTask, l: &Limits, words: &Words) -> Option<PersonFragment> {
-    if value.results.capacity() > l.rows || value.acts.capacity() > jig_client_domain::contract::MAX_OFFERED_ACTS {
+    if value.results.capacity() > l.rows || value.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS {
         return None;
     }
     chip_fits(&value.task, l, words)?;
@@ -143,7 +143,7 @@ pub fn required(value: &OwnerPersonTask, l: &Limits, words: &Words) -> Option<Pe
         link_fits(&shown.task, l, words)?;
         if let Some(result) = &shown.result {
             chip_fits(&result.task, l, words)?;
-            if result.acts.capacity() > jig_client_domain::contract::MAX_OFFERED_ACTS {
+            if result.acts.capacity() > jig_client::contract::MAX_OFFERED_ACTS {
                 return None;
             }
             if let Some(value) = &result.value {
@@ -294,7 +294,7 @@ pub fn card(
     let Some(fact) = client.objects().get(object) else {
         return false;
     };
-    let Some(value) = jig_domain_client::objects::person_task::owner_facts(fact) else {
+    let Some(value) = crate::objects::person_task::owner_facts(fact) else {
         return false;
     };
     if !crate::cards::open(b, client, object, place, &saying(words, P::PersonTask, &[]), words, bindings) {

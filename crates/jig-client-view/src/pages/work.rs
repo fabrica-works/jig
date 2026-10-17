@@ -5,8 +5,8 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
-use jig_client_domain::contract::{Budget, PhaseCounts};
-use jig_domain_client::action::Act;
+use crate::action::Act;
+use jig_client::contract::{Budget, PhaseCounts};
 pub(crate) fn section(b: &mut Builder, words: &Words, phrase: JigPhrase, region: crate::regions::JigRegion) {
     let title = words.say(phrase, &[]);
     b.open(Role::Region);
@@ -85,11 +85,11 @@ pub(crate) fn cursors(
     b: &mut Builder,
     words: &Words,
     bindings: &mut JigBindings,
-    before: Option<&jig_client_domain::contract::Cursor>,
-    after: Option<&jig_client_domain::contract::Cursor>,
+    before: Option<&jig_client::contract::Cursor>,
+    after: Option<&jig_client::contract::Cursor>,
     window: u64,
 ) {
-    use jig_domain_client::windows::{Edge, Edges};
+    use crate::windows::{Edge, Edges};
     super::edges(
         b,
         words,
@@ -109,7 +109,7 @@ pub(crate) fn cursors(
 }
 
 // Supplied stage counts stay distinct from the locally folded PhaseCounts.
-pub(crate) fn owner_counts(b: &mut Builder, counts: jig_client_domain::contract::OwnerPhaseCounts, words: &Words) {
+pub(crate) fn owner_counts(b: &mut Builder, counts: jig_client::contract::OwnerPhaseCounts, words: &Words) {
     for (phrase, count) in [
         (JigPhrase::TasksWaiting, counts.waiting),
         (JigPhrase::TasksIdle, counts.idle),

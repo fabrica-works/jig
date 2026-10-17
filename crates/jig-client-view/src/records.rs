@@ -1,7 +1,7 @@
 //! The reference UI's own small-store records (client/domain/view.md, 18.8).
+use crate::address::Address;
 use alloc::boxed::Box;
-use jig_client_domain::contract::Text;
-use jig_domain_client::address::Address;
+use jig_client::contract::Text;
 use skein_lib::{Reader, Writer, bytes};
 mod address;
 use crate::records_wire as w;

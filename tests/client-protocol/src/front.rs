@@ -82,7 +82,7 @@ impl Side {
                     };
                     Event::First(client::first::Event::Watch { watch: original, event })
                 } else {
-                    Event::Jig(jig_domain_client::Event::Watch { watch: original, event })
+                    Event::Jig(jig_client_view::Event::Watch { watch: original, event })
                 }
             }
             link::Request::FamilyDelivery { watch, record } => {
@@ -102,7 +102,7 @@ impl Side {
                 if is_family {
                     Event::First(client::first::Event::Ended { watch: original, end: family::end(end) })
                 } else {
-                    Event::Jig(jig_domain_client::Event::Ended { watch: original, end })
+                    Event::Jig(jig_client_view::Event::Ended { watch: original, end })
                 }
             }
             link::Request::Read { read, result } => {
@@ -116,7 +116,7 @@ impl Side {
                                 result: family::read_none(&result),
                             })
                         } else {
-                            Event::Jig(jig_domain_client::Event::Read { read: original, result })
+                            Event::Jig(jig_client_view::Event::Read { read: original, result })
                         }
                     }
                     jig_client_domain::Readout::Family { family: 1, record } => {
@@ -134,7 +134,7 @@ impl Side {
                 }
             }
             link::Request::Hello { family: None, versions } => {
-                Event::Jig(jig_domain_client::Event::Hello { served: versions.is_some_and(link::serves) })
+                Event::Jig(jig_client_view::Event::Hello { served: versions.is_some_and(link::serves) })
             }
             transport @ (link::Request::Exchange { .. }
             | link::Request::OpenStream { .. }
@@ -378,7 +378,7 @@ impl Protocol {
                         Signing::Again | Signing::Lost | Signing::Refused => {
                             if side.signing_out {
                                 side.signing_out = false;
-                                self.callbacks.push((*client, Event::Jig(jig_domain_client::Event::SignOutLost)));
+                                self.callbacks.push((*client, Event::Jig(jig_client_view::Event::SignOutLost)));
                             }
                         }
                     }
@@ -476,10 +476,7 @@ fn count(
 ) {
     if matches!(
         event,
-        Event::Jig(jig_domain_client::Event::Watch {
-            event: jig_client_domain::contract::WatchEvent::Delivered(_),
-            ..
-        })
+        Event::Jig(jig_client_view::Event::Watch { event: jig_client_domain::contract::WatchEvent::Delivered(_), .. })
     ) {
         *deliveries.entry(client).or_default() += 1;
     }

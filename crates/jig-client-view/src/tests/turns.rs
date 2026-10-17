@@ -10,13 +10,13 @@ use super::{
     work_pages::{entered, list, part},
 };
 use crate::words::Words;
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Event, Request,
     action::Act,
     address::{Address, TaskSection},
     fields::Purpose,
 };
+use jig_client::contract::*;
 use skein_lib::{Token, Wall};
 use skein_ui::{Key, Role, Tree};
 fn read(out: &[Request]) -> Token {
@@ -842,10 +842,7 @@ fn displayed_retry_replaces_empty_then_resumes_with_exact_actual_watch_position(
     drive(
         &mut d,
         Event::Act {
-            act: Act::FoldCall {
-                name: jig_domain_client::conversation::CallName { attempt: 2, turn: 1, call: 1 },
-                open: true,
-            },
+            act: Act::FoldCall { name: crate::conversation::CallName { attempt: 2, turn: 1, call: 1 }, open: true },
         },
     );
     assert!(contains(&build(&d, 3, words).0, b"whole private input"), "existing rich call detail is still available");

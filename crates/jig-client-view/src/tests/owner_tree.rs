@@ -9,12 +9,12 @@ use crate::{JigBindings, owner_tree as view};
 use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Event, Request,
     action::Act as ClientAct,
     address::{Address, Place, TaskSection},
 };
+use jig_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn chip(n: u64) -> Chip {
     let mut c = super::cards_objects::task_doc(&[]).chip;

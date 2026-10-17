@@ -9,36 +9,33 @@ use skein_ui::{Act, Binding, number};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum JigMeaning {
     /// One typed Project settings field, preserving other whole channels.
-    ProjectSetting { ask: Box<jig_client_domain::contract::Ask>, field: crate::owner_project::Field },
+    ProjectSetting { ask: Box<jig_client::contract::Ask>, field: crate::owner_project::Field },
     /// A new service name, after an explicit supplied role choice.
-    ProjectServiceName { project: u32, role: jig_client_domain::contract::HeldRole },
+    ProjectServiceName { project: u32, role: jig_client::contract::HeldRole },
     /// An explicit budget for one supplied party in the configured target.
     ProjectPoolBudget { project: u32, party: u64 },
     /// Pressing, submitting or toggling asks this already typed action.
-    Action(jig_domain_client::action::Act),
+    Action(crate::action::Act),
     /// Whole text edits a domain field; submit names that same field.
-    Field(jig_domain_client::fields::Purpose),
+    Field(crate::fields::Purpose),
     /// Digits are kept in the view and submitting goes to that task.
     TaskNumber,
     /// Digits edit the confirmation's priority without a hidden submit.
     Priority,
     /// Source values and selected replacements kept separately for one named field.
     Amendment {
-        before: Box<jig_client_domain::contract::Amendment>,
-        change: Box<jig_client_domain::contract::Amendment>,
+        before: Box<jig_client::contract::Amendment>,
+        change: Box<jig_client::contract::Amendment>,
         field: crate::confirmation::amendment::Field,
     },
     /// A typed project goal form field.
-    GoalField {
-        form: jig_domain_client::pages::project::goals::GoalForm,
-        field: crate::sections::project::goals::Field,
-    },
+    GoalField { form: crate::page::project::goals::GoalForm, field: crate::sections::project::goals::Field },
     /// Description search changes the current note scope only.
-    NoteSearch { filter: jig_domain_client::pages::project::NoteFilter },
+    NoteSearch { filter: crate::page::project::NoteFilter },
     /// A connector-owned part referred to by a slot, never an actionable node.
-    Part(jig_client_domain::contract::Part),
+    Part(jig_client::contract::Part),
     /// A whole exact owner reference, with literal path segment boundaries.
-    OwnerPart(jig_client_domain::contract::OwnerPart),
+    OwnerPart(jig_client::contract::OwnerPart),
 }
 #[derive(Debug)]
 struct Entry {
@@ -74,7 +71,7 @@ impl JigBindings {
     }
     /// Resolve a part slot's token for its connector's view root.
     #[must_use]
-    pub fn part(&self, token: Token) -> Option<&jig_client_domain::contract::Part> {
+    pub fn part(&self, token: Token) -> Option<&jig_client::contract::Part> {
         for entry in &self.entries {
             if entry.token == token {
                 match &entry.meaning {
@@ -97,7 +94,7 @@ impl JigBindings {
     }
     /// Resolve an exact reference slot's raw key; scope is supplied by its producer.
     #[must_use]
-    pub fn owner_part(&self, token: Token) -> Option<&jig_client_domain::contract::OwnerPart> {
+    pub fn owner_part(&self, token: Token) -> Option<&jig_client::contract::OwnerPart> {
         for entry in &self.entries {
             if entry.token == token {
                 match &entry.meaning {
@@ -120,50 +117,50 @@ impl JigBindings {
     }
     /// A link's typed address for the platform's address translation.
     #[must_use]
-    pub fn address(&self, token: Token) -> Option<jig_domain_client::address::Address> {
+    pub fn address(&self, token: Token) -> Option<crate::address::Address> {
         for entry in &self.entries {
             if entry.token == token {
                 match &entry.meaning {
                     JigMeaning::Action(action) => match action {
-                        jig_domain_client::action::Act::Go { address } => return Some(*address),
-                        jig_domain_client::action::Act::OpenChat { task } => {
-                            return Some(jig_domain_client::address::Address::Task {
+                        crate::action::Act::Go { address } => return Some(*address),
+                        crate::action::Act::OpenChat { task } => {
+                            return Some(crate::address::Address::Task {
                                 task: *task,
-                                section: jig_domain_client::address::TaskSection::Activity,
+                                section: crate::address::TaskSection::Activity,
                             });
                         }
-                        jig_domain_client::action::Act::Edit { .. }
-                        | jig_domain_client::action::Act::Submit { .. }
-                        | jig_domain_client::action::Act::Intend { .. }
-                        | jig_domain_client::action::Act::Choose { .. }
-                        | jig_domain_client::action::Act::CannotDo
-                        | jig_domain_client::action::Act::Again { .. }
-                        | jig_domain_client::action::Act::Dispose { .. }
-                        | jig_domain_client::action::Act::Change { .. }
-                        | jig_domain_client::action::Act::WriteRelease { .. }
-                        | jig_domain_client::action::Act::Priority { .. }
-                        | jig_domain_client::action::Act::ChatAbout { .. }
-                        | jig_domain_client::action::Act::LookAgain { .. }
-                        | jig_domain_client::action::Act::Confirm
-                        | jig_domain_client::action::Act::Dismiss
-                        | jig_domain_client::action::Act::Fold { .. }
-                        | jig_domain_client::action::Act::FoldCall { .. }
-                        | jig_domain_client::action::Act::FoldCurrentCall { .. }
-                        | jig_domain_client::action::Act::Filter { .. }
-                        | jig_domain_client::action::Act::More { .. }
-                        | jig_domain_client::action::Act::FilterInbox { .. }
-                        | jig_domain_client::action::Act::OpenUpdates
-                        | jig_domain_client::action::Act::StartChat { .. }
-                        | jig_domain_client::action::Act::ProjectSettings { .. }
-                        | jig_domain_client::action::Act::ProjectServiceRole { .. }
-                        | jig_domain_client::action::Act::GoalForm { .. }
-                        | jig_domain_client::action::Act::FilterTasks { .. }
-                        | jig_domain_client::action::Act::FilterNotes { .. }
-                        | jig_domain_client::action::Act::FilterPlan { .. }
-                        | jig_domain_client::action::Act::HistoryScope { .. }
-                        | jig_domain_client::action::Act::OpenEnded { .. }
-                        | jig_domain_client::action::Act::SignOut
-                        | jig_domain_client::action::Act::SignIn { .. } => return None,
+                        crate::action::Act::Edit { .. }
+                        | crate::action::Act::Submit { .. }
+                        | crate::action::Act::Intend { .. }
+                        | crate::action::Act::Choose { .. }
+                        | crate::action::Act::CannotDo
+                        | crate::action::Act::Again { .. }
+                        | crate::action::Act::Dispose { .. }
+                        | crate::action::Act::Change { .. }
+                        | crate::action::Act::WriteRelease { .. }
+                        | crate::action::Act::Priority { .. }
+                        | crate::action::Act::ChatAbout { .. }
+                        | crate::action::Act::LookAgain { .. }
+                        | crate::action::Act::Confirm
+                        | crate::action::Act::Dismiss
+                        | crate::action::Act::Fold { .. }
+                        | crate::action::Act::FoldCall { .. }
+                        | crate::action::Act::FoldCurrentCall { .. }
+                        | crate::action::Act::Filter { .. }
+                        | crate::action::Act::More { .. }
+                        | crate::action::Act::FilterInbox { .. }
+                        | crate::action::Act::OpenUpdates
+                        | crate::action::Act::StartChat { .. }
+                        | crate::action::Act::ProjectSettings { .. }
+                        | crate::action::Act::ProjectServiceRole { .. }
+                        | crate::action::Act::GoalForm { .. }
+                        | crate::action::Act::FilterTasks { .. }
+                        | crate::action::Act::FilterNotes { .. }
+                        | crate::action::Act::FilterPlan { .. }
+                        | crate::action::Act::HistoryScope { .. }
+                        | crate::action::Act::OpenEnded { .. }
+                        | crate::action::Act::SignOut
+                        | crate::action::Act::SignIn { .. } => return None,
                     },
                     JigMeaning::Field(_)
                     | JigMeaning::TaskNumber
@@ -185,29 +182,29 @@ impl JigBindings {
 /// Decode an act only through a token issued for the last tree.
 /// Numeric input is retained here until submit; no navigation happens while typing.
 #[must_use]
-pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_domain_client::action::Act> {
+pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<crate::action::Act> {
     for entry in &view.entries {
         if entry.token == token {
             return match &entry.meaning {
                 JigMeaning::Part(_) | JigMeaning::OwnerPart(_) => None,
                 JigMeaning::ProjectPoolBudget { project, party } => match act {
-                    Act::Input { value } => Some(jig_domain_client::pages::project::owner_form::action(
-                        jig_client_domain::contract::Ask::SetPool {
+                    Act::Input { value } => {
+                        Some(crate::page::project::owner_form::action(jig_client::contract::Ask::SetPool {
                             project: *project,
                             party: *party,
                             budget: number(&value)?,
-                        },
-                    )),
+                        }))
+                    }
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::ProjectServiceName { project, role } => match act {
-                    Act::Input { value } => Some(jig_domain_client::pages::project::owner_form::action(
-                        jig_client_domain::contract::Ask::MakeService {
+                    Act::Input { value } => {
+                        Some(crate::page::project::owner_form::action(jig_client::contract::Ask::MakeService {
                             project: *project,
                             role: *role,
-                            name: jig_client_domain::contract::Text::new(value, view.text_limit).ok()?,
-                        },
-                    )),
+                            name: jig_client::contract::Text::new(value, view.text_limit).ok()?,
+                        }))
+                    }
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::ProjectSetting { ask, field } => match act {
@@ -219,22 +216,22 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::NoteSearch { filter } => match act {
-                    Act::Input { value } => Some(jig_domain_client::action::Act::FilterNotes {
-                        filter: jig_domain_client::pages::project::NoteFilter {
+                    Act::Input { value } => Some(crate::action::Act::FilterNotes {
+                        filter: crate::page::project::NoteFilter {
                             scope: filter.scope.clone(),
                             description: if value.is_empty() {
                                 None
                             } else {
-                                Some(jig_client_domain::contract::Text::new(value, view.text_limit).ok()?)
+                                Some(jig_client::contract::Text::new(value, view.text_limit).ok()?)
                             },
                         },
                     }),
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::Priority => match act {
-                    Act::Input { value } => Some(jig_domain_client::action::Act::Priority {
-                        priority: u32::try_from(number(&value)?).ok()?,
-                    }),
+                    Act::Input { value } => {
+                        Some(crate::action::Act::Priority { priority: u32::try_from(number(&value)?).ok()? })
+                    }
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::Amendment { before, change, field } => match act {
@@ -249,10 +246,10 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                 },
                 JigMeaning::Field(field) => match act {
                     Act::Input { value } => {
-                        let text = jig_client_domain::contract::Text::new(value, view.text_limit).ok()?;
-                        Some(jig_domain_client::action::Act::Edit { field: *field, text })
+                        let text = jig_client::contract::Text::new(value, view.text_limit).ok()?;
+                        Some(crate::action::Act::Edit { field: *field, text })
                     }
-                    Act::Submit => Some(jig_domain_client::action::Act::Submit { field: *field }),
+                    Act::Submit => Some(crate::action::Act::Submit { field: *field }),
                     Act::Press | Act::Toggle | Act::Drawing { .. } => None,
                 },
                 JigMeaning::TaskNumber => match act {
@@ -260,9 +257,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
                         view.task = number(&value);
                         None
                     }
-                    Act::Submit => Some(jig_domain_client::action::Act::Go {
-                        address: jig_domain_client::address::Address::task(view.task?),
-                    }),
+                    Act::Submit => Some(crate::action::Act::Go { address: crate::address::Address::task(view.task?) }),
                     Act::Press | Act::Toggle | Act::Drawing { .. } => None,
                 },
             };
@@ -275,7 +270,7 @@ pub fn decode(view: &mut JigBindings, token: Token, act: Act) -> Option<jig_doma
 /// Amendment controls own both source values and selected replacements, each
 /// under the bounded document/text envelope. Action text and part paths also fit.
 #[must_use]
-pub fn jig_bindings_worst_case(capacity: u32, client: &jig_domain_client::Limits) -> Option<u64> {
+pub fn jig_bindings_worst_case(capacity: u32, client: &crate::Limits) -> Option<u64> {
     let payload = client.document_bytes.checked_mul(4)?.checked_add(u64::from(client.text).checked_mul(8)?)?;
     skein_lib::List::<Entry>::worst_case(capacity)?.checked_add(u64::from(capacity).checked_mul(payload)?)
 }

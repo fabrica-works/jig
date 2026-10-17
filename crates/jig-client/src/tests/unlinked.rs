@@ -68,10 +68,10 @@ fn an_unlinked_client_takes_an_answer_as_the_domain_s() {
     let read = *read;
     let page = Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown));
     c.step(Event::Up { up: Up::ReadDone { read, result: page.clone() } });
-    let [Request::Told { told: Told::Page { handle, page: actual } }] = c.requests() else {
+    let [Request::Told { told: Told::Page { handle, page: told_page } }] = c.requests() else {
         panic!("one page: {:?}", c.requests());
     };
-    assert_eq!((*handle, actual), (TASK, &page));
+    assert_eq!((*handle, told_page), (TASK, &page));
 }
 #[test]
 fn an_unlinked_client_s_records_are_the_table_s() {

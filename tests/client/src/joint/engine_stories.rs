@@ -72,9 +72,9 @@ fn a_note_written_corrected_by_a_person_and_recalled() {
         member,
         vec![
             Step::Go {
-                address: jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
+                address: jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Project {
                     project: 1,
-                    section: jig_domain_client::address::ProjectSection::Notes,
+                    section: jig_client_view::address::ProjectSection::Notes,
                 }),
             },
             Step::See { find: Find::text(b"original"), within },

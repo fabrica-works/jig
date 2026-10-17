@@ -15,7 +15,7 @@ pub mod native;
 use alloc::boxed::Box;
 pub use documents::{Document, Kind, ReadResult, Scope, Subject, WatchEnd, WatchEvent};
 use jig_client_domain::contract::Part;
-use jig_domain_client::{frame::FrameShown, link::Link};
+use jig_client_view::{frame::me::FrameShown, link::Link};
 use skein_lib::{Env, Id, List, Map, Queue, Slab, Time, Token};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Address {
@@ -84,7 +84,7 @@ pub enum Request {
     Save { record: Record },
     Out(Out),
     ShowObjects { objects: List<jig_client_domain::contract::ObjectKey> },
-    ShowSections { sections: List<jig_domain_client::pages::Section> },
+    ShowSections { sections: List<jig_client_view::page::Section> },
     ObjectsLeft,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

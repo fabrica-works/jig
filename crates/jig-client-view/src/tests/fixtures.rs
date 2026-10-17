@@ -1,6 +1,6 @@
+use crate::address::Address;
 use crate::records::{RECORDS_VERSION, Record};
-use jig_client_domain::contract::Text;
-use jig_domain_client::address::Address;
+use jig_client::contract::Text;
 pub const PARTY: u64 = u64::MAX;
 pub const TASK: u64 = u64::MAX;
 pub fn place() -> Record {
@@ -16,7 +16,7 @@ pub fn draft() -> Record {
     }
 }
 pub fn places() -> skein_lib::List<Record> {
-    use jig_domain_client::address::{Address, ProjectSection, TaskSection};
+    use crate::address::{Address, ProjectSection, TaskSection};
     let mut addresses = skein_lib::List::with_capacity(21);
     for address in [
         Address::Inbox { project: None },

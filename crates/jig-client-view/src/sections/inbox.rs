@@ -5,22 +5,22 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{
-    InboxDocument, InboxGroup, InboxReadGroup, InboxRow, OwnerInboxEntry, OwnerInboxObject, Proposer, Recipient,
-};
-use jig_domain_client::{
+use crate::{
     Domain,
     action::Act,
     action::End,
-    pages::inbox::{Filter, needs},
+    page::inbox::{Filter, needs},
+};
+use jig_client::contract::{
+    InboxDocument, InboxGroup, InboxReadGroup, InboxRow, OwnerInboxEntry, OwnerInboxObject, Proposer, Recipient,
 };
 /// The inbox's filters and counts while either group is shown.
 pub fn header(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
     let Some(project) = client.shown_inbox() else {
         return false;
     };
-    if !client.shows(jig_domain_client::pages::Section::Inbox { group: InboxReadGroup::Needs, project })
-        && !client.shows(jig_domain_client::pages::Section::Inbox { group: InboxReadGroup::Updates, project })
+    if !client.shows(crate::page::Section::Inbox { group: InboxReadGroup::Needs, project })
+        && !client.shows(crate::page::Section::Inbox { group: InboxReadGroup::Updates, project })
     {
         return false;
     }
@@ -59,7 +59,7 @@ pub(crate) fn group(
     parent: InboxReadGroup,
     project: Option<u32>,
 ) -> bool {
-    if !client.shows(jig_domain_client::pages::Section::Inbox { group: parent, project }) {
+    if !client.shows(crate::page::Section::Inbox { group: parent, project }) {
         return false;
     }
     let group = parent == InboxReadGroup::Needs;
@@ -70,7 +70,7 @@ pub(crate) fn group(
         if group { crate::regions::JigRegion::InboxNeeds } else { crate::regions::JigRegion::InboxUpdates },
     );
     let page = client.inbox();
-    super::status(b, client, words, jig_domain_client::pages::Section::Inbox { group: parent, project });
+    super::status(b, client, words, crate::page::Section::Inbox { group: parent, project });
     b.open(Role::List);
     for entry in &page.rows {
         if needs(entry.group()) == group {
@@ -133,8 +133,8 @@ fn window(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBin
                 &[],
                 Act::More {
                     window: skein_lib::Token::new(match parent {
-                        InboxReadGroup::Needs => jig_domain_client::pages::conversations::INBOX_WINDOW,
-                        InboxReadGroup::Updates => jig_domain_client::pages::conversations::INBOX_UPDATES_WINDOW,
+                        InboxReadGroup::Needs => crate::page::conversations::INBOX_WINDOW,
+                        InboxReadGroup::Updates => crate::page::conversations::INBOX_UPDATES_WINDOW,
                     }),
                     end,
                 },
@@ -208,7 +208,7 @@ fn filters(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBi
     }
 }
 
-fn unread(entry: &jig_client_domain::contract::InboxEntry, results_seen: u64) -> bool {
+fn unread(entry: &jig_client::contract::InboxEntry, results_seen: u64) -> bool {
     match entry.group {
         InboxGroup::Results => entry.position > results_seen,
         InboxGroup::Replies => match &entry.reply {
@@ -224,7 +224,7 @@ fn supplied_entry(
     client: &Domain,
     words: &Words,
     bindings: &mut JigBindings,
-    entry: &jig_client_domain::contract::InboxEntry,
+    entry: &jig_client::contract::InboxEntry,
     group: bool,
 ) {
     b.key(crate::pages::object_key(entry.object));

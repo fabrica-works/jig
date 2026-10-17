@@ -28,13 +28,13 @@ impl Limits {
         let mut tree = jig_client_view::limits::envelope(
             &domain.jig,
             jig_client_view::phrases::jig_capacity(&jig.book)?,
-            &jig_domain_client::pages::Arrangement::none(),
+            &jig_client_view::page::Arrangement::none(),
             0,
             0,
             0,
         )?;
         let jig_nodes = tree.nodes;
-        let sections = jig_client_view::task_section_nodes(&domain.jig, jig_domain_client::address::TaskSection::Plan)?
+        let sections = jig_client_view::task_section_nodes(&domain.jig, jig_client_view::address::TaskSection::Plan)?
             .checked_add(4)?
             .checked_mul(2)?;
         let jig_cards = u64::from(jig_client_view::card_nodes(&domain.jig)?)
@@ -84,7 +84,7 @@ impl Limits {
         // All nodes bound the possible slots in the public jig envelope.
         // This conservative bound also covers duplicate references to one part.
         let jig_nodes = jig_client_view::limits::of_words(&domain.jig, jig)?.nodes;
-        let sections = jig_client_view::task_section_nodes(&domain.jig, jig_domain_client::address::TaskSection::Plan)?
+        let sections = jig_client_view::task_section_nodes(&domain.jig, jig_client_view::address::TaskSection::Plan)?
             .checked_add(4)?
             .checked_mul(2)?;
         let jig_cards = jig_client_view::card_nodes(&domain.jig)?.checked_mul(cards)?.checked_add(sections)?;
@@ -93,7 +93,7 @@ impl Limits {
         let mut tree = jig_client_view::limits::compose(
             &domain.jig,
             jig,
-            &jig_domain_client::pages::Arrangement::none(),
+            &jig_client_view::page::Arrangement::none(),
             application_nodes,
             slot_nodes,
             owner.depth.checked_add(4)?.max(8),

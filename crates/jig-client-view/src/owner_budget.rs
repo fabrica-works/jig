@@ -7,7 +7,7 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use jig_client_domain::contract::{OwnerBudget, OwnerNumbers, PoolLedger};
+use jig_client::contract::{OwnerBudget, OwnerNumbers, PoolLedger};
 use skein_lib::Wall;
 
 /// Checked tree storage for one standalone budget or ledger region.

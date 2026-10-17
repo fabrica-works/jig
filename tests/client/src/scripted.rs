@@ -153,7 +153,7 @@ impl Scripted {
         std::mem::take(&mut self.hellos)
             .into_iter()
             .map(|client| {
-                (client, Event::Jig(jig_domain_client::Event::Hello { served: self.engine.versions().contains(8) }))
+                (client, Event::Jig(jig_client_view::Event::Hello { served: self.engine.versions().contains(8) }))
             })
             .collect()
     }
@@ -409,10 +409,10 @@ impl Front<Test> for Scripted {
                             answer: answer.map(domain::Answered::Jig),
                         },
                         Up::Read { token: _, terminal } => {
-                            Event::Jig(jig_domain_client::Event::Read { read: local, result: terminal })
+                            Event::Jig(jig_client_view::Event::Read { read: local, result: terminal })
                         }
                         Up::Watch { token: _, event } => match route {
-                            Route::Jig(_, _) => Event::Jig(jig_domain_client::Event::Watch { watch: local, event }),
+                            Route::Jig(_, _) => Event::Jig(jig_client_view::Event::Watch { watch: local, event }),
                             Route::First(_, _) => Event::First(first::Event::Watch {
                                 watch: local,
                                 event: match event {
@@ -447,7 +447,7 @@ impl Front<Test> for Scripted {
                             event: family::WatchEvent::Delivered(document),
                         }),
                         Up::Ended { token: _, why } => match route {
-                            Route::Jig(_, _) => Event::Jig(jig_domain_client::Event::Ended { watch: local, end: why }),
+                            Route::Jig(_, _) => Event::Jig(jig_client_view::Event::Ended { watch: local, end: why }),
                             Route::First(_, _) => Event::First(first::Event::Ended {
                                 watch: local,
                                 end: match why {
@@ -565,7 +565,7 @@ impl Front<Test> for Scripted {
     }
     fn received(&mut self, client: ClientId, event: &Event) {
         let selected = match event {
-            Event::Jig(jig_domain_client::Event::Watch { watch, event: WatchEvent::Delivered(_) }) => {
+            Event::Jig(jig_client_view::Event::Watch { watch, event: WatchEvent::Delivered(_) }) => {
                 Some((*watch, false))
             }
             Event::First(first::Event::Watch { watch, event: family::WatchEvent::Delivered(_) }) => {
@@ -586,7 +586,7 @@ impl Front<Test> for Scripted {
     }
     fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
         if std::mem::take(&mut self.lose_sign_out) || self.recovery.is_some_and(|at| now < at) {
-            self.shell.push((client, Event::Jig(jig_domain_client::Event::SignOutLost)));
+            self.shell.push((client, Event::Jig(jig_client_view::Event::SignOutLost)));
             return;
         }
         let sign_in = self.parties[&client];

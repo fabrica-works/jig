@@ -28,9 +28,9 @@ pub(super) fn hello(b: &mut Builder, words: &Words, value: &OwnerHelloRefusalLin
     }
     b.close();
 }
-fn agent(b: &mut Builder, words: &Words, why: jig_client_domain::contract::OwnerAgentShortfall) {
+fn agent(b: &mut Builder, words: &Words, why: jig_client::contract::OwnerAgentShortfall) {
     use crate::owner_deployment_words::AgentPhrase as A;
-    use jig_client_domain::contract::OwnerAgentShortfall as S;
+    use jig_client::contract::OwnerAgentShortfall as S;
     let phrase = match why {
         S::Model { .. } => A::Model,
         S::Window { .. } => A::Window,

@@ -84,7 +84,7 @@ fn settled_note_answer(act: ActKind, cut: bool) {
     let facts = domain.objects().get(id).unwrap();
     assert_eq!(facts.answer.as_ref(), Some(&answer));
     match &facts.body {
-        Some(jig_domain_client::objects::Body::Note { document, .. }) => assert_eq!(document.as_ref(), &expected_note),
+        Some(crate::objects::Body::Note { document, .. }) => assert_eq!(document.as_ref(), &expected_note),
         other => panic!("the answer must preserve the supplied note: {other:?}"),
     }
     let mut envelope = crate::limits::of_words(&CLIENT, words).unwrap();

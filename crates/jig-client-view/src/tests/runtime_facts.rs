@@ -10,11 +10,11 @@ use super::{
     work_pages::{entered, list},
 };
 use crate::JigBindings;
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Request,
     address::{Address, TaskSection},
 };
+use jig_client::contract::*;
 use skein_lib::{Token, Wall};
 use skein_ui::{Builder, Role, Tree};
 

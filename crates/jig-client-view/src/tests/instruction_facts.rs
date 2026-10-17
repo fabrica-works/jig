@@ -1,6 +1,6 @@
 //! Instruction source presence and independent amendment choices (objects.md, 11).
 use super::*;
-use jig_domain_client::{
+use crate::{
     address::{Address, TaskSection},
     objects::Body,
 };

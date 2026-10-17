@@ -1,6 +1,6 @@
 use super::*;
+use crate::address::{Address, TaskSection};
 use crate::phrases::jig::JigPhrase;
-use jig_domain_client::address::{Address, TaskSection};
 use skein_ui::phrases::Hole;
 
 #[test]
@@ -63,7 +63,7 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
         let tree = dialog(&domain, words(), &mut bindings);
         let caption = words().say(JigPhrase::TasksRunning, &[Hole::Number(u64::from(u32::MAX))]);
         assert_eq!(contains(&tree, &caption), present);
-        let Some(jig_domain_client::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
+        let Some(crate::objects::Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
             panic!("whole task");
         };
         assert_eq!(retained.context, row.context);

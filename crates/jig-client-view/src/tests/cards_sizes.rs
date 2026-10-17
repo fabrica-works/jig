@@ -4,7 +4,7 @@ use crate::Owner;
 use skein_ui::Limits;
 use skein_ui::SlotRef;
 
-use jig_domain_client::{address::Address, boundary::Offset};
+use crate::{address::Address, boundary::Offset};
 use skein_lib::Token;
 
 fn full_text() -> Text {
@@ -350,7 +350,7 @@ fn full_dialog(d: &Domain, words: &crate::words::Words, sized: &Limits) {
     super::super::cards_access::check(&tree);
 }
 fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
-    use jig_domain_client::pages::navigation::{Destination, Navigation};
+    use crate::page::navigation::{Destination, Navigation};
     let mut d = Domain::new(&CLIENT, 1);
     let mut entries = List::with_capacity(CLIENT.navigation_entries);
     for task in 0..CLIENT.navigation_entries {
@@ -460,9 +460,9 @@ fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Word
     );
     card_tree(d, d.objects().find(ObjectKey::Task(8)).unwrap(), words, sized, crate::reply_nodes(&CLIENT).unwrap());
     for _ in 0..CLIENT.notices {
-        jig_domain_client::notices::show(
+        crate::notices::kept::show(
             d,
-            jig_domain_client::notices::Kind::Answer {
+            crate::notices::kept::Kind::Answer {
                 object: ObjectKey::Task(8),
                 answer: Answer::Done(Outcome::Made { what: Made::Tasks { tasks: list([9, 10]) } }),
             },
@@ -481,7 +481,7 @@ fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Word
     super::super::cards_access::check(&tree);
 }
 pub(super) fn scenario(words: &crate::words::Words) {
-    let default = crate::limits::of(&CLIENT, &jig_domain_client::pages::Arrangement::none()).unwrap();
+    let default = crate::limits::of(&CLIENT, &crate::page::Arrangement::none()).unwrap();
     let localized = crate::limits::of_words(&CLIENT, words).unwrap();
     assert!(default.text_per_node >= localized.text_per_node);
     assert!(crate::limits::jig_worst_case(&localized).is_some());
@@ -489,10 +489,10 @@ pub(super) fn scenario(words: &crate::words::Words) {
     let mut excessive = CLIENT;
     excessive.rows = u32::MAX;
     assert!(crate::card_nodes(&excessive).is_none());
-    assert!(crate::limits::of(&excessive, &jig_domain_client::pages::Arrangement::none()).is_none());
+    assert!(crate::limits::of(&excessive, &crate::page::Arrangement::none()).is_none());
     excessive = CLIENT;
     excessive.text = u32::MAX;
-    assert!(crate::limits::of(&excessive, &jig_domain_client::pages::Arrangement::none()).is_none());
+    assert!(crate::limits::of(&excessive, &crate::page::Arrangement::none()).is_none());
     full_cards(words, &localized);
     full_frame_notices(words, &localized);
 }

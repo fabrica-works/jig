@@ -5,7 +5,7 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Segment, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_client_domain::contract::{
+use jig_client::contract::{
     OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant, OwnerPattern,
     OwnerPatternEnd, OwnerResourceScope,
 };

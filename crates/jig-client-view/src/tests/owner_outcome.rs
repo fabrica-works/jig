@@ -3,7 +3,7 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Hole, HoleKind, Invalid, Language, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
-use jig_client_domain::contract::{
+use jig_client::contract::{
     OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,
 };
 use skein_lib::{Wall, bytes::copy_of};
@@ -389,7 +389,7 @@ fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
     let fragment = view::required(&words).unwrap();
     assert!(fragment.text_per_node >= 2048);
     // This positive language proof needs one row, not every full page window.
-    let client = jig_domain_client::Limits { rows: 1, ..super::cards::CLIENT };
+    let client = crate::Limits { rows: 1, ..super::cards::CLIENT };
     assert!(crate::limits::of_words(&client, &words).unwrap().text_per_node >= 2048);
     let value = OwnerOutcome::ProposalDecided {
         proposal: ProposalKey { proposer: Proposer::Party(u64::MAX), number: 17 },
@@ -439,13 +439,13 @@ fn durable_answer_rendering_keeps_every_owner_fact_within_the_existing_notice_en
     };
     for (value, expected) in max_cases() {
         let mut builder = Builder::new(&limits);
-        words.outcome(&mut builder, &jig_client_domain::contract::Outcome::Owner(value));
+        words.outcome(&mut builder, &jig_client::contract::Outcome::Owner(value));
         let tree = builder.finish();
         expect_lines(&tree, expected);
         assert!(tree.len() <= required.nodes);
     }
     // The enclosing notice bound includes at least twelve nodes even with no
     // incoming rows; the owner fragment needs eight, including its region.
-    let client = jig_domain_client::Limits { rows: 0, notices: 1, ..super::cards::CLIENT };
+    let client = crate::Limits { rows: 0, notices: 1, ..super::cards::CLIENT };
     assert!(crate::notices_nodes(&client).unwrap() >= required.nodes + 4);
 }

@@ -5,13 +5,13 @@ use crate::{JigBindings, JigMeaning};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
-use jig_client_domain::contract::{OptionLine, PersonContract};
-use jig_domain_client::{
+use crate::{
     Domain,
     action::Act,
     fields::Purpose,
     objects::{Object, person_task::facts},
 };
+use jig_client::contract::{OptionLine, PersonContract};
 use skein_lib::{Id, List};
 /// Build the person-task card, addressed and taken from committed facts.
 pub fn person_task(

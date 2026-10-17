@@ -11,12 +11,12 @@ use super::{
 use crate::{JigBindings, words::Words};
 use skein_ui::{Role, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::{
+use crate::{
     Domain, Event, Request,
     action::Act,
     address::{Address, Place, ProjectSection, TaskSection},
 };
+use jig_client::contract::*;
 use skein_lib::{List, Wall};
 pub(super) fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     let values: Vec<_> = values.into_iter().collect();
@@ -38,12 +38,9 @@ pub(super) fn chip(task: u64) -> Chip {
     chip
 }
 pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
-    entered_arranged(address, jig_domain_client::pages::Arrangement::none())
+    entered_arranged(address, crate::page::Arrangement::none())
 }
-pub(super) fn entered_arranged(
-    address: Address,
-    arrangement: jig_domain_client::pages::Arrangement,
-) -> (Domain, Vec<Request>) {
+pub(super) fn entered_arranged(address: Address, arrangement: crate::page::Arrangement) -> (Domain, Vec<Request>) {
     let (mut d, f) = super::cards::start_arranged(arrangement);
     let mut frame = document();
     frame.charters.get_mut(0).unwrap().goals =
@@ -71,12 +68,12 @@ pub(super) fn entered_arranged(
     (d, out)
 }
 pub(super) fn task(section: TaskSection, executor: Executor) -> (Domain, Vec<Request>) {
-    task_arranged(section, executor, jig_domain_client::pages::Arrangement::none())
+    task_arranged(section, executor, crate::page::Arrangement::none())
 }
 fn task_arranged(
     section: TaskSection,
     executor: Executor,
-    arrangement: jig_domain_client::pages::Arrangement,
+    arrangement: crate::page::Arrangement,
 ) -> (Domain, Vec<Request>) {
     let (mut d, out) = entered_arranged(Address::Task { task: 8, section }, arrangement);
     let watch = out
@@ -159,7 +156,7 @@ fn plan_folds(words: &Words) {
     deliver(
         &mut d,
         tree_watch,
-        Delivery::Tree(Box::new(jig_client_domain::contract::Tree {
+        Delivery::Tree(Box::new(jig_client::contract::Tree {
             task: 8,
             nodes: list([node(9, None), node(10, Some(9))]),
             folded: PhaseCounts { done: 3, ..counts() },
@@ -177,11 +174,9 @@ fn plan_folds(words: &Words) {
     let open = crate::decode(&mut bindings, named_binding(&folded, b"Open subtree"), skein_ui::Act::Press).unwrap();
     drive(&mut d, Event::Act { act: open });
     assert_eq!(build(&d, 3, words).0.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
-    for filter in [
-        jig_domain_client::pages::task::PlanFilter::Held,
-        jig_domain_client::pages::task::PlanFilter::Live,
-        jig_domain_client::pages::task::PlanFilter::All,
-    ] {
+    for filter in
+        [crate::page::task::PlanFilter::Held, crate::page::task::PlanFilter::Live, crate::page::task::PlanFilter::All]
+    {
         drive(&mut d, Event::Act { act: Act::FilterPlan { filter } });
         acts_are_named(&build(&d, 3, words).0);
     }
@@ -473,7 +468,7 @@ fn project_sections(words: &Words) {
 }
 fn goal_form(words: &Words) {
     let (mut d, _) = project(ProjectSection::Goals);
-    let form = jig_domain_client::pages::project::goals::GoalForm {
+    let form = crate::page::project::goals::GoalForm {
         project: 4,
         executor: GoalExecutor::Charter(2),
         budget: 30,
@@ -491,7 +486,7 @@ fn goal_form(words: &Words) {
     .unwrap();
     match action {
         Act::GoalForm { form: changed } => {
-            assert_eq!(changed, jig_domain_client::pages::project::goals::GoalForm { budget: 40, ..form });
+            assert_eq!(changed, crate::page::project::goals::GoalForm { budget: 40, ..form });
         }
         _ => panic!("typed goal field"),
     }
@@ -502,10 +497,7 @@ fn goal_form(words: &Words) {
         skein_ui::Act::Input { value: Box::from(b"2026-10-09 17:00".as_slice()) },
     )
     .unwrap();
-    assert_eq!(
-        action,
-        Act::GoalForm { form: jig_domain_client::pages::project::goals::GoalForm { deadline: Some(at), ..form } }
-    );
+    assert_eq!(action, Act::GoalForm { form: crate::page::project::goals::GoalForm { deadline: Some(at), ..form } });
     drive(&mut d, Event::Act { act: action });
     let (dated, _) = build(&d, 3, words);
     let field = dated
@@ -625,7 +617,7 @@ fn recurring_times_use_supplied_boundaries_without_inferred_cadence(words: &Word
 
 #[test]
 fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
-    use jig_domain_client::pages::project::goals::GoalForm;
+    use crate::page::project::goals::GoalForm;
     let words = words();
     let (mut d, f) = start();
     let mut frame = document();
@@ -700,13 +692,11 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     drive(&mut d, Event::Act { act: edit });
     drive(
         &mut d,
-        Event::Act {
-            act: Act::Edit { field: jig_domain_client::fields::Purpose::NewGoal, text: text(b"procedure words") },
-        },
+        Event::Act { act: Act::Edit { field: crate::fields::Purpose::NewGoal, text: text(b"procedure words") } },
     );
     let (tree, _) = build(&d, 3, words);
     assert!(contains(&tree, b"proposed"));
-    drive(&mut d, Event::Act { act: Act::Submit { field: jig_domain_client::fields::Purpose::NewGoal } });
+    drive(&mut d, Event::Act { act: Act::Submit { field: crate::fields::Purpose::NewGoal } });
     let mut b = skein_ui::Builder::new(&super::cards::limits());
     let mut bindings = JigBindings::new(32, super::cards::CLIENT.text);
     b.open(Role::Page);
@@ -729,7 +719,7 @@ fn a_task_section_not_shown_builds_nothing() {
         &d,
         words(),
         &mut bindings,
-        jig_domain_client::pages::Section::Task { task: 9, section: TaskSection::Overview }
+        crate::page::Section::Task { task: 9, section: TaskSection::Overview }
     ));
     b.close();
     assert_eq!(b.finish().len(), 1);
@@ -787,7 +777,7 @@ fn arranged_task() -> Domain {
     task_arranged(
         TaskSection::Plan,
         Executor::Agent { charter: 2 },
-        jig_domain_client::pages::Arrangement {
+        crate::page::Arrangement {
             task: list([
                 TaskSection::Overview,
                 TaskSection::Activity,

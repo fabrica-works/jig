@@ -9,8 +9,8 @@ use crate::words::Words;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::{Domain, Event, Request};
+use crate::{Domain, Event, Request};
+use jig_client::contract::*;
 use skein_lib::{List, bytes::copy_of};
 fn words(selected: bool) -> Words {
     let english = crate::phrases::english::language();
@@ -58,7 +58,7 @@ fn whole(rows: impl IntoIterator<Item = OwnerInboxEntry>, limited: bool) -> Owne
     let mut needs = List::with_capacity(CLIENT.rows);
     let mut updates = List::with_capacity(CLIENT.rows);
     for row in rows {
-        if jig_domain_client::pages::inbox::needs(row.group()) {
+        if crate::page::inbox::needs(row.group()) {
             needs.push(row).unwrap();
         } else {
             updates.push(row).unwrap();
@@ -223,5 +223,5 @@ fn owner_inbox_both_full_groups_two_read_windows_counts_source_cuts_fit_the_whol
     assert!(contains(&tree, b"Escalation revision: 2"));
     assert!(contains(&tree, b"Reply message: 3"));
     assert!(contains(&tree, b"Result position: 4"));
-    assert!(crate::inbox_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..CLIENT }, 0).is_none());
+    assert!(crate::inbox_nodes(&crate::Limits { rows: u32::MAX, ..CLIENT }, 0).is_none());
 }

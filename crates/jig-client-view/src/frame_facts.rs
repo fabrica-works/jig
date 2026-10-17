@@ -7,7 +7,7 @@ use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
 use alloc::boxed::Box;
-use jig_client_domain::contract::{Charter, Frame, FrameParty, PartyKind, ProjectRole};
+use jig_client::contract::{Charter, Frame, FrameParty, PartyKind, ProjectRole};
 
 pub(crate) fn project_label(words: &Words, project: &ProjectRole) -> Box<[u8]> {
     match &project.name {

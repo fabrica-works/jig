@@ -3,7 +3,7 @@ use crate::regions::JigRegion;
 use crate::{JigBindings, phrases::jig::JigPhrase, words::Words};
 use skein_ui::{Builder, Role};
 
-use jig_domain_client::{Domain, action::Act, pages::Page};
+use crate::{Domain, action::Act, page::Page};
 /// Render starting, signing in, missing, outdated or another party's kept work.
 pub fn not_the_work(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
     let region = match client.page() {

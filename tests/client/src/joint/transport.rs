@@ -124,8 +124,8 @@ impl Transport {
     }
 
     #[must_use]
-    pub fn hello(&self) -> jig_domain_client::Event {
-        jig_domain_client::Event::Hello { served: jig_client_protocol_link::serves(self.versions) }
+    pub fn hello(&self) -> jig_client_view::Event {
+        jig_client_view::Event::Hello { served: jig_client_protocol_link::serves(self.versions) }
     }
 
     /// The configured Jig range, independent of a delivered Frame.
@@ -390,7 +390,7 @@ pub fn contract_request(down: jig_client::Down) -> Result<jig_client_test_domain
 pub fn contract_event(event: &jig_client_test_domain::Event) -> Option<jig_client::Up> {
     use jig_client::{Answered, Readout, Up};
     use jig_client_test_domain::{Answered as Reply, Event};
-    use jig_domain_client::Event as Jig;
+    use jig_client_view::Event as Jig;
     match event {
         Event::Jig(Jig::Watch { watch, event }) => Some(Up::Watched { watch: *watch, event: event.clone() }),
         Event::Jig(Jig::Ended { watch, end }) => Some(Up::WatchEnded { watch: *watch, end: *end }),
@@ -620,7 +620,7 @@ mod tests {
         let mut front = Transport::new(versions);
         let supplied = identity(&[255, b'/', 0]);
         front.bind(ClientId(0), u64::MAX, supplied.clone());
-        assert_eq!(front.hello(), jig_domain_client::Event::Hello { served: false });
+        assert_eq!(front.hello(), jig_client_view::Event::Hello { served: false });
         assert_eq!(front.sign_in(ClientId(0)), None);
         let Event::SignIn { reply_to, identity: actual } = front.start_sign_in(ClientId(0)) else {
             panic!("authentic sign-in input")

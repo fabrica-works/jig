@@ -5,7 +5,7 @@ use crate::words::{Words, name};
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
-use jig_client_domain::contract::HoldReason;
+use jig_client::contract::HoldReason;
 
 /// Say the actual held reason and every fact it carries; parts remain connector-owned.
 pub fn reason(b: &mut Builder, reason: &HoldReason, words: &Words, bindings: &mut JigBindings) {

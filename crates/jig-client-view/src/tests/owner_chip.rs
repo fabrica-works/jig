@@ -6,8 +6,8 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, PhraseLimits, Segment};
 use skein_ui::{Builder, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::Domain;
+use crate::Domain;
+use jig_client::contract::*;
 use skein_lib::{Duration, List, Token, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), 256).unwrap(), cut }
@@ -67,8 +67,8 @@ fn hold() -> OwnerChipHold {
         hold_wait_since: Some(Wall::from_nanos(40)),
     }
 }
-fn client_limits() -> jig_domain_client::Limits {
-    jig_domain_client::Limits { rows: 4, text: 256, objects: 4, ..super::cards::CLIENT }
+fn client_limits() -> crate::Limits {
+    crate::Limits { rows: 4, text: 256, objects: 4, ..super::cards::CLIENT }
 }
 fn phrase_limits() -> PhraseLimits {
     PhraseLimits {
@@ -489,8 +489,8 @@ fn exact_owner_verdict_fits_chip_result_fragment_at_full_field_capacity_and_reje
         tree.nodes().iter().map(|node| u64::from(crate::tests::text_bytes(node))).sum::<u64>()
             <= u64::from(envelope.text_bytes)
     );
-    assert!(view::required(&value, &jig_domain_client::Limits { rows: 3, ..client_limits() }, words()).is_none());
-    assert!(view::required(&value, &jig_domain_client::Limits { text: 255, ..client_limits() }, words()).is_none());
+    assert!(view::required(&value, &crate::Limits { rows: 3, ..client_limits() }, words()).is_none());
+    assert!(view::required(&value, &crate::Limits { text: 255, ..client_limits() }, words()).is_none());
     assert_eq!(value, before);
 }
 #[test]
@@ -545,13 +545,9 @@ fn maximum_chip_fragment_checks_selected_language_storage_raw_slots_loss_and_ari
             assert!(bindings.owner_part(slot.token).is_some());
         }
     }
-    assert!(
-        view::required(&value, &jig_domain_client::Limits { text: u32::MAX, ..client_limits() }, words()).is_none()
-    );
-    assert!(
-        view::required(&value, &jig_domain_client::Limits { rows: u32::MAX, ..client_limits() }, words()).is_none()
-    );
-    let smaller = jig_domain_client::Limits { text: 1, ..client_limits() };
+    assert!(view::required(&value, &crate::Limits { text: u32::MAX, ..client_limits() }, words()).is_none());
+    assert!(view::required(&value, &crate::Limits { rows: u32::MAX, ..client_limits() }, words()).is_none());
+    let smaller = crate::Limits { text: 1, ..client_limits() };
     let mut terminal = details();
     terminal.ending = Some(OwnerChipEnding::Done(ResultValue::Approved { state: copy_of(&[255, 0]), words: None }));
     assert!(view::required(&terminal, &smaller, words()).is_none());

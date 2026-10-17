@@ -6,7 +6,7 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_client_domain::contract::*;
+use jig_client::contract::*;
 use skein_lib::{Duration, List, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), 8).unwrap(), cut }
@@ -168,8 +168,8 @@ pub(super) fn line() -> OwnerHistoryLine {
         at: None,
     }
 }
-pub(super) fn client_limits() -> jig_domain_client::Limits {
-    jig_domain_client::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
+pub(super) fn client_limits() -> crate::Limits {
+    crate::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
 }
 pub(super) fn words(selected: bool) -> Words {
     let mut english = crate::phrases::english::language();
@@ -518,10 +518,7 @@ fn owner_history_whole_view_admission_checks_nested_reserved_capacities_and_text
         ..line()
     };
     assert!(view::required(&source, &client_limits(), words).is_some());
-    for limits in [
-        jig_domain_client::Limits { text: 7, ..client_limits() },
-        jig_domain_client::Limits { rows: 2, ..client_limits() },
-    ] {
+    for limits in [crate::Limits { text: 7, ..client_limits() }, crate::Limits { rows: 2, ..client_limits() }] {
         let original = source.clone();
         assert!(view::required(&source, &limits, words).is_none());
         assert_eq!(source, original);
@@ -529,10 +526,7 @@ fn owner_history_whole_view_admission_checks_nested_reserved_capacities_and_text
     let reserved =
         OwnerHistoryLine { proposal: Some(proposal(OwnerRetainedAction::Batch(List::with_capacity(4)))), ..line() };
     assert!(view::required(&reserved, &client_limits(), words).is_none());
-    assert_eq!(
-        view::worst_case(&jig_domain_client::Limits { rows: u32::MAX, text: u32::MAX, ..client_limits() }, words),
-        None
-    );
+    assert_eq!(view::worst_case(&crate::Limits { rows: u32::MAX, text: u32::MAX, ..client_limits() }, words), None);
 }
 #[test]
 fn owner_history_normal_selected_language_checks_all_holes_and_nested_tree_binding_envelope() {

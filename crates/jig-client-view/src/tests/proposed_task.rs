@@ -11,7 +11,7 @@ use super::{
 use crate::{JigBindings, proposed_task};
 use skein_ui::{Builder, Role, Tree};
 
-use jig_client_domain::contract::*;
+use jig_client::contract::*;
 
 fn builder() -> Builder {
     let mut limits = limits();

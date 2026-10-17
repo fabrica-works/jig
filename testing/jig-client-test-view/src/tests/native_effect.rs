@@ -52,7 +52,7 @@ fn load(root: &mut Domain, proposal: OwnerProposal) -> Vec<Request> {
         .unwrap();
     drive(
         root,
-        Event::Jig(jig_domain_client::Event::Read {
+        Event::Jig(jig_client_view::Event::Read {
             read,
             result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(proposal))),
         }),
@@ -137,16 +137,14 @@ fn a_native_effect_slot_reads_its_separate_scoped_description_and_releases_it_on
     assert_eq!(root.first().object(id).unwrap().value, first::Value::Known(family::Document::Connector(supplied)));
     let retained =
         root.jig().objects().get(root.jig().objects().find(ObjectKey::Proposal(original.key)).unwrap()).unwrap();
-    let jig_domain_client::objects::Body::OwnerProposal(retained) = retained.body.as_ref().unwrap() else {
+    let jig_client_view::objects::Body::OwnerProposal(retained) = retained.body.as_ref().unwrap() else {
         panic!("whole owner proposal")
     };
     assert_eq!(retained.as_ref(), &original);
     assert!(patches(&mut view, &root).is_empty());
     let left = drive(
         &mut root,
-        Event::Went {
-            place: Place::Address(Address::Jig(jig_domain_client::address::Address::Inbox { project: None })),
-        },
+        Event::Went { place: Place::Address(Address::Jig(jig_client_view::address::Address::Inbox { project: None })) },
     );
     assert!(left.iter().any(|row| match row {
         Request::First(first::Out::Close { watch: actual }) => *actual == watch,
@@ -180,7 +178,7 @@ fn a_path_keyed_native_effect_keeps_whole_proposal_facts_without_inventing_a_rea
     assert!(view.tree().nodes().iter().any(|node| node.name.as_deref() == Some(b"Cannot show this part".as_slice())));
     let retained =
         root.jig().objects().get(root.jig().objects().find(ObjectKey::Proposal(original.key)).unwrap()).unwrap();
-    let jig_domain_client::objects::Body::OwnerProposal(retained) = retained.body.as_ref().unwrap() else {
+    let jig_client_view::objects::Body::OwnerProposal(retained) = retained.body.as_ref().unwrap() else {
         panic!("whole owner proposal")
     };
     assert_eq!(retained.as_ref(), &original);

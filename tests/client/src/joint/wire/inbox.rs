@@ -3,7 +3,7 @@
 //! reconstructed here; native reads retain their original query separately.
 use super::{owner, reads, results, rows};
 use jig_client_domain::contract as client;
-use jig_domain_client::Limits;
+use jig_client_view::Limits;
 use jig_domain_core::documents;
 use skein_lib::List;
 

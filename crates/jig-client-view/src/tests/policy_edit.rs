@@ -1,7 +1,7 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect full semantic leaves")]
 use super::cards::{contains, words};
 use crate::policy_edit;
-use jig_client_domain::contract::*;
+use jig_client::contract::*;
 use skein_lib::{Duration, List};
 use skein_ui::{Builder, Role};
 fn pattern(last: OwnerPatternEnd) -> OwnerPattern {

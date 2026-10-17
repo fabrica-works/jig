@@ -26,8 +26,8 @@ fn a_failed_store_stops_the_steps_keyed_sends_and_notifies_the_table() {
     w.fail_store();
     w.event(
         c,
-        jig_client_test_domain::Event::Jig(jig_domain_client::Event::Ask {
-            ask: jig_domain_client::intents::ByValue {
+        jig_client_test_domain::Event::Jig(jig_client_view::Event::Ask {
+            ask: jig_client_view::intents::ByValue {
                 asked: skein_lib::Token::new(99),
                 scope: 7,
                 ask: Box::new(jig_client_domain::contract::Ask::StartChat {

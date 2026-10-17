@@ -9,15 +9,15 @@ use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, Language, PhraseLimits, Phrasebook, Segment, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use jig_client_domain::contract::{
+use crate::Domain;
+use jig_client::contract::{
     Chip, ChipPhase, Executor, OwnerExecutor, OwnerPart, OwnerPartKey, OwnerPartKind, OwnerRequester, OwnerTaskLink,
     OwnerTaskStatus, PersonAddress, Phase, ProposalKey, Proposer, ResultDetails, TaskContractDocument, Text,
 };
-use jig_domain_client::Domain;
 use skein_lib::{List, Wall, bytes::copy_of};
 
-fn client_limits() -> jig_domain_client::Limits {
-    jig_domain_client::Limits { rows: 8, ..super::cards::CLIENT }
+fn client_limits() -> crate::Limits {
+    crate::Limits { rows: 8, ..super::cards::CLIENT }
 }
 fn phrase_limits(languages: &[Language]) -> PhraseLimits {
     let mut segments = 0_u32;
@@ -48,7 +48,7 @@ fn words() -> Words {
 fn chip() -> Chip {
     Chip {
         task: u64::MAX,
-        title: jig_client_domain::contract::DocumentText::complete(Text::new(copy_of(b"supplied title"), 128).unwrap()),
+        title: jig_client::contract::DocumentText::complete(Text::new(copy_of(b"supplied title"), 128).unwrap()),
         executor: Executor::Agent { charter: u32::MAX },
         phase: Phase::Due,
         details: Box::new(ChipPhase::Starting),
@@ -253,5 +253,5 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
             "one below a checked storage dimension refuses"
         );
     }
-    assert_eq!(view::nodes(&jig_domain_client::Limits { rows: u32::MAX, ..client_limits() }), None);
+    assert_eq!(view::nodes(&crate::Limits { rows: u32::MAX, ..client_limits() }), None);
 }

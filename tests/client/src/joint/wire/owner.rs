@@ -2,7 +2,7 @@
 //! This layer copies opaque names, paths, codes and loss facts. It owns no
 //! application scope or document policy and never clips a receiving value.
 use jig_client_domain::contract as client;
-use jig_domain_client::Limits;
+use jig_client_view::Limits;
 use jig_domain_core::documents;
 use jig_domain_tasks as tasks;
 use skein_lib::List;

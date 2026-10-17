@@ -1,10 +1,10 @@
 //! P reads and acts on the actual engine's public Ops client tree.
+use jig_client_view::address::{Address as JigAddress, TaskSection};
 use jig_client_world::{
     Until,
     harness::{ClientId, FrontFault},
 };
 use jig_conformance::Cut;
-use jig_domain_client::address::{Address as JigAddress, TaskSection};
 use jig_ops_client_domain::{Address, observability as obs};
 use jig_ops_domain as root;
 use jig_ops_world::joint::engine::Milestone;

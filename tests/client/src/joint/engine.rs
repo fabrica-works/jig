@@ -165,7 +165,7 @@ mod tests {
             name: b"Person".as_slice().into(),
         };
         driver.transport.bind(ClientId(0), 1, supplied.clone());
-        assert_eq!(driver.transport.hello(), jig_domain_client::Event::Hello { served: true });
+        assert_eq!(driver.transport.hello(), jig_client_view::Event::Hello { served: true });
         driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(driver.world.store.applied + 1));
         let event = driver.transport.start_sign_in(ClientId(0));
         let core::Event::SignIn { identity, .. } = &event else { panic!("real sign-in") };

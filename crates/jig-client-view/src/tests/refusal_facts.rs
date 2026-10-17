@@ -4,7 +4,7 @@
     reason = "ordinary tests inspect complete semantic trees"
 )]
 use super::cards::{CLIENT, contains, limits, shared_words, text};
-use jig_client_domain::contract::*;
+use jig_client::contract::*;
 use skein_lib::{List, Wall};
 use skein_ui::{Builder, Role, Tree};
 fn render(refusal: Refusal) -> Tree {

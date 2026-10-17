@@ -929,7 +929,7 @@ impl Front<super::fixture::Client> for Joint {
     }
     fn received(&mut self, client: ClientId, event: &client::Event) {
         match event {
-            client::Event::Jig(jig_domain_client::Event::Watch {
+            client::Event::Jig(jig_client_view::Event::Watch {
                 watch,
                 event: jig_client_domain::contract::WatchEvent::Delivered(_),
             }) => {
@@ -957,7 +957,7 @@ impl Front<super::fixture::Client> for Joint {
     fn sign_out(&mut self, client: ClientId, now: Time, _wall: Wall) {
         self.advance(now);
         if self.offline_until.is_some() {
-            self.callbacks.push((client, client::Event::Jig(jig_domain_client::Event::SignOutLost)));
+            self.callbacks.push((client, client::Event::Jig(jig_client_view::Event::SignOutLost)));
             return;
         }
         let Some(sign_in) = self.engine.peers.transport.sign_in(client) else { return };

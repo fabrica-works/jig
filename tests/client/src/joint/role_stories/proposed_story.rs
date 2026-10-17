@@ -6,9 +6,9 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
     let mut world = world(8519, vec![]);
     let member = world.client_with(
         3,
-        jig_client_test_domain::Address::Jig(jig_domain_client::address::Address::Project {
+        jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Project {
             project: 1,
-            section: jig_domain_client::address::ProjectSection::Goals,
+            section: jig_client_view::address::ProjectSection::Goals,
         }),
         receiving_limits(),
         client,

@@ -25,9 +25,9 @@ pub(super) fn ready() -> Domain {
     let rows = drive(
         &mut root,
         Event::Start {
-            address: Address::Jig(jig_domain_client::address::Address::Inbox { project: None }),
+            address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             kept: List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: jig_client_view::boundary::Offset { minutes: 0 },
         },
     );
     let watch = rows
@@ -37,10 +37,10 @@ pub(super) fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_domain_client::Event::Hello { served: true }));
+    drive(&mut root, Event::Jig(jig_client_view::Event::Hello { served: true }));
     drive(
         &mut root,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
                 party: FrameParty {
@@ -115,9 +115,9 @@ fn load(root: &mut Domain, task: Task) -> Vec<Request> {
     let opened = drive(
         root,
         Event::Went {
-            place: Place::Address(Address::Jig(jig_domain_client::address::Address::Task {
+            place: Place::Address(Address::Jig(jig_client_view::address::Address::Task {
                 task: task.chip.task,
-                section: jig_domain_client::address::TaskSection::Overview,
+                section: jig_client_view::address::TaskSection::Overview,
             })),
         },
     );
@@ -130,7 +130,7 @@ fn load(root: &mut Domain, task: Task) -> Vec<Request> {
         .unwrap();
     drive(
         root,
-        Event::Jig(jig_domain_client::Event::Watch {
+        Event::Jig(jig_client_view::Event::Watch {
             watch,
             event: WatchEvent::Delivered(Delivery::Task(Box::new(task))),
         }),
@@ -210,15 +210,11 @@ fn a_supplied_native_hold_slot_reads_and_renders_its_actual_scoped_account() {
     assert!(view.tree().nodes().iter().any(|node| node.key == Some(crate::family_key(&subject))));
     assert!(patches(&mut view, &root).is_empty());
     let retained = root.jig().objects().get(root.jig().objects().find(ObjectKey::Task(9)).unwrap()).unwrap();
-    let jig_domain_client::objects::Body::Task(retained) = retained.body.as_ref().unwrap() else {
-        panic!("whole task")
-    };
+    let jig_client_view::objects::Body::Task(retained) = retained.body.as_ref().unwrap() else { panic!("whole task") };
     assert_eq!(retained.as_ref(), &original);
     let left = drive(
         &mut root,
-        Event::Went {
-            place: Place::Address(Address::Jig(jig_domain_client::address::Address::Inbox { project: None })),
-        },
+        Event::Went { place: Place::Address(Address::Jig(jig_client_view::address::Address::Inbox { project: None })) },
     );
     assert!(left.iter().any(|row| match row {
         Request::First(first::Out::Close { watch: actual }) => *actual == watch,

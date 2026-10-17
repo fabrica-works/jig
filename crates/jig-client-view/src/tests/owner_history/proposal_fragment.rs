@@ -191,13 +191,13 @@ fn retained_proposal_fragment_validation_refuses_whole_allocated_rows_and_text_w
         ..proposal(OwnerRetainedAction::Release { task: 0 })
     };
     assert!(view::proposal_required(&value, &limits, words).is_some());
-    assert!(view::proposal_required(&value, &jig_domain_client::Limits { text: 7, ..limits }, words).is_none());
+    assert!(view::proposal_required(&value, &crate::Limits { text: 7, ..limits }, words).is_none());
     for action in actions().into_iter().skip(1).take(3) {
         let value = proposal(action);
         assert!(view::proposal_required(&value, &limits, words).is_some());
-        assert!(view::proposal_required(&value, &jig_domain_client::Limits { rows: 2, ..limits }, words).is_none());
+        assert!(view::proposal_required(&value, &crate::Limits { rows: 2, ..limits }, words).is_none());
     }
-    assert!(view::proposal_max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..limits }).is_none());
+    assert!(view::proposal_max_nodes(&crate::Limits { rows: u32::MAX, ..limits }).is_none());
 }
 #[test]
 fn retained_proposal_fragment_preserves_absent_empty_and_independent_retained_losses() {

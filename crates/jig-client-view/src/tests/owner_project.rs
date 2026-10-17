@@ -10,8 +10,8 @@ use crate::{JigBindings, owner_project as view};
 use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Role, Tree};
 
-use jig_client_domain::contract::*;
-use jig_domain_client::Domain;
+use crate::Domain;
+use jig_client::contract::*;
 use skein_lib::{
     Duration, List, Wall,
     bytes::{copy_of, find},
@@ -23,8 +23,8 @@ fn list<T>(cap: u32, rows: impl IntoIterator<Item = T>) -> List<T> {
     }
     out
 }
-fn limits() -> jig_domain_client::Limits {
-    jig_domain_client::Limits { rows: 4, text: 32, ..super::cards::CLIENT }
+fn limits() -> crate::Limits {
+    crate::Limits { rows: 4, text: 32, ..super::cards::CLIENT }
 }
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
     DocumentText { bytes: Text::new(copy_of(bytes), 32).unwrap(), cut }
@@ -409,7 +409,7 @@ fn owner_project_raw_role_permissions_requirement_guards_and_spend_recurring_sou
                 .expect("source expense has its named task link")
         })
         .map(|address| match address {
-            jig_domain_client::address::Address::Task { task, .. } => task,
+            crate::address::Address::Task { task, .. } => task,
             _ => panic!("expense task link"),
         })
         .collect();
@@ -438,7 +438,7 @@ fn owner_project_raw_role_permissions_requirement_guards_and_spend_recurring_sou
         })
         .filter_map(|node| node.binding.and_then(|binding| bindings.address(binding.token)))
         .map(|address| match address {
-            jig_domain_client::address::Address::Task { task, .. } => task,
+            crate::address::Address::Task { task, .. } => task,
             _ => panic!("recurring task link"),
         })
         .collect();
@@ -478,9 +478,9 @@ fn owner_project_public_required_envelope_checks_last_nested_capacity_and_both_l
     assert!(view::required(&changed, &small, w).is_none());
     assert_eq!(value, before);
 }
-fn native_drive(domain: &mut Domain, event: jig_domain_client::Event) -> Vec<jig_domain_client::Request> {
-    let mut out = skein_lib::Queue::with_capacity(jig_domain_client::max_out(&limits()));
-    jig_domain_client::step(
+fn native_drive(domain: &mut Domain, event: crate::Event) -> Vec<crate::Request> {
+    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&limits()));
+    crate::step(
         domain,
         &skein_lib::Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits: limits() },
         event,
@@ -498,7 +498,7 @@ fn owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and
 }
 #[expect(clippy::too_many_lines, reason = "complete whole source fixture or ordered public journey proof")]
 fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and_reviews_before_after_once() {
-    use jig_domain_client::{
+    use crate::{
         Event, Request,
         action::Act,
         address::{Address, ProjectSection},
@@ -509,7 +509,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         Event::Start {
             address: Address::Project { project: 4, section: ProjectSection::Settings },
             kept: List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: crate::boundary::Offset { minutes: 0 },
         },
     );
     native_drive(&mut d, Event::Hello { served: true });
@@ -679,17 +679,17 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     assert_eq!(value.resources.capacity(), 4);
 }
 fn native_owner(value: OwnerProject) -> Domain {
-    native_owner_at(value, jig_domain_client::address::ProjectSection::Settings)
+    native_owner_at(value, crate::address::ProjectSection::Settings)
 }
-fn native_owner_at(value: OwnerProject, section: jig_domain_client::address::ProjectSection) -> Domain {
-    use jig_domain_client::{Event, Request, address::Address};
+fn native_owner_at(value: OwnerProject, section: crate::address::ProjectSection) -> Domain {
+    use crate::{Event, Request, address::Address};
     let mut domain = Domain::new(&limits(), 9177);
     let out = native_drive(
         &mut domain,
         Event::Start {
             address: Address::Project { project: value.number, section },
             kept: List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: crate::boundary::Offset { minutes: 0 },
         },
     );
     native_drive(&mut domain, Event::Hello { served: true });
@@ -733,7 +733,7 @@ fn owner_page(domain: &Domain) -> (Tree, JigBindings) {
 #[test]
 #[expect(clippy::too_many_lines, reason = "complete explicit public service, pool and membership journey proof")]
 fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_preserve_complete_membership_choices() {
-    use jig_domain_client::{Event, Request, action::Act};
+    use crate::{Event, Request, action::Act};
     let mut value = source();
     value.number = 4;
     value.cut = false;
@@ -866,7 +866,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
 #[test]
 #[expect(clippy::too_many_lines, reason = "complete whole source fixture or ordered public journey proof")]
 fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_proposed_review_before_one_keyed_request() {
-    use jig_domain_client::{Event, Request, action::Act, address::ProjectSection, fields::Purpose};
+    use crate::{Event, Request, action::Act, address::ProjectSection, fields::Purpose};
     let mut value = source();
     value.number = 4;
     let executor = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
@@ -1053,7 +1053,7 @@ fn historical_old_spend(before: &Cursor, after: &Cursor) -> SpendPage {
     }
 }
 fn native_historical_project() -> (Domain, OwnerSpendPage) {
-    use jig_domain_client::{
+    use crate::{
         Event, Request,
         action::{Act, End},
         address::{Address, ProjectSection},
@@ -1066,7 +1066,7 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
         Event::Start {
             address: Address::Project { project: 4, section: ProjectSection::Spend },
             kept: List::with_capacity(0),
-            offset: jig_domain_client::boundary::Offset { minutes: 0 },
+            offset: crate::boundary::Offset { minutes: 0 },
         },
     );
     native_drive(&mut domain, Event::Hello { served: true });
@@ -1106,10 +1106,7 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
     let requests = native_drive(
         &mut domain,
         Event::Act {
-            act: Act::More {
-                window: skein_lib::Token::new(jig_domain_client::pages::project::SPEND_WINDOW),
-                end: End::After,
-            },
+            act: Act::More { window: skein_lib::Token::new(crate::page::project::SPEND_WINDOW), end: End::After },
         },
     );
     let read = requests
@@ -1157,7 +1154,7 @@ fn historical_project_bound(w: &Words) -> skein_ui::Limits {
 }
 #[test]
 fn owner_project_genuine_spend_keeps_live_historical_and_earlier_period_facts_with_both_opaque_edges() {
-    use jig_domain_client::{
+    use crate::{
         Event, Request,
         action::{Act, End},
     };
@@ -1233,7 +1230,7 @@ fn owner_project_historical_companion_prices_whole_languages_and_refuses_one_und
             assert!(has(&tree, b"second "));
         }
     }
-    assert!(view::max_nodes(&jig_domain_client::Limits { rows: u32::MAX, ..limits() }).is_none());
+    assert!(view::max_nodes(&crate::Limits { rows: u32::MAX, ..limits() }).is_none());
     assert_eq!(domain.project_page().owner_spend.as_deref(), Some(&page));
     assert_eq!(domain.project_page().spend.get(0).unwrap().period, 997);
 }
