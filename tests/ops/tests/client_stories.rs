@@ -11,6 +11,19 @@ use skein_world::domain::{Verdict, heap::Counting};
 #[global_allocator]
 static HEAP: Counting = Counting;
 const WITHIN: Duration = Duration::from_secs(1);
+
+#[test]
+fn scripted_client_starts_within_the_shell_heap_envelope() {
+    let meter = skein_world::domain::heap::Meter::new();
+    meter.start();
+    let state = Ops::new(501);
+    let measured = meter.end();
+    let peak = meter.check(measured, u64::MAX, &"scripted client startup");
+    let bound = jig_client_world::Settings::default().heap_bytes_per_client;
+    assert!(peak <= bound, "scripted client startup: {peak} bytes exceeds {bound}");
+    drop(state);
+}
+
 fn see(words: &[u8]) -> Step<Address> {
     Step::See { find: Find::text(words), within: WITHIN }
 }

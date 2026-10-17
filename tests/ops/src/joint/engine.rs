@@ -2,7 +2,7 @@
 //! (client/domain/testing.md, 5; examples.md, 10).
 use crate::conformance::{self, Config, Delivery, Ops, Systems};
 use jig_client_world::harness::Observed;
-use jig_client_world::joint::{transport::Transport, truth::Truth};
+use jig_client_world::joint::truth::Truth;
 use jig_conformance::{Application, Clock, Input, Output, referee};
 use jig_domain_core as core;
 use jig_domain_people as people;
@@ -23,7 +23,6 @@ pub enum Milestone {
 
 pub struct Peers {
     pub conformance: conformance::Peers,
-    pub transport: Transport,
     pub packets: Vec<root::Output>,
     pub truth: Truth,
     pub observations: Vec<Observed>,
@@ -31,6 +30,8 @@ pub struct Peers {
     /// Whole authenticated requests observed at the actual root boundary.
     pub keyed_asks: Vec<(u64, [u8; 16], people::Ask)>,
     pub application_asks: Vec<(u64, [u8; 16], jig_ops_domain_infrastructure::ApplicationRequest, [u8; 32])>,
+    /// Opaque family request bytes that crossed the native component boundary.
+    pub application_bytes: Vec<([u8; 16], Box<[u8]>)>,
     pub milestones: Vec<(Milestone, u64)>,
     /// The outside alert sender retains its whole notifications across a
     /// receiver crash; cold recovery redelivers without inventing new facts.
@@ -166,19 +167,19 @@ impl Application for OpsApplication {
         Ops::systems(config, seed)
     }
     fn peers(config: &Config, seed: u64) -> Peers {
-        let versions = config.limits().core.documents.versions;
+        let mut conformance = Ops::peers(config, seed);
+        // Interactive navigation and the post-action health wait outlive the
+        // inline scenario's 2,000 iterations; keep their joint allowance finite.
+        conformance.policy.story_steps = 20_000;
         Peers {
-            conformance: Ops::peers(config, seed),
-            transport: Transport::new(jig_client_domain::contract::VersionRange {
-                first: versions.minimum,
-                last: versions.maximum,
-            }),
+            conformance,
             packets: Vec::new(),
             truth: Truth::default(),
             observations: Vec::new(),
             protocol: jig_client_world::joint::referee::Referee::default(),
             keyed_asks: Vec::new(),
             application_asks: Vec::new(),
+            application_bytes: Vec::new(),
             milestones: Vec::new(),
             alert_news: Vec::new(),
             replay_news: false,

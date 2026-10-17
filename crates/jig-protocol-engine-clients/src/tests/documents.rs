@@ -8,6 +8,32 @@ fn a_frame_with_two_projects_becomes_its_record() {
         Ok(jig_client_test_records::frame_two_projects_record())
     );
 }
+const SPARE_FRAME_ROOM: [(u32, u32); 2] = [(32, 2), (1, 32)];
+#[test]
+fn a_frame_with_spare_list_room_becomes_its_record() {
+    let limits = fixtures::wire_limits();
+    for (goal_room, project_room) in SPARE_FRAME_ROOM {
+        let mut frame = fixtures::frame_two_projects();
+        for index in 0..frame.charters.len() {
+            let charter = frame.charters.get_mut(index).expect("fixture charter");
+            let mut goals = skein_lib::List::with_capacity(goal_room);
+            for number in &charter.goals {
+                goals.push(*number).expect("fixture goal room");
+            }
+            charter.goals = goals;
+        }
+        let mut projects = skein_lib::List::with_capacity(project_room);
+        for project in frame.projects.into_boxed() {
+            projects.push(project).expect("fixture project room");
+        }
+        frame.projects = projects;
+        assert_eq!(
+            translate::owner::frame(&frame, &limits),
+            Ok(jig_client_test_records::frame_two_projects_record()),
+            "goals room {goal_room}, projects room {project_room}"
+        );
+    }
+}
 fn a_task_with_a_hold_becomes_its_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(

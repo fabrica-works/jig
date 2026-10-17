@@ -14,7 +14,7 @@ use jig_ops_domain_connectors::{Connector, number};
 use skein_ui::Act;
 use skein_ui::{NodeId, Patch, Role, Tree};
 
-use skein_lib::{Duration, Env, Queue, RequestEnvelope, RequestLimits, Time};
+use skein_lib::{Duration, Env, Queue, RequestEnvelope, Time};
 
 use std::{
     collections::BTreeMap,
@@ -79,14 +79,7 @@ pub fn limits() -> domain::Limits {
             retry: Duration::from_millis(10),
             document_bytes: 65536,
         },
-        table: RequestLimits {
-            requests: 4,
-            bytes: 262_144,
-            out: 16,
-            first: Duration::from_millis(10),
-            most: Duration::from_millis(80),
-            margin: Duration::from_secs(1),
-        },
+        client: client_limits(),
     }
 }
 type Books = (jig_client_view::words::Words, view::words::Words, view::words::Words);
@@ -158,7 +151,7 @@ impl App for Ops {
         let limits = limits();
         let (jig, obs, infra) = phrasebooks(&limits);
         let bounds = fixture_profile().0;
-        let mut root = domain::new(&limits, seed);
+        let mut root = domain::unlinked(&limits, seed);
         domain::configure_arrangement(&mut root, view::arrangement()).expect("ops arrangement before start");
         domain::provider(
             &mut root,
@@ -200,14 +193,11 @@ impl App for Ops {
             Request::Erase { key } => Duty::Store(StoreWrite::Erase(key)),
             Request::Show { address, replace } => Duty::Show { address, replace },
             Request::SignIn { provider, back } => Duty::SignIn { provider, back },
-            Request::SignOut => Duty::SignOut,
-            Request::Send { .. }
-            | Request::Jig(
-                JigOut::Read { .. } | JigOut::Open { .. } | JigOut::Continue { .. } | JigOut::Close { .. },
-            )
-            | Request::Observability(obs::Out::Read { .. } | obs::Out::Open { .. } | obs::Out::Close { .. })
+            Request::SignOut | Request::Client { request: jig_client::Request::SignOut } => Duty::SignOut,
+            Request::Client { .. } => Duty::Wire(request),
+            Request::Observability(obs::Out::Read { .. } | obs::Out::Open { .. } | obs::Out::Close { .. })
             | Request::Infrastructure(infra::Out::Read { .. } | infra::Out::Open { .. } | infra::Out::Close { .. }) => {
-                Duty::Wire(request)
+                panic!("family work routes through the client")
             }
             Request::Fact { .. }
             | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
@@ -224,31 +214,45 @@ impl App for Ops {
             domain::store::Record::Infrastructure(infra::Record::Place { .. }) => {
                 domain::store::Key::Infrastructure(infra::Key::Place)
             }
-            domain::store::Record::Table { record, .. } => domain::store::Key::Table(record.key),
+            domain::store::Record::Client(record) => domain::store::Key::Client(record.key.clone()),
+            domain::store::Record::Unlinked(record) => domain::store::Key::Unlinked(record.key),
         }
     }
     fn unsent(request: Request) -> Option<Event> {
         match request {
-            Request::Send { attempt, .. } => {
-                Some(Event::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None })
-            }
-            Request::Jig(JigOut::Read { read, .. }) => {
-                Some(Event::Jig(jig_client_view::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
-            }
-            Request::Jig(JigOut::Open { watch, .. } | JigOut::Continue { watch, .. } | JigOut::Close { watch }) => {
-                Some(Event::Jig(jig_client_view::Event::Ended { watch, end: WatchEnd::Dropped }))
-            }
-            Request::Observability(obs::Out::Read { read, .. }) => {
-                Some(Event::Observability(obs::Event::Read { read, result: obs::ReadResult::Busy }))
-            }
-            Request::Observability(obs::Out::Open { watch, .. } | obs::Out::Close { watch }) => {
-                Some(Event::Observability(obs::Event::Ended { watch, end: obs::WatchEnd::Dropped }))
-            }
-            Request::Infrastructure(infra::Out::Read { read, .. }) => {
-                Some(Event::Infrastructure(infra::Event::Read { read, result: infra::ReadResult::Busy }))
-            }
-            Request::Infrastructure(infra::Out::Open { watch, .. } | infra::Out::Close { watch }) => {
-                Some(Event::Infrastructure(infra::Event::Ended { watch, end: infra::WatchEnd::Dropped }))
+            Request::Client { request } => {
+                let event = match request {
+                    jig_client::Request::Down { down: jig_client::Down::Send { attempt, .. } } => {
+                        jig_client::Event::Up {
+                            up: jig_client::Up::Answer {
+                                attempt,
+                                envelope: RequestEnvelope::Lost,
+                                answer: None,
+                                why: None,
+                            },
+                        }
+                    }
+                    jig_client::Request::Down {
+                        down:
+                            jig_client::Down::Open { watch, .. }
+                            | jig_client::Down::Close { watch }
+                            | jig_client::Down::Continue { watch, .. },
+                    } => jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch, end: WatchEnd::Dropped } },
+                    jig_client::Request::Down { down: jig_client::Down::Read { read, .. } } => jig_client::Event::Up {
+                        up: jig_client::Up::ReadDone { read, result: jig_client::Readout::Limit },
+                    },
+                    jig_client::Request::Exchange { exchange, .. } => jig_client::Event::Lost { exchange },
+                    jig_client::Request::OpenStream { .. } => jig_client::Event::StreamGone,
+                    jig_client::Request::SignOut => jig_client::Event::SignOutLost,
+                    jig_client::Request::CloseStream
+                    | jig_client::Request::Save { .. }
+                    | jig_client::Request::Erase { .. }
+                    | jig_client::Request::Told { .. }
+                    | jig_client::Request::Down {
+                        down: jig_client::Down::Save { .. } | jig_client::Down::Erase { .. },
+                    } => return None,
+                };
+                Some(Event::Client { event })
             }
             Request::Save { .. }
             | Request::Erase { .. }
@@ -256,9 +260,9 @@ impl App for Ops {
             | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. }
-            | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
-            | Request::Observability(obs::Out::Fact { .. })
-            | Request::Infrastructure(infra::Out::Fact { .. }) => None,
+            | Request::Jig(_)
+            | Request::Infrastructure(_)
+            | Request::Observability(_) => None,
         }
     }
     fn max_out(limits: &Self::Limits) -> u32 {
@@ -290,7 +294,7 @@ impl App for Ops {
             Event::Start { .. }
             | Event::Went { .. }
             | Event::Act { .. }
-            | Event::Answer { .. }
+            | Event::Client { .. }
             | Event::Jig(_)
             | Event::Observability(_)
             | Event::Infrastructure(_)
@@ -301,50 +305,40 @@ impl App for Ops {
         super::stories::seen(tree)
     }
     fn sent(request: &Request) -> Option<Sent> {
-        let Request::Send { attempt, key, ask } = request else { return None };
-        Some(match ask {
+        if let Request::Client {
+            request:
+                request @ jig_client::Request::Exchange { message: jig_client::Message::Request(bytes), exchange, .. },
+        } = request
+        {
+            use jig_client_protocol_wire::v8 as w;
+            let keyed = w::Keyed::decode(&w::CEILINGS, &mut skein_lib::Reader::new(bytes)).expect("keyed Ops bytes");
+            if *keyed.owner() == w::Owner::Jig {
+                return jig_client_protocol_world::observe::client_sent(request);
+            }
+            let ask = domain::wire::ask_value(keyed.request()).expect("whole environment ask");
+            return Some(infrastructure_sent(*exchange, *keyed.key(), &ask));
+        }
+        let Request::Client {
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key, request } },
+        } = request
+        else {
+            return None;
+        };
+        let ask = match request {
+            jig_client::Ask::Jig(value) => domain::Ask::Jig(value.clone()),
+            jig_client::Ask::Family(record) => {
+                domain::Ask::Infrastructure(domain::wire::ask_value(&record.bytes).expect("whole environment ask"))
+            }
+        };
+        Some(match &ask {
             domain::Ask::Jig(ask) => observe::jig_sent(*attempt, *key, ask),
-            domain::Ask::Infrastructure(infra::Ask::NativeMoveEnd { object, revision, .. }) => Sent {
-                attempt: *attempt,
-                key: *key,
-                card: Some(CardKey::of(skein_ui::Key {
-                    owner: (jig_client_view::Owner::Application { number: 2 }).opaque(),
-                    kind: 12,
-                    a: 0,
-                    b: object.raw(),
-                })),
-                revision: Some((0, revision.value)),
-                words: None,
-            },
-            domain::Ask::Infrastructure(infra::Ask::MoveEnd { project, environment, revision, .. }) => Sent {
-                attempt: *attempt,
-                key: *key,
-                card: Some(environment_key(*project, *environment)),
-                revision: Some((0, revision.value)),
-                words: None,
-            },
+            domain::Ask::Infrastructure(ask) => infrastructure_sent(*attempt, *key, ask),
         })
     }
     fn received(event: &Event) -> Vec<Receipt> {
         match event {
             Event::Jig(event) => observe::jig_received(event),
-            Event::Answer { attempt, envelope, answer } => {
-                if *envelope == RequestEnvelope::SignedOut {
-                    vec![Receipt::Parked]
-                } else {
-                    let words = match answer {
-                        Some(domain::Answered::Jig(Answer::Done(Outcome::Made {
-                            what: Made::Words { task, message },
-                        }))) => Some((*task, *message)),
-                        Some(domain::Answered::Jig(_) | domain::Answered::Infrastructure(_)) | None => None,
-                    };
-                    vec![Receipt::Answer {
-                        attempt: *attempt,
-                        final_answer: *envelope == RequestEnvelope::Final,
-                        words,
-                    }]
-                }
-            }
+            Event::Client { event: jig_client::Event::Up { up } } => client_received(up),
             Event::Infrastructure(
                 infra::Event::Read { result: infra::ReadResult::Value(doc), .. }
                 | infra::Event::Watch { event: infra::WatchEvent::Delivered(doc), .. },
@@ -365,7 +359,8 @@ impl App for Ops {
             | Event::Went { .. }
             | Event::Act { .. }
             | Event::Observability(_)
-            | Event::Infrastructure(_) => vec![],
+            | Event::Infrastructure(_)
+            | Event::Client { .. } => vec![],
         }
     }
     fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {
@@ -396,4 +391,117 @@ pub(super) fn environment_key(project: u32, environment: u64) -> CardKey {
         })
         .expect("legacy numeric environment key"),
     )
+}
+
+fn client_limits() -> jig_client::Limits {
+    const OWNERS: [jig_client::Spoken; 2] = [
+        jig_client::Spoken { family: number(Connector::Observability), version: jig_ops_client_protocol_wire::VERSION },
+        jig_client::Spoken {
+            family: number(Connector::Infrastructure),
+            version: jig_ops_client_protocol_wire::VERSION,
+        },
+    ];
+    let mut client = jig_client_world::test::limits().client;
+    client.domain.owners = &OWNERS;
+    client.domain.requests.bytes = 262_144;
+    client
+}
+
+fn client_received(up: &jig_client::Up) -> Vec<Receipt> {
+    use jig_client::Up;
+    match up {
+        Up::Answer { attempt, envelope, answer, .. } => {
+            if *envelope == skein_lib::RequestEnvelope::SignedOut {
+                return vec![Receipt::Parked];
+            }
+            let words = match answer {
+                Some(jig_client::Answered::Jig(Answer::Done(Outcome::Made {
+                    what: Made::Words { task, message },
+                }))) => Some((*task, *message)),
+                _ => None,
+            };
+            vec![Receipt::Answer {
+                attempt: *attempt,
+                final_answer: *envelope == skein_lib::RequestEnvelope::Final,
+                words,
+            }]
+        }
+        Up::Watched { watch, event } => {
+            observe::jig_received(&jig_client_view::Event::Watch { watch: *watch, event: event.clone() })
+        }
+        Up::ReadDone { read, result: jig_client::Readout::Jig(result) } => {
+            observe::jig_received(&jig_client_view::Event::Read { read: *read, result: result.clone() })
+        }
+        Up::FamilyDelivered { record, .. } if record.family == 2 => infrastructure_received(&record.bytes),
+        Up::ReadDone { result: jig_client::Readout::Family { family: 2, record: Some(bytes) }, .. } => {
+            infrastructure_read_received(bytes)
+        }
+        Up::SignedOut => vec![Receipt::Parked],
+        Up::SignedIn
+        | Up::NotKept { .. }
+        | Up::Served { .. }
+        | Up::FamilyServed { .. }
+        | Up::FamilyDelivered { .. }
+        | Up::WatchEnded { .. }
+        | Up::ReadDone { .. } => vec![],
+    }
+}
+pub(crate) fn infrastructure_received(bytes: &[u8]) -> Vec<Receipt> {
+    let doc = domain::wire::infrastructure::document_value(bytes).expect("whole infrastructure receipt");
+    infrastructure_document_received(&doc)
+}
+
+pub(crate) fn infrastructure_read_received(bytes: &[u8]) -> Vec<Receipt> {
+    let result = domain::wire::infrastructure::read_answer_value(bytes);
+    let infra::ReadResult::Value(doc) = result else { return vec![] };
+    infrastructure_document_received(&doc)
+}
+
+fn infrastructure_document_received(doc: &infra::Document) -> Vec<Receipt> {
+    if let infra::Document::Environment(env) = doc
+        && let Some(end) = env.end
+    {
+        vec![Receipt::Card { key: environment_key(env.project, env.number), revisions: vec![(0, end.revision.value)] }]
+    } else {
+        vec![]
+    }
+}
+
+fn infrastructure_sent(attempt: skein_lib::Token, key: [u8; 16], ask: &infra::Ask) -> Sent {
+    let (card, revision) = match ask {
+        infra::Ask::NativeMoveEnd { object, revision, .. } => (
+            CardKey::of(skein_ui::Key {
+                owner: (jig_client_view::Owner::Application { number: 2 }).opaque(),
+                kind: 12,
+                a: 0,
+                b: object.raw(),
+            }),
+            revision.value,
+        ),
+        infra::Ask::MoveEnd { project, environment, revision, .. } => {
+            (environment_key(*project, *environment), revision.value)
+        }
+    };
+    Sent { attempt, key, card: Some(card), revision: Some((0, revision)), words: None }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn application_read_receipt_unwraps_its_versioned_read_answer() {
+        let document = infra::Document::Environment(super::super::stories::environment_document());
+        let bytes = domain::wire::infrastructure::read_answer(&infra::ReadResult::Value(Box::new(document)))
+            .expect("fixture read answer fits");
+        let receipts = client_received(&jig_client::Up::ReadDone {
+            read: skein_lib::Token::new(7),
+            result: jig_client::Readout::Family { family: 2, record: Some(bytes) },
+        });
+        let [Receipt::Card { key, revisions }] = receipts.as_slice() else {
+            panic!("one versioned environment receipt");
+        };
+        assert_eq!(*key, environment_key(1, 7));
+        assert_eq!(*revisions, vec![(0, 5)]);
+    }
 }

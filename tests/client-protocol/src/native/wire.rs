@@ -15,19 +15,31 @@ enum Kind {
     Other,
 }
 #[derive(Default)]
-pub(crate) struct Wire {
+pub struct Wire {
     exchanges: BTreeMap<Token, Kind>,
     watches: BTreeMap<u64, jig_client_test_domain::family::Subject>,
     credential: Option<Secret>,
 }
 impl Wire {
-    pub(crate) fn credential(&self) -> Option<Secret> {
+    #[must_use]
+    pub fn credential(&self) -> Option<Secret> {
         self.credential.clone()
     }
-    pub(crate) fn restore(&mut self, credential: Option<Secret>) {
+    pub fn restore(&mut self, credential: Option<Secret>) {
         self.credential = credential;
     }
-    pub(crate) fn sent(&mut self, request: &Request) -> Vec<Received> {
+    pub fn sent(&mut self, request: &Request) -> Vec<Received> {
+        self.sent_with(request, Some)
+    }
+    /// Track jig envelopes while leaving an application's bytes to its observer.
+    pub fn sent_without_family(&mut self, request: &Request) -> Vec<Received> {
+        self.sent_with(request, |_| None)
+    }
+    fn sent_with(
+        &mut self,
+        request: &Request,
+        family: fn(jig_client::Family) -> Option<jig_client::Family>,
+    ) -> Vec<Received> {
         if matches!(request, Request::CloseStream) {
             self.watches.clear();
         }
@@ -38,14 +50,12 @@ impl Wire {
                 let record = w::Owned::decode(&w::CEILINGS, &mut Reader::new(bytes)).expect("owned read");
                 let subject = match record.owner() {
                     w::Owner::Jig => None,
-                    w::Owner::Family(owner) => Some(jig_client_world::test::family_subject(
-                        &jig_client::Family {
-                            family: owner.number(),
-                            version: record.version(),
-                            bytes: record.record().into(),
-                        },
-                        true,
-                    )),
+                    w::Owner::Family(owner) => family(jig_client::Family {
+                        family: owner.number(),
+                        version: record.version(),
+                        bytes: record.record().into(),
+                    })
+                    .map(|record| jig_client_world::test::family_subject(&record, true)),
                 };
                 Kind::Read(subject)
             }
@@ -53,15 +63,14 @@ impl Wire {
             Message::SignOut => Kind::SignOut,
             Message::Watch(bytes) => {
                 let open = w::Open::decode(&w::CEILINGS, &mut Reader::new(bytes)).expect("open bytes");
-                if let w::Owner::Family(owner) = open.subject().owner() {
-                    let subject = jig_client_world::test::family_subject(
-                        &jig_client::Family {
-                            family: owner.number(),
-                            version: open.subject().version(),
-                            bytes: open.subject().record().into(),
-                        },
-                        false,
-                    );
+                if let w::Owner::Family(owner) = open.subject().owner()
+                    && let Some(record) = family(jig_client::Family {
+                        family: owner.number(),
+                        version: open.subject().version(),
+                        bytes: open.subject().record().into(),
+                    })
+                {
+                    let subject = jig_client_world::test::family_subject(&record, false);
                     self.watches.insert(open.watch(), subject);
                 }
                 Kind::Other
@@ -76,12 +85,14 @@ impl Wire {
             vec![]
         }
     }
-    pub(crate) fn sign_in_refused(&self, event: &Event) -> bool {
+    #[must_use]
+    pub fn sign_in_refused(&self, event: &Event) -> bool {
         let Event::Reply { exchange, message } = event else { return false };
         matches!(self.exchanges.get(exchange), Some(Kind::SignIn))
             && matches!(w::SignInAnswer::decode(&w::CEILINGS, &mut Reader::new(message)), Ok(w::SignInAnswer::Refused))
     }
-    pub(crate) fn additional_receipts(&self, event: &Event) -> Vec<jig_client_world::harness::Receipt> {
+    #[must_use]
+    pub fn additional_receipts(&self, event: &Event) -> Vec<jig_client_world::harness::Receipt> {
         use jig_client_world::harness::Receipt;
         if let Event::Streamed { message: Streamed::Record(bytes) } = event {
             if let w::StreamEvent::Delivery(value) =
@@ -127,8 +138,11 @@ impl Wire {
             Some(Kind::Read(None) | Kind::SignIn | Kind::SignOut | Kind::Other) | None => Vec::new(),
         }
     }
-    pub(crate) fn received(&mut self, event: &Event) -> Vec<Received> {
-        let limits = crate::fixtures::link_limits();
+    pub fn received(&mut self, event: &Event) -> Vec<Received> {
+        self.received_with(event, crate::fixtures::link_limits())
+    }
+    /// Decode the same public bytes under the application's declared receiving profile.
+    pub fn received_with(&mut self, event: &Event, limits: jig_client_protocol_link::Limits) -> Vec<Received> {
         match event {
             Event::Reply { exchange, message } => match self.exchanges.remove(exchange) {
                 Some(Kind::Request) => {

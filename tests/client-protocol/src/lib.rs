@@ -5,8 +5,10 @@ mod engine;
 pub mod family;
 pub mod fixtures;
 mod front;
-mod net;
+pub mod net;
+pub use engine::{held_event, now_event, watcher};
 pub use front::Protocol;
+pub use front::observe;
 pub mod protocol {
     pub use crate::fixtures::world;
 }

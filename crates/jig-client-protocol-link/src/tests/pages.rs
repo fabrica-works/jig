@@ -78,6 +78,28 @@ fn a_escalation_record_becomes_its_literal_contract_value() {
         Ok(fixtures::read_value_escalation())
     );
 }
+#[test]
+fn owner_escalation_acts_fit_the_contract_bound() {
+    let mut limits = fixtures::limits();
+    limits.client.rows = 32;
+    let offered =
+        w::Offered::new(&limits.wire, w::OfferedParts { act: w::ActKind::Accept, admission: w::Admission::Allowed })
+            .unwrap();
+    let mut encoded = skein_lib::Writer::new(usize::try_from(offered.measure()).unwrap());
+    offered.encode(&mut encoded).unwrap();
+    let encoded = encoded.finish();
+    let mut acts = skein_lib::Writer::new(5 * (encoded.len() + 4));
+    for _ in 0_u32..5 {
+        skein_codec::piece::write(&mut acts, &encoded).unwrap();
+    }
+    let mut parts = fixtures::read_wire_owner_escalation().into_parts();
+    parts.acts = acts.finish();
+    let record = w::OwnerEscalation::new(&limits.wire, parts).unwrap();
+    let document = translate::pages::owner_escalation_fields(&record, &limits).unwrap();
+    assert_eq!(document.acts.len(), 5);
+    assert!(document.acts.capacity() <= c::MAX_OFFERED_ACTS);
+}
+
 fn a_owner_escalation_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::objects::owner_escalation(fixtures::read_wire_owner_escalation(), &fixtures::limits()),

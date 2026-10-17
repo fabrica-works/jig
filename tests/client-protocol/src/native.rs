@@ -333,6 +333,6 @@ impl Host for NativeClient {
     }
 }
 
-pub(crate) mod wire;
+pub mod wire;
 mod world;
 pub use world::{Outcome, run, run_terminal};

@@ -9,7 +9,7 @@ use skein_lib::{
 };
 use std::collections::BTreeMap;
 mod faults;
-mod observe;
+pub mod observe;
 pub(crate) mod persistence;
 pub(super) struct Side {
     wire: crate::native::wire::Wire,

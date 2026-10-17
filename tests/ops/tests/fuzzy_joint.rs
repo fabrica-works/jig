@@ -9,6 +9,7 @@ use jig_ops_client_domain::{Address, observability as obs};
 use jig_ops_domain as root;
 use jig_ops_world::joint::engine::Milestone;
 use jig_ops_world::joint::fixture;
+use sha2::{Digest, Sha256};
 use skein_fake_person::{Find, Step};
 use skein_lib::Duration;
 use skein_ui::Role;
@@ -557,19 +558,23 @@ fn assert_durable_end(
     assert_eq!(markers.len(), 1);
     assert_eq!(markers[0].0.person, 1);
     assert_eq!(markers[0].2, answers[0].0);
-    let (_, request, digest) =
-        jig_ops_world::joint::infrastructure::ask(jig_ops_client_domain::infrastructure::Ask::NativeMoveEnd {
-            object: skein_lib::Token::new(0),
-            project: 1,
-            environment: jig_ops_client_domain::infrastructure::native::Environment {
-                pool: environment.pool.clone(),
-                name: environment.name.clone(),
-            },
-            revision: jig_client_domain::contract::Revision { value: 0 },
-            until: 1_209_600,
-        })
-        .expect("the protocol hash includes all supplied owner facts, independent of the local view handle");
-    assert_eq!(request.revision, 0, "Q named the owner's seen end revision");
+    let requests: Vec<_> = engine
+        .peers
+        .application_bytes
+        .iter()
+        .filter(|(key, _)| *key == markers[0].0.key)
+        .map(|(_, bytes)| bytes)
+        .collect();
+    assert!(!requests.is_empty(), "Q's opaque request crossed the native byte boundary");
+    let digest: [u8; 32] = Sha256::digest(requests[0]).into();
+    assert!(requests.iter().all(|bytes| *bytes == requests[0]), "retries preserve the exact opaque request");
+    let request = engine
+        .peers
+        .application_asks
+        .iter()
+        .find(|(_, key, _, _)| *key == markers[0].0.key)
+        .expect("Q's request reached its owner");
+    assert_eq!(request.2.revision, 0, "Q named the owner's seen end revision");
     assert_eq!(
         markers[0].1.as_ref(),
         &jig_domain_people::Ask::Application {
@@ -734,7 +739,6 @@ fn assert_native_retries(world: &mut StoryWorld) {
 }
 
 #[test]
-#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn p_acceptance_survives_the_commit_before_its_durable_decision() {
     let mut baseline = p_story(531, Cut::None, false);
     let commit = position(&mut baseline, Milestone::Acceptance(6)) - 1;
@@ -744,7 +748,6 @@ fn p_acceptance_survives_the_commit_before_its_durable_decision() {
 }
 
 #[test]
-#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn p_acceptance_survives_its_durable_decision_commit() {
     let mut baseline = p_story(532, Cut::None, false);
     let commit = position(&mut baseline, Milestone::Acceptance(6));
@@ -754,7 +757,6 @@ fn p_acceptance_survives_its_durable_decision_commit() {
 }
 
 #[test]
-#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn p_acceptance_survives_the_commit_after_its_durable_decision() {
     let mut baseline = p_story(533, Cut::None, false);
     let commit = position(&mut baseline, Milestone::Acceptance(6)) + 1;
@@ -764,7 +766,6 @@ fn p_acceptance_survives_the_commit_after_its_durable_decision() {
 }
 
 #[test]
-#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn q_provision_survives_its_acceptance_commit_and_move_end_survives_reload() {
     let mut baseline = q_story(534, Cut::None, false, false);
     let commit = position(&mut baseline, Milestone::Acceptance(1));
@@ -773,7 +774,6 @@ fn q_provision_survives_its_acceptance_commit_and_move_end_survives_reload() {
 }
 
 #[test]
-#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn q_provision_survives_its_made_commit_and_move_end_survives_reload() {
     let mut baseline = q_story(535, Cut::None, false, false);
     let commit = position(&mut baseline, Milestone::Made);
@@ -782,7 +782,6 @@ fn q_provision_survives_its_made_commit_and_move_end_survives_reload() {
 }
 
 #[test]
-#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn q_move_end_survives_its_durable_answer_commit_and_reload() {
     let mut baseline = q_story(536, Cut::None, false, false);
     let commit = position(&mut baseline, Milestone::MoveEnd);
@@ -791,7 +790,6 @@ fn q_move_end_survives_its_durable_answer_commit_and_reload() {
 }
 
 #[test]
-#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn p_story_survives_seeded_commit_crashes_and_random_presses() {
     for seed in [537, 548] {
         let mut world = p_story(seed, Cut::Random { seed: seed ^ 0x33 }, true);
@@ -802,7 +800,6 @@ fn p_story_survives_seeded_commit_crashes_and_random_presses() {
 }
 
 #[test]
-#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn q_story_survives_seeded_commit_crashes_reload_and_random_presses() {
     for seed in [539, 540] {
         let mut world = q_story(seed, Cut::Random { seed: seed ^ 0x33 }, true, true);

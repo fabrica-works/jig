@@ -37,12 +37,16 @@ pub(super) fn callback(event: &jig_client::Event) -> Option<Callback> {
     }
 }
 
-pub(super) fn sent(request: &Request) -> Option<Sent> {
-    let Request::Client { request: ClientRequest::Exchange { exchange, message: Message::Request(bytes), .. } } =
-        request
-    else {
-        return None;
-    };
+#[must_use]
+pub fn sent(request: &Request) -> Option<Sent> {
+    let Request::Client { request } = request else { return None };
+    client_sent(request)
+}
+
+/// Observe a linked client's request independently of its application's root type.
+#[must_use]
+pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
+    let ClientRequest::Exchange { exchange, message: Message::Request(bytes), .. } = request else { return None };
     let keyed = w::Keyed::decode(&w::CEILINGS, &mut Reader::new(bytes)).expect("keyed bytes");
     let mut sent = Sent { attempt: *exchange, key: *keyed.key(), card: None, revision: None, words: None };
     match keyed.owner() {
@@ -111,7 +115,8 @@ pub(super) fn sent(request: &Request) -> Option<Sent> {
     Some(sent)
 }
 
-pub(super) fn receipts(fact: &Received) -> Vec<Receipt> {
+#[must_use]
+pub fn receipts(fact: &Received) -> Vec<Receipt> {
     let event = match fact {
         Received::Answer { attempt, answer } => Event::Client {
             event: jig_client::Event::Up {

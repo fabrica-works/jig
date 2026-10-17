@@ -97,7 +97,7 @@ impl Config {
     reason = "independent account, sign-in, application-request and document peers progress separately"
 )]
 pub struct Peers {
-    policy: r::Policy,
+    pub(crate) policy: r::Policy,
     applied: u64,
     observed: Vec<r::Observed>,
     application_observed: Vec<r::Observed>,

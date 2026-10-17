@@ -160,14 +160,14 @@ fn project(value: &d::FrameProjectRole, limits: &w::Limits) -> Result<w::Project
 fn charters(value: &d::OfferedCharter, limits: &w::Limits) -> Result<w::OfferedCharters, w::Problem> {
     let mut chats = List::with_capacity(1);
     chats.push(w::Charter::new(limits, w::CharterParts { number: value.chat, name: None })?).expect("one chat");
-    let mut goals = List::with_capacity(value.goals.capacity());
+    let mut goals = List::with_capacity(value.goals.len());
     for number in &value.goals {
         goals.push(w::Charter::new(limits, w::CharterParts { number: *number, name: None })?).expect("supplied goals");
     }
     w::OfferedCharters::new(limits, w::OfferedChartersParts { project: value.project, chats, goals, cut: value.cut })
 }
 pub fn frame(value: &d::Frame, limits: &w::Limits) -> Result<w::Frame, w::Problem> {
-    let mut projects = List::with_capacity(value.projects.capacity());
+    let mut projects = List::with_capacity(value.projects.len());
     for item in &value.projects {
         projects.push(project(item, limits)?).expect("supplied projects");
     }

@@ -250,7 +250,7 @@ pub(crate) fn proposal_fields(value: &w::Proposal, limits: &Limits) -> Result<c:
         waiting: crate::translate::facts::recipient(value.waiting(), limits),
         trail: passed_piece(value.trail(), limits, limits.client.rows)?,
         since: Wall::from_nanos(value.since()),
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
         ending: opt0,
     })
 }

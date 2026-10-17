@@ -38,7 +38,7 @@ pub(crate) fn owner_proposal_fields(value: &w::OwnerProposal, limits: &Limits) -
         as_holder: value.as_holder(),
         waiting: owner_proposal_waiting_fields(value.waiting(), limits),
         funding: list0,
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
     })
 }
 
@@ -47,7 +47,7 @@ pub(crate) fn owner_escalation_fields(
     limits: &Limits,
 ) -> Result<c::OwnerEscalation, w::Problem> {
     Ok(c::OwnerEscalation {
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
         task: Box::new(task_fields(value.task(), limits)?),
     })
 }
@@ -68,7 +68,7 @@ pub(crate) fn question_fields(value: &w::Question, limits: &Limits) -> Result<c:
         message: value.message(),
         words: text(value.words(), limits)?,
         since: Wall::from_nanos(value.since()),
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
         ending: opt1,
     })
 }
@@ -169,7 +169,7 @@ pub(crate) fn person_task_fields(value: &w::PersonTask, limits: &Limits) -> Resu
         since: opt1,
         stall: opt2,
         deadline: opt3,
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
         ending: opt4,
     })
 }
@@ -252,7 +252,7 @@ pub(crate) fn owner_person_task_fields(
         contract: task_contract_document_fields(value.contract(), limits)?,
         results: owner_shown_result_piece(value.results(), limits, limits.client.rows)?,
         cut: value.cut(),
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
     })
 }
 

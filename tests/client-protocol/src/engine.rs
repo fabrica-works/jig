@@ -242,7 +242,8 @@ impl Engine {
             .count()
     }
 }
-fn held_event(held: core::Held) -> Option<Event> {
+#[must_use]
+pub fn held_event(held: core::Held) -> Option<Event> {
     Some(match held {
         core::Held::PeopleReply { to, reply } => Event::Reply { to, reply },
         core::Held::Read { reply, answer } => Event::Read { reply, answer },
@@ -276,7 +277,8 @@ fn held_event(held: core::Held) -> Option<Event> {
         | core::Held::NotesDeleted { .. } => return None,
     })
 }
-fn now_event(now: core::Now) -> Option<Event> {
+#[must_use]
+pub fn now_event(now: core::Now) -> Option<Event> {
     Some(match now {
         core::Now::SignInRefused { to } => Event::SignInRefused { to },
         core::Now::WatchRefused { watcher, why } => Event::WatchRefused { watcher, why },
@@ -320,7 +322,8 @@ fn now_event(now: core::Now) -> Option<Event> {
     })
 }
 
-fn watcher(event: &core::Event) -> Option<Token> {
+#[must_use]
+pub fn watcher(event: &core::Event) -> Option<Token> {
     match event {
         core::Event::Watch { watcher, .. } | core::Event::WatchRun { watcher, .. } => Some(*watcher),
         core::Event::Fill { .. }

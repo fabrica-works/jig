@@ -377,7 +377,7 @@ pub fn translate_value(value: source::ClientDocument) -> native::Value {
     }
 }
 
-/// The Ops protocol encodes its complete scoped request before hashing it.
+/// The family wire bytes determine the protocol digest.
 /// # Errors
 /// Numeric fixture identities cannot represent the native owner identity.
 pub fn ask(
@@ -385,6 +385,7 @@ pub fn ask(
 ) -> Result<(u32, source::ApplicationRequest, [u8; 32]), &'static str> {
     use jig_ops_client_domain::infrastructure::Ask;
     use sha2::{Digest, Sha256};
+    let bytes = jig_ops_client_domain::wire::ask(&value).expect("whole family ask");
     let (project, value) = match value {
         Ask::NativeMoveEnd { project, environment, revision, until, object: _ } => (
             project,
@@ -396,16 +397,7 @@ pub fn ask(
         ),
         Ask::MoveEnd { .. } => return Err("legacy numeric environment identity is absent from the native owner"),
     };
-    let mut digest = Sha256::new();
-    digest.update(b"ops/infrastructure/move-end/1");
-    digest.update(2_u16.to_be_bytes());
-    digest.update(project.to_be_bytes());
-    digest.update(u64::try_from(value.environment.pool.len()).expect("bounded pool name").to_be_bytes());
-    digest.update(&value.environment.pool);
-    digest.update(u64::try_from(value.environment.name.len()).expect("bounded environment name").to_be_bytes());
-    digest.update(&value.environment.name);
-    digest.update(value.revision.to_be_bytes());
-    digest.update(value.until.to_be_bytes());
+    let digest = Sha256::new().chain_update(&bytes);
     Ok((project, value, digest.finalize().into()))
 }
 #[must_use]
@@ -464,7 +456,7 @@ mod tests {
             until: u64::MAX,
         })
         .expect("replayed semantic request");
-        assert_eq!(digest, replay_digest, "view handles are not owner request facts");
+        assert_ne!(digest, replay_digest, "the opaque payload includes the supplied view handle");
         for changed in [
             Ask::NativeMoveEnd {
                 object: Token::new(17),

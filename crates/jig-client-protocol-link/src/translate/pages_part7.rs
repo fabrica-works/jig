@@ -94,7 +94,7 @@ pub(crate) fn project_fields(value: &w::Project, limits: &Limits) -> Result<c::P
         services: list2,
         recurring: recurring_piece(value.recurring(), limits, limits.client.rows)?,
         parts: part_piece(value.parts(), limits, limits.client.rows)?,
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
     })
 }
 

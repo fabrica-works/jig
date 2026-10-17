@@ -1,5 +1,6 @@
 //! Ops vocabulary adapters on the generic App/Front/World and independent referee.
-mod app;
+pub(crate) mod app;
+pub(crate) mod callbacks;
 mod script;
 pub mod stories;
 mod transport;

@@ -15,6 +15,17 @@ use jig_ops_domain_observability as obs;
 #[must_use]
 pub fn limits() -> client::Limits {
     let mut limits = crate::client::limits();
+    // Navigation overlaps a page's closing watches with its successor's reads.
+    limits.client.exchanges = 16;
+    limits.client.domain.handles = 128;
+    limits.client.domain.watches = 64;
+    limits.client.domain.reads = 64;
+    limits.client.domain.text = 4096;
+    limits.client.domain.document_bytes = 262_144;
+    limits.client.domain.rows = 32;
+    limits.client.domain.projects = 7;
+    limits.client.domain.charters = 4;
+    limits.client.domain.delegates = 8;
     limits.jig.text = 4096;
     limits.jig.document_bytes = 262_144;
     limits.jig.rows = 32;
@@ -113,12 +124,7 @@ pub fn environment_world(seed: u64) -> World<Client, Joint> {
     world
 }
 fn world_for(seed: u64, story: Story) -> World<Client, Joint> {
-    let codec = jig_protocol_transcript::Limits {
-        smith: smith_transcript::v3::CEILINGS,
-        bytes: 32768,
-        turn: jig_client_domain::contract::TurnLimits { messages: 32, blocks: 32, text: 8192 },
-    };
-    let front = Joint::for_story(seed, limits(), codec, story);
+    let front = Joint::for_story(seed, limits(), story);
     let mut world = World::new(
         Settings { seed, heap_bytes_per_client: 64 * 1024 * 1024, iterations: 4096, ..Settings::default() },
         front,
@@ -155,6 +161,9 @@ pub fn alert(front: &mut Joint) {
         })));
     }
     front.engine.drain().expect("actual noise triage");
+    // Triage advances the independent engine; release its facts and packets
+    // only when the common client clock reaches the drain's completion.
+    front.due = Some(skein_lib::Time::from_nanos(front.engine.clock().now));
     front
         .engine
         .systems

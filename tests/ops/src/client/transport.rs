@@ -5,7 +5,7 @@ use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{self as engine, ApplicationScope, Envelope, Up};
 use jig_client_view::{self as client};
 use jig_client_world::{harness::*, observe};
-use jig_ops_client_domain::{self as domain, Event, JigOut, Request, infrastructure as infra, observability as obs};
+use jig_ops_client_domain::{self as domain, Event, Request, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
 use sha2::{Digest, Sha256};
 use skein_lib::{RequestEnvelope, Time, Token, Wall};
@@ -125,11 +125,21 @@ fn scope(subject: &Subject) -> ApplicationScope {
         }
     }
 }
-fn connector(channel: Channel) -> u16 {
-    match channel {
-        Channel::Observability => number(Connector::Observability),
-        Channel::Infrastructure => number(Connector::Infrastructure),
-        Channel::Jig => unreachable!("jig is not an application owner"),
+fn family_subject(record: &jig_client::Family) -> (Channel, Subject) {
+    match record.family {
+        1 => (
+            Channel::Observability,
+            Subject::Observability(
+                domain::wire::observability::subject_value(&record.bytes).expect("whole incident subject"),
+            ),
+        ),
+        2 => (
+            Channel::Infrastructure,
+            Subject::Infrastructure(
+                domain::wire::infrastructure::subject_value(&record.bytes).expect("whole environment subject"),
+            ),
+        ),
+        _ => panic!("declared family"),
     }
 }
 fn watch(channel: Channel, local: Token, event: WatchEvent) -> Event {
@@ -188,28 +198,29 @@ impl Front<Ops> for Scripted {
     fn bind(&mut self, client: ClientId, party: u64) {
         self.parties.insert(client, party);
         self.hellos.insert(client);
+        self.shell.push((client, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } }));
     }
-    #[expect(
-        clippy::too_many_lines,
-        reason = "the three owner wire vocabularies are exhaustively translated without interpreting payloads"
-    )]
     fn wire(&mut self, client: ClientId, now: Time, wall: Wall, request: Request) {
+        let Request::Client { request: jig_client::Request::Down { down } } = request else {
+            panic!("unlinked client transport")
+        };
         let party = self.parties[&client];
-        match request {
-            Request::Send { attempt, key, ask } => {
-                let channel = match &ask {
-                    domain::Ask::Jig(_) => Channel::Jig,
-                    domain::Ask::Infrastructure(_) => Channel::Infrastructure,
+        match down {
+            jig_client::Down::Send { attempt, key, request } => {
+                let channel = match &request {
+                    jig_client::Ask::Jig(_) => Channel::Jig,
+                    jig_client::Ask::Family(_) => Channel::Infrastructure,
                 };
                 let attempt = self.open(client, attempt, channel);
                 self.last_attempt = Some(attempt);
-                match ask {
-                    domain::Ask::Jig(ask) => {
+                match request {
+                    jig_client::Ask::Jig(ask) => {
                         self.engine.send(now, wall, party, key, attempt, *ask).expect("jig send admitted");
                     }
-                    domain::Ask::Infrastructure(ask) => {
+                    jig_client::Ask::Family(record) => {
+                        let ask = domain::wire::ask_value(&record.bytes).expect("whole infrastructure request");
                         let infra::Ask::MoveEnd { project, environment, revision, until } = &ask else {
-                            panic!("native environments use the actual joint front");
+                            panic!("native environments use joint front")
                         };
                         let mut canonical = Sha256::new();
                         canonical.update(b"Ops.MoveEnd.v1");
@@ -233,129 +244,46 @@ impl Front<Ops> for Scripted {
                     }
                 }
             }
-            Request::Jig(JigOut::Read { read, what }) => {
-                self.last_object = match &what {
-                    Read::Task { task } => Some(ObjectKey::Task(*task)),
-                    Read::Proposal { proposal } => Some(ObjectKey::Proposal(*proposal)),
-                    Read::Escalation { task } => Some(ObjectKey::Escalation(*task)),
-                    Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
-                    Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
-                    Read::Result { task } => Some(ObjectKey::Result(*task)),
-                    Read::Frame
-                    | Read::Ended { .. }
-                    | Read::History { .. }
-                    | Read::Activity { .. }
-                    | Read::Inbox { .. }
-                    | Read::Conversations { .. }
-                    | Read::Goals { .. }
-                    | Read::Spend { .. }
-                    | Read::Project { .. }
-                    | Read::Notes { .. }
-                    | Read::Deployment => self.last_object,
-                };
+            jig_client::Down::Read { read, what: jig_client::Readable::Jig(what) } => {
+                self.last_object = self.read_object(&what);
                 let token = self.open(client, read, Channel::Jig);
                 self.engine.read(now, party, token, what).expect("jig read admitted");
             }
-            Request::Jig(JigOut::Open { watch, subject }) => {
+            jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(subject) } => {
                 let token = self.open(client, watch, Channel::Jig);
                 self.last_watch = Some(token);
                 self.engine.open(now, party, token, subject).expect("jig watch admitted");
             }
-            Request::Jig(JigOut::Continue { watch, subject }) => {
+            jig_client::Down::Continue { watch, subject } => {
                 let token = self.token(client, watch, Channel::Jig).expect("live run route");
                 let SubjectRun { turn, offset } = run_position(&subject);
-                {
-                    self.engine.continue_run(token, turn, offset).expect("continue live run");
-                }
+                self.engine.continue_run(token, turn, offset).expect("continue live run");
             }
-            Request::Jig(JigOut::Close { watch }) => {
-                if let Some(token) = self.token(client, watch, Channel::Jig) {
+            jig_client::Down::Close { watch } => {
+                if let Some(token) = self
+                    .routes
+                    .iter()
+                    .find_map(|(token, route)| (route.client == client && route.local == watch).then_some(*token))
+                {
                     self.engine.close(now, token);
                 }
             }
-            Request::Observability(out) => match out {
-                obs::Out::Read { read, subject } => {
-                    let token = self.open(client, read, Channel::Observability);
-                    let subject = Subject::Observability(subject);
-                    self.engine
-                        .read_scoped_application(
-                            now,
-                            party,
-                            token,
-                            connector(Channel::Observability),
-                            scope(&subject),
-                            &subject,
-                        )
-                        .expect("incident read admitted");
-                }
-                obs::Out::Open { watch, subject } => {
-                    let token = self.open(client, watch, Channel::Observability);
-                    self.last_watch = Some(token);
-                    let subject = Subject::Observability(subject);
-                    self.engine
-                        .open_scoped_application(
-                            now,
-                            party,
-                            token,
-                            connector(Channel::Observability),
-                            scope(&subject),
-                            subject,
-                        )
-                        .expect("incident watch admitted");
-                }
-                obs::Out::Close { watch } => {
-                    if let Some(token) = self.token(client, watch, Channel::Observability) {
-                        self.engine.close(now, token);
-                    }
-                }
-                obs::Out::Fact { .. } => unreachable!("facts classified by shell"),
-            },
-            Request::Infrastructure(out) => match out {
-                infra::Out::Read { read, subject } => {
-                    let token = self.open(client, read, Channel::Infrastructure);
-                    let subject = Subject::Infrastructure(subject);
-                    self.engine
-                        .read_scoped_application(
-                            now,
-                            party,
-                            token,
-                            connector(Channel::Infrastructure),
-                            scope(&subject),
-                            &subject,
-                        )
-                        .expect("environment read admitted");
-                }
-                infra::Out::Open { watch, subject } => {
-                    let token = self.open(client, watch, Channel::Infrastructure);
-                    self.last_watch = Some(token);
-                    let subject = Subject::Infrastructure(subject);
-                    self.engine
-                        .open_scoped_application(
-                            now,
-                            party,
-                            token,
-                            connector(Channel::Infrastructure),
-                            scope(&subject),
-                            subject,
-                        )
-                        .expect("environment watch admitted");
-                }
-                infra::Out::Close { watch } => {
-                    if let Some(token) = self.token(client, watch, Channel::Infrastructure) {
-                        self.engine.close(now, token);
-                    }
-                }
-                infra::Out::Fact { .. } => unreachable!("facts classified by shell"),
-            },
-            Request::Save { .. }
-            | Request::Erase { .. }
-            | Request::Show { .. }
-            | Request::SignOut
-            | Request::SignIn { .. }
-            | Request::Fact { .. }
-            | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. }) => {
-                unreachable!("nonwire shell obligation")
+            jig_client::Down::Read { read, what: jig_client::Readable::Family(record) } => {
+                let (channel, subject) = family_subject(&record);
+                let token = self.open(client, read, channel);
+                self.engine
+                    .read_scoped_application(now, party, token, record.family, scope(&subject), &subject)
+                    .expect("family read admitted");
             }
+            jig_client::Down::Open { watch, subject: jig_client::Watchable::Family(record) } => {
+                let (channel, subject) = family_subject(&record);
+                let token = self.open(client, watch, channel);
+                self.last_watch = Some(token);
+                self.engine
+                    .open_scoped_application(now, party, token, record.family, scope(&subject), subject)
+                    .expect("family watch admitted");
+            }
+            jig_client::Down::Save { .. } | jig_client::Down::Erase { .. } => panic!("stores remain shell duties"),
         }
     }
     fn poll(&mut self, now: Time, wall: Wall) -> Vec<(ClientId, Event)> {
@@ -392,21 +320,21 @@ impl Front<Ops> for Scripted {
             let local = route.local;
             let event = match up {
                 Up::Answer { envelope: env, answer, .. } => {
-                    Event::Answer { attempt: local, envelope: envelope(env), answer: answer.map(domain::Answered::Jig) }
+                    super::callbacks::answer(local, envelope(env), answer.map(domain::Answered::Jig))
                 }
-                Up::ApplicationAnswer { envelope: env, answer, .. } => Event::Answer {
-                    attempt: local,
-                    envelope: envelope(env),
-                    answer: answer.map(|result| {
+                Up::ApplicationAnswer { envelope: env, answer, .. } => super::callbacks::answer(
+                    local,
+                    envelope(env),
+                    answer.map(|result| {
                         domain::Answered::Infrastructure(match result {
                             Ok(answer) => answer,
                             Err(refusal) => infra::Answer::EntranceRefused(
                                 jig_client_domain::contract::EntranceRefusal::new(refusal)
-                                    .expect("scripted engine supplies bounded entrance facts"),
+                                    .expect("bounded entrance facts"),
                             ),
                         })
                     }),
-                },
+                ),
                 Up::Read { terminal, .. } => Event::Jig(client::Event::Read { read: local, result: terminal }),
                 Up::Watch { event, .. } => watch(route.channel, local, event),
                 Up::App { document, .. } => match document {
@@ -458,7 +386,7 @@ impl Front<Ops> for Scripted {
             };
             delivered.push((route.client, event));
         }
-        delivered
+        super::callbacks::events(delivered)
     }
     fn next_due(&self) -> Option<Time> {
         if !self.hellos.is_empty() || !self.shell.is_empty() {
@@ -526,6 +454,7 @@ impl Front<Ops> for Scripted {
     }
     fn reload(&mut self, client: ClientId, now: Time) {
         self.hellos.insert(client);
+        self.shell.push((client, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } }));
         let abandoned: Vec<_> =
             self.routes.iter().filter_map(|(token, route)| (route.client == client).then_some(*token)).collect();
         for token in abandoned {
@@ -534,28 +463,23 @@ impl Front<Ops> for Scripted {
         }
     }
     fn received(&mut self, client: ClientId, event: &Event) {
-        let selected = match event {
-            Event::Jig(client::Event::Watch { watch, event: WatchEvent::Delivered(_), .. }) => {
-                Some((*watch, Channel::Jig))
-            }
-            Event::Observability(obs::Event::Watch { watch, event: obs::WatchEvent::Delivered(_) }) => {
-                Some((*watch, Channel::Observability))
-            }
-            Event::Infrastructure(infra::Event::Watch { watch, event: infra::WatchEvent::Delivered(_) }) => {
-                Some((*watch, Channel::Infrastructure))
-            }
+        let (local, channel) = match event {
+            Event::Client {
+                event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(_) } },
+            } => (*watch, Channel::Jig),
+            Event::Client {
+                event: jig_client::Event::Up { up: jig_client::Up::FamilyDelivered { watch, record } },
+            } => (*watch, if record.family == 1 { Channel::Observability } else { Channel::Infrastructure }),
             Event::Start { .. }
             | Event::Went { .. }
             | Event::Act { .. }
-            | Event::Answer { .. }
+            | Event::Client { .. }
             | Event::Jig(_)
-            | Event::Observability(_)
             | Event::Infrastructure(_)
-            | Event::SignedOut => None,
+            | Event::Observability(_)
+            | Event::SignedOut => return,
         };
-        if let Some((local, channel)) = selected
-            && let Some(token) = self.token(client, local, channel)
-        {
+        if let Some(token) = self.token(client, local, channel) {
             self.engine.taken(token);
         }
     }
@@ -688,5 +612,29 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
         | engine::Change::Deployment(_)
         | engine::Change::Tree(_)
         | engine::Change::Seen { .. } => {}
+    }
+}
+
+impl Scripted {
+    fn read_object(&self, what: &Read) -> Option<ObjectKey> {
+        match what {
+            Read::Task { task } => Some(ObjectKey::Task(*task)),
+            Read::Proposal { proposal } => Some(ObjectKey::Proposal(*proposal)),
+            Read::Escalation { task } => Some(ObjectKey::Escalation(*task)),
+            Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
+            Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
+            Read::Result { task } => Some(ObjectKey::Result(*task)),
+            Read::Frame
+            | Read::Ended { .. }
+            | Read::History { .. }
+            | Read::Activity { .. }
+            | Read::Inbox { .. }
+            | Read::Conversations { .. }
+            | Read::Goals { .. }
+            | Read::Spend { .. }
+            | Read::Project { .. }
+            | Read::Notes { .. }
+            | Read::Deployment => self.last_object,
+        }
     }
 }

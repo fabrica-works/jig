@@ -352,7 +352,10 @@ fn ops_client_domain_is_step_code_with_only_client_and_connector_vocabulary() {
     assert_eq!(roots.len(), 1);
     let mut dependencies = roots[0].dependencies.clone();
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-client-domain", "jig-client-view", "jig-ops-domain-connectors", "skein-lib"]);
+    assert_eq!(
+        dependencies,
+        ["jig-client", "jig-client-view", "jig-ops-client-protocol-wire", "jig-ops-domain-connectors", "skein-lib"]
+    );
     let source = fs::read_to_string(kit_root().join("examples/ops/client-domain/src/lib.rs")).expect("domain source");
     assert!(source.contains("cfg_attr(not(test), no_std)"));
     assert!(source.contains("forbid(unsafe_code)"));
@@ -367,9 +370,10 @@ fn ops_client_view_is_step_code_with_only_client_and_connector_vocabulary() {
     assert_eq!(
         dependencies,
         [
-            "jig-client-domain",
+            "jig-client",
             "jig-client-view",
             "jig-ops-client-domain",
+            "jig-ops-client-protocol-wire",
             "jig-ops-domain-connectors",
             "skein-lib",
             "skein-ui"

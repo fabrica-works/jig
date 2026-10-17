@@ -35,7 +35,7 @@ struct Socket {
     fail: bool,
     upload_limit: Option<usize>,
 }
-pub(super) struct Net {
+pub struct Net {
     sockets: BTreeMap<Token, Socket>,
     names: BTreeMap<(ClientId, Conn), Token>,
     next: u64,
@@ -49,6 +49,7 @@ pub(super) struct Net {
     offline: Option<Time>,
 }
 impl Net {
+    #[must_use]
     pub fn new(seed: u64) -> Self {
         Self {
             sockets: BTreeMap::new(),
@@ -76,6 +77,7 @@ impl Net {
     pub fn offline(&mut self, until: Time) {
         self.offline = Some(until);
     }
+    #[must_use]
     pub fn unread(&self, client: ClientId) -> bool {
         self.slow.is_some_and(|(id, until)| id == client && until > self.now)
             && self
@@ -83,6 +85,7 @@ impl Net {
                 .values()
                 .any(|socket| socket.client == client && !socket.broken && !socket.closed && stream(socket))
     }
+    #[must_use]
     pub fn next_due(&self) -> Option<Time> {
         self.slow.map(|(_, at)| at).into_iter().chain(self.offline).min()
     }
@@ -235,7 +238,12 @@ impl Net {
             socket.engine.eof = socket.shell.finished;
             let mut record_changed = false;
             let slow = self.slow.is_some_and(|(client, _)| client == socket.client && stream(socket));
-            if !slow && let Some(up) = socket.shell.answer() {
+            let shell_progress = socket.shell.trace.len();
+            let shell_up = if slow { None } else { socket.shell.answer() };
+            // A seeded Wire may buffer a fragment before it can answer a
+            // complete line. That is progress even without a callback.
+            changed |= socket.shell.trace.len() != shell_progress;
+            if let Some(up) = shell_up {
                 if let Up::Bytes(bytes) = &up {
                     socket.response.extend_from_slice(bytes);
                     record_changed = true;
@@ -246,6 +254,7 @@ impl Net {
                 clients.push((socket.client, socket.conn, up));
                 changed = true;
             }
+            let engine_progress = socket.engine.trace.len();
             if !slow
                 && !socket.closed
                 && let Some(owner) = socket.owner
@@ -258,6 +267,7 @@ impl Net {
                 events.push(Event::Stream { owner, up });
                 changed = true;
             }
+            changed |= socket.engine.trace.len() != engine_progress;
             if record_changed {
                 check(socket, rules);
             }

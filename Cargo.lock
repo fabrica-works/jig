@@ -702,7 +702,6 @@ name = "jig-ops-client-domain"
 version = "0.0.0"
 dependencies = [
  "jig-client",
- "jig-client-domain",
  "jig-client-view",
  "jig-ops-client-protocol-wire",
  "jig-ops-domain-connectors",
@@ -721,9 +720,10 @@ dependencies = [
 name = "jig-ops-client-view"
 version = "0.0.0"
 dependencies = [
- "jig-client-domain",
+ "jig-client",
  "jig-client-view",
  "jig-ops-client-domain",
+ "jig-ops-client-protocol-wire",
  "jig-ops-domain-connectors",
  "skein-lib",
  "skein-ui",
@@ -785,7 +785,11 @@ version = "0.0.0"
 dependencies = [
  "jig-client",
  "jig-client-domain",
+ "jig-client-protocol-link",
+ "jig-client-protocol-wire",
+ "jig-client-protocol-world",
  "jig-client-scripted-engine",
+ "jig-client-shell-native",
  "jig-client-test-domain",
  "jig-client-view",
  "jig-client-world",
@@ -802,6 +806,7 @@ dependencies = [
  "jig-domain-views",
  "jig-fake-store",
  "jig-ops-client-domain",
+ "jig-ops-client-protocol-wire",
  "jig-ops-client-view",
  "jig-ops-domain",
  "jig-ops-domain-connectors",
@@ -809,12 +814,14 @@ dependencies = [
  "jig-ops-domain-observability",
  "jig-ops-fake-production",
  "jig-protocol-charter",
+ "jig-protocol-engine-clients",
  "jig-protocol-tools",
  "jig-protocol-transcript",
  "jig-test-domain",
  "jig-test-system",
  "sha2",
  "skein-fake-person",
+ "skein-io",
  "skein-json",
  "skein-lib",
  "skein-ui",

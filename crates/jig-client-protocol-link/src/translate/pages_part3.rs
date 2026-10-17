@@ -152,7 +152,7 @@ pub(crate) fn note_fields(value: &w::Note, limits: &Limits) -> Result<c::Note, w
         writer: note_author_fields(value.writer(), limits),
         tasks: list0,
         changed: opt1,
-        acts: offered_piece(value.acts(), limits, limits.client.rows)?,
+        acts: offered_piece(value.acts(), limits, c::MAX_OFFERED_ACTS)?,
         cut: value.cut(),
     })
 }
