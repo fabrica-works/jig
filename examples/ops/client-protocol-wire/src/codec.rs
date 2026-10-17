@@ -87,6 +87,24 @@ pub mod infrastructure {
         }
         Ok(record)
     }
+    /// Encode the owner's read answer, including a refusal.
+    #[must_use]
+    pub fn read_answer(value: &w::InfrastructureReadAnswer) -> Box<[u8]> {
+        let mut writer = Writer::new(usize::try_from(value.measure()).expect("bounded read answer"));
+        value.encode(&mut writer).expect("measured read answer");
+        writer.finish()
+    }
+    /// Decode a whole owner read answer.
+    pub fn read_answer_value(bytes: &[u8]) -> Result<w::InfrastructureReadAnswer, Undecodable> {
+        let mut reader = Reader::new(bytes);
+        let Ok(record) = w::InfrastructureReadAnswer::decode(&w::CEILINGS, &mut reader) else {
+            return Err(Undecodable);
+        };
+        if reader.remaining() != 0 {
+            return Err(Undecodable);
+        }
+        Ok(record)
+    }
 }
 
 pub mod observability {
@@ -124,6 +142,24 @@ pub mod observability {
     pub fn document(bytes: &[u8]) -> Result<w::ObservabilityDocumentRecord, Undecodable> {
         let mut reader = Reader::new(bytes);
         let Ok(record) = w::ObservabilityDocumentRecord::decode(&w::CEILINGS, &mut reader) else {
+            return Err(Undecodable);
+        };
+        if reader.remaining() != 0 {
+            return Err(Undecodable);
+        }
+        Ok(record)
+    }
+    /// Encode the owner's read answer, including a refusal.
+    #[must_use]
+    pub fn read_answer(value: &w::ObservabilityReadAnswer) -> Box<[u8]> {
+        let mut writer = Writer::new(usize::try_from(value.measure()).expect("bounded read answer"));
+        value.encode(&mut writer).expect("measured read answer");
+        writer.finish()
+    }
+    /// Decode a whole owner read answer.
+    pub fn read_answer_value(bytes: &[u8]) -> Result<w::ObservabilityReadAnswer, Undecodable> {
+        let mut reader = Reader::new(bytes);
+        let Ok(record) = w::ObservabilityReadAnswer::decode(&w::CEILINGS, &mut reader) else {
             return Err(Undecodable);
         };
         if reader.remaining() != 0 {

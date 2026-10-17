@@ -4,7 +4,7 @@ use crate::{
     bindings::{Bindings, Meaning},
     words::{Word, Words},
 };
-use jig_client_domain::contract::{Part, Proposer};
+use jig_client::contract::{Part, Proposer};
 use jig_client_view::Owner;
 use jig_ops_client_domain::{
     Action,
@@ -104,7 +104,7 @@ fn show_object(
                         native_form(
                             builder,
                             id,
-                            jig_client_domain::contract::Revision { value: *end_revision },
+                            jig_client::contract::Revision { value: *end_revision },
                             until,
                             object,
                             words,
@@ -163,7 +163,7 @@ fn form(
 fn native_form(
     builder: &mut Builder,
     id: Id<infrastructure::Object>,
-    revision: jig_client_domain::contract::Revision,
+    revision: jig_client::contract::Revision,
     until: u64,
     object: &infrastructure::Object,
     words: &Words,

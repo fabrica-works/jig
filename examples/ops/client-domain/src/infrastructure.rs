@@ -15,7 +15,7 @@ pub mod native;
 use alloc::boxed::Box;
 pub use documents::{Answer, Ask};
 pub use documents::{Document, Kind, ReadResult, Scope, Subject, WatchEnd, WatchEvent};
-use jig_client_domain::contract::{Part, Revision};
+use jig_client::contract::{Part, Revision};
 use jig_client_view::{frame::me::FrameShown, link::Link};
 use skein_lib::{Env, Id, List, Map, Queue, RequestProgress, Slab, Time, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -99,7 +99,7 @@ pub enum Request {
     Save { record: Record },
     Send { request: Token, scope: u64, ask: Ask },
     Out(Out),
-    ShowObjects { objects: List<jig_client_domain::contract::ObjectKey> },
+    ShowObjects { objects: List<jig_client::contract::ObjectKey> },
     ObjectsLeft,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -829,7 +829,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total
         .checked_add(List::<Subject>::worst_case(limits.objects)?)?
         .checked_add(List::<Id<Watching>>::worst_case(limits.watches)?)?;
-    total.checked_add(List::<jig_client_domain::contract::ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)
+    total.checked_add(List::<jig_client::contract::ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)
 }
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
@@ -953,7 +953,7 @@ fn progress_changed(
 
 fn part_fits(part: &Part, segments: u32, text: u32) -> bool {
     match part {
-        Part::Resource { path, .. } => jig_client_domain::contract::resource_path_fits(path, segments, text),
+        Part::Resource { path, .. } => jig_client::contract::resource_path_fits(path, segments, text),
         Part::Connector { .. }
         | Part::Kind { .. }
         | Part::Panel { .. }

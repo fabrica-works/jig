@@ -5,7 +5,7 @@ use crate::{
     drawing,
     words::{Word, Words},
 };
-use jig_client_domain::contract::{ObjectKey, Part, Proposer};
+use jig_client::contract::{ObjectKey, Part, Proposer};
 use jig_client_view::Owner;
 use jig_ops_client_domain::{
     Action,

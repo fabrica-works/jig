@@ -1321,6 +1321,30 @@ pub enum Path {
     InfrastructureDocumentRecordVersion,
     /// Bytes after `InfrastructureDocumentRecord`.
     InfrastructureDocumentRecordTail,
+    /// The `value` field of `InfrastructureReadValue`.
+    InfrastructureReadValueValue,
+    /// Bytes after `InfrastructureReadValue`.
+    InfrastructureReadValueTail,
+    /// The tag of `InfrastructureReadResult`.
+    InfrastructureReadResultTag,
+    /// The `value` field of `InfrastructureReadAnswer`.
+    InfrastructureReadAnswerValue,
+    /// The version of `InfrastructureReadAnswer`.
+    InfrastructureReadAnswerVersion,
+    /// Bytes after `InfrastructureReadAnswer`.
+    InfrastructureReadAnswerTail,
+    /// The `value` field of `ObservabilityReadValue`.
+    ObservabilityReadValueValue,
+    /// Bytes after `ObservabilityReadValue`.
+    ObservabilityReadValueTail,
+    /// The tag of `ObservabilityReadResult`.
+    ObservabilityReadResultTag,
+    /// The `value` field of `ObservabilityReadAnswer`.
+    ObservabilityReadAnswerValue,
+    /// The version of `ObservabilityReadAnswer`.
+    ObservabilityReadAnswerVersion,
+    /// Bytes after `ObservabilityReadAnswer`.
+    ObservabilityReadAnswerTail,
 }
 
 /// A decoding or bound failure at a schema path.
@@ -9334,6 +9358,204 @@ impl InfrastructureDocumentRecord {
     }
 }
 
+/// Movable fields of `InfrastructureReadValue`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct InfrastructureReadValueParts {
+    /// The `value` field.
+    pub value: InfrastructureDocument,
+}
+
+/// `InfrastructureReadValue` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct InfrastructureReadValue {
+    value: InfrastructureDocument,
+}
+
+impl InfrastructureReadValue {
+    /// Makes a value within the given limits.
+    pub fn new(limits: &Limits, parts: InfrastructureReadValueParts) -> Result<Self, Problem> {
+        let InfrastructureReadValueParts { value } = parts;
+        let value = Self { value };
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    /// Reads the `value` field.
+    #[must_use]
+    pub fn value(&self) -> &InfrastructureDocument { &self.value }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> InfrastructureReadValueParts { InfrastructureReadValueParts { value: self.value } }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        self.value.check(limits)?;
+        Ok(())
+    }
+}
+
+/// `InfrastructureReadResult` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum InfrastructureReadResult {
+    /// `value` carrying `Box<InfrastructureReadValue>`.
+    Value(Box<InfrastructureReadValue>),
+    /// `unknown` without a payload.
+    Unknown,
+    /// `not_allowed` without a payload.
+    NotAllowed,
+}
+
+impl InfrastructureReadResult {
+    /// Checks the payload against the given limits.
+    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        match self {
+            Self::Value(record) => InfrastructureReadValue::check(record, limits),
+            Self::Unknown | Self::NotAllowed => Ok(()),
+        }?;
+        Ok(())
+    }
+}
+
+/// Movable fields of `InfrastructureReadAnswer`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct InfrastructureReadAnswerParts {
+    /// The `value` field.
+    pub value: InfrastructureReadResult,
+}
+
+/// `InfrastructureReadAnswer` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct InfrastructureReadAnswer {
+    value: InfrastructureReadResult,
+}
+
+impl InfrastructureReadAnswer {
+    /// Makes a value within the given limits.
+    pub fn new(limits: &Limits, parts: InfrastructureReadAnswerParts) -> Result<Self, Problem> {
+        let InfrastructureReadAnswerParts { value } = parts;
+        let value = Self { value };
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    /// Reads the `value` field.
+    #[must_use]
+    pub fn value(&self) -> &InfrastructureReadResult { &self.value }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> InfrastructureReadAnswerParts { InfrastructureReadAnswerParts { value: self.value } }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        self.value.check(limits)?;
+        Ok(())
+    }
+}
+
+/// Movable fields of `ObservabilityReadValue`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ObservabilityReadValueParts {
+    /// The `value` field.
+    pub value: ObservabilityDocument,
+}
+
+/// `ObservabilityReadValue` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ObservabilityReadValue {
+    value: ObservabilityDocument,
+}
+
+impl ObservabilityReadValue {
+    /// Makes a value within the given limits.
+    pub fn new(limits: &Limits, parts: ObservabilityReadValueParts) -> Result<Self, Problem> {
+        let ObservabilityReadValueParts { value } = parts;
+        let value = Self { value };
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    /// Reads the `value` field.
+    #[must_use]
+    pub fn value(&self) -> &ObservabilityDocument { &self.value }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> ObservabilityReadValueParts { ObservabilityReadValueParts { value: self.value } }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        self.value.check(limits)?;
+        Ok(())
+    }
+}
+
+/// `ObservabilityReadResult` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ObservabilityReadResult {
+    /// `value` carrying `Box<ObservabilityReadValue>`.
+    Value(Box<ObservabilityReadValue>),
+    /// `unknown` without a payload.
+    Unknown,
+    /// `not_allowed` without a payload.
+    NotAllowed,
+}
+
+impl ObservabilityReadResult {
+    /// Checks the payload against the given limits.
+    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        match self {
+            Self::Value(record) => ObservabilityReadValue::check(record, limits),
+            Self::Unknown | Self::NotAllowed => Ok(()),
+        }?;
+        Ok(())
+    }
+}
+
+/// Movable fields of `ObservabilityReadAnswer`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ObservabilityReadAnswerParts {
+    /// The `value` field.
+    pub value: ObservabilityReadResult,
+}
+
+/// `ObservabilityReadAnswer` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ObservabilityReadAnswer {
+    value: ObservabilityReadResult,
+}
+
+impl ObservabilityReadAnswer {
+    /// Makes a value within the given limits.
+    pub fn new(limits: &Limits, parts: ObservabilityReadAnswerParts) -> Result<Self, Problem> {
+        let ObservabilityReadAnswerParts { value } = parts;
+        let value = Self { value };
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    /// Reads the `value` field.
+    #[must_use]
+    pub fn value(&self) -> &ObservabilityReadResult { &self.value }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> ObservabilityReadAnswerParts { ObservabilityReadAnswerParts { value: self.value } }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        self.value.check(limits)?;
+        Ok(())
+    }
+}
+
 impl DecisionTask {
     /// Measures this record's wire encoding.
     #[must_use]
@@ -17306,6 +17528,212 @@ impl InfrastructureDocumentRecord {
     }
 }
 
+impl InfrastructureReadValue {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        let field_value = &self.value;
+        size = size.checked_add(field_value.measure()).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        let field_value = &self.value;
+        field_value.encode(writer)?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::InfrastructureReadValueTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let decoded_value = InfrastructureDocument::decode_from(limits, reader)?;
+        Ok(Self { value: decoded_value })
+    }
+}
+
+impl InfrastructureReadResult {
+    /// Measures this variant's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        match self {
+            Self::Value(record) => 1_u32.checked_add(InfrastructureReadValue::measure(record)).expect("schema ceilings fit u32"),
+            Self::Unknown | Self::NotAllowed => 1,
+        }
+    }
+
+    /// Writes this variant's tag and payload.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        match self {
+            Self::Value(record) => { writer.put(&[0_u8])?; record.encode(writer)?; }
+            Self::Unknown => writer.put(&[1_u8])?,
+            Self::NotAllowed => writer.put(&[2_u8])?,
+        }
+        Ok(())
+    }
+
+    /// Reads a whole variant and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::InfrastructureReadResultTag, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let tag = reader.u8().ok_or(Problem { path: Path::InfrastructureReadResultTag, reason: skein_codec::Reason::Short })?;
+        let value = match tag {
+            0 => Self::Value(Box::new(InfrastructureReadValue::decode_from(limits, reader)?)),
+            1 => Self::Unknown,
+            2 => Self::NotAllowed,
+            _ => return Err(Problem { path: Path::InfrastructureReadResultTag, reason: skein_codec::Reason::Tag }),
+        };
+        Ok(value)
+    }
+}
+
+impl InfrastructureReadAnswer {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        size = size.checked_add(2).expect("schema ceilings fit u32");
+        let field_value = &self.value;
+        size = size.checked_add(field_value.measure()).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        writer.put(&1_u16.to_be_bytes())?;
+        let field_value = &self.value;
+        field_value.encode(writer)?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::InfrastructureReadAnswerTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let version = reader.u16().ok_or(Problem { path: Path::InfrastructureReadAnswerVersion, reason: skein_codec::Reason::Short })?;
+        if version != 1 { return Err(Problem { path: Path::InfrastructureReadAnswerVersion, reason: skein_codec::Reason::Version }); }
+        let decoded_value = InfrastructureReadResult::decode_from(limits, reader)?;
+        Ok(Self { value: decoded_value })
+    }
+}
+
+impl ObservabilityReadValue {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        let field_value = &self.value;
+        size = size.checked_add(field_value.measure()).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        let field_value = &self.value;
+        field_value.encode(writer)?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::ObservabilityReadValueTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let decoded_value = ObservabilityDocument::decode_from(limits, reader)?;
+        Ok(Self { value: decoded_value })
+    }
+}
+
+impl ObservabilityReadResult {
+    /// Measures this variant's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        match self {
+            Self::Value(record) => 1_u32.checked_add(ObservabilityReadValue::measure(record)).expect("schema ceilings fit u32"),
+            Self::Unknown | Self::NotAllowed => 1,
+        }
+    }
+
+    /// Writes this variant's tag and payload.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        match self {
+            Self::Value(record) => { writer.put(&[0_u8])?; record.encode(writer)?; }
+            Self::Unknown => writer.put(&[1_u8])?,
+            Self::NotAllowed => writer.put(&[2_u8])?,
+        }
+        Ok(())
+    }
+
+    /// Reads a whole variant and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::ObservabilityReadResultTag, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let tag = reader.u8().ok_or(Problem { path: Path::ObservabilityReadResultTag, reason: skein_codec::Reason::Short })?;
+        let value = match tag {
+            0 => Self::Value(Box::new(ObservabilityReadValue::decode_from(limits, reader)?)),
+            1 => Self::Unknown,
+            2 => Self::NotAllowed,
+            _ => return Err(Problem { path: Path::ObservabilityReadResultTag, reason: skein_codec::Reason::Tag }),
+        };
+        Ok(value)
+    }
+}
+
+impl ObservabilityReadAnswer {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        size = size.checked_add(2).expect("schema ceilings fit u32");
+        let field_value = &self.value;
+        size = size.checked_add(field_value.measure()).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        writer.put(&1_u16.to_be_bytes())?;
+        let field_value = &self.value;
+        field_value.encode(writer)?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::ObservabilityReadAnswerTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let version = reader.u16().ok_or(Problem { path: Path::ObservabilityReadAnswerVersion, reason: skein_codec::Reason::Short })?;
+        if version != 1 { return Err(Problem { path: Path::ObservabilityReadAnswerVersion, reason: skein_codec::Reason::Version }); }
+        let decoded_value = ObservabilityReadResult::decode_from(limits, reader)?;
+        Ok(Self { value: decoded_value })
+    }
+}
+
 impl DecisionTask {
     /// Maximum encoded bytes under these limits.
     #[must_use]
@@ -22750,6 +23178,174 @@ impl InfrastructureDocumentRecord {
     }
 }
 
+impl InfrastructureReadValue {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 0_u64;
+        size = size.checked_add(InfrastructureDocument::worst_case_bytes_within(limits)?)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(InfrastructureDocument::worst_case_heap_within(limits)?)?;
+        heap.checked_add(0)
+    }
+}
+
+impl InfrastructureReadResult {
+    /// Maximum encoded bytes among variants.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut biggest = 0_u64;
+        biggest = biggest.max(InfrastructureReadValue::worst_case_bytes_within(limits)?);
+        1_u64.checked_add(biggest)
+    }
+
+    /// Maximum heap held by any decoded variant.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut biggest = 0_u64;
+        biggest = biggest.max(InfrastructureReadValue::worst_case_heap_within(limits)?.checked_add(u64::try_from(size_of::<InfrastructureReadValue>()).ok()?)?);
+        biggest.checked_add(0)
+    }
+}
+
+impl InfrastructureReadAnswer {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 2_u64;
+        size = size.checked_add(InfrastructureReadResult::worst_case_bytes_within(limits)?)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(InfrastructureReadResult::worst_case_heap_within(limits)?)?;
+        heap.checked_add(0)
+    }
+}
+
+impl ObservabilityReadValue {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 0_u64;
+        size = size.checked_add(ObservabilityDocument::worst_case_bytes_within(limits)?)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(ObservabilityDocument::worst_case_heap_within(limits)?)?;
+        heap.checked_add(0)
+    }
+}
+
+impl ObservabilityReadResult {
+    /// Maximum encoded bytes among variants.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut biggest = 0_u64;
+        biggest = biggest.max(ObservabilityReadValue::worst_case_bytes_within(limits)?);
+        1_u64.checked_add(biggest)
+    }
+
+    /// Maximum heap held by any decoded variant.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut biggest = 0_u64;
+        biggest = biggest.max(ObservabilityReadValue::worst_case_heap_within(limits)?.checked_add(u64::try_from(size_of::<ObservabilityReadValue>()).ok()?)?);
+        biggest.checked_add(0)
+    }
+}
+
+impl ObservabilityReadAnswer {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 2_u64;
+        size = size.checked_add(ObservabilityReadResult::worst_case_bytes_within(limits)?)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(ObservabilityReadResult::worst_case_heap_within(limits)?)?;
+        heap.checked_add(0)
+    }
+}
+
 /// Maximum wire bytes among this family's top-level types.
 #[must_use]
 pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
@@ -22956,6 +23552,12 @@ fn worst_case_bytes_2(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(InfrastructureDocumentPart::worst_case_bytes_within(limits)?);
     biggest = biggest.max(InfrastructureDocument::worst_case_bytes_within(limits)?);
     biggest = biggest.max(InfrastructureDocumentRecord::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(InfrastructureReadValue::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(InfrastructureReadResult::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(InfrastructureReadAnswer::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(ObservabilityReadValue::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(ObservabilityReadResult::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(ObservabilityReadAnswer::worst_case_bytes_within(limits)?);
     Some(biggest)
 }
 
@@ -23165,12 +23767,18 @@ fn worst_case_heap_2(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(InfrastructureDocumentPart::worst_case_heap_within(limits)?);
     biggest = biggest.max(InfrastructureDocument::worst_case_heap_within(limits)?);
     biggest = biggest.max(InfrastructureDocumentRecord::worst_case_heap_within(limits)?);
+    biggest = biggest.max(InfrastructureReadValue::worst_case_heap_within(limits)?);
+    biggest = biggest.max(InfrastructureReadResult::worst_case_heap_within(limits)?);
+    biggest = biggest.max(InfrastructureReadAnswer::worst_case_heap_within(limits)?);
+    biggest = biggest.max(ObservabilityReadValue::worst_case_heap_within(limits)?);
+    biggest = biggest.max(ObservabilityReadResult::worst_case_heap_within(limits)?);
+    biggest = biggest.max(ObservabilityReadAnswer::worst_case_heap_within(limits)?);
     Some(biggest)
 }
 
 #[cfg(test)]
 mod golden_tests {
-    use super::{CEILINGS, DecisionTask, DecisionTaskParts, DecisionParty, DecisionPartyParts, DecisionMaker, DecisionKey, DecisionKeyParts, InfrastructureScopeProject, InfrastructureScopeProjectParts, InfrastructureScope, InfrastructureKindEnvironments, InfrastructureKindEnvironmentsParts, InfrastructureKindEnvironment, InfrastructureKindEnvironmentParts, InfrastructureKindPanel, InfrastructureKindPanelParts, InfrastructureKindResult, InfrastructureKindResultParts, InfrastructureKindEffect, InfrastructureKindEffectParts, InfrastructureKindOwnerEffect, InfrastructureKindOwnerEffectParts, InfrastructureKindOutbox, InfrastructureKindOutboxParts, InfrastructureKindHold, InfrastructureKindHoldParts, InfrastructureKindProject, InfrastructureKindProjectParts, InfrastructurePool, InfrastructurePoolParts, InfrastructureEnd, InfrastructureEndParts, InfrastructureService, InfrastructureServiceParts, InfrastructureBackend, InfrastructurePurposeCall, InfrastructurePurposeCallParts, InfrastructurePurposeProcedure, InfrastructurePurposeProcedureParts, InfrastructurePurposeProjection, InfrastructurePurposeProjectionParts, InfrastructurePurpose, InfrastructurePhase, InfrastructureProcedureRemediate, InfrastructureProcedureRemediateParts, InfrastructureProcedureScale, InfrastructureProcedureScaleParts, InfrastructureProcedureProvision, InfrastructureProcedureProvisionParts, InfrastructureResourceRole, InfrastructureResourceFactService, InfrastructureResourceFactServiceParts, InfrastructureResourceFactPool, InfrastructureResourceFactPoolParts, InfrastructureResourceFactQuota, InfrastructureResourceFactQuotaParts, InfrastructureRecovery, InfrastructureForm, InfrastructureEffectActionRestart, InfrastructureEffectActionRestartParts, InfrastructureEffectActionScale, InfrastructureEffectActionScaleParts, InfrastructureEffectActionRollback, InfrastructureEffectActionRollbackParts, InfrastructureEffectActionCreateEnvironment, InfrastructureEffectActionCreateEnvironmentParts, InfrastructureEffectState, InfrastructureDriftKind, InfrastructureAskMoveEnd, InfrastructureAskMoveEndParts, InfrastructureRefusalRole, InfrastructureRefusalRoleParts, InfrastructureRefusal, InfrastructureAnswerMovedEnd, InfrastructureAnswerMovedEndParts, InfrastructureAnswerMoved, InfrastructureAnswerMovedParts, InfrastructureAnswerRefused, InfrastructureAnswerRefusedParts, InfrastructureNativeService, InfrastructureNativeServiceParts, InfrastructureNativeEnvironment, InfrastructureNativeEnvironmentParts, InfrastructureNativePool, InfrastructureNativePoolParts, InfrastructureNativeResourceService, InfrastructureNativeResourceServiceParts, InfrastructureNativeResourceEnvironment, InfrastructureNativeResourceEnvironmentParts, InfrastructureNativeResourcePool, InfrastructureNativeResourcePoolParts, InfrastructureNativeResourceQuota, InfrastructureNativeResourceQuotaParts, InfrastructureNativeResource, InfrastructureNativeHold, InfrastructureNativeResourceRole, InfrastructureNativeNamed, InfrastructureNativeNamedParts, InfrastructureNativePurposeCall, InfrastructureNativePurposeCallParts, InfrastructureNativePurposeProcedure, InfrastructureNativePurposeProcedureParts, InfrastructureNativePurposeProjection, InfrastructureNativePurposeProjectionParts, InfrastructureNativePurpose, InfrastructureNativeKey, InfrastructureNativeKeyParts, InfrastructureNativeBackend, InfrastructureNativeEffectRestart, InfrastructureNativeEffectRestartParts, InfrastructureNativeEffectScale, InfrastructureNativeEffectScaleParts, InfrastructureNativeEffectRollback, InfrastructureNativeEffectRollbackParts, InfrastructureNativeEffectCreateEnvironment, InfrastructureNativeEffectCreateEnvironmentParts, InfrastructureNativeEffectTearDown, InfrastructureNativeEffectTearDownParts, InfrastructureNativeEffect, InfrastructureNativeForm, InfrastructureNativeRecovery, InfrastructureNativeDescription, InfrastructureNativeDescriptionParts, InfrastructureNativePhase, InfrastructureNativeEntry, InfrastructureNativeEntryParts, InfrastructureNativeServiceFact, InfrastructureNativeServiceFactParts, InfrastructureNativeEnvironmentFact, InfrastructureNativeEnvironmentFactParts, InfrastructureNativeProcedureRemediate, InfrastructureNativeProcedureRemediateParts, InfrastructureNativeProcedureScale, InfrastructureNativeProcedureScaleParts, InfrastructureNativeProcedureProvision, InfrastructureNativeProcedureProvisionParts, InfrastructureNativeProcedureTearDown, InfrastructureNativeProcedureTearDownParts, InfrastructureNativeProcedure, InfrastructureNativeProcedurePhase, InfrastructureNativeProcedureState, InfrastructureNativeProcedureStateParts, InfrastructureNativeDriftKind, InfrastructureNativeDriftAccount, InfrastructureNativeDriftAccountParts, InfrastructureNativeEnvironmentEnd, InfrastructureNativeEnvironmentEndParts, InfrastructureNativeClientPool, InfrastructureNativeClientPoolParts, InfrastructureNativeResourceFactService, InfrastructureNativeResourceFactServiceParts, InfrastructureNativeResourceFactEnvironment, InfrastructureNativeResourceFactEnvironmentParts, InfrastructureNativeResourceFactPool, InfrastructureNativeResourceFactPoolParts, InfrastructureNativeResourceFactQuota, InfrastructureNativeResourceFactQuotaParts, InfrastructureNativeResourceFact, InfrastructureNativeClientResource, InfrastructureNativeClientResourceParts, InfrastructureNativeClientEnvironment, InfrastructureNativeClientEnvironmentParts, InfrastructureNativeValueEnvironment, InfrastructureNativeValueEnvironmentParts, InfrastructureNativeValuePanel, InfrastructureNativeValuePanelParts, InfrastructureNativeValueResult, InfrastructureNativeValueResultParts, InfrastructureNativeValueEffect, InfrastructureNativeValueEffectParts, InfrastructureNativeValueOutbox, InfrastructureNativeValueOutboxParts, InfrastructureNativeValueHold, InfrastructureNativeValueHoldParts, InfrastructureNativeValueProject, InfrastructureNativeValueProjectParts, InfrastructureNativeValueDeployment, InfrastructureNativeValueDeploymentParts, InfrastructureNativeValue, ObservabilityScopeProject, ObservabilityScopeProjectParts, ObservabilityScope, ObservabilityKindIncidents, ObservabilityKindIncidentsParts, ObservabilityKindIncident, ObservabilityKindIncidentParts, ObservabilityKindPanel, ObservabilityKindPanelParts, ObservabilityKindResult, ObservabilityKindResultParts, ObservabilityKindEffect, ObservabilityKindEffectParts, ObservabilityKindOutbox, ObservabilityKindOutboxParts, ObservabilityKindHold, ObservabilityKindHoldParts, ObservabilityKindProject, ObservabilityKindProjectParts, ObservabilityKind, ObservabilitySubject, ObservabilitySubjectParts, ObservabilityService, ObservabilityServiceParts, ObservabilityHealth, ObservabilityHealthParts, ObservabilityPoint, ObservabilityPointParts, ObservabilityState, ObservabilityIncident, ObservabilityIncidentParts, ObservabilityServiceState, ObservabilityServiceStateParts, ObservabilityEffectState, ObservabilityDocumentIncidents, ObservabilityDocumentIncidentsParts, ObservabilityDocumentIncident, ObservabilityDocumentIncidentParts, ObservabilityNativeLoadPoint, ObservabilityNativeLoadPointParts, ObservabilityNativeFact, ObservabilityNativeFactParts, ObservabilityNativeHealth, ObservabilityNativeHealthParts, ObservabilityNativePoint, ObservabilityNativePointParts, ObservabilityNativeIncident, ObservabilityNativeIncidentParts, ObservabilityNativeServiceState, ObservabilityNativeServiceStateParts, ObservabilityNativeAlert, ObservabilityNativeAlertParts, ObservabilityNativePurposeCall, ObservabilityNativePurposeCallParts, ObservabilityNativePurposeProcedure, ObservabilityNativePurposeProcedureParts, ObservabilityNativePurposeProjection, ObservabilityNativePurposeProjectionParts, ObservabilityNativePurpose, ObservabilityNativeKey, ObservabilityNativeKeyParts, ObservabilityNativeEffect, ObservabilityNativeEffectParts, ObservabilityNativePhase, ObservabilityNativeEntry, ObservabilityNativeEntryParts, ObservabilityNativeValueService, ObservabilityNativeValueServiceParts, ObservabilityNativeValueAlert, ObservabilityNativeValueAlertParts, ObservabilityNativeValueOutbox, ObservabilityNativeValueOutboxParts, ObservabilityNativeValueDeployment, ObservabilityNativeValueDeploymentParts, ObservabilityNativeValueIncident, ObservabilityNativeValueIncidentParts, ObservabilityNativeValueProject, ObservabilityNativeValueProjectParts, ObservabilityNativeValue, ObservabilityNativeDocument, ObservabilityNativeDocumentParts, ObservabilitySubjectRecord, ObservabilitySubjectRecordParts, InfrastructureKindNativeEnvironment, InfrastructureKindNativeEnvironmentParts, InfrastructureKindNativeEnvironments, InfrastructureKindNativeEnvironmentsParts, InfrastructureKind, InfrastructureSubject, InfrastructureSubjectParts, InfrastructureCreation, InfrastructureCreationParts, InfrastructureProcedureTearDown, InfrastructureProcedureTearDownParts, InfrastructureProcedure, InfrastructurePanel, InfrastructurePanelParts, InfrastructureDescription, InfrastructureDescriptionParts, InfrastructureEffectActionTearDown, InfrastructureEffectActionTearDownParts, InfrastructureEffectAction, InfrastructureEffect, InfrastructureEffectParts, InfrastructureDrift, InfrastructureDriftParts, InfrastructureAskNativeMoveEnd, InfrastructureAskNativeMoveEndParts, InfrastructureAsk, InfrastructureAnswerNativeMovedEnd, InfrastructureAnswerNativeMovedEndParts, InfrastructureAnswerNativeMoved, InfrastructureAnswerNativeMovedParts, InfrastructureAnswer, InfrastructureNativeDocument, InfrastructureNativeDocumentParts, ObservabilityEffect, ObservabilityEffectParts, ObservabilityDocumentNative, ObservabilityDocumentNativeParts, InfrastructureAskRecord, InfrastructureAskRecordParts, InfrastructureAnswerRecord, InfrastructureAnswerRecordParts, InfrastructureSubjectRecord, InfrastructureSubjectRecordParts, InfrastructureEnvironment, InfrastructureEnvironmentParts, InfrastructureResourceFactEnvironment, InfrastructureResourceFactEnvironmentParts, InfrastructureResourceFact, InfrastructureDocumentNative, InfrastructureDocumentNativeParts, InfrastructureDocumentEnvironments, InfrastructureDocumentEnvironmentsParts, InfrastructureDocumentEnvironment, InfrastructureDocumentEnvironmentParts, ObservabilityPartDocument, ObservabilityPartDocumentParts, ObservabilityDocumentPart, ObservabilityDocumentPartParts, ObservabilityDocument, ObservabilityDocumentRecord, ObservabilityDocumentRecordParts, InfrastructureResource, InfrastructureResourceParts, InfrastructurePartDocument, InfrastructurePartDocumentParts, InfrastructureDocumentPart, InfrastructureDocumentPartParts, InfrastructureDocument, InfrastructureDocumentRecord, InfrastructureDocumentRecordParts, Path};
+    use super::{CEILINGS, DecisionTask, DecisionTaskParts, DecisionParty, DecisionPartyParts, DecisionMaker, DecisionKey, DecisionKeyParts, InfrastructureScopeProject, InfrastructureScopeProjectParts, InfrastructureScope, InfrastructureKindEnvironments, InfrastructureKindEnvironmentsParts, InfrastructureKindEnvironment, InfrastructureKindEnvironmentParts, InfrastructureKindPanel, InfrastructureKindPanelParts, InfrastructureKindResult, InfrastructureKindResultParts, InfrastructureKindEffect, InfrastructureKindEffectParts, InfrastructureKindOwnerEffect, InfrastructureKindOwnerEffectParts, InfrastructureKindOutbox, InfrastructureKindOutboxParts, InfrastructureKindHold, InfrastructureKindHoldParts, InfrastructureKindProject, InfrastructureKindProjectParts, InfrastructurePool, InfrastructurePoolParts, InfrastructureEnd, InfrastructureEndParts, InfrastructureService, InfrastructureServiceParts, InfrastructureBackend, InfrastructurePurposeCall, InfrastructurePurposeCallParts, InfrastructurePurposeProcedure, InfrastructurePurposeProcedureParts, InfrastructurePurposeProjection, InfrastructurePurposeProjectionParts, InfrastructurePurpose, InfrastructurePhase, InfrastructureProcedureRemediate, InfrastructureProcedureRemediateParts, InfrastructureProcedureScale, InfrastructureProcedureScaleParts, InfrastructureProcedureProvision, InfrastructureProcedureProvisionParts, InfrastructureResourceRole, InfrastructureResourceFactService, InfrastructureResourceFactServiceParts, InfrastructureResourceFactPool, InfrastructureResourceFactPoolParts, InfrastructureResourceFactQuota, InfrastructureResourceFactQuotaParts, InfrastructureRecovery, InfrastructureForm, InfrastructureEffectActionRestart, InfrastructureEffectActionRestartParts, InfrastructureEffectActionScale, InfrastructureEffectActionScaleParts, InfrastructureEffectActionRollback, InfrastructureEffectActionRollbackParts, InfrastructureEffectActionCreateEnvironment, InfrastructureEffectActionCreateEnvironmentParts, InfrastructureEffectState, InfrastructureDriftKind, InfrastructureAskMoveEnd, InfrastructureAskMoveEndParts, InfrastructureRefusalRole, InfrastructureRefusalRoleParts, InfrastructureRefusal, InfrastructureAnswerMovedEnd, InfrastructureAnswerMovedEndParts, InfrastructureAnswerMoved, InfrastructureAnswerMovedParts, InfrastructureAnswerRefused, InfrastructureAnswerRefusedParts, InfrastructureNativeService, InfrastructureNativeServiceParts, InfrastructureNativeEnvironment, InfrastructureNativeEnvironmentParts, InfrastructureNativePool, InfrastructureNativePoolParts, InfrastructureNativeResourceService, InfrastructureNativeResourceServiceParts, InfrastructureNativeResourceEnvironment, InfrastructureNativeResourceEnvironmentParts, InfrastructureNativeResourcePool, InfrastructureNativeResourcePoolParts, InfrastructureNativeResourceQuota, InfrastructureNativeResourceQuotaParts, InfrastructureNativeResource, InfrastructureNativeHold, InfrastructureNativeResourceRole, InfrastructureNativeNamed, InfrastructureNativeNamedParts, InfrastructureNativePurposeCall, InfrastructureNativePurposeCallParts, InfrastructureNativePurposeProcedure, InfrastructureNativePurposeProcedureParts, InfrastructureNativePurposeProjection, InfrastructureNativePurposeProjectionParts, InfrastructureNativePurpose, InfrastructureNativeKey, InfrastructureNativeKeyParts, InfrastructureNativeBackend, InfrastructureNativeEffectRestart, InfrastructureNativeEffectRestartParts, InfrastructureNativeEffectScale, InfrastructureNativeEffectScaleParts, InfrastructureNativeEffectRollback, InfrastructureNativeEffectRollbackParts, InfrastructureNativeEffectCreateEnvironment, InfrastructureNativeEffectCreateEnvironmentParts, InfrastructureNativeEffectTearDown, InfrastructureNativeEffectTearDownParts, InfrastructureNativeEffect, InfrastructureNativeForm, InfrastructureNativeRecovery, InfrastructureNativeDescription, InfrastructureNativeDescriptionParts, InfrastructureNativePhase, InfrastructureNativeEntry, InfrastructureNativeEntryParts, InfrastructureNativeServiceFact, InfrastructureNativeServiceFactParts, InfrastructureNativeEnvironmentFact, InfrastructureNativeEnvironmentFactParts, InfrastructureNativeProcedureRemediate, InfrastructureNativeProcedureRemediateParts, InfrastructureNativeProcedureScale, InfrastructureNativeProcedureScaleParts, InfrastructureNativeProcedureProvision, InfrastructureNativeProcedureProvisionParts, InfrastructureNativeProcedureTearDown, InfrastructureNativeProcedureTearDownParts, InfrastructureNativeProcedure, InfrastructureNativeProcedurePhase, InfrastructureNativeProcedureState, InfrastructureNativeProcedureStateParts, InfrastructureNativeDriftKind, InfrastructureNativeDriftAccount, InfrastructureNativeDriftAccountParts, InfrastructureNativeEnvironmentEnd, InfrastructureNativeEnvironmentEndParts, InfrastructureNativeClientPool, InfrastructureNativeClientPoolParts, InfrastructureNativeResourceFactService, InfrastructureNativeResourceFactServiceParts, InfrastructureNativeResourceFactEnvironment, InfrastructureNativeResourceFactEnvironmentParts, InfrastructureNativeResourceFactPool, InfrastructureNativeResourceFactPoolParts, InfrastructureNativeResourceFactQuota, InfrastructureNativeResourceFactQuotaParts, InfrastructureNativeResourceFact, InfrastructureNativeClientResource, InfrastructureNativeClientResourceParts, InfrastructureNativeClientEnvironment, InfrastructureNativeClientEnvironmentParts, InfrastructureNativeValueEnvironment, InfrastructureNativeValueEnvironmentParts, InfrastructureNativeValuePanel, InfrastructureNativeValuePanelParts, InfrastructureNativeValueResult, InfrastructureNativeValueResultParts, InfrastructureNativeValueEffect, InfrastructureNativeValueEffectParts, InfrastructureNativeValueOutbox, InfrastructureNativeValueOutboxParts, InfrastructureNativeValueHold, InfrastructureNativeValueHoldParts, InfrastructureNativeValueProject, InfrastructureNativeValueProjectParts, InfrastructureNativeValueDeployment, InfrastructureNativeValueDeploymentParts, InfrastructureNativeValue, ObservabilityScopeProject, ObservabilityScopeProjectParts, ObservabilityScope, ObservabilityKindIncidents, ObservabilityKindIncidentsParts, ObservabilityKindIncident, ObservabilityKindIncidentParts, ObservabilityKindPanel, ObservabilityKindPanelParts, ObservabilityKindResult, ObservabilityKindResultParts, ObservabilityKindEffect, ObservabilityKindEffectParts, ObservabilityKindOutbox, ObservabilityKindOutboxParts, ObservabilityKindHold, ObservabilityKindHoldParts, ObservabilityKindProject, ObservabilityKindProjectParts, ObservabilityKind, ObservabilitySubject, ObservabilitySubjectParts, ObservabilityService, ObservabilityServiceParts, ObservabilityHealth, ObservabilityHealthParts, ObservabilityPoint, ObservabilityPointParts, ObservabilityState, ObservabilityIncident, ObservabilityIncidentParts, ObservabilityServiceState, ObservabilityServiceStateParts, ObservabilityEffectState, ObservabilityDocumentIncidents, ObservabilityDocumentIncidentsParts, ObservabilityDocumentIncident, ObservabilityDocumentIncidentParts, ObservabilityNativeLoadPoint, ObservabilityNativeLoadPointParts, ObservabilityNativeFact, ObservabilityNativeFactParts, ObservabilityNativeHealth, ObservabilityNativeHealthParts, ObservabilityNativePoint, ObservabilityNativePointParts, ObservabilityNativeIncident, ObservabilityNativeIncidentParts, ObservabilityNativeServiceState, ObservabilityNativeServiceStateParts, ObservabilityNativeAlert, ObservabilityNativeAlertParts, ObservabilityNativePurposeCall, ObservabilityNativePurposeCallParts, ObservabilityNativePurposeProcedure, ObservabilityNativePurposeProcedureParts, ObservabilityNativePurposeProjection, ObservabilityNativePurposeProjectionParts, ObservabilityNativePurpose, ObservabilityNativeKey, ObservabilityNativeKeyParts, ObservabilityNativeEffect, ObservabilityNativeEffectParts, ObservabilityNativePhase, ObservabilityNativeEntry, ObservabilityNativeEntryParts, ObservabilityNativeValueService, ObservabilityNativeValueServiceParts, ObservabilityNativeValueAlert, ObservabilityNativeValueAlertParts, ObservabilityNativeValueOutbox, ObservabilityNativeValueOutboxParts, ObservabilityNativeValueDeployment, ObservabilityNativeValueDeploymentParts, ObservabilityNativeValueIncident, ObservabilityNativeValueIncidentParts, ObservabilityNativeValueProject, ObservabilityNativeValueProjectParts, ObservabilityNativeValue, ObservabilityNativeDocument, ObservabilityNativeDocumentParts, ObservabilitySubjectRecord, ObservabilitySubjectRecordParts, InfrastructureKindNativeEnvironment, InfrastructureKindNativeEnvironmentParts, InfrastructureKindNativeEnvironments, InfrastructureKindNativeEnvironmentsParts, InfrastructureKind, InfrastructureSubject, InfrastructureSubjectParts, InfrastructureCreation, InfrastructureCreationParts, InfrastructureProcedureTearDown, InfrastructureProcedureTearDownParts, InfrastructureProcedure, InfrastructurePanel, InfrastructurePanelParts, InfrastructureDescription, InfrastructureDescriptionParts, InfrastructureEffectActionTearDown, InfrastructureEffectActionTearDownParts, InfrastructureEffectAction, InfrastructureEffect, InfrastructureEffectParts, InfrastructureDrift, InfrastructureDriftParts, InfrastructureAskNativeMoveEnd, InfrastructureAskNativeMoveEndParts, InfrastructureAsk, InfrastructureAnswerNativeMovedEnd, InfrastructureAnswerNativeMovedEndParts, InfrastructureAnswerNativeMoved, InfrastructureAnswerNativeMovedParts, InfrastructureAnswer, InfrastructureNativeDocument, InfrastructureNativeDocumentParts, ObservabilityEffect, ObservabilityEffectParts, ObservabilityDocumentNative, ObservabilityDocumentNativeParts, InfrastructureAskRecord, InfrastructureAskRecordParts, InfrastructureAnswerRecord, InfrastructureAnswerRecordParts, InfrastructureSubjectRecord, InfrastructureSubjectRecordParts, InfrastructureEnvironment, InfrastructureEnvironmentParts, InfrastructureResourceFactEnvironment, InfrastructureResourceFactEnvironmentParts, InfrastructureResourceFact, InfrastructureDocumentNative, InfrastructureDocumentNativeParts, InfrastructureDocumentEnvironments, InfrastructureDocumentEnvironmentsParts, InfrastructureDocumentEnvironment, InfrastructureDocumentEnvironmentParts, ObservabilityPartDocument, ObservabilityPartDocumentParts, ObservabilityDocumentPart, ObservabilityDocumentPartParts, ObservabilityDocument, ObservabilityDocumentRecord, ObservabilityDocumentRecordParts, InfrastructureResource, InfrastructureResourceParts, InfrastructurePartDocument, InfrastructurePartDocumentParts, InfrastructureDocumentPart, InfrastructureDocumentPartParts, InfrastructureDocument, InfrastructureDocumentRecord, InfrastructureDocumentRecordParts, InfrastructureReadValue, InfrastructureReadValueParts, InfrastructureReadResult, InfrastructureReadAnswer, InfrastructureReadAnswerParts, ObservabilityReadValue, ObservabilityReadValueParts, ObservabilityReadResult, ObservabilityReadAnswer, ObservabilityReadAnswerParts, Path};
     use super::Limits;
 
     use alloc::boxed::Box;
@@ -23223,7 +23831,7 @@ mod golden_tests {
         };
         at && past
     }
-    static GOLDEN_0: [Case; 630] = [
+    static GOLDEN_0: [Case; 650] = [
         ("record_decision_task_smallest", || { let value = DecisionTask::new(&CEILINGS, DecisionTaskParts { value: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, DecisionTask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_decision_task_full", || { let value = DecisionTask::new(&CEILINGS, DecisionTaskParts { value: u64::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, DecisionTask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_decision_party_smallest", || { let value = DecisionParty::new(&CEILINGS, DecisionPartyParts { value: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, DecisionParty::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -23854,6 +24462,26 @@ mod golden_tests {
         ("enum_infrastructure_document_part_full", || { let value = InfrastructureDocument::Part(InfrastructureDocumentPart::new(&CEILINGS, InfrastructureDocumentPartParts { value: InfrastructurePartDocument::new(&CEILINGS, InfrastructurePartDocumentParts { subject: InfrastructureSubject::new(&CEILINGS, InfrastructureSubjectParts { scope: InfrastructureScope::Project(InfrastructureScopeProject::new(&CEILINGS, InfrastructureScopeProjectParts { value: u32::MAX }).expect("golden within ceilings")), kind: InfrastructureKind::Environments(InfrastructureKindEnvironments::new(&CEILINGS, InfrastructureKindEnvironmentsParts { pool: Some(u32::MAX) }).expect("golden within ceilings")) }).expect("golden within ceilings"), revision: u64::MAX, panel: Some(InfrastructurePanel::new(&CEILINGS, InfrastructurePanelParts { task: u64::MAX, procedure: InfrastructureProcedure::Remediate(InfrastructureProcedureRemediate::new(&CEILINGS, InfrastructureProcedureRemediateParts { service: InfrastructureService::new(&CEILINGS, InfrastructureServiceParts { environment: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), operation: u64::MAX, deadline: u64::MAX }).expect("golden within ceilings")), phase: InfrastructurePhase::Active }).expect("golden within ceilings")), description: Some(InfrastructureDescription::new(&CEILINGS, InfrastructureDescriptionParts { words: Box::from([0_u8, 127_u8, 255_u8].as_slice()), resource: Box::from([0_u8, 127_u8, 255_u8].as_slice()), kind: u16::MAX, recovery: InfrastructureRecovery::Keyed, price: Some(u64::MAX), condition: true, form: InfrastructureForm::Creation, state: u64::MAX }).expect("golden within ceilings")), effect: Some(InfrastructureEffectAction::Restart(InfrastructureEffectActionRestart::new(&CEILINGS, InfrastructureEffectActionRestartParts { service: InfrastructureService::new(&CEILINGS, InfrastructureServiceParts { environment: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), operation: u64::MAX }).expect("golden within ceilings"))), resources: { let mut items = skein_lib::List::with_capacity(1); items.push(InfrastructureResource::new(&CEILINGS, InfrastructureResourceParts { name: Box::from([0_u8, 127_u8, 255_u8].as_slice()), role: InfrastructureResourceRole::Owned, fact: InfrastructureResourceFact::Service(InfrastructureResourceFactService::new(&CEILINGS, InfrastructureResourceFactServiceParts { version: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), replicas: Some(u32::MAX), healthy: Some(true), revision: Some(u64::MAX), observed: Some(u64::MAX) }).expect("golden within ceilings")) }).expect("golden within ceilings")).expect("one slot"); items }, effects: { let mut items = skein_lib::List::with_capacity(1); items.push(InfrastructureEffect::new(&CEILINGS, InfrastructureEffectParts { entry: u64::MAX, task: u64::MAX, project: Some(u32::MAX), origin: InfrastructureCreation::new(&CEILINGS, InfrastructureCreationParts { deployment: [165_u8; 16], task: u64::MAX, origin: InfrastructurePurpose::Call(InfrastructurePurposeCall::new(&CEILINGS, InfrastructurePurposeCallParts { attempt: u64::MAX, completion: u64::MAX, position: u32::MAX }).expect("golden within ceilings")), purpose: u64::MAX }).expect("golden within ceilings"), description: Some(InfrastructureDescription::new(&CEILINGS, InfrastructureDescriptionParts { words: Box::from([0_u8, 127_u8, 255_u8].as_slice()), resource: Box::from([0_u8, 127_u8, 255_u8].as_slice()), kind: u16::MAX, recovery: InfrastructureRecovery::Keyed, price: Some(u64::MAX), condition: true, form: InfrastructureForm::Creation, state: u64::MAX }).expect("golden within ceilings")), state: InfrastructureEffectState::Kept, attempt: u32::MAX, deadline: u64::MAX, action: InfrastructureEffectAction::Restart(InfrastructureEffectActionRestart::new(&CEILINGS, InfrastructureEffectActionRestartParts { service: InfrastructureService::new(&CEILINGS, InfrastructureServiceParts { environment: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), operation: u64::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")).expect("one slot"); items }, drift: { let mut items = skein_lib::List::with_capacity(1); items.push(InfrastructureDrift::new(&CEILINGS, InfrastructureDriftParts { resource: Box::from([0_u8, 127_u8, 255_u8].as_slice()), kind: InfrastructureDriftKind::Deleted, actor: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), at: Some(u64::MAX), observed: u64::MAX }).expect("golden within ceilings")).expect("one slot"); items }, environments: { let mut items = skein_lib::List::with_capacity(1); items.push(InfrastructureEnvironment::new(&CEILINGS, InfrastructureEnvironmentParts { project: u32::MAX, number: u64::MAX, pool: u32::MAX, name: Box::from([0_u8, 127_u8, 255_u8].as_slice()), revision: u64::MAX, created_by: InfrastructureCreation::new(&CEILINGS, InfrastructureCreationParts { deployment: [165_u8; 16], task: u64::MAX, origin: InfrastructurePurpose::Call(InfrastructurePurposeCall::new(&CEILINGS, InfrastructurePurposeCallParts { attempt: u64::MAX, completion: u64::MAX, position: u32::MAX }).expect("golden within ceilings")), purpose: u64::MAX }).expect("golden within ceilings"), ready_at: Some(u64::MAX), ready: Some(true), cost: Some(u64::MAX), observed_until: Some(u64::MAX), end: Some(InfrastructureEnd::new(&CEILINGS, InfrastructureEndParts { revision: u64::MAX, until: u64::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")).expect("one slot"); items }, pools: { let mut items = skein_lib::List::with_capacity(1); items.push(InfrastructurePool::new(&CEILINGS, InfrastructurePoolParts { number: u32::MAX, name: Box::from([0_u8, 127_u8, 255_u8].as_slice()), quota: Some(u32::MAX), used: Some(u32::MAX) }).expect("golden within ceilings")).expect("one slot"); items }, backend: Some(InfrastructureBackend::OperationIds), made: Some(u32::MAX), proposal_limit: Some(u32::MAX), staged_limit: Some(u32::MAX) }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 0, 255, 255, 255, 255, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 1, 255, 255, 255, 255, 1, 1, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 1, 0, 0, 0, 3, 0, 127, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 1, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 0, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255, 1, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureDocument::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_infrastructure_document_record_smallest", || { let value = InfrastructureDocumentRecord::new(&CEILINGS, InfrastructureDocumentRecordParts { value: InfrastructureDocument::Native(InfrastructureDocumentNative::new(&CEILINGS, InfrastructureDocumentNativeParts { value: InfrastructureNativeDocument::new(&CEILINGS, InfrastructureNativeDocumentParts { subject: InfrastructureSubject::new(&CEILINGS, InfrastructureSubjectParts { scope: InfrastructureScope::Project(InfrastructureScopeProject::new(&CEILINGS, InfrastructureScopeProjectParts { value: 0_u32 }).expect("golden within ceilings")), kind: InfrastructureKind::Environments(InfrastructureKindEnvironments::new(&CEILINGS, InfrastructureKindEnvironmentsParts { pool: None }).expect("golden within ceilings")) }).expect("golden within ceilings"), value: InfrastructureNativeValue::Environment(InfrastructureNativeValueEnvironment::new(&CEILINGS, InfrastructureNativeValueEnvironmentParts { environment: InfrastructureNativeEnvironment::new(&CEILINGS, InfrastructureNativeEnvironmentParts { pool: Box::from([].as_slice()), name: Box::from([].as_slice()) }).expect("golden within ceilings"), end_revision: 0_u64, fact: InfrastructureNativeEnvironmentFact::new(&CEILINGS, InfrastructureNativeEnvironmentFactParts { created_by: InfrastructureNativeKey::new(&CEILINGS, InfrastructureNativeKeyParts { deployment: [0_u8; 16], task: 0_u64, origin: InfrastructureNativePurpose::Call(InfrastructureNativePurposeCall::new(&CEILINGS, InfrastructureNativePurposeCallParts { attempt: 0_u64, completion: 0_u32, position: 0_u32 }).expect("golden within ceilings")), purpose: 0_u64 }).expect("golden within ceilings"), ready_at: 0_u64, until: 0_u64, price: 0_u64 }).expect("golden within ceilings"), end: None, pool: None }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureDocumentRecord::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_infrastructure_document_record_full", || { let value = InfrastructureDocumentRecord::new(&CEILINGS, InfrastructureDocumentRecordParts { value: InfrastructureDocument::Native(InfrastructureDocumentNative::new(&CEILINGS, InfrastructureDocumentNativeParts { value: InfrastructureNativeDocument::new(&CEILINGS, InfrastructureNativeDocumentParts { subject: InfrastructureSubject::new(&CEILINGS, InfrastructureSubjectParts { scope: InfrastructureScope::Project(InfrastructureScopeProject::new(&CEILINGS, InfrastructureScopeProjectParts { value: u32::MAX }).expect("golden within ceilings")), kind: InfrastructureKind::Environments(InfrastructureKindEnvironments::new(&CEILINGS, InfrastructureKindEnvironmentsParts { pool: Some(u32::MAX) }).expect("golden within ceilings")) }).expect("golden within ceilings"), value: InfrastructureNativeValue::Environment(InfrastructureNativeValueEnvironment::new(&CEILINGS, InfrastructureNativeValueEnvironmentParts { environment: InfrastructureNativeEnvironment::new(&CEILINGS, InfrastructureNativeEnvironmentParts { pool: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), end_revision: u64::MAX, fact: InfrastructureNativeEnvironmentFact::new(&CEILINGS, InfrastructureNativeEnvironmentFactParts { created_by: InfrastructureNativeKey::new(&CEILINGS, InfrastructureNativeKeyParts { deployment: [165_u8; 16], task: u64::MAX, origin: InfrastructureNativePurpose::Call(InfrastructureNativePurposeCall::new(&CEILINGS, InfrastructureNativePurposeCallParts { attempt: u64::MAX, completion: u32::MAX, position: u32::MAX }).expect("golden within ceilings")), purpose: u64::MAX }).expect("golden within ceilings"), ready_at: u64::MAX, until: u64::MAX, price: u64::MAX }).expect("golden within ceilings"), end: Some(InfrastructureNativeEnvironmentEnd::new(&CEILINGS, InfrastructureNativeEnvironmentEndParts { revision: u64::MAX, until: u64::MAX }).expect("golden within ceilings")), pool: Some(InfrastructureNativeClientPool::new(&CEILINGS, InfrastructureNativeClientPoolParts { quota: u32::MAX, used: u32::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 0, 0, 255, 255, 255, 255, 0, 1, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureDocumentRecord::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_infrastructure_read_value_smallest", || { let value = InfrastructureReadValue::new(&CEILINGS, InfrastructureReadValueParts { value: InfrastructureDocument::Native(InfrastructureDocumentNative::new(&CEILINGS, InfrastructureDocumentNativeParts { value: InfrastructureNativeDocument::new(&CEILINGS, InfrastructureNativeDocumentParts { subject: InfrastructureSubject::new(&CEILINGS, InfrastructureSubjectParts { scope: InfrastructureScope::Project(InfrastructureScopeProject::new(&CEILINGS, InfrastructureScopeProjectParts { value: 0_u32 }).expect("golden within ceilings")), kind: InfrastructureKind::Environments(InfrastructureKindEnvironments::new(&CEILINGS, InfrastructureKindEnvironmentsParts { pool: None }).expect("golden within ceilings")) }).expect("golden within ceilings"), value: InfrastructureNativeValue::Environment(InfrastructureNativeValueEnvironment::new(&CEILINGS, InfrastructureNativeValueEnvironmentParts { environment: InfrastructureNativeEnvironment::new(&CEILINGS, InfrastructureNativeEnvironmentParts { pool: Box::from([].as_slice()), name: Box::from([].as_slice()) }).expect("golden within ceilings"), end_revision: 0_u64, fact: InfrastructureNativeEnvironmentFact::new(&CEILINGS, InfrastructureNativeEnvironmentFactParts { created_by: InfrastructureNativeKey::new(&CEILINGS, InfrastructureNativeKeyParts { deployment: [0_u8; 16], task: 0_u64, origin: InfrastructureNativePurpose::Call(InfrastructureNativePurposeCall::new(&CEILINGS, InfrastructureNativePurposeCallParts { attempt: 0_u64, completion: 0_u32, position: 0_u32 }).expect("golden within ceilings")), purpose: 0_u64 }).expect("golden within ceilings"), ready_at: 0_u64, until: 0_u64, price: 0_u64 }).expect("golden within ceilings"), end: None, pool: None }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_infrastructure_read_value_full", || { let value = InfrastructureReadValue::new(&CEILINGS, InfrastructureReadValueParts { value: InfrastructureDocument::Native(InfrastructureDocumentNative::new(&CEILINGS, InfrastructureDocumentNativeParts { value: InfrastructureNativeDocument::new(&CEILINGS, InfrastructureNativeDocumentParts { subject: InfrastructureSubject::new(&CEILINGS, InfrastructureSubjectParts { scope: InfrastructureScope::Project(InfrastructureScopeProject::new(&CEILINGS, InfrastructureScopeProjectParts { value: u32::MAX }).expect("golden within ceilings")), kind: InfrastructureKind::Environments(InfrastructureKindEnvironments::new(&CEILINGS, InfrastructureKindEnvironmentsParts { pool: Some(u32::MAX) }).expect("golden within ceilings")) }).expect("golden within ceilings"), value: InfrastructureNativeValue::Environment(InfrastructureNativeValueEnvironment::new(&CEILINGS, InfrastructureNativeValueEnvironmentParts { environment: InfrastructureNativeEnvironment::new(&CEILINGS, InfrastructureNativeEnvironmentParts { pool: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), end_revision: u64::MAX, fact: InfrastructureNativeEnvironmentFact::new(&CEILINGS, InfrastructureNativeEnvironmentFactParts { created_by: InfrastructureNativeKey::new(&CEILINGS, InfrastructureNativeKeyParts { deployment: [165_u8; 16], task: u64::MAX, origin: InfrastructureNativePurpose::Call(InfrastructureNativePurposeCall::new(&CEILINGS, InfrastructureNativePurposeCallParts { attempt: u64::MAX, completion: u32::MAX, position: u32::MAX }).expect("golden within ceilings")), purpose: u64::MAX }).expect("golden within ceilings"), ready_at: u64::MAX, until: u64::MAX, price: u64::MAX }).expect("golden within ceilings"), end: Some(InfrastructureNativeEnvironmentEnd::new(&CEILINGS, InfrastructureNativeEnvironmentEndParts { revision: u64::MAX, until: u64::MAX }).expect("golden within ceilings")), pool: Some(InfrastructureNativeClientPool::new(&CEILINGS, InfrastructureNativeClientPoolParts { quota: u32::MAX, used: u32::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 255, 255, 255, 255, 0, 1, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_infrastructure_read_result_value_smallest", || { let value = InfrastructureReadResult::Value(Box::new(InfrastructureReadValue::new(&CEILINGS, InfrastructureReadValueParts { value: InfrastructureDocument::Native(InfrastructureDocumentNative::new(&CEILINGS, InfrastructureDocumentNativeParts { value: InfrastructureNativeDocument::new(&CEILINGS, InfrastructureNativeDocumentParts { subject: InfrastructureSubject::new(&CEILINGS, InfrastructureSubjectParts { scope: InfrastructureScope::Project(InfrastructureScopeProject::new(&CEILINGS, InfrastructureScopeProjectParts { value: 0_u32 }).expect("golden within ceilings")), kind: InfrastructureKind::Environments(InfrastructureKindEnvironments::new(&CEILINGS, InfrastructureKindEnvironmentsParts { pool: None }).expect("golden within ceilings")) }).expect("golden within ceilings"), value: InfrastructureNativeValue::Environment(InfrastructureNativeValueEnvironment::new(&CEILINGS, InfrastructureNativeValueEnvironmentParts { environment: InfrastructureNativeEnvironment::new(&CEILINGS, InfrastructureNativeEnvironmentParts { pool: Box::from([].as_slice()), name: Box::from([].as_slice()) }).expect("golden within ceilings"), end_revision: 0_u64, fact: InfrastructureNativeEnvironmentFact::new(&CEILINGS, InfrastructureNativeEnvironmentFactParts { created_by: InfrastructureNativeKey::new(&CEILINGS, InfrastructureNativeKeyParts { deployment: [0_u8; 16], task: 0_u64, origin: InfrastructureNativePurpose::Call(InfrastructureNativePurposeCall::new(&CEILINGS, InfrastructureNativePurposeCallParts { attempt: 0_u64, completion: 0_u32, position: 0_u32 }).expect("golden within ceilings")), purpose: 0_u64 }).expect("golden within ceilings"), ready_at: 0_u64, until: 0_u64, price: 0_u64 }).expect("golden within ceilings"), end: None, pool: None }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")) }).expect("golden within ceilings"))); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_infrastructure_read_result_value_full", || { let value = InfrastructureReadResult::Value(Box::new(InfrastructureReadValue::new(&CEILINGS, InfrastructureReadValueParts { value: InfrastructureDocument::Native(InfrastructureDocumentNative::new(&CEILINGS, InfrastructureDocumentNativeParts { value: InfrastructureNativeDocument::new(&CEILINGS, InfrastructureNativeDocumentParts { subject: InfrastructureSubject::new(&CEILINGS, InfrastructureSubjectParts { scope: InfrastructureScope::Project(InfrastructureScopeProject::new(&CEILINGS, InfrastructureScopeProjectParts { value: u32::MAX }).expect("golden within ceilings")), kind: InfrastructureKind::Environments(InfrastructureKindEnvironments::new(&CEILINGS, InfrastructureKindEnvironmentsParts { pool: Some(u32::MAX) }).expect("golden within ceilings")) }).expect("golden within ceilings"), value: InfrastructureNativeValue::Environment(InfrastructureNativeValueEnvironment::new(&CEILINGS, InfrastructureNativeValueEnvironmentParts { environment: InfrastructureNativeEnvironment::new(&CEILINGS, InfrastructureNativeEnvironmentParts { pool: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), end_revision: u64::MAX, fact: InfrastructureNativeEnvironmentFact::new(&CEILINGS, InfrastructureNativeEnvironmentFactParts { created_by: InfrastructureNativeKey::new(&CEILINGS, InfrastructureNativeKeyParts { deployment: [165_u8; 16], task: u64::MAX, origin: InfrastructureNativePurpose::Call(InfrastructureNativePurposeCall::new(&CEILINGS, InfrastructureNativePurposeCallParts { attempt: u64::MAX, completion: u32::MAX, position: u32::MAX }).expect("golden within ceilings")), purpose: u64::MAX }).expect("golden within ceilings"), ready_at: u64::MAX, until: u64::MAX, price: u64::MAX }).expect("golden within ceilings"), end: Some(InfrastructureNativeEnvironmentEnd::new(&CEILINGS, InfrastructureNativeEnvironmentEndParts { revision: u64::MAX, until: u64::MAX }).expect("golden within ceilings")), pool: Some(InfrastructureNativeClientPool::new(&CEILINGS, InfrastructureNativeClientPoolParts { quota: u32::MAX, used: u32::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")) }).expect("golden within ceilings"))); let bytes: &[u8] = &[0, 0, 0, 255, 255, 255, 255, 0, 1, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_infrastructure_read_result_unknown_smallest", || { let value = InfrastructureReadResult::Unknown; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_infrastructure_read_result_unknown_full", || { let value = InfrastructureReadResult::Unknown; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_infrastructure_read_result_not_allowed_smallest", || { let value = InfrastructureReadResult::NotAllowed; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_infrastructure_read_result_not_allowed_full", || { let value = InfrastructureReadResult::NotAllowed; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_infrastructure_read_answer_smallest", || { let value = InfrastructureReadAnswer::new(&CEILINGS, InfrastructureReadAnswerParts { value: InfrastructureReadResult::Value(Box::new(InfrastructureReadValue::new(&CEILINGS, InfrastructureReadValueParts { value: InfrastructureDocument::Native(InfrastructureDocumentNative::new(&CEILINGS, InfrastructureDocumentNativeParts { value: InfrastructureNativeDocument::new(&CEILINGS, InfrastructureNativeDocumentParts { subject: InfrastructureSubject::new(&CEILINGS, InfrastructureSubjectParts { scope: InfrastructureScope::Project(InfrastructureScopeProject::new(&CEILINGS, InfrastructureScopeProjectParts { value: 0_u32 }).expect("golden within ceilings")), kind: InfrastructureKind::Environments(InfrastructureKindEnvironments::new(&CEILINGS, InfrastructureKindEnvironmentsParts { pool: None }).expect("golden within ceilings")) }).expect("golden within ceilings"), value: InfrastructureNativeValue::Environment(InfrastructureNativeValueEnvironment::new(&CEILINGS, InfrastructureNativeValueEnvironmentParts { environment: InfrastructureNativeEnvironment::new(&CEILINGS, InfrastructureNativeEnvironmentParts { pool: Box::from([].as_slice()), name: Box::from([].as_slice()) }).expect("golden within ceilings"), end_revision: 0_u64, fact: InfrastructureNativeEnvironmentFact::new(&CEILINGS, InfrastructureNativeEnvironmentFactParts { created_by: InfrastructureNativeKey::new(&CEILINGS, InfrastructureNativeKeyParts { deployment: [0_u8; 16], task: 0_u64, origin: InfrastructureNativePurpose::Call(InfrastructureNativePurposeCall::new(&CEILINGS, InfrastructureNativePurposeCallParts { attempt: 0_u64, completion: 0_u32, position: 0_u32 }).expect("golden within ceilings")), purpose: 0_u64 }).expect("golden within ceilings"), ready_at: 0_u64, until: 0_u64, price: 0_u64 }).expect("golden within ceilings"), end: None, pool: None }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")) }).expect("golden within ceilings"))) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadAnswer::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_infrastructure_read_answer_full", || { let value = InfrastructureReadAnswer::new(&CEILINGS, InfrastructureReadAnswerParts { value: InfrastructureReadResult::Value(Box::new(InfrastructureReadValue::new(&CEILINGS, InfrastructureReadValueParts { value: InfrastructureDocument::Native(InfrastructureDocumentNative::new(&CEILINGS, InfrastructureDocumentNativeParts { value: InfrastructureNativeDocument::new(&CEILINGS, InfrastructureNativeDocumentParts { subject: InfrastructureSubject::new(&CEILINGS, InfrastructureSubjectParts { scope: InfrastructureScope::Project(InfrastructureScopeProject::new(&CEILINGS, InfrastructureScopeProjectParts { value: u32::MAX }).expect("golden within ceilings")), kind: InfrastructureKind::Environments(InfrastructureKindEnvironments::new(&CEILINGS, InfrastructureKindEnvironmentsParts { pool: Some(u32::MAX) }).expect("golden within ceilings")) }).expect("golden within ceilings"), value: InfrastructureNativeValue::Environment(InfrastructureNativeValueEnvironment::new(&CEILINGS, InfrastructureNativeValueEnvironmentParts { environment: InfrastructureNativeEnvironment::new(&CEILINGS, InfrastructureNativeEnvironmentParts { pool: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), end_revision: u64::MAX, fact: InfrastructureNativeEnvironmentFact::new(&CEILINGS, InfrastructureNativeEnvironmentFactParts { created_by: InfrastructureNativeKey::new(&CEILINGS, InfrastructureNativeKeyParts { deployment: [165_u8; 16], task: u64::MAX, origin: InfrastructureNativePurpose::Call(InfrastructureNativePurposeCall::new(&CEILINGS, InfrastructureNativePurposeCallParts { attempt: u64::MAX, completion: u32::MAX, position: u32::MAX }).expect("golden within ceilings")), purpose: u64::MAX }).expect("golden within ceilings"), ready_at: u64::MAX, until: u64::MAX, price: u64::MAX }).expect("golden within ceilings"), end: Some(InfrastructureNativeEnvironmentEnd::new(&CEILINGS, InfrastructureNativeEnvironmentEndParts { revision: u64::MAX, until: u64::MAX }).expect("golden within ceilings")), pool: Some(InfrastructureNativeClientPool::new(&CEILINGS, InfrastructureNativeClientPoolParts { quota: u32::MAX, used: u32::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")) }).expect("golden within ceilings"))) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 0, 0, 0, 255, 255, 255, 255, 0, 1, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, InfrastructureReadAnswer::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_observability_read_value_smallest", || { let value = ObservabilityReadValue::new(&CEILINGS, ObservabilityReadValueParts { value: ObservabilityDocument::Incidents(ObservabilityDocumentIncidents::new(&CEILINGS, ObservabilityDocumentIncidentsParts { subject: ObservabilitySubject::new(&CEILINGS, ObservabilitySubjectParts { scope: ObservabilityScope::Project(ObservabilityScopeProject::new(&CEILINGS, ObservabilityScopeProjectParts { value: 0_u32 }).expect("golden within ceilings")), kind: ObservabilityKind::Incidents(ObservabilityKindIncidents::new(&CEILINGS, ObservabilityKindIncidentsParts { open: false }).expect("golden within ceilings")) }).expect("golden within ceilings"), revision: 0_u64, incidents: skein_lib::List::with_capacity(0) }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_observability_read_value_full", || { let value = ObservabilityReadValue::new(&CEILINGS, ObservabilityReadValueParts { value: ObservabilityDocument::Incidents(ObservabilityDocumentIncidents::new(&CEILINGS, ObservabilityDocumentIncidentsParts { subject: ObservabilitySubject::new(&CEILINGS, ObservabilitySubjectParts { scope: ObservabilityScope::Project(ObservabilityScopeProject::new(&CEILINGS, ObservabilityScopeProjectParts { value: u32::MAX }).expect("golden within ceilings")), kind: ObservabilityKind::Incidents(ObservabilityKindIncidents::new(&CEILINGS, ObservabilityKindIncidentsParts { open: true }).expect("golden within ceilings")) }).expect("golden within ceilings"), revision: u64::MAX, incidents: { let mut items = skein_lib::List::with_capacity(1); items.push(ObservabilityIncident::new(&CEILINGS, ObservabilityIncidentParts { project: u32::MAX, number: u64::MAX, revision: u64::MAX, watch: u64::MAX, raised: u64::MAX, service: ObservabilityService::new(&CEILINGS, ObservabilityServiceParts { environment: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), severity: u8::MAX, state: ObservabilityState::Alerting, timeline: { let mut items = skein_lib::List::with_capacity(1); items.push(ObservabilityPoint::new(&CEILINGS, ObservabilityPointParts { at: u64::MAX, health: Some(ObservabilityHealth::new(&CEILINGS, ObservabilityHealthParts { observed: u64::MAX, healthy_replicas: u32::MAX, errors: u32::MAX, error_rate_percent: u8::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")).expect("one slot"); items }, cut: true, health: Some(ObservabilityHealth::new(&CEILINGS, ObservabilityHealthParts { observed: u64::MAX, healthy_replicas: u32::MAX, errors: u32::MAX, error_rate_percent: u8::MAX }).expect("golden within ceilings")), lead: Some(u64::MAX), proposals: { let mut items = skein_lib::List::with_capacity(1); items.push(DecisionKey::new(&CEILINGS, DecisionKeyParts { maker: DecisionMaker::Task(DecisionTask::new(&CEILINGS, DecisionTaskParts { value: u64::MAX }).expect("golden within ceilings")), number: u64::MAX }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 255, 255, 255, 255, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 0, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_observability_read_result_value_smallest", || { let value = ObservabilityReadResult::Value(Box::new(ObservabilityReadValue::new(&CEILINGS, ObservabilityReadValueParts { value: ObservabilityDocument::Incidents(ObservabilityDocumentIncidents::new(&CEILINGS, ObservabilityDocumentIncidentsParts { subject: ObservabilitySubject::new(&CEILINGS, ObservabilitySubjectParts { scope: ObservabilityScope::Project(ObservabilityScopeProject::new(&CEILINGS, ObservabilityScopeProjectParts { value: 0_u32 }).expect("golden within ceilings")), kind: ObservabilityKind::Incidents(ObservabilityKindIncidents::new(&CEILINGS, ObservabilityKindIncidentsParts { open: false }).expect("golden within ceilings")) }).expect("golden within ceilings"), revision: 0_u64, incidents: skein_lib::List::with_capacity(0) }).expect("golden within ceilings")) }).expect("golden within ceilings"))); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_observability_read_result_value_full", || { let value = ObservabilityReadResult::Value(Box::new(ObservabilityReadValue::new(&CEILINGS, ObservabilityReadValueParts { value: ObservabilityDocument::Incidents(ObservabilityDocumentIncidents::new(&CEILINGS, ObservabilityDocumentIncidentsParts { subject: ObservabilitySubject::new(&CEILINGS, ObservabilitySubjectParts { scope: ObservabilityScope::Project(ObservabilityScopeProject::new(&CEILINGS, ObservabilityScopeProjectParts { value: u32::MAX }).expect("golden within ceilings")), kind: ObservabilityKind::Incidents(ObservabilityKindIncidents::new(&CEILINGS, ObservabilityKindIncidentsParts { open: true }).expect("golden within ceilings")) }).expect("golden within ceilings"), revision: u64::MAX, incidents: { let mut items = skein_lib::List::with_capacity(1); items.push(ObservabilityIncident::new(&CEILINGS, ObservabilityIncidentParts { project: u32::MAX, number: u64::MAX, revision: u64::MAX, watch: u64::MAX, raised: u64::MAX, service: ObservabilityService::new(&CEILINGS, ObservabilityServiceParts { environment: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), severity: u8::MAX, state: ObservabilityState::Alerting, timeline: { let mut items = skein_lib::List::with_capacity(1); items.push(ObservabilityPoint::new(&CEILINGS, ObservabilityPointParts { at: u64::MAX, health: Some(ObservabilityHealth::new(&CEILINGS, ObservabilityHealthParts { observed: u64::MAX, healthy_replicas: u32::MAX, errors: u32::MAX, error_rate_percent: u8::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")).expect("one slot"); items }, cut: true, health: Some(ObservabilityHealth::new(&CEILINGS, ObservabilityHealthParts { observed: u64::MAX, healthy_replicas: u32::MAX, errors: u32::MAX, error_rate_percent: u8::MAX }).expect("golden within ceilings")), lead: Some(u64::MAX), proposals: { let mut items = skein_lib::List::with_capacity(1); items.push(DecisionKey::new(&CEILINGS, DecisionKeyParts { maker: DecisionMaker::Task(DecisionTask::new(&CEILINGS, DecisionTaskParts { value: u64::MAX }).expect("golden within ceilings")), number: u64::MAX }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings")) }).expect("golden within ceilings"))); let bytes: &[u8] = &[0, 0, 0, 255, 255, 255, 255, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 0, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_observability_read_result_unknown_smallest", || { let value = ObservabilityReadResult::Unknown; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_observability_read_result_unknown_full", || { let value = ObservabilityReadResult::Unknown; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_observability_read_result_not_allowed_smallest", || { let value = ObservabilityReadResult::NotAllowed; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_observability_read_result_not_allowed_full", || { let value = ObservabilityReadResult::NotAllowed; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadResult::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_observability_read_answer_smallest", || { let value = ObservabilityReadAnswer::new(&CEILINGS, ObservabilityReadAnswerParts { value: ObservabilityReadResult::Value(Box::new(ObservabilityReadValue::new(&CEILINGS, ObservabilityReadValueParts { value: ObservabilityDocument::Incidents(ObservabilityDocumentIncidents::new(&CEILINGS, ObservabilityDocumentIncidentsParts { subject: ObservabilitySubject::new(&CEILINGS, ObservabilitySubjectParts { scope: ObservabilityScope::Project(ObservabilityScopeProject::new(&CEILINGS, ObservabilityScopeProjectParts { value: 0_u32 }).expect("golden within ceilings")), kind: ObservabilityKind::Incidents(ObservabilityKindIncidents::new(&CEILINGS, ObservabilityKindIncidentsParts { open: false }).expect("golden within ceilings")) }).expect("golden within ceilings"), revision: 0_u64, incidents: skein_lib::List::with_capacity(0) }).expect("golden within ceilings")) }).expect("golden within ceilings"))) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadAnswer::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_observability_read_answer_full", || { let value = ObservabilityReadAnswer::new(&CEILINGS, ObservabilityReadAnswerParts { value: ObservabilityReadResult::Value(Box::new(ObservabilityReadValue::new(&CEILINGS, ObservabilityReadValueParts { value: ObservabilityDocument::Incidents(ObservabilityDocumentIncidents::new(&CEILINGS, ObservabilityDocumentIncidentsParts { subject: ObservabilitySubject::new(&CEILINGS, ObservabilitySubjectParts { scope: ObservabilityScope::Project(ObservabilityScopeProject::new(&CEILINGS, ObservabilityScopeProjectParts { value: u32::MAX }).expect("golden within ceilings")), kind: ObservabilityKind::Incidents(ObservabilityKindIncidents::new(&CEILINGS, ObservabilityKindIncidentsParts { open: true }).expect("golden within ceilings")) }).expect("golden within ceilings"), revision: u64::MAX, incidents: { let mut items = skein_lib::List::with_capacity(1); items.push(ObservabilityIncident::new(&CEILINGS, ObservabilityIncidentParts { project: u32::MAX, number: u64::MAX, revision: u64::MAX, watch: u64::MAX, raised: u64::MAX, service: ObservabilityService::new(&CEILINGS, ObservabilityServiceParts { environment: Box::from([0_u8, 127_u8, 255_u8].as_slice()), name: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), severity: u8::MAX, state: ObservabilityState::Alerting, timeline: { let mut items = skein_lib::List::with_capacity(1); items.push(ObservabilityPoint::new(&CEILINGS, ObservabilityPointParts { at: u64::MAX, health: Some(ObservabilityHealth::new(&CEILINGS, ObservabilityHealthParts { observed: u64::MAX, healthy_replicas: u32::MAX, errors: u32::MAX, error_rate_percent: u8::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")).expect("one slot"); items }, cut: true, health: Some(ObservabilityHealth::new(&CEILINGS, ObservabilityHealthParts { observed: u64::MAX, healthy_replicas: u32::MAX, errors: u32::MAX, error_rate_percent: u8::MAX }).expect("golden within ceilings")), lead: Some(u64::MAX), proposals: { let mut items = skein_lib::List::with_capacity(1); items.push(DecisionKey::new(&CEILINGS, DecisionKeyParts { maker: DecisionMaker::Task(DecisionTask::new(&CEILINGS, DecisionTaskParts { value: u64::MAX }).expect("golden within ceilings")), number: u64::MAX }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings")) }).expect("golden within ceilings"))) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 0, 0, 0, 255, 255, 255, 255, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 255, 0, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ObservabilityReadAnswer::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
     ];
 
     #[test]

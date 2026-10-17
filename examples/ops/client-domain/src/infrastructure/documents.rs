@@ -2,7 +2,7 @@
 //! Replace: infrastructure resources, procedures and the application's own forms.
 //! The owner supplies prices, end facts and drift (examples.md, 3 and 8).
 use alloc::boxed::Box;
-use jig_client_domain::contract::{ObjectKey, Part, ProposalKey, Revision};
+use jig_client::contract::{ObjectKey, Part, ProposalKey, Revision};
 use skein_lib::{List, Wall};
 /// Scope supplied with every read and watch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -452,7 +452,7 @@ pub enum Answer {
     Moved { environment: u64, revision: Revision, until: Option<Wall> },
     Gone,
     Refused { why: Refusal },
-    EntranceRefused(jig_client_domain::contract::EntranceRefusal),
+    EntranceRefused(jig_client::contract::EntranceRefusal),
 }
 /// A scoped whole-read terminal.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -495,8 +495,8 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
         },
         Part::Outbox { scope, entry, .. } => {
             let scope = match scope {
-                jig_client_domain::contract::PartScope::Project(project) => Scope::Project(*project),
-                jig_client_domain::contract::PartScope::Deployment => Scope::Deployment,
+                jig_client::contract::PartScope::Project(project) => Scope::Project(*project),
+                jig_client::contract::PartScope::Deployment => Scope::Deployment,
             };
             return Some(Subject { scope, kind: Kind::Outbox(*entry) });
         }

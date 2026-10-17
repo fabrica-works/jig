@@ -701,8 +701,10 @@ dependencies = [
 name = "jig-ops-client-domain"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
  "jig-client-domain",
  "jig-client-view",
+ "jig-ops-client-protocol-wire",
  "jig-ops-domain-connectors",
  "skein-lib",
 ]

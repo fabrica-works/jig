@@ -14,7 +14,7 @@ pub mod documents;
 pub mod native;
 use alloc::boxed::Box;
 pub use documents::{Document, Kind, ReadResult, Scope, Subject, WatchEnd, WatchEvent};
-use jig_client_domain::contract::Part;
+use jig_client::contract::Part;
 use jig_client_view::{frame::me::FrameShown, link::Link};
 use skein_lib::{Env, Id, List, Map, Queue, Slab, Time, Token};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -83,7 +83,7 @@ pub enum Request {
     Show { address: Address },
     Save { record: Record },
     Out(Out),
-    ShowObjects { objects: List<jig_client_domain::contract::ObjectKey> },
+    ShowObjects { objects: List<jig_client::contract::ObjectKey> },
     ShowSections { sections: List<jig_client_view::page::Section> },
     ObjectsLeft,
 }
@@ -609,7 +609,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total
         .checked_add(List::<Subject>::worst_case(limits.objects)?)?
         .checked_add(List::<Id<Watching>>::worst_case(limits.watches)?)?;
-    total.checked_add(List::<jig_client_domain::contract::ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)
+    total.checked_add(List::<jig_client::contract::ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)
 }
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
@@ -676,7 +676,7 @@ fn watch_event(side: &mut Side, env: &Env<Limits>, watch: Token, event: WatchEve
 
 fn part_fits(part: &Part, segments: u32, text: u32) -> bool {
     match part {
-        Part::Resource { path, .. } => jig_client_domain::contract::resource_path_fits(path, segments, text),
+        Part::Resource { path, .. } => jig_client::contract::resource_path_fits(path, segments, text),
         Part::Connector { .. }
         | Part::Kind { .. }
         | Part::Panel { .. }

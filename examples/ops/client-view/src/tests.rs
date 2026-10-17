@@ -5,9 +5,13 @@
     reason = "fixtures inspect public tree nodes and observed boundary outputs"
 )]
 use crate::{Limits, View, build, words};
-use jig_client_domain::contract::*;
-use jig_ops_client_domain::{self as root, Address, Domain, Event, JigOut, Request, infrastructure, observability};
-use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Wall};
+use jig_client::contract::*;
+use jig_ops_client_domain as support_domain;
+use jig_ops_client_domain::{self as root, Address, Event, infrastructure, observability};
+#[path = "../../client-domain/src/tests_support.rs"]
+mod support;
+use skein_lib::{Duration, Env, List, Queue, Time, Wall};
+use support::{Domain, JigOut, Request};
 const JIG: jig_client_view::Limits = jig_client_view::Limits {
     watches: 4,
     notices: 2,
@@ -62,20 +66,13 @@ fn limits() -> root::Limits {
             retry: Duration::from_nanos(10),
             document_bytes: 65536,
         },
-        table: RequestLimits {
-            requests: 4,
-            bytes: 262_144,
-            out: 16,
-            first: Duration::from_nanos(10),
-            most: Duration::from_nanos(80),
-            margin: Duration::from_secs(1),
-        },
+        client: support::client_limits(),
     }
 }
 
 fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
     let mut out = Queue::with_capacity(root::max_out(&limits()));
-    root::step(root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, event, &mut out);
+    support::step(root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, event, &mut out);
     let mut rows = Vec::new();
     while let Some(r) = out.pop() {
         rows.push(r);
@@ -83,16 +80,17 @@ fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
     rows
 }
 fn ready() -> Domain {
-    let mut root = root::new(&limits(), 5);
+    let mut root = support::new(&limits(), 5);
     root::configure_arrangement(&mut root, crate::arrangement()).expect("ops arrangement before start");
-    let rows = drive(
+    let mut rows = drive(&mut root, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } });
+    rows.extend(drive(
         &mut root,
         Event::Start {
             address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             kept: List::with_capacity(0),
             offset: jig_client_view::boundary::Offset { minutes: 0 },
         },
-    );
+    ));
     let watch = rows
         .iter()
         .find_map(|r| match r {
@@ -870,8 +868,8 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
     let action = crate::decode(&mut view, button, skein_ui::Act::Press).unwrap();
     assert!(drive(&mut root, Event::Act { action }).is_empty());
     let mut out = Queue::with_capacity(root::max_out(&limits()));
-    root::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut out);
-    let Some(Request::Save { record: root::store::Record::Table { .. } }) = out.pop() else {
+    support::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut out);
+    let Some(Request::Save { record: root::store::Record::Unlinked(_) }) = out.pop() else {
         panic!("save precedes send");
     };
     let request = out.pop().unwrap();
@@ -887,15 +885,15 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
     assert_eq!(until.as_secs(), 900);
     drive(
         &mut root,
-        Event::Answer {
+        support::answer(
             attempt,
-            envelope: skein_lib::RequestEnvelope::Again,
-            answer: Some(root::Answered::Infrastructure(infrastructure::Answer::MovedEnd {
+            skein_lib::RequestEnvelope::Again,
+            Some(root::Answered::Infrastructure(infrastructure::Answer::MovedEnd {
                 environment: 7,
                 revision: Revision { value: 6 },
                 until,
             })),
-        },
+        ),
     );
     while patches.pop().is_some() {}
     build(&mut view, &root, &mut patches);
@@ -1026,7 +1024,7 @@ fn a_common_entrance_refusal_prints_supplied_budget_facts_without_claiming_gone(
         Event::Act { action: root::Action::Infrastructure(infrastructure::Act::MoveEnd { object, revision }) },
     );
     let mut out = Queue::with_capacity(root::max_out(&limits()));
-    root::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut out);
+    support::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut out);
     let mut attempt = None;
     while let Some(request) = out.pop() {
         if let Request::Send { attempt: token, .. } = request {
@@ -1038,11 +1036,10 @@ fn a_common_entrance_refusal_prints_supplied_budget_facts_without_claiming_gone(
             .unwrap();
     drive(
         &mut root,
-        Event::Answer {
-            attempt: attempt.unwrap(),
-            envelope: skein_lib::RequestEnvelope::Final,
-            answer: Some(root::Answered::Infrastructure(infrastructure::Answer::EntranceRefused(refusal))),
-        },
+        support::final_answer(
+            attempt.unwrap(),
+            root::Answered::Infrastructure(infrastructure::Answer::EntranceRefused(refusal)),
+        ),
     );
     let mut view = view();
     let mut patches = Queue::with_capacity(view.limits().tree.patches);

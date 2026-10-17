@@ -1,32 +1,49 @@
-//! Keep: the child/table routing shape and exhaustive owner variants.
+//! Keep: the child routing shape and exhaustive connector variants.
 //! Replace: Ops connector sides, family addresses and application vocabulary.
-use crate::{
-    Ask, Event, Fact, Limits, Request, infrastructure,
-    owner::Owner,
-    route,
-    store::{Key, Record},
-};
-use skein_lib::{Env, Queue, RequestAnswered, RequestOut, RequestProgress, RequestTable, Rng, Time};
-/// The three children and their shared durable request table.
+use crate::{Event, Limits, Request, infrastructure, route};
+use skein_lib::{Env, Queue, Rng, Time};
+/// The three children and their shared durable client.
 #[derive(Debug)]
 pub struct Domain {
     pub(crate) jig: jig_client_view::Domain,
     pub(crate) infrastructure: infrastructure::Side,
     pub(crate) observability: crate::observability::Side,
-    pub(crate) table: RequestTable<Owner, Ask>,
+    pub(crate) client: jig_client::Client,
+    pub(crate) salt: u64,
+    pub(crate) unlinked: bool,
 }
 #[must_use]
 pub fn new(limits: &Limits, seed: u64) -> Domain {
+    build(limits, seed, false)
+}
+#[must_use]
+pub fn unlinked(limits: &Limits, seed: u64) -> Domain {
+    build(limits, seed, true)
+}
+fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
     assert!(crate::worst_case(limits).is_some(), "root capacities are checked");
     let mut rng = Rng::new(seed);
+    let client = if unlinked {
+        jig_client::Client::unlinked(&limits.client, rng.next_u64())
+    } else {
+        jig_client::Client::new(&limits.client, rng.next_u64())
+    }
+    .expect("checked client capacities");
     Domain {
         jig: jig_client_view::Domain::new(&limits.jig),
         infrastructure: infrastructure::Side::new(&limits.infrastructure, rng.next_u64()),
         observability: crate::observability::Side::new(&limits.observability, rng.next_u64()),
-        table: RequestTable::new(&limits.table, rng.next_u64()),
+        client,
+        salt: rng.next_u64(),
+        unlinked,
     }
 }
 impl Domain {
+    #[must_use]
+    pub const fn client(&self) -> &jig_client::Client {
+        &self.client
+    }
+
     #[must_use]
     pub const fn jig(&self) -> &jig_client_view::Domain {
         &self.jig
@@ -61,7 +78,9 @@ pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         &mut child,
     );
     route::route_observability(root, env, &mut child, out);
-    root.table.fire(env.now, env.wall);
+    let mut client = Queue::with_capacity(jig_client::max_out(&env.limits.client));
+    root.client.fire(env.now, env.wall, &mut client);
+    route::route_client(root, env, &mut client, out);
 }
 #[must_use]
 pub fn next_deadline(root: &Domain) -> Option<Time> {
@@ -69,7 +88,7 @@ pub fn next_deadline(root: &Domain) -> Option<Time> {
     for deadline in [
         infrastructure::next_deadline(&root.infrastructure),
         crate::observability::next_deadline(&root.observability),
-        root.table.next_deadline(),
+        root.client.next_deadline(),
     ]
     .into_iter()
     .flatten()
@@ -81,30 +100,9 @@ pub fn next_deadline(root: &Domain) -> Option<Time> {
     }
     next
 }
-/// Iterate's table phase: emit stores before sends, report progress, reclaim.
-pub fn take(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
-    {
-        let mut cursor = root.table.take(env.now, env.wall);
-        for _ in 0..env.limits.table.out {
-            match cursor.next_out() {
-                Some(RequestOut::Save(record)) => out.push(Request::Save {
-                    record: Record::Table { version: crate::store::VERSION, record: record.clone() },
-                }),
-                Some(RequestOut::Erase(key)) => out.push(Request::Erase { key: Key::Table(key) }),
-                Some(RequestOut::Send { attempt, key, request }) => {
-                    out.push(Request::Send { attempt, key, ask: request.clone() });
-                }
-                None => break,
-            }
-        }
-    }
-    for _ in 0..env.limits.table.requests {
-        let Some((owner, progress)) = root.table.progress() else {
-            break;
-        };
-        route::progress(root, env, owner, progress, out);
-    }
-    root.table.reclaim();
+/// Reclaim the client and children after every tell has been routed.
+pub fn take(root: &mut Domain, _env: &Env<Limits>, _out: &mut Queue<Request>) {
+    root.client.reclaim();
     jig_client_view::reclaim(&mut root.jig);
     infrastructure::reclaim(&mut root.infrastructure);
     crate::observability::reclaim(&mut root.observability);
@@ -118,67 +116,6 @@ pub fn shown(root: &Domain) -> u64 {
         .checked_add(crate::observability::shown(&root.observability))
         .expect("observability shown count fits")
 }
-pub(crate) fn answered(
-    root: &mut Domain,
-    env: &Env<Limits>,
-    attempt: skein_lib::Token,
-    envelope: skein_lib::RequestEnvelope,
-    answer: Option<crate::Answered>,
-    out: &mut Queue<Request>,
-) {
-    match root.table.answered(env.now, attempt, envelope) {
-        RequestAnswered::Final(owner) => match owner {
-            Owner::Jig(request) => match answer {
-                Some(crate::Answered::Jig(answer)) => {
-                    route::jig(root, env, jig_client_view::Event::Answered { request, answer }, out);
-                }
-                Some(crate::Answered::Infrastructure(_)) | None => {
-                    out.push(Request::Fact { fact: Fact::InvalidAnswer });
-                }
-            },
-            Owner::Infrastructure(request) => match answer {
-                Some(crate::Answered::Infrastructure(answer)) => {
-                    route::infrastructure(root, env, infrastructure::Event::Answered { request, answer }, out);
-                }
-                Some(crate::Answered::Jig(_)) | None => out.push(Request::Fact { fact: Fact::InvalidAnswer }),
-            },
-            Owner::Observability(_) => out.push(Request::Fact { fact: Fact::InvalidAnswer }),
-            Owner::Kept { scope } => {
-                out.push(Request::Fact { fact: Fact::KeptAnswered });
-                route::jig(root, env, jig_client_view::Event::KeptGone { scope }, out);
-            }
-        },
-        RequestAnswered::Pending => match envelope {
-            skein_lib::RequestEnvelope::SignedOut => route::jig(root, env, jig_client_view::Event::SignedOut, out),
-            skein_lib::RequestEnvelope::Final
-            | skein_lib::RequestEnvelope::Again
-            | skein_lib::RequestEnvelope::Lost => {}
-        },
-        RequestAnswered::Stale => {}
-    }
-}
-pub(crate) fn ask(root: &mut Domain, env: &Env<Limits>, owner: Owner, scope: u64, ask: Ask, out: &mut Queue<Request>) {
-    let size = ask_size(&env.limits, &ask);
-    if root.table.ask(owner, scope, size, ask).is_err() {
-        out.push(Request::Fact { fact: Fact::TableFull });
-        route::progress(root, env, owner, RequestProgress::Unknown, out);
-    }
-}
-pub(crate) fn ask_size(limits: &Limits, ask: &Ask) -> u64 {
-    match ask {
-        Ask::Jig(_) => limits.jig.document_bytes,
-        Ask::Infrastructure(ask) => {
-            let base = u64::try_from(size_of::<infrastructure::Ask>()).expect("ask size fits");
-            match ask {
-                infrastructure::Ask::MoveEnd { .. } => base,
-                infrastructure::Ask::NativeMoveEnd { environment, .. } => base
-                    .saturating_add(u64::try_from(environment.pool.len()).expect("name size fits"))
-                    .saturating_add(u64::try_from(environment.name.len()).expect("name size fits")),
-            }
-        }
-    }
-}
-
 /// Installs application-configured provider words before Start (client.md, 12).
 pub fn provider(
     root: &mut Domain,

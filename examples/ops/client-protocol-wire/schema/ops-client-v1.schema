@@ -185,3 +185,9 @@ record InfrastructurePartDocument { subject: InfrastructureSubject revision: u64
 record InfrastructureDocumentPart { value: InfrastructurePartDocument }
 enum InfrastructureDocument { native: InfrastructureDocumentNative, environments: InfrastructureDocumentEnvironments, environment: InfrastructureDocumentEnvironment, part: InfrastructureDocumentPart }
 versioned record InfrastructureDocumentRecord { value: InfrastructureDocument }
+record InfrastructureReadValue { value: InfrastructureDocument }
+enum InfrastructureReadResult { value: boxed InfrastructureReadValue, unknown, not_allowed }
+versioned record InfrastructureReadAnswer { value: InfrastructureReadResult }
+record ObservabilityReadValue { value: ObservabilityDocument }
+enum ObservabilityReadResult { value: boxed ObservabilityReadValue, unknown, not_allowed }
+versioned record ObservabilityReadAnswer { value: ObservabilityReadResult }
