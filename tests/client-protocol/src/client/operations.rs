@@ -154,3 +154,15 @@ fn stored_party_proposal(row: &jig_test_domain::Record, number: u64) -> Option<&
         jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
     }
 }
+
+impl Story {
+    /// A batch fixture whose owner may create a person task at their held role.
+    #[must_use]
+    pub fn live_person_batch(seed: u64) -> Self {
+        let mut story =
+            Self::configured(seed, &crate::fixtures::query_limits(), crate::fixtures::person_batch_config(seed));
+        story.sign_in();
+        assert!(story.run_until(|s| s.client.link().state == jig_client::Link::Live, RUNNING_WAIT));
+        story
+    }
+}

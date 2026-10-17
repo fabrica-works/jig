@@ -62,7 +62,7 @@ pub enum Act {
     /// Choose the new goal charter, budget, deadline and priority.
     GoalForm { form: crate::page::project::goals::GoalForm },
     /// Filter the project live task source.
-    FilterTasks { filter: jig_client::contract::TaskFilter },
+    FilterTasks { filter: jig_client::contract::TaskQuery },
     /// Select note scope and description search.
     FilterNotes { filter: crate::page::project::NoteFilter },
     /// Select held or live plan rows.

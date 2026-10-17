@@ -1,3 +1,4 @@
+#![expect(clippy::manual_map, reason = "step code matches optional authenticated identities without closures")]
 //! Filters and live rows are the domain's facts (pages.md, 6.3).
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
@@ -6,8 +7,8 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
 use crate::{Borrowed, action::Act};
-use jig_client::contract::{Executor, ObjectKey, Phase, Project};
-pub(super) fn tasks(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words: &Words, bindings: &mut JigBindings) {
+use jig_client::contract::{ExecutorKind, ObjectKey, PhaseClass, Project, TaskQuery};
+pub(super) fn tasks(b: &mut Builder, client: &Borrowed<'_>, _doc: &Project, words: &Words, bindings: &mut JigBindings) {
     let project_page = client.project_page();
     let filter = project_page.task_filter;
     crate::pages::work::control(
@@ -15,58 +16,52 @@ pub(super) fn tasks(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words
         words,
         bindings,
         JigPhrase::AllTasks,
-        Act::FilterTasks {
-            filter: jig_client::contract::TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false },
-        },
-        filter.phase.is_none() && filter.executor.is_none() && filter.goal.is_none() && !filter.asked_by_me,
+        Act::FilterTasks { filter: TaskQuery { phase: None, executor: None, root: None, requester: None, ..filter } },
+        filter.phase.is_none() && filter.executor.is_none() && filter.root.is_none() && filter.requester.is_none(),
     );
     crate::pages::work::control(
         b,
         words,
         bindings,
         JigPhrase::AskedByMe,
-        Act::FilterTasks { filter: jig_client::contract::TaskFilter { asked_by_me: !filter.asked_by_me, ..filter } },
-        filter.asked_by_me,
+        Act::FilterTasks {
+            filter: TaskQuery {
+                requester: if filter.requester.is_some() {
+                    None
+                } else {
+                    match client.frame().party() {
+                        Some(party) => Some(jig_client::contract::OwnerRequester::Person(party)),
+                        None => None,
+                    }
+                },
+                ..filter
+            },
+        },
+        filter.requester.is_some(),
     );
-    for phase in [
-        Phase::Waiting,
-        Phase::Idle,
-        Phase::Due,
-        Phase::Preparing,
-        Phase::Claimed,
-        Phase::Running,
-        Phase::BackingOff,
-        Phase::Active,
-        Phase::Closing,
-        Phase::Held,
-        Phase::Ended,
-        Phase::Done,
-        Phase::Failed,
-        Phase::Cancelled,
-    ] {
+    for phase in [PhaseClass::Working, PhaseClass::Waiting, PhaseClass::Held, PhaseClass::Closing, PhaseClass::Ended] {
         crate::pages::work::control(
             b,
             words,
             bindings,
             phrase(phase),
-            Act::FilterTasks { filter: jig_client::contract::TaskFilter { phase: Some(phase), ..filter } },
+            Act::FilterTasks { filter: TaskQuery { phase: Some(phase), ..filter } },
             filter.phase == Some(phase),
         );
     }
-    for executor in &doc.policy.ceiling.task_kinds {
+    for executor in [ExecutorKind::Agent, ExecutorKind::Procedure, ExecutorKind::Person] {
         let phrase = match executor {
-            Executor::Agent { .. } => JigPhrase::Agent,
-            Executor::Procedure { .. } => JigPhrase::Procedure,
-            Executor::Party { .. } => JigPhrase::Person,
-            Executor::Role { .. } => JigPhrase::RoleExecutor,
+            ExecutorKind::Agent => JigPhrase::Agent,
+            ExecutorKind::Procedure => JigPhrase::Procedure,
+            ExecutorKind::Person => JigPhrase::Person,
         };
         crate::pages::work::control(
             b,
             words,
             bindings,
             phrase,
-            Act::FilterTasks { filter: jig_client::contract::TaskFilter { executor: Some(*executor), ..filter } },
-            filter.executor == Some(*executor),
+            Act::FilterTasks { filter: TaskQuery { executor: Some(executor), ..filter } },
+            filter.executor == Some(executor),
         );
     }
     b.open(Role::List);
@@ -79,7 +74,8 @@ pub(super) fn tasks(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words
         }
         crate::owner_result::requester(b, row.requester, words);
         words.wall(b, row.changed);
-        if let Some(goal) = row.goal {
+        let goal = task_root(client, row.chip.task);
+        if let Some(goal) = goal {
             crate::frame::control(
                 b,
                 words,
@@ -87,7 +83,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words
                 Role::Button,
                 JigPhrase::OnlyGoal,
                 &[Hole::Number(goal)],
-                Act::FilterTasks { filter: jig_client::contract::TaskFilter { goal: Some(goal), ..filter } },
+                Act::FilterTasks { filter: TaskQuery { root: Some(goal), ..filter } },
             );
         }
         b.close();
@@ -97,21 +93,18 @@ pub(super) fn tasks(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words
         words.status(b, JigPhrase::MoreRows, &[]);
     }
 }
-const fn phrase(phase: Phase) -> JigPhrase {
+const fn phrase(phase: PhaseClass) -> JigPhrase {
     match phase {
-        Phase::Waiting => JigPhrase::Waiting,
-        Phase::Idle => JigPhrase::Idle,
-        Phase::Due => JigPhrase::DuePhase,
-        Phase::Preparing => JigPhrase::PreparingPhase,
-        Phase::Claimed => JigPhrase::ClaimedPhase,
-        Phase::Running => JigPhrase::Running,
-        Phase::BackingOff => JigPhrase::RetryingPhase,
-        Phase::Active => JigPhrase::ActivePhase,
-        Phase::Closing => JigPhrase::ClosingPhase,
-        Phase::Held => JigPhrase::Held,
-        Phase::Ended => JigPhrase::Ended,
-        Phase::Done => JigPhrase::Done,
-        Phase::Failed => JigPhrase::FailedPhase,
-        Phase::Cancelled => JigPhrase::CancelledPhase,
+        PhaseClass::Working => JigPhrase::ActivePhase,
+        PhaseClass::Waiting => JigPhrase::Waiting,
+        PhaseClass::Held => JigPhrase::Held,
+        PhaseClass::Closing => JigPhrase::ClosingPhase,
+        PhaseClass::Ended => JigPhrase::Ended,
     }
+}
+
+fn task_root(client: &Borrowed<'_>, task: u64) -> Option<u64> {
+    let id = client.objects().find(ObjectKey::Task(task))?;
+    let object = client.objects().get(id)?;
+    if let Some(crate::objects::Body::Task(task)) = object.body { task.goal } else { None }
 }

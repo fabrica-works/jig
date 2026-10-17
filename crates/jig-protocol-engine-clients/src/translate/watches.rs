@@ -3,7 +3,6 @@
 use super::{chips, cursor, deployment, inbox, live, objects, owner, task, w};
 use alloc::boxed::Box;
 use jig_domain_core::{self as core, documents as d};
-use jig_domain_tasks as tasks;
 use jig_domain_views as views;
 use skein_lib::{List, Reader, Token, Writer};
 
@@ -28,51 +27,12 @@ pub(crate) fn watch(watcher: Token, sign_in: u64, value: w::Subject, rows: u32) 
         w::Subject::Goals(value) => (d::Watched::Goals { project: value.project() }, rows),
         w::Subject::Tasks(value) => {
             let value = value.into_parts();
-            (d::Watched::Tasks { project: value.project, filter: filter(value.project, value.filter)? }, value.window)
+            (d::Watched::Query { query: super::queries::query(value.query)? }, value.window)
         }
         w::Subject::Deployment => (d::Watched::Deployment, rows),
         w::Subject::Run(_) => return None,
     };
     Some(core::Event::Watch { watcher, sign_in, subject, window: d::Window { rows, after: None } })
-}
-fn filter(project: u32, value: w::TaskFilter) -> Option<d::TaskFilter> {
-    let value = value.into_parts();
-    let phase = match value.phase {
-        Some(value) => Some(match value {
-            w::Phase::Waiting => d::TaskPhase::Waiting,
-            w::Phase::Idle => d::TaskPhase::Idle,
-            w::Phase::Due => d::TaskPhase::Due,
-            w::Phase::Preparing => d::TaskPhase::Preparing,
-            w::Phase::Claimed => d::TaskPhase::Claimed,
-            w::Phase::Running => d::TaskPhase::Running,
-            w::Phase::BackingOff => d::TaskPhase::BackingOff,
-            w::Phase::Active => d::TaskPhase::Active,
-            w::Phase::Closing => d::TaskPhase::Closing,
-            w::Phase::Held => d::TaskPhase::Held,
-            w::Phase::Done => d::TaskPhase::Done,
-            w::Phase::Failed => d::TaskPhase::Failed,
-            w::Phase::Cancelled => d::TaskPhase::Cancelled,
-            w::Phase::Ended => d::TaskPhase::Ended,
-        }),
-        None => None,
-    };
-    let executor = match value.executor {
-        None => None,
-        Some(value) => Some(match value {
-            w::Executor::Agent(value) => tasks::Executor::Agent { charter: value.charter() },
-            w::Executor::Procedure(value) => {
-                tasks::Executor::Procedure { connector: value.connector(), code: value.kind() }
-            }
-            w::Executor::Party(value) => tasks::Executor::Person(tasks::PersonAddress::Person(value.party())),
-            w::Executor::Role(value) => {
-                if value.project() != project {
-                    return None;
-                }
-                tasks::Executor::Person(tasks::PersonAddress::Role(value.role()))
-            }
-        }),
-    };
-    Some(d::TaskFilter { phase, executor, goal: value.goal, asked_by_me: value.asked_by_me })
 }
 pub(crate) fn decode(bytes: &[u8], limits: &w::Limits) -> Option<w::Subject> {
     let mut reader = Reader::new(bytes);
@@ -164,7 +124,7 @@ pub(crate) fn delivery(
             }
             w::DeliveryValue::Goals(live::goals(project, value, limits)?)
         }
-        d::Document::Tasks(value) => w::DeliveryValue::Tasks(live::tasks(value, limits)?),
+        d::Document::Lines(value) => w::DeliveryValue::Tasks(super::queries::lines(value, limits)?),
         d::Document::Conversations(value) => {
             let position = core::reads::conversations_cursor(value);
             let bytes =
@@ -175,7 +135,7 @@ pub(crate) fn delivery(
         d::Document::Run(value) => w::DeliveryValue::RunState(live::run(value, limits)?),
         d::Document::Deployment(value) => w::DeliveryValue::OwnerDeployment(deployment::document(value, limits)?),
         d::Document::Proposal(value) => w::DeliveryValue::OwnerProposal(objects::proposal(value, limits)?),
-        d::Document::Lines(_)
+        d::Document::Tasks(_)
         | d::Document::Escalation(_)
         | d::Document::Question(_)
         | d::Document::PersonTask(_)

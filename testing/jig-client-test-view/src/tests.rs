@@ -192,6 +192,10 @@ fn budget() -> Budget {
 }
 fn task() -> Task {
     Task {
+        label: 0,
+        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        last_activity: Wall::EPOCH,
+        waits_on: WaitsOn::Nothing,
         chip: Chip {
             task: 9,
             title: DocumentText::complete(text(&[b't'; 32])),

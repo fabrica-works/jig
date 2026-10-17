@@ -140,6 +140,10 @@ fn text() -> contract::Text {
 }
 fn document(number: u64) -> contract::Task {
     contract::Task {
+        label: 0,
+        flags: contract::TaskFlags { conversation: false, listed: true, retention: contract::Retention::Kept },
+        last_activity: Wall::from_nanos(0),
+        waits_on: contract::WaitsOn::Nothing,
         chip: contract::Chip {
             task: number,
             title: contract::DocumentText::complete(text()),

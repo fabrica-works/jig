@@ -538,3 +538,83 @@ fn me_template_budget(story: &Story, template: u32) -> Option<contract::Template
         .find(|row| row.number == template)
         .map(|row| row.budget)
 }
+
+const QUERY: Handle = Handle { asker: Asker::JIG, number: 5 };
+const QUERY_AMEND: Key = Key { asker: Asker::JIG, number: 91 };
+#[test]
+fn a_task_query_watch_delivers_the_live_lines_its_keys_select() {
+    let mut story = Story::live_batch(fixtures::SEED, true);
+    story.send(
+        CREATE,
+        Ask::Jig(Box::new(contract::Ask::Create { project: PROJECT_NUMBER, tasks: fixtures::tracked_tasks() })),
+    );
+    assert!(story.run_until(|s| !s.answered(CREATE).is_empty(), PROOF_WAIT));
+    story.watch(
+        QUERY,
+        Watchable::Jig(contract::Subject::Tasks { query: fixtures::task_query(PROJECT_NUMBER), window: 2 }),
+    );
+    assert!(story.run_until(|s| fixtures::task_lines(s, QUERY).is_some(), PROOF_WAIT));
+    assert_eq!(
+        fixtures::task_lines(&story, QUERY)
+            .expect("query story fixture and delivery")
+            .rows
+            .iter()
+            .map(|r| (r.chip.task, r.tracked))
+            .collect::<Vec<_>>(),
+        vec![(fixtures::FIRST_QUERY_TASK, Some(1))]
+    );
+    story.send(
+        QUERY_AMEND,
+        Ask::Jig(Box::new(contract::Ask::Amend {
+            project: PROJECT_NUMBER,
+            task: fixtures::SECOND_QUERY_TASK,
+            revision: None,
+            change: Box::new(contract::Amendment {
+                addressed: None,
+                spec: None,
+                wake: None,
+                dependencies: None,
+                authority: None,
+                instructions: None,
+                tracked: Some(contract::Tracking::Tracked { priority: 2 }),
+            }),
+            reason: contract::Text::new(b"track".as_slice().into(), 32).expect("query story fixture and delivery"),
+        })),
+    );
+    assert!(story.run_until(|s| fixtures::task_lines(s, QUERY).is_some_and(|tasks| tasks.rows.len() == 2), PROOF_WAIT));
+    assert_eq!(
+        fixtures::task_lines(&story, QUERY)
+            .expect("query story fixture and delivery")
+            .rows
+            .iter()
+            .map(|r| (r.chip.task, r.tracked))
+            .collect::<Vec<_>>(),
+        vec![(fixtures::FIRST_QUERY_TASK, Some(1)), (fixtures::SECOND_QUERY_TASK, Some(2))]
+    );
+}
+
+#[test]
+fn a_task_line_says_what_its_task_waits_on() {
+    let mut story = Story::live_person_batch(fixtures::SEED);
+    story.send(
+        CREATE,
+        Ask::Jig(Box::new(contract::Ask::Create { project: PROJECT_NUMBER, tasks: fixtures::person_tasks() })),
+    );
+    assert!(story.run_until(|s| !s.answered(CREATE).is_empty(), PROOF_WAIT));
+    story.watch(
+        QUERY,
+        Watchable::Jig(contract::Subject::Tasks { query: fixtures::task_query(PROJECT_NUMBER), window: 2 }),
+    );
+    assert!(story.run_until(|s| fixtures::task_lines(s, QUERY).is_some(), PROOF_WAIT));
+    let rows = &fixtures::task_lines(&story, QUERY).expect("query story fixture and delivery").rows;
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        rows.get(0).expect("query story fixture and delivery").waits_on,
+        contract::WaitsOn::Party {
+            whom: contract::Whom::Person(fixtures::FIRST_OWNER),
+            entries: 1,
+            task: fixtures::FIRST_QUERY_TASK,
+            kind: contract::WaitedFor::PersonTask
+        }
+    );
+}

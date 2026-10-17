@@ -68,7 +68,7 @@ pub fn templates(values: &List<jig_domain_core::Template>, limits: &w::Limits) -
     pieces(&encoded, limits.me_project_templates, w::Path::MeProjectTemplates)
 }
 
-fn flags(value: jig_domain_tasks::Flags, limits: &w::Limits) -> Result<w::TaskFlags, w::Problem> {
+pub(super) fn flags(value: jig_domain_tasks::Flags, limits: &w::Limits) -> Result<w::TaskFlags, w::Problem> {
     w::TaskFlags::new(
         limits,
         w::TaskFlagsParts {

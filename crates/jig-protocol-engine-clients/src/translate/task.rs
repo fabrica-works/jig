@@ -328,6 +328,10 @@ pub fn document(value: &d::Task, limits: &w::Limits) -> Result<w::Task, w::Probl
     w::Task::new(
         limits,
         w::TaskParts {
+            label: value.label,
+            flags: super::me::flags(value.flags, limits)?,
+            last_activity: value.last_activity.as_nanos(),
+            waits_on: super::queries::waits(value.waits_on, limits)?,
             chip: chips::chip(&value.chip, limits)?,
             goal: value.goal,
             priority: value.priority,

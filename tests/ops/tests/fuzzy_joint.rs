@@ -27,7 +27,7 @@ type OpsEngine = jig_conformance::Harness<jig_ops_world::joint::engine::OpsAppli
 
 type StoryWorld = jig_client_world::World<fixture::Client, jig_ops_world::joint::front::Joint>;
 
-fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
+fn restart_started(seed: u64, cut: Cut, noise: bool) -> (StoryWorld, ClientId, u64, u64) {
     let (mut world, p) = monitor(seed);
     world.front().engine.cut(cut);
     fixture::alert(world.front());
@@ -87,7 +87,12 @@ fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
     );
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
-    let outcome = world.run(Until::Time(outcome.now.saturating_add(Duration::from_secs(8))));
+    (world, p, lead, remedy)
+}
+
+fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
+    let (mut world, p, lead, remedy) = restart_started(seed, cut, noise);
+    let outcome = world.run(Until::Time(world.now().saturating_add(Duration::from_secs(8))));
     assert_eq!(outcome.verdict, Verdict::Passed, "{}", outcome.trace.join("\n"));
     fixture::refresh(world.front());
     world.person(
@@ -711,7 +716,7 @@ fn assert_native_retries(world: &mut StoryWorld) {
 
 #[test]
 fn p_acceptance_survives_the_commit_before_its_durable_decision() {
-    let mut baseline = p_story(531, Cut::None, false);
+    let (mut baseline, _, _, _) = restart_started(531, Cut::None, false);
     let commit = position(&mut baseline, Milestone::Acceptance(6)) - 1;
     let mut recovered = p_story(531, Cut::AfterCommit(commit), false);
     assert_recovered(&mut recovered, commit);
@@ -720,7 +725,7 @@ fn p_acceptance_survives_the_commit_before_its_durable_decision() {
 
 #[test]
 fn p_acceptance_survives_its_durable_decision_commit() {
-    let mut baseline = p_story(532, Cut::None, false);
+    let (mut baseline, _, _, _) = restart_started(532, Cut::None, false);
     let commit = position(&mut baseline, Milestone::Acceptance(6));
     let mut recovered = p_story(532, Cut::AfterCommit(commit), false);
     assert_recovered(&mut recovered, commit);
@@ -729,7 +734,7 @@ fn p_acceptance_survives_its_durable_decision_commit() {
 
 #[test]
 fn p_acceptance_survives_the_commit_after_its_durable_decision() {
-    let mut baseline = p_story(533, Cut::None, false);
+    let (mut baseline, _, _, _) = restart_started(533, Cut::None, false);
     let commit = position(&mut baseline, Milestone::Acceptance(6)) + 1;
     let mut recovered = p_story(533, Cut::AfterCommit(commit), false);
     assert_recovered(&mut recovered, commit);

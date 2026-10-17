@@ -17,7 +17,7 @@ use crate::{
     objects::{Object, Source},
 };
 use alloc::boxed::Box;
-use jig_client::contract::{self, Cursor, GoalLine, NoteScope, Part, Project, Read, TaskFilter, TaskLine, Text};
+use jig_client::contract::{self, Cursor, GoalLine, NoteScope, Part, Project, Read, TaskLine, TaskQuery, Text};
 use skein_lib::{Env, Id, List, Queue, Token};
 pub mod goals;
 pub mod notes;
@@ -43,7 +43,7 @@ pub struct ProjectPage {
     pub ended_cut: bool,
     pub ended_before: Option<Cursor>,
     pub ended_after: Option<Cursor>,
-    pub task_filter: TaskFilter,
+    pub task_filter: TaskQuery,
     pub notes: List<Id<Object>>,
     pub note_filter: Option<NoteFilter>,
     /// Ui writes of the selected note scope and description.
@@ -68,7 +68,17 @@ impl ProjectPage {
             ended_cut: false,
             ended_before: None,
             ended_after: None,
-            task_filter: TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false },
+            task_filter: TaskQuery {
+                project: None,
+                requester: None,
+                root: None,
+                parent: None,
+                label: None,
+                phase: None,
+                executor: None,
+                tracked: None,
+                order: contract::QueryOrder::Changed,
+            },
             notes: List::with_capacity(rows),
             note_filter: None,
             note_writes: 0,
@@ -91,7 +101,17 @@ impl ProjectPage {
         self.ended_cut = false;
         self.ended_before = None;
         self.ended_after = None;
-        self.task_filter = TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false };
+        self.task_filter = TaskQuery {
+            project: None,
+            requester: None,
+            root: None,
+            parent: None,
+            label: None,
+            phase: None,
+            executor: None,
+            tracked: None,
+            order: contract::QueryOrder::Changed,
+        };
         self.notes.clear();
         self.note_filter = None;
         self.note_writes = self.note_writes.checked_add(1).expect("note writes remain");
@@ -213,7 +233,7 @@ pub(crate) fn show(domain: &mut Ui, env: &Env<crate::Limits>, parts: List<Part>,
     }
 }
 /// Replaces the live task watch so every filter is authoritative at its source.
-pub(crate) fn tasks(domain: &mut Ui, env: &Env<crate::Limits>, filter: TaskFilter, out: &mut Queue<Request>) {
+pub(crate) fn tasks(domain: &mut Ui, env: &Env<crate::Limits>, filter: TaskQuery, out: &mut Queue<Request>) {
     let Some(project) = number(domain) else {
         return;
     };
@@ -240,7 +260,11 @@ pub(crate) fn tasks(domain: &mut Ui, env: &Env<crate::Limits>, filter: TaskFilte
         domain.release(id, out);
     }
     domain.project_page.task_filter = filter;
-    open(domain, contract::Subject::Tasks { project, filter, window: env.limits.rows }, out);
+    open(
+        domain,
+        contract::Subject::Tasks { query: TaskQuery { project: Some(project), ..filter }, window: env.limits.rows },
+        out,
+    );
     domain.changed();
 }
 /// Opaque windows exposed by the board, notes and spend views.
@@ -351,44 +375,12 @@ pub(crate) fn task_rows(
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
-    if number(domain) != Some(tasks.project) || tasks.filter != domain.project_page.task_filter {
-        return;
-    }
     let mut keys = List::with_capacity(env.limits.rows);
     for task in &tasks.rows {
         keys.push(contract::ObjectKey::Task(task.chip.task)).expect("keys fit rows");
     }
     crate::page::routing::names(domain, env, source, keys, out, lent);
     domain.changed();
-}
-pub(crate) fn matches_filter(row: &TaskLine, filter: TaskFilter) -> bool {
-    crate::page::conversations::live(row.chip.phase)
-        && match filter.phase {
-            Some(phase) => phase == row.chip.phase,
-            None => true,
-        }
-        && match filter.executor {
-            Some(executor) => executor == row.chip.executor,
-            None => true,
-        }
-        && match filter.goal {
-            Some(goal) => row.goal == Some(goal),
-            None => true,
-        }
-        && (!filter.asked_by_me || row.asked_by_me)
-}
-pub(crate) fn order_tasks(rows: &mut List<TaskLine>) {
-    for first in 0..rows.len() {
-        for second in first.checked_add(1).expect("row index fits")..rows.len() {
-            let a = rows.get(first).expect("row exists");
-            let b = rows.get(second).expect("row exists");
-            if b.changed > a.changed || (b.changed == a.changed && b.chip.task < a.chip.task) {
-                let b = b.clone();
-                let a = core::mem::replace(rows.get_mut(first).expect("row exists"), b);
-                *rows.get_mut(second).expect("row exists") = a;
-            }
-        }
-    }
 }
 pub(crate) fn spend(domain: &mut Ui, page: contract::SpendPage) {
     domain.project_page.spend_cut = page.cut;

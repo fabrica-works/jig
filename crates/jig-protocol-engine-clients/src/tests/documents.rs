@@ -125,7 +125,7 @@ fn goals_keep_all_ten_phase_counts_and_budget() {
 fn tasks_keep_the_filter_requester_goal_and_changed_wall() {
     let limits = fixtures::wire_limits();
     assert_eq!(
-        translate::live::tasks(&fixtures::tasks_document(), &limits),
+        translate::queries::lines(&fixtures::tasks_document(), &limits),
         Ok(jig_client_test_records::tasks_rows_record())
     );
 }

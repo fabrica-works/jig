@@ -462,3 +462,5 @@ pub mod historical_pages;
 pub mod owner_deployment;
 pub mod owner_historical;
 pub mod owner_project;
+
+mod queries;

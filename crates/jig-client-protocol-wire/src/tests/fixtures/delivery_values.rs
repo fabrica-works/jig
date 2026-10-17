@@ -17,7 +17,7 @@ pub fn delivery_values(limits: &Limits) -> List<(&'static str, DeliveryValue)> {
     let mut values = List::with_capacity(16);
     value!(values, limits, OwnerProject, OwnerProject, 110);
     value!(values, limits, Me, Me, 70);
-    value!(values, limits, Task, Task, 213, Box::new);
+    value!(values, limits, Task, Task, 251, Box::new);
     value!(values, limits, OwnerProposal, OwnerProposal, 57);
     value!(values, limits, Tree, Tree, 48);
     value!(values, limits, OwnerTree, OwnerTree, 17);
@@ -25,7 +25,7 @@ pub fn delivery_values(limits: &Limits) -> List<(&'static str, DeliveryValue)> {
     value!(values, limits, Inbox, Inbox, 38);
     value!(values, limits, OwnerInbox, OwnerInbox, 36);
     value!(values, limits, Goals, Goals, 9);
-    value!(values, limits, Tasks, Tasks, 13);
+    value!(values, limits, Tasks, Tasks, 5);
     value!(values, limits, Conversations, Conversations, 9);
     value!(values, limits, Run, RunText, 39);
     value!(values, limits, RunState, RunState, 15);

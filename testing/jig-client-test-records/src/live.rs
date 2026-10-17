@@ -66,20 +66,7 @@ pub fn goals_record() -> w::Goals {
 #[must_use]
 pub fn tasks_record() -> w::Tasks {
     let lim = limits();
-    w::Tasks::new(
-        &lim,
-        w::TasksParts {
-            project: 7,
-            filter: w::TaskFilter::new(
-                &lim,
-                w::TaskFilterParts { phase: None, executor: None, goal: None, asked_by_me: false },
-            )
-            .expect("literal fixture fits"),
-            rows: Box::from([]),
-            more: false,
-        },
-    )
-    .expect("literal fixture fits")
+    w::Tasks::new(&lim, w::TasksParts { rows: Box::from([]), more: false }).expect("literal fixture fits")
 }
 #[must_use]
 pub fn owner_deployment_record() -> w::OwnerDeployment {

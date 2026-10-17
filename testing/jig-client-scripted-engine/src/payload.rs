@@ -17,9 +17,9 @@ use jig_client_domain::contract::{
     Question, Read, ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result,
     ResultContract, ResultField, ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding,
     RunObservation, RunStage, RunState, RunText, RunWork, Runtime, SeenThrough, Speaker, Specification,
-    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskContext,
-    TaskFilter, TaskHold, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage,
-    VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskContext, TaskHold,
+    TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy,
+    WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Token, Wall};
 
@@ -455,6 +455,7 @@ impl Payload for ChipPhase {
     }
 }
 fields!(Task {
+    label, flags, last_activity, waits_on,
     chip,
     goal,
     priority,
@@ -906,9 +907,28 @@ impl Payload for Runtime {
 fields!(Impact { tasks, live_runs, proposals, effects_pending, effects_settling, takeover_budget });
 fields!(WriterSlot { resource, task, attempt });
 fields!(LiveDelegate { chip, takeover_budget });
-fields!(TaskFilter { phase, executor, goal, asked_by_me });
-fields!(TaskLine { asked_by_me, chip, goal, requester, changed });
-fields!(Tasks { project, filter, rows, more });
+plain!(
+    jig_client_domain::contract::TaskQuery,
+    jig_client_domain::contract::WaitsOn,
+    jig_client_domain::contract::ConversationRead
+);
+fields!(TaskLine {
+    chip,
+    project,
+    requester,
+    tracked,
+    label,
+    flags,
+    changed,
+    last_activity,
+    ended_at,
+    budget,
+    waits_on,
+    phases,
+    held_below,
+    conversation
+});
+fields!(Tasks { rows, more });
 fields!(TaskSpend { chip, spent });
 fields!(SpendPeriod { period, budget, pools, tasks });
 fields!(Cursor { value });
@@ -1104,9 +1124,7 @@ impl Payload for Subject {
             Self::Chips { tasks } => sum(&[tasks.heap(bounds)]),
             Self::Inbox { window } => sum(&[window.heap(bounds)]),
             Self::Goals { project } => sum(&[project.heap(bounds)]),
-            Self::Tasks { project, filter, window } => {
-                sum(&[project.heap(bounds), filter.heap(bounds), window.heap(bounds)])
-            }
+            Self::Tasks { query, window } => sum(&[query.heap(bounds), window.heap(bounds)]),
             Self::Run { task, turn, offset } => sum(&[task.heap(bounds), turn.heap(bounds), offset.heap(bounds)]),
         }
     }

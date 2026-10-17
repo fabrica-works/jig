@@ -23,6 +23,10 @@ pub fn document(source: &documents::Task, limits: &Limits) -> Result<client::Tas
 
 fn copy(source: &documents::Task, limits: &Limits) -> Result<client::Task, owner::Invalid> {
     Ok(client::Task {
+        label: source.label,
+        flags: super::queries::flags(source.flags),
+        last_activity: source.last_activity,
+        waits_on: super::queries::waits(source.waits_on),
         chip: chips::chip(&source.chip, limits)?,
         goal: source.goal,
         priority: source.priority,

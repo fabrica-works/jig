@@ -67,8 +67,7 @@ fn task_list_filters_do_not_alias_person_task_and_deployment_requesters_with_equ
                     11,
                     Token::new(3),
                     Subject::Tasks {
-                        project: 1,
-                        filter: TaskFilter { phase: None, executor: None, goal: None, asked_by_me },
+                        query: TaskQuery { requester: asked_by_me.then_some(OwnerRequester::Person(1)), ..query(1) },
                         window: 2,
                     },
                 )
@@ -94,7 +93,7 @@ fn task_list_filters_do_not_alias_person_task_and_deployment_requesters_with_equ
             } else {
                 assert_eq!(rows.len(), 1);
                 assert_eq!(rows.get(0).unwrap().requester, requester);
-                assert_eq!(rows.get(0).unwrap().asked_by_me, asked_by_person);
+                assert_eq!(rows.get(0).unwrap().requester == OwnerRequester::Person(1), asked_by_person);
             }
         }
     }

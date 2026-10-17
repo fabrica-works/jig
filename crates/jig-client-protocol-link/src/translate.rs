@@ -33,3 +33,5 @@ pub(crate) mod envelope;
 pub mod store;
 
 mod compound;
+
+mod queries;

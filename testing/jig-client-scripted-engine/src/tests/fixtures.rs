@@ -46,3 +46,17 @@ pub(super) fn proposed_amendment(bounded: bool, changed: bool) -> (Script, Ask, 
     setup.rules.push(Rule { party: Some(1), ask: ask.clone(), answer: answer.clone(), changes: vec![] });
     (setup, ask, answer)
 }
+
+pub(super) fn query(project: u32) -> TaskQuery {
+    TaskQuery {
+        project: Some(project),
+        requester: None,
+        root: None,
+        parent: None,
+        label: None,
+        phase: None,
+        executor: None,
+        tracked: None,
+        order: QueryOrder::Changed,
+    }
+}

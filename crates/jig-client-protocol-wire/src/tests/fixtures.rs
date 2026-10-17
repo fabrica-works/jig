@@ -744,6 +744,14 @@ pub fn task(limits: &Limits) -> Task {
     Task::new(
         limits,
         TaskParts {
+            label: 0,
+            flags: TaskFlags::new(
+                limits,
+                TaskFlagsParts { conversation: false, listed: true, retention: Retention::Kept },
+            )
+            .expect("fixture flags"),
+            last_activity: 0,
+            waits_on: WaitsOn::Nothing,
             chip: chip(limits, &rows),
             goal: Some(u64::MAX),
             priority: Some(u32::MAX),

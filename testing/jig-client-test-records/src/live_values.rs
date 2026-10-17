@@ -186,36 +186,30 @@ pub fn tasks_rows_record() -> w::Tasks {
         &l,
         w::TaskLineParts {
             chip: live_chip_record(),
-            goal: Some(19),
+            project: 7,
+            tracked: Some(19),
+            label: 0,
+            flags: w::TaskFlags::new(
+                &l,
+                w::TaskFlagsParts { conversation: false, listed: true, retention: w::Retention::Kept },
+            )
+            .expect("fixture flags"),
+            last_activity: 29,
+            ended_at: None,
+            budget: live_budget_record(),
+            waits_on: w::WaitsOn::Nothing,
+            phases: phases_record(),
+            held_below: 0,
+            conversation: None,
             requester: w::OwnerRequester::Person(
                 w::OwnerRequesterPerson::new(&l, w::OwnerRequesterPersonParts { value: 23 }).expect("literal"),
             ),
-            asked_by_me: true,
             changed: 29,
         },
     )
     .expect("literal");
-    w::Tasks::new(
-        &l,
-        w::TasksParts {
-            project: 7,
-            filter: w::TaskFilter::new(
-                &l,
-                w::TaskFilterParts {
-                    phase: Some(w::Phase::Running),
-                    executor: Some(w::Executor::Role(
-                        w::ExecutorRole::new(&l, w::ExecutorRoleParts { project: 7, role: 17 }).expect("literal"),
-                    )),
-                    goal: Some(19),
-                    asked_by_me: true,
-                },
-            )
-            .expect("literal"),
-            rows: pieces([encoded(row.measure(), |w| row.encode(w))]),
-            more: true,
-        },
-    )
-    .expect("literal")
+    w::Tasks::new(&l, w::TasksParts { rows: pieces([encoded(row.measure(), |w| row.encode(w))]), more: true })
+        .expect("literal")
 }
 #[must_use]
 pub fn stored_link_record() -> w::OwnerTaskLink {

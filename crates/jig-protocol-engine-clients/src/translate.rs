@@ -15,6 +15,7 @@ pub mod objects;
 pub(crate) mod operations;
 pub mod owner;
 pub mod pages;
+pub(crate) mod queries;
 pub(crate) mod reads;
 pub(crate) mod refusals;
 pub mod task;

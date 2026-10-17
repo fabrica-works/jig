@@ -47,7 +47,7 @@ pub(super) fn project_pages(words: &Words) {
                     asked:
                         jig_client::Event::Watch {
                             handle: watch,
-                            subject: jig_client::Watchable::Jig(Subject::Tasks { filter, .. }),
+                            subject: jig_client::Watchable::Jig(Subject::Tasks { query: filter, .. }),
                         },
                 } => fill_tasks(&mut d, watch, filter),
                 Request::Client {

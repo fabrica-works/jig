@@ -427,6 +427,10 @@ record ReadGoals { project: u32 after: option Cursor }
 record ReadSpend { project: u32 after: option Cursor }
 record ReadProject { project: u32 }
 record ReadNotes { scope: NoteScope description: option text 65536 after: option Cursor }
+enum PhaseClass { working, waiting, held, closing, ended }
+enum ExecutorKind { agent, procedure, person }
+enum QueryOrder { number, changed, activity, priority, ended }
+record TaskQuery { project: option u32 requester: option OwnerRequester root: option u64 parent: option u64 label: option u32 phase: option PhaseClass executor: option ExecutorKind tracked: option bool order: QueryOrder }
 enum Read { me, task: ReadTask, proposal: ReadProposal, escalation: ReadEscalation, question: ReadQuestion, person_task: ReadPersonTask, result: ReadResult, ended: ReadEnded, history: ReadHistory, activity: ReadActivity, inbox: ReadInbox, conversations: ReadConversations, goals: ReadGoals, spend: ReadSpend, project: ReadProject, notes: ReadNotes, deployment }
 enum ReadNone { unknown, refused, gone, busy, signed_out }
 record ReadAnswerNone { value: ReadNone }
@@ -648,16 +652,22 @@ record SubscriptionKindTopic { connector: u16 topic: u64 }
 enum SubscriptionKind { task: SubscriptionKindTask, timer: SubscriptionKindTimer, topic: SubscriptionKindTopic }
 record Subscription { number: u64 kind: SubscriptionKind }
 record Subscriptions { entries: list 32 Subscription }
-record Task { chip: Chip goal: option u64 priority: option u32 lineage_chips: bytes 16777216 inputs: bytes 16777216 project: u32 requester: OwnerRequester lineage: list 32 u64 spec: SpecificationDocument spec_revision: Revision person_revision: option Revision taken_by: option u64 instructions: option DocumentText wake: OwnerWakePolicy subscriptions: Subscriptions result_contract: TaskContractDocument dependencies: bytes 16777216 references: bytes 16777216 cut: bool resources: bytes 16777216 budget: OwnerBudget authority: OwnerAuthorityDocument hold: option TaskHold proposals: list 32 ProposalKey activity: u64 changed: u64 acts: bytes 16777216 result: option TaskResult delegates: bytes 16777216 context: option TaskContext }
+record WhomPerson { value: u64 }
+record WhomRole { project: u32 role: u32 }
+enum Whom { person: WhomPerson, role: WhomRole }
+enum WaitedFor { question, proposal, escalation, person_task }
+record WaitsOnParty { whom: Whom entries: u32 task: u64 kind: WaitedFor }
+enum WaitsOn { party: WaitsOnParty, delegates, news, nothing }
+record ConversationRead { seen: u64 unread: Count }
+record Task { label: u32 flags: TaskFlags last_activity: u64 waits_on: WaitsOn chip: Chip goal: option u64 priority: option u32 lineage_chips: bytes 16777216 inputs: bytes 16777216 project: u32 requester: OwnerRequester lineage: list 32 u64 spec: SpecificationDocument spec_revision: Revision person_revision: option Revision taken_by: option u64 instructions: option DocumentText wake: OwnerWakePolicy subscriptions: Subscriptions result_contract: TaskContractDocument dependencies: bytes 16777216 references: bytes 16777216 cut: bool resources: bytes 16777216 budget: OwnerBudget authority: OwnerAuthorityDocument hold: option TaskHold proposals: list 32 ProposalKey activity: u64 changed: u64 acts: bytes 16777216 result: option TaskResult delegates: bytes 16777216 context: option TaskContext }
 record TreeNode { chip: Chip parent: option u64 dependencies: list 32 u64 proposals: list 32 ProposalKey spend: u64 folded: PhaseCounts held_below: u32 }
 record Tree { task: u64 nodes: bytes 16777216 folded: PhaseCounts held_below: u32 }
 record ReplyPosition { chat: u64 through: u64 }
 record Inbox { entries: bytes 16777216 needs: Needs updates: Count results_seen: u64 replies_seen: list 32 ReplyPosition more: bool }
 record Conversations { rows: bytes 16777216 more: bool after: Cursor }
 record Goals { project: u32 rows: bytes 16777216 more: bool }
-record TaskFilter { phase: option Phase executor: option Executor goal: option u64 asked_by_me: bool }
-record TaskLine { asked_by_me: bool chip: Chip goal: option u64 requester: OwnerRequester changed: u64 }
-record Tasks { project: u32 filter: TaskFilter rows: bytes 16777216 more: bool }
+record TaskLine { chip: Chip project: u32 requester: OwnerRequester tracked: option u32 label: u32 flags: TaskFlags changed: u64 last_activity: u64 ended_at: option u64 budget: OwnerBudget waits_on: WaitsOn phases: OwnerPhaseCounts held_below: u32 conversation: option ConversationRead }
+record Tasks { rows: bytes 16777216 more: bool }
 record Call { number: u64 tool: text 65536 input: text 65536 outcome: option text 65536 failed: bool objects: list 32 ObjectKey parts: bytes 16777216 }
 record CurrentCall { identity: CallIdentity tool: text 65536 input: text 65536 cut: bool began: option u64 }
 record LiveCallDecoded { value: Call }
@@ -737,7 +747,7 @@ record SubjectTree { task: u64 window: u32 }
 record SubjectChips { tasks: list 32 u64 }
 record SubjectInbox { window: u32 }
 record SubjectGoals { project: u32 }
-record SubjectTasks { project: u32 filter: TaskFilter window: u32 }
+record SubjectTasks { query: TaskQuery window: u32 }
 record SubjectRun { task: u64 turn: option ProvisionalTurnName offset: u32 }
 enum Subject { me, task: SubjectTask, tree: SubjectTree, chips: SubjectChips, inbox: SubjectInbox, goals: SubjectGoals, tasks: SubjectTasks, conversations, run: SubjectRun, deployment }
 record Host { number: u64 connected: bool grace: option u64 used: u32 free: u32 runs: bytes 16777216 refused: option text 65536 }

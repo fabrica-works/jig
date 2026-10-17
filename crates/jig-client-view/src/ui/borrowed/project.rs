@@ -31,7 +31,7 @@ impl<'a> Borrowed<'a> {
             tasks: List::with_capacity(self.ui.limits.rows),
             tasks_more: false,
         };
-        for (handle, _) in &self.ui.handles.watches {
+        for (handle, watch) in &self.ui.handles.watches {
             let Some(document) = self.client.document(*handle) else {
                 continue;
             };
@@ -45,13 +45,18 @@ impl<'a> Borrowed<'a> {
                     }
                 }
                 Some(Latest::Jig(Delivery::Tasks(tasks)))
-                    if Some(tasks.project) == self.ui.shown_project() && tasks.filter == page.task_filter =>
+                    if watch.subject
+                        == jig_client::contract::Subject::Tasks {
+                            query: jig_client::contract::TaskQuery {
+                                project: self.ui.shown_project(),
+                                ..page.task_filter
+                            },
+                            window: self.ui.limits.rows,
+                        } =>
                 {
                     page.tasks_more = tasks.more;
                     for row in &tasks.rows {
-                        if crate::page::project::matches_filter(row, tasks.filter)
-                            && page.tasks.push(row.clone()).is_err()
-                        {
+                        if page.tasks.push(row.clone()).is_err() {
                             break;
                         }
                     }
@@ -60,7 +65,6 @@ impl<'a> Borrowed<'a> {
             }
         }
         crate::page::project::goals::order(&mut page.goals);
-        crate::page::project::order_tasks(&mut page.tasks);
         for rows in [&page.goals, &page.state.ended] {
             for row in rows {
                 let mut named = false;

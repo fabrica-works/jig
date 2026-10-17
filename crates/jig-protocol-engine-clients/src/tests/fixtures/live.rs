@@ -76,23 +76,36 @@ pub fn goals() -> d::Goals {
         next: Some(d::Cursor::Number { number: 7 }),
     }
 }
-pub fn tasks_document() -> d::Tasks {
-    d::Tasks {
-        project: 7,
-        filter: d::TaskFilter {
-            phase: Some(d::TaskPhase::Running),
-            executor: Some(t::Executor::Person(t::PersonAddress::Role(17))),
-            goal: Some(19),
-            asked_by_me: true,
+pub fn tasks_document() -> d::Lines {
+    d::Lines {
+        query: d::TaskQuery {
+            project: Some(7),
+            requester: None,
+            root: None,
+            parent: None,
+            label: None,
+            phase: None,
+            executor: None,
+            tracked: None,
+            order: d::QueryOrder::Changed,
         },
-        rows: list([d::ProjectTaskLine {
+        lines: list([d::TaskLine {
             chip: chip(),
-            goal: Some(19),
+            project: 7,
             requester: t::Party::Person(23),
-            asked_by_me: true,
+            tracked: Some(19),
+            label: 0,
+            flags: t::Flags { conversation: false, listed: true, retention: t::Retention::Kept },
             changed: Wall::from_nanos(29),
+            last_activity: Wall::from_nanos(29),
+            ended_at: None,
+            budget: budget(),
+            waits_on: d::WaitsOn::Nothing,
+            phases: phase_counts(),
+            held_below: 0,
+            conversation: None,
         }]),
-        more: true,
+        next: Some(d::Cursor::Number { number: 7 }),
     }
 }
 pub fn tree_document() -> d::Tree {

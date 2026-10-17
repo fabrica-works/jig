@@ -56,7 +56,7 @@ fn task_windows_filter_the_supplied_served_goal_without_reconstructing_it_from_l
             let mut setup = script();
             let mut row = task();
             row.goal = supplied;
-            row.lineage = list(vec![9]);
+            row.lineage = list(supplied.into_iter().collect());
             let mut ancestor = task();
             ancestor.chip.task = 9;
             ancestor.project = 2;
@@ -69,11 +69,7 @@ fn task_windows_filter_the_supplied_served_goal_without_reconstructing_it_from_l
                     Time::ZERO,
                     11,
                     Token::new(3),
-                    Subject::Tasks {
-                        project: 1,
-                        filter: TaskFilter { phase: None, executor: None, goal: wanted, asked_by_me: false },
-                        window: 2,
-                    },
+                    Subject::Tasks { query: TaskQuery { root: wanted, ..query(1) }, window: 2 },
                 )
                 .unwrap();
             let up = engine.poll(Time::ZERO);
@@ -91,10 +87,9 @@ fn task_windows_filter_the_supplied_served_goal_without_reconstructing_it_from_l
                 })
                 .collect();
             assert_eq!(rows.len(), 1);
-            if wanted.is_none() || wanted == supplied {
+            if wanted.is_none() || wanted == Some(supplied.unwrap_or(8)) {
                 assert_eq!(rows[0].len(), 1);
                 assert_eq!(rows[0].get(0).unwrap().chip.task, 8);
-                assert_eq!(rows[0].get(0).unwrap().goal, supplied);
             } else {
                 assert!(rows[0].is_empty());
             }

@@ -152,85 +152,7 @@ pub fn goals(project: u32, value: &d::Goals, limits: &w::Limits) -> Result<w::Go
     let rows = goal_pieces(&rows, limits.goals_rows, w::Path::GoalsRows)?;
     w::Goals::new(limits, w::GoalsParts { project, rows, more: value.next.is_some() })
 }
-pub fn task_line(value: &d::ProjectTaskLine, limits: &w::Limits) -> Result<w::TaskLine, w::Problem> {
-    w::TaskLine::new(
-        limits,
-        w::TaskLineParts {
-            chip: chips::chip(&value.chip, limits)?,
-            goal: value.goal,
-            requester: owner::requester(value.requester, limits)?,
-            asked_by_me: value.asked_by_me,
-            changed: value.changed.as_nanos(),
-        },
-    )
-}
-pub fn tasks(value: &d::Tasks, limits: &w::Limits) -> Result<w::Tasks, w::Problem> {
-    let mut rows = List::with_capacity(value.rows.len());
-    for row in &value.rows {
-        rows.push(task_line(row, limits)?).expect("supplied rows fit");
-    }
-    let rows = task_line_pieces(&rows, limits.tasks_rows, w::Path::TasksRows)?;
-    w::Tasks::new(
-        limits,
-        w::TasksParts {
-            project: value.project,
-            filter: filter(value.project, value.filter, limits)?,
-            rows,
-            more: value.more,
-        },
-    )
-}
-fn executor(project: u32, value: jig_domain_tasks::Executor, limits: &w::Limits) -> Result<w::Executor, w::Problem> {
-    Ok(match value {
-        jig_domain_tasks::Executor::Agent { charter } => {
-            w::Executor::Agent(w::ExecutorAgent::new(limits, w::ExecutorAgentParts { charter })?)
-        }
-        jig_domain_tasks::Executor::Procedure { connector, code } => w::Executor::Procedure(w::ExecutorProcedure::new(
-            limits,
-            w::ExecutorProcedureParts { connector, kind: code },
-        )?),
-        jig_domain_tasks::Executor::Person(address) => match address {
-            jig_domain_tasks::PersonAddress::Person(party) => {
-                w::Executor::Party(w::ExecutorParty::new(limits, w::ExecutorPartyParts { party })?)
-            }
-            jig_domain_tasks::PersonAddress::Role(role) => {
-                w::Executor::Role(w::ExecutorRole::new(limits, w::ExecutorRoleParts { project, role })?)
-            }
-        },
-    })
-}
-fn filter(project: u32, value: d::TaskFilter, limits: &w::Limits) -> Result<w::TaskFilter, w::Problem> {
-    w::TaskFilter::new(
-        limits,
-        w::TaskFilterParts {
-            phase: match value.phase {
-                Some(value) => Some(match value {
-                    d::TaskPhase::Waiting => w::Phase::Waiting,
-                    d::TaskPhase::Idle => w::Phase::Idle,
-                    d::TaskPhase::Due => w::Phase::Due,
-                    d::TaskPhase::Preparing => w::Phase::Preparing,
-                    d::TaskPhase::Claimed => w::Phase::Claimed,
-                    d::TaskPhase::Running => w::Phase::Running,
-                    d::TaskPhase::BackingOff => w::Phase::BackingOff,
-                    d::TaskPhase::Active => w::Phase::Active,
-                    d::TaskPhase::Closing => w::Phase::Closing,
-                    d::TaskPhase::Held => w::Phase::Held,
-                    d::TaskPhase::Ended => w::Phase::Ended,
-                    d::TaskPhase::Done => w::Phase::Done,
-                    d::TaskPhase::Failed => w::Phase::Failed,
-                    d::TaskPhase::Cancelled => w::Phase::Cancelled,
-                }),
-                None => None,
-            },
-            executor: match value.executor {
-                Some(item) => Some(executor(project, item, limits)?),
-                None => None,
-            },
-            goal: value.goal,
-            asked_by_me: value.asked_by_me,
-        },
-    )
-}
+
 pub fn tree_row(value: &d::TreeRow, limits: &w::Limits) -> Result<w::OwnerTreeRow, w::Problem> {
     let mut proposals = List::with_capacity(value.proposals.len());
     for row in &value.proposals {
@@ -303,18 +225,7 @@ fn goal_pieces(rows: &List<w::GoalLine>, bound: u32, path: w::Path) -> Result<Bo
     }
     pieces(&encoded, bound, path)
 }
-fn task_line_pieces(rows: &List<w::TaskLine>, bound: u32, path: w::Path) -> Result<Box<[u8]>, w::Problem> {
-    let mut encoded = List::with_capacity(rows.len());
-    for row in rows {
-        let mut out = Writer::new(usize::try_from(row.measure()).expect("u32 measure fits usize"));
-        match row.encode(&mut out) {
-            Ok(()) => (),
-            Err(_) => return Err(w::Problem { path, reason: skein_codec::Reason::Bound }),
-        }
-        encoded.push(out.finish()).expect("supplied rows fit");
-    }
-    pieces(&encoded, bound, path)
-}
+
 fn tree_pieces(rows: &List<w::OwnerTreeRow>, bound: u32, path: w::Path) -> Result<Box<[u8]>, w::Problem> {
     let mut encoded = List::with_capacity(rows.len());
     for row in rows {

@@ -25,21 +25,9 @@ pub fn subject(value: &c::Subject, limits: &w::Limits) -> Result<w::Subject, w::
         c::Subject::Goals { project } => {
             w::Subject::Goals(w::SubjectGoals::new(limits, w::SubjectGoalsParts { project: *project })?)
         }
-        c::Subject::Tasks { project, filter, window } => w::Subject::Tasks(w::SubjectTasks::new(
+        c::Subject::Tasks { query, window } => w::Subject::Tasks(w::SubjectTasks::new(
             limits,
-            w::SubjectTasksParts {
-                project: *project,
-                filter: w::TaskFilter::new(
-                    limits,
-                    w::TaskFilterParts {
-                        phase: phase(filter.phase),
-                        executor: executor(filter.executor, limits)?,
-                        goal: filter.goal,
-                        asked_by_me: filter.asked_by_me,
-                    },
-                )?,
-                window: *window,
-            },
+            w::SubjectTasksParts { query: super::queries::query(*query, limits)?, window: *window },
         )?),
         c::Subject::Conversations => w::Subject::Conversations,
         c::Subject::Run { task, turn, offset } => {
@@ -92,49 +80,6 @@ pub fn ended(value: &w::WatchEnd) -> c::WatchEnd {
         w::WatchEnd::SignedOut => c::WatchEnd::SignedOut,
         w::WatchEnd::Stopping => c::WatchEnd::Stopping,
     }
-}
-
-#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-fn phase(value: Option<c::Phase>) -> Option<w::Phase> {
-    match value {
-        None => None,
-        Some(value) => Some(match value {
-            c::Phase::Waiting => w::Phase::Waiting,
-            c::Phase::Idle => w::Phase::Idle,
-            c::Phase::Due => w::Phase::Due,
-            c::Phase::Preparing => w::Phase::Preparing,
-            c::Phase::Claimed => w::Phase::Claimed,
-            c::Phase::Running => w::Phase::Running,
-            c::Phase::BackingOff => w::Phase::BackingOff,
-            c::Phase::Active => w::Phase::Active,
-            c::Phase::Closing => w::Phase::Closing,
-            c::Phase::Held => w::Phase::Held,
-            c::Phase::Ended => w::Phase::Ended,
-            c::Phase::Done => w::Phase::Done,
-            c::Phase::Failed => w::Phase::Failed,
-            c::Phase::Cancelled => w::Phase::Cancelled,
-        }),
-    }
-}
-fn executor(value: Option<c::Executor>, limits: &w::Limits) -> Result<Option<w::Executor>, w::Problem> {
-    Ok(match value {
-        None => None,
-        Some(value) => Some(match value {
-            c::Executor::Agent { charter } => {
-                w::Executor::Agent(w::ExecutorAgent::new(limits, w::ExecutorAgentParts { charter })?)
-            }
-            c::Executor::Procedure { connector, kind } => w::Executor::Procedure(w::ExecutorProcedure::new(
-                limits,
-                w::ExecutorProcedureParts { connector, kind },
-            )?),
-            c::Executor::Party { party } => {
-                w::Executor::Party(w::ExecutorParty::new(limits, w::ExecutorPartyParts { party })?)
-            }
-            c::Executor::Role { project, role } => {
-                w::Executor::Role(w::ExecutorRole::new(limits, w::ExecutorRoleParts { project, role })?)
-            }
-        }),
-    })
 }
 
 /// A delivery's discriminator and its whole record are admitted before decoding.

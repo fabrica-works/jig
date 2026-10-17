@@ -1,6 +1,7 @@
 use super::*;
 use crate::Bounds;
 use crate::Decision as ApplicationDecision;
+use fixtures::query;
 use jig_client_domain::contract::Decision;
 use jig_client_domain::contract::*;
 use skein_lib::List;
@@ -347,6 +348,10 @@ fn counts() -> PhaseCounts {
 }
 fn task() -> Task {
     Task {
+        label: 0,
+        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        last_activity: Wall::EPOCH,
+        waits_on: WaitsOn::Nothing,
         chip: Chip {
             task: 8,
             title: DocumentText::complete(text(b"chat")),
@@ -526,11 +531,7 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
         Subject::Chips { tasks: list(vec![8]) },
         Subject::Inbox { window: 1 },
         Subject::Goals { project: 1 },
-        Subject::Tasks {
-            project: 1,
-            filter: TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false },
-            window: 1,
-        },
+        Subject::Tasks { query: query(1), window: 1 },
         Subject::Conversations,
         Subject::Run { task: 8, turn: None, offset: 0 },
         Subject::Deployment,

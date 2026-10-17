@@ -1207,54 +1207,47 @@ fn project_task_filters_and_spend_pages() {
     };
     let (mut domain, opened) = project_open(ProjectSection::Tasks);
     let watch = open_token(&opened);
-    let filter = domain.project_page().task_filter;
     let mut rows = List::with_capacity(2);
-    rows.push(TaskLine {
-        chip: tree_node(8, Phase::Running, 0).chip,
-        goal: Some(10),
-        requester: OwnerRequester::Person(7),
-        asked_by_me: true,
-        changed: skein_lib::Wall::from_nanos(1),
-    })
+    rows.push(crate::tests::fixtures::task_line(
+        tree_node(9, Phase::Running, 0).chip,
+        1,
+        OwnerRequester::Person(8),
+        skein_lib::Wall::from_nanos(2),
+    ))
     .unwrap();
-    rows.push(TaskLine {
-        chip: tree_node(9, Phase::Running, 0).chip,
-        goal: Some(10),
-        requester: OwnerRequester::Person(8),
-        asked_by_me: false,
-        changed: skein_lib::Wall::from_nanos(2),
-    })
+    rows.push(crate::tests::fixtures::task_line(
+        tree_node(8, Phase::Running, 0).chip,
+        1,
+        OwnerRequester::Person(7),
+        skein_lib::Wall::from_nanos(1),
+    ))
     .unwrap();
     drive(
         &mut domain,
         Time::ZERO,
         Watched {
             watch,
-            event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks {
-                project: 1,
-                filter,
-                rows: rows.clone(),
-                more: true,
-            }))),
+            event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows: rows.clone(), more: true }))),
         },
     );
     assert_eq!(domain.project_page().tasks.as_slice()[0].chip.task, 9);
     assert!(domain.project_page().tasks_more);
-    let filter = TaskFilter {
-        phase: Some(Phase::Running),
-        executor: Some(Executor::Party { party: 7 }),
-        goal: Some(10),
-        asked_by_me: true,
+    let filter = TaskQuery {
+        phase: Some(PhaseClass::Working),
+        executor: Some(ExecutorKind::Person),
+        root: Some(10),
+        requester: Some(OwnerRequester::Person(7)),
+        ..domain.project_page().task_filter
     };
+    let selected = rows.get(1).unwrap().clone();
+    rows.clear();
+    rows.push(selected).unwrap();
     let opened = drive(&mut domain, Time::ZERO, Event::Act { action: Act::FilterTasks { filter } });
     let watch = open_token(&opened);
     drive(
         &mut domain,
         Time::ZERO,
-        Watched {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { project: 1, filter, rows, more: false }))),
-        },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows, more: false }))) },
     );
     assert_eq!(domain.project_page().tasks.len(), 1);
     assert!(!domain.project_page().tasks_more);

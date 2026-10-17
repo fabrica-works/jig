@@ -20,7 +20,7 @@ pub enum Subject {
     /// Project live goals.
     Goals { project: u32 },
     /// Filtered live tasks in one project.
-    Tasks { project: u32, filter: super::TaskFilter, window: u32 },
+    Tasks { query: super::TaskQuery, window: u32 },
     /// Party live chats.
     Conversations,
     /// A task run text from the client offset.

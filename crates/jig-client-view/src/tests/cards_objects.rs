@@ -815,6 +815,10 @@ fn dialog(d: &Fixture, words: &crate::words::Words, bindings: &mut JigBindings) 
 }
 pub(super) fn task_doc(acts: &[ActKind]) -> Task {
     Task {
+        label: 0,
+        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        last_activity: Wall::EPOCH,
+        waits_on: WaitsOn::Nothing,
         chip: chip(),
         goal: Some(8),
         priority: Some(1),

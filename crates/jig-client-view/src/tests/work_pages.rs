@@ -355,24 +355,18 @@ pub(super) fn project_rows(d: &mut Fixture, out: &[Request]) {
             }
             Request::Client {
                 asked:
-                    jig_client::Event::Watch {
-                        handle: watch,
-                        subject: jig_client::Watchable::Jig(Subject::Tasks { filter, .. }),
-                    },
+                    jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Tasks { .. }) },
             } => {
                 deliver(
                     d,
                     *watch,
                     Delivery::Tasks(Box::new(Tasks {
-                        project: 4,
-                        filter: *filter,
-                        rows: list([TaskLine {
-                            chip: chip(8),
-                            goal: Some(8),
-                            requester: OwnerRequester::Person(1),
-                            changed: Wall::EPOCH,
-                            asked_by_me: true,
-                        }]),
+                        rows: list([crate::tests::fixtures::task_line(
+                            chip(8),
+                            4,
+                            OwnerRequester::Person(1),
+                            Wall::EPOCH,
+                        )]),
                         more: true,
                     })),
                 );
@@ -440,7 +434,7 @@ fn project_sections(words: &Words) {
             }
             ProjectSection::Tasks => {
                 assert!(contains(&tree, b"Tasks I asked for"));
-                assert!(contains(&tree, b"Goal 8"));
+                assert!(contains(&tree, b"Executor active"));
             }
             ProjectSection::Notes => {
                 assert!(tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Search notes by description")));

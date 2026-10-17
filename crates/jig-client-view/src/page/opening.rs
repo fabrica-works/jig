@@ -52,8 +52,10 @@ pub(crate) fn section(
                     project::ask(domain, project::GOALS_READ, Read::Goals { project, after: None }, out);
                 }
                 ProjectSection::Tasks => {
-                    let subject =
-                        Subject::Tasks { project, filter: domain.project_page.task_filter, window: env.limits.rows };
+                    let subject = Subject::Tasks {
+                        query: contract::TaskQuery { project: Some(project), ..domain.project_page.task_filter },
+                        window: env.limits.rows,
+                    };
                     open_once(domain, subject, owner, out);
                     domain.changed();
                 }

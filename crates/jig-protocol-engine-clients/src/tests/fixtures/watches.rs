@@ -95,20 +95,38 @@ pub fn subject_cases() -> [(&'static str, w::Subject, core::documents::Watched, 
                 w::SubjectTasks::new(
                     &limits,
                     w::SubjectTasksParts {
-                        project: 3,
-                        filter: w::TaskFilter::new(
+                        query: w::TaskQuery::new(
                             &limits,
-                            w::TaskFilterParts { phase: None, executor: None, goal: Some(7), asked_by_me: true },
+                            w::TaskQueryParts {
+                                project: Some(3),
+                                requester: None,
+                                root: Some(7),
+                                parent: None,
+                                label: None,
+                                phase: None,
+                                executor: None,
+                                tracked: None,
+                                order: w::QueryOrder::Changed,
+                            },
                         )
-                        .expect("filter"),
+                        .expect("query"),
                         window: 3,
                     },
                 )
                 .expect("tasks"),
             ),
-            d::Watched::Tasks {
-                project: 3,
-                filter: d::TaskFilter { phase: None, executor: None, goal: Some(7), asked_by_me: true },
+            d::Watched::Query {
+                query: d::TaskQuery {
+                    project: Some(3),
+                    requester: None,
+                    root: Some(7),
+                    parent: None,
+                    label: None,
+                    phase: None,
+                    executor: None,
+                    tracked: None,
+                    order: d::QueryOrder::Changed,
+                },
             },
             3,
         ),

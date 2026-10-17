@@ -2,7 +2,7 @@
 use crate::{Engine, Invalid, Rows, Up, payload, reads::list};
 use jig_client_domain::contract::{
     Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, OwnerRequester, Phase, ProvisionalTurnName, Read,
-    ReadValue, RunState, RunText, Subject, TaskLine, Tasks, Text, TurnName, WatchEnd, WatchEvent,
+    ReadValue, RunState, RunText, Subject, Tasks, Text, TurnName, WatchEnd, WatchEvent,
 };
 use skein_lib::{Time, Token, Wall};
 
@@ -177,8 +177,17 @@ impl<A: crate::Application> Engine<A> {
         let tasks: Vec<u64> = match subject {
             Subject::Task { task } | Subject::Tree { task, .. } | Subject::Run { task, .. } => vec![*task],
             Subject::Chips { tasks } => tasks.iter().copied().collect(),
-            Subject::Goals { project } | Subject::Tasks { project, .. } => {
+            Subject::Goals { project } => {
                 return (!self.truth.visible(party, *project)).then_some(hidden);
+            }
+            Subject::Tasks { query, .. } => {
+                if matches!(query.requester, Some(OwnerRequester::Deployment { .. })) {
+                    return Some(WatchEnd::Unknown);
+                }
+                return match query.project {
+                    Some(project) => (!self.truth.visible(party, project)).then_some(hidden),
+                    None => (query.requester != Some(OwnerRequester::Person(party))).then_some(hidden),
+                };
             }
             Subject::Me => return (!self.truth.frames.contains_key(&party)).then_some(hidden),
             Subject::Inbox { .. } | Subject::Conversations => return None,
@@ -274,38 +283,32 @@ impl<A: crate::Application> Engine<A> {
                     after: self.conversations_cursor(party),
                 }))
             }
-            Subject::Tasks { project, filter, window } => {
+            Subject::Tasks { query, window } => {
                 let mut rows = Vec::new();
                 for doc in self.truth.objects.values() {
                     if let ReadValue::Task(task) = doc {
-                        let asked_by_me = task.requester == OwnerRequester::Person(party);
-                        let goal = task.goal;
-                        if task.project != *project
-                            || ended(task.chip.phase)
-                            || filter.phase.is_some_and(|phase| phase != task.chip.phase)
-                            || filter.executor.is_some_and(|executor| executor != task.chip.executor)
-                            || filter.goal.is_some_and(|wanted| goal != Some(wanted))
-                            || (filter.asked_by_me && !asked_by_me)
-                        {
+                        if !crate::queries::selects(query, task) || !self.truth.visible(party, task.project) {
                             continue;
                         }
-                        rows.push(TaskLine {
-                            asked_by_me,
-                            chip: task.chip.clone(),
-                            goal,
-                            requester: task.requester,
-                            changed: task.changed,
+                        let subtree = self.truth.objects.values().filter_map(|value| {
+                            if let ReadValue::Task(member) = value {
+                                if member.chip.task == task.chip.task
+                                    || member.lineage.as_slice().contains(&task.chip.task)
+                                {
+                                    Some(member.as_ref())
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
                         });
+                        rows.push(crate::queries::line(task, subtree, self.conversation_read(task)?));
                     }
                 }
-                rows.sort_by(|a, b| b.changed.cmp(&a.changed).then(a.chip.task.cmp(&b.chip.task)));
+                crate::queries::order(&mut rows, query.order);
                 let count = rows.len().min((*window).min(self.bounds.rows) as usize);
-                Delivery::Tasks(Box::new(Tasks {
-                    project: *project,
-                    filter: *filter,
-                    rows: list(&rows[..count]),
-                    more: count < rows.len(),
-                }))
+                Delivery::Tasks(Box::new(Tasks { rows: list(&rows[..count]), more: count < rows.len() }))
             }
             Subject::Run { task, turn, offset } => {
                 let Some(run) = self.runs.get(task) else {

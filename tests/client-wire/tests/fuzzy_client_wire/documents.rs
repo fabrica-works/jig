@@ -39,7 +39,9 @@ fn records_1(bytes: &[u8]) {
     check!(Inbox, bytes);
     check!(Conversations, bytes);
     check!(Goals, bytes);
-    check!(TaskFilter, bytes);
+    check!(TaskQuery, bytes);
+    check!(WaitsOn, bytes);
+    check!(ConversationRead, bytes);
     check!(TaskLine, bytes);
     check!(Tasks, bytes);
 }

@@ -50,6 +50,10 @@ pub fn task_record() -> w::Task {
 }
 pub fn task() -> c::Task {
     c::Task {
+        label: 0,
+        flags: c::TaskFlags { conversation: false, listed: false, retention: c::Retention::Kept },
+        last_activity: Wall::EPOCH,
+        waits_on: c::WaitsOn::Nothing,
         chip: chip(),
         goal: None,
         priority: None,
@@ -224,12 +228,7 @@ pub fn tasks_record() -> w::Tasks {
     jig_client_test_records::tasks_record()
 }
 pub fn tasks() -> c::Tasks {
-    c::Tasks {
-        project: 7,
-        filter: c::TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false },
-        rows: List::with_capacity(0),
-        more: false,
-    }
+    c::Tasks { rows: List::with_capacity(0), more: false }
 }
 pub fn tree_record() -> w::Tree {
     let lim = limits().wire;

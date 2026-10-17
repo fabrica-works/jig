@@ -1113,7 +1113,7 @@ pub(crate) fn contexts(value: &jig_client::contract::Delivery, capacity: u32) ->
         }
         jig_client::contract::Delivery::Tasks(tasks) => {
             for row in &tasks.rows {
-                if rows.push(Context { object: ObjectKey::Task(row.chip.task), project: tasks.project }).is_err() {
+                if rows.push(Context { object: ObjectKey::Task(row.chip.task), project: row.project }).is_err() {
                     break;
                 }
             }

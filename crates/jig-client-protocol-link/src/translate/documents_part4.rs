@@ -259,38 +259,6 @@ pub(crate) fn goals_fields(value: &w::Goals, limits: &Limits) -> Result<c::Goals
     })
 }
 
-#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-pub(crate) fn task_filter_fields(value: &w::TaskFilter, limits: &Limits) -> c::TaskFilter {
-    let opt0 = match value.phase() {
-        Some(item) => Some(crate::translate::facts::phase(item, limits)),
-        None => None,
-    };
-    let opt1 = match value.executor() {
-        Some(item) => Some(crate::translate::answers::executor(item, limits)),
-        None => None,
-    };
-    let opt2 = match value.goal() {
-        Some(item) => Some(*item),
-        None => None,
-    };
-    c::TaskFilter { phase: opt0, executor: opt1, goal: opt2, asked_by_me: value.asked_by_me() }
-}
-
-#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-pub(crate) fn task_line_fields(value: &w::TaskLine, limits: &Limits) -> Result<c::TaskLine, w::Problem> {
-    let opt0 = match value.goal() {
-        Some(item) => Some(*item),
-        None => None,
-    };
-    Ok(c::TaskLine {
-        asked_by_me: value.asked_by_me(),
-        chip: chip_fields(value.chip(), limits)?,
-        goal: opt0,
-        requester: crate::translate::facts::owner_requester(value.requester(), limits),
-        changed: Wall::from_nanos(value.changed()),
-    })
-}
-
 pub(crate) fn task_line_piece(bytes: &[u8], limits: &Limits, bound: u32) -> Result<List<c::TaskLine>, w::Problem> {
     let mut reader = Reader::new(bytes);
     let mut rows = List::with_capacity(bound);
@@ -312,7 +280,7 @@ pub(crate) fn task_line_piece(bytes: &[u8], limits: &Limits, bound: u32) -> Resu
             return Err(too_large());
         }
         let row = w::TaskLine::decode(&limits.wire, &mut Reader::new(&item))?;
-        let row = task_line_fields(&row, limits)?;
+        let row = crate::translate::queries::line(&row, limits)?;
         if rows.push(row).is_err() {
             return Err(too_large());
         }
@@ -321,10 +289,5 @@ pub(crate) fn task_line_piece(bytes: &[u8], limits: &Limits, bound: u32) -> Resu
 }
 
 pub(crate) fn tasks_fields(value: &w::Tasks, limits: &Limits) -> Result<c::Tasks, w::Problem> {
-    Ok(c::Tasks {
-        project: value.project(),
-        filter: task_filter_fields(value.filter(), limits),
-        rows: task_line_piece(value.rows(), limits, limits.client.rows)?,
-        more: value.more(),
-    })
+    Ok(c::Tasks { rows: task_line_piece(value.rows(), limits, limits.client.rows)?, more: value.more() })
 }

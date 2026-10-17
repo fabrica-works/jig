@@ -3,13 +3,12 @@
 //! translation does not choose visibility or reinterpret a role's project.
 use jig_client_domain::contract as client;
 use jig_domain_core::{Event, WatchRefusal, documents};
-use jig_domain_tasks as tasks;
 use jig_domain_views as views;
 use skein_lib::Token;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
-    WrongRoleProject,
+    DeploymentRequester,
 }
 
 /// # Errors
@@ -36,61 +35,14 @@ fn subject(value: &client::Subject, default_rows: u32) -> Result<(documents::Wat
         client::Subject::Chips { tasks } => (documents::Watched::Chips { tasks: tasks.clone() }, default_rows),
         client::Subject::Inbox { window } => (documents::Watched::Inbox, *window),
         client::Subject::Goals { project } => (documents::Watched::Goals { project: *project }, default_rows),
-        client::Subject::Tasks { project, filter, window } => {
-            (documents::Watched::Tasks { project: *project, filter: task_filter(*project, filter)? }, *window)
+        client::Subject::Tasks { query, window } => {
+            (documents::Watched::Query { query: super::queries::query(query)? }, *window)
         }
         client::Subject::Conversations => (documents::Watched::Conversations, default_rows),
         client::Subject::Run { task, turn: _, offset: _ } => (documents::Watched::Run { task: *task }, default_rows),
         client::Subject::Deployment => (documents::Watched::Deployment, default_rows),
     };
     Ok((subject, documents::Window { rows, after: None }))
-}
-
-/// # Errors
-/// Refuses a mismatched executor role project or any whole window/subject allocation above the receiving bounds.
-pub fn task_filter(project: u32, value: &client::TaskFilter) -> Result<documents::TaskFilter, Invalid> {
-    Ok(documents::TaskFilter {
-        phase: value.phase.map(phase),
-        executor: value.executor.map(|value| executor(project, value)).transpose()?,
-        goal: value.goal,
-        asked_by_me: value.asked_by_me,
-    })
-}
-
-/// # Errors
-/// Refuses a mismatched executor role project or any whole window/subject allocation above the receiving bounds.
-pub fn executor(project: u32, value: client::Executor) -> Result<tasks::Executor, Invalid> {
-    Ok(match value {
-        client::Executor::Agent { charter } => tasks::Executor::Agent { charter },
-        client::Executor::Procedure { connector, kind } => tasks::Executor::Procedure { connector, code: kind },
-        client::Executor::Party { party } => tasks::Executor::Person(tasks::PersonAddress::Person(party)),
-        client::Executor::Role { project: actual, role } => {
-            if actual != project {
-                return Err(Invalid::WrongRoleProject);
-            }
-            tasks::Executor::Person(tasks::PersonAddress::Role(role))
-        }
-    })
-}
-
-#[must_use]
-pub fn phase(value: client::Phase) -> documents::TaskPhase {
-    match value {
-        client::Phase::Waiting => documents::TaskPhase::Waiting,
-        client::Phase::Idle => documents::TaskPhase::Idle,
-        client::Phase::Due => documents::TaskPhase::Due,
-        client::Phase::Preparing => documents::TaskPhase::Preparing,
-        client::Phase::Claimed => documents::TaskPhase::Claimed,
-        client::Phase::Running => documents::TaskPhase::Running,
-        client::Phase::BackingOff => documents::TaskPhase::BackingOff,
-        client::Phase::Active => documents::TaskPhase::Active,
-        client::Phase::Closing => documents::TaskPhase::Closing,
-        client::Phase::Held => documents::TaskPhase::Held,
-        client::Phase::Done => documents::TaskPhase::Done,
-        client::Phase::Failed => documents::TaskPhase::Failed,
-        client::Phase::Cancelled => documents::TaskPhase::Cancelled,
-        client::Phase::Ended => documents::TaskPhase::Ended,
-    }
 }
 
 #[must_use]
@@ -120,20 +72,22 @@ mod tests {
 
     #[test]
     fn generic_ended_watch_selector_keeps_its_exact_live_query_identity_without_a_terminal_outcome() {
-        let filter = client::TaskFilter {
-            phase: Some(client::Phase::Ended),
+        let query = client::TaskQuery {
+            project: Some(u32::MAX),
+            requester: Some(client::OwnerRequester::Person(1)),
+            root: Some(u64::MAX),
+            parent: None,
+            label: None,
+            phase: Some(client::PhaseClass::Ended),
             executor: None,
-            goal: Some(u64::MAX),
-            asked_by_me: true,
+            tracked: None,
+            order: client::QueryOrder::Changed,
         };
-        let actual = task_filter(u32::MAX, &filter).expect("actual generic ended selector is legal");
-        assert_eq!(actual.phase, Some(documents::TaskPhase::Ended));
-        assert_eq!(actual.goal, Some(u64::MAX));
-        assert!(actual.asked_by_me);
+        let actual = super::super::queries::query(&query).expect("ended query");
+        assert_eq!(actual.phase, Some(documents::PhaseClass::Ended));
+        assert_eq!(actual.root, Some(u64::MAX));
+        assert_eq!(actual.requester, Some(jig_domain_tasks::Party::Person(1)));
         assert_eq!(actual.executor, None);
-        assert_ne!(actual.phase, Some(documents::TaskPhase::Done));
-        assert_ne!(actual.phase, Some(documents::TaskPhase::Failed));
-        assert_ne!(actual.phase, Some(documents::TaskPhase::Cancelled));
     }
     use skein_lib::List;
 
@@ -187,28 +141,32 @@ mod tests {
 
     #[test]
     fn task_watch_filters_keep_full_executor_identity_and_refuse_a_different_role_project() {
-        let filter = client::TaskFilter {
-            phase: Some(client::Phase::BackingOff),
-            executor: Some(client::Executor::Procedure { connector: u16::MAX, kind: u32::MAX }),
-            goal: Some(u64::MAX),
-            asked_by_me: true,
+        let query = client::TaskQuery {
+            project: Some(8),
+            requester: None,
+            root: Some(u64::MAX),
+            parent: None,
+            label: None,
+            phase: Some(client::PhaseClass::Working),
+            executor: Some(client::ExecutorKind::Procedure),
+            tracked: None,
+            order: client::QueryOrder::Changed,
         };
         assert_eq!(
-            task_filter(8, &filter).expect("the complete supplied fixture is admitted"),
-            documents::TaskFilter {
-                phase: Some(documents::TaskPhase::BackingOff),
-                executor: Some(tasks::Executor::Procedure { connector: u16::MAX, code: u32::MAX }),
-                goal: Some(u64::MAX),
-                asked_by_me: true,
+            super::super::queries::query(&query).expect("query"),
+            documents::TaskQuery {
+                project: Some(8),
+                requester: None,
+                root: Some(u64::MAX),
+                parent: None,
+                label: None,
+                phase: Some(documents::PhaseClass::Working),
+                executor: Some(documents::ExecutorKind::Procedure),
+                tracked: None,
+                order: documents::QueryOrder::Changed
             }
         );
-        let mut filter = filter;
-        filter.executor = Some(client::Executor::Role { project: 9, role: u32::MAX });
-        assert_eq!(task_filter(8, &filter), Err(Invalid::WrongRoleProject));
-        filter.executor = Some(client::Executor::Role { project: 8, role: u32::MAX });
-        assert_eq!(
-            task_filter(8, &filter).expect("the complete supplied fixture is admitted").executor,
-            Some(tasks::Executor::Person(tasks::PersonAddress::Role(u32::MAX)))
-        );
+        let query = client::TaskQuery { requester: Some(client::OwnerRequester::Deployment { project: 8 }), ..query };
+        assert_eq!(super::super::queries::query(&query), Err(Invalid::DeploymentRequester));
     }
 }

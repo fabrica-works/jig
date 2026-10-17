@@ -106,11 +106,11 @@ pub fn document(
             };
             wire::documents::goals_delivery(project, value, limits)
         }
-        jig_domain_core::documents::Document::Tasks(value) => {
-            let client::Subject::Tasks { project, filter, .. } = subject else {
+        jig_domain_core::documents::Document::Lines(value) => {
+            let client::Subject::Tasks { query, .. } = subject else {
                 return Err(Invalid::OwnerRoute);
             };
-            wire::documents::tasks_delivery(project, &filter, value, limits)
+            wire::documents::tasks_delivery(&query, value, limits)
         }
         jig_domain_core::documents::Document::Inbox(value) => {
             let client::Subject::Inbox { window } = subject else { return Err(Invalid::OwnerRoute) };
@@ -138,7 +138,7 @@ pub fn document(
         | jig_domain_core::documents::Document::PersonTask(_)
         | jig_domain_core::documents::Document::Result(_)
         | jig_domain_core::documents::Document::Project(_)
-        | jig_domain_core::documents::Document::Lines(_)
+        | jig_domain_core::documents::Document::Tasks(_)
         | jig_domain_core::documents::Document::Note(_) => return Err(Invalid::PendingDocument),
     }
     .map_err(Invalid::Document)?;
@@ -720,31 +720,27 @@ mod tests {
     fn normal_tasks_check_the_original_filter_before_opening_the_exact_tab_flight() {
         let mut transport = transport();
         let native = Token::new(u64::MAX);
-        let filter = client::TaskFilter {
-            phase: Some(client::Phase::Ended),
-            executor: Some(client::Executor::Procedure { connector: u16::MAX, kind: u32::MAX }),
-            goal: Some(0),
-            asked_by_me: true,
+        let query = client::TaskQuery {
+            project: Some(u32::MAX),
+            requester: None,
+            root: Some(0),
+            parent: None,
+            label: None,
+            phase: Some(client::PhaseClass::Ended),
+            executor: Some(client::ExecutorKind::Procedure),
+            tracked: None,
+            order: client::QueryOrder::Changed,
         };
-        let watcher = transport.open(
-            ClientId(1),
-            native,
-            Watched::Jig(client::Subject::Tasks { project: u32::MAX, filter, window: 3 }),
-        );
+        let watcher = transport.open(ClientId(1), native, Watched::Jig(client::Subject::Tasks { query, window: 3 }));
         let sibling = transport.open(
             ClientId(0),
             native,
-            Watched::Jig(client::Subject::Tasks {
-                project: u32::MAX,
-                filter: client::TaskFilter { goal: None, ..filter },
-                window: 3,
-            }),
+            Watched::Jig(client::Subject::Tasks { query: client::TaskQuery { root: None, ..query }, window: 3 }),
         );
-        let source = jig_domain_core::documents::Document::Tasks(jig_domain_core::documents::Tasks {
-            project: u32::MAX,
-            filter: wire::watches::task_filter(u32::MAX, &filter).expect("original filter"),
-            rows: skein_lib::List::with_capacity(3),
-            more: false,
+        let source = jig_domain_core::documents::Document::Lines(jig_domain_core::documents::Lines {
+            query: wire::queries::query(&query).expect("original query"),
+            lines: skein_lib::List::with_capacity(3),
+            next: None,
         });
         let limits = Limits { rows: 4, ..crate::test::limits().jig };
         assert!(matches!(
@@ -775,7 +771,7 @@ mod tests {
             panic!("original Tasks route")
         };
         assert_eq!(watch, native);
-        assert_eq!(value.filter, filter);
+        assert_eq!(query.phase, Some(client::PhaseClass::Ended));
         assert_eq!((value.rows.len(), value.rows.capacity()), (0, 3));
         assert!(!value.more);
         assert!(transport.taken(ClientId(0), native).is_none());

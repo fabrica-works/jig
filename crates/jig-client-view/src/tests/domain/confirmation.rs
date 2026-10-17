@@ -45,6 +45,10 @@ fn counts() -> PhaseCounts {
 }
 pub(super) fn task() -> Task {
     Task {
+        label: 0,
+        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        last_activity: Wall::EPOCH,
+        waits_on: WaitsOn::Nothing,
         chip: chip(8),
         goal: None,
         priority: None,

@@ -115,6 +115,10 @@ pub enum ChipPhase {
 /// A complete task document with independently moving revisions.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Task {
+    pub label: u32,
+    pub flags: super::TaskFlags,
+    pub last_activity: Wall,
+    pub waits_on: super::WaitsOn,
     pub chip: Chip,
     /// The actual goal this task serves, including itself when it is a goal.
     pub goal: Option<u64>,
@@ -1067,29 +1071,10 @@ pub struct LiveDelegate {
     pub takeover_budget: u64,
 }
 
-/// Project task list context, without copying whole task documents.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct TaskFilter {
-    pub phase: Option<Phase>,
-    pub executor: Option<Executor>,
-    pub goal: Option<u64>,
-    pub asked_by_me: bool,
-}
-/// One project task's context, supplied by its authoritative owner.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct TaskLine {
-    pub asked_by_me: bool,
-    pub chip: Chip,
-    pub goal: Option<u64>,
-    pub requester: super::OwnerRequester,
-    pub changed: Wall,
-}
 /// Bounded live project tasks in last-change order.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tasks {
-    pub project: u32,
-    pub filter: TaskFilter,
-    pub rows: List<TaskLine>,
+    pub rows: List<super::TaskLine>,
     pub more: bool,
 }
 /// Spend attributed to one goal or chat, largest first.

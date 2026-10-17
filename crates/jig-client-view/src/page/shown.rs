@@ -293,9 +293,10 @@ pub(crate) fn uses(section: Section, subject: &jig_client::contract::Subject) ->
             section == Section::Project { project: *project, section: ProjectSection::Overview }
                 || section == Section::Project { project: *project, section: ProjectSection::Goals }
         }
-        Subject::Tasks { project, .. } => {
-            section == Section::Project { project: *project, section: ProjectSection::Tasks }
-        }
+        Subject::Tasks { query, .. } => match query.project {
+            Some(project) => section == Section::Project { project, section: ProjectSection::Tasks },
+            None => false,
+        },
         Subject::Deployment => section == Section::Deployment,
     }
 }

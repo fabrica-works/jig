@@ -1,7 +1,7 @@
 //! Whole document envelopes at the real client boundary (contract.md, 5–7).
 //! Normal Run state remains independent of provisional text and its Continue
 //! cursor. Receiving admission prices the complete envelope before it is fed.
-use super::{chips, cursor, inbox, offers, owner, results, rows, watches};
+use super::{chips, cursor, inbox, offers, owner, queries, results, rows};
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
 use jig_client_view::Limits;
@@ -167,32 +167,19 @@ pub fn goals_delivery(project: u32, value: &documents::Goals, limits: &Limits) -
 /// # Errors
 /// Refuses mismatched source identity or any whole reserved payload above bounds.
 pub fn tasks_delivery(
-    project: u32,
-    filter: &client::TaskFilter,
-    value: &documents::Tasks,
+    query: &client::TaskQuery,
+    value: &documents::Lines,
     limits: &Limits,
 ) -> Result<client::Delivery, Invalid> {
-    let expected = watches::task_filter(project, filter).map_err(|_| Invalid::Identity)?;
-    if value.project != project
-        || value.filter != expected
-        || value.rows.iter().any(|row| row.chip.details.project != project)
+    let expected = queries::query(query).map_err(|_| Invalid::Identity)?;
+    if value.query != expected
+        || value.lines.iter().any(|row| Some(row.project) != query.project && query.project.is_some())
     {
         return Err(Invalid::Identity);
     }
     let value = client::Delivery::Tasks(Box::new(client::Tasks {
-        project,
-        filter: *filter,
-        rows: owner::list(&value.rows, limits, |row| {
-            Ok(client::TaskLine {
-                chip: chips::chip(&row.chip, limits)?,
-                goal: row.goal,
-                requester: results::requester(row.requester),
-                asked_by_me: row.asked_by_me,
-                changed: row.changed,
-            })
-        })
-        .map_err(Invalid::Owner)?,
-        more: value.more,
+        rows: owner::list(&value.lines, limits, |row| queries::line(row, limits)).map_err(Invalid::Owner)?,
+        more: value.next.is_some(),
     }));
     admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
@@ -617,63 +604,72 @@ pub(crate) mod tests {
     #[test]
     fn live_tasks_keep_the_original_filter_supplied_requester_goal_clock_and_reserved_rows() {
         let limits = rows::tests::limits();
-        let filter = client::TaskFilter {
-            phase: Some(client::Phase::Ended),
-            executor: Some(client::Executor::Role { project: u32::MAX, role: u32::MAX }),
-            goal: Some(u64::MAX),
-            asked_by_me: true,
+        let query = client::TaskQuery {
+            project: Some(u32::MAX),
+            requester: None,
+            root: Some(u64::MAX),
+            parent: None,
+            label: None,
+            phase: Some(client::PhaseClass::Ended),
+            executor: Some(client::ExecutorKind::Person),
+            tracked: None,
+            order: client::QueryOrder::Changed,
         };
-        let mut rows = List::with_capacity(3);
-        rows.push(documents::ProjectTaskLine {
-            chip: chips::tests::source_chip(),
-            goal: Some(0),
-            requester: jig_domain_tasks::Party::Deployment { project: u32::MAX },
-            asked_by_me: false,
-            changed: Wall::EPOCH,
-        })
-        .expect("owner-supplied row");
-        let source = documents::Tasks {
-            project: u32::MAX,
-            filter: watches::task_filter(u32::MAX, &filter).expect("original filter"),
-            rows,
-            more: true,
+        let mut lines = List::with_capacity(3);
+        lines
+            .push(documents::TaskLine {
+                chip: chips::tests::source_chip(),
+                project: u32::MAX,
+                requester: jig_domain_tasks::Party::Deployment { project: u32::MAX },
+                tracked: None,
+                label: 0,
+                flags: jig_domain_tasks::Flags::PLAIN,
+                changed: Wall::EPOCH,
+                last_activity: Wall::EPOCH,
+                ended_at: None,
+                budget: chips::tests::source_chip().details.budget,
+                waits_on: documents::WaitsOn::Nothing,
+                phases: documents::PhaseCounts::ZERO,
+                held_below: 0,
+                conversation: None,
+            })
+            .expect("owner row");
+        let source = documents::Lines {
+            query: queries::query(&query).expect("query"),
+            lines,
+            next: Some(documents::Cursor::Number { number: 1 }),
         };
         let before = source.clone();
-        let client::Delivery::Tasks(value) = tasks_delivery(u32::MAX, &filter, &source, &limits).expect("whole Tasks")
-        else {
+        let client::Delivery::Tasks(value) = tasks_delivery(&query, &source, &limits).expect("whole Tasks") else {
             panic!("Tasks")
         };
-        assert_eq!(value.filter, filter);
-        assert_eq!(value.project, u32::MAX);
         assert!(value.more);
         assert_eq!((value.rows.len(), value.rows.capacity()), (1, 3));
-        let row = value.rows.get(0).expect("copied original row");
-        assert_eq!(row.goal, Some(0));
+        let row = value.rows.get(0).expect("copied row");
+        assert_eq!(row.project, u32::MAX);
         assert_eq!(row.requester, client::OwnerRequester::Deployment { project: u32::MAX });
-        assert!(!row.asked_by_me);
         assert_eq!(row.changed, Wall::EPOCH);
         assert_eq!(row.chip.task, u64::MAX);
         assert!(row.chip.title.cut);
-        assert_eq!(tasks_delivery(0, &filter, &source, &limits), Err(Invalid::Identity));
-        let changed = client::TaskFilter { goal: None, ..filter };
-        assert_eq!(tasks_delivery(u32::MAX, &changed, &source, &limits), Err(Invalid::Identity));
         assert_eq!(
-            tasks_delivery(u32::MAX, &filter, &source, &Limits { rows: 2, ..limits }),
+            tasks_delivery(&client::TaskQuery { project: Some(0), ..query }, &source, &limits),
+            Err(Invalid::Identity)
+        );
+        assert_eq!(
+            tasks_delivery(&client::TaskQuery { root: None, ..query }, &source, &limits),
+            Err(Invalid::Identity)
+        );
+        assert_eq!(
+            tasks_delivery(&query, &source, &Limits { rows: 2, ..limits }),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
-        assert_eq!(
-            tasks_delivery(u32::MAX, &filter, &source, &Limits { document_bytes: 0, ..limits }),
-            Err(Invalid::Payload)
-        );
+        assert_eq!(tasks_delivery(&query, &source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
         assert_eq!(source, before);
-        // The owner also supplies a legal empty Ended selection in its live list.
-        let empty = documents::Tasks { rows: List::with_capacity(3), more: false, ..source };
-        let client::Delivery::Tasks(value) = tasks_delivery(u32::MAX, &filter, &empty, &limits).expect("empty Ended")
-        else {
+        let empty = documents::Lines { lines: List::with_capacity(3), next: None, ..source };
+        let client::Delivery::Tasks(value) = tasks_delivery(&query, &empty, &limits).expect("empty Ended") else {
             panic!("Tasks")
         };
         assert!(value.rows.is_empty());
-        assert_eq!(value.filter.phase, Some(client::Phase::Ended));
         assert!(!value.more);
     }
 

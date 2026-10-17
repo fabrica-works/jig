@@ -32,3 +32,5 @@ pub mod turns;
 pub mod watches;
 
 mod me;
+
+pub(crate) mod queries;

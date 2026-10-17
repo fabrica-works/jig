@@ -117,6 +117,14 @@ pub fn task_record() -> w::Task {
     w::Task::new(
         &lim,
         w::TaskParts {
+            label: 0,
+            flags: w::TaskFlags::new(
+                &lim,
+                w::TaskFlagsParts { conversation: false, listed: false, retention: w::Retention::Kept },
+            )
+            .expect("fixture flags"),
+            last_activity: 0,
+            waits_on: w::WaitsOn::Nothing,
             chip: chip_record(),
             goal: None,
             priority: None,

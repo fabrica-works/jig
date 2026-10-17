@@ -706,19 +706,9 @@ fn fill_inbox(d: &mut Fixture, watch: jig_client::Handle) {
         })),
     );
 }
-fn fill_tasks(d: &mut Fixture, watch: jig_client::Handle, filter: TaskFilter) {
-    let row = |number| TaskLine {
-        asked_by_me: true,
-        chip: full_chip(number),
-        goal: Some(8),
-        requester: OwnerRequester::Person(1),
-        changed: Wall::EPOCH,
-    };
-    deliver(
-        d,
-        watch,
-        Delivery::Tasks(Box::new(Tasks { project: 4, filter, rows: list([row(8), row(9)]), more: true })),
-    );
+fn fill_tasks(d: &mut Fixture, watch: jig_client::Handle, _query: TaskQuery) {
+    let row = |number| crate::tests::fixtures::task_line(full_chip(number), 4, OwnerRequester::Person(1), Wall::EPOCH);
+    deliver(d, watch, Delivery::Tasks(Box::new(Tasks { rows: list([row(8), row(9)]), more: true })));
 }
 fn fill_notes(d: &mut Fixture, read: jig_client::Handle) {
     let note = |number| Note {

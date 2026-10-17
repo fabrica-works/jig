@@ -131,3 +131,45 @@ pub(crate) fn selected_change(ask: &jig_client::contract::Ask) -> Option<&jig_cl
 pub(crate) fn refusal_answer(refusal: jig_client::contract::Refusal) -> jig_client::contract::Answer {
     jig_client::contract::Answer::Refused { refusal, at: None }
 }
+
+/// A supplied query row, independent of the reference UI's selection.
+pub(crate) fn task_line(
+    chip: jig_client::contract::Chip,
+    project: u32,
+    requester: jig_client::contract::OwnerRequester,
+    changed: skein_lib::Wall,
+) -> jig_client::contract::TaskLine {
+    use jig_client::contract as c;
+    c::TaskLine {
+        chip,
+        project,
+        requester,
+        changed,
+        tracked: None,
+        label: 0,
+        flags: c::TaskFlags { conversation: false, listed: true, retention: c::Retention::Kept },
+        last_activity: changed,
+        ended_at: None,
+        budget: c::OwnerBudget {
+            numbers: c::OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
+            left: 0,
+            funder: c::Funder::Task(8),
+            deadline: None,
+        },
+        waits_on: c::WaitsOn::Nothing,
+        phases: c::OwnerPhaseCounts {
+            waiting: 0,
+            idle: 0,
+            starting: 0,
+            running: 1,
+            backing_off: 0,
+            closing: 0,
+            held: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+        conversation: None,
+    }
+}

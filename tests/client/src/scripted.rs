@@ -127,6 +127,8 @@ enum Route {
 }
 /// The scripted engine with opaque client token routes.
 pub struct Scripted {
+    /// Whole subjects received at the scripted engine boundary.
+    pub opened: Vec<Subject>,
     pub engine: engine::Engine<Family>,
     ledger: Ledger<Token, ()>,
     parties: BTreeMap<ClientId, u64>,
@@ -173,6 +175,7 @@ impl Scripted {
             observe_change(&engine::Change::Source(source.clone()), 0, &mut initial);
         }
         Self {
+            opened: Vec::new(),
             ledger: Ledger::new("scripted wire operation"),
             engine: engine::Engine::with_application(script, seed, family).expect("script keeps contract"),
             parties: BTreeMap::new(),
@@ -336,6 +339,7 @@ impl Front<Test> for Scripted {
                 self.engine.read(now, party, read, what).expect("read fits");
             }
             Down::Open { watch, subject: Watchable::Jig(subject) } => {
+                self.opened.push(subject.clone());
                 self.last_watch = Some(watch);
                 if let Subject::Task { task } = &subject {
                     self.last_object = Some(ObjectKey::Task(*task));
