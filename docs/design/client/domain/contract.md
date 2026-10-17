@@ -157,7 +157,7 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 
 | Operation | Names | Becomes |
 |---|---|---|
-| `Create` | a project; a batch: for each task its executor (an agent's charter, a procedure and its parameters, a person, or a role, which is the project's: roles are per project, `../../domain/people.md`, section 1), spec, result contract (a report, a change or a verdict: an approval is a procedure's, `../../domain/people.md`, section 8), authority, whose spend and deadline are the task's budget and deadline (`../../domain/authority.md`, section 3), that budget as named there or `AsAllowed`, wake policy, dependencies and inputs, the grants named after it (`../../domain/authority.md`, section 4), tracked and priority, label and flags; and the dependencies among its tasks. The other resources a task will write are those its connectors name from its executor and spec (`../../domain/tasks.md`, section 4) | the batch checked whole and made at once (`../../domain/tasks.md`, section 4), its tasks numbered consecutively in the batch's order, the first and the last answered, and the `AsAllowed` task, if any, with what it was given |
+| `Create` | a project; a batch: for each task its executor (an agent's charter, a procedure and its parameters, a person, or a role, which is the project's: roles are per project, `../../domain/people.md`, section 1), spec, result contract (a report, a change or a verdict: an approval is a procedure's, `../../domain/people.md`, section 8), authority, whose spend and deadline are the task's budget and deadline (`../../domain/authority.md`, section 3), that budget as named there or `AsAllowed`, wake policy, or none for its executor's default (`../../domain/tasks.md`, 8.3), as an agent's delegate may leave it, dependencies and inputs, the grants named after it (`../../domain/authority.md`, section 4), tracked and priority, label and flags; and the dependencies among its tasks. The other resources a task will write are those its connectors name from its executor and spec (`../../domain/tasks.md`, section 4) | the batch checked whole and made at once (`../../domain/tasks.md`, section 4), its tasks numbered consecutively in the batch's order, the first and the last answered, and the `AsAllowed` task, if any, with what it was given |
 | `Propose` | a project; the action: a batch, or an amendment (a widening of a task's authority among them); a party makes no effect (`../../domain/people.md`, 5.1); a reason | a proposal to whoever may accept it, its number answered (3.5) |
 | `Withdraw` | the party's own pending proposal | withdrawn |
 | `Message` | a task; the words | words in its inbox, their message number answered |
@@ -338,10 +338,13 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   showing; the executor (a charter, or "a charter or procedure the role
   may create with", the creator's choice); the result contract;
   authority, as the creator's role narrowed (one level shallower in
-  delegation, by default); the budget (an amount, `AsAllowed` with an
+  delegation, by default: its `shallower` counts the levels below the
+  role, and the authority `me` offers for creating is one level below,
+  5.3); the budget (an amount, `AsAllowed` with an
   optional cap, or the creator's to give); a deadline (none, a span from
   creation, or the creator's to give); wake and
-  park, which are the charter's; tracked, with a default priority; the
+  park, which are the charter's, so its `Create` names no wake policy;
+  tracked, with a default priority; the
   flags; the label; and the grace its helper cancels with.
 - **jig's defaults,** which an application keeps, changes or drops, and
   beside which it adds its own:
@@ -555,7 +558,9 @@ unsent, for its owner's version (section 8).
   - *creating,* in `me`, per project: the executors the party may create
     with, and their pool left; within, the largest budget and the latest
     deadline they may give a task alone, and the authority they may give
-    it, from their role and their pool; and, past that, the largest
+    it, from their role and their pool: whole, their role's, one level
+    shallower in delegation and its tasks within a tree's; and, past
+    that, the largest
     budget and the latest deadline any root task of the project may
     have, from its spend per period, its policy's ceiling and the
     deployment's rules;

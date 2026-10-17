@@ -249,15 +249,25 @@ activity, the conversation, comes first.
 
   | The chat is | The page says |
   |---|---|
-  | due, preparing or claimed | starting |
+  | waiting to start, due, preparing or claimed; or its host preparing or starting its run | starting |
   | running, writing | writing |
   | running a tool | which tool, when its host names it, and for how long |
+  | running, neither writing nor in a tool its host names, or nothing reported yet | working, and for how long |
   | waiting on the person: a question, a proposal or a person task in its tree | waiting for you, and for what |
   | waiting on another party | waiting for them, by name |
-  | idle, parked | parked; your words resume it |
+  | idle: its run waiting, holding its slot, or parked | parked; your words resume it |
   | backing off | retrying, when, and why: "host lost, try 2 of 3" |
   | held | why, with its card |
   | closing, then ended | closing; ended, and when |
+
+  The first row that applies, in this order: held, closing and ended,
+  each a phase that says why it waits; then a party it waits on, in any
+  active stage; then its stage, and, while its run is claimed or
+  running, what its host last reported. Writing and a tool are said only
+  on such a report, never from a run being placed
+  (`../../domain/hosts.md`, 6.5). A run that waits holds its slot only
+  until it parks, and is idle meanwhile (`../../domain/engine.md`, 7.4):
+  words wake it as they resume a parked one.
 
 - **Words** may be written while it is not closing or ended: a `Message`.
   A running chat hears them at its next turn, a waiting one wakes, a

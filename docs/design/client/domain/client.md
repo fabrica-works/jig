@@ -869,7 +869,19 @@ view.md's, 18.10.
     cancelled with the template's grace;
   - `shapes::set_goal(..)` fills the goal template into a `Create`, or a
     `Propose` where the project's offer says the creator's authority
-    does not cover it.
+    does not cover it;
+  - each fills what a template does not give from `me` and its own
+    inputs: the authority `me` offers for creating (contract.md, 5.3),
+    one level below the role, made one level shallower again for each
+    level of the template's `shallower` past the first, its spend the
+    budget named (any for `AsAllowed`, whose amount the engine gives)
+    and its deadline the task's; no wake policy, so the executor's own;
+    no parameters, inputs, dependencies or grants named after it;
+  - a template it cannot fill gives `NotOffered::Template`, and nothing
+    is sent: a contract no `Create` names (an approval, or a verdict
+    whose choices its document cut), a value its helper takes no input
+    for (a chat's executor, budget or deadline the creator's to give),
+    or a `shallower` of 0, which no task's authority may be.
 - **`facts`:** pure functions over the documents the client holds: a
   chat's status, from its phase, its run and what it waits on; what a
   decision will do, read from its document.
