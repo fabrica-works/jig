@@ -280,6 +280,23 @@ deployment's rules       the most any project may have; requirements on effects
   anew: its old funder is given back what the task has left and keeps
   what it spent; the new funder reserves what the task has left from its
   own.
+- **Whoever widens a task funds it.** An amendment that widens a task's
+  authority (section 5) is funded by whoever gives the widening: its
+  amender, when it is within the amender's own authority, or its
+  accepter, when it was proposed (section 9). From that commit, the
+  giver is the task's funder:
+  - *when it already was,* its reservation is resized to the task's new
+    budget;
+  - *otherwise,* the task is funded anew from it, as a moved task is:
+    its old funder is given back what the task had left and keeps what
+    it spent, and the giver reserves the task's new budget less what the
+    task spent. Its requester, its tree and its delegates' funding stay
+    as they were.
+
+  An amendment that only narrows a task's authority, or changes none,
+  leaves its funder as it was, a lower budget giving the difference back
+  to it. So a task has one funder, and a widening is never split between
+  two.
 - **No overrun is recorded.** Every charge is reserved before it is
   made (below), so what is recorded against a task never passes its
   budget. A task left with too little for its next run or effect waits,
@@ -498,9 +515,9 @@ proposals wait and how they move is tasks.md, section 9.
 - **What it needs** is the least authority the action takes: for a
   batch, every tool, grant, kind and scope its tasks have, the sum of
   their tasks and budgets, their depth, their latest deadline; for an
-  effect, the one grant that covers it, and its price; for a widening,
-  what it asks for. The holder that accepts funds all of it, whatever
-  the proposer has.
+  effect, the one grant that covers it, and its price; for an amendment
+  or a widening, the authority it asks for its task. The holder that
+  accepts funds all of it, whatever the proposer has.
 - **An escalation needs** nothing more than standing above the held task,
   unless releasing it needs what the task lacks (budget, time, a grant):
   then it needs that, as a widening would.
@@ -510,8 +527,10 @@ proposals wait and how they move is tasks.md, section 9.
   proposal and whose pool has the budget left.
 - **An acceptance funds the action** from the accepter: the budgets of a
   batch's tasks are reserved from the accepter, which is recorded as
-  their funder; a widening moves budget or a grant from the accepter into
-  the proposer; an effect is made with the accepter's grant, its price
+  their funder; an amendment or a widening makes the accepter the funder
+  of the task it changes, whoever proposed it, as section 7 says
+  ("Whoever widens a task funds it"), its grants covered by the
+  accepter's; an effect is made with the accepter's grant, its price
   charged to the accepter. The action commits with the acceptance, as one
   decision; an effect's requirements are judged again then, as any
   effect's are.

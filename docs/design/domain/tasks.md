@@ -503,13 +503,14 @@ tasks holding it: a quota cut, a machine gone.
   policy; the dependencies of a task still waiting, by removing some,
   never adding; the authority, narrowed freely and widened only within
   the amender's own (beyond it, refused, and proposed if the amender asks:
-  section 9); an agent task's instructions; a procedure's parameters,
-  which go to its connector; a person task's address, to another party
-  or role, naming the person task's revision as an amendment names the
-  spec's, a party who took it holding it no more; whether it is tracked,
-  within goals per project (section 11), and its priority. An amendment
-  is refused once a task is closing. Its label and its flags are never
-  amended (section 3).
+  section 9), the amender, or the proposal's accepter, funding the
+  widened task from then on (authority.md, section 7); an agent task's
+  instructions; a procedure's parameters, which go to its connector; a
+  person task's address, to another party or role, naming the person
+  task's revision as an amendment names the spec's, a party who took it
+  holding it no more; whether it is tracked, within goals per project
+  (section 11), and its priority. An amendment is refused once a task is
+  closing. Its label and its flags are never amended (section 3).
 - **Tracking and untracking.** A task an amendment tracks is a goal from
   that commit, with all a goal has (core.md, 6.2). One it untracks is no
   goal from that commit: the core ends its goals' topics, and its
@@ -772,7 +773,9 @@ proposed, what an action needs, and what an acceptance funds.
   proposer's action, with the accepter's authority funding what it
   needs, in the commit that accepts it; the tasks it makes are the
   proposer's (a task's delegates, a party's roots), or, when the proposal
-  asked, the accepter's (a chat proposing a goal asks so). A rejection is
+  asked, the accepter's (a chat proposing a goal asks so); a task it
+  amends or widens is funded by the accepter from then on, whoever
+  proposed it (authority.md, section 7). A rejection is
   a message to the proposer: a task hears it in its inbox, and a party
   finds it in theirs (people.md, section 6). A party's proposal to amend
   a task is the party's, not that task's. A party who does not cover a
