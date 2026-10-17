@@ -39,7 +39,7 @@ fn procedure_configuration(configuration: &mut jig_test_domain::Config, owner: &
 
 #[test]
 fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_page() {
-    let mut world = configured_with_bounds(8524, vec![], 1, procedure_configuration, family_limits());
+    let mut world = configured_with_bounds(8524, vec![], 1, procedure_configuration, &family_limits());
     let owner = world.client_with(
         1,
         jig_client_test_domain::Address::Jig(jig_client_view::address::Address::Project {
@@ -146,7 +146,7 @@ fn effect_configuration(configuration: &mut jig_test_domain::Config, owner: &jig
 #[test]
 fn a_proposed_effect_shows_its_real_connector_description_in_the_proposal_card() {
     let mut world =
-        configured_with_bounds(8526, vec![Box::new([Script::Wait])], 1, effect_configuration, family_limits());
+        configured_with_bounds(8526, vec![Box::new([Script::Wait])], 1, effect_configuration, &family_limits());
     let owner = world.client_with(1, crate::stories::conversation(), family_limits(), family_client);
     world.person(owner, start(b"describe its effect"));
     let outcome = world.run(Until::Done);

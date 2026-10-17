@@ -299,7 +299,7 @@ fn drift_client(seed: u64) -> (jig_client_test_domain::Domain, jig_client_test_v
 fn drift_holds_a_task_and_the_person_is_told_why() {
     use jig_test_connector as connector;
     use jig_test_domain as root;
-    let mut world = configured_with_bounds(8519, vec![Box::new([Script::Wait])], 1, |_, _| {}, drift_limits());
+    let mut world = configured_with_bounds(8519, vec![Box::new([Script::Wait])], 1, |_, _| {}, &drift_limits());
     let person = world.client_with(1, crate::stories::conversation(), drift_limits(), drift_client);
     world.person(person, start(b"watch the resource drift"));
     let outcome = world.run(Until::Done);

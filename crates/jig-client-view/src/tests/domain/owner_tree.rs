@@ -87,7 +87,7 @@ fn plan_task() -> Task {
     doc
 }
 fn opened(root: u64) -> (Domain, Token) {
-    let mut d = Domain::new(&limits(), 32);
+    let mut d = Domain::new(&limits());
     let f = start(&mut d, List::with_capacity(0));
     delivered(&mut d, Time::ZERO, f, frame(7));
     let asks =

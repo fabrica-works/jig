@@ -227,7 +227,7 @@ pub(crate) fn show(
         let watch = domain.watches.get(*id).expect("registered watch exists");
         if watch.owner == owner && !needed(domain, &watch.subject) {
             let watch = domain.watches.get_mut(*id).expect("registered watch exists");
-            crate::ui::close_watch(watch, *id, &mut domain.timers, out);
+            crate::ui::close_watch(watch, *id, out);
         }
     }
     for index in 0..domain.sections.len() {

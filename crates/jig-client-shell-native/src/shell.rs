@@ -1,7 +1,7 @@
 //! Connections on sockets, with private durable storage (protocol/client.md, 12).
 use crate::{Conn, Connections, Limits, files::Files};
+use jig_client as client;
 use jig_client_protocol_http::{Mapping, Unlinked};
-use jig_client_protocol_link::boundary as link;
 use skein_io::{
     self as io,
     kernel::{Complete, Fd, Submit},
@@ -34,8 +34,8 @@ pub struct Shell {
     raw: Queue<Submit>,
     told: Queue<io::Event>,
     below: Queue<(Conn, Down)>,
-    events: Queue<link::Event>,
-    held: VecDeque<link::Request>,
+    events: Queue<client::Event>,
+    held: VecDeque<client::Request>,
     closing: bool,
     max: u32,
     body_bytes: u32,
@@ -75,11 +75,11 @@ impl Shell {
         self.files.adopt(root, user, seed);
     }
     /// Read records once, after the private token and small store have loaded.
-    pub fn loaded(&mut self) -> Option<(Option<Secret>, Vec<link::Record>)> {
+    pub fn loaded(&mut self) -> Option<(Option<Secret>, Vec<client::Record>)> {
         let records = self.files.loaded()?;
         Some((self.files.token(), records))
     }
-    pub fn events(&mut self) -> &mut Queue<link::Event> {
+    pub fn events(&mut self) -> &mut Queue<client::Event> {
         &mut self.events
     }
     /// Keep a credential in the private file; `kept` reports its durability.
@@ -101,29 +101,27 @@ impl Shell {
         self.connections.printed(printed)
     }
     /// Route one link output; call iterate after the whole step's outputs.
-    pub fn down(&mut self, request: link::Request) {
+    pub fn down(&mut self, request: client::Request) {
         match request {
-            link::Request::Save { record } => self.files.edit(record.key, Some(record.bytes)),
-            link::Request::Erase { key } => self.files.edit(key, None),
-            request @ (link::Request::Exchange { .. } | link::Request::OpenStream { .. }) => {
+            client::Request::Save { records } => {
+                for record in records.into_boxed() {
+                    self.files.edit(record.key, Some(record.bytes));
+                }
+            }
+            client::Request::Erase { records } => {
+                for key in records.into_boxed() {
+                    self.files.edit(key, None);
+                }
+            }
+            request @ (client::Request::Exchange { .. } | client::Request::OpenStream { .. }) => {
                 assert!(self.held.len() < usize::try_from(self.max * 64).expect("held bound"), "step output bound");
                 self.held.push_back(request);
             }
-            request @ link::Request::CloseStream => {
+            request @ client::Request::CloseStream => {
                 self.connections.down(self.env.now, request, &mut self.below);
             }
-            link::Request::Kept { .. }
-            | link::Request::Dropped
-            | link::Request::Answer { .. }
-            | link::Request::NotKept { .. }
-            | link::Request::Signing { .. }
-            | link::Request::ServiceCredential { .. }
-            | link::Request::Watch { .. }
-            | link::Request::FamilyDelivery { .. }
-            | link::Request::Ended { .. }
-            | link::Request::Hello { .. }
-            | link::Request::Read { .. }
-            | link::Request::Fact { .. } => {}
+            client::Request::Told { .. } => {}
+            client::Request::Down { .. } | client::Request::SignOut => panic!("linked hosts emit wire work"),
         }
     }
     pub fn close(&mut self) {
@@ -237,14 +235,17 @@ impl Shell {
         }
         self.files.progress(now);
         if let Some(ok) = self.files.written.take() {
-            self.events.push(if ok { link::Event::Stored } else { link::Event::NotStored });
+            self.events.push(if ok { client::Event::Stored } else { client::Event::NotStored });
             if !ok {
                 while let Some(request) = self.held.pop_front() {
-                    if let link::Request::Exchange { exchange, .. } = request {
-                        self.events.push(link::Event::Lost { exchange });
+                    if let client::Request::Exchange { exchange, .. } = request {
+                        self.events.push(client::Event::Lost { exchange });
                     } else {
-                        assert!(matches!(request, link::Request::OpenStream { .. }), "only exchanges and streams held");
-                        self.events.push(link::Event::StreamGone);
+                        assert!(
+                            matches!(request, client::Request::OpenStream { .. }),
+                            "only exchanges and streams held"
+                        );
+                        self.events.push(client::Event::StreamGone);
                     }
                 }
             }

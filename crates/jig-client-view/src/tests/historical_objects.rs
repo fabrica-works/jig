@@ -121,7 +121,7 @@ fn limits(f: view::HistoricalFragment) -> Limits {
 fn build(value: &OwnerHistorical, words: &crate::words::Words) -> (Tree, JigBindings) {
     let f = view::required(value, &CLIENT, words).unwrap();
     let l = limits(f);
-    let domain = Domain::new(&CLIENT, 1);
+    let domain = Domain::new(&CLIENT);
     let mut b = Builder::new(&l);
     let mut bindings = JigBindings::new(f.bindings, CLIENT.text);
     view::render(&mut b, &domain, value, words, &mut bindings);
@@ -325,7 +325,7 @@ fn step(domain: &mut Domain, l: &crate::Limits, event: crate::Event) -> Vec<crat
 fn presence(mask: u8) {
     use crate::{Event, Request};
     let l = crate::Limits { objects: 4, reads: 8, ..CLIENT };
-    let mut domain = Domain::new(&l, 1);
+    let mut domain = Domain::new(&l);
     let first = step(
         &mut domain,
         &l,

@@ -1,6 +1,6 @@
 //! The second connector owns resource/kind words and the shared link only.
 use alloc::boxed::Box;
-use jig_client_domain::contract::Part;
+use jig_client::contract::Part;
 use jig_client_view::link::Link;
 use skein_lib::List;
 #[derive(Debug)]
@@ -41,7 +41,7 @@ impl Side {
     pub(crate) fn show(&mut self, part: Part, generation: u32) -> bool {
         match &part {
             Part::Resource { path, .. } => {
-                if !jig_client_domain::contract::resource_path_fits(path, self.segments, self.text) {
+                if !jig_client::contract::resource_path_fits(path, self.segments, self.text) {
                     return false;
                 }
             }

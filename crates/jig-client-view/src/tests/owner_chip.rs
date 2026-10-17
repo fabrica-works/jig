@@ -99,7 +99,7 @@ fn words() -> &'static Words {
     })
 }
 fn build(value: &OwnerChipDetails, words: &Words) -> (Tree, JigBindings, view::ChipFragment) {
-    let client = Domain::new(&client_limits(), 1);
+    let client = Domain::new(&client_limits());
     let f = view::required(value, &client_limits(), words).unwrap();
     let capacity = Limits {
         nodes: f.nodes,
@@ -604,7 +604,7 @@ fn retry_activation_tree(retry: Option<RetryNotice>, words: &Words) -> Tree {
         scene_marks: 0,
         scene_bytes: 0,
     };
-    let client = Domain::new(&client_limits(), 1);
+    let client = Domain::new(&client_limits());
     let chip = Chip {
         task: u64::MAX,
         title: doc(b"retry", false),

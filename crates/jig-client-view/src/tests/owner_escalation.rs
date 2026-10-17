@@ -284,7 +284,7 @@ fn presence_person(result: &Result, owner: bool) -> ReadValue {
 }
 
 fn presence_domain(l: crate::Limits, documents: &[(ObjectKey, Option<ReadValue>)]) -> Domain {
-    let mut domain = Domain::new(&l, 1);
+    let mut domain = Domain::new(&l);
     let mut requests = presence_step(
         &mut domain,
         l,

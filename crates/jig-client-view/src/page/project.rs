@@ -134,8 +134,8 @@ impl ProjectPage {
 pub(crate) fn number(domain: &Domain) -> Option<u32> {
     domain.shown_project()
 }
-fn open(domain: &mut Domain, env: &Env<crate::Limits>, subject: contract::Subject, out: &mut Queue<Request>) {
-    super::routing::open_once(domain, env, subject, crate::page::shown::owner(domain), out);
+fn open(domain: &mut Domain, subject: contract::Subject, out: &mut Queue<Request>) {
+    super::routing::open_once(domain, subject, crate::page::shown::owner(domain), out);
 }
 pub(crate) fn ask(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
     crate::page::shown::context_read(domain, &what);
@@ -265,7 +265,7 @@ pub(crate) fn tasks(domain: &mut Domain, env: &Env<crate::Limits>, filter: TaskF
     domain.project_page.tasks_more = false;
     domain.project_page.task_filter = filter;
     domain.project_page.tasks.clear();
-    open(domain, env, contract::Subject::Tasks { project, filter, window: env.limits.rows }, out);
+    open(domain, contract::Subject::Tasks { project, filter, window: env.limits.rows }, out);
     domain.changed();
 }
 /// Opaque windows exposed by the board, notes and spend views.

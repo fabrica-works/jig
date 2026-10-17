@@ -24,7 +24,7 @@ fn version_ranges_are_inclusive_and_invalid_ranges_match_nothing() {
     assert!(!VersionRange { first: 4, last: 2 }.contains(3));
 }
 
-mod spine;
+pub(super) mod spine;
 
 mod storage;
 

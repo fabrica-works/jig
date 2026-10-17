@@ -6,7 +6,7 @@
 use crate::family::{self, Document, Kind, Scope, Subject};
 pub use crate::family::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
 use alloc::boxed::Box;
-use jig_client_domain::contract::{Part, Revision};
+use jig_client::contract::{Part, Revision};
 use jig_client_view::{frame::me::FrameShown, link::Link};
 use skein_lib::{Env, Id, List, Map, Queue, RequestProgress, Slab, Time, Token};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,7 +65,7 @@ pub enum Request {
     Save { record: Record },
     Send { request: Token, scope: u64, ask: Ask },
     Out(Out),
-    ShowObjects { objects: List<jig_client_domain::contract::ObjectKey> },
+    ShowObjects { objects: List<jig_client::contract::ObjectKey> },
     ShowSections { sections: List<jig_client_view::page::Section> },
     ObjectsLeft,
 }
@@ -204,6 +204,12 @@ impl Side {
             kept: None,
             shown: 0,
         }
+    }
+    pub(crate) fn read_subject(&self, read: Token) -> Option<Subject> {
+        Some(self.reads.get(Id::from_token(read))?.subject)
+    }
+    pub(crate) fn watch_subject(&self, watch: Token) -> Option<Subject> {
+        Some(self.watches.get(Id::from_token(watch))?.subject)
     }
     #[must_use]
     pub const fn address(&self) -> Option<Address> {
@@ -797,6 +803,7 @@ pub fn reclaim(side: &mut Side) {
 }
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    limits.watches.checked_add(limits.reads)?;
     if limits.retry == skein_lib::Duration::ZERO {
         return None;
     }
@@ -813,7 +820,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     >::worst_case(
         limits.objects,
     )?)?;
-    let payload = List::<jig_client_domain::contract::ProposalKey>::worst_case(limits.rows)?
+    let payload = List::<jig_client::contract::ProposalKey>::worst_case(limits.rows)?
         .max(crate::connector_bounds::document_worst_case(&limits.connector)?);
     total = total.checked_add(u64::from(limits.objects.checked_mul(2)?).checked_mul(payload)?)?;
     total = total
@@ -824,7 +831,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total
         .checked_add(List::<Subject>::worst_case(limits.objects)?)?
         .checked_add(List::<Id<Watching>>::worst_case(limits.watches)?)?;
-    total.checked_add(List::<jig_client_domain::contract::ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)
+    total.checked_add(List::<jig_client::contract::ObjectKey>::worst_case(limits.rows.checked_add(1)?)?)
 }
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
@@ -951,7 +958,7 @@ fn progress_changed(
 
 fn part_fits(part: &Part, segments: u32, text: u32) -> bool {
     match part {
-        Part::Resource { path, .. } => jig_client_domain::contract::resource_path_fits(path, segments, text),
+        Part::Resource { path, .. } => jig_client::contract::resource_path_fits(path, segments, text),
         Part::Connector { .. }
         | Part::Kind { .. }
         | Part::Panel { .. }

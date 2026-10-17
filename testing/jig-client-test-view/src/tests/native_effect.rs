@@ -44,9 +44,16 @@ fn load(root: &mut Domain, proposal: OwnerProposal) -> Vec<Request> {
     let read = named
         .iter()
         .find_map(|row| match row {
-            Request::Jig(JigOut::Read { read, what: Read::Proposal { proposal: key } }) if *key == proposal.key => {
-                Some(*read)
-            }
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down:
+                            jig_client::Down::Read {
+                                read,
+                                what: jig_client::Readable::Jig(Read::Proposal { proposal: key }),
+                            },
+                    },
+            } if *key == proposal.key => Some(*read),
             _ => None,
         })
         .unwrap();

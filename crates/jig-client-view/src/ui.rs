@@ -7,7 +7,7 @@
 //! |---|---|---|---|
 //! | unstarted | start | starting | frame open |
 //! | starting/offline | frame delivery | live | confirmed, retention, link |
-//! | live | frame dropped/silent | offline | link, retry/close |
+//! | active | client link | client link | link |
 //! | active | unsupported stream hello | out of date | park and close |
 //! | active | different party from kept work | someone else's work | confirm nobody |
 //! | active | frame hand off | unchanged | frame answer |
@@ -24,17 +24,13 @@ use crate::{
     watches::{Following, Owner, Watch},
 };
 use jig_client::contract::{Delivery, Frame, Limit, Subject, WatchEnd, WatchEvent};
-use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Rng, Slab, Time, Token, Wall};
+use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Slab, Time, Token, Wall};
 
 mod owed;
 
-/// Client deadlines: one per watch, notice, linger and saved record, plus a tick.
+/// View deadlines: one per notice, linger and saved record, plus a tick.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Timer {
-    /// No event arrived within the heartbeat.
-    Silent(Id<Watch>),
-    /// The old attempt ended and backoff permits another open.
-    Reopen(Id<Watch>),
     /// A visible notice reaches its monotonic end.
     Notice(Id<crate::notices::kept::Notice>),
     /// A leaving card has lingered.
@@ -88,7 +84,6 @@ pub struct Domain {
     pub(crate) watch_ids: Map<Id<Watch>, ()>,
     pub(crate) frame_watch: Option<Id<Watch>>,
     pub(crate) timers: Deadlines<Timer>,
-    pub(crate) rng: Rng,
     pub(crate) objects: crate::objects::Objects,
     pub(crate) reads: crate::reads::Reads,
     pub(crate) object_rows: crate::windows::ObjectWindow,
@@ -97,9 +92,9 @@ pub struct Domain {
     pub(crate) history_rows: crate::windows::HistoryWindow,
 }
 impl Domain {
-    /// Allocates bounded state from limits; the seed is the only randomness.
+    /// Allocates bounded state from limits.
     #[must_use]
-    pub fn new(limits: &Limits, seed: u64) -> Self {
+    pub fn new(limits: &Limits) -> Self {
         assert!(crate::limits::ui::worst_case(limits).is_some(), "client limits are valid");
         let mut conversation = crate::conversation::Conversation::new(0, limits.rows);
         conversation.words = crate::conversation::KeptWords::new(limits.conversation_words);
@@ -144,7 +139,6 @@ impl Domain {
             watch_ids: Map::with_capacity(limits.watches),
             frame_watch: None,
             timers: Deadlines::with_capacity(crate::limits::ui::timers(limits).expect("timer capacity is validated")),
-            rng: Rng::new(seed),
             objects: crate::objects::Objects::new(limits.objects, limits.sources),
             reads: crate::reads::Reads::new(limits.reads),
             object_rows: crate::windows::ObjectWindow::new(limits.rows),
@@ -416,7 +410,6 @@ impl Domain {
     }
     /// Reclaims entities only after their terminals arrived.
     pub fn reclaim(&mut self) {
-        // A watch closed during backoff has no outstanding terminal.
         for _ in 0..self.watch_ids.len() {
             let mut finished = None;
             for (id, ()) in &self.watch_ids {
@@ -426,7 +419,7 @@ impl Domain {
                         finished = Some(*id);
                         break;
                     }
-                    Following::Opening { .. } | Following::Live | Following::Reopening { .. } | Following::Closing => {}
+                    Following::Opening | Following::Live | Following::Closing => {}
                 }
             }
             match finished {
@@ -469,24 +462,14 @@ impl Domain {
             out.push(Request::Link { link });
         }
     }
-    fn arm(&mut self, timer: Timer, at: Time) {
-        self.timers.arm(timer, at).expect("one timer per watch fits the timer capacity");
-    }
-    pub(crate) fn open(
-        &mut self,
-        env: &Env<Limits>,
-        subject: Subject,
-        owner: Owner,
-        out: &mut Queue<Request>,
-    ) -> Option<Id<Watch>> {
-        let watch = Watch { subject, owner, state: Following::Opening { attempt: 0 }, behind: false };
+    pub(crate) fn open(&mut self, subject: Subject, owner: Owner, out: &mut Queue<Request>) -> Option<Id<Watch>> {
+        let watch = Watch { subject, owner, state: Following::Opening, behind: false };
         match self.watches.insert(watch) {
             Ok(id) => {
                 let previous = self.watch_ids.insert(id, ()).expect("the registry has the slab capacity");
                 assert!(previous.is_none(), "a newly issued watch is not already registered");
                 let subject = self.watches.get(id).expect("inserted watch exists").subject.clone();
                 out.push(Request::Open { watch: id.token(), subject });
-                self.arm(Timer::Silent(id), env.now.saturating_add(env.limits.heartbeat));
                 Some(id)
             }
             Err(_) => {
@@ -500,14 +483,12 @@ impl Domain {
             Some(watch) => {
                 match watch.state {
                     Following::Closed => return,
-                    Following::Opening { .. } | Following::Live | Following::Reopening { .. } | Following::Closing => {}
+                    Following::Opening | Following::Live | Following::Closing => {}
                 }
                 watch.state = Following::Closed;
             }
             None => return,
         }
-        self.timers.cancel(Timer::Silent(id));
-        self.timers.cancel(Timer::Reopen(id));
         let removed = self.watch_ids.remove(&id);
         assert!(removed.is_some(), "retired watch was registered");
         self.watches.retire(id);
@@ -523,7 +504,7 @@ impl Domain {
     }
     pub(crate) fn close_one(&mut self, id: Id<Watch>, out: &mut Queue<Request>) {
         if let Some(watch) = self.watches.get_mut(id) {
-            close_watch(watch, id, &mut self.timers, out);
+            close_watch(watch, id, out);
         }
     }
     pub(crate) fn close_page(&mut self, out: &mut Queue<Request>) {
@@ -532,7 +513,7 @@ impl Domain {
             match watch.owner {
                 Owner::Frame => {}
                 Owner::Page { .. } | Owner::Application { .. } | Owner::Sections { .. } => {
-                    close_watch(watch, *id, &mut self.timers, out);
+                    close_watch(watch, *id, out);
                 }
             }
         }
@@ -540,7 +521,7 @@ impl Domain {
     pub(crate) fn close_all(&mut self, out: &mut Queue<Request>) {
         for (id, ()) in &self.watch_ids {
             let watch = self.watches.get_mut(*id).expect("registered watch exists");
-            close_watch(watch, *id, &mut self.timers, out);
+            close_watch(watch, *id, out);
         }
     }
     fn page_behind(&mut self) {
@@ -576,15 +557,13 @@ impl Domain {
     }
 }
 
-pub(crate) fn close_watch(watch: &mut Watch, id: Id<Watch>, timers: &mut Deadlines<Timer>, out: &mut Queue<Request>) {
-    timers.cancel(Timer::Silent(id));
-    timers.cancel(Timer::Reopen(id));
+pub(crate) fn close_watch(watch: &mut Watch, id: Id<Watch>, out: &mut Queue<Request>) {
     watch.state = match watch.state {
-        Following::Opening { .. } | Following::Live | Following::Reopening { waiting: true, .. } => {
+        Following::Opening | Following::Live => {
             out.push(Request::Close { watch: id.token() });
             Following::Closing
         }
-        Following::Reopening { waiting: false, .. } | Following::Closed => Following::Closed,
+        Following::Closed => Following::Closed,
         Following::Closing => Following::Closing,
     };
 }
@@ -632,7 +611,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Hello { served } => crate::versions::hello(domain, env, served, out),
         Event::Frame { asked } => frame_answer(domain, asked, out),
         Event::Watch { watch, event } => watch_event(domain, env, Id::from_token(watch), event, out),
-        Event::Ended { watch, end } => watch_end(domain, env, Id::from_token(watch), end, out),
+        Event::Ended { watch, end } => watch_end(domain, Id::from_token(watch), end, out),
         Event::Went { place } => {
             crate::confirm::close(domain);
             crate::page::routing::navigate(domain, env, place, true, out);
@@ -677,7 +656,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     domain.section_context = u32::MAX;
     crate::drafts::sync(domain, out);
     crate::confirm::sync(domain);
-    crate::signin::returned(domain, env, out);
+    crate::signin::returned(domain, out);
     crate::conversation::sending::restore(domain);
     crate::conversation::chips::sync(domain, env, out);
     crate::clock::sync(domain);
@@ -785,7 +764,7 @@ fn start(
     domain.address = address;
     domain.offset = offset;
     crate::store::restore(domain, env.limits.text, kept, out);
-    domain.frame_watch = domain.open(env, Subject::Frame, Owner::Frame, out);
+    domain.frame_watch = domain.open(Subject::Frame, Owner::Frame, out);
     domain.changed();
 }
 // Restored table scopes are facts; the client owns the warning and its end.
@@ -827,8 +806,8 @@ fn frame_answer(domain: &Domain, asked: Token, out: &mut Queue<Request>) {
 
 fn accepts(state: Following) -> bool {
     match state {
-        Following::Opening { .. } | Following::Live => true,
-        Following::Reopening { .. } | Following::Closing | Following::Closed => false,
+        Following::Opening | Following::Live => true,
+        Following::Closing | Following::Closed => false,
     }
 }
 fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: WatchEvent, out: &mut Queue<Request>) {
@@ -842,6 +821,10 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
     let subject = watch.subject.clone();
     match event {
         WatchEvent::Opened | WatchEvent::Alive => {}
+        WatchEvent::Behind => {
+            watch.behind = true;
+            domain.page_behind();
+        }
         WatchEvent::Delivered(delivery) => {
             match &delivery {
                 Delivery::OwnerDeployment(_) => {
@@ -923,9 +906,6 @@ fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: Wat
             domain.page_behind();
         }
     }
-    if !domain.blocked {
-        domain.arm(Timer::Silent(id), env.now.saturating_add(env.limits.heartbeat));
-    }
 }
 pub(crate) fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Frame, out: &mut Queue<Request>) {
     if !crate::frame::me::fits(&frame, &env.limits) {
@@ -975,41 +955,7 @@ pub(crate) fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Fram
         }
     }
 }
-fn backoff(rng: &mut Rng, limits: &Limits, attempt: u32) -> Duration {
-    let shift = attempt.saturating_sub(1).min(31);
-    let factor = 1_u64.checked_shl(shift).expect("backoff shift is bounded");
-    let cap = limits.backoff.first.saturating_mul(factor).as_nanos().min(limits.backoff.most.as_nanos());
-    let jitter = cap.checked_div(4).expect("four is positive");
-    let upper = cap.saturating_add(jitter).min(limits.backoff.most.as_nanos());
-    Duration::from_nanos(rng.between(cap, upper))
-}
-fn retry(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, out: &mut Queue<Request>) {
-    let Some(watch) = domain.watches.get_mut(id) else {
-        return;
-    };
-    let attempt = match watch.state {
-        Following::Opening { attempt } | Following::Reopening { attempt, .. } => attempt.saturating_add(1),
-        Following::Live => 1,
-        Following::Closing | Following::Closed => {
-            domain.retire(id);
-            return;
-        }
-    };
-    watch.state = Following::Reopening { attempt, waiting: false };
-    watch.behind = true;
-    let frame = match watch.owner {
-        Owner::Frame => true,
-        Owner::Page { .. } | Owner::Application { .. } | Owner::Sections { .. } => false,
-    };
-    domain.timers.cancel(Timer::Silent(id));
-    let span = backoff(&mut domain.rng, &env.limits, attempt);
-    domain.arm(Timer::Reopen(id), env.now.saturating_add(span));
-    if frame {
-        domain.set_link(Link::Offline, out);
-    }
-    domain.page_behind();
-}
-fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEnd, out: &mut Queue<Request>) {
+fn watch_end(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Queue<Request>) {
     let Some(watch) = domain.watches.get(id) else {
         return;
     };
@@ -1029,31 +975,17 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
         | Subject::Conversations
         | Subject::Deployment => {}
     }
-    let recovering = match watch.state {
-        Following::Reopening { waiting: true, .. } => true,
-        Following::Reopening { waiting: false, .. } => return,
-        Following::Opening { .. } | Following::Live | Following::Closing | Following::Closed => false,
-    };
     match watch.state {
         Following::Closed => return,
         Following::Closing => {
             domain.retire(id);
-            crate::signin::returned(domain, env, out);
+            crate::signin::returned(domain, out);
             return;
         }
-        Following::Opening { .. } | Following::Live | Following::Reopening { .. } => {}
+        Following::Opening | Following::Live => {}
     }
     match end {
-        WatchEnd::Dropped | WatchEnd::Busy | WatchEnd::Stopping => {
-            retry(domain, env, id, out);
-        }
-        WatchEnd::Closed => {
-            if recovering {
-                retry(domain, env, id, out);
-            } else {
-                domain.retire(id);
-            }
-        }
+        WatchEnd::Dropped | WatchEnd::Busy | WatchEnd::Stopping | WatchEnd::Closed => domain.retire(id),
         WatchEnd::Unknown | WatchEnd::NotAllowed | WatchEnd::SubjectEnded => {
             terminal_watch(domain, id, end, out);
         }
@@ -1062,7 +994,7 @@ fn watch_end(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, end: WatchEn
             signed_out(domain, out);
         }
     }
-    crate::signin::returned(domain, env, out);
+    crate::signin::returned(domain, out);
 }
 fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Queue<Request>) {
     let Some(watch) = domain.watches.get(id) else {
@@ -1201,48 +1133,6 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                     | crate::objects::Card::Refused { .. }
                     | crate::objects::Card::Unknown { .. } => {}
                 }
-            }
-        }
-        Timer::Silent(id) => {
-            let Some(watch) = domain.watches.get_mut(id) else {
-                return;
-            };
-            if !accepts(watch.state) {
-                return;
-            }
-            let attempt = match watch.state {
-                Following::Opening { attempt } => attempt,
-                Following::Live => 0,
-                Following::Reopening { .. } | Following::Closing | Following::Closed => return,
-            };
-            watch.state = Following::Reopening { attempt, waiting: true };
-            watch.behind = true;
-            let frame = match watch.owner {
-                Owner::Frame => true,
-                Owner::Page { .. } | Owner::Application { .. } | Owner::Sections { .. } => false,
-            };
-            out.push(Request::Close { watch: id.token() });
-            if frame {
-                domain.set_link(Link::Offline, out);
-            }
-            domain.page_behind();
-        }
-        Timer::Reopen(id) => {
-            let Some(watch) = domain.watches.get_mut(id) else {
-                return;
-            };
-            match watch.state {
-                Following::Reopening { attempt, waiting: false } => {
-                    watch.state = Following::Opening { attempt };
-                    let subject = watch.subject.clone();
-                    out.push(Request::Open { watch: id.token(), subject });
-                    domain.arm(Timer::Silent(id), env.now.saturating_add(env.limits.heartbeat));
-                }
-                Following::Opening { .. }
-                | Following::Live
-                | Following::Reopening { waiting: true, .. }
-                | Following::Closing
-                | Following::Closed => {}
             }
         }
     }

@@ -35,3 +35,5 @@ pub struct Limits {
     pub record: u32,
     pub chunk: u32,
 }
+
+pub use jig_client_protocol_link::Heard;

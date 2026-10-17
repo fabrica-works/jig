@@ -352,7 +352,7 @@ fn full_dialog(d: &Domain, words: &crate::words::Words, sized: &Limits) {
 }
 fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
     use crate::page::navigation::{Destination, Navigation};
-    let mut d = Domain::new(&CLIENT, 1);
+    let mut d = Domain::new(&CLIENT);
     let mut entries = List::with_capacity(CLIENT.navigation_entries);
     for task in 0..CLIENT.navigation_entries {
         entries.push(Destination::Jig(Address::task(u64::from(task)))).unwrap();

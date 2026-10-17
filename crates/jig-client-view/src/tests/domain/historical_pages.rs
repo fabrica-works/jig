@@ -56,7 +56,7 @@ fn funding(project: u32) -> OwnerSpendPage {
     }
 }
 fn begin() -> Domain {
-    let mut d = Domain::new(&LIMITS, 91);
+    let mut d = Domain::new(&LIMITS);
     let token = start(&mut d, List::with_capacity(0));
     let out = delivered(&mut d, Time::ZERO, token, frame(7));
     super::pages::finish_initial_inbox_reads(&mut d, &out);

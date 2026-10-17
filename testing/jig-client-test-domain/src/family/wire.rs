@@ -172,7 +172,7 @@ pub fn document(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jig_client_domain::contract::Revision;
+    use jig_client::contract::Revision;
     use skein_lib::List;
 
     #[test]
@@ -210,7 +210,7 @@ mod tests {
 mod scripted {
     //! Exact scripted-family fields, separate from the connector's vocabulary.
     use crate::family as d;
-    use jig_client_domain::contract::{ProposalKey, Proposer, Revision};
+    use jig_client::contract::{ProposalKey, Proposer, Revision};
     use jig_client_test_protocol_wire::v1 as w;
     use skein_lib::List;
 
@@ -445,7 +445,7 @@ pub fn encode_answer(value: &family::Answer) -> Result<Box<[u8]>, Invalid> {
 /// # Errors
 /// Refuses malformed records or values outside the family's configured bounds.
 pub fn decode_answer(bytes: &[u8], bounds: &jig_test_connector::Limits) -> Result<family::Answer, Invalid> {
-    use jig_client_domain::contract::Revision;
+    use jig_client::contract::Revision;
     use jig_client_test_protocol_wire::{codec, v1 as w};
     let Ok(value) = codec::family::answer_value(bytes, bounds) else { return Err(Invalid::TooLarge) };
     let value = match value {

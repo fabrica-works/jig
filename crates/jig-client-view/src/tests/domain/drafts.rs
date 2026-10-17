@@ -16,7 +16,7 @@ use crate::{
     store::{Record, StoreKey},
 };
 use jig_client::contract::*;
-use skein_lib::{Duration, Env, Id, List, Queue, Time, Token, Wall};
+use skein_lib::{Env, Id, List, Queue, Time, Token, Wall};
 fn install(domain: &mut Domain, document: Task) -> Id<Object> {
     let key = ObjectKey::Task(document.chip.task);
     let id = domain.objects.name(key, Source::Window { generation: 0, number: 4 }).unwrap();
@@ -185,8 +185,8 @@ fn drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_cur
     check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_current_records();
 }
 fn check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_only_current_records() {
-    let limits = Limits { drafts: 2, records: 3, heartbeat: Duration::from_secs(3600), ..LIMITS };
-    let mut domain = Domain::new(&limits, 8);
+    let limits = Limits { drafts: 2, records: 3, ..LIMITS };
+    let mut domain = Domain::new(&limits);
     let first = custom(
         &mut domain,
         limits,
@@ -232,7 +232,7 @@ fn check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_on
     custom(&mut domain, limits, Time::from_nanos(1_000_000_000), Event::Went { place: Place::Elsewhere });
     assert_eq!(domain.drafts().get(8).unwrap().words, text(b"newest"));
     let kept = domain.records().clone();
-    let mut restarted = Domain::new(&limits, 9);
+    let mut restarted = Domain::new(&limits);
     let rows = custom(
         &mut restarted,
         limits,

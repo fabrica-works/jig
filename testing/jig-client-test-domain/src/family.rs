@@ -1,6 +1,6 @@
 //! The connector's documents and one revision-naming keyed request. Application
 //! values and forms stay here, never in jig's requests (root.md, sections 6–7).
-use jig_client_domain::contract::{
+use jig_client::contract::{
     EntranceRefusal, ObjectKey, OwnerPart, OwnerPartKey, OwnerPartKind, Part, ProposalKey, Revision,
 };
 use skein_lib::List;
@@ -206,8 +206,8 @@ pub fn subject(part: &Part, scope: Scope) -> Option<Subject> {
         Part::OwnerEffect { proposal, .. } => Kind::OwnerEffect(*proposal),
         Part::Outbox { scope, entry, .. } => {
             let scope = match scope {
-                jig_client_domain::contract::PartScope::Project(project) => Scope::Project(*project),
-                jig_client_domain::contract::PartScope::Deployment => Scope::Deployment,
+                jig_client::contract::PartScope::Project(project) => Scope::Project(*project),
+                jig_client::contract::PartScope::Deployment => Scope::Deployment,
             };
             return Some(Subject { scope, kind: Kind::Outbox(*entry) });
         }
@@ -257,3 +257,5 @@ pub fn owner_effect(part: &OwnerPart) -> Option<Part> {
 }
 
 pub mod wire;
+
+pub(crate) mod client;

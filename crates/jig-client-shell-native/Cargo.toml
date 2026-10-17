@@ -9,7 +9,7 @@ publish.workspace = true
 skein-lib.workspace = true
 skein-http.workspace = true
 skein-io.workspace = true
-jig-client-protocol-link.workspace = true
+jig-client.workspace = true
 jig-client-protocol-http.workspace = true
 jig-client-protocol-wire.workspace = true
 

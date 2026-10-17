@@ -1,6 +1,6 @@
 //! io-free HTTP machines, with transport-owned exchange deadlines (protocol/client.md, 4).
+use jig_client as client;
 use jig_client_protocol_http::{self as mapping, Call, Mapping, Unlinked};
-use jig_client_protocol_link::boundary as link;
 use skein_http::{Header, client as http};
 use skein_lib::{
     Duration, Env, Queue, Secret, Time, Token, Wall,
@@ -39,12 +39,12 @@ struct Exchange {
 pub struct Connections {
     limits: Limits,
     mapping: Mapping,
-    heard: Queue<link::Heard>,
+    heard: Queue<mapping::Heard>,
     host: String,
     next: u32,
     exchanges: BTreeMap<Conn, Exchange>,
     pending: VecDeque<Pending>,
-    events: VecDeque<link::Event>,
+    events: VecDeque<client::Event>,
 }
 impl Connections {
     #[must_use]
@@ -98,35 +98,23 @@ impl Connections {
             self.pending.push_back((owner, call));
         }
     }
-    pub fn down(&mut self, now: Time, request: link::Request, below: &mut Queue<(Conn, stream::Down)>) {
+    pub fn down(&mut self, now: Time, request: client::Request, below: &mut Queue<(Conn, stream::Down)>) {
         match request {
-            link::Request::Exchange { exchange, message, credential } => {
+            client::Request::Exchange { exchange, message, credential } => {
                 self.enqueue(Owner::Link(exchange), mapping::exchange(&self.mapping, credential.as_ref(), message));
             }
-            link::Request::OpenStream { credential } => {
+            client::Request::OpenStream { credential } => {
                 if !self.exchanges.values().any(|value| matches!(value.owner, Owner::Stream)) {
                     self.start(now, Owner::Stream, mapping::stream(&self.mapping, credential.as_ref()), below);
                 }
             }
-            link::Request::CloseStream => self.close(now, None, below),
-            link::Request::Save { .. }
-            | link::Request::Erase { .. }
-            | link::Request::Kept { .. }
-            | link::Request::Dropped
-            | link::Request::Answer { .. }
-            | link::Request::NotKept { .. }
-            | link::Request::Signing { .. }
-            | link::Request::ServiceCredential { .. }
-            | link::Request::Watch { .. }
-            | link::Request::FamilyDelivery { .. }
-            | link::Request::Ended { .. }
-            | link::Request::Hello { .. }
-            | link::Request::Read { .. }
-            | link::Request::Fact { .. } => {}
+            client::Request::CloseStream => self.close(now, None, below),
+            client::Request::Save { .. } | client::Request::Erase { .. } | client::Request::Told { .. } => {}
+            client::Request::Down { .. } | client::Request::SignOut => panic!("linked hosts emit wire work"),
         }
         self.flush(now, below);
     }
-    pub fn take(&mut self, now: Time, to_link: &mut Queue<link::Event>, below: &mut Queue<(Conn, Down)>) {
+    pub fn take(&mut self, now: Time, to_link: &mut Queue<client::Event>, below: &mut Queue<(Conn, Down)>) {
         self.expire(now, below);
         self.flush(now, below);
         while let Some(event) = self.events.pop_front() {
@@ -147,7 +135,7 @@ impl Connections {
     pub(crate) fn stream_memory(&self) -> u64 {
         mapping::worst_case(&self.stream_limits())
             .expect("stream memory")
-            .checked_add(Queue::<link::Heard>::worst_case(self.heard.capacity()).expect("stream output queue"))
+            .checked_add(Queue::<mapping::Heard>::worst_case(self.heard.capacity()).expect("stream output queue"))
             .expect("stream memory fits")
     }
     fn env(&self, now: Time) -> Env<http::Limits> {
@@ -227,7 +215,7 @@ impl Connections {
         now: Time,
         conn: Conn,
         up: Up,
-        to_link: &mut Queue<link::Event>,
+        to_link: &mut Queue<client::Event>,
         below: &mut Queue<(Conn, Down)>,
     ) {
         self.expire(now, below);
@@ -369,12 +357,12 @@ impl Connections {
         let mut gone = false;
         while let Some(heard) = self.heard.pop() {
             self.events.push_back(match heard {
-                link::Heard::Reply { exchange, message } => link::Event::Reply { exchange, message },
-                link::Heard::Lost { exchange } => link::Event::Lost { exchange },
-                link::Heard::Streamed { message } => link::Event::Streamed { message },
-                link::Heard::StreamGone => {
+                mapping::Heard::Reply { exchange, message } => client::Event::Reply { exchange, message },
+                mapping::Heard::Lost { exchange } => client::Event::Lost { exchange },
+                mapping::Heard::Streamed { message } => client::Event::Streamed { message },
+                mapping::Heard::StreamGone => {
                     gone = true;
-                    link::Event::StreamGone
+                    client::Event::StreamGone
                 }
             });
         }
@@ -382,8 +370,8 @@ impl Connections {
     }
     fn failed(&mut self, owner: Owner) {
         match owner {
-            Owner::Link(exchange) => self.events.push_back(link::Event::Lost { exchange }),
-            Owner::Stream => self.events.push_back(link::Event::StreamGone),
+            Owner::Link(exchange) => self.events.push_back(client::Event::Lost { exchange }),
+            Owner::Stream => self.events.push_back(client::Event::StreamGone),
         }
     }
     #[must_use]

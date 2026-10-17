@@ -51,7 +51,7 @@ pub(crate) fn sync(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queu
         if let Some(id) = domain.conversation.chips_watch
             && let Some(watch) = domain.watches.get_mut(id)
         {
-            crate::ui::close_watch(watch, id, &mut domain.timers, out);
+            crate::ui::close_watch(watch, id, out);
         }
         domain.conversation.chips = tasks;
         domain.conversation.chips_pending = true;
@@ -73,7 +73,7 @@ pub(crate) fn sync(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queu
     }
     let subject = Subject::Chips { tasks: domain.conversation.chips.clone() };
     let owner = crate::page::shown::owner(domain);
-    if let Some(id) = domain.open(env, subject, owner, out) {
+    if let Some(id) = domain.open(subject, owner, out) {
         domain.conversation.chips_watch = Some(id);
         domain.conversation.chips_pending = false;
     }

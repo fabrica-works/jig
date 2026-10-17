@@ -1,11 +1,10 @@
 //! Exhaustive wrapping and synchronous hand-offs. The root never interprets
 //! child answers or application documents (client/domain/root.md, section 5).
 use crate::{
-    Action, Address, Ask, Domain, Event, Fact, JigOut, Limits, Place, Request, first,
-    owner::Owner,
+    Action, Address, Domain, Event, Fact, JigOut, Limits, Place, Request, first,
     store::{Key, Record},
 };
-use skein_lib::{Env, List, Map, Queue, RequestProgress};
+use skein_lib::{Env, List, Queue};
 pub(crate) fn jig_env(env: &Env<Limits>) -> Env<jig_client_view::Limits> {
     Env { now: env.now, wall: env.wall, limits: env.limits.jig }
 }
@@ -25,8 +24,9 @@ pub(crate) fn first(root: &mut Domain, env: &Env<Limits>, event: first::Event, o
 pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
         Event::Start { address, kept, offset } => {
-            let mut scopes = Map::<u64, u32>::with_capacity(env.limits.table.requests);
             let mut jig_kept = List::with_capacity(env.limits.jig.records);
+            let mut bytes = List::with_capacity(env.limits.client.domain.requests.requests);
+            let mut records = List::with_capacity(env.limits.client.domain.requests.requests);
             for record in kept.into_boxed() {
                 match record {
                     Record::Jig(record) => {
@@ -35,22 +35,11 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
                         }
                     }
                     Record::First(record) => first(root, env, first::Event::Restore { record }, out),
-                    Record::Table { version, record } => {
-                        let size = crate::domain::ask_size(&env.limits, &record.request.request);
-                        let scope = record.scope;
-                        if version != crate::store::VERSION
-                            || root.table.restore(Owner::Kept { scope }, size, record).is_err()
-                        {
-                            out.push(Request::Fact { fact: Fact::InvalidRecord });
-                        } else {
-                            let requests = scopes
-                                .get(&scope)
-                                .copied()
-                                .unwrap_or(0)
-                                .checked_add(1)
-                                .expect("restored request count is bounded");
-                            scopes.insert(scope, requests).expect("one scope per admitted restored request");
-                        }
+                    Record::Client(record) => {
+                        bytes.push(record).expect("bounded client records");
+                    }
+                    Record::Unlinked(record) => {
+                        records.push(record).expect("bounded unlinked records");
                     }
                 }
             }
@@ -58,10 +47,21 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
                 Address::Jig(address) => address,
                 Address::First(_) => jig_client_view::address::Address::Inbox { project: None },
             };
-            jig(root, env, jig_client_view::Event::Start { address: jig_address, kept: jig_kept, offset }, out);
-            for (scope, requests) in &scopes {
-                jig(root, env, jig_client_view::Event::Kept { scope: *scope, requests: *requests }, out);
-            }
+            let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
+            jig_client_view::step(
+                &mut root.jig,
+                &jig_env(env),
+                jig_client_view::Event::Start { address: jig_address, kept: jig_kept, offset },
+                &mut child,
+            );
+            let event = if root.unlinked {
+                jig_client::Event::StartUnlinked { kept: records }
+            } else {
+                jig_client::Event::Start { kept: bytes }
+            };
+            client(root, env, event, out);
+            route_jig(root, env, &mut child, out);
+            told(root, env, jig_client::Told::Link { link: root.client.link().state }, out);
             match address {
                 Address::Jig(_) => first(root, env, first::Event::Left, out),
                 Address::First(address) => went(root, env, Place::Address(Address::First(address)), out),
@@ -72,9 +72,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
             Action::Jig(act) => jig(root, env, jig_client_view::Event::Act { act }, out),
             Action::First(act) => first(root, env, first::Event::Act { act }, out),
         },
-        Event::Answer { attempt, envelope, answer } => {
-            crate::domain::answered(root, env, attempt, envelope, answer, out);
-        }
+        Event::Client { event } => client(root, env, event, out),
         Event::Jig(event) => jig(root, env, event, out),
         Event::First(event) => first(root, env, event, out),
         Event::SignedOut => jig(root, env, jig_client_view::Event::SignedOut, out),
@@ -103,24 +101,27 @@ pub(crate) fn route_jig(
     out: &mut Queue<Request>,
 ) {
     for _ in 0..child.len() {
-        match child.pop().expect("counted jig output") {
-            jig_client_view::Request::Send { request, scope, ask } => {
-                crate::domain::ask(root, env, Owner::Jig(request), scope, Ask::Jig(ask), out);
+        let request = child.pop().expect("counted jig output");
+        if let Some(event) = jig_client_view::bridge::asked(&request, root.salt, env.limits.jig.watches) {
+            client(root, env, event, out);
+            if let jig_client_view::Request::Close { watch } = request {
+                let mut closed = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
+                jig_client_view::bridge::closed(&mut root.jig, &jig_env(env), watch, &mut closed);
+                route_jig(root, env, &mut closed, out);
             }
-            jig_client_view::Request::Read { read, what } => out.push(Request::Jig(JigOut::Read { read, what })),
-            jig_client_view::Request::Open { watch, subject } => {
-                out.push(Request::Jig(JigOut::Open { watch, subject }));
-            }
-            jig_client_view::Request::Continue { watch, subject } => {
-                out.push(Request::Jig(JigOut::Continue { watch, subject }));
-            }
-            jig_client_view::Request::Close { watch } => out.push(Request::Jig(JigOut::Close { watch })),
+            continue;
+        }
+        match request {
+            jig_client_view::Request::Send { .. }
+            | jig_client_view::Request::Read { .. }
+            | jig_client_view::Request::Open { .. }
+            | jig_client_view::Request::Close { .. }
+            | jig_client_view::Request::SignOut => unreachable!("the bridge takes client work"),
             jig_client_view::Request::Show { address, replace } => {
                 out.push(Request::Show { address: Address::Jig(address), replace });
             }
             jig_client_view::Request::Save { record } => out.push(Request::Save { record: Record::Jig(record) }),
             jig_client_view::Request::Erase { key } => out.push(Request::Erase { key: Key::Jig(key) }),
-            jig_client_view::Request::SignOut => out.push(Request::SignOut),
             jig_client_view::Request::SignIn { provider, back } => {
                 out.push(Request::SignIn { provider, back: Address::Jig(back) });
             }
@@ -131,20 +132,13 @@ pub(crate) fn route_jig(
                 first(root, env, first::Event::PartsLeft { generation }, out);
                 root.second.left(generation);
             }
-            jig_client_view::Request::Link { link } => {
-                first(root, env, first::Event::Link { link }, out);
-                root.second.link_is(link);
-                root.table.link(match link {
-                    jig_client_view::link::Link::Live => true,
-                    jig_client_view::link::Link::Starting | jig_client_view::link::Link::Offline => false,
-                });
-            }
+            jig_client_view::Request::Continue { .. }
+            | jig_client_view::Request::Link { .. }
+            | jig_client_view::Request::Retention { .. } => {}
             jig_client_view::Request::Confirmed { party } => {
                 first(root, env, first::Event::Confirmed { party }, out);
                 root.second.confirmed(party);
-                root.table.confirmed(party);
             }
-            jig_client_view::Request::Retention { retention } => root.table.retention(retention),
             jig_client_view::Request::FrameIs { asked, frame } => {
                 first(root, env, first::Event::FrameIs { asked, frame }, out);
             }
@@ -169,20 +163,13 @@ pub(crate) fn route_first(
                 out.push(Request::Show { address: Address::First(address), replace: false });
             }
             first::Request::Save { record } => out.push(Request::Save { record: Record::First(record) }),
-            first::Request::Send { request, scope, ask } => {
-                crate::domain::ask(root, env, Owner::First(request), scope, Ask::First(ask), out);
+            first::Request::Send { request, ask, .. } => {
+                crate::family::client::send(root, env, request, &ask, out);
             }
-            first::Request::Out(value) => match value {
-                first::Out::Fact { fact: first::Fact::SignedOut } => {
-                    jig(root, env, jig_client_view::Event::SignedOut, out);
-                }
-                first::Out::Read { .. }
-                | first::Out::Open { .. }
-                | first::Out::Close { .. }
-                | first::Out::Fact { fact: first::Fact::Full | first::Fact::InvalidDocument } => {
-                    out.push(Request::First(value));
-                }
-            },
+            first::Request::Out(first::Out::Fact { fact: first::Fact::SignedOut }) => {
+                jig(root, env, jig_client_view::Event::SignedOut, out);
+            }
+            first::Request::Out(value) => crate::family::client::asked(root, env, value, out),
             first::Request::ShowObjects { objects } => {
                 jig(root, env, jig_client_view::Event::ShowObjects { objects }, out);
             }
@@ -193,27 +180,75 @@ pub(crate) fn route_first(
         }
     }
 }
-pub(crate) fn progress(
+pub(crate) fn client(root: &mut Domain, env: &Env<Limits>, event: jig_client::Event, out: &mut Queue<Request>) {
+    let mut child = Queue::with_capacity(jig_client::max_out(&env.limits.client));
+    root.client.step(env.now, env.wall, event, &mut child);
+    route_client(root, env, &mut child, out);
+}
+pub(crate) fn route_client(
     root: &mut Domain,
     env: &Env<Limits>,
-    owner: Owner,
-    progress: RequestProgress,
+    child: &mut Queue<jig_client::Request>,
     out: &mut Queue<Request>,
 ) {
-    match owner {
-        Owner::Jig(request) => {
-            let progress = match progress {
-                RequestProgress::InFlight => jig_client_view::intents::Progress::InFlight,
-                RequestProgress::Retrying => jig_client_view::intents::Progress::Retrying,
-                RequestProgress::Parked => jig_client_view::intents::Progress::Parked,
-                RequestProgress::Unknown => jig_client_view::intents::Progress::Unknown,
-            };
-            jig(root, env, jig_client_view::Event::Progress { request, progress }, out);
+    while let Some(request) = child.pop() {
+        match request {
+            jig_client::Request::Told { told: value } => told(root, env, value, out),
+            jig_client::Request::Save { records } => {
+                for record in records.into_boxed() {
+                    out.push(Request::Save { record: Record::Client(record) });
+                }
+            }
+            jig_client::Request::Erase { records } => {
+                for key in records.into_boxed() {
+                    out.push(Request::Erase { key: Key::Client(key) });
+                }
+            }
+            jig_client::Request::Down { down: jig_client::Down::Save { record } } => {
+                out.push(Request::Save { record: Record::Unlinked(record) });
+            }
+            jig_client::Request::Down { down: jig_client::Down::Erase { key } } => {
+                out.push(Request::Erase { key: Key::Unlinked(key) });
+            }
+            request @ (jig_client::Request::Exchange { .. }
+            | jig_client::Request::OpenStream { .. }
+            | jig_client::Request::CloseStream
+            | jig_client::Request::Down { .. }
+            | jig_client::Request::SignOut) => out.push(Request::Client { request }),
         }
-        Owner::First(request) => first(root, env, first::Event::Progress { request, progress }, out),
-        Owner::Kept { scope } => match progress {
-            RequestProgress::Unknown => jig(root, env, jig_client_view::Event::KeptGone { scope }, out),
-            RequestProgress::InFlight | RequestProgress::Retrying | RequestProgress::Parked => {}
+    }
+}
+pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told, out: &mut Queue<Request>) {
+    use jig_client::Told;
+    let asker = match &told {
+        Told::Link { link } => {
+            let link = match link {
+                jig_client::Link::Live => jig_client_view::link::Link::Live,
+                jig_client::Link::Starting => jig_client_view::link::Link::Starting,
+                jig_client::Link::Offline | jig_client::Link::SignedOut | jig_client::Link::OutOfDate => {
+                    jig_client_view::link::Link::Offline
+                }
+            };
+            first(root, env, first::Event::Link { link }, out);
+            root.second.link_is(link);
+            jig_client::Asker::JIG
+        }
+        Told::Dropped { .. } => jig_client::Asker::JIG,
+        Told::Kept { key, .. } | Told::Pending { key } | Told::Answered { key, .. } => key.asker,
+        Told::Changed { handle } | Told::Text { handle } | Told::Ended { handle, .. } | Told::Page { handle, .. } => {
+            handle.asker
+        }
+    };
+    match jig_client_view::Owner::of_asker(asker) {
+        Some(jig_client_view::Owner::Jig) => {
+            let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
+            jig_client_view::bridge::told(&mut root.jig, &jig_env(env), &root.client, told, root.salt, &mut child);
+            route_jig(root, env, &mut child, out);
+        }
+        Some(jig_client_view::Owner::Application { number }) => match crate::Connector::of(number) {
+            Some(crate::Connector::First) => crate::family::client::told(root, env, told, out),
+            Some(crate::Connector::Second) | None => {}
         },
+        None => {}
     }
 }

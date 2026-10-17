@@ -62,7 +62,7 @@ fn native_deployment_authority_none_builtins_and_admitted_policy_numbers_are_ind
         Some(HeldRole::Policy { role: 4 }),
         Some(HeldRole::Policy { role: u32::MAX }),
     ] {
-        let mut domain = Domain::new(&LIMITS, 1);
+        let mut domain = Domain::new(&LIMITS);
         let watch = start(&mut domain, List::with_capacity(0));
         let mut value = frame(7);
         value.deployment_role = role;
@@ -97,7 +97,7 @@ fn native_deployment_authority_none_builtins_and_admitted_policy_numbers_are_ind
 }
 #[test]
 fn native_deployment_wrong_subject_wrong_read_left_generation_and_ended_watch_never_restore_a_page() {
-    let mut domain = Domain::new(&LIMITS, 1);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     let inbox = open_token(&initial);
@@ -131,7 +131,7 @@ fn native_deployment_wrong_subject_wrong_read_left_generation_and_ended_watch_ne
 }
 #[test]
 fn native_deployment_genuine_and_synthetic_documents_replace_each_other_without_inventing_connector_parts() {
-    let mut domain = Domain::new(&LIMITS, 1);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     let opened = deploy(&mut domain);
@@ -164,7 +164,7 @@ fn native_deployment_genuine_and_synthetic_documents_replace_each_other_without_
 }
 #[test]
 fn native_deployment_only_supplied_configured_references_open_ordered_parts_in_the_current_generation() {
-    let mut domain = Domain::new(&LIMITS, 1);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     let opened = deploy(&mut domain);

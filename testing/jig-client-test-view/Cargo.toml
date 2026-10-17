@@ -13,3 +13,7 @@ jig-client-view.workspace = true
 jig-client-test-domain.workspace = true
 [lints]
 workspace = true
+
+[dev-dependencies]
+jig-client-test-protocol-wire.workspace = true
+jig-client.workspace = true

@@ -19,16 +19,16 @@ pub(crate) fn section(
     match section {
         Section::Inbox { group, project } => {
             domain.inbox.filter = super::inbox::Filter { project, kind: None, goal: None };
-            open_once(domain, env, Subject::Inbox { window: env.limits.rows }, owner, out);
+            open_once(domain, Subject::Inbox { window: env.limits.rows }, owner, out);
             super::conversations::start_group(domain, group, out);
         }
         Section::Conversations { .. } => {
-            open_once(domain, env, Subject::Conversations, owner, out);
+            open_once(domain, Subject::Conversations, owner, out);
             read(domain, super::conversations::CONVERSATIONS_READ, Read::Conversations { after: None }, out);
         }
         Section::Task { task, section } => {
             domain.conversation.task = task;
-            open_once(domain, env, Subject::Task { task }, owner, out);
+            open_once(domain, Subject::Task { task }, owner, out);
             match section {
                 TaskSection::History => {
                     read(domain, super::task::HISTORY_READ, Read::History { task, subtree: false, after: None }, out);
@@ -43,12 +43,12 @@ pub(crate) fn section(
         Section::Project { project, section } => {
             match section {
                 ProjectSection::Overview => {
-                    open_once(domain, env, Subject::Goals { project }, owner, out);
-                    open_once(domain, env, Subject::Inbox { window: env.limits.rows }, owner, out);
+                    open_once(domain, Subject::Goals { project }, owner, out);
+                    open_once(domain, Subject::Inbox { window: env.limits.rows }, owner, out);
                     domain.inbox.filter = super::inbox::Filter { project: Some(project), kind: None, goal: None };
                 }
                 ProjectSection::Goals => {
-                    open_once(domain, env, Subject::Goals { project }, owner, out);
+                    open_once(domain, Subject::Goals { project }, owner, out);
                     project::ask(domain, project::GOALS_READ, Read::Goals { project, after: None }, out);
                 }
                 ProjectSection::Tasks => {
@@ -56,7 +56,7 @@ pub(crate) fn section(
                     domain.project_page.tasks.clear();
                     let subject =
                         Subject::Tasks { project, filter: domain.project_page.task_filter, window: env.limits.rows };
-                    open_once(domain, env, subject, owner, out);
+                    open_once(domain, subject, owner, out);
                     domain.changed();
                 }
                 ProjectSection::Notes => project::notes::filter(
@@ -76,7 +76,7 @@ pub(crate) fn section(
             project::ask(domain, project::PROJECT_READ, Read::Project { project }, out);
         }
         Section::Deployment => {
-            open_once(domain, env, Subject::Deployment, owner, out);
+            open_once(domain, Subject::Deployment, owner, out);
         }
     }
 }

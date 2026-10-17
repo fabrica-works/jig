@@ -67,7 +67,7 @@ fn supplied(generation: u32, effect: u64) -> Request {
 #[test]
 fn native_proposal_page_reads_and_watches_keep_whole_facts_scope_and_identity_without_late_resurrection() {
     for proposer in [Proposer::Task(8), Proposer::Party(8)] {
-        let (mut domain, watch) = live_inbox(10);
+        let (mut domain, watch) = live_inbox();
         let original = proposal(proposer, u64::MAX);
         let read = named(&mut domain, watch, original.key);
         let event =
@@ -100,7 +100,7 @@ fn native_proposal_page_reads_and_watches_keep_whole_facts_scope_and_identity_wi
 #[test]
 fn native_proposal_page_reads_and_watches_refuse_part_capacity_while_preserving_whole_offered_documents() {
     for watch_delivery in [false, true] {
-        let (mut domain, watch) = live_inbox(10);
+        let (mut domain, watch) = live_inbox();
         let value = proposal(Proposer::Party(8), 17);
         let read = named(&mut domain, watch, value.key);
         let Page::Work { refused: None, .. } = domain.page() else {

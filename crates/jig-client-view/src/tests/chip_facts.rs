@@ -28,7 +28,7 @@ fn chip(phase: OwnerChipPhase, details: OwnerChipDetails) -> Chip {
     }
 }
 fn brief(value: &Chip) -> Tree {
-    let client = Domain::new(&CLIENT, 1);
+    let client = Domain::new(&CLIENT);
     let limits = crate::limits::of_words(&CLIENT, words()).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);

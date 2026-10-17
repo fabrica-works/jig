@@ -1,7 +1,6 @@
 //! The application-held client against the real engine over native HTTP bytes.
 use crate::{engine::Engine, fixtures, net::Net};
 use jig_client::{self as client, Ask, Event, Handle, Key, Latest, Link, Outcome, Readable, Told, Watchable};
-use jig_client_protocol_link as link;
 use jig_client_protocol_wire::v8 as w;
 use jig_client_shell_native::{Conn, Connections};
 use jig_client_world::{ClientId, harness::Observed};
@@ -51,7 +50,7 @@ pub struct Front {
     pub client: client::Client,
     connections: Connections,
     out: Queue<client::Request>,
-    up: Queue<link::Event>,
+    up: Queue<client::Event>,
     below: Queue<(Conn, Down)>,
     told: Vec<Told>,
     told_at: BTreeMap<Key, Time>,
@@ -87,7 +86,7 @@ impl Front {
     fn advance(&mut self, now: Time, id: ClientId, net: &mut Net, engine: &mut Engine) -> bool {
         let active = !self.up.is_empty() || !self.out.is_empty() || !self.below.is_empty();
         while let Some(event) = self.up.pop() {
-            self.event(now, transport(event));
+            self.event(now, event);
         }
         while let Some(request) = self.out.pop() {
             self.request(now, request);
@@ -140,14 +139,18 @@ impl Front {
                         w::Keyed::decode(&w::CEILINGS, &mut Reader::new(bytes)).expect("client's keyed request");
                     self.referee.keyed(*keyed.key(), self.client.link().party).expect("kept and confirmed exchange");
                 }
-                self.connections.down(now, link::Request::Exchange { exchange, credential, message }, &mut self.below);
+                self.connections.down(
+                    now,
+                    client::Request::Exchange { exchange, credential, message },
+                    &mut self.below,
+                );
             }
             client::Request::OpenStream { credential } => {
-                self.connections.down(now, link::Request::OpenStream { credential }, &mut self.below);
+                self.connections.down(now, client::Request::OpenStream { credential }, &mut self.below);
             }
-            client::Request::Down { .. } => panic!("linked clients emit wire work"),
+            client::Request::Down { .. } | client::Request::SignOut => panic!("linked clients emit wire work"),
             client::Request::CloseStream => {
-                self.connections.down(now, link::Request::CloseStream, &mut self.below);
+                self.connections.down(now, client::Request::CloseStream, &mut self.below);
             }
         }
         let limits = client::Limits { domain: fixtures::domain_limits(), exchanges: 8 };
@@ -221,10 +224,13 @@ impl Story {
     pub fn new(seed: u64) -> Self {
         let mut limits = fixtures::owner_limits();
         limits.core.people.sign_ins = 3;
+        Self::bounded(seed, &limits)
+    }
+    fn bounded(seed: u64, limits: &jig_test_domain::Limits) -> Self {
         let mut story = Self {
             front: Front::new(seed),
             second: None,
-            engine: Engine::bounded(seed, &limits),
+            engine: Engine::bounded(seed, limits),
             net: Net::new(seed),
             now: Time::ZERO,
             seen: Vec::new(),
@@ -470,23 +476,63 @@ impl Story {
         panic!("client HTTP bytes did not quiesce")
     }
 }
-fn transport(event: link::Event) -> Event {
-    match event {
-        link::Event::Reply { exchange, message } => Event::Reply { exchange, message },
-        link::Event::Lost { exchange } => Event::Lost { exchange },
-        link::Event::Streamed { message } => Event::Streamed { message },
-        link::Event::StreamGone => Event::StreamGone,
-        link::Event::SignIn { .. }
-        | link::Event::SignOut
-        | link::Event::Start { .. }
-        | link::Event::Save { .. }
-        | link::Event::Erase { .. }
-        | link::Event::Stored
-        | link::Event::NotStored
-        | link::Event::Send { .. }
-        | link::Event::Read { .. }
-        | link::Event::Open { .. }
-        | link::Event::Continue { .. }
-        | link::Event::Close { .. } => panic!("connections only tell transport events"),
+
+pub fn transient_request(seed: u64, fault: &jig_client_world::FrontFault) {
+    let mut limits = fixtures::owner_limits();
+    limits.core.people.requests = 1;
+    limits.core.people.request_retention = Duration::from_millis(100);
+    let mut story = Story::bounded(seed, &limits);
+    let mut receiving = fixtures::domain_limits();
+    receiving.requests.margin = Duration::from_nanos(1);
+    story.front.client = client::Client::new(&client::Limits { domain: receiving, exchanges: 8 }, seed)
+        .expect("short owner retention fixture");
+    story.sign_in();
+    assert!(story.run_until(|s| s.client.link().state == Link::Live, Duration::from_secs(1)));
+    let not_ready = match fault {
+        jig_client_world::FrontFault::Busy => {
+            story.engine.driver.scripted_party(crate::stories::pressure(), story.now, fixtures::wall(story.now));
+            false
+        }
+        jig_client_world::FrontFault::NotReady => {
+            story.engine.driver.pause_restore(
+                jig_core_world::world::config(seed),
+                story.now,
+                fixtures::wall(story.now),
+            );
+            true
+        }
+        jig_client_world::FrontFault::Restart { .. }
+        | jig_client_world::FrontFault::Slow { .. }
+        | jig_client_world::FrontFault::DropWatch
+        | jig_client_world::FrontFault::NoAnswer
+        | jig_client_world::FrontFault::SignedOut
+        | jig_client_world::FrontFault::Versions
+        | jig_client_world::FrontFault::ObjectGone => unreachable!("this story checks transient request refusals"),
+    };
+    let released = story.now.saturating_add(Duration::from_nanos(100_000_001));
+    story.now = story.now.saturating_add(Duration::from_millis(50));
+    story.advance();
+    let key = Key { asker: client::Asker::JIG, number: 62 };
+    story.send(key, Ask::Jig(Box::new(client::contract::Ask::Stop { project: 1, task: u64::MAX })));
+    assert!(
+        story.run_until(
+            |s| s.client.pending(key).is_some_and(|p| matches!(p.progress, client::Progress::Retrying { .. })),
+            Duration::from_millis(50)
+        ),
+        "actual busy"
+    );
+    let saved = *story.front.referee.stored.keys().next().expect("the client's retained original key");
+    story.now = released;
+    if not_ready {
+        story.engine.driver.finish_restore(story.now, fixtures::wall(story.now));
     }
+    assert!(
+        story.run_until(|s| !s.answered(key).is_empty(), Duration::from_secs(1)),
+        "busy retry is a real final owner answer"
+    );
+    assert_eq!(
+        story.seen.iter().filter(|value| matches!(value, Observed::Made { key, .. } if *key == saved)).count(),
+        1,
+        "busy key is made once"
+    );
 }

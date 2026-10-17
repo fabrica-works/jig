@@ -76,7 +76,7 @@ fn history_page() -> HistoryPage {
     }
 }
 fn populated() -> Domain {
-    let mut domain = Domain::new(&fixture::client_limits(), 208);
+    let mut domain = Domain::new(&fixture::client_limits());
     let out = drive(
         &mut domain,
         Event::Start {

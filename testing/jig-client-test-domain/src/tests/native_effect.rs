@@ -1,5 +1,5 @@
 use crate::family::{self, Kind, Scope, Subject};
-use jig_client_domain::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part, ProposalKey, Proposer};
+use jig_client::contract::{OwnerPart, OwnerPartKey, OwnerPartKind, Part, ProposalKey, Proposer};
 use skein_lib::List;
 
 #[test]

@@ -149,3 +149,26 @@ fn a_service_s_sign_in_answered_not_ready_is_sent_again_after_its_backoff() {
     assert_eq!(message, &Message::SignInService);
     assert_eq!(credential, &Some(fixtures::credential(&SERVICE_CREDENTIAL)));
 }
+
+#[test]
+fn a_sign_out_that_did_not_reach_the_engine_tells_the_link() {
+    let mut c = Client::signed_in();
+    c.step(Event::SignOut);
+    c.step(Event::Lost { exchange: c.exchange() });
+    let mut links = skein_lib::List::with_capacity(1);
+    for request in c.requests() {
+        match request {
+            Request::Told { told: Told::Link { link } } => links.push(*link).unwrap(),
+            Request::Exchange { .. }
+            | Request::OpenStream { .. }
+            | Request::CloseStream
+            | Request::Save { .. }
+            | Request::Erase { .. }
+            | Request::Told { .. }
+            | Request::Down { .. }
+            | Request::SignOut => {}
+        }
+    }
+    assert_eq!(links.as_slice(), &[Link::Live]);
+    assert!(c.machine.link().sign_out_lost);
+}

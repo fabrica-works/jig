@@ -164,7 +164,7 @@ fn build(value: &OwnerProposal, w: &Words) -> (Tree, JigBindings) {
     let f = view::required(value, &limits(), w).unwrap();
     let mut b = Builder::new(&capacity(f));
     let mut bindings = JigBindings::new(f.bindings, 256);
-    let client = Domain::new(&limits(), 1);
+    let client = Domain::new(&limits());
     view::render(&mut b, &client, value, w, &mut bindings);
     let tree = b.finish();
     super::cards_access::check(&tree);
@@ -418,7 +418,7 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
     let _refusal = std::panic::catch_unwind(|| {
         let mut b = Builder::new(&short);
         let mut bindings = JigBindings::new(f.bindings, 256);
-        view::render(&mut b, &Domain::new(&limits(), 1), &v, &w, &mut bindings);
+        view::render(&mut b, &Domain::new(&limits()), &v, &w, &mut bindings);
         b.finish()
     })
     .unwrap_err();

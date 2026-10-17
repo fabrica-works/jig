@@ -16,6 +16,7 @@ use jig_domain_people as people;
 use jig_test_domain as root;
 use skein_lib::{Duration, Time, Wall};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+mod signing;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Invalid {
@@ -43,6 +44,7 @@ pub struct Session {
     truth: Truth,
     parked: BTreeMap<ClientId, Vec<Request>>,
     unsigned: BTreeSet<ClientId>,
+    reloaded: BTreeSet<ClientId>,
     sign_in_again: BTreeMap<ClientId, people::Again>,
     sign_in_failures: BTreeMap<ClientId, packets::SignInFailure>,
     callbacks: Vec<(ClientId, Event)>,
@@ -72,6 +74,7 @@ impl Session {
             truth,
             parked: BTreeMap::new(),
             unsigned: BTreeSet::new(),
+            reloaded: BTreeSet::new(),
             sign_in_again: BTreeMap::new(),
             sign_in_failures: BTreeMap::new(),
             callbacks: Vec::new(),
@@ -115,7 +118,7 @@ impl Session {
     /// Its two-span tolerance must fit the client's configured silence timeout
     /// (client/domain/client.md, 8.1); neither configured duration is changed.
     pub fn stream_heartbeat(&mut self, span: Duration) {
-        assert!(span != Duration::ZERO && span.as_nanos() <= self.limits.jig.heartbeat.as_nanos() / 2);
+        assert!(span != Duration::ZERO && span.as_nanos() <= self.limits.client.domain.heartbeat.as_nanos() / 2);
         self.stream_heartbeat = Some(span);
     }
 
@@ -171,6 +174,11 @@ impl Session {
     /// reads/watches. Existing authentication remains the owner's actual session.
     pub fn reload(&mut self, client: ClientId, now: Time, wall: Wall) {
         self.detach(client, now, wall);
+        if self.driver.transport.sign_in(client).is_some() {
+            self.reloaded.insert(client);
+            self.callbacks
+                .push((client, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } }));
+        }
         self.hello(client);
     }
 
@@ -181,43 +189,6 @@ impl Session {
         for client in self.driver.transport.clients() {
             self.hello(client);
         }
-    }
-
-    /// Retry sign-in using the supplied identity, not the expected party number.
-    pub fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall) {
-        self.stopping().expect("whole original stopped routes");
-        self.unsigned.remove(&client);
-        self.sign_in_again.remove(&client);
-        self.sign_in_failures.remove(&client);
-        let event = self.driver.transport.start_sign_in(client);
-        self.source(now, wall, root::Event::Core(event));
-    }
-
-    /// The source terminal of the latest provider exchange. It establishes no
-    /// session and schedules no keyed or automatic sign-in retry (protocol/client.md, 8).
-    #[must_use]
-    pub fn sign_in_again(&self, client: ClientId) -> Option<people::Again> {
-        self.sign_in_again.get(&client).copied()
-    }
-
-    /// The exact failure of the latest provider exchange. It neither creates a
-    /// session nor retires an independently authenticated older session.
-    #[must_use]
-    pub fn sign_in_failure(&self, client: ClientId) -> Option<&packets::SignInFailure> {
-        self.sign_in_failures.get(&client)
-    }
-
-    /// End the actual independent owner session through its durable `SignOut` door.
-    /// An already absent session needs no fabricated owner reply.
-    pub fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
-        self.stopping().expect("whole original stopped routes");
-        if self.offline() {
-            self.callbacks.push((client, Event::Jig(jig_client_view::Event::SignOutLost)));
-            return;
-        }
-        let Some(sign_in) = self.driver.transport.sign_in(client) else { return };
-        let reply_to = self.driver.transport.reply_to(Reply::SignOut { client, sign_in });
-        self.source(now, wall, root::Event::Core(core::Event::People(people::Event::SignOut { reply_to, sign_in })));
     }
 
     /// Supply external source events at declared world times. This ordinary
@@ -333,6 +304,10 @@ impl Session {
     fn recover(&mut self, now: Time, wall: Wall) -> Result<(), Invalid> {
         self.offline_until = None;
         for client in self.driver.transport.clients() {
+            if self.reloaded.contains(&client) && self.driver.transport.sign_in(client).is_some() {
+                self.callbacks
+                    .push((client, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } }));
+            }
             self.hello(client);
         }
         if self.delay_until.is_none_or(|until| now >= until) {
@@ -361,7 +336,7 @@ impl Session {
     pub fn lose_answer(&mut self, client: ClientId, attempt: skein_lib::Token) {
         let final_for_attempt = |(owner, event): &(ClientId, Event)| {
             *owner == client
-                && matches!(event, Event::Answer { attempt: actual, envelope: skein_lib::RequestEnvelope::Final, .. } if *actual == attempt)
+                && matches!(event, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt: actual, envelope: skein_lib::RequestEnvelope::Final, .. } } } if *actual == attempt)
         };
         let before = self.callbacks.len().checked_add(self.delayed.len()).expect("finite callbacks");
         self.callbacks.retain(|event| !final_for_attempt(event));
@@ -404,26 +379,21 @@ impl Session {
             Err(requests::Invalid::Session) => {
                 if self.unsigned.contains(&client) {
                     let event = match &request {
-                        Request::Jig(jig_client_test_domain::JigOut::Open { watch, .. }) => {
-                            Some(Event::Jig(jig_client_view::Event::Ended {
-                                watch: *watch,
-                                end: client::WatchEnd::SignedOut,
-                            }))
-                        }
-                        Request::First(jig_client_test_domain::first::Out::Open { watch, .. }) => {
-                            Some(Event::First(jig_client_test_domain::first::Event::Ended {
-                                watch: *watch,
-                                end: jig_client_test_domain::family::WatchEnd::SignedOut,
-                            }))
-                        }
-                        Request::Send { .. }
+                        Request::Client {
+                            request: jig_client::Request::Down { down: jig_client::Down::Open { watch, .. } },
+                        } => Some(Event::Client {
+                            event: jig_client::Event::Up {
+                                up: jig_client::Up::WatchEnded { watch: *watch, end: client::WatchEnd::SignedOut },
+                            },
+                        }),
+                        Request::Save { .. }
+                        | Request::Erase { .. }
+                        | Request::Client { .. }
                         | Request::Jig(_)
                         | Request::First(_)
-                        | Request::Save { .. }
-                        | Request::Erase { .. }
                         | Request::Show { .. }
-                        | Request::SignOut
                         | Request::SignIn { .. }
+                        | Request::SignOut
                         | Request::Fact { .. } => None,
                     };
                     if let Some(event) = event {
@@ -448,7 +418,12 @@ impl Session {
                 ) {
                     self.stream_event(client, now);
                 }
-                if let Event::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, .. } = &event
+                if let Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up: jig_client::Up::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, .. },
+                        },
+                } = &event
                     && self.lost_answers.remove(&(client, *attempt))
                 {
                     self.lost_final_answers += 1;
@@ -477,6 +452,8 @@ impl Session {
                 }
             }
             Incoming::Authenticated { client, .. } => {
+                self.callbacks
+                    .push((client, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } }));
                 self.unsigned.remove(&client);
                 self.sign_in_again.remove(&client);
                 self.sign_in_failures.remove(&client);
@@ -858,6 +835,9 @@ impl Session {
     /// A normal callback taken by the shell releases only its normal flight.
     pub fn received(&mut self, client: ClientId, now: Time, wall: Wall, event: &Event) {
         self.stopping().expect("whole original stopped routes");
+        if matches!(event, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } }) {
+            self.reloaded.remove(&client);
+        }
         if let Event::Jig(jig_client_view::Event::Watch { watch, event: client::WatchEvent::Delivered(value) }) = event
             && !matches!(value, client::Delivery::Run(_))
             && let Some(watcher) = self.driver.transport.watch_token(client, *watch)
@@ -916,6 +896,7 @@ fn unrouted_delivery(other: &root::Delivery) -> Result<(), Invalid> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::joint::take_signed_in;
     use jig_core_world::peers::Peers;
     use skein_lib::Token;
 
@@ -951,7 +932,11 @@ mod tests {
         }
     }
     fn frame(watch: Token) -> Request {
-        Request::Jig(jig_client_test_domain::JigOut::Open { watch, subject: client::Subject::Frame })
+        Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(client::Subject::Frame) },
+            },
+        }
     }
 
     #[test]
@@ -990,7 +975,14 @@ mod tests {
         session.send(client, now, wall, frame(native)).expect("actual owner watch");
         let original = session.driver.transport.watch_token(client, native).expect("original route");
         session
-            .send(client, now, wall, Request::Jig(jig_client_test_domain::JigOut::Close { watch: native }))
+            .send(
+                client,
+                now,
+                wall,
+                Request::Client {
+                    request: jig_client::Request::Down { down: jig_client::Down::Close { watch: native } },
+                },
+            )
             .expect("actual close");
         let mut callbacks = session.poll(now, wall).expect("discard late body and finish actual flight");
         callbacks.extend(session.poll(now, wall).expect("actual owning terminal"));
@@ -1048,10 +1040,11 @@ mod tests {
                 Event::Start { .. }
                 | Event::Went { .. }
                 | Event::Act { .. }
-                | Event::Answer { .. }
+                | Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { .. } } }
                 | Event::Jig(_)
                 | Event::First(_)
-                | Event::SignedOut => None,
+                | Event::SignedOut
+                | Event::Client { .. } => None,
             })
             .collect();
         tokens.sort();
@@ -1061,7 +1054,14 @@ mod tests {
         assert_eq!(session.driver.world.commits.len(), commits);
         assert!(session.driver.transport.taken(client, Token::new(0)).is_some(), "Alive did not ACK the normal flight");
         session
-            .send(client, due, wall, Request::Jig(jig_client_test_domain::JigOut::Close { watch: Token::new(0) }))
+            .send(
+                client,
+                due,
+                wall,
+                Request::Client {
+                    request: jig_client::Request::Down { down: jig_client::Down::Close { watch: Token::new(0) } },
+                },
+            )
             .expect("close original watch");
         let _ = session.poll(due, wall).expect("original close");
         let next = due.saturating_add(Duration::from_millis(50));
@@ -1118,7 +1118,10 @@ mod tests {
                 root::Delivery::Core(core::Held::PeopleReply { reply: people::Reply::SignedIn { person: 1, .. }, .. })
             )
         ));
-        assert!(session.poll(now, wall).expect("explicit admitted provider exchange").is_empty());
+        assert!(
+            take_signed_in(ClientId(0), session.poll(now, wall).expect("explicit admitted provider exchange"))
+                .is_empty()
+        );
         assert!(session.driver.transport.sign_in(ClientId(0)).is_some());
         assert!(session.sign_in_failure(ClientId(0)).is_none());
     }
@@ -1164,7 +1167,8 @@ mod tests {
         assert_eq!(session.observed(), vec![Observed::Durable { commit: session.driver.world.store.applied, at: now }]);
         assert!(session.observed().is_empty(), "one applied image is transferred once");
         session.driver.release_commits();
-        let callbacks = session.poll(now, wall).expect("genuine session flushes original request");
+        let callbacks =
+            take_signed_in(ClientId(0), session.poll(now, wall).expect("genuine session flushes original request"));
         assert_eq!(callbacks.len(), 1, "actual callbacks: {callbacks:?}");
         let (client, event) = &callbacks[0];
         assert_eq!(*client, ClientId(0));
@@ -1192,6 +1196,7 @@ mod tests {
         session.bind(ClientId(0), 1, identity(), now, wall);
         session.bind(ClientId(1), 1, identity(), now, wall);
         let callbacks = session.poll(now, wall).expect("both genuine sign-ins");
+        let callbacks = take_signed_in(ClientId(1), take_signed_in(ClientId(0), callbacks));
         assert_eq!(callbacks.len(), 2);
         let native = Token::new(9);
         for client in [ClientId(0), ClientId(1)] {
@@ -1222,10 +1227,18 @@ mod tests {
                 ClientId(0),
                 now,
                 wall,
-                Request::Jig(jig_client_test_domain::JigOut::Open {
-                    watch: native,
-                    subject: client::Subject::Run { task: u64::MAX, turn: None, offset: 0 },
-                }),
+                Request::Client {
+                    request: jig_client::Request::Down {
+                        down: jig_client::Down::Open {
+                            watch: native,
+                            subject: jig_client::Watchable::Jig(client::Subject::Run {
+                                task: u64::MAX,
+                                turn: None,
+                                offset: 0,
+                            }),
+                        },
+                    },
+                },
             )
             .expect("owner decides visibility");
         let callbacks = session.poll(now, wall).expect("actual volatile terminal");
@@ -1243,7 +1256,9 @@ mod tests {
         for client in [ClientId(0), ClientId(1)] {
             session.bind(client, 1, identity(), now, wall);
         }
-        assert_eq!(session.poll(now, wall).expect("both real sessions").len(), 2);
+        let callbacks = session.poll(now, wall).expect("both real sessions");
+        let callbacks = take_signed_in(ClientId(1), take_signed_in(ClientId(0), callbacks));
+        assert_eq!(callbacks.len(), 2);
         let native = Token::new(9);
         for client in [ClientId(0), ClientId(1)] {
             session.send(client, now, wall, frame(native)).expect("actual Frame watch");
@@ -1263,7 +1278,8 @@ mod tests {
         session.send(ClientId(0), now, wall, frame(native)).expect("root supplies its new watch");
         let reopened = session.driver.transport.watch_token(ClientId(0), native).expect("fresh route");
         assert_ne!(old, reopened);
-        let callbacks = session.poll(now, wall).expect("actual fresh Frame plus untouched sibling");
+        let callbacks =
+            take_signed_in(ClientId(0), session.poll(now, wall).expect("actual fresh Frame plus untouched sibling"));
         assert_eq!(callbacks.len(), 3);
         assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. }))));
         let owners: Vec<_> = callbacks
@@ -1357,10 +1373,14 @@ mod tests {
             .store
             .fault(jig_core_world::Fault::Fail { commit: durable.checked_add(1).expect("next actual transaction") });
         let key = [17; 16];
-        let request = |attempt| Request::Send {
-            attempt,
-            key,
-            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+        let request = |attempt| Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Send {
+                    attempt,
+                    key,
+                    request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                },
+            },
         };
         session.send(ClientId(0), now, wall, request(Token::new(31))).expect("actual owner submit");
         assert!(session.driver.world.stopped, "existing Failed completion stops the real root");
@@ -1384,7 +1404,7 @@ mod tests {
         assert!(session.poll(now, wall).expect("supplied offline span").is_empty());
         let callbacks = session.poll(until, wall).expect("real restart and original retry");
         assert!(callbacks.iter().any(|(client, value)| *client == ClientId(0)
-            && matches!(value, Event::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(_), .. } if *attempt == retry)));
+            && matches!(value, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(_), .. } } } if *attempt == retry)));
         assert!(matches!(callbacks.first(), Some((ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. })))));
         assert_eq!(
             session
@@ -1405,10 +1425,14 @@ mod tests {
         let first = Token::new(31);
         let retry = Token::new(32);
         let key = [255; 16];
-        let request = |attempt| Request::Send {
-            attempt,
-            key,
-            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+        let request = |attempt| Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Send {
+                    attempt,
+                    key,
+                    request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                },
+            },
         };
         session.lose_answer(ClientId(0), first);
         session.send(ClientId(0), now, wall, request(first)).expect("owner receives whole original ask");
@@ -1425,7 +1449,7 @@ mod tests {
         let callbacks = session.poll(now, wall).expect("actual owner replays retained whole answer");
         assert_eq!(callbacks.len(), 1);
         assert!(
-            matches!(&callbacks[0], (ClientId(0), Event::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(_), .. }) if *attempt == retry)
+            matches!(&callbacks[0], (ClientId(0), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(_), .. } } }) if *attempt == retry)
         );
         assert!(
             session
@@ -1471,10 +1495,14 @@ mod tests {
         let sign_in = session.driver.transport.sign_in(ClientId(0));
         let _ = session.observed();
         let key = [211; 16];
-        let request = |attempt| Request::Send {
-            attempt,
-            key,
-            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+        let request = |attempt| Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Send {
+                    attempt,
+                    key,
+                    request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                },
+            },
         };
         let first = Token::new(311);
         session.send(ClientId(0), now, wall, request(first)).expect("actual original attempt");
@@ -1498,7 +1526,7 @@ mod tests {
         let callbacks = session.poll(until, corrected_wall).expect("actual recovery replays retained key");
         assert!(!session.offline());
         assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. }))));
-        assert_eq!(callbacks.iter().filter(|(_, value)| matches!(value, Event::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(_), .. } if *attempt == retry)).count(), 1);
+        assert_eq!(callbacks.iter().filter(|(_, value)| matches!(value, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, envelope: skein_lib::RequestEnvelope::Final, answer: Some(_), .. } } } if *attempt == retry)).count(), 1);
         assert!(
             session
                 .observed()
@@ -1517,8 +1545,14 @@ mod tests {
         }
         session.poll(now, wall).expect("actual sibling authentication");
         let native = Token::new(u64::MAX);
-        let open =
-            || Request::Jig(jig_client_test_domain::JigOut::Open { watch: native, subject: client::Subject::Frame });
+        let open = || Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Open {
+                    watch: native,
+                    subject: jig_client::Watchable::Jig(client::Subject::Frame),
+                },
+            },
+        };
         for client in [ClientId(0), ClientId(1)] {
             session.send(client, now, wall, open()).expect("original frame watch");
         }

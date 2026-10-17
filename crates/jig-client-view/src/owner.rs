@@ -10,6 +10,16 @@ pub enum Owner {
 }
 
 impl Owner {
+    /// The client's stable asker for this view child.
+    #[must_use]
+    pub const fn asker(self) -> jig_client::Asker {
+        jig_client::Asker(self.opaque().number)
+    }
+    /// An asker outside the build's complete owner range has no child.
+    #[must_use]
+    pub const fn of_asker(asker: jig_client::Asker) -> Option<Self> {
+        Self::from_opaque(skein_ui::Owner { number: asker.0 })
+    }
     #[must_use]
     pub const fn opaque(self) -> skein_ui::Owner {
         let number = match self {

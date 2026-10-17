@@ -8,9 +8,9 @@
 )]
 use crate::{Address, Answered, Ask, Domain, Event, JigOut, Limits, Request, infrastructure, new, step, take};
 use jig_client_domain::contract::{
-    self, Answer, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, Outcome, PartyKind, WatchEnd, WatchEvent,
+    self, Answer, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, Outcome, PartyKind, WatchEvent,
 };
-use jig_client_view::{boundary::Offset, limits::ui::Backoff, link::Link};
+use jig_client_view::{boundary::Offset, link::Link};
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, RequestLimits, Time, Token, Wall};
 const JIG: jig_client_view::Limits = jig_client_view::Limits {
     watches: 4,
@@ -39,8 +39,6 @@ const JIG: jig_client_view::Limits = jig_client_view::Limits {
     conversation_words: 2,
     navigation_entries: 8,
     updates_count: 99,
-    backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
-    heartbeat: Duration::from_nanos(100),
 };
 fn limits() -> Limits {
     Limits {
@@ -258,7 +256,9 @@ fn link_and_confirmation_reach_both_children_and_park_the_table() {
     assert_eq!(root.infrastructure().party(), Some(7));
     assert_eq!(root.observability().party(), Some(7));
     ask(&mut root, Token::new(42));
-    drive(&mut root, Event::Jig(jig_client_view::Event::Ended { watch, end: WatchEnd::Dropped }));
+    let mut child = Queue::with_capacity(jig_client_view::max_out(&limits().jig));
+    child.push(jig_client_view::Request::Link { link: Link::Offline });
+    crate::route::route_jig(&mut root, &env(), &mut child, &mut Queue::with_capacity(crate::max_out(&limits())));
     assert_eq!(root.infrastructure().link(), Link::Offline);
     assert_eq!(root.observability().link(), Link::Offline);
     for row in taken(&mut root) {

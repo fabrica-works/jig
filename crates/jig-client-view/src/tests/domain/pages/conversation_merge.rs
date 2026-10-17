@@ -67,7 +67,7 @@ fn reply(domain: &Domain, task: u64) -> &crate::objects::result::Reply {
 }
 #[test]
 fn live_watch_growth_keeps_a_continuation_to_known_dropped_past() {
-    let (mut domain, watch, first) = live_conversation_page(7107);
+    let (mut domain, watch, first) = live_conversation_page();
     let eight = list_entry(8, Phase::Idle, 10);
     let ended = list_entry(9, Phase::Done, 9);
     watch_rows(&mut domain, watch, core::slice::from_ref(&eight));
@@ -107,7 +107,7 @@ fn live_watch_growth_keeps_a_continuation_to_known_dropped_past() {
 }
 #[test]
 fn a_stale_read_preserves_one_current_conversation_and_its_reply() {
-    let (mut domain, watch, first) = live_conversation_page(7101);
+    let (mut domain, watch, first) = live_conversation_page();
     let old = list_entry(8, Phase::Idle, 99);
     watch_rows(&mut domain, watch, core::slice::from_ref(&old));
     let mut current = old.clone();
@@ -178,7 +178,7 @@ fn more(domain: &mut Domain, end: End, value: &Cursor) -> Token {
 }
 #[test]
 fn opposite_edge_reads_keep_their_opaque_cursor_and_drop_the_other_end() {
-    let (mut domain, watch, first) = live_conversation_page(7102);
+    let (mut domain, watch, first) = live_conversation_page();
     let eight = list_entry(8, Phase::Idle, 10);
     let nine = list_entry(9, Phase::Done, 9);
     let ten = list_entry(10, Phase::Done, 8);
@@ -218,7 +218,7 @@ fn opposite_edge_reads_keep_their_opaque_cursor_and_drop_the_other_end() {
 }
 #[test]
 fn a_live_replacement_keeps_read_rows_and_clears_its_own_unread_receipt() {
-    let (mut domain, watch, first) = live_conversation_page(7103);
+    let (mut domain, watch, first) = live_conversation_page();
     let eight = list_entry(8, Phase::Idle, 10);
     let ended = list_entry(9, Phase::Done, 9);
     let observed = watch_rows(&mut domain, watch, core::slice::from_ref(&eight));
@@ -251,8 +251,8 @@ fn a_live_replacement_keeps_read_rows_and_clears_its_own_unread_receipt() {
 }
 #[test]
 fn old_page_terminals_and_sibling_clients_cannot_replace_current_conversations() {
-    let (mut domain, old_watch, old_read) = live_conversation_page(7104);
-    let (mut sibling, sibling_watch, sibling_read) = live_conversation_page(7104);
+    let (mut domain, old_watch, old_read) = live_conversation_page();
+    let (mut sibling, sibling_watch, sibling_read) = live_conversation_page();
     let sibling_row = list_entry(80, Phase::Idle, 8);
     watch_rows(&mut sibling, sibling_watch, core::slice::from_ref(&sibling_row));
     read_rows(&mut sibling, sibling_read, core::slice::from_ref(&sibling_row), None, None, false);
@@ -280,7 +280,7 @@ fn old_page_terminals_and_sibling_clients_cannot_replace_current_conversations()
 
 #[test]
 fn a_full_live_window_keeps_both_winners_when_a_read_disagrees_on_every_key() {
-    let (mut domain, watch, first) = live_conversation_page(7105);
+    let (mut domain, watch, first) = live_conversation_page();
     let mut eight = list_entry(8, Phase::Running, 8);
     eight.first_words = DocumentText { bytes: text(UTF8_TEXTS[8]), cut: true };
     eight.seen = 0;
@@ -322,7 +322,7 @@ fn step_three(domain: &mut Domain, event: Event) -> Box<[Request]> {
     requests.into_boxed()
 }
 fn three() -> (Domain, Token, Token) {
-    let mut domain = Domain::new(&THREE, 7110);
+    let mut domain = Domain::new(&THREE);
     let begin = step_three(
         &mut domain,
         Event::Start {
@@ -456,7 +456,7 @@ fn repeated_owner_replays_recover_multiple_past_pages_and_new_source_prefixes() 
 }
 #[test]
 fn empty_owner_pages_preserve_the_held_opposite_edge_and_whole_rows() {
-    let (mut domain, _watch, first) = live_conversation_page(7112);
+    let (mut domain, _watch, first) = live_conversation_page();
     let eight = list_entry(8, Phase::Idle, 10);
     let held_before = cursor(UTF8_TEXTS[12]);
     let next = cursor(b"\x00next");
@@ -477,7 +477,7 @@ fn empty_owner_pages_preserve_the_held_opposite_edge_and_whole_rows() {
 }
 #[test]
 fn an_owner_replay_joins_once_and_full_admission_keeps_the_current_cursor() {
-    let (mut domain, watch, first) = live_conversation_page(7113);
+    let (mut domain, watch, first) = live_conversation_page();
     let eight = list_entry(8, Phase::Idle, 10);
     let restart = cursor(b"source-restart");
     watch_owner(&mut domain, watch, core::slice::from_ref(&eight), false, restart.clone());
@@ -502,7 +502,7 @@ fn an_owner_replay_joins_once_and_full_admission_keeps_the_current_cursor() {
 
     // Earlier page reads still owe terminals after navigation. Two displayed
     // object reads fill the remaining slots; the new owner cursor stays whole.
-    let (mut domain, old_watch, old_read) = live_conversation_page(7114);
+    let (mut domain, old_watch, old_read) = live_conversation_page();
     let history = drive(
         &mut domain,
         Time::ZERO,

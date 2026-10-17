@@ -42,7 +42,7 @@ pub(super) fn details() -> OwnerChipDetails {
 fn folded_generic_endings_keep_unknown_outcome_separate_and_retain_whole_visible_chip() {
     let mut limits = super::spine::LIMITS;
     limits.rows = 1;
-    let mut domain = crate::Domain::new(&limits, 1);
+    let mut domain = crate::Domain::new(&limits);
     let mut nodes = List::with_capacity(3);
     for (task, phase) in [(1, Phase::Active), (2, Phase::Ended), (3, Phase::Failed)] {
         let details = if phase == Phase::Failed {

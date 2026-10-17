@@ -1169,7 +1169,7 @@ fields!(RunState { task, attempt, committed_turn, writing, call });
 impl Payload for WatchEvent {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Opened | Self::Alive => Some(0),
+            Self::Opened | Self::Alive | Self::Behind => Some(0),
             Self::Delivered(value0) => sum(&[value0.heap(bounds)]),
         }
     }

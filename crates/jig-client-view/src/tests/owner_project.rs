@@ -296,7 +296,7 @@ fn build(value: &OwnerProject, w: &Words) -> (Tree, JigBindings) {
     let f = view::required(value, &limits(), w).expect("whole finite admission");
     let mut b = Builder::new(&capacity(f));
     let mut bindings = JigBindings::new(f.bindings, 32);
-    let d = Domain::new(&limits(), 9123);
+    let d = Domain::new(&limits());
     view::render(&mut b, value, &d, w, &mut bindings);
     let tree = b.finish();
     super::cards_access::check(&tree);
@@ -504,7 +504,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         action::Act,
         address::{Address, ProjectSection},
     };
-    let mut d = Domain::new(&limits(), 9199);
+    let mut d = Domain::new(&limits());
     let opened = native_drive(
         &mut d,
         Event::Start {
@@ -665,7 +665,7 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     let render = |bound: skein_ui::Limits| {
         let mut b = Builder::new(&bound);
         let mut bindings = JigBindings::new(f.bindings, 32);
-        view::render(&mut b, &value, &Domain::new(&limits(), 9151), w, &mut bindings);
+        view::render(&mut b, &value, &Domain::new(&limits()), w, &mut bindings);
         b.finish()
     };
     let exact = render(bound);
@@ -684,7 +684,7 @@ fn native_owner(value: OwnerProject) -> Domain {
 }
 fn native_owner_at(value: OwnerProject, section: crate::address::ProjectSection) -> Domain {
     use crate::{Event, Request, address::Address};
-    let mut domain = Domain::new(&limits(), 9177);
+    let mut domain = Domain::new(&limits());
     let out = native_drive(
         &mut domain,
         Event::Start {
@@ -1061,7 +1061,7 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
     };
     let mut value = source();
     value.number = 4;
-    let mut domain = Domain::new(&limits(), 9181);
+    let mut domain = Domain::new(&limits());
     let start = native_drive(
         &mut domain,
         Event::Start {

@@ -28,7 +28,7 @@ fn send(domain: &mut Domain, asked: u64) -> Token {
 
 #[test]
 fn intents_join_progress_and_one_terminal_and_refuse_past_the_limit() {
-    let mut domain = Domain::new(&LIMITS, 1);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, f, frame(7));
     let key = ObjectKey::Task(8);
@@ -82,7 +82,7 @@ fn fields_count_only_domain_writes_and_records_restore_save_and_erase() {
     let draft = Record::Draft { version: STORE_VERSION, party: 7, task: 8, words: text(b"draft"), touched: 1 };
     kept.push(draft.clone()).unwrap();
     kept.push(Record::Place { version: 9, party: 8, address: Address::Deployment }).unwrap();
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, kept);
     assert_eq!(domain.records().as_slice(), core::slice::from_ref(&draft));
     delivered(&mut domain, Time::ZERO, f, frame(7));
@@ -107,8 +107,8 @@ fn fields_count_only_domain_writes_and_records_restore_save_and_erase() {
 
 #[test]
 fn signed_out_from_answer_read_or_watch_preserves_intents_and_returns_to_the_address() {
-    for path in 0..3 {
-        let mut domain = Domain::new(&LIMITS, path);
+    for path in 0_u64..3 {
+        let mut domain = Domain::new(&LIMITS);
         domain.provider(Provider { number: 2, name: text(b"Provider") }).unwrap();
         let f = start(&mut domain, List::with_capacity(0));
         delivered(&mut domain, Time::ZERO, f, frame(7));
@@ -162,7 +162,7 @@ fn signed_out_from_answer_read_or_watch_preserves_intents_and_returns_to_the_add
 
 #[test]
 fn a_service_never_opens_a_work_or_signin_page() {
-    let mut domain = Domain::new(&LIMITS, 3);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let mut service = frame(7);
     service.party.kind = PartyKind::Service;

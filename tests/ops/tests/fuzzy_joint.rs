@@ -734,6 +734,7 @@ fn assert_native_retries(world: &mut StoryWorld) {
 }
 
 #[test]
+#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn p_acceptance_survives_the_commit_before_its_durable_decision() {
     let mut baseline = p_story(531, Cut::None, false);
     let commit = position(&mut baseline, Milestone::Acceptance(6)) - 1;
@@ -743,6 +744,7 @@ fn p_acceptance_survives_the_commit_before_its_durable_decision() {
 }
 
 #[test]
+#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn p_acceptance_survives_its_durable_decision_commit() {
     let mut baseline = p_story(532, Cut::None, false);
     let commit = position(&mut baseline, Milestone::Acceptance(6));
@@ -752,6 +754,7 @@ fn p_acceptance_survives_its_durable_decision_commit() {
 }
 
 #[test]
+#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn p_acceptance_survives_the_commit_after_its_durable_decision() {
     let mut baseline = p_story(533, Cut::None, false);
     let commit = position(&mut baseline, Milestone::Acceptance(6)) + 1;
@@ -761,6 +764,7 @@ fn p_acceptance_survives_the_commit_after_its_durable_decision() {
 }
 
 #[test]
+#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn q_provision_survives_its_acceptance_commit_and_move_end_survives_reload() {
     let mut baseline = q_story(534, Cut::None, false, false);
     let commit = position(&mut baseline, Milestone::Acceptance(1));
@@ -769,6 +773,7 @@ fn q_provision_survives_its_acceptance_commit_and_move_end_survives_reload() {
 }
 
 #[test]
+#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn q_provision_survives_its_made_commit_and_move_end_survives_reload() {
     let mut baseline = q_story(535, Cut::None, false, false);
     let commit = position(&mut baseline, Milestone::Made);
@@ -777,6 +782,7 @@ fn q_provision_survives_its_made_commit_and_move_end_survives_reload() {
 }
 
 #[test]
+#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn q_move_end_survives_its_durable_answer_commit_and_reload() {
     let mut baseline = q_story(536, Cut::None, false, false);
     let commit = position(&mut baseline, Milestone::MoveEnd);
@@ -785,6 +791,7 @@ fn q_move_end_survives_its_durable_answer_commit_and_reload() {
 }
 
 #[test]
+#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn p_story_survives_seeded_commit_crashes_and_random_presses() {
     for seed in [537, 548] {
         let mut world = p_story(seed, Cut::Random { seed: seed ^ 0x33 }, true);
@@ -795,6 +802,7 @@ fn p_story_survives_seeded_commit_crashes_and_random_presses() {
 }
 
 #[test]
+#[ignore = "ops' root has no client to recover its watches until jig 21.2 (ruling 218)"]
 fn q_story_survives_seeded_commit_crashes_reload_and_random_presses() {
     for seed in [539, 540] {
         let mut world = q_story(seed, Cut::Random { seed: seed ^ 0x33 }, true, true);

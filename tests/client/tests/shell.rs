@@ -45,7 +45,7 @@ fn a_failed_store_stops_the_steps_keyed_sends_and_notifies_the_table() {
         "same key retries after lost envelope"
     );
     assert!(
-        w.kept(c).iter().all(|r| !matches!(r, jig_client_test_domain::store::Record::Table { .. })),
+        w.kept(c).iter().all(|r| !matches!(r, jig_client_test_domain::store::Record::Unlinked { .. })),
         "answered keys are erased"
     );
 }

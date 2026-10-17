@@ -127,18 +127,21 @@ impl Joint {
             Incoming::Callback { client, event } => {
                 let event = match event {
                     jig_client_test_domain::Event::Jig(value) => client::Event::Jig(value),
-                    jig_client_test_domain::Event::Answer { attempt, envelope, answer } => client::Event::Answer {
+                    jig_client_test_domain::Event::Client {
+                        event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, envelope, answer, .. } },
+                    } => client::Event::Answer {
                         attempt,
                         envelope,
                         answer: answer.map(|answer| match answer {
-                            jig_client_test_domain::Answered::Jig(value) => client::Answered::Jig(value),
-                            jig_client_test_domain::Answered::First(_) => {
+                            jig_client::Answered::Jig(value) => client::Answered::Jig(value),
+                            jig_client::Answered::Family(_) => {
                                 panic!("Ops never registers first-owner replies")
                             }
                         }),
                     },
                     jig_client_test_domain::Event::SignedOut => client::Event::SignedOut,
-                    jig_client_test_domain::Event::First(_)
+                    jig_client_test_domain::Event::Client { .. }
+                    | jig_client_test_domain::Event::First(_)
                     | jig_client_test_domain::Event::Start { .. }
                     | jig_client_test_domain::Event::Went { .. }
                     | jig_client_test_domain::Event::Act { .. } => panic!("45 protocol emits only its jig owner"),

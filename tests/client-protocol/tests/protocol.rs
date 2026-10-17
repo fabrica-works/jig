@@ -186,7 +186,7 @@ fn actual_busy_not_ready_restart_and_dropped_watch_retry_the_same_request() {
     ] {
         eprintln!("fault case {label}");
         if matches!(&fault, FrontFault::Busy | FrontFault::NotReady) {
-            bytes::transient_request(fixtures::SEED, fault);
+            bytes::transient_request(fixtures::SEED, &fault);
             continue;
         }
         let (mut world, client) = bytes::ready(fixtures::SEED);
@@ -201,7 +201,7 @@ fn pending_stop(world: &mut jig_client_protocol_world::stories::Story, client: j
     world.fault(jig_client_world::FrontFault::NoAnswer);
     jig_client_protocol_world::stories::submit_stop(world, client);
     assert!(
-        world.kept(client).iter().any(|record| matches!(record, jig_client_test_domain::store::Record::Table { .. })),
+        world.kept(client).iter().any(|record| matches!(record, jig_client_test_domain::store::Record::Client(..))),
         "the request remains in the small store"
     );
 }

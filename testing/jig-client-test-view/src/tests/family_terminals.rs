@@ -1,11 +1,10 @@
 use super::*;
-fn watching(rows: &[Request]) -> Token {
-    rows.iter()
-        .find_map(|row| match row {
-            Request::First(first::Out::Open { watch, .. }) => Some(*watch),
-            _ => None,
-        })
-        .unwrap()
+fn watching(root: &Domain) -> Token {
+    // These caption tests address the first owner handle directly. Transport
+    // watch tokens belong to the client; the owner's first slab slot is zero.
+    let token = Token::new(0);
+    assert!(root.client().document(jig_client::Handle { asker: jig_client::Asker(1), number: token.raw() }).is_some());
+    token
 }
 #[test]
 fn denied_and_ended_family_values_have_distinct_public_captions_without_mutation_bindings() {
@@ -18,7 +17,7 @@ fn denied_and_ended_family_values_have_distinct_public_captions_without_mutation
             &mut root,
             Event::Went { place: Place::Address(Address::First(first::Address { project: 3, item: 5 })) },
         );
-        let watch = watching(&rows);
+        let watch = watching(&root);
         let document = family::Document::Item(family::Item {
             project: 3,
             key: 5,
@@ -79,7 +78,7 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
             &mut root,
             Event::Went { place: Place::Address(Address::First(first::Address { project: 3, item: 5 })) },
         );
-        let watch = watching(&rows);
+        let watch = watching(&root);
         let read = family_read(&rows);
         let document = family::Document::Item(family::Item {
             project: 3,
@@ -250,11 +249,8 @@ fn family_terminal_captions_come_from_the_selected_checked_language_without_engl
         (first::WatchEnd::Stopping, b"Chosen stopping recovery".as_slice()),
     ] {
         let mut root = ready();
-        let rows = drive(
-            &mut root,
-            Event::Went { place: Place::Address(Address::First(first::Address { project: 3, item: 5 })) },
-        );
-        let watch = watching(&rows);
+        drive(&mut root, Event::Went { place: Place::Address(Address::First(first::Address { project: 3, item: 5 })) });
+        let watch = watching(&root);
         drive(&mut root, Event::First(first::Event::Ended { watch, end }));
         let jig = words();
         let family = selected_words();

@@ -1,9 +1,10 @@
 //! Token routing between a client root and scripted engine. No root state is read.
 #![allow(clippy::wildcard_imports, reason = "world adapters translate the complete owner vocabulary")]
 use crate::{harness::*, test::Test};
+use jig_client::{Ask, Down, Readable, Watchable};
 use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{self as engine, Application, ApplicationValue, Decision, Envelope, Truth, Up};
-use jig_client_test_domain::{self as domain, Ask, Event, JigOut, Request, family, first};
+use jig_client_test_domain::{self as domain, Event, Request, family, first};
 use sha2::{Digest, Sha256};
 use skein_lib::{RequestEnvelope, Time, Token, Wall};
 use skein_world::domain::Ledger;
@@ -133,6 +134,7 @@ pub struct Scripted {
     shell: Vec<(ClientId, Event)>,
     lose_sign_out: bool,
     routes: BTreeMap<Token, Route>,
+    watch_routes: std::collections::BTreeSet<Token>,
     serial: u64,
     committed: usize,
     last_attempt: Option<Token>,
@@ -172,6 +174,7 @@ impl Scripted {
             shell: Vec::new(),
             lose_sign_out: false,
             routes: BTreeMap::new(),
+            watch_routes: std::collections::BTreeSet::new(),
             serial: 0,
             committed: 0,
             last_attempt: None,
@@ -186,9 +189,12 @@ impl Scripted {
     }
     fn transport(&mut self, client: ClientId, local: Token, first: bool, fresh: bool) -> Token {
         if !fresh
-            && let Some((token, _)) = self.routes.iter().rev().find(|(_, r)| match r {
-                Route::Jig(c, t) => !first && *c == client && *t == local,
-                Route::First(c, t) => first && *c == client && *t == local,
+            && let Some((token, _)) = self.routes.iter().rev().find(|(token, route)| {
+                self.watch_routes.contains(token)
+                    && match route {
+                        Route::Jig(c, t) => !first && *c == client && *t == local,
+                        Route::First(c, t) => first && *c == client && *t == local,
+                    }
             })
         {
             return *token;
@@ -223,6 +229,14 @@ impl Scripted {
                 self.engine
                     .act(now, wall, engine::Change::SignIn { sign_in: party, party })
                     .expect("recovered sign in fits");
+                for (client, owner) in &self.parties {
+                    if *owner == party {
+                        self.shell.push((
+                            *client,
+                            Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } },
+                        ));
+                    }
+                }
             }
             for fault in std::mem::take(&mut self.pending_faults) {
                 self.fault(now, fault);
@@ -230,60 +244,63 @@ impl Scripted {
         }
     }
     fn routed(&mut self, client: ClientId, request: Request) -> Request {
-        match request {
-            Request::Send { attempt, key, ask } => {
-                let first = matches!(&ask, Ask::First(_));
-                Request::Send { attempt: self.transport(client, attempt, first, true), key, ask }
+        let Request::Client { request: jig_client::Request::Down { down } } = request else { return request };
+        let down = match down {
+            Down::Send { attempt, key, request } => {
+                let first = matches!(&request, Ask::Family(_));
+                Down::Send { attempt: self.transport(client, attempt, first, true), key, request }
             }
-            Request::Jig(JigOut::Read { read, what }) => {
-                Request::Jig(JigOut::Read { read: self.transport(client, read, false, true), what })
+            Down::Read { read, what } => {
+                let first = matches!(&what, Readable::Family(_));
+                Down::Read { read: self.transport(client, read, first, true), what }
             }
-            Request::Jig(JigOut::Open { watch, subject }) => {
-                Request::Jig(JigOut::Open { watch: self.transport(client, watch, false, true), subject })
+            Down::Open { watch, subject } => {
+                let first = matches!(&subject, Watchable::Family(_));
+                let watch = self.transport(client, watch, first, true);
+                self.watch_routes.insert(watch);
+                Down::Open { watch, subject }
             }
-            Request::Jig(JigOut::Continue { watch, subject }) => {
-                Request::Jig(JigOut::Continue { watch: self.transport(client, watch, false, false), subject })
+            Down::Continue { watch, subject } => {
+                Down::Continue { watch: self.transport(client, watch, false, false), subject }
             }
-            Request::Jig(JigOut::Close { watch }) => {
-                Request::Jig(JigOut::Close { watch: self.transport(client, watch, false, false) })
+            Down::Close { watch } => {
+                let first = self
+                    .routes
+                    .values()
+                    .any(|route| matches!(route, Route::First(owner, local) if *owner == client && *local == watch));
+                Down::Close { watch: self.transport(client, watch, first, false) }
             }
-            Request::First(first::Out::Read { read, subject }) => {
-                Request::First(first::Out::Read { read: self.transport(client, read, true, true), subject })
-            }
-            Request::First(first::Out::Open { watch, subject }) => {
-                Request::First(first::Out::Open { watch: self.transport(client, watch, true, true), subject })
-            }
-            Request::First(first::Out::Close { watch }) => {
-                Request::First(first::Out::Close { watch: self.transport(client, watch, true, false) })
-            }
-            Request::Save { .. }
-            | Request::Erase { .. }
-            | Request::Show { .. }
-            | Request::SignOut
-            | Request::SignIn { .. }
-            | Request::Fact { .. }
-            | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
-            | Request::First(first::Out::Fact { .. }) => request,
-        }
+            Down::Save { .. } | Down::Erase { .. } => unreachable!("store writes belong to the shell"),
+        };
+        Request::Client { request: jig_client::Request::Down { down } }
     }
 }
 
 impl Front<Test> for Scripted {
     fn bind(&mut self, client: ClientId, party: u64) {
         self.parties.insert(client, party);
-        self.hellos.insert(client);
+    }
+    fn starting(&mut self, _client: ClientId) -> Vec<Event> {
+        vec![
+            Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } },
+            Event::Jig(jig_client_view::Event::Hello { served: self.engine.versions().contains(8) }),
+        ]
     }
     fn wire(&mut self, client: ClientId, now: Time, wall: Wall, request: Request) {
         let party = self.parties[&client];
         let request = self.routed(client, request);
-        match request {
-            Request::Send { attempt, key, ask } => {
+        let Request::Client { request: jig_client::Request::Down { down } } = request else {
+            unreachable!("shell classified a wire request")
+        };
+        match down {
+            Down::Send { attempt, key, request: ask } => {
                 self.last_attempt = Some(attempt);
                 match ask {
                     Ask::Jig(ask) => {
                         self.engine.send(now, wall, party, key, attempt, *ask).expect("jig send fits");
                     }
-                    Ask::First(ask) => {
+                    Ask::Family(record) => {
+                        let ask = crate::test::family_request(&record);
                         let project = match &ask {
                             family::Ask::Touch { project, .. } | family::Ask::ChangeObject { project, .. } => *project,
                         };
@@ -294,179 +311,73 @@ impl Front<Test> for Scripted {
                     }
                 }
             }
-            Request::Jig(out) => match out {
-                JigOut::Read { read, what } => {
-                    self.last_object = match &what {
-                        Read::Task { task } => Some(ObjectKey::Task(*task)),
-                        Read::Proposal { proposal } => Some(ObjectKey::Proposal(*proposal)),
-                        Read::Escalation { task } => Some(ObjectKey::Escalation(*task)),
-                        Read::Question { task, message } => {
-                            Some(ObjectKey::Question { task: *task, message: *message })
-                        }
-                        Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
-                        Read::Result { task } => Some(ObjectKey::Result(*task)),
-                        Read::Frame
-                        | Read::Ended { .. }
-                        | Read::History { .. }
-                        | Read::Activity { .. }
-                        | Read::Inbox { .. }
-                        | Read::Conversations { .. }
-                        | Read::Goals { .. }
-                        | Read::Spend { .. }
-                        | Read::Project { .. }
-                        | Read::Notes { .. }
-                        | Read::Deployment => self.last_object,
-                    };
-                    self.engine.read(now, party, read, what).expect("read fits");
+            Down::Read { read, what: Readable::Jig(what) } => {
+                self.last_object = match &what {
+                    Read::Task { task } => Some(ObjectKey::Task(*task)),
+                    Read::Proposal { proposal } => Some(ObjectKey::Proposal(*proposal)),
+                    Read::Escalation { task } => Some(ObjectKey::Escalation(*task)),
+                    Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
+                    Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
+                    Read::Result { task } => Some(ObjectKey::Result(*task)),
+                    Read::Frame
+                    | Read::Ended { .. }
+                    | Read::History { .. }
+                    | Read::Activity { .. }
+                    | Read::Inbox { .. }
+                    | Read::Conversations { .. }
+                    | Read::Goals { .. }
+                    | Read::Spend { .. }
+                    | Read::Project { .. }
+                    | Read::Notes { .. }
+                    | Read::Deployment => self.last_object,
+                };
+                self.engine.read(now, party, read, what).expect("read fits");
+            }
+            Down::Open { watch, subject: Watchable::Jig(subject) } => {
+                self.last_watch = Some(watch);
+                if let Subject::Task { task } = &subject {
+                    self.last_object = Some(ObjectKey::Task(*task));
+                    self.page_watch = Some(watch);
                 }
-                JigOut::Open { watch, subject } => {
-                    self.last_watch = Some(watch);
-                    if let Subject::Task { task } = &subject {
-                        self.last_object = Some(ObjectKey::Task(*task));
-                        self.page_watch = Some(watch);
-                    }
-                    self.engine.open(now, party, watch, subject).expect("watch fits");
+                self.engine.open(now, party, watch, subject).expect("watch fits");
+            }
+            Down::Continue { watch, subject } => match subject {
+                Subject::Run { turn, offset, .. } => {
+                    self.engine.continue_run(watch, turn, offset).expect("run watch exists");
                 }
-                JigOut::Continue { watch, subject } => match subject {
-                    Subject::Run { turn, offset, .. } => {
-                        self.engine.continue_run(watch, turn, offset).expect("run watch exists");
-                    }
-                    Subject::Frame
-                    | Subject::Task { .. }
-                    | Subject::Tree { .. }
-                    | Subject::Chips { .. }
-                    | Subject::Inbox { .. }
-                    | Subject::Goals { .. }
-                    | Subject::Tasks { .. }
-                    | Subject::Conversations
-                    | Subject::Deployment => unreachable!("only runs continue"),
-                },
-                JigOut::Close { watch } => self.engine.close(now, watch),
-                JigOut::Answered { .. } | JigOut::Unknown { .. } => {}
+                Subject::Frame
+                | Subject::Task { .. }
+                | Subject::Tree { .. }
+                | Subject::Chips { .. }
+                | Subject::Inbox { .. }
+                | Subject::Goals { .. }
+                | Subject::Tasks { .. }
+                | Subject::Conversations
+                | Subject::Deployment => unreachable!("only runs continue"),
             },
-            Request::First(out) => match out {
-                first::Out::Read { read, subject } => {
-                    self.engine
-                        .read_scoped_application(now, party, read, 1, scope(subject.scope), &subject)
-                        .expect("family read fits");
-                }
-                first::Out::Open { watch, subject } => {
-                    self.last_watch = Some(watch);
-                    self.engine
-                        .open_scoped_application(now, party, watch, 1, scope(subject.scope), subject)
-                        .expect("family watch fits");
-                }
-                first::Out::Close { watch } => self.engine.close(now, watch),
-                first::Out::Fact { .. } => {}
-            },
-            Request::Save { .. }
-            | Request::Erase { .. }
-            | Request::Show { .. }
-            | Request::SignOut
-            | Request::SignIn { .. }
-            | Request::Fact { .. } => unreachable!("shell classified a wire request"),
+            Down::Close { watch } => self.engine.close(now, watch),
+            Down::Read { read, what: Readable::Family(record) } => {
+                let subject = crate::test::family_subject(&record, true);
+                self.engine
+                    .read_scoped_application(now, party, read, 1, scope(subject.scope), &subject)
+                    .expect("family read fits");
+            }
+            Down::Open { watch, subject: Watchable::Family(record) } => {
+                let subject = crate::test::family_subject(&record, false);
+                self.last_watch = Some(watch);
+                self.engine
+                    .open_scoped_application(now, party, watch, 1, scope(subject.scope), subject)
+                    .expect("family watch fits");
+            }
+            Down::Save { .. } | Down::Erase { .. } => unreachable!("the shell keeps records"),
         }
     }
+
     fn poll(&mut self, now: Time, wall: Wall) -> Vec<(ClientId, Event)> {
         self.recover(now, wall);
         let mut events = self.hello_events();
         events.append(&mut self.shell);
-        events.extend(
-            self.engine
-                .poll(now)
-                .into_iter()
-                .filter_map(|up| {
-                    let token = match &up {
-                        Up::Answer { attempt, .. } | Up::ApplicationAnswer { attempt, .. } => *attempt,
-                        Up::Read { token, .. }
-                        | Up::ApplicationRead { token, .. }
-                        | Up::Watch { token, .. }
-                        | Up::Ended { token, .. } => *token,
-                        Up::App { watch, .. } => *watch,
-                    };
-                    let terminal = matches!(
-                        &up,
-                        Up::Answer { .. }
-                            | Up::Read { .. }
-                            | Up::ApplicationAnswer { .. }
-                            | Up::ApplicationRead { .. }
-                            | Up::Ended { .. }
-                    );
-                    if terminal {
-                        self.ledger.end(token);
-                    }
-                    let route = self.routes.get(&token).copied()?;
-                    if terminal {
-                        self.routes.remove(&token);
-                    }
-                    let (client, local) = match route {
-                        Route::Jig(c, t) | Route::First(c, t) => (c, t),
-                    };
-                    let event = match up {
-                        Up::Answer { attempt: _, envelope: e, answer } => Event::Answer {
-                            attempt: local,
-                            envelope: envelope(e),
-                            answer: answer.map(domain::Answered::Jig),
-                        },
-                        Up::Read { token: _, terminal } => {
-                            Event::Jig(jig_client_view::Event::Read { read: local, result: terminal })
-                        }
-                        Up::Watch { token: _, event } => match route {
-                            Route::Jig(_, _) => Event::Jig(jig_client_view::Event::Watch { watch: local, event }),
-                            Route::First(_, _) => Event::First(first::Event::Watch {
-                                watch: local,
-                                event: match event {
-                                    WatchEvent::Opened => family::WatchEvent::Opened,
-                                    WatchEvent::Alive => family::WatchEvent::Alive,
-                                    WatchEvent::Delivered(_) => {
-                                        panic!("application watches carry application documents")
-                                    }
-                                },
-                            }),
-                        },
-                        Up::ApplicationAnswer { attempt: _, envelope: e, answer } => Event::Answer {
-                            attempt: local,
-                            envelope: envelope(e),
-                            answer: answer.map(|a| {
-                                domain::Answered::First(a.expect("test family fixture requires a typed outcome"))
-                            }),
-                        },
-                        Up::ApplicationRead { token: _, terminal } => Event::First(first::Event::Read {
-                            read: local,
-                            result: match terminal {
-                                Ok(d) => family::ReadResult::Value(d),
-                                Err(ReadNone::Busy | ReadNone::Unreachable) => family::ReadResult::Busy,
-                                Err(ReadNone::SignedOut) => family::ReadResult::SignedOut,
-                                Err(ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone) => {
-                                    family::ReadResult::Unknown
-                                }
-                            },
-                        }),
-                        Up::App { watch: _, document } => Event::First(first::Event::Watch {
-                            watch: local,
-                            event: family::WatchEvent::Delivered(document),
-                        }),
-                        Up::Ended { token: _, why } => match route {
-                            Route::Jig(_, _) => Event::Jig(jig_client_view::Event::Ended { watch: local, end: why }),
-                            Route::First(_, _) => Event::First(first::Event::Ended {
-                                watch: local,
-                                end: match why {
-                                    WatchEnd::Closed => family::WatchEnd::Closed,
-                                    WatchEnd::SignedOut => family::WatchEnd::SignedOut,
-                                    WatchEnd::Dropped => family::WatchEnd::Dropped,
-                                    WatchEnd::Unknown => family::WatchEnd::Unknown,
-                                    WatchEnd::NotAllowed => family::WatchEnd::NotAllowed,
-                                    WatchEnd::Busy => family::WatchEnd::Busy,
-                                    WatchEnd::SubjectEnded => family::WatchEnd::SubjectEnded,
-                                    WatchEnd::Stopping => family::WatchEnd::Stopping,
-                                },
-                            }),
-                        },
-                    };
-                    Some((client, event))
-                })
-                .collect::<Vec<_>>(),
-        );
+        events.extend(self.engine.poll(now).into_iter().filter_map(|up| self.callback(up)).collect::<Vec<_>>());
         events
     }
     fn next_due(&self) -> Option<Time> {
@@ -550,7 +461,6 @@ impl Front<Test> for Scripted {
         self.engine.fault(now, fault);
     }
     fn reload(&mut self, client: ClientId, now: Time) {
-        self.hellos.insert(client);
         let tokens: Vec<_> = self
             .routes
             .iter()
@@ -561,6 +471,7 @@ impl Front<Test> for Scripted {
         for token in tokens {
             self.engine.close(now, token);
             self.routes.remove(&token);
+            self.watch_routes.remove(&token);
         }
     }
     fn received(&mut self, client: ClientId, event: &Event) {
@@ -574,10 +485,11 @@ impl Front<Test> for Scripted {
             Event::Start { .. }
             | Event::Went { .. }
             | Event::Act { .. }
-            | Event::Answer { .. }
+            | Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { .. } } }
             | Event::Jig(_)
             | Event::First(_)
-            | Event::SignedOut => None,
+            | Event::SignedOut
+            | Event::Client { .. } => None,
         };
         if let Some((local, first)) = selected {
             let token = self.transport(client, local, first, false);
@@ -602,6 +514,7 @@ impl Front<Test> for Scripted {
             return;
         }
         self.engine.act(now, wall, engine::Change::SignIn { sign_in: party, party }).expect("sign in fits");
+        self.shell.push((client, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } }));
     }
 }
 
@@ -698,5 +611,106 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
         | engine::Change::OwnerDeployment(_)
         | engine::Change::Tree(_)
         | engine::Change::Seen { .. } => {}
+    }
+}
+
+impl Scripted {
+    fn callback(&mut self, up: Up<Family>) -> Option<(ClientId, Event)> {
+        let token = match &up {
+            Up::Answer { attempt, .. } | Up::ApplicationAnswer { attempt, .. } => *attempt,
+            Up::Read { token, .. }
+            | Up::ApplicationRead { token, .. }
+            | Up::Watch { token, .. }
+            | Up::Ended { token, .. } => *token,
+            Up::App { watch, .. } => *watch,
+        };
+        let terminal = matches!(
+            &up,
+            Up::Answer { .. }
+                | Up::Read { .. }
+                | Up::ApplicationAnswer { .. }
+                | Up::ApplicationRead { .. }
+                | Up::Ended { .. }
+        );
+        if terminal {
+            self.ledger.end(token);
+        }
+        let route = self.routes.get(&token).copied()?;
+        if terminal {
+            self.watch_routes.remove(&token);
+            self.routes.remove(&token);
+        }
+        let (client, local) = match route {
+            Route::Jig(c, t) | Route::First(c, t) => (c, t),
+        };
+        let event = match up {
+            Up::Answer { attempt: _, envelope: e, answer } => Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Answer {
+                        attempt: local,
+                        envelope: envelope(e),
+                        answer: answer.map(jig_client::Answered::Jig),
+                        why: None,
+                    },
+                },
+            },
+            Up::Read { token: _, terminal } => {
+                Event::Jig(jig_client_view::Event::Read { read: local, result: terminal })
+            }
+            Up::Watch { token: _, event } => match route {
+                Route::Jig(_, _) => Event::Jig(jig_client_view::Event::Watch { watch: local, event }),
+                Route::First(_, _) => Event::First(first::Event::Watch {
+                    watch: local,
+                    event: match event {
+                        WatchEvent::Opened => family::WatchEvent::Opened,
+                        WatchEvent::Alive => family::WatchEvent::Alive,
+                        WatchEvent::Behind | WatchEvent::Delivered(_) => {
+                            panic!("application watches carry application documents")
+                        }
+                    },
+                }),
+            },
+            Up::ApplicationAnswer { attempt: _, envelope: e, answer } => Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Answer {
+                        attempt: local,
+                        envelope: envelope(e),
+                        answer: answer.map(|a| {
+                            crate::test::family_answer(a.expect("test family fixture requires a typed outcome"))
+                        }),
+                        why: None,
+                    },
+                },
+            },
+            Up::ApplicationRead { token: _, terminal } => Event::First(first::Event::Read {
+                read: local,
+                result: match terminal {
+                    Ok(d) => family::ReadResult::Value(d),
+                    Err(ReadNone::Busy | ReadNone::Unreachable) => family::ReadResult::Busy,
+                    Err(ReadNone::SignedOut) => family::ReadResult::SignedOut,
+                    Err(ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone) => family::ReadResult::Unknown,
+                },
+            }),
+            Up::App { watch: _, document } => {
+                Event::First(first::Event::Watch { watch: local, event: family::WatchEvent::Delivered(document) })
+            }
+            Up::Ended { token: _, why } => match route {
+                Route::Jig(_, _) => Event::Jig(jig_client_view::Event::Ended { watch: local, end: why }),
+                Route::First(_, _) => Event::First(first::Event::Ended {
+                    watch: local,
+                    end: match why {
+                        WatchEnd::Closed => family::WatchEnd::Closed,
+                        WatchEnd::SignedOut => family::WatchEnd::SignedOut,
+                        WatchEnd::Dropped => family::WatchEnd::Dropped,
+                        WatchEnd::Unknown => family::WatchEnd::Unknown,
+                        WatchEnd::NotAllowed => family::WatchEnd::NotAllowed,
+                        WatchEnd::Busy => family::WatchEnd::Busy,
+                        WatchEnd::SubjectEnded => family::WatchEnd::SubjectEnded,
+                        WatchEnd::Stopping => family::WatchEnd::Stopping,
+                    },
+                }),
+            },
+        };
+        Some((client, event))
     }
 }

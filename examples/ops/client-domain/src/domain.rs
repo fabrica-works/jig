@@ -20,7 +20,7 @@ pub fn new(limits: &Limits, seed: u64) -> Domain {
     assert!(crate::worst_case(limits).is_some(), "root capacities are checked");
     let mut rng = Rng::new(seed);
     Domain {
-        jig: jig_client_view::Domain::new(&limits.jig, rng.next_u64()),
+        jig: jig_client_view::Domain::new(&limits.jig),
         infrastructure: infrastructure::Side::new(&limits.infrastructure, rng.next_u64()),
         observability: crate::observability::Side::new(&limits.observability, rng.next_u64()),
         table: RequestTable::new(&limits.table, rng.next_u64()),

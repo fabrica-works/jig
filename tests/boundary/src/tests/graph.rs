@@ -241,7 +241,7 @@ fn test_client_domain_links_only_its_child_owner_vocabulary_and_foundation() {
     dependencies.sort();
     assert_eq!(
         dependencies,
-        ["jig-client-domain", "jig-client-test-protocol-wire", "jig-client-view", "jig-test-connector", "skein-lib"],
+        ["jig-client", "jig-client-test-protocol-wire", "jig-client-view", "jig-test-connector", "skein-lib"],
         "the client root depends only on its client child, pure owner vocabulary and foundation"
     );
     let source = fs::read_to_string(kit_root().join("testing/jig-client-test-domain/src/lib.rs"))
@@ -302,6 +302,7 @@ fn client_world_joins_only_the_client_and_test_roles() {
                 "skein-ui",
                 "skein-ui-text",
                 "jig-client-test-domain",
+                "jig-client-test-protocol-wire",
                 "jig-client-test-view",
                 "skein-fake-person",
                 "jig-client-scripted-engine",

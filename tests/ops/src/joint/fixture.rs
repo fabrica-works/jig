@@ -12,7 +12,6 @@ use jig_ops_client_view as view;
 use jig_ops_domain as root;
 use jig_ops_domain_infrastructure as infra;
 use jig_ops_domain_observability as obs;
-use skein_lib::Duration;
 #[must_use]
 pub fn limits() -> client::Limits {
     let mut limits = crate::client::limits();
@@ -29,7 +28,6 @@ pub fn limits() -> client::Limits {
     limits.jig.watches = 32;
     limits.jig.reads = 32;
     limits.jig.conversation_words = 16;
-    limits.jig.heartbeat = Duration::from_secs(60);
     limits.observability.rows = 32;
     limits.observability.text = 4096;
     limits.infrastructure.rows = 32;

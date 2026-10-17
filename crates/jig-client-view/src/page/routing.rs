@@ -48,27 +48,19 @@ pub(crate) fn excess(domain: &mut Domain, count: u32) {
     }
     domain.changed();
 }
-pub(crate) fn open_once(
-    domain: &mut Domain,
-    env: &Env<crate::Limits>,
-    subject: Subject,
-    owner: Owner,
-    out: &mut Queue<Request>,
-) -> bool {
+pub(crate) fn open_once(domain: &mut Domain, subject: Subject, owner: Owner, out: &mut Queue<Request>) -> bool {
     for (id, ()) in &domain.watch_ids {
         let watch = domain.watches.get(*id).expect("registered watch exists");
         match watch.state {
             crate::watches::Following::Closing | crate::watches::Following::Closed => {}
-            crate::watches::Following::Opening { .. }
-            | crate::watches::Following::Live
-            | crate::watches::Following::Reopening { .. } => {
+            crate::watches::Following::Opening | crate::watches::Following::Live => {
                 if watch.owner == owner && watch.subject == subject {
                     return false;
                 }
             }
         }
     }
-    if domain.open(env, subject, owner, out).is_none() {
+    if domain.open(subject, owner, out).is_none() {
         refuse(domain, Limit::Watches);
     }
     true
@@ -151,7 +143,7 @@ pub(crate) fn navigate(
             domain.changed();
         }
     }
-    crate::signin::returned(domain, env, out);
+    crate::signin::returned(domain, out);
 }
 /// Opens only what the selected work page shows; services have no page.
 pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {

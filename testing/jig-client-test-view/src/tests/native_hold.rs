@@ -11,33 +11,40 @@ pub(super) fn limits() -> jig_client_test_domain::Limits {
     limits
 }
 pub(super) fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
-    let limits = limits();
-    let mut out = Queue::with_capacity(jig_client_test_domain::max_out(&limits));
-    jig_client_test_domain::step(root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event, &mut out);
-    let mut rows = Vec::new();
-    while let Some(row) = out.pop() {
-        rows.push(row);
-    }
-    rows
+    transport::drive(root, event, &limits())
 }
 pub(super) fn ready() -> Domain {
-    let mut root = jig_client_test_domain::new(&limits(), 43);
-    let rows = drive(
+    let mut root = jig_client_test_domain::unlinked(&limits(), 43);
+    let mut rows = drive(&mut root, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } });
+    rows.extend(drive(
         &mut root,
         Event::Start {
             address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             kept: List::with_capacity(0),
             offset: jig_client_view::boundary::Offset { minutes: 0 },
         },
-    );
+    ));
     let watch = rows
         .iter()
         .find_map(|row| match row {
-            Request::Jig(JigOut::Open { watch, subject: Subject::Frame }) => Some(*watch),
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                    },
+            } => Some(*watch),
             _ => None,
         })
         .unwrap();
     drive(&mut root, Event::Jig(jig_client_view::Event::Hello { served: true }));
+    drive(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::FamilyServed { family: 1, versions: Some(VersionRange { first: 1, last: 1 }) },
+            },
+        },
+    );
     drive(
         &mut root,
         Event::Jig(jig_client_view::Event::Watch {
@@ -124,7 +131,13 @@ fn load(root: &mut Domain, task: Task) -> Vec<Request> {
     let watch = opened
         .iter()
         .find_map(|row| match row {
-            Request::Jig(JigOut::Open { watch, subject: Subject::Task { .. } }) => Some(*watch),
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down:
+                            jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(Subject::Task { .. }) },
+                    },
+            } => Some(*watch),
             _ => None,
         })
         .unwrap();

@@ -140,7 +140,7 @@ fn watch(channel: Channel, local: Token, event: WatchEvent) -> Event {
             event: match event {
                 WatchEvent::Opened => obs::WatchEvent::Opened,
                 WatchEvent::Alive => obs::WatchEvent::Alive,
-                WatchEvent::Delivered(_) => unreachable!("Ops docs use Up::App"),
+                WatchEvent::Behind | WatchEvent::Delivered(_) => unreachable!("Ops docs use Up::App"),
             },
         }),
         Channel::Infrastructure => Event::Infrastructure(infra::Event::Watch {
@@ -148,7 +148,7 @@ fn watch(channel: Channel, local: Token, event: WatchEvent) -> Event {
             event: match event {
                 WatchEvent::Opened => infra::WatchEvent::Opened,
                 WatchEvent::Alive => infra::WatchEvent::Alive,
-                WatchEvent::Delivered(_) => unreachable!("Ops docs use Up::App"),
+                WatchEvent::Behind | WatchEvent::Delivered(_) => unreachable!("Ops docs use Up::App"),
             },
         }),
     }

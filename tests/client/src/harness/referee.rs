@@ -31,6 +31,7 @@ pub struct Rules {
     request_within: Duration,
     link_within: Duration,
     clients: BTreeSet<ClientId>,
+    links: BTreeMap<ClientId, bool>,
     reachable: Option<bool>,
     parked: BTreeSet<ClientId>,
     ended_watches: BTreeSet<(ClientId, Token)>,
@@ -58,6 +59,7 @@ impl Rules {
             request_within,
             link_within,
             clients: BTreeSet::new(),
+            links: BTreeMap::new(),
             reachable: None,
             parked: BTreeSet::new(),
             ended_watches: BTreeSet::new(),
@@ -131,6 +133,9 @@ impl Rules {
                     } else {
                         judge.withdraw(&Deadline::Online(*client));
                         judge.rearm(Deadline::Offline(*client), self.heartbeat);
+                    }
+                    if self.links.get(client) == Some(&live) {
+                        judge.meet(&if live { Deadline::Online(*client) } else { Deadline::Offline(*client) });
                     }
                 }
             }
@@ -280,6 +285,7 @@ impl Rules {
                 Seen::Outline { .. } => judge.check(false, "the page's outline: a tree broke view.md 3.1"),
                 Seen::HiddenPage => {}
                 Seen::Link { live } => {
+                    self.links.insert(client, live);
                     judge.meet(&if live { Deadline::Online(client) } else { Deadline::Offline(client) });
                 }
             }

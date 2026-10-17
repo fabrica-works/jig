@@ -1,27 +1,7 @@
 //! Each owner's records are encoded by that owner's codec.
-use super::{ClientId, Link, Protocol, Queue, Side, Time, client, family, fixtures, link};
-use skein_lib::{List, RequestRecord};
+use super::{ClientId, Protocol, Side, Time, client, family, fixtures};
+use jig_client_protocol_link as link;
 pub(super) type Bytes = Vec<(Box<[u8]>, Box<[u8]>)>;
-fn saved(record: client::store::Record) -> link::Saved {
-    match record {
-        client::store::Record::Table { version, record } => link::Saved {
-            version,
-            record: RequestRecord {
-                key: record.key,
-                scope: record.scope,
-                first_sent: record.first_sent,
-                request: jig_client_domain::Held {
-                    key: record.request.key,
-                    request: match record.request.request {
-                        client::Ask::Jig(value) => jig_client_domain::Ask::Jig(value),
-                        client::Ask::First(value) => jig_client_domain::Ask::Family(family::request(&value)),
-                    },
-                },
-            },
-        },
-        client::store::Record::Jig(_) | client::store::Record::First(_) => unreachable!("table record"),
-    }
-}
 pub(super) fn encode(records: &[client::store::Record]) -> Bytes {
     records.iter().cloned().map(encode_one).map(|record| (record.key, record.bytes)).collect()
 }
@@ -43,14 +23,8 @@ pub(crate) fn encode_one(record: client::store::Record) -> link::Record {
         client::store::Record::First(record) => {
             link::Record { key: Box::from(b"first.place".as_slice()), bytes: family::saved(&record) }
         }
-        record @ client::store::Record::Table { .. } => {
-            let mut link = Link::new(&fixtures::link_limits()).expect("bounded store codec");
-            let mut out = Queue::with_capacity(256);
-            link.step(Time::ZERO, link::Event::Save { record: saved(record) }, &mut out);
-            let Some(link::Request::Save { record }) = out.pop() else { panic!("save writes its record") };
-            assert!(out.is_empty());
-            record
-        }
+        client::store::Record::Client(record) => record,
+        client::store::Record::Unlinked(_) => unreachable!("byte transport keeps the client's encoded records"),
     }
 }
 pub(crate) fn child_record(record: &link::Record) -> Option<client::store::Record> {
@@ -81,76 +55,31 @@ pub(crate) fn erased(key: client::store::Key) -> Box<[u8]> {
             jig_client_view::store::StoreKey::Draft { task } => RecordKey::Draft { task }.encode(),
         },
         client::store::Key::First(_) => Box::from(b"first.place".as_slice()),
-        client::store::Key::Table(key) => Box::new(key),
-    }
-}
-pub(crate) fn restored(saved: link::Saved) -> client::store::Record {
-    let link::Saved { version, record } = saved;
-    client::store::Record::Table {
-        version,
-        record: RequestRecord {
-            key: record.key,
-            scope: record.scope,
-            first_sent: record.first_sent,
-            request: client::store::Held {
-                key: record.request.key,
-                request: match record.request.request {
-                    jig_client_domain::Ask::Jig(value) => client::Ask::Jig(value),
-                    jig_client_domain::Ask::Family(value) => {
-                        let decoded = jig_client_test_protocol_wire::codec::request(
-                            &value.bytes,
-                            &fixtures::owner_limits().connector,
-                        )
-                        .expect("family ask");
-                        client::Ask::First(client::first::Ask::ChangeObject {
-                            project: decoded.project,
-                            object: decoded.value.object,
-                            revision: jig_client_domain::contract::Revision { value: decoded.value.revision },
-                            value: decoded.value.value,
-                        })
-                    }
-                },
-            },
-        },
+        client::store::Key::Client(key) => key,
+        client::store::Key::Unlinked(_) => unreachable!("byte transport uses encoded keys"),
     }
 }
 pub(super) fn decode(bytes: &Bytes) -> Vec<client::store::Record> {
-    let mut link = Link::new(&fixtures::link_limits()).expect("bounded store codec");
-    let mut kept = List::with_capacity(u32::try_from(bytes.len()).expect("bounded small store"));
-    let mut records = Vec::new();
-    for (key, bytes) in bytes {
-        let record = link::Record { key: key.clone(), bytes: bytes.clone() };
-        if key.len() == 16 {
-            kept.push(record).expect("exact store capacity");
-        } else if let Some(record) = child_record(&record) {
-            records.push(record);
-        }
-    }
-    let mut out = Queue::with_capacity(256);
-    link.step(Time::ZERO, link::Event::Start { kept }, &mut out);
-    while let Some(request) = out.pop() {
-        if let link::Request::Kept { record } = request {
-            records.push(restored(record));
-        } else {
-            panic!("admitted record must restore");
-        }
-    }
-    records
+    bytes
+        .iter()
+        .filter_map(|(key, bytes)| {
+            let record = link::Record { key: key.clone(), bytes: bytes.clone() };
+            if key.len() == 16 { Some(client::store::Record::Client(record)) } else { child_record(&record) }
+        })
+        .collect()
 }
 impl Protocol {
     pub(super) fn reload_side(&mut self, client: ClientId, now: Time) {
         self.net.cut_client(client);
         self.advance(now, fixtures::wall(now));
+        let credential = self.clients[&client].wire.credential();
         let mut side = Side::new();
-        let old = self.clients.get(&client).expect("bound side");
-        side.authenticated = old.authenticated;
-        if let Some(credential) = old.link.credential() {
-            side.event(now, link::Event::SignIn { with: link::With::Held(credential.clone()) });
-        }
+        side.wire.restore(credential);
         // Connection names survive the shell restart so late bytes cannot name a new socket.
         self.net.retire(client);
         self.clients.insert(client, side);
         self.callbacks.retain(|(id, _)| *id != client);
+        self.receipts.retain(|(id, _, _, _)| *id != client);
     }
     #[must_use]
     pub fn pending_bytes(&self, client: ClientId) -> usize {

@@ -48,7 +48,7 @@ pub(super) fn special_pages(words: &crate::words::Words) {
     assert!(contains(&build(&d, 2, words).0, b"Page missing"));
     drive(&mut d, Event::SignedOut);
     assert_eq!(d.page(), &Page::SigningIn);
-    let mut d = Domain::new(&CLIENT, 1);
+    let mut d = Domain::new(&CLIENT);
     d.provider(crate::signin::Provider { number: 3, name: text(b"Organization") }).unwrap();
     drive(
         &mut d,
@@ -68,7 +68,7 @@ pub(super) fn special_pages(words: &crate::words::Words) {
     drive(&mut d, Event::Hello { served: false });
     assert!(deliver(&mut d, f, Delivery::Frame(Box::new(document()))).is_empty());
     assert!(contains(&build(&d, 2, words).0, b"update or reload"));
-    let mut d = Domain::new(&CLIENT, 9);
+    let mut d = Domain::new(&CLIENT);
     let mut kept = List::with_capacity(1);
     kept.push(crate::store::Record::Draft {
         version: crate::store::STORE_VERSION,

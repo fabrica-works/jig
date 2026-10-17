@@ -48,7 +48,7 @@ fn configured_with_slots(
     slots: u32,
     configure: fn(&mut jig_test_domain::Config, &jig_test_domain::Limits),
 ) -> World<Test, Joint> {
-    configured_with_bounds(seed, scripts, slots, configure, receiving_limits())
+    configured_with_bounds(seed, scripts, slots, configure, &receiving_limits())
 }
 
 fn configured_with_bounds(
@@ -56,7 +56,7 @@ fn configured_with_bounds(
     scripts: Vec<Box<[Script]>>,
     slots: u32,
     configure: fn(&mut jig_test_domain::Config, &jig_test_domain::Limits),
-    receiving: jig_client_test_domain::Limits,
+    receiving: &jig_client_test_domain::Limits,
 ) -> World<Test, Joint> {
     let (mut configuration, mut owner) = jig_core_world::peers::fixture(seed, 0);
     configuration.core.owners = Box::new([]);
@@ -152,7 +152,7 @@ fn configured_with_bounds(
             )
         })
         .collect();
-    let mut front = Joint::new(Session::new(driver, receiving, codec), identities, clock);
+    let mut front = Joint::new(Session::new(driver, *receiving, codec), identities, clock);
     front.unsigned_on_bind();
     front.session.capture_task_offers();
     front.session.stream_heartbeat(Duration::from_millis(50));
@@ -233,7 +233,7 @@ fn a_person_answers_a_choice_between_two_reports() {
         ])],
         1,
         |_, _| {},
-        choice_limits(),
+        &choice_limits(),
     );
     world.front().session.capture_card_offers();
     let member = world.client_with(3, crate::stories::conversation(), choice_limits(), choice_client);

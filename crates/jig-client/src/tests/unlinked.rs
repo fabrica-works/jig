@@ -94,3 +94,18 @@ fn an_unlinked_client_s_records_are_the_table_s() {
     assert_eq!(c.machine.pending(STOP), Some(Pending { progress: Progress::Parked, party: PARTY, owner: None }));
     assert_eq!(c.machine.link().credential, None);
 }
+
+#[test]
+fn an_unlinked_sign_out_its_world_loses_keeps_the_party_signed_in() {
+    let mut c = live();
+    c.step(Event::SignOut);
+    assert_eq!(c.requests().len(), 1);
+    assert_eq!(c.requests(), &[Request::SignOut]);
+    c.step(Event::SignOutLost);
+    let [Request::Told { told: Told::Link { link } }] = c.requests() else { panic!("link tells the loss") };
+    assert_eq!(*link, Link::Live);
+    assert_eq!(c.machine.link().party, Some(PARTY));
+    assert!(c.machine.link().sign_out_lost);
+    c.step(Event::Up { up: Up::SignedIn });
+    assert!(!c.machine.link().sign_out_lost);
+}

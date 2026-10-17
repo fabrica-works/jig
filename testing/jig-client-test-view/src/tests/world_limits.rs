@@ -9,12 +9,12 @@ fn world_domain() -> jig_client_test_domain::Limits {
     let mut domain = super::limits();
     domain.jig.document_bytes = 65536;
     domain.jig.save_delay = Duration::from_millis(10);
-    domain.jig.backoff.first = Duration::from_millis(10);
-    domain.jig.backoff.most = Duration::from_millis(80);
-    domain.jig.heartbeat = Duration::from_millis(100);
+    domain.client.domain.backoff.first = Duration::from_millis(10);
+    domain.client.domain.backoff.most = Duration::from_millis(80);
+    domain.client.domain.heartbeat = Duration::from_millis(100);
     domain.first.retry = Duration::from_millis(10);
-    domain.table.first = Duration::from_millis(10);
-    domain.table.most = Duration::from_millis(80);
+    domain.client.domain.requests.first = Duration::from_millis(10);
+    domain.client.domain.requests.most = Duration::from_millis(80);
     domain
 }
 

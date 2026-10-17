@@ -1,17 +1,15 @@
-//! Live subjects, their attempt obligations and timers; client/domain/client.md, 8.1.
-//! A terminal permits reopening; a silence first closes the old attempt and waits
-//! for its terminal. Delivery values replace one another, with no backlog.
+//! Live view handles, held documents and their closing obligations.
+//! The client owns reopening and silence (client/domain/client.md, 8.1).
+//! A Behind event keeps the held document until a live delivery replaces it.
 //!
 //! | State | Event | Next | Emits |
 //! |---|---|---|---|
-//! | opening/live | opened/alive | unchanged | heartbeat armed |
+//! | opening/live | opened/alive | unchanged | none |
 //! | opening/live | delivery | live | owner receives whole document |
-//! | opening/live | silence | reopening, waiting terminal | close |
-//! | opening/live | dropped/stopping/busy | reopening, backoff | retry timer |
-//! | reopening | retry after terminal | opening | open |
-//! | any active | leave | closing | close if an attempt is live |
+//! | opening/live | behind | unchanged | page marked behind |
+//! | any active | leave | closing | close |
 //! | closing | terminal | closed | retire |
-//! | any | unknown/not allowed/subject ended | closed | retire |
+//! | any | terminal | closed | retire |
 use jig_client::contract::Subject;
 
 /// The owner that receives a watch document.
@@ -31,11 +29,9 @@ pub enum Owner {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Following {
     /// Asked to open, awaiting its first document.
-    Opening { attempt: u32 },
+    Opening,
     /// Receiving whole current documents.
     Live,
-    /// Dropped, awaiting an old terminal or a backoff.
-    Reopening { attempt: u32, waiting: bool },
     /// Closed by its owner, awaiting its terminal.
     Closing,
     /// Its terminal arrived; ready to reclaim.

@@ -6,9 +6,10 @@ use super::{
     wire,
 };
 use crate::harness::ClientId;
+use jig_client::Answered;
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
-use jig_client_test_domain::{Answered, Event, connector_values::ConnectorLimits, family};
+use jig_client_test_domain::{Event, connector_values::ConnectorLimits, family};
 use jig_client_view::Limits;
 use jig_domain_people as people;
 use jig_test_connector::ApplicationOutcome;
@@ -347,7 +348,7 @@ pub fn people_reply(
                                 return Err(Invalid::OwnerRoute);
                             };
                             let why = client::EntranceRefusal::new(why).map_err(|_| Invalid::Payload)?;
-                            Answered::First(family::Answer::Refused(why))
+                            crate::test::family_answer(family::Answer::Refused(why))
                         }
                         KeyedOwner::Application { .. } => return Err(Invalid::OwnerRoute),
                     })
@@ -356,7 +357,14 @@ pub fn people_reply(
             if envelope == RequestEnvelope::SignedOut {
                 transport.signed_out(client);
             }
-            Incoming::Callback { client, event: Event::Answer { attempt, envelope, answer } }
+            Incoming::Callback {
+                client,
+                event: Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Answer { attempt, envelope, answer, why: None },
+                    },
+                },
+            }
         }
         Reply::Read { .. } | Reply::ApplicationRead { .. } => return Err(Invalid::OwnerRoute),
     };
@@ -390,10 +398,15 @@ pub fn application_reply(
     transport.take_reply(to).expect("validated original reply route");
     Ok(Incoming::Callback {
         client,
-        event: Event::Answer {
-            attempt,
-            envelope: RequestEnvelope::Final,
-            answer: Some(Answered::First(family::Answer::Connector(answer))),
+        event: Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt,
+                    envelope: RequestEnvelope::Final,
+                    answer: Some(crate::test::family_answer(family::Answer::Connector(answer))),
+                    why: None,
+                },
+            },
         },
     })
 }
@@ -894,7 +907,18 @@ mod tests {
         let Incoming::Callback {
             client,
             event:
-                Event::Answer { attempt: actual, envelope, answer: Some(Answered::First(family::Answer::Refused(answer))) },
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Answer {
+                                    attempt: actual,
+                                    envelope,
+                                    answer: Some(Answered::Jig(client::Answer::Refused(answer))),
+                                    why: None,
+                                },
+                        },
+                },
         } = people_reply(&mut transport, token, people::Reply::Refused(why), &crate::test::limits().jig)
             .expect("original child")
         else {
@@ -904,7 +928,7 @@ mod tests {
         assert_eq!(actual, attempt);
         assert_eq!(envelope, RequestEnvelope::Final);
         assert_eq!(
-            answer.refusal(),
+            &answer,
             &client::Refusal::Moved { now: client::Revision { value: u64::MAX }, what: client::Moved::PersonTask }
         );
         assert!(transport.reply(token).is_none());
@@ -932,16 +956,29 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Answer {
-                    attempt: actual,
-                    envelope: RequestEnvelope::Final,
-                    answer: Some(Answered::First(family::Answer::Connector(answer))),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Answer {
+                                    attempt: actual,
+                                    envelope: RequestEnvelope::Final,
+                                    answer: Some(Answered::Family(record)),
+                                    why: None,
+                                },
+                        },
                 },
         } = application_reply(&mut transport, token, 1, outcome, &limits).expect("whole owner answer")
         else {
             panic!("application callback");
         };
         assert_eq!(actual, attempt);
+        let family::Answer::Connector(answer) =
+            family::wire::decode_answer(&record.bytes, &jig_core_world::world::limits().connector)
+                .expect("whole application answer")
+        else {
+            panic!("connector answer")
+        };
         assert_eq!(answer.value, outcome);
         let jig = transport
             .reply_to(Reply::Keyed { client: ClientId(1), attempt, key: [0; 16], owner: KeyedOwner::Jig })

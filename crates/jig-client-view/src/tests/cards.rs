@@ -14,7 +14,6 @@ use crate::{
     address::Address,
     boundary::Offset,
     intents::Progress,
-    limits::ui::Backoff,
     objects::{Card, Left, Source},
 };
 use crate::{JigBindings, JigMeaning, Owner, decode};
@@ -51,8 +50,6 @@ pub(crate) const CLIENT: crate::Limits = crate::Limits {
     conversation_words: 2,
     navigation_entries: 8,
     updates_count: 99,
-    backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
-    heartbeat: Duration::from_secs(100),
 };
 pub(super) fn limits() -> skein_ui::Limits {
     skein_ui::Limits {
@@ -169,7 +166,7 @@ pub(super) fn start() -> (Domain, Token) {
     start_arranged(crate::page::Arrangement::none())
 }
 pub(super) fn start_arranged(arrangement: crate::page::Arrangement) -> (Domain, Token) {
-    let mut d = Domain::new(&CLIENT, 1);
+    let mut d = Domain::new(&CLIENT);
     d.configure_arrangement(arrangement).unwrap();
     let out = drive(
         &mut d,
@@ -191,7 +188,7 @@ pub(super) fn start_arranged(arrangement: crate::page::Arrangement) -> (Domain, 
 fn flat(tree: &Tree) -> Vec<u8> {
     tree.nodes().iter().flat_map(|n| n.text.as_slice().iter().flat_map(|r| r.text.iter().copied())).collect()
 }
-pub(super) fn contains(tree: &Tree, text: &[u8]) -> bool {
+pub(crate) fn contains(tree: &Tree, text: &[u8]) -> bool {
     flat(tree).windows(text.len()).any(|w| w == text)
 }
 
@@ -204,7 +201,7 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
             drive(&mut d, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
         }
         if expected == b"Offline" {
-            drive(&mut d, Event::Ended { watch, end: WatchEnd::Dropped });
+            d.set_link(crate::link::Link::Offline, &mut Queue::with_capacity(crate::max_out(&CLIENT)));
         }
         bindings.begin();
         let mut b = Builder::new(&limits());

@@ -144,7 +144,7 @@ fn owner_inbox_whole_groups_aggregate_counts_live_winner_and_unknown_time_source
     }
 }
 fn begin() -> (Domain, Token, Box<[Request]>) {
-    let mut domain = Domain::new(&LIMITS, 94);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let out = delivered(&mut domain, Time::ZERO, f, frame(7));
     (domain, open_token(&out), out)

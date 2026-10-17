@@ -21,7 +21,7 @@ fn limits() -> jig_client::Limits {
     jig_client::Limits {
         domain: jig_client::DomainLimits {
             owners: &[],
-            requests: world.table,
+            requests: world.client.domain.requests,
             ask_bytes: 16384,
             rows: l.rows,
             segments: l.segments,
@@ -33,7 +33,7 @@ fn limits() -> jig_client::Limits {
             records: l.records,
             kept: l.kept,
             parts: l.parts,
-            heartbeat: l.heartbeat,
+            heartbeat: world.client.domain.heartbeat,
             handles: 8,
             turn_bytes: 32,
             reads: l.reads,
@@ -53,7 +53,8 @@ fn drain(client: &mut Client, front: &mut Joint, out: &mut Queue<Request>) {
             | Request::OpenStream { .. }
             | Request::CloseStream
             | Request::Save { .. }
-            | Request::Erase { .. } => panic!("unlinked client emits domain operations"),
+            | Request::Erase { .. }
+            | Request::SignOut => panic!("unlinked client emits domain operations"),
         }
     }
     client.reclaim();

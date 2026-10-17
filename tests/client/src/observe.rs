@@ -26,27 +26,28 @@ pub fn key(object: ObjectKey) -> CardKey {
 }
 #[must_use]
 pub fn sent(request: &Request) -> Option<Sent> {
-    let Request::Send { attempt, key: k, ask } = request else {
+    let Request::Client {
+        request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key: k, request: ask } },
+    } = request
+    else {
         return None;
     };
     let (card, revision, words) = match ask {
-        domain::Ask::First(family::Ask::Touch { project, item, revision, .. }) => (
-            Some(CardKey::of(jig_client_test_view::family_key(&family::Subject {
-                scope: family::Scope::Project(*project),
-                kind: family::Kind::Item(*item),
-            }))),
-            Some((0, revision.value)),
-            None,
-        ),
-        domain::Ask::First(family::Ask::ChangeObject { project, object, revision, .. }) => (
-            Some(CardKey::of(jig_client_test_view::family_key(&family::Subject {
-                scope: family::Scope::Project(*project),
-                kind: family::Kind::Item(*object),
-            }))),
-            Some((0, revision.value)),
-            None,
-        ),
-        domain::Ask::Jig(ask) => return Some(jig_sent(*attempt, *k, ask)),
+        jig_client::Ask::Jig(ask) => return Some(jig_sent(*attempt, *k, ask)),
+        jig_client::Ask::Family(record) => {
+            let ask = crate::test::family_request(record);
+            let family::Ask::Touch { project, item, revision, .. } = ask else {
+                unreachable!("decoded optional request")
+            };
+            (
+                Some(CardKey::of(jig_client_test_view::family_key(&family::Subject {
+                    scope: family::Scope::Project(project),
+                    kind: family::Kind::Item(item),
+                }))),
+                Some((0, revision.value)),
+                None,
+            )
+        }
     };
     Some(Sent { attempt: *attempt, key: *k, card, revision, words })
 }
@@ -165,15 +166,17 @@ fn family(doc: &family::Document) -> Receipt {
 #[must_use]
 pub fn received(event: &Event) -> Vec<Receipt> {
     match event {
-        Event::Answer { attempt, envelope, answer } => {
+        Event::Client {
+            event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, envelope, answer, why: None } },
+        } => {
             let words = match answer {
-                Some(domain::Answered::Jig(Answer::Done(
+                Some(jig_client::Answered::Jig(Answer::Done(
                     Outcome::Made { what: Made::Words { task, message } }
                     | Outcome::Owner(
                         OwnerOutcome::Said { task, message, .. } | OwnerOutcome::QuestionAnswered { task, message, .. },
                     ),
                 ))) => Some((*task, *message)),
-                Some(domain::Answered::Jig(_) | domain::Answered::First(_)) | None => None,
+                Some(jig_client::Answered::Jig(_) | jig_client::Answered::Family(_)) | None => None,
             };
             if *envelope == RequestEnvelope::SignedOut {
                 vec![Receipt::Parked]
@@ -192,7 +195,7 @@ pub fn received(event: &Event) -> Vec<Receipt> {
             domain::first::Event::Read { result: family::ReadResult::SignedOut, .. }
             | domain::first::Event::Ended { end: family::WatchEnd::SignedOut, .. },
         ) => vec![Receipt::Parked],
-        Event::Went { .. } | Event::Act { .. } | Event::First(_) => vec![],
+        Event::Client { .. } | Event::Went { .. } | Event::Act { .. } | Event::First(_) => vec![],
     }
 }
 /// Observe delivered jig documents and sign-in state before the root callback.
@@ -414,10 +417,11 @@ pub fn window_changed(event: &Event) -> bool {
         Event::Start { .. }
         | Event::Went { .. }
         | Event::Act { action: domain::Action::First(_) }
-        | Event::Answer { .. }
+        | Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { .. } } }
         | Event::Jig(_)
         | Event::First(_)
-        | Event::SignedOut => return false,
+        | Event::SignedOut
+        | Event::Client { .. } => return false,
     };
     jig_window_changed(act)
 }
@@ -546,8 +550,9 @@ mod tests {
     #[test]
     fn public_owner_answer_receipts_keep_original_attempt_envelope_and_exact_message_ids() {
         use super::{Receipt, received};
+        use jig_client::Answered;
         use jig_client_domain::contract::{Answer, Outcome, OwnerOutcome};
-        use jig_client_test_domain::{Answered, Event};
+        use jig_client_test_domain::Event;
         use skein_lib::{RequestEnvelope, Token};
         let cases = [
             (OwnerOutcome::Said { task: u64::MAX, message: 37, released: false }, Some((u64::MAX, 37))),
@@ -558,10 +563,15 @@ mod tests {
         ];
         for (outcome, expected) in cases {
             for envelope in [RequestEnvelope::Final, RequestEnvelope::Again, RequestEnvelope::Lost] {
-                let event = Event::Answer {
-                    attempt: Token::new(73),
-                    envelope,
-                    answer: Some(Answered::Jig(Answer::Done(Outcome::Owner(outcome.clone())))),
+                let event = Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Answer {
+                            attempt: Token::new(73),
+                            envelope,
+                            answer: Some(Answered::Jig(Answer::Done(Outcome::Owner(outcome.clone())))),
+                            why: None,
+                        },
+                    },
                 };
                 let receipts = received(&event);
                 let [Receipt::Answer { attempt, final_answer, words }] = receipts.as_slice() else {
@@ -571,10 +581,15 @@ mod tests {
                 assert_eq!(*final_answer, envelope == RequestEnvelope::Final);
                 assert_eq!(*words, expected);
             }
-            let signed_out = Event::Answer {
-                attempt: Token::new(73),
-                envelope: RequestEnvelope::SignedOut,
-                answer: Some(Answered::Jig(Answer::Done(Outcome::Owner(outcome)))),
+            let signed_out = Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Answer {
+                        attempt: Token::new(73),
+                        envelope: RequestEnvelope::SignedOut,
+                        answer: Some(Answered::Jig(Answer::Done(Outcome::Owner(outcome)))),
+                        why: None,
+                    },
+                },
             };
             assert!(matches!(received(&signed_out).as_slice(), [Receipt::Parked]));
         }

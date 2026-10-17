@@ -67,7 +67,7 @@ fn details() -> ResultDetails {
     }
 }
 fn build(value: &ResultDetails, words: &Words) -> Tree {
-    let client = Domain::new(&client_limits(), 1);
+    let client = Domain::new(&client_limits());
     let limits = view::limits(&client_limits(), words).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, 128);
@@ -216,7 +216,7 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
         Some(Invalid::Holes { id: ResultPhrase::RequesterTask.id() })
     );
     let value = details();
-    let client = Domain::new(&client_limits(), 1);
+    let client = Domain::new(&client_limits());
     let mut capacity = view::limits(&client_limits(), &words).unwrap();
     assert_eq!(tree.len(), 9, "one region and eight independent metadata leaves");
     capacity.nodes = 9;

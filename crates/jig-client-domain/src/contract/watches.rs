@@ -115,6 +115,8 @@ pub enum WatchEvent {
     Delivered(Delivery),
     /// The heartbeat.
     Alive,
+    /// The client is reopening this handle; its held document may be old.
+    Behind,
 }
 
 /// The one terminal of an open watch.

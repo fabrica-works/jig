@@ -23,9 +23,7 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, served: bool, out: &
         Some(id) => match domain.watches.get(id) {
             Some(watch) => match watch.state {
                 Following::Live => true,
-                Following::Opening { .. } | Following::Reopening { .. } | Following::Closing | Following::Closed => {
-                    false
-                }
+                Following::Opening | Following::Closing | Following::Closed => false,
             },
             None => false,
         },

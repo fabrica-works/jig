@@ -113,7 +113,7 @@ fn limits_for(client: &crate::Limits, words: &Words) -> Limits {
     }
 }
 fn build(value: &OwnerPersonTask, words: &Words, cap: Limits) -> Tree {
-    let d = Domain::new(&client_limits(), 1);
+    let d = Domain::new(&client_limits());
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
     view::render(&mut b, &d, value, words, &mut bindings);
@@ -248,7 +248,7 @@ fn person_owner_approval_renders_opaque_parts_without_inventing_application_scop
     };
     let w = words();
     let cap = limits(w);
-    let client = Domain::new(&client_limits(), 1);
+    let client = Domain::new(&client_limits());
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
     view::render(&mut b, &client, &value, w, &mut bindings);

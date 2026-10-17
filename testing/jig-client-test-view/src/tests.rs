@@ -8,88 +8,22 @@ mod connector_values;
 mod family_terminals;
 mod native_effect;
 mod native_hold;
+mod transport;
 mod world_limits;
 use crate::{Limits, View, build, decode, words};
 use jig_client_domain::contract::*;
-use jig_client_test_domain::{Address, Domain, Event, JigOut, Place, Request, family, first};
+use jig_client_test_domain::{Address, Domain, Event, Place, Request, family, first};
 use jig_client_view::Owner;
 use skein_ui::Act;
 use skein_ui::{NodeId, Patch, Role};
 
-use skein_lib::{Duration, Env, List, Queue, RequestLimits, Time, Token, Wall};
-fn limits() -> jig_client_test_domain::Limits {
-    jig_client_test_domain::Limits {
-        jig: jig_client_view::Limits {
-            watches: 8,
-            notices: 2,
-            notice_life: Duration::from_secs(5),
-            linger: Duration::from_secs(5),
-            save_delay: Duration::from_secs(1),
-            intents: 2,
-            fields: 4,
-            providers: 2,
-            objects: 3,
-            sources: 8,
-            reads: 8,
-            parts: 8,
-            delegates: 2,
-            document_bytes: 1024,
-            records: 2,
-            kept: 4,
-            drafts: 1,
-            projects: 2,
-            roles: 2,
-            charters: 2,
-            text: 32,
-            rows: 2,
-            segments: 4,
-            conversation_words: 2,
-            navigation_entries: 8,
-            updates_count: 99,
-            backoff: jig_client_view::limits::ui::Backoff {
-                first: Duration::from_nanos(10),
-                most: Duration::from_nanos(80),
-            },
-            heartbeat: Duration::from_secs(100),
-        },
-        first: first::Limits {
-            connector: jig_client_test_domain::connector_values::ConnectorLimits {
-                rows: 0,
-                paths: 0,
-                segments: 0,
-                segment_bytes: 0,
-                bytes: 4096,
-            },
-            parts: 8,
-            objects: 8,
-            reads: 16,
-            watches: 16,
-            requests: 4,
-            rows: 2,
-            segments: 4,
-            text: 32,
-            retry: Duration::from_nanos(10),
-        },
-        second_parts: 8,
-        table: RequestLimits {
-            requests: 4,
-            bytes: 65536,
-            out: 16,
-            first: Duration::from_nanos(10),
-            most: Duration::from_nanos(80),
-            margin: Duration::from_secs(1),
-        },
-    }
-}
+use skein_lib::{Duration, List, Queue, Token, Wall};
+use transport::limits;
+
 fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
-    let mut out = Queue::with_capacity(jig_client_test_domain::max_out(&limits()));
-    jig_client_test_domain::step(root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, event, &mut out);
-    let mut rows = Vec::new();
-    while let Some(row) = out.pop() {
-        rows.push(row);
-    }
-    rows
+    transport::drive(root, event, &limits())
 }
+
 fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), limits().jig.text).unwrap()
 }
@@ -102,23 +36,39 @@ fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
     out
 }
 fn ready() -> Domain {
-    let mut root = jig_client_test_domain::new(&limits(), 1);
-    let rows = drive(
+    let mut root = jig_client_test_domain::unlinked(&limits(), 1);
+    let mut rows = drive(&mut root, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } });
+    rows.extend(drive(
         &mut root,
         Event::Start {
             address: Address::Jig(jig_client_view::address::Address::Inbox { project: None }),
             kept: List::with_capacity(0),
             offset: jig_client_view::boundary::Offset { minutes: 0 },
         },
-    );
+    ));
     let watch = rows
         .iter()
         .find_map(|row| match row {
-            Request::Jig(JigOut::Open { watch, subject: Subject::Frame }) => Some(*watch),
+            Request::Client {
+                request:
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+                    },
+            } => Some(*watch),
             _ => None,
         })
         .unwrap();
     drive(&mut root, Event::Jig(jig_client_view::Event::Hello { served: true }));
+    for family in [1, 2] {
+        drive(
+            &mut root,
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::FamilyServed { family, versions: Some(VersionRange { first: 1, last: 1 }) },
+                },
+            },
+        );
+    }
     drive(
         &mut root,
         Event::Jig(jig_client_view::Event::Watch {
@@ -337,7 +287,11 @@ fn proposal(key: ProposalKey) -> Proposal {
 }
 fn load_cards(root: &mut Domain, rows: Vec<Request>) {
     for row in rows {
-        if let Request::Jig(JigOut::Read { read, what }) = row {
+        if let Request::Client {
+            request:
+                jig_client::Request::Down { down: jig_client::Down::Read { read, what: jig_client::Readable::Jig(what) } },
+        } = row
+        {
             let value = match what {
                 Read::Task { .. } => ReadValue::Task(Box::new(task())),
                 Read::Proposal { proposal: key } => ReadValue::Proposal(Box::new(proposal(key))),
@@ -512,7 +466,7 @@ fn a_family_entrance_refusal_shows_its_budget_and_keeps_the_object_present() {
     let mut root = ready();
     family_document(&mut root, 0);
     let id = root.first().page().unwrap();
-    drive(
+    let sends = drive(
         &mut root,
         Event::Act {
             action: jig_client_test_domain::Action::First(first::Act::Touch {
@@ -521,11 +475,12 @@ fn a_family_entrance_refusal_shows_its_budget_and_keeps_the_object_present() {
             }),
         },
     );
-    let mut out = Queue::with_capacity(jig_client_test_domain::max_out(&limits()));
-    jig_client_test_domain::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut out);
     let mut attempt = None;
-    while let Some(request) = out.pop() {
-        if let Request::Send { attempt: sent, .. } = request {
+    for request in sends {
+        if let Request::Client {
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt: sent, .. } },
+        } = request
+        {
             attempt = Some(sent);
         }
     }
@@ -536,10 +491,15 @@ fn a_family_entrance_refusal_shows_its_budget_and_keeps_the_object_present() {
     .unwrap();
     drive(
         &mut root,
-        Event::Answer {
-            attempt: attempt.unwrap(),
-            envelope: skein_lib::RequestEnvelope::Final,
-            answer: Some(jig_client_test_domain::Answered::First(first::Answer::Refused(refusal))),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt: attempt.unwrap(),
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(jig_client::Answered::Jig(Answer::Refused(refusal.into_refusal()))),
+                    why: None,
+                },
+            },
         },
     );
     let mut view = view();
@@ -577,7 +537,7 @@ fn check_outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
     let watch = opened
         .iter()
         .find_map(|row| match row {
-            Request::Jig(JigOut::Open { watch, subject: Subject::Deployment }) => Some(*watch),
+            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(Subject::Deployment)} } } => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -638,7 +598,7 @@ fn effect_family_keys_keep_equal_task_and_party_makers_in_distinct_public_items(
     let watch = opened
         .iter()
         .find_map(|row| match row {
-            Request::Jig(JigOut::Open { watch, subject: Subject::Deployment }) => Some(*watch),
+            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Jig(Subject::Deployment)} } } => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -735,13 +695,7 @@ fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_f
     let mut view = view();
     patches(&mut view, &root);
     assert!(contains(&view, b"18446744073709551615"));
-    let field = view
-        .tree()
-        .nodes()
-        .iter()
-        .find(|node| node.role == Role::TextField && node.name.as_deref() == Some(b"Parameters".as_slice()))
-        .unwrap()
-        .id;
+    let field = named(&view, Role::TextField, b"Parameters");
     let changed = decode(&mut view, field, Act::Input { value: Box::from(*b"0") }).unwrap();
     assert_eq!(
         changed,
@@ -760,15 +714,24 @@ fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_f
         .find(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Apply parameters".as_slice()))
         .unwrap()
         .id;
-    drive(&mut root, Event::Act { action: decode(&mut view, apply, Act::Press).unwrap() });
-    let mut sends = Queue::with_capacity(jig_client_test_domain::max_out(&limits()));
-    jig_client_test_domain::take(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits() }, &mut sends);
+    let sends = drive(&mut root, Event::Act { action: decode(&mut view, apply, Act::Press).unwrap() });
     let mut attempt = None;
-    while let Some(send) = sends.pop() {
-        if let Request::Send { attempt: number, ask: jig_client_test_domain::Ask::First(ask), .. } = send {
+    for send in sends {
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Send { attempt: number, request: jig_client::Ask::Family(ask), .. },
+                },
+        } = send
+        {
             assert_eq!(
                 ask,
-                family::Ask::ChangeObject { project: 3, object: 5, revision: Revision { value: 17 }, value: 0 }
+                family_request(family::Ask::ChangeObject {
+                    project: 3,
+                    object: 5,
+                    revision: Revision { value: 17 },
+                    value: 0
+                })
             );
             attempt = Some(number);
         }
@@ -778,10 +741,15 @@ fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_f
     });
     drive(
         &mut root,
-        Event::Answer {
-            attempt: attempt.unwrap(),
-            envelope: skein_lib::RequestEnvelope::Final,
-            answer: Some(jig_client_test_domain::Answered::First(answer.clone())),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt: attempt.unwrap(),
+                    envelope: skein_lib::RequestEnvelope::Final,
+                    answer: Some(family_answer(answer.clone())),
+                    why: None,
+                },
+            },
         },
     );
     patches(&mut view, &root);
@@ -866,13 +834,22 @@ fn a_slot_of_a_number_no_owner_has_is_unshowable() {
 fn family_with_plan(second: Option<u64>) -> Domain {
     let mut root = ready();
     let rows = family_document_with_second(&mut root, 0, second);
-    let watch = rows
-        .iter()
-        .find_map(|row| match row {
-            Request::Jig(JigOut::Open { watch, subject: Subject::Task { task: 9 } }) => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        rows.iter()
+            .find_map(|row| match row {
+                Request::Client {
+                    request:
+                        jig_client::Request::Down {
+                            down:
+                                jig_client::Down::Open {
+                                    watch,
+                                    subject: jig_client::Watchable::Jig(Subject::Task { task: 9 }),
+                                },
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut document = task();
     document.context.as_mut().unwrap().impact.tasks.waiting = 1;
     drive(
@@ -921,4 +898,20 @@ fn a_second_tasks_section_slot_says_it_cannot_be_shown() {
         (slot.size, status.role, status.name.as_deref()),
         (2, Role::Status, Some(b"Cannot show this part".as_slice()))
     );
+}
+
+fn family_answer(answer: first::Answer) -> jig_client::Answered {
+    jig_client::Answered::Family(jig_client::Family {
+        family: jig_client_test_domain::FIRST,
+        version: jig_client_test_protocol_wire::VERSION,
+        bytes: family::wire::encode_answer(&answer).unwrap(),
+    })
+}
+fn family_request(ask: first::Ask) -> jig_client::Family {
+    let (project, value) = family::wire::request(&ask);
+    jig_client::Family {
+        family: jig_client_test_domain::FIRST,
+        version: jig_client_test_protocol_wire::VERSION,
+        bytes: jig_client_test_protocol_wire::codec::family::request_record(project, value),
+    }
 }

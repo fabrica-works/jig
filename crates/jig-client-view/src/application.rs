@@ -57,15 +57,15 @@ pub(crate) fn show(domain: &mut Domain, env: &Env<crate::Limits>, objects: List<
         }
     }
     if !tasks.is_empty() {
-        open(domain, env, Subject::Chips { tasks }, out);
+        open(domain, Subject::Chips { tasks }, out);
     }
     if deciding {
-        open(domain, env, Subject::Inbox { window: env.limits.rows }, out);
+        open(domain, Subject::Inbox { window: env.limits.rows }, out);
     }
     domain.changed();
 }
-fn open(domain: &mut Domain, env: &Env<crate::Limits>, subject: Subject, out: &mut Queue<Request>) {
-    if domain.open(env, subject, Owner::Application { generation: domain.generation }, out).is_none() {
+fn open(domain: &mut Domain, subject: Subject, out: &mut Queue<Request>) {
+    if domain.open(subject, Owner::Application { generation: domain.generation }, out).is_none() {
         crate::page::routing::refuse(domain, contract::Limit::Watches);
     }
 }
@@ -73,7 +73,7 @@ fn close(domain: &mut Domain, out: &mut Queue<Request>) {
     for (id, ()) in &domain.watch_ids {
         let watch = domain.watches.get_mut(*id).expect("registered watch exists");
         match watch.owner {
-            Owner::Application { .. } => crate::ui::close_watch(watch, *id, &mut domain.timers, out),
+            Owner::Application { .. } => crate::ui::close_watch(watch, *id, out),
             Owner::Page { .. } | Owner::Sections { .. } | Owner::Frame => {}
         }
     }

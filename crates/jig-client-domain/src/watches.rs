@@ -52,7 +52,7 @@ impl Domain {
             }
             Up::Watched { event, .. } => match event {
                 WatchEvent::Delivered(value) => self.deliver(env, id, Latest::Jig(value), out),
-                WatchEvent::Opened | WatchEvent::Alive => {}
+                WatchEvent::Opened | WatchEvent::Alive | WatchEvent::Behind => {}
             },
             Up::FamilyDelivered { record, .. } => self.deliver(env, id, Latest::Family(record), out),
             Up::WatchEnded { end, .. } => self.ended(env, id, end, out),

@@ -74,7 +74,7 @@ fn history(position: u64) -> HistoryRow {
 
 #[test]
 fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() {
-    let mut domain = Domain::new(&LIMITS, 15);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     let inbox = open_token(&delivered(&mut domain, Time::ZERO, frame_watch, frame(7)));
     let source = Source::Window { generation: 0, number: 0 };
@@ -174,7 +174,7 @@ fn full_reads_refuse_and_keep_the_abandoned_terminal_obligation() {
 
 #[test]
 fn deployment_parts_are_shown_with_the_page_generation() {
-    let mut domain = Domain::new(&LIMITS, 17);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, f, frame(7));
     let moved = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
@@ -287,7 +287,7 @@ fn every_concrete_window_slides_from_both_ends_and_gates_live_rows() {
 #[test]
 fn outbox_parts_keep_their_owner_scope_in_pages_and_retained_application_objects() {
     for owner in [PartScope::Project(41), PartScope::Deployment] {
-        let mut domain = Domain::new(&LIMITS, 117);
+        let mut domain = Domain::new(&LIMITS);
         let f = start(&mut domain, List::with_capacity(0));
         delivered(&mut domain, Time::ZERO, f, frame(7));
         let part = Part::Outbox { connector: 2, scope: owner, entry: u64::MAX };

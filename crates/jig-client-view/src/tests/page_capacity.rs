@@ -477,7 +477,7 @@ fn inbox(words: &Words) {
     render(&d, words);
 }
 fn not_the_work(words: &Words) {
-    let mut d = Domain::new(&CLIENT, 1);
+    let mut d = Domain::new(&CLIENT);
     for number in [1, 2] {
         d.provider(crate::signin::Provider { number, name: full() }).unwrap();
     }

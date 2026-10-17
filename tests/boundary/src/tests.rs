@@ -246,13 +246,6 @@ fn the_native_shell_links_only_the_clients_components_and_foundation() {
     dependencies.sort();
     assert_eq!(
         dependencies,
-        [
-            "jig-client-protocol-http",
-            "jig-client-protocol-link",
-            "jig-client-protocol-wire",
-            "skein-http",
-            "skein-io",
-            "skein-lib"
-        ]
+        ["jig-client", "jig-client-protocol-http", "jig-client-protocol-wire", "skein-http", "skein-io", "skein-lib"]
     );
 }

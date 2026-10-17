@@ -104,7 +104,7 @@ fn enter(domain: &mut Domain, number: u32) -> Box<[Request]> {
     )
 }
 fn live(number: u32) -> (Domain, Token) {
-    let mut domain = Domain::new(&LIMITS, 37);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
     value.projects = list(2, [super::pages::project(number, false)]);

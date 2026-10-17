@@ -86,7 +86,7 @@ fn ended_tree(page: &OwnerEndedPage, w: &Words, cap: Option<Limits>) -> Tree {
     let cap = cap.unwrap_or(limits(f));
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    view::ended_render(&mut b, &Domain::new(&CLIENT, 1), page, w, &mut bindings);
+    view::ended_render(&mut b, &Domain::new(&CLIENT), page, w, &mut bindings);
     b.finish()
 }
 fn spend_tree(page: &OwnerSpendPage, w: &Words, cap: Option<Limits>) -> Tree {

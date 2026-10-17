@@ -130,3 +130,5 @@ pub mod windows;
 pub use boundary::{Event, Request};
 pub use limits::ui::{Limits, worst_case};
 pub use ui::{Domain, fire, max_out, next_deadline, reclaim, step};
+
+pub mod bridge;

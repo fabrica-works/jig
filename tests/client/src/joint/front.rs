@@ -6,7 +6,7 @@ use crate::{
     harness::{ClientId, Front, FrontFault, Observed},
     test::Test,
 };
-use jig_client_test_domain::{Event, JigOut, Request, first};
+use jig_client_test_domain::{Event, Request, first};
 use jig_domain_people::Identity;
 use skein_lib::{Duration, Time, Token, Wall};
 use std::collections::BTreeMap;
@@ -207,8 +207,11 @@ impl Front<Test> for Joint {
         self.wall = wall;
         self.last_client = Some(client);
         match &request {
-            Request::Send { attempt, .. } => self.last_attempt = Some((client, *attempt)),
-            Request::Jig(JigOut::Open { watch, .. }) | Request::First(first::Out::Open { watch, .. }) => {
+            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, .. } } } => {
+                self.last_attempt = Some((client, *attempt));
+            }
+            Request::Client { request: jig_client::Request::Down { down: jig_client::Down::Open { watch, .. } } }
+            | Request::First(first::Out::Open { watch, .. }) => {
                 self.last_watch = Some((client, *watch));
             }
             Request::Jig(_)
@@ -218,7 +221,8 @@ impl Front<Test> for Joint {
             | Request::Show { .. }
             | Request::SignOut
             | Request::SignIn { .. }
-            | Request::Fact { .. } => {}
+            | Request::Fact { .. }
+            | Request::Client { .. } => {}
         }
         self.session.send(client, now, wall, request).expect("complete real outbound translation");
     }
@@ -408,11 +412,13 @@ mod tests {
         assert!(world.front().session.driver.world.store.applied > original_applied);
     }
 
+    use crate::joint::take_signed_in;
+
     #[test]
     fn the_generic_real_front_binds_a_supplied_identity_and_transfers_actual_durability_before_owner_callbacks() {
         let mut front = front();
         Front::<Test>::bind(&mut front, ClientId(0), 1);
-        let callbacks = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
+        let callbacks = take_signed_in(ClientId(0), Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO)));
         assert_eq!(callbacks.len(), 1);
         assert!(matches!(&callbacks[0], (ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. }))));
         let observations = Front::<Test>::observed(&mut front);
@@ -465,7 +471,7 @@ mod tests {
         owner_limits.core.people.request_retention = Duration::from_secs(1);
         let mut front = front_with_limits(&owner_limits);
         Front::<Test>::bind(&mut front, ClientId(0), 1);
-        let initial = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
+        let initial = take_signed_in(ClientId(0), Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO)));
         assert!(matches!(initial.as_slice(), [(ClientId(0), Event::Jig(jig_client_view::Event::Hello { .. }))]));
         let _ = Front::<Test>::observed(&mut front);
         front.busy_pressure(pressure_party);
@@ -479,10 +485,14 @@ mod tests {
         assert!(pressure.iter().any(|value| matches!(value, Observed::Made { key, .. } if *key == [61; 16])));
         let applied = front.session.driver.world.store.applied;
         let rows = front.session.driver.world.store.rows.clone();
-        let request = |attempt| Request::Send {
-            attempt,
-            key: [62; 16],
-            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+        let request = |attempt| Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Send {
+                    attempt,
+                    key: [62; 16],
+                    request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                },
+            },
         };
         Front::<Test>::wire(&mut front, ClientId(0), Time::ZERO, clock(Time::ZERO), request(Token::new(31)));
         let peer = front.session.driver.world.client_peer.as_ref().expect("registered protocol peer");
@@ -494,8 +504,10 @@ mod tests {
             })
         )));
         let callbacks = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
-        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Answer {
-            attempt, envelope: RequestEnvelope::Again, answer: None })] if *attempt == Token::new(31)));
+        assert!(
+            matches!(callbacks.as_slice(), [(ClientId(0), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer {
+            attempt, envelope: RequestEnvelope::Again, answer: None, why: None } } })] if *attempt == Token::new(31))
+        );
         assert_eq!(front.session.driver.world.store.rows, rows);
         assert_eq!(front.session.driver.world.store.applied, applied);
         assert!(Front::<Test>::observed(&mut front).is_empty(), "Busy did not make or keep the client key");
@@ -503,8 +515,10 @@ mod tests {
         assert!(Front::<Test>::poll(&mut front, later, clock(later)).is_empty(), "owner expiry is not a final answer");
         Front::<Test>::wire(&mut front, ClientId(0), later, clock(later), request(Token::new(32)));
         let callbacks = Front::<Test>::poll(&mut front, later, clock(later));
-        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Answer {
-            attempt, envelope: RequestEnvelope::Final, answer: Some(_) })] if *attempt == Token::new(32)));
+        assert!(
+            matches!(callbacks.as_slice(), [(ClientId(0), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer {
+            attempt, envelope: RequestEnvelope::Final, answer: Some(_), why: None } } })] if *attempt == Token::new(32))
+        );
         let observations = Front::<Test>::observed(&mut front);
         assert_eq!(
             observations
@@ -554,7 +568,7 @@ mod tests {
         assert_eq!(front.session.driver.world.store.applied, applied);
         assert_eq!(front.session.driver.world.commits.len(), commits);
         Front::<Test>::sign_in(&mut front, ClientId(0), later, clock(later));
-        assert!(Front::<Test>::poll(&mut front, later, clock(later)).is_empty());
+        assert!(take_signed_in(ClientId(0), Front::<Test>::poll(&mut front, later, clock(later))).is_empty());
         assert!(front.session.driver.transport.sign_in(ClientId(0)).is_some());
         assert_eq!(front.session.sign_in_again(ClientId(0)), None);
         assert!(front.session.driver.world.store.applied > applied);
@@ -577,10 +591,14 @@ mod tests {
         front.try_fault(Time::ZERO, &FrontFault::NotReady).expect("actual paused owner restore");
         assert!(front.session.driver.world.store.loading());
         assert_eq!(Front::<Test>::next_due(&front), Some(Time::ZERO.saturating_add(delay)));
-        let request = |attempt| Request::Send {
-            attempt,
-            key: [63; 16],
-            ask: jig_client_test_domain::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+        let request = |attempt| Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Send {
+                    attempt,
+                    key: [63; 16],
+                    request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                },
+            },
         };
         Front::<Test>::wire(&mut front, ClientId(0), Time::ZERO, clock(Time::ZERO), request(Token::new(41)));
         assert!(front.session.driver.world.client_peer.as_ref().expect("actual protocol peer").delivered.iter().any(
@@ -593,8 +611,10 @@ mod tests {
             )
         ));
         let callbacks = Front::<Test>::poll(&mut front, Time::ZERO, clock(Time::ZERO));
-        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Answer {
-            attempt, envelope: RequestEnvelope::Again, answer: None })] if *attempt == Token::new(41)));
+        assert!(
+            matches!(callbacks.as_slice(), [(ClientId(0), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer {
+            attempt, envelope: RequestEnvelope::Again, answer: None, why: None } } })] if *attempt == Token::new(41))
+        );
         assert_eq!(front.session.driver.world.store.rows, rows);
         assert_eq!(front.session.driver.world.store.applied, applied);
         assert_eq!(front.session.driver.world.commits.len(), commits);
@@ -610,8 +630,10 @@ mod tests {
         assert!(Front::<Test>::observed(&mut front).is_empty());
         Front::<Test>::wire(&mut front, ClientId(0), later, clock(later), request(Token::new(42)));
         let callbacks = Front::<Test>::poll(&mut front, later, clock(later));
-        assert!(matches!(callbacks.as_slice(), [(ClientId(0), Event::Answer {
-            attempt, envelope: RequestEnvelope::Final, answer: Some(_) })] if *attempt == Token::new(42)));
+        assert!(
+            matches!(callbacks.as_slice(), [(ClientId(0), Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer {
+            attempt, envelope: RequestEnvelope::Final, answer: Some(_), why: None } } })] if *attempt == Token::new(42))
+        );
         let observed = Front::<Test>::observed(&mut front);
         assert_eq!(
             observed

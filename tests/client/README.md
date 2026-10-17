@@ -48,17 +48,12 @@ all scripted stories, fourteen separate faults, both incident variants,
 negative referee cases, shell/store and memory cases. `fuzzy_client` keeps
 six independent 16-seed story sweeps and one 32-seed random-truth sweep.
 
-The test application's restored table owner carries `Kept { scope }`.
-At start its root routes `jig_client_view::Event::Kept { scope, requests }` once
-per restored scope; final or retention-unknown retirement routes
-`KeptGone { scope }`. `Limits::kept` must be at least the table's request
-capacity. The client owns the foreign-work warning and clears it after the
-last foreign request retires (QUESTIONS 33); application roots only route
-these facts. Application roots in jig 50 must do the same.
+The test application's root holds `jig_client::Client`, passes its transport
+requests out in order, and routes tells by asker. The reference UI's bridge
+counts kept requests per party; until jig 21.4, foreign work leaves when that
+party signs in. The client keeps only its own table records; the UI and family
+keep their records separately under their own keys.
 
-The current scripted test family has typed `Touched`, `Moved` and `Gone`
-outcomes. Its root carrier has no application admission-refusal variant;
-`RawAppAnswer::Refused` cannot honestly be translated to `Gone`. Joint or
-application worlds needing that admission case must settle that carrier
-with its owner, rather than invent a conversion. Producer-to-client mapping
-belongs to jig 45; this kit's scripted front carries client contract values.
+The scripted test family carries its complete requests, subjects, documents
+and answers as bytes through its wire crate. Admission refusals stay on jig's
+entrance wire and reach the original family child as the exact refusal.

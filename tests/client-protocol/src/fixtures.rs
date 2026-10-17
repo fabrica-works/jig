@@ -16,6 +16,8 @@ pub fn address() -> skein_io::Addr {
 #[must_use]
 pub fn owner_limits() -> jig_test_domain::Limits {
     let mut limits = jig_core_world::world::limits();
+    // Client keeps closing watches until their engine terminals arrive.
+    limits.core.views.watchers = jig_client_world::test::limits().client.domain.watches;
     limits.core.documents.rows = 2;
     limits.core.documents.lines = 2;
     limits.core.documents.chips = 2;
@@ -133,14 +135,14 @@ pub fn domain_limits() -> jig_client_domain::Limits {
     let jig = profile.jig;
     jig_client_domain::Limits {
         owners: &[jig_client_domain::Spoken { family: 1, version: jig_client_test_protocol_wire::VERSION }],
-        requests: profile.table,
+        requests: profile.client.domain.requests,
         ask_bytes: 16384,
         handles: 8,
         watches: jig.watches,
         reads: jig.reads,
         turn_bytes: 32,
         document_bytes: jig.document_bytes,
-        backoff: jig_client_domain::Backoff { first: jig.backoff.first, most: jig.backoff.most },
+        backoff: jig_client_world::test::limits().client.domain.backoff,
         rows: jig.rows,
         segments: jig.segments,
         text: jig.text,
@@ -151,7 +153,7 @@ pub fn domain_limits() -> jig_client_domain::Limits {
         records: jig.records,
         kept: jig.kept,
         parts: jig.parts,
-        heartbeat: jig.heartbeat,
+        heartbeat: jig_client_world::test::limits().client.domain.heartbeat,
     }
 }
 

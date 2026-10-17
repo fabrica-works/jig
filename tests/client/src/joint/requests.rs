@@ -7,7 +7,8 @@ use super::{
     wire,
 };
 use crate::harness::ClientId;
-use jig_client_test_domain::{Ask, JigOut, Request, first};
+use jig_client::{Ask, Down, Readable, Watchable};
+use jig_client_test_domain::Request;
 use jig_client_view::Limits;
 use jig_domain_core as core;
 use jig_domain_people as people;
@@ -39,94 +40,82 @@ pub fn send(
     request: &Request,
     limits: &Limits,
 ) -> Result<(), Invalid> {
+    let Request::Client { request: jig_client::Request::Down { down } } = request else { return Err(Invalid::Shell) };
     let sign_in = driver.transport.sign_in(client);
-    let event = match request {
-        Request::Send { attempt, key, ask } => {
+    let event = match down {
+        Down::Send { attempt, key, request: ask } => {
             keyed(driver, client, sign_in.ok_or(Invalid::Session)?, *attempt, *key, ask)?
         }
-        Request::Jig(value) => match value {
-            JigOut::Read { read, what } => {
-                let sign_in = sign_in.ok_or(Invalid::Session)?;
-                let owner = wire::reads::read(what, limits.text).map_err(Invalid::Read)?;
-                let reply = driver.transport.reply_to(Reply::Read { client, read: *read, what: what.clone() });
-                root::Event::Core(core::Event::Read { reply, sign_in, read: owner })
-            }
-            JigOut::Open { watch, subject } => {
-                let sign_in = sign_in.ok_or(Invalid::Session)?;
-                let watcher = driver.transport.open(client, *watch, Watched::Jig(subject.clone()));
-                match wire::watches::watch(watcher, sign_in, subject, limits.rows) {
-                    Ok(event) => root::Event::Core(event),
-                    Err(why) => {
-                        driver.transport.end_watch(watcher);
-                        return Err(Invalid::Watch(why));
-                    }
+        Down::Read { read, what: Readable::Jig(what) } => {
+            let sign_in = sign_in.ok_or(Invalid::Session)?;
+            let owner = wire::reads::read(what, limits.text).map_err(Invalid::Read)?;
+            let reply = driver.transport.reply_to(Reply::Read { client, read: *read, what: what.clone() });
+            root::Event::Core(core::Event::Read { reply, sign_in, read: owner })
+        }
+        Down::Open { watch, subject: Watchable::Jig(subject) } => {
+            let sign_in = sign_in.ok_or(Invalid::Session)?;
+            let watcher = driver.transport.open(client, *watch, Watched::Jig(subject.clone()));
+            match wire::watches::watch(watcher, sign_in, subject, limits.rows) {
+                Ok(event) => root::Event::Core(event),
+                Err(why) => {
+                    driver.transport.end_watch(watcher);
+                    return Err(Invalid::Watch(why));
                 }
             }
-            JigOut::Continue { watch, subject } => {
-                let event =
-                    driver.transport.continued(client, *watch, subject.clone()).map_err(|_| Invalid::Continuation)?;
-                let Some(event) = event else { return Ok(()) };
-                root::Event::Core(event)
-            }
-            JigOut::Close { watch } => {
-                let Some(watcher) = driver.transport.watch_token(client, *watch) else { return Ok(()) };
-                let terminals = driver.transport.close_watch(watcher);
-                driver.send(now, wall, root::Event::Core(core::Event::Unwatch { watcher }));
-                for event in terminals {
-                    driver.send(now, wall, root::Event::Core(event));
-                }
+        }
+        Down::Continue { watch, subject } => {
+            let event =
+                driver.transport.continued(client, *watch, subject.clone()).map_err(|_| Invalid::Continuation)?;
+            let Some(event) = event else { return Ok(()) };
+            root::Event::Core(event)
+        }
+        Down::Close { watch } => {
+            let Some(watcher) = driver
+                .transport
+                .watch_token(client, *watch)
+                .or_else(|| driver.transport.application_watch_token(client, *watch))
+            else {
                 return Ok(());
+            };
+            let terminals = driver.transport.close_watch(watcher);
+            driver.send(now, wall, root::Event::Core(core::Event::Unwatch { watcher }));
+            for event in terminals {
+                driver.send(now, wall, root::Event::Core(event));
             }
-            JigOut::Answered { .. } | JigOut::Unknown { .. } => return Err(Invalid::Shell),
-        },
-        Request::First(value) => match value {
-            first::Out::Read { read, subject } => {
-                let sign_in = sign_in.ok_or(Invalid::Session)?;
-                let (scope, owner) =
-                    jig_client_test_domain::family::wire::connector_subject(*subject).map_err(Invalid::Family)?;
-                let reply =
-                    driver.transport.reply_to(Reply::ApplicationRead { client, read: *read, subject: *subject });
-                root::Event::ReadApplication {
-                    reply,
-                    sign_in,
-                    scope: application_scope(scope),
-                    number: 1,
-                    subject: owner,
-                    window: core::documents::Window { rows: limits.rows, after: None },
-                }
+            return Ok(());
+        }
+        Down::Read { read, what: Readable::Family(record) } => {
+            let subject = crate::test::family_subject(record, true);
+            let sign_in = sign_in.ok_or(Invalid::Session)?;
+            let (scope, owner) =
+                jig_client_test_domain::family::wire::connector_subject(subject).map_err(Invalid::Family)?;
+            let reply = driver.transport.reply_to(Reply::ApplicationRead { client, read: *read, subject });
+            root::Event::ReadApplication {
+                reply,
+                sign_in,
+                scope: application_scope(scope),
+                number: 1,
+                subject: owner,
+                window: core::documents::Window { rows: limits.rows, after: None },
             }
-            first::Out::Open { watch, subject } => {
-                let sign_in = sign_in.ok_or(Invalid::Session)?;
-                let (scope, owner) =
-                    jig_client_test_domain::family::wire::connector_subject(*subject).map_err(Invalid::Family)?;
-                let scope = application_scope(scope);
-                let watcher = driver.transport.open(client, *watch, Watched::Application { subject: *subject, scope });
-                root::Event::WatchApplication {
-                    watcher,
-                    sign_in,
-                    scope,
-                    number: 1,
-                    subject: owner,
-                    window: core::documents::Window { rows: limits.rows, after: None },
-                }
+        }
+        Down::Open { watch, subject: Watchable::Family(record) } => {
+            let subject = crate::test::family_subject(record, false);
+            let sign_in = sign_in.ok_or(Invalid::Session)?;
+            let (scope, owner) =
+                jig_client_test_domain::family::wire::connector_subject(subject).map_err(Invalid::Family)?;
+            let scope = application_scope(scope);
+            let watcher = driver.transport.open(client, *watch, Watched::Application { subject, scope });
+            root::Event::WatchApplication {
+                watcher,
+                sign_in,
+                scope,
+                number: 1,
+                subject: owner,
+                window: core::documents::Window { rows: limits.rows, after: None },
             }
-            first::Out::Close { watch } => {
-                let Some(watcher) = driver.transport.application_watch_token(client, *watch) else { return Ok(()) };
-                let terminals = driver.transport.close_watch(watcher);
-                driver.send(now, wall, root::Event::Core(core::Event::Unwatch { watcher }));
-                for event in terminals {
-                    driver.send(now, wall, root::Event::Core(event));
-                }
-                return Ok(());
-            }
-            first::Out::Fact { .. } => return Err(Invalid::Shell),
-        },
-        Request::Save { .. }
-        | Request::Erase { .. }
-        | Request::Show { .. }
-        | Request::SignOut
-        | Request::SignIn { .. }
-        | Request::Fact { .. } => return Err(Invalid::Shell),
+        }
+        Down::Save { .. } | Down::Erase { .. } => return Err(Invalid::Shell),
     };
     driver.send(now, wall, event);
     Ok(())
@@ -146,9 +135,10 @@ fn keyed(
             let reply_to = driver.transport.reply_to(Reply::Keyed { client, attempt, key, owner: KeyedOwner::Jig });
             root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask }))
         }
-        Ask::First(value) => {
+        Ask::Family(record) => {
             let (project, value) =
-                jig_client_test_domain::family::wire::connector_request(value).map_err(Invalid::Family)?;
+                jig_client_test_domain::family::wire::connector_request(&crate::test::family_request(record))
+                    .map_err(Invalid::Family)?;
             let number = 1;
             let digest = application_digest(number, project, &value);
             let reply_to = driver.transport.reply_to(Reply::Keyed {
@@ -237,8 +227,14 @@ mod tests {
     #[test]
     fn real_request_dispatch_waits_for_the_supplied_session_without_consuming_native_names() {
         let (mut driver, now, wall) = driver();
-        let value =
-            Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_client_domain::contract::Subject::Frame });
+        let value = Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Open {
+                    watch: Token::new(71),
+                    subject: jig_client::Watchable::Jig(jig_client_domain::contract::Subject::Frame),
+                },
+            },
+        };
         assert_eq!(
             send(&mut driver, ClientId(0), now, wall, &value, &crate::test::limits().jig),
             Err(Invalid::Session)
@@ -247,7 +243,14 @@ mod tests {
         assert!(driver.poll(now, wall).is_empty());
         assert_eq!(
             value,
-            Request::Jig(JigOut::Open { watch: Token::new(71), subject: jig_client_domain::contract::Subject::Frame })
+            Request::Client {
+                request: jig_client::Request::Down {
+                    down: jig_client::Down::Open {
+                        watch: Token::new(71),
+                        subject: jig_client::Watchable::Jig(jig_client_domain::contract::Subject::Frame)
+                    }
+                }
+            }
         );
     }
 
@@ -268,10 +271,14 @@ mod tests {
         assert!(driver.transport.sign_in(ClientId(0)).is_some());
         let attempt = Token::new(u64::MAX);
         let key = [255; 16];
-        let request = Request::Send {
-            attempt,
-            key,
-            ask: Ask::Jig(Box::new(jig_client_domain::contract::Ask::Stop { project: 1, task: u64::MAX })),
+        let request = Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Send {
+                    attempt,
+                    key,
+                    request: Ask::Jig(Box::new(jig_client_domain::contract::Ask::Stop { project: 1, task: u64::MAX })),
+                },
+            },
         };
         driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(driver.world.store.applied + 1));
         send(&mut driver, ClientId(0), now, wall, &request, &crate::test::limits().jig)

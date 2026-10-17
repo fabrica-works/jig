@@ -14,7 +14,7 @@ fn drive(domain: &mut Domain, event: Event) -> Box<[Request]> {
     drain(out)
 }
 fn start() -> (Domain, skein_lib::Token) {
-    let mut domain = Domain::new(&LIMITS, 1);
+    let mut domain = Domain::new(&LIMITS);
     let out = drive(
         &mut domain,
         Event::Start {
@@ -82,26 +82,10 @@ fn a_late_hello_cannot_restore_link_from_a_frame_whose_watch_already_dropped() {
         drive(&mut domain, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) })
             .is_empty()
     );
-    assert_eq!(
-        drive(&mut domain, Event::Ended { watch, end: jig_client::contract::WatchEnd::Dropped }).as_ref(),
-        &[Request::Link { link: Link::Offline }]
-    );
+    assert!(drive(&mut domain, Event::Ended { watch, end: jig_client::contract::WatchEnd::Dropped }).is_empty());
+    let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
+    domain.set_link(Link::Offline, &mut out);
+    assert_eq!(drain(out).as_ref(), &[Request::Link { link: Link::Offline }]);
     assert!(drive(&mut domain, Event::Hello { served: true }).is_empty());
     assert_eq!(domain.link(), Link::Offline);
-    let retry = domain.next_deadline().expect("dropped frame watch keeps its retry");
-    let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
-    crate::fire(&mut domain, &env(retry), &mut out);
-    assert_eq!(drain(out).as_ref(), &[Request::Open { watch, subject: jig_client::contract::Subject::Frame }]);
-    let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
-    crate::step(
-        &mut domain,
-        &env(retry),
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },
-        &mut out,
-    );
-    let out = drain(out);
-    assert_eq!(out[0], Request::Confirmed { party: Some(7) });
-    assert_eq!(out[1], Request::Retention { retention: frame(7).retention });
-    assert_eq!(out[2], Request::Link { link: Link::Live });
-    assert_eq!(domain.link(), Link::Live);
 }

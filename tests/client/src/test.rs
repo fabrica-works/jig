@@ -45,11 +45,6 @@ pub fn limits() -> jig_client_test_domain::Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_client_view::limits::ui::Backoff {
-                first: Duration::from_millis(10),
-                most: Duration::from_millis(80),
-            },
-            heartbeat: Duration::from_millis(100),
         },
         first: first::Limits {
             connector: jig_client_test_domain::connector_values::ConnectorLimits {
@@ -70,13 +65,40 @@ pub fn limits() -> jig_client_test_domain::Limits {
             retry: Duration::from_millis(10),
         },
         second_parts: 8,
-        table: RequestLimits {
-            requests: 4,
-            bytes: 65536,
-            out: 16,
-            first: Duration::from_millis(10),
-            most: Duration::from_millis(80),
-            margin: Duration::from_secs(1),
+        client: jig_client::Limits {
+            domain: jig_client::DomainLimits {
+                owners: &[
+                    jig_client::Spoken { family: 1, version: jig_client_test_protocol_wire::VERSION },
+                    jig_client::Spoken { family: 2, version: jig_client_test_protocol_wire::VERSION },
+                ],
+                requests: RequestLimits {
+                    requests: 4,
+                    bytes: 65536,
+                    out: 16,
+                    first: Duration::from_millis(10),
+                    most: Duration::from_millis(80),
+                    margin: Duration::from_secs(1),
+                },
+                ask_bytes: 16384,
+                handles: 32,
+                watches: 32,
+                reads: 32,
+                turn_bytes: 32,
+                document_bytes: 65536,
+                backoff: jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+                rows: 2,
+                segments: 4,
+                text: 32,
+                projects: 2,
+                charters: 2,
+                fields: 4,
+                delegates: 2,
+                records: 2,
+                kept: 4,
+                parts: 10,
+                heartbeat: Duration::from_millis(100),
+            },
+            exchanges: 8,
         },
     }
 }
@@ -132,27 +154,34 @@ fn fixture_with(limits: &domain::Limits, arranged: bool) -> &'static Fixture {
 /// Constructs the test application's root and view with one declared bound.
 #[must_use]
 pub fn new(limits: &domain::Limits, seed: u64) -> (domain::Domain, view::View<'static>) {
-    from_fixture(limits, seed, fixture(limits))
+    from_fixture(limits, seed, fixture(limits), false)
 }
 fn from_fixture(
     limits: &domain::Limits,
     seed: u64,
     fixture: &'static Fixture,
+    linked: bool,
 ) -> (domain::Domain, view::View<'static>) {
     let (words, family) = fixture.books;
-    let mut root = domain::new(limits, seed);
+    let mut root = if linked { domain::new(limits, seed) } else { domain::unlinked(limits, seed) };
     domain::provider(&mut root, jig_client_view::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
         .expect("provider fits");
     domain::provider(&mut root, jig_client_view::signin::Provider { number: 2, name: crate::stories::text(b"Other") })
         .expect("second provider fits");
     (root, view::View::new(&fixture.bounds, limits, words, family, first::Address { project: 1, item: 1 }))
 }
+/// The same fixture with the application's byte transport attached.
+#[must_use]
+pub fn linked(seed: u64) -> (domain::Domain, view::View<'static>) {
+    let limits = limits();
+    from_fixture(&limits, seed, fixture(&limits), true)
+}
 /// Constructs the one arranged client used by the all-sections story.
 #[must_use]
 pub fn arranged(seed: u64) -> (domain::Domain, view::View<'static>) {
     use jig_client_view::{address::TaskSection, page::Arrangement};
     let limits = limits();
-    let (mut root, view) = from_fixture(&limits, seed, fixture_with(&limits, true));
+    let (mut root, view) = from_fixture(&limits, seed, fixture_with(&limits, true), false);
     domain::configure_arrangement(
         &mut root,
         Arrangement {
@@ -192,7 +221,27 @@ impl App for Test {
         Event::Went { place: domain::Place::Address(address) }
     }
     fn step(root: &mut Self::Root, env: &Env<Self::Limits>, event: Event, out: &mut Queue<Request>) {
-        domain::step(root, env, event, out);
+        if matches!(&event, Event::Jig(jig_client_view::Event::Hello { .. })) {
+            for family in [domain::FIRST, domain::SECOND] {
+                domain::step(
+                    root,
+                    env,
+                    Event::Client {
+                        event: jig_client::Event::Up {
+                            up: jig_client::Up::FamilyServed {
+                                family,
+                                versions: Some(VersionRange {
+                                    first: jig_client_test_protocol_wire::VERSION,
+                                    last: jig_client_test_protocol_wire::VERSION,
+                                }),
+                            },
+                        },
+                    },
+                    out,
+                );
+            }
+        }
+        domain::step(root, env, client_event(event), out);
     }
     fn fire(root: &mut Self::Root, env: &Env<Self::Limits>, out: &mut Queue<Request>) {
         domain::fire(root, env, out);
@@ -216,18 +265,12 @@ impl App for Test {
         match request {
             Request::Save { record } => Duty::Store(StoreWrite::Save(record)),
             Request::Erase { key } => Duty::Store(StoreWrite::Erase(key)),
-            Request::Send { .. }
-            | Request::Jig(
-                JigOut::Read { .. } | JigOut::Open { .. } | JigOut::Continue { .. } | JigOut::Close { .. },
-            )
-            | Request::First(first::Out::Read { .. } | first::Out::Open { .. } | first::Out::Close { .. }) => {
-                Duty::Wire(request)
-            }
+            Request::Client { request: jig_client::Request::SignOut } | Request::SignOut => Duty::SignOut,
+            Request::Client { .. } => Duty::Wire(request),
             Request::Show { address, replace } => Duty::Show { address, replace },
             Request::SignIn { provider, back } => Duty::SignIn { provider, back },
-            Request::SignOut => Duty::SignOut,
             Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
-            | Request::First(first::Out::Fact { .. })
+            | Request::First(_)
             | Request::Fact { .. } => Duty::Fact,
         }
     }
@@ -235,25 +278,45 @@ impl App for Test {
         match record {
             domain::store::Record::Jig(record) => domain::store::Key::Jig(record.key()),
             domain::store::Record::First(first::Record::Place { .. }) => domain::store::Key::First(first::Key::Place),
-            domain::store::Record::Table { record, .. } => domain::store::Key::Table(record.key),
+            domain::store::Record::Client(record) => domain::store::Key::Client(record.key.clone()),
+            domain::store::Record::Unlinked(record) => domain::store::Key::Unlinked(record.key),
         }
     }
     fn unsent(request: Request) -> Option<Event> {
         match request {
-            Request::Send { attempt, .. } => {
-                Some(Event::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None })
-            }
-            Request::Jig(JigOut::Read { read, .. }) => {
-                Some(Event::Jig(jig_client_view::Event::Read { read, result: ReadResult::None(ReadNone::Busy) }))
-            }
-            Request::Jig(JigOut::Open { watch, .. } | JigOut::Continue { watch, .. } | JigOut::Close { watch }) => {
-                Some(Event::Jig(jig_client_view::Event::Ended { watch, end: WatchEnd::Dropped }))
-            }
-            Request::First(first::Out::Read { read, .. }) => {
-                Some(Event::First(first::Event::Read { read, result: first::ReadResult::Busy }))
-            }
-            Request::First(first::Out::Open { watch, .. } | first::Out::Close { watch }) => {
-                Some(Event::First(first::Event::Ended { watch, end: first::WatchEnd::Dropped }))
+            Request::Client { request } => {
+                let event = match request {
+                    jig_client::Request::Down { down: jig_client::Down::Send { attempt, .. } } => {
+                        jig_client::Event::Up {
+                            up: jig_client::Up::Answer {
+                                attempt,
+                                envelope: RequestEnvelope::Lost,
+                                answer: None,
+                                why: None,
+                            },
+                        }
+                    }
+                    jig_client::Request::Down {
+                        down:
+                            jig_client::Down::Open { watch, .. }
+                            | jig_client::Down::Close { watch }
+                            | jig_client::Down::Continue { watch, .. },
+                    } => jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch, end: WatchEnd::Dropped } },
+                    jig_client::Request::Down { down: jig_client::Down::Read { read, .. } } => jig_client::Event::Up {
+                        up: jig_client::Up::ReadDone { read, result: jig_client::Readout::Limit },
+                    },
+                    jig_client::Request::Exchange { exchange, .. } => jig_client::Event::Lost { exchange },
+                    jig_client::Request::OpenStream { .. } => jig_client::Event::StreamGone,
+                    jig_client::Request::SignOut => jig_client::Event::SignOutLost,
+                    jig_client::Request::CloseStream
+                    | jig_client::Request::Save { .. }
+                    | jig_client::Request::Erase { .. }
+                    | jig_client::Request::Told { .. }
+                    | jig_client::Request::Down {
+                        down: jig_client::Down::Save { .. } | jig_client::Down::Erase { .. },
+                    } => return None,
+                };
+                Some(Event::Client { event })
             }
             Request::Save { .. }
             | Request::Erase { .. }
@@ -261,8 +324,8 @@ impl App for Test {
             | Request::SignOut
             | Request::SignIn { .. }
             | Request::Fact { .. }
-            | Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
-            | Request::First(first::Out::Fact { .. }) => None,
+            | Request::Jig(_)
+            | Request::First(_) => None,
         }
     }
     fn max_out(limits: &Self::Limits) -> u32 {
@@ -292,4 +355,114 @@ impl App for Test {
     fn card(tree: &Tree, node: NodeId) -> Option<CardKey> {
         crate::observe::card(tree, node)
     }
+}
+
+/// Decode the transport's whole optional-value application request.
+#[must_use]
+pub fn family_request(record: &jig_client::Family) -> domain::family::Ask {
+    use jig_client_test_protocol_wire::v1 as w;
+    let mut reader = skein_lib::Reader::new(&record.bytes);
+    let request = w::Request::decode(&w::CEILINGS, &mut reader).expect("whole application request").into_parts();
+    assert_eq!(reader.remaining(), 0);
+    let value = request.value.into_parts();
+    domain::family::Ask::Touch {
+        project: request.project,
+        item: value.object,
+        revision: Revision { value: value.revision },
+        parameters: value.value,
+    }
+}
+/// The typed test transport retains every supplied family subject field.
+#[must_use]
+pub fn family_subject(record: &jig_client::Family, read: bool) -> domain::family::Subject {
+    use jig_client_test_protocol_wire::v1 as w;
+    let mut reader = skein_lib::Reader::new(&record.bytes);
+    let value = if read {
+        w::Read::decode(&w::CEILINGS, &mut reader).expect("whole family read").into_parts().value
+    } else {
+        w::Subject::decode(&w::CEILINGS, &mut reader).expect("whole family subject").into_parts().value
+    };
+    assert_eq!(reader.remaining(), 0);
+    domain::family::wire::subject_value(value)
+}
+/// Admission refusals stay on Jig's entrance wire; family answers use its codec.
+#[must_use]
+pub fn family_answer(answer: domain::family::Answer) -> jig_client::Answered {
+    match answer {
+        domain::family::Answer::Refused(why) => jig_client::Answered::Jig(Answer::Refused(why.into_refusal())),
+        value @ (domain::family::Answer::Touched { .. }
+        | domain::family::Answer::Moved { .. }
+        | domain::family::Answer::Gone
+        | domain::family::Answer::Connector(_)) => jig_client::Answered::Family(jig_client::Family {
+            family: domain::FIRST,
+            version: jig_client_test_protocol_wire::VERSION,
+            bytes: domain::family::wire::encode_answer(&value).expect("whole application answer"),
+        }),
+    }
+}
+fn client_event(event: Event) -> Event {
+    let up = match event {
+        Event::Jig(jig_client_view::Event::Hello { served }) => jig_client::Up::Served { served, versions: None },
+        Event::Jig(jig_client_view::Event::Watch { watch, event }) => jig_client::Up::Watched { watch, event },
+        Event::Jig(jig_client_view::Event::Ended { watch, end }) => jig_client::Up::WatchEnded { watch, end },
+        Event::Jig(jig_client_view::Event::Read { read, result }) => {
+            jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) }
+        }
+        Event::SignedOut | Event::Jig(jig_client_view::Event::SignedOut) => jig_client::Up::SignedOut,
+        Event::Jig(jig_client_view::Event::SignOutLost) => {
+            return Event::Client { event: jig_client::Event::SignOutLost };
+        }
+        Event::First(first::Event::Read { read, result }) => jig_client::Up::ReadDone {
+            read,
+            result: match result {
+                first::ReadResult::Value(value) => jig_client::Readout::Family {
+                    family: domain::FIRST,
+                    record: Some(domain::family::wire::encode_document(&value)),
+                },
+                first::ReadResult::Unknown => jig_client::Readout::Family { family: domain::FIRST, record: None },
+                first::ReadResult::Busy => jig_client::Readout::Limit,
+                first::ReadResult::Unsupported => {
+                    jig_client::Readout::NotServed { family: Some(domain::FIRST), served: None }
+                }
+                first::ReadResult::NotAllowed => jig_client::Readout::Jig(ReadResult::None(ReadNone::Refused)),
+                first::ReadResult::SignedOut => jig_client::Readout::Jig(ReadResult::None(ReadNone::SignedOut)),
+            },
+        },
+        Event::First(first::Event::Watch { watch, event: domain::family::WatchEvent::Delivered(value) }) => {
+            jig_client::Up::FamilyDelivered {
+                watch,
+                record: jig_client::Family {
+                    family: domain::FIRST,
+                    version: jig_client_test_protocol_wire::VERSION,
+                    bytes: domain::family::wire::encode_document(&value),
+                },
+            }
+        }
+        Event::First(first::Event::Watch { watch, event: domain::family::WatchEvent::Opened }) => {
+            jig_client::Up::Watched { watch, event: WatchEvent::Opened }
+        }
+        Event::First(first::Event::Watch { watch, event: domain::family::WatchEvent::Alive }) => {
+            jig_client::Up::Watched { watch, event: WatchEvent::Alive }
+        }
+        Event::First(first::Event::Ended { watch, end }) => jig_client::Up::WatchEnded {
+            watch,
+            end: match end {
+                first::WatchEnd::Closed => WatchEnd::Closed,
+                first::WatchEnd::Dropped => WatchEnd::Dropped,
+                first::WatchEnd::Stopping => WatchEnd::Stopping,
+                first::WatchEnd::Unknown | first::WatchEnd::Unsupported => WatchEnd::Unknown,
+                first::WatchEnd::NotAllowed => WatchEnd::NotAllowed,
+                first::WatchEnd::Busy => WatchEnd::Busy,
+                first::WatchEnd::SubjectEnded => WatchEnd::SubjectEnded,
+                first::WatchEnd::SignedOut => WatchEnd::SignedOut,
+            },
+        },
+        event @ (Event::Start { .. }
+        | Event::Went { .. }
+        | Event::Act { .. }
+        | Event::Client { .. }
+        | Event::Jig(_)
+        | Event::First(_)) => return event,
+    };
+    Event::Client { event: jig_client::Event::Up { up } }
 }

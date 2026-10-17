@@ -13,7 +13,7 @@ use crate::{
 use jig_client::contract::*;
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 fn limits() -> Limits {
-    Limits { heartbeat: Duration::from_secs(3600), ..LIMITS }
+    Limits { ..LIMITS }
 }
 fn drive(domain: &mut Domain, limits: &Limits, now: Time, event: Event) -> Box<[Request]> {
     let mut out = Queue::with_capacity(crate::max_out(limits));
@@ -92,9 +92,9 @@ fn text(bytes: &[u8]) -> Text {
 #[test]
 fn a_minute_counts_a_change_only_while_the_page_shows_wall_times() {
     let limits = limits();
-    let mut domain = Domain::new(&limits, 1);
+    let mut domain = Domain::new(&limits);
     start(&mut domain, &limits, List::with_capacity(0));
-    assert_eq!(domain.next_deadline(), Some(Time::from_nanos(Duration::from_secs(3600).as_nanos())));
+    assert_eq!(domain.next_deadline(), None);
     domain.timed_page(true);
     assert_eq!(domain.next_deadline(), Some(Time::from_nanos(Duration::from_secs(60).as_nanos())));
     let shown = domain.shown();
@@ -116,7 +116,7 @@ fn a_minute_counts_a_change_only_while_the_page_shows_wall_times() {
 #[test]
 fn hidden_answers_have_notices_and_lingers_and_coalesced_saves_end_on_deadlines() {
     let limits = limits();
-    let mut domain = Domain::new(&limits, 2);
+    let mut domain = Domain::new(&limits);
     start(&mut domain, &limits, List::with_capacity(0));
     let key = ObjectKey::Task(8);
     domain.objects.name(key, Source::Window { generation: 0, number: 1 }).unwrap();
@@ -174,7 +174,7 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
         ..limits()
     };
     check_worst_case(limits);
-    let mut domain = Domain::new(&limits, 3);
+    let mut domain = Domain::new(&limits);
     domain.provider(crate::signin::Provider { number: 1, name: text(b"P") }).unwrap();
     let mut kept = List::with_capacity(1);
     kept.push(Record::Draft { version: STORE_VERSION, party: 7, task: 8, words: text(b"kept"), touched: 1 }).unwrap();
@@ -266,10 +266,6 @@ fn check_worst_case(limits: Limits) {
         Limits { document_bytes: u64::MAX, ..limits },
         Limits { notice_life: Duration::ZERO, ..limits },
         Limits { save_delay: Duration::ZERO, ..limits },
-        Limits {
-            backoff: crate::limits::ui::Backoff { first: Duration::from_secs(2), most: Duration::from_secs(1) },
-            ..limits
-        },
     ] {
         assert!(crate::worst_case(&invalid).is_none());
     }

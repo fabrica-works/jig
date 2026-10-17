@@ -35,8 +35,6 @@ const JIG: jig_client_view::Limits = jig_client_view::Limits {
     conversation_words: 2,
     navigation_entries: 8,
     updates_count: 99,
-    backoff: jig_client_view::limits::ui::Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
-    heartbeat: Duration::from_nanos(100),
 };
 fn limits() -> root::Limits {
     root::Limits {

@@ -1,7 +1,7 @@
 use super::*;
 use jig_client_protocol_http::Unlinked;
 const EXCHANGE: u64 = 42;
-use jig_client_protocol_link as link;
+use jig_client as client;
 use skein_lib::{
     Queue, Secret, Time, Token, Writer,
     base64::{self, Alphabet},
@@ -20,7 +20,7 @@ fn limits() -> Limits {
 struct Peer {
     shell: Connections,
     wire: Wire,
-    up: Queue<link::Event>,
+    up: Queue<client::Event>,
     below: Queue<(Conn, Down)>,
     conn: Option<Conn>,
 }
@@ -37,10 +37,10 @@ impl Peer {
     fn exchange(&mut self) {
         self.shell.down(
             Time::ZERO,
-            link::Request::Exchange {
+            client::Request::Exchange {
                 exchange: Token::new(EXCHANGE),
                 credential: Some(Secret::new(Box::new(TOKEN))),
-                message: link::Message::Request(Box::from(b"ask".as_slice())),
+                message: client::Message::Request(Box::from(b"ask".as_slice())),
             },
             &mut self.below,
         );
@@ -76,7 +76,7 @@ fn an_exchange_carries_the_bearer_token() {
     assert!(text.to_ascii_lowercase().contains("content-length: 3\r\n"));
     assert!(text.to_ascii_lowercase().contains("host: localhost\r\n"));
     assert!(
-        matches!(peer.up.pop(), Some(link::Event::Reply { exchange, message: body }) if exchange == Token::new(EXCHANGE) && body.as_ref() == b"ok")
+        matches!(peer.up.pop(), Some(client::Event::Reply { exchange, message: body }) if exchange == Token::new(EXCHANGE) && body.as_ref() == b"ok")
     );
 }
 #[test]
@@ -90,7 +90,7 @@ fn a_body_of_unknown_length_read_as_it_arrives_is_the_same_whatever_its_cuts() {
         }
         peer.wire.eof = true;
         peer.drive();
-        assert!(matches!(peer.up.pop(), Some(link::Event::Reply { exchange, message: body })
+        assert!(matches!(peer.up.pop(), Some(client::Event::Reply { exchange, message: body })
             if exchange == Token::new(EXCHANGE) && body.as_ref() == b"whole body"));
         assert!(peer.up.is_empty());
     }
@@ -102,22 +102,22 @@ fn a_connection_cut_mid_body_fails_the_exchange() {
     peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nab");
     peer.wire.eof = true;
     peer.drive();
-    assert!(matches!(peer.up.pop(), Some(link::Event::Lost { exchange }) if exchange == Token::new(EXCHANGE)));
+    assert!(matches!(peer.up.pop(), Some(client::Event::Lost { exchange }) if exchange == Token::new(EXCHANGE)));
     assert!(peer.up.is_empty());
 }
 #[test]
 fn the_stream_s_bytes_reach_the_link_in_order() {
     let mut peer = Peer::new();
-    peer.shell.down(Time::ZERO, link::Request::OpenStream { credential: None }, &mut peer.below);
+    peer.shell.down(Time::ZERO, client::Request::OpenStream { credential: None }, &mut peer.below);
     peer.respond(b"HTTP/1.1 200 OK\r\n\r\ndata: Zmlyc3Q=\n\ndata: c2Vjb25k\n\n");
     let mut bytes = Vec::new();
     while let Some(event) = peer.up.pop() {
-        if let link::Event::Streamed { message: link::Streamed::Record(part) } = event {
+        if let client::Event::Streamed { message: client::Streamed::Record(part) } = event {
             bytes.extend_from_slice(&part);
         }
     }
     assert_eq!(bytes, b"firstsecond");
-    peer.shell.down(Time::ZERO, link::Request::CloseStream, &mut peer.below);
+    peer.shell.down(Time::ZERO, client::Request::CloseStream, &mut peer.below);
     peer.drive();
     assert!(peer.wire.finished);
 }
@@ -170,13 +170,15 @@ impl Disk {
                 self.closing = true;
             }
             FileCase::Store => {
-                self.shell.down(link::Request::Save {
-                    record: link::Record { key: b"key".as_slice().into(), bytes: b"pending".as_slice().into() },
-                });
-                self.shell.down(link::Request::Exchange {
+                let mut records = skein_lib::List::with_capacity(1);
+                records
+                    .push(client::Record { key: b"key".as_slice().into(), bytes: b"pending".as_slice().into() })
+                    .expect("one record fits");
+                self.shell.down(client::Request::Save { records });
+                self.shell.down(client::Request::Exchange {
                     exchange: Token::new(EXCHANGE),
                     credential: Some(Secret::new(Box::new(TOKEN))),
-                    message: link::Message::Request(b"ask".as_slice().into()),
+                    message: client::Message::Request(b"ask".as_slice().into()),
                 });
             }
         }
@@ -196,25 +198,25 @@ impl skein_shell::Host for Disk {
         }
         while let Some(event) = self.shell.events().pop() {
             match event {
-                link::Event::Stored => self.writes += 1,
-                link::Event::NotStored => {
+                client::Event::Stored => self.writes += 1,
+                client::Event::NotStored => {
                     self.failures += 1;
                     self.closing = true;
                 }
-                link::Event::Lost { .. } => self.closing = true,
-                other @ (link::Event::SignIn { .. }
-                | link::Event::SignOut
-                | link::Event::Start { .. }
-                | link::Event::Save { .. }
-                | link::Event::Erase { .. }
-                | link::Event::Send { .. }
-                | link::Event::Read { .. }
-                | link::Event::Reply { .. }
-                | link::Event::Open { .. }
-                | link::Event::Continue { .. }
-                | link::Event::Close { .. }
-                | link::Event::Streamed { .. }
-                | link::Event::StreamGone) => panic!("file fixture event {other:?}"),
+                client::Event::Lost { .. } => self.closing = true,
+                other @ (client::Event::SignIn { .. }
+                | client::Event::SignOut
+                | client::Event::SignOutLost
+                | client::Event::Start { .. }
+                | client::Event::StartUnlinked { .. }
+                | client::Event::Send { .. }
+                | client::Event::Read { .. }
+                | client::Event::Reply { .. }
+                | client::Event::Watch { .. }
+                | client::Event::Unwatch { .. }
+                | client::Event::Up { .. }
+                | client::Event::Streamed { .. }
+                | client::Event::StreamGone) => panic!("file fixture event {other:?}"),
             }
         }
         for submit in self.shell.submissions().iter() {
@@ -341,7 +343,7 @@ fn an_exchange_past_its_deadline_is_answered_lost() {
     let until = Time::ZERO.saturating_add(limits().deadline);
     assert_eq!(peer.shell.next_deadline(), Some(until));
     peer.shell.take(until, &mut peer.up, &mut peer.below);
-    assert!(matches!(peer.up.pop(), Some(link::Event::Lost { exchange }) if exchange == Token::new(EXCHANGE)));
+    assert!(matches!(peer.up.pop(), Some(client::Event::Lost { exchange }) if exchange == Token::new(EXCHANGE)));
     assert_eq!(peer.shell.next_deadline(), None);
     peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
     assert!(peer.up.is_empty());

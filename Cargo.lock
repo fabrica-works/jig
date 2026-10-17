@@ -294,8 +294,8 @@ dependencies = [
 name = "jig-client-shell-native"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
  "jig-client-protocol-http",
- "jig-client-protocol-link",
  "jig-client-protocol-wire",
  "skein-fake-machine",
  "skein-http",
@@ -310,7 +310,7 @@ dependencies = [
 name = "jig-client-test-domain"
 version = "0.0.0"
 dependencies = [
- "jig-client-domain",
+ "jig-client",
  "jig-client-test-protocol-wire",
  "jig-client-view",
  "jig-test-connector",
@@ -348,8 +348,10 @@ dependencies = [
 name = "jig-client-test-view"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
  "jig-client-domain",
  "jig-client-test-domain",
+ "jig-client-test-protocol-wire",
  "jig-client-view",
  "skein-lib",
  "skein-ui",
@@ -397,6 +399,7 @@ dependencies = [
  "jig-client-scripted-engine",
  "jig-client-test-domain",
  "jig-client-test-kit",
+ "jig-client-test-protocol-wire",
  "jig-client-test-view",
  "jig-client-view",
  "jig-core-world",
@@ -770,6 +773,7 @@ version = "0.0.0"
 name = "jig-ops-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
  "jig-client-domain",
  "jig-client-scripted-engine",
  "jig-client-test-domain",

@@ -1,11 +1,8 @@
 //! The test application's native client over simulated or real io.
-use crate::front::Side;
-use jig_client_protocol_link as link;
 use jig_client_shell_native::{Settings, Shell};
 use jig_client_test_domain::{self as client, Request};
 use jig_client_view::address::{Address, TaskSection};
 use jig_client_world::{App, Test};
-use link::Signing;
 use skein_fake_person::{Doing, Find, Next, Person, Step, TreeFace};
 use skein_io::kernel::{Complete, Fd, Submit};
 use skein_lib::{Duration, Env, Queue, Time, Wall};
@@ -78,19 +75,18 @@ pub enum Received {
 /// A native client as a process of a skein world.
 pub struct NativeClient {
     shell: Shell,
-    saving_signing: Option<Signing>,
+    wire: wire::Wire,
+    credential: Option<skein_lib::Secret>,
     terminal: Option<skein_ui_text::Terminal>,
     #[expect(clippy::disallowed_types, reason = "scenario input hands inherited pipes to the host between iterations")]
     pipes: core::cell::Cell<Option<(Fd, Fd)>>,
     complete: Queue<Complete>,
-    side: Side,
     root: client::Domain,
     view: jig_client_test_view::View<'static>,
     person: Person<client::Address>,
     env: Env<client::Limits>,
     out: Queue<Request>,
     patches: Queue<skein_ui::Patch>,
-    kept: Vec<client::store::Record>,
     address: client::Address,
     started: bool,
     person_done: bool,
@@ -106,7 +102,7 @@ impl NativeClient {
         let mut shell = Shell::new(settings);
         shell.adopt(root, user, seed);
         let limits = jig_client_world::test::limits();
-        let (root, view) = Test::new(seed);
+        let (root, view) = jig_client_world::test::linked(seed);
         let patches = Queue::with_capacity(Test::patch_limit(&view));
         let complete = Queue::with_capacity(shell.operations() + 10);
         Self {
@@ -114,15 +110,14 @@ impl NativeClient {
             pipes: None.into(),
             complete,
             shell,
-            saving_signing: None,
-            side: Side::new(),
+            wire: wire::Wire::default(),
+            credential: None,
             root,
             view,
             person: Person::new(script.steps),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(Test::max_out(&limits) * 4),
             patches,
-            kept: Vec::new(),
             address: jig_client_world::stories::conversation(),
             started: false,
             person_done: false,
@@ -137,66 +132,48 @@ impl NativeClient {
     /// Refuses a link outside the configured loopback engine's address.
     pub fn sign_in(&mut self, printed: &[u8]) -> Result<(), jig_client_protocol_http::Unlinked> {
         let secret = self.shell.sign_in(printed)?;
-        self.side.event(self.env.now, link::Event::SignIn { with: link::With::Link(secret) });
+        self.callback(client::Event::Client {
+            event: jig_client::Event::SignIn { with: jig_client::With::Link(secret) },
+        });
         Ok(())
     }
-    fn signing(&mut self, signing: Signing) {
-        match signing {
-            Signing::SignedIn { party } => {
-                self.received.push(Received::SignedIn { person: party });
-                self.signed_in += 1;
-                self.side.authenticated = true;
-            }
-            Signing::SignedOut => self.callback(client::Event::SignedOut),
-            other @ (Signing::Again | Signing::Lost | Signing::Refused) => panic!("native sign in failed: {other:?}"),
-        }
-    }
     fn callback(&mut self, event: client::Event) {
-        match &event {
-            client::Event::Answer { attempt, answer: Some(client::Answered::Jig(answer)), .. } => {
-                self.received.push(Received::Answer { attempt: *attempt, answer: answer.clone() });
+        if let client::Event::Client { event } = &event {
+            let received = self.wire.received(event);
+            for fact in &received {
+                match fact {
+                    Received::SignedIn { .. } => self.signed_in += 1,
+                    Received::Answer {
+                        answer:
+                            jig_client::contract::Answer::Done(jig_client::contract::Outcome::Owner(
+                                jig_client::contract::OwnerOutcome::Started { .. },
+                            )),
+                        ..
+                    } => self.chats_made += 1,
+                    Received::Sent { .. } | Received::Answer { .. } | Received::Delivery(_) | Received::Read(_) => {}
+                }
             }
-            client::Event::Jig(jig_client_view::Event::Watch {
-                event: jig_client_domain::contract::WatchEvent::Delivered(delivery),
-                ..
-            }) => self.received.push(Received::Delivery(delivery.clone())),
-            client::Event::Jig(jig_client_view::Event::Read { result, .. }) => {
-                self.received.push(Received::Read(result.clone()));
-            }
-            client::Event::Answer { .. }
-            | client::Event::Start { .. }
-            | client::Event::Went { .. }
-            | client::Event::Act { .. }
-            | client::Event::Jig(_)
-            | client::Event::First(_)
-            | client::Event::SignedOut => {}
-        }
-        if matches!(
-            &event,
-            client::Event::Answer {
-                answer: Some(client::Answered::Jig(jig_client_domain::contract::Answer::Done(
-                    jig_client_domain::contract::Outcome::Owner(
-                        jig_client_domain::contract::OwnerOutcome::Started { .. }
-                    )
-                ))),
-                ..
-            }
-        ) {
-            self.chats_made += 1;
+            self.received.extend(received);
         }
         Test::step(&mut self.root, &self.env, event, &mut self.out);
-    }
-    fn kept(&mut self, saved: link::Saved) {
-        self.kept.push(crate::front::persistence::restored(saved));
+        let credential = self.root.client().link().credential.cloned();
+        if credential != self.credential {
+            self.shell.keep(credential.clone());
+            self.credential = credential;
+        }
     }
     fn outputs(&mut self) {
         while let Some(request) = self.out.pop() {
             match request {
                 Request::Save { record } => {
-                    self.shell.down(link::Request::Save { record: crate::front::persistence::encode_one(record) });
+                    self.shell.down(jig_client::Request::Save {
+                        records: jig_client_world::test::list([crate::front::persistence::encode_one(record)]),
+                    });
                 }
                 Request::Erase { key } => {
-                    self.shell.down(link::Request::Erase { key: crate::front::persistence::erased(key) });
+                    self.shell.down(jig_client::Request::Erase {
+                        records: jig_client_world::test::list([crate::front::persistence::erased(key)]),
+                    });
                 }
                 Request::Show { address, .. } => {
                     if self.address != address {
@@ -204,33 +181,13 @@ impl NativeClient {
                         self.callback(Test::went(address));
                     }
                 }
-                Request::SignOut => self.side.event(self.env.now, link::Event::SignOut),
+                Request::SignOut => self.callback(client::Event::Client { event: jig_client::Event::SignOut }),
                 Request::SignIn { .. } => panic!("printed link supplied by caller"),
-                request @ (Request::Send { .. } | Request::Jig(_) | Request::First(_) | Request::Fact { .. }) => {
-                    if let Request::Send { attempt, key, .. } = &request {
-                        self.received.push(Received::Sent { attempt: *attempt, key: *key });
-                    }
-                    self.side.wire(self.env.now, request);
+                Request::Client { request } => {
+                    self.received.extend(self.wire.sent(&request));
+                    self.shell.down(request);
                 }
-            }
-        }
-        while let Some(request) = self.side.out.pop() {
-            if let link::Request::Signing { signing } = request {
-                if matches!(signing, Signing::SignedIn { .. } | Signing::SignedOut) {
-                    self.shell.keep(self.side.link.credential().cloned());
-                    self.saving_signing = Some(signing);
-                } else {
-                    self.signing(signing);
-                }
-                continue;
-            }
-            if let link::Request::Kept { record } = request {
-                self.kept(record);
-            } else {
-                match self.side.callback(request) {
-                    Ok(event) => self.callback(event),
-                    Err(request) => self.shell.down(request),
-                }
+                Request::Jig(_) | Request::First(_) | Request::Fact { .. } => {}
             }
         }
     }
@@ -279,37 +236,32 @@ impl Host for NativeClient {
         }
         self.shell.iterate(now, wall);
         if let Some((credential, kept)) = self.shell.loaded() {
-            if let Some(credential) = credential {
-                self.side.event(now, link::Event::SignIn { with: link::With::Held(credential) });
-                self.side.authenticated = true;
-            }
-            let mut table = Vec::new();
+            let mut client_records = Vec::new();
             for record in kept {
                 if record.key.len() == 16 {
-                    table.push(record);
+                    client_records.push(client::store::Record::Client(record));
                 } else if let Some(record) = crate::front::persistence::child_record(&record) {
-                    self.kept.push(record);
+                    client_records.push(record);
                 }
             }
-            self.side.event(now, link::Event::Start { kept: jig_client_world::test::list(table) });
+            self.started = true;
+            if let Some(credential) = credential {
+                self.callback(client::Event::Client {
+                    event: jig_client::Event::SignIn { with: jig_client::With::Held(credential) },
+                });
+            }
+            self.callback(Test::start(self.address, client_records, 0));
         }
         if let Some(ok) = self.shell.kept() {
-            let signing = self.saving_signing.take().expect("pending credential");
-            self.signing(if ok { signing } else { Signing::Lost });
+            assert!(ok, "native credential is durable");
         }
         while let Some(event) = self.shell.events().pop() {
-            self.side.event(now, event);
+            self.callback(client::Event::Client { event });
         }
         self.outputs();
-        if self.side.authenticated && !self.started {
-            self.started = true;
-            let kept = std::mem::take(&mut self.kept);
-            self.callback(Test::start(self.address, kept, 0));
-        }
         if !self.closing && self.started {
             Test::fire(&mut self.root, &self.env, &mut self.out);
             Test::take(&mut self.root, &self.env, &mut self.out);
-            self.side.link.fire(now, &mut self.side.out);
             self.outputs();
             Test::build(&mut self.view, &self.root, &mut self.patches);
             changed = !self.patches.is_empty();
@@ -355,7 +307,6 @@ impl Host for NativeClient {
             || self.pipes.get().is_some()
             || self.terminal.as_ref().is_some_and(|terminal| terminal.work_pending(now))
             || !self.out.is_empty()
-            || !self.side.out.is_empty()
             || (!self.closing && self.started && self.wake.is_some_and(|at| at <= now))
     }
     fn next_deadline(&self) -> Option<Time> {
@@ -369,11 +320,7 @@ impl Host for NativeClient {
         .min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
-        if self.closing {
-            None
-        } else {
-            [Test::next_deadline(&self.root), self.side.link.next_deadline(), self.wake].into_iter().flatten().min()
-        }
+        if self.closing { None } else { [Test::next_deadline(&self.root), self.wake].into_iter().flatten().min() }
     }
     fn is_empty(&self) -> bool {
         self.closing && self.shell.is_empty() && self.terminal.as_ref().is_none_or(skein_ui_text::Terminal::closed)
@@ -386,5 +333,6 @@ impl Host for NativeClient {
     }
 }
 
+pub(crate) mod wire;
 mod world;
 pub use world::{Outcome, run, run_terminal};

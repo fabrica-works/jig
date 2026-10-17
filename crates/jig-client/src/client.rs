@@ -7,12 +7,13 @@ use alloc::boxed::Box;
 use jig_client_domain::{self as domain, Down, Up};
 use jig_client_protocol_link as link;
 use skein_lib::{Duration, Env, List, Queue, Rng, Secret, Time, Token, Wall};
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Event {
     Start { kept: List<Record> },
     StartUnlinked { kept: List<skein_lib::RequestRecord<crate::Held>> },
     SignIn { with: With },
     SignOut,
+    SignOutLost,
     Watch { handle: Handle, subject: Watchable },
     Unwatch { handle: Handle },
     Read { handle: Handle, read: Readable },
@@ -25,7 +26,7 @@ pub enum Event {
     NotStored,
     Up { up: Up },
 }
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Request {
     Exchange { exchange: Token, credential: Option<Secret>, message: Message },
     OpenStream { credential: Option<Secret> },
@@ -34,6 +35,7 @@ pub enum Request {
     Erase { records: List<Box<[u8]>> },
     Told { told: Told },
     Down { down: Down },
+    SignOut,
 }
 #[derive(Debug)]
 pub struct LinkView<'a> {
@@ -101,7 +103,7 @@ impl Client {
     pub fn step(&mut self, now: Time, wall: Wall, event: Event, out: &mut Queue<Request>) {
         let env = Env { now, wall, limits: self.limits.domain };
         if self.link.is_none() {
-            self.step_unlinked(&env, event);
+            self.step_unlinked(&env, event, out);
             self.drain(&env, out);
             return;
         }
@@ -150,7 +152,7 @@ impl Client {
             Event::StreamGone => self.link_step(now, link::Event::StreamGone),
             Event::Stored => self.store_answer(&env, true),
             Event::NotStored => self.store_answer(&env, false),
-            Event::Up { .. } | Event::StartUnlinked { .. } => {
+            Event::Up { .. } | Event::StartUnlinked { .. } | Event::SignOutLost => {
                 assert!(self.link.is_none(), "Up and StartUnlinked require an unlinked client");
             }
         }
@@ -217,19 +219,40 @@ impl Client {
             },
         }
     }
-    fn step_unlinked(&mut self, env: &Env<DomainLimits>, event: Event) {
+    fn step_unlinked(&mut self, env: &Env<DomainLimits>, event: Event, out: &mut Queue<Request>) {
         match event {
             Event::StartUnlinked { kept } => self.domain_step(env, domain::Event::Start { kept }),
             Event::Watch { handle, subject } => self.domain_step(env, domain::Event::Watch { handle, subject }),
             Event::Unwatch { handle } => self.domain_step(env, domain::Event::Unwatch { handle }),
             Event::Read { handle, read } => self.domain_step(env, domain::Event::Read { handle, read }),
             Event::Send { key, request } => self.domain_step(env, domain::Event::Send { key, request }),
-            Event::Up { up } => self.up(env, up),
+            Event::Up { up } => {
+                match &up {
+                    Up::SignedIn | Up::SignedOut => {
+                        self.signing_out = false;
+                        self.sign_out_lost = false;
+                    }
+                    Up::Served { .. }
+                    | Up::FamilyServed { .. }
+                    | Up::Answer { .. }
+                    | Up::NotKept { .. }
+                    | Up::ReadDone { .. }
+                    | Up::Watched { .. }
+                    | Up::FamilyDelivered { .. }
+                    | Up::WatchEnded { .. } => {}
+                }
+                self.up(env, up);
+            }
             Event::SignIn { with } => {
                 assert!(with == With::Transport, "unlinked sign-in belongs to the transport");
                 self.up(env, Up::SignedIn);
             }
-            Event::SignOut => self.up(env, Up::SignedOut),
+            Event::SignOut => {
+                self.signing_out = true;
+                self.sign_out_lost = false;
+                out.push(Request::SignOut);
+            }
+            Event::SignOutLost => self.sign_out_failed(),
             Event::Stored | Event::NotStored => {}
             Event::Start { .. }
             | Event::Reply { .. }
@@ -270,11 +293,17 @@ impl Client {
                     Some(env.now.saturating_add(Duration::from_nanos(self.rng.between(nanos.div_euclid(2), nanos))));
             }
             link::Signing::Again | link::Signing::Lost | link::Signing::Refused => {
-                self.sign_out_lost = self.signing_out;
-                self.signing_out = false;
+                self.sign_out_failed();
                 self.service = None;
                 self.signing_until = None;
             }
+        }
+    }
+    fn sign_out_failed(&mut self) {
+        self.sign_out_lost = self.signing_out;
+        self.signing_out = false;
+        if self.sign_out_lost {
+            self.domain_out.push(domain::Request::Told { told: Told::Link { link: self.domain.link() } });
         }
     }
     fn store_answer(&mut self, env: &Env<DomainLimits>, stored: bool) {

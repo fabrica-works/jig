@@ -78,7 +78,7 @@ pub(super) fn seeded_world(
     configure: fn(&mut Joint),
     bounds: fn(&mut jig_test_domain::Limits),
 ) -> World<Test, Joint> {
-    seeded_world_with_receiving(seed, body, configure, bounds, crate::test::limits())
+    seeded_world_with_receiving(seed, body, configure, bounds, &crate::test::limits())
 }
 
 pub(super) fn seeded_world_with_receiving(
@@ -86,7 +86,7 @@ pub(super) fn seeded_world_with_receiving(
     body: Box<[u8]>,
     configure: fn(&mut Joint),
     bounds: fn(&mut jig_test_domain::Limits),
-    receiving: jig_client_test_domain::Limits,
+    receiving: &jig_client_test_domain::Limits,
 ) -> World<Test, Joint> {
     let mut owner = jig_core_world::world::limits();
     bounds(&mut owner);
@@ -132,7 +132,7 @@ pub(super) fn seeded_world_with_receiving(
         login: b"login".as_slice().into(),
         name: b"Person".as_slice().into(),
     };
-    let mut front = Joint::new(Session::new(driver, receiving, codec), BTreeMap::from([(1, identity)]), clock);
+    let mut front = Joint::new(Session::new(driver, *receiving, codec), BTreeMap::from([(1, identity)]), clock);
     front.unsigned_on_bind();
     front.session.stream_heartbeat(Duration::from_millis(50));
     front.session.capture_task_offers();

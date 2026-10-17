@@ -83,7 +83,7 @@ fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view:
     };
     let mut b = Builder::new(&capacity);
     let mut bindings = JigBindings::new(f.bindings, 256);
-    let client = Domain::new(&limits(), 1);
+    let client = Domain::new(&limits());
     view::render(&mut b, value, &client, words, &mut bindings);
     let tree = b.finish();
     let region = tree.nodes().first().expect("standalone milestone region");

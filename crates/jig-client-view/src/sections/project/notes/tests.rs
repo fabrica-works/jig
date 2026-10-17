@@ -21,19 +21,13 @@ fn a_resource_notes_filter_keeps_the_whole_path_behind_its_cut_label() {
         scope,
     );
     let tree = b.finish();
-    let mut cut = false;
     let mut button = None;
     for node in tree.nodes() {
-        for run in &node.text {
-            if run.text.as_ref() == "…".as_bytes() {
-                cut = true;
-            }
-        }
         if node.binding.is_some() {
             button = node.binding;
         }
     }
-    assert!(cut);
+    assert!(crate::tests::cards::contains(&tree, "…".as_bytes()));
     let button = button.unwrap();
     assert_eq!(
         crate::binding::decode(&mut bindings, button.token, skein_ui::Act::Press),

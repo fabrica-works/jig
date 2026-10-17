@@ -43,7 +43,7 @@ impl Default for Settings {
             store_records: 32,
             iterations: 4096,
             memory: false,
-            heap_bytes_per_client: 8 * 1024 * 1024,
+            heap_bytes_per_client: 16 * 1024 * 1024,
             random_steps: 32,
             word_bytes: 32,
             faults_per_mille: 0,
@@ -96,6 +96,7 @@ struct Client<A: App> {
     party: u64,
     epoch: u64,
     navigation: u64,
+    delivery: Time,
     acted_card: Option<CardKey>,
     text_shell: Option<TextShell>,
 }
@@ -217,6 +218,7 @@ impl<A: App, F: Front<A>> World<A, F> {
         if let Some(meter) = &self.meter {
             meter.start();
         }
+        let constructor = self.front.constructor(constructor);
         let (root, view) = constructor(self.rng.next_u64());
         let id = ClientId(self.clients.len());
         let patches = Queue::with_capacity(A::patch_limit(&view));
@@ -235,11 +237,15 @@ impl<A: App, F: Front<A>> World<A, F> {
             party,
             epoch: 0,
             navigation: 0,
+            delivery: self.now,
             acted_card: None,
             text_shell: None,
         });
         self.observe(Observation::Client { client: id });
         self.front.bind(id, party);
+        for event in self.front.starting(id) {
+            self.callback(id, Some(event));
+        }
         self.callback(id, Some(A::start(address, kept, 0)));
         self.check_heap();
         id
@@ -305,6 +311,9 @@ impl<A: App, F: Front<A>> World<A, F> {
         c.deferred.clear();
         c.kept = self.front.restored(id, c.kept.clone());
         let event = A::start(c.history[c.at].clone(), c.kept.clone(), 0);
+        for initial in self.front.starting(id) {
+            self.callback(id, Some(initial));
+        }
         self.callback(id, Some(event));
     }
     /// Navigates and records an address in the shell history.
@@ -526,7 +535,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             if A::window_changed(event) {
                 self.observe(Observation::WindowChanged { client: id });
             }
-            for receipt in A::received(event) {
+            for receipt in A::received(event).into_iter().chain(self.front.receipts(id, event)) {
                 self.observe(Observation::Delivered { client: id, receipt });
             }
         }
@@ -589,7 +598,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                     );
                 }
             } else {
-                if let Some(mut sent) = A::sent(&request) {
+                if let Some(mut sent) = A::sent(&request).or_else(|| self.front.sent(&request)) {
                     if self.clients[id.0].acted_card.is_some() {
                         sent.card.clone_from(&self.clients[id.0].acted_card);
                     }
@@ -841,10 +850,12 @@ impl<A: App, F: Front<A>> World<A, F> {
             self.draw_fault();
             let wall = Wall::from_nanos(1_000_000_000_000 + self.now.as_nanos());
             for (client, event) in self.front.poll(self.now, wall) {
-                self.schedule.send(
-                    self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
-                    Due { client, epoch: self.clients[client.0].epoch, event, navigation: None },
-                );
+                let at = self
+                    .now
+                    .saturating_add(self.settings.latency.draw(&mut self.rng))
+                    .max(self.clients[client.0].delivery.saturating_add(Duration::from_nanos(1)));
+                self.clients[client.0].delivery = at;
+                self.schedule.send(at, Due { client, epoch: self.clients[client.0].epoch, event, navigation: None });
             }
             for observed in self.front.observed() {
                 self.observe(Observation::Truth(observed));
@@ -864,6 +875,7 @@ impl<A: App, F: Front<A>> World<A, F> {
             let stop = match until {
                 Until::Done => {
                     done && self.schedule.is_empty()
+                        && self.front.next_due().is_none_or(|at| at > self.now)
                         && self.faults.is_empty()
                         && self.referee.verdict() == Verdict::Passed
                 }

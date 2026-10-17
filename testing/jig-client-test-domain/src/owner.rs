@@ -1,5 +1,4 @@
 //! Connector identities are named once, as in the test engine root.
-use skein_lib::Token;
 pub const FIRST: u16 = 1;
 pub const SECOND: u16 = 2;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,11 +22,4 @@ impl Connector {
             _ => None,
         }
     }
-}
-/// The table returns this value unchanged; restored requests have no live child.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Owner {
-    Jig(Token),
-    First(Token),
-    Kept { scope: u64 },
 }

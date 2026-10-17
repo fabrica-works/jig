@@ -90,7 +90,7 @@ fn ready(seed: u64) -> (World<Test, Joint>, crate::ClientId) {
         fixture::turn(),
         |front| front.restart_configuration(configuration),
         |limits| limits.core.views.watchers = 12,
-        receiving(),
+        &receiving(),
     );
     world.randomness(8, 0, 0);
     let client = world.client_with(1, crate::stories::conversation(), receiving(), client);

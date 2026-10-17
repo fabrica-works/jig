@@ -4,8 +4,8 @@ use crate::{
     store::{Key, Record},
 };
 use alloc::boxed::Box;
-use jig_client_domain::contract::{Ask as JigAsk, Read, Subject};
-use skein_lib::{List, RequestEnvelope, RequestKey, Token};
+use jig_client::contract::Ask as JigAsk;
+use skein_lib::{List, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
     Jig(Box<JigAsk>),
@@ -13,7 +13,7 @@ pub enum Ask {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Answered {
-    Jig(jig_client_domain::contract::Answer),
+    Jig(jig_client::contract::Answer),
     First(first::Answer),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,35 +26,28 @@ pub enum Event {
     Start { address: Address, kept: List<Record>, offset: jig_client_view::boundary::Offset },
     Went { place: Place },
     Act { action: Action },
-    Answer { attempt: Token, envelope: RequestEnvelope, answer: Option<Answered> },
+    Client { event: jig_client::Event },
     Jig(jig_client_view::Event),
     First(first::Event),
     SignedOut,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum JigOut {
-    Read { read: Token, what: Read },
-    Open { watch: Token, subject: Subject },
-    Continue { watch: Token, subject: Subject },
-    Close { watch: Token },
-    Answered { asked: Token, answer: jig_client_domain::contract::Answer },
+    Answered { asked: Token, answer: jig_client::contract::Answer },
     Unknown { asked: Token },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
     Jig(jig_client_view::facts::Fact),
-    TableFull,
     PartsFull,
     InvalidRecord,
-    InvalidAnswer,
     UnknownConnector,
-    KeptAnswered,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Request {
     Save { record: Record },
     Erase { key: Key },
-    Send { attempt: Token, key: RequestKey, ask: Ask },
+    Client { request: jig_client::Request },
     Jig(JigOut),
     First(first::Out),
     Show { address: Address, replace: bool },

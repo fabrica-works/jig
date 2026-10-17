@@ -524,7 +524,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
     }
     if domain.shows(crate::page::Section::Task { task: number, section: TaskSection::Plan }) {
         if crate::page::conversations::live(phase) {
-            open_once(domain, env, contract::Subject::Tree { task: number, window: env.limits.rows }, out);
+            open_once(domain, contract::Subject::Tree { task: number, window: env.limits.rows }, out);
         } else {
             domain.task_page.ended_task = Some(number);
             read(domain, ENDED_READ, Read::Ended { task: number, after: None }, out);
@@ -536,7 +536,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
     match executor {
         Executor::Agent { .. } => {
             let subject = contract::Subject::Run { task: number, turn: None, offset: 0 };
-            if open_once(domain, env, subject, out) {
+            if open_once(domain, subject, out) {
                 read(
                     domain,
                     crate::conversation::routing::ACTIVITY_READ,
@@ -560,13 +560,8 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
         }
     }
 }
-fn open_once(
-    domain: &mut Domain,
-    env: &Env<crate::Limits>,
-    subject: contract::Subject,
-    out: &mut Queue<Request>,
-) -> bool {
-    super::routing::open_once(domain, env, subject, crate::page::shown::owner(domain), out)
+fn open_once(domain: &mut Domain, subject: contract::Subject, out: &mut Queue<Request>) -> bool {
+    super::routing::open_once(domain, subject, crate::page::shown::owner(domain), out)
 }
 
 fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {

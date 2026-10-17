@@ -231,7 +231,7 @@ fn routed_conversation() {
     };
     use jig_client::contract::{Delivery, ReadResult, ReadValue, Runtime, WatchEvent};
     use skein_lib::Time;
-    let mut domain = Domain::new(&LIMITS, 21);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
     super::pages::finish_initial_inbox_reads(&mut domain, &initial);

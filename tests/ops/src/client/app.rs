@@ -55,11 +55,6 @@ pub fn limits() -> domain::Limits {
             conversation_words: 2,
             navigation_entries: 8,
             updates_count: 99,
-            backoff: jig_client_view::limits::ui::Backoff {
-                first: Duration::from_millis(10),
-                most: Duration::from_millis(80),
-            },
-            heartbeat: Duration::from_millis(100),
         },
         observability: obs::Limits {
             parts: 8,

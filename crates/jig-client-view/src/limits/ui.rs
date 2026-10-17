@@ -6,13 +6,6 @@ use core::mem::size_of;
 use jig_client::contract::{Charter, Frame, ProjectRole};
 use skein_lib::{Deadlines, Duration, Id, List, Map, Slab};
 
-/// Backoff spans: double the first up to most, with seeded bounded jitter.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Backoff {
-    pub first: Duration,
-    pub most: Duration,
-}
-
 /// Configured capacities, payload bounds and durations for the client spine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Limits {
@@ -50,20 +43,16 @@ pub struct Limits {
     pub navigation_entries: u32,
     /// The largest unread update count displayed without a lower-bound mark.
     pub updates_count: u32,
-    pub backoff: Backoff,
-    pub heartbeat: Duration,
 }
 
 /// The heap held by the implemented spine, including frame and record payloads.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    limits.watches.checked_add(limits.reads)?;
     if limits.watches == 0
         || limits.notice_life == Duration::ZERO
         || limits.linger == Duration::ZERO
         || limits.save_delay == Duration::ZERO
-        || limits.heartbeat == Duration::ZERO
-        || limits.backoff.first == Duration::ZERO
-        || limits.backoff.first > limits.backoff.most
     {
         return None;
     }
@@ -122,11 +111,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total.checked_add(u64::from(limits.watches).checked_mul(List::<u64>::worst_case(limits.rows)?)?)
 }
 
-/// One deadline per watch, lingering object, visible notice and saved record,
+/// One deadline per lingering object, visible notice and saved record,
 /// plus the minute tick. Checked before any container is allocated.
 #[must_use]
 pub fn timers(limits: &Limits) -> Option<u32> {
-    limits.watches.checked_add(limits.objects)?.checked_add(limits.notices)?.checked_add(limits.records)?.checked_add(1)
+    limits.objects.checked_add(limits.notices)?.checked_add(limits.records)?.checked_add(1)
 }
 
 /// One task and every bounded proposal name per retained tree row.

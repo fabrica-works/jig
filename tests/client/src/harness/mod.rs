@@ -67,11 +67,24 @@ pub enum Duty<A: App> {
 }
 /// Engine boundary; token routing and transport epochs belong to the front.
 pub trait Front<A: App> {
+    fn constructor(&self, constructor: ClientConstructor<A>) -> ClientConstructor<A> {
+        constructor
+    }
+
     fn bind(&mut self, client: ClientId, party: u64);
+    fn starting(&mut self, _client: ClientId) -> Vec<A::Event> {
+        Vec::new()
+    }
     fn wire(&mut self, client: ClientId, now: Time, wall: Wall, request: A::Request);
     fn poll(&mut self, now: Time, wall: Wall) -> Vec<(ClientId, A::Event)>;
     fn next_due(&self) -> Option<Time>;
     fn observed(&mut self) -> Vec<Observed>;
+    fn sent(&self, _request: &A::Request) -> Option<Sent> {
+        None
+    }
+    fn receipts(&mut self, _client: ClientId, _event: &A::Event) -> Vec<Receipt> {
+        Vec::new()
+    }
     fn fault(&mut self, now: Time, fault: FrontFault);
     fn reload(&mut self, client: ClientId, now: Time);
     fn received(&mut self, client: ClientId, event: &A::Event);

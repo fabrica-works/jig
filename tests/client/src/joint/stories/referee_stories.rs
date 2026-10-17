@@ -37,10 +37,15 @@ fn the_joint_referee_catches_a_translation_answering_stop_before_its_actual_comm
     .expect("complete actual translation");
     world.event(
         client,
-        jig_client_test_domain::Event::Answer {
-            attempt,
-            envelope,
-            answer: answer.map(jig_client_test_domain::Answered::Jig),
+        jig_client_test_domain::Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Answer {
+                    attempt,
+                    envelope,
+                    answer: answer.map(jig_client::Answered::Jig),
+                    why: None,
+                },
+            },
         },
     );
 }

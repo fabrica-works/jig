@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 [dependencies]
 jig-client-test-protocol-wire.workspace = true
-jig-client-domain.workspace = true
+jig-client.workspace = true
 skein-lib.workspace = true
 jig-client-view.workspace = true
 jig-test-connector.workspace = true

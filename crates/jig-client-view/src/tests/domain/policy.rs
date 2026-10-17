@@ -14,7 +14,7 @@ fn a_whole_policy_edit_enters_as_one_request_and_a_duplicate_joins_that_request(
     };
     let ask = Ask::ChangePolicy { project: u32::MAX, edit };
     let by_value = ByValue { asked: Token::new(73), scope: u64::MAX, ask: Box::new(ask.clone()) };
-    let mut domain = Domain::new(&LIMITS, 1);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, f, frame(7));
     let out = drive(&mut domain, Time::ZERO, Event::Ask { ask: by_value.clone() });

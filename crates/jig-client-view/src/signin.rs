@@ -10,7 +10,7 @@ pub struct Provider {
 
 use crate::{Domain, Request, page::Page, watches::Owner};
 use jig_client::contract::Subject;
-use skein_lib::{Env, List, Queue};
+use skein_lib::{List, Queue};
 /// Providers installed by the application before start, and a return awaiting
 /// the old frame's terminal. Credentials never cross this state.
 #[derive(Debug)]
@@ -75,9 +75,9 @@ pub(crate) fn signed_out(domain: &mut Domain, out: &mut Queue<Request>) {
     domain.changed();
 }
 /// A shell returned: reopen the frame once its prior attempt has ended.
-pub(crate) fn returned(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
+pub(crate) fn returned(domain: &mut Domain, out: &mut Queue<Request>) {
     if domain.signin.returning && domain.frame_watch.is_none() && !domain.blocked {
-        domain.frame_watch = domain.open(env, Subject::Frame, Owner::Frame, out);
+        domain.frame_watch = domain.open(Subject::Frame, Owner::Frame, out);
         if domain.frame_watch.is_some() {
             domain.signin.returning = false;
         }

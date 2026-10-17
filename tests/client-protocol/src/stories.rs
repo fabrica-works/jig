@@ -96,47 +96,6 @@ pub fn two_clients(seed: u64) -> (Story, ClientId) {
     (world, client)
 }
 
-pub fn transient_request(seed: u64, fault: jig_client_world::FrontFault) {
-    use jig_client_test_domain::{Ask, Event, Request};
-    use jig_client_world::Front;
-    use skein_lib::{RequestEnvelope, Token};
-    let mut limits = fixtures::owner_limits();
-    limits.core.people.requests = 1;
-    limits.core.people.request_retention = Duration::from_millis(100);
-    let mut protocol = Protocol::bounded(seed, &limits);
-    let client = ClientId(0);
-    Front::<Test>::bind(&mut protocol, client, 1);
-    Front::<Test>::sign_in(&mut protocol, client, Time::ZERO, fixtures::wall(Time::ZERO));
-    let _ = Front::<Test>::poll(&mut protocol, Time::ZERO, fixtures::wall(Time::ZERO));
-    Front::<Test>::fault(&mut protocol, Time::ZERO, fault);
-    let request = |attempt| Request::Send {
-        attempt,
-        key: [62; 16],
-        ask: Ask::Jig(Box::new(jig_client_domain::contract::Ask::Stop { project: 1, task: u64::MAX })),
-    };
-    Front::<Test>::wire(&mut protocol, client, Time::ZERO, fixtures::wall(Time::ZERO), request(Token::new(31)));
-    let events = Front::<Test>::poll(&mut protocol, Time::ZERO, fixtures::wall(Time::ZERO));
-    assert!(
-        events.iter().any(|(_, event)| matches!(event, Event::Answer { envelope: RequestEnvelope::Again, .. })),
-        "actual busy"
-    );
-    let later = Time::from_nanos(100_000_001);
-    let _ = Front::<Test>::poll(&mut protocol, later, fixtures::wall(later));
-    Front::<Test>::wire(&mut protocol, client, later, fixtures::wall(later), request(Token::new(32)));
-    let events = Front::<Test>::poll(&mut protocol, later, fixtures::wall(later));
-    assert!(
-        events
-            .iter()
-            .any(|(_, event)| matches!(event, Event::Answer { envelope: RequestEnvelope::Final, answer: Some(_), .. })),
-        "busy retry is a real final owner answer"
-    );
-    let observations = Front::<Test>::observed(&mut protocol);
-    assert_eq!(
-        observations
-            .iter()
-            .filter(|value| matches!(value, jig_client_world::harness::Observed::Made { key, .. } if *key == [62; 16]))
-            .count(),
-        1,
-        "busy key is made once"
-    );
+pub fn transient_request(seed: u64, fault: &jig_client_world::FrontFault) {
+    crate::client::transient_request(seed, fault);
 }

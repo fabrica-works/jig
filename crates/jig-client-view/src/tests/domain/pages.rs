@@ -45,7 +45,7 @@ fn budget() -> Budget {
     Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(7) }
 }
 fn the_frame_counts_needs_exactly_and_caps_updates_on_every_page() {
-    let mut domain = Domain::new(&LIMITS, 1);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
     value.needs = Needs { questions: u32::MAX, proposals: 2, escalations: 3, person_tasks: 4 };
@@ -74,7 +74,7 @@ fn the_frame_counts_needs_exactly_and_caps_updates_on_every_page() {
     assert_eq!(Address::task(42), Address::Task { task: 42, section: TaskSection::Overview });
 }
 fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     let mut navigation = Navigation::new(8);
     assert_eq!(navigation.home, Destination::Jig(Address::Inbox { project: None }));
     let own = Destination::Application { owner: 1, number: 3 };
@@ -109,7 +109,7 @@ fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
     );
     assert!(domain.navigation().offered(deployment, domain.frame().document.as_ref()));
     assert!(domain.configure_navigation(Navigation::new(0)).is_err());
-    let mut fresh = Domain::new(&LIMITS, 3);
+    let mut fresh = Domain::new(&LIMITS);
     assert!(fresh.configure_navigation(Navigation::new(9)).is_err());
     assert_eq!(own.place(), Place::Elsewhere);
 }
@@ -125,7 +125,7 @@ fn arrangement(task: &[TaskSection], project: &[ProjectSection]) -> Arrangement 
 }
 #[test]
 fn an_arrangement_given_before_the_start_is_kept() {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     assert_eq!(domain.arrangement(), &Arrangement::none());
     assert_eq!(domain.arrangement().task.capacity(), 0);
     assert_eq!(domain.arrangement().project.capacity(), 0);
@@ -147,7 +147,7 @@ fn each_malformed_arrangement_is_refused() {
         ("Settings with Spend", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Spend])),
         ("Settings with Recurring", arrangement(&[], &[ProjectSection::Settings, ProjectSection::Recurring])),
     ];
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     for (label, value) in rows {
         assert_eq!(domain.configure_arrangement(value.clone()), Err(value), "{label}");
         assert_eq!(domain.arrangement(), &Arrangement::none(), "{label}");
@@ -157,7 +157,7 @@ fn each_malformed_arrangement_is_refused() {
     assert_eq!(domain.configure_arrangement(value.clone()), Err(value), "after the start");
 }
 fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility() {
-    let mut domain = Domain::new(&LIMITS, 4);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     assert_eq!(domain.page(), &Page::Starting);
     delivered(&mut domain, Time::ZERO, f, frame(7));
@@ -166,7 +166,7 @@ fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility
     drive(&mut domain, Time::ZERO, Event::SignedOut);
     assert_eq!(domain.page(), &Page::SigningIn);
     for end in [WatchEnd::Unknown, WatchEnd::NotAllowed] {
-        let mut domain = Domain::new(&LIMITS, 5);
+        let mut domain = Domain::new(&LIMITS);
         let f = start(&mut domain, List::with_capacity(0));
         delivered(&mut domain, Time::ZERO, f, frame(7));
         let opened = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(42)) });
@@ -193,12 +193,12 @@ fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility
         }
         assert_eq!(domain.page(), &Page::Missing);
     }
-    let mut old = Domain::new(&LIMITS, 6);
+    let mut old = Domain::new(&LIMITS);
     let f = start(&mut old, List::with_capacity(0));
     drive(&mut old, Time::ZERO, Event::Hello { served: false });
     assert!(delivered(&mut old, Time::ZERO, f, frame(7)).is_empty());
     assert_eq!(old.page(), &Page::OutOfDate);
-    let mut other = Domain::new(&LIMITS, 7);
+    let mut other = Domain::new(&LIMITS);
     let mut kept = List::with_capacity(1);
     kept.push(crate::store::Record::Draft {
         version: crate::store::STORE_VERSION,
@@ -213,7 +213,7 @@ fn non_work_pages_follow_their_causes_and_missing_tasks_do_not_reveal_visibility
     assert_eq!(other.page(), &Page::SomeoneElse);
 }
 fn deployment_without_a_role_is_missing_and_never_watched() {
-    let mut domain = Domain::new(&LIMITS, 8);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
     value.deployment_role = None;
@@ -271,8 +271,8 @@ pub(super) fn finish_initial_inbox_reads(domain: &mut Domain, out: &[Request]) {
     }
     domain.reclaim();
 }
-fn live_inbox(seed: u64) -> (Domain, skein_lib::Token) {
-    let mut domain = Domain::new(&LIMITS, seed);
+fn live_inbox() -> (Domain, skein_lib::Token) {
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let out = delivered(&mut domain, Time::ZERO, f, frame(7));
     let page = open_token(&out);
@@ -314,7 +314,7 @@ fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
 }
 fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder() {
     for group in [InboxGroup::Proposals, InboxGroup::Results] {
-        let (mut domain, page) = live_inbox(20);
+        let (mut domain, page) = live_inbox();
         let mut rows = List::with_capacity(2);
         rows.push(entry(8, group, 20)).unwrap();
         rows.push(entry(7, group, 10)).unwrap();
@@ -353,7 +353,7 @@ fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_h
         }
     }
     for party in [7, 8] {
-        let mut domain = Domain::new(&LIMITS, party);
+        let mut domain = Domain::new(&LIMITS);
         let f = start(&mut domain, List::with_capacity(0));
         let page = open_token(&delivered(&mut domain, Time::ZERO, f, frame(party)));
         let mut rows = List::with_capacity(1);
@@ -364,7 +364,7 @@ fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_h
     }
 }
 fn opening_updates_sends_one_mark_seen_for_the_newest_result_displayed() {
-    let (mut domain, page) = live_inbox(21);
+    let (mut domain, page) = live_inbox();
     drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenUpdates });
     let mut rows = List::with_capacity(2);
     rows.push(entry(7, InboxGroup::Results, 10)).unwrap();
@@ -387,7 +387,7 @@ fn opening_updates_sends_one_mark_seen_for_the_newest_result_displayed() {
     assert!(drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenUpdates }).is_empty());
 }
 fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() {
-    let (mut domain, _) = live_inbox(22);
+    let (mut domain, _) = live_inbox();
     let entered =
         drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
     let mut read = None;
@@ -446,7 +446,7 @@ fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() 
     assert!(mark);
 }
 fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
-    let mut about = Domain::new(&LIMITS, 24);
+    let mut about = Domain::new(&LIMITS);
     let f = start(&mut about, List::with_capacity(0));
     let mut value = frame(7);
     value.projects = List::with_capacity(1);
@@ -466,7 +466,7 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
         panic!("chat about the held task");
     };
     assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"held checkout") });
-    let mut domain = Domain::new(&LIMITS, 23);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
     value.projects = List::with_capacity(1);
@@ -535,7 +535,7 @@ fn task_sections_and_activity_sources_follow_the_executor() {
             assert!(task::offered(&sections, section));
         }
         assert!(!task::offered(&sections, TaskSection::Plan));
-        let mut domain = Domain::new(&LIMITS, 22);
+        let mut domain = Domain::new(&LIMITS);
         let f = start(&mut domain, List::with_capacity(0));
         let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
         finish_initial_inbox_reads(&mut domain, &initial);
@@ -598,7 +598,7 @@ fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
     use crate::page::task::{self, PlanFilter};
     let mut limits = LIMITS;
     limits.rows = 2;
-    let mut domain = Domain::new(&limits, 22);
+    let mut domain = Domain::new(&limits);
     let mut nodes = List::with_capacity(3);
     nodes.push(tree_node(9, Phase::Done, 3)).unwrap();
     nodes.push(tree_node(10, Phase::Running, 0)).unwrap();
@@ -618,7 +618,7 @@ fn task_plan_keeps_folded_held_counts_and_filters_without_losing_rows() {
     assert!(plan.visible(&plan.nodes.as_slice()[1]));
     task::filter(&mut domain, PlanFilter::All);
     assert_eq!(domain.task_page().plan.nodes.len(), 2);
-    let mut domain = Domain::new(&LIMITS, 22);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -690,7 +690,7 @@ fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
         address::TaskSection,
         page::task::HISTORY_WINDOW,
     };
-    let mut domain = Domain::new(&LIMITS, 22);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -737,7 +737,7 @@ fn task_history_pages_and_scope_changes_discard_old_scope_reads() {
 }
 fn task_parts_follow_the_section_and_leave_with_the_page_generation() {
     use crate::address::TaskSection;
-    let mut domain = Domain::new(&LIMITS, 22);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -813,7 +813,7 @@ fn project_document() -> Project {
     }
 }
 fn project_open(section: ProjectSection) -> (Domain, Box<[Request]>) {
-    let mut domain = Domain::new(&LIMITS, 22);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
     let role = project(1, true);
@@ -1357,7 +1357,7 @@ fn reply_entry(task: u64, seen: u64, last: u64) -> InboxEntry {
 )]
 fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_requests() {
     use crate::{action::Act, objects::Body, page::inbox::Filter};
-    let (mut domain, page) = live_inbox(45);
+    let (mut domain, page) = live_inbox();
     let mut rows = List::with_capacity(1);
     rows.push(reply_entry(8, 4, 7)).unwrap();
     let out = inbox_delivery(&mut domain, page, rows);
@@ -1451,7 +1451,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
     assert!(marked, "an inbox-only reply marks its committed last position");
     assert!(domain.objects().get(id).is_none(), "leaving drops unretained page objects");
 
-    let (mut domain, page) = live_inbox(46);
+    let (mut domain, page) = live_inbox();
     let mut bad = reply_entry(8, 1, 2);
     bad.reply.as_mut().unwrap().chip.task = 9;
     let mut rows = List::with_capacity(1);
@@ -1460,8 +1460,8 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
     assert!(domain.objects().get(domain.objects().find(ObjectKey::Task(8)).unwrap()).unwrap().reply.is_none());
     assert!(domain.objects().find(ObjectKey::Task(9)).is_none(), "mismatched facts cannot name another chat");
 }
-fn live_conversation_page(seed: u64) -> (Domain, skein_lib::Token, skein_lib::Token) {
-    let (mut domain, _) = live_inbox(seed);
+fn live_conversation_page() -> (Domain, skein_lib::Token, skein_lib::Token) {
+    let (mut domain, _) = live_inbox();
     let entered =
         drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
     let watch = open_token(&entered);
@@ -1474,7 +1474,7 @@ fn conversation_reply_windows_replace_sources_drop_rows_and_clear_committed_seen
         action::{Act, End},
         objects::{Body, Source},
     };
-    let (mut domain, watch, first_read) = live_conversation_page(47);
+    let (mut domain, watch, first_read) = live_conversation_page();
     let mut rows = List::with_capacity(2);
     rows.push(list_entry(8, Phase::Idle, 10)).unwrap();
     rows.push(list_entry(9, Phase::Idle, 9)).unwrap();
@@ -1726,7 +1726,7 @@ fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
         };
         row
     };
-    let mut domain = Domain::new(&limits, 88);
+    let mut domain = Domain::new(&limits);
     let f = open_token(&send(
         &mut domain,
         Event::Start {
@@ -1839,7 +1839,7 @@ fn check_inbox_group_pages_keep_orders_cursors_and_live_precedence() {
 }
 #[test]
 fn conversations_address_project_preselects_form_without_filtering_rows() {
-    let (mut domain, _) = live_inbox(89);
+    let (mut domain, _) = live_inbox();
     let entered =
         drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: Some(1) }) });
     let query = Read::Conversations { after: None };
@@ -1986,7 +1986,7 @@ fn procedure_goal_document(until: skein_lib::Wall) -> Project {
 fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers_whole() {
     use crate::{action::Act, fields::Purpose, notices::kept::Kind};
     for away in [false, true] {
-        let mut domain = Domain::new(&LIMITS, 123);
+        let mut domain = Domain::new(&LIMITS);
         let token = start(&mut domain, List::with_capacity(0));
         let mut value = frame(7);
         value.projects = List::with_capacity(1);
@@ -2088,7 +2088,7 @@ fn resource_path(bytes: &[u8]) -> List<Box<[u8]>> {
 #[test]
 fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_slots() {
     use crate::address::TaskSection;
-    let mut domain = Domain::new(&LIMITS, 77);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -2157,7 +2157,7 @@ fn literal_resource_names_keep_boundaries_and_open_grants_do_not_make_resource_s
 
 #[test]
 fn goal_note_scope_keeps_its_supplied_project_instead_of_the_parent_page() {
-    let mut domain = Domain::new(&LIMITS, 88);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -2249,7 +2249,7 @@ fn note_reads_keep_full_writer_identity_and_optional_time_without_changing_the_n
 
 #[test]
 fn task_watch_replacements_preserve_requester_kinds_and_missing_link_facts_with_aggregate_loss() {
-    let mut domain = Domain::new(&LIMITS, 77);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -2293,7 +2293,7 @@ fn task_watch_replacements_preserve_requester_kinds_and_missing_link_facts_with_
 
 #[test]
 fn watched_task_policies_replace_every_channel_without_merging_standing_interests() {
-    let mut domain = Domain::new(&LIMITS, 77);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -2354,7 +2354,7 @@ fn watched_task_policies_replace_every_channel_without_merging_standing_interest
 
 #[test]
 fn task_watch_replacements_keep_served_goal_identity_and_whole_contract_loss_independent() {
-    let mut domain = Domain::new(&LIMITS, 94);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -2395,7 +2395,7 @@ fn task_watch_replacements_keep_served_goal_identity_and_whole_contract_loss_ind
 
 #[test]
 fn task_authority_watch_replacements_keep_bitmap_pattern_and_loss_facts_whole() {
-    let mut domain = Domain::new(&LIMITS, 77);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -2441,7 +2441,7 @@ fn task_authority_watch_replacements_keep_bitmap_pattern_and_loss_facts_whole() 
 
 #[test]
 fn task_budget_watch_replacements_keep_all_owner_numbers_funders_and_optional_deadlines() {
-    let mut domain = Domain::new(&LIMITS, 78);
+    let mut domain = Domain::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -2481,7 +2481,7 @@ fn task_budget_watch_replacements_keep_all_owner_numbers_funders_and_optional_de
 
 #[test]
 fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_reply_positions() {
-    let (mut domain, watch, read) = live_conversation_page(3101);
+    let (mut domain, watch, read) = live_conversation_page();
     let mut old = list_entry(8, Phase::Idle, 99);
     old.cached_replies = 17;
     let mut rows = List::with_capacity(1);
@@ -2548,7 +2548,7 @@ fn owner_conversation_replacement_keeps_absent_facts_whole_text_and_independent_
 #[test]
 fn owner_conversation_order_keeps_missing_clock_rows_in_source_order_and_supplied_clocks_newest_first() {
     for absent in [true, false] {
-        let (mut domain, watch, _) = live_conversation_page(3102);
+        let (mut domain, watch, _) = live_conversation_page();
         let mut first = list_entry(8, Phase::Idle, 1);
         let second = list_entry(9, Phase::Idle, 99);
         if absent {
@@ -2632,7 +2632,7 @@ const UTF8_TEXTS: [&[u8]; 2] = [b"~\0whole", b"~\0opaque-row"];
 
 #[test]
 fn the_inbox_shows_both_groups_of_its_filter() {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, f, frame(7));
     for project in [None, Some(3)] {
@@ -2649,7 +2649,7 @@ fn the_inbox_shows_both_groups_of_its_filter() {
 }
 #[test]
 fn a_task_address_shows_its_own_section_alone() {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, f, frame(7));
     drive(
@@ -2661,7 +2661,7 @@ fn a_task_address_shows_its_own_section_alone() {
 }
 #[test]
 fn a_page_not_about_the_work_shows_no_section() {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     assert_eq!(domain.sections(), &[]);
     let f = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, f, frame(7));
@@ -2673,7 +2673,7 @@ fn a_page_not_about_the_work_shows_no_section() {
 
 #[test]
 fn an_application_page_shows_no_task_after_a_task_page() {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, f, frame(7));
     drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(9)) });
@@ -2728,7 +2728,7 @@ fn no_two_reads_of_a_page_share_a_number() {
 
 #[test]
 fn the_inbox_opens_its_watch_once_for_both_groups() {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, f, frame(7));
     let requests = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Inbox { project: None }) });
@@ -2743,7 +2743,7 @@ fn the_inbox_opens_its_watch_once_for_both_groups() {
 
 #[test]
 fn an_arranged_task_page_lists_every_section_in_order() {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     domain
         .configure_arrangement(arrangement(
             &[
@@ -2791,7 +2791,7 @@ fn settings_stand_for_its_five_on_an_arranged_project_page() {
         ("arranged Settings", ProjectSection::Policy, &[ProjectSection::Settings]),
     ];
     for (label, own, sections) in rows {
-        let mut domain = Domain::new(&LIMITS, 2);
+        let mut domain = Domain::new(&LIMITS);
         let mut value = arrangement(&[], sections);
         value.project.push(ProjectSection::Goals).unwrap();
         value.project.push(ProjectSection::Overview).unwrap();
@@ -2816,7 +2816,7 @@ fn settings_stand_for_its_five_on_an_arranged_project_page() {
 fn an_arranged_task_section_its_document_does_not_offer_is_not_shown() {
     for section in [TaskSection::Plan, TaskSection::Budget, TaskSection::Panels] {
         for own in [TaskSection::Overview, section] {
-            let mut domain = Domain::new(&LIMITS, 2);
+            let mut domain = Domain::new(&LIMITS);
             domain.configure_arrangement(arrangement(&[section], &[])).unwrap();
             let f = start(&mut domain, List::with_capacity(0));
             delivered(&mut domain, Time::ZERO, f, frame(7));
@@ -2858,7 +2858,7 @@ fn source_requests(requests: &[Request]) -> (List<Subject>, List<Read>) {
     (watches, reads)
 }
 fn arranged_task() -> (Domain, Box<[Request]>) {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     domain
         .configure_arrangement(arrangement(
             &[
@@ -2931,7 +2931,7 @@ fn an_arranged_task_page_opens_its_watch_once() {
 }
 #[test]
 fn an_arranged_project_page_opens_the_goals_watch_once() {
-    let mut domain = Domain::new(&LIMITS, 2);
+    let mut domain = Domain::new(&LIMITS);
     domain.configure_arrangement(arrangement(&[], &[ProjectSection::Goals, ProjectSection::Overview])).unwrap();
     let f = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
@@ -2978,7 +2978,7 @@ fn an_arranged_task_document_opens_its_parts_once() {
 
 #[test]
 fn an_object_no_source_names_is_owed_while_deciding() {
-    let mut domain = Domain::new(&LIMITS, 1);
+    let mut domain = Domain::new(&LIMITS);
     let source = crate::objects::Source::Window { generation: 0, number: 0 };
     let id = domain.objects.name(ObjectKey::Task(8), source).unwrap();
     domain.objects.get_mut(id).unwrap().card =
@@ -2988,7 +2988,7 @@ fn an_object_no_source_names_is_owed_while_deciding() {
 }
 
 fn application_page() -> Domain {
-    let mut domain = Domain::new(&LIMITS, 1);
+    let mut domain = Domain::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
     finish_initial_inbox_reads(&mut domain, &initial);
@@ -3101,7 +3101,7 @@ fn a_sections_dropped_watch_shows_that_section_behind() {
     let mut domain = application_page();
     let section = Section::Task { task: 8, section: TaskSection::Plan };
     let opened = show_sections(&mut domain, &[section, Section::Deployment]);
-    drive(&mut domain, Time::ZERO, Event::Ended { watch: open_token(&opened), end: WatchEnd::Dropped });
+    drive(&mut domain, Time::ZERO, Event::Watch { watch: open_token(&opened), event: WatchEvent::Behind });
     let clear = crate::page::SectionStatus { behind: false, excess: 0, refused: None, missing: false };
     assert_eq!(domain.section_status(section), Some(crate::page::SectionStatus { behind: true, ..clear }));
     assert_eq!(domain.section_status(Section::Deployment), Some(clear));
