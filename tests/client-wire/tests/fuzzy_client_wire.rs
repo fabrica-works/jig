@@ -343,6 +343,11 @@ fn records_7(bytes: &[u8]) {
     check!(ContractChange, bytes);
     check!(BudgetAsAllowed, bytes);
     check!(Create, bytes);
+    check!(ProposeBatch, bytes);
+    check!(ProposeAmendment, bytes);
+    check!(ProposeAction, bytes);
+    check!(Propose, bytes);
+    check!(Withdraw, bytes);
     check!(NewTask, bytes);
     check!(TaskRef, bytes);
     check!(NewContract, bytes);
@@ -376,7 +381,8 @@ fn records_8(bytes: &[u8]) {
     check!(OwnerOutcomeQuestionAnswered, bytes);
     check!(OwnerOutcomePrioritised, bytes);
     check!(OwnerOutcomeAmended, bytes);
-    check!(OwnerOutcomeAmendProposed, bytes);
+    check!(OwnerOutcomeProposed, bytes);
+    check!(OwnerOutcomeWithdrawn, bytes);
     check!(OwnerOutcomeRolesSet, bytes);
     check!(OwnerOutcomePolicyChanged, bytes);
     check!(OwnerOutcomePoolSet, bytes);

@@ -6,7 +6,7 @@ use jig_client_domain::contract::{
 use skein_lib::Wall;
 use std::mem::size_of;
 
-fn maximum_outcomes() -> [OwnerOutcome; 26] {
+fn maximum_outcomes() -> [OwnerOutcome; 27] {
     [
         OwnerOutcome::Closing { chat: u64::MAX, cancelled: u32::MAX, kept: u32::MAX },
         OwnerOutcome::MarkedSeen { seen: SeenThrough::Results { through: u64::MAX } },
@@ -33,7 +33,8 @@ fn maximum_outcomes() -> [OwnerOutcome; 26] {
         OwnerOutcome::QuestionAnswered { task: u64::MAX, question: u64::MAX, message: u64::MAX },
         OwnerOutcome::Prioritised { project: u32::MAX },
         OwnerOutcome::Amended { task: u64::MAX },
-        OwnerOutcome::AmendProposed { task: u64::MAX, proposal: u64::MAX },
+        OwnerOutcome::Proposed { proposal: u64::MAX },
+        OwnerOutcome::Withdrawn { proposal: u64::MAX },
         OwnerOutcome::RolesSet { project: u32::MAX },
         OwnerOutcome::PolicyChanged { project: u32::MAX },
         OwnerOutcome::PoolSet { project: u32::MAX, person: u64::MAX },
@@ -97,7 +98,7 @@ fn closed_decision_choices_and_release_flags_need_no_explanation_payload() {
         for value in [
             OwnerOutcome::Said { task: 7, message: 11 },
             OwnerOutcome::Amended { task: 13 },
-            OwnerOutcome::AmendProposed { task: 17, proposal: 23 },
+            OwnerOutcome::Proposed { proposal: 23 },
         ] {
             assert_eq!(owner_outcome_bytes(&value, &bounds), Some(bytes));
             assert_eq!(admit_owner_outcome(&value, &bounds), Ok(()));

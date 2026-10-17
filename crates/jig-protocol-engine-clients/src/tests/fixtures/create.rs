@@ -149,7 +149,7 @@ fn list<T, const N: usize>(values: [T; N]) -> List<T> {
     list
 }
 
-pub fn create_refusals() -> [(&'static str, p::Refusal, w::Refusal); 4] {
+pub fn create_refusals() -> [(&'static str, p::Refusal, w::Refusal); 5] {
     let l = wire();
     [
         (
@@ -176,6 +176,14 @@ pub fn create_refusals() -> [(&'static str, p::Refusal, w::Refusal); 4] {
             p::Refusal::NotWellFormed { at: 3, why: p::Malformed::Cycle },
             w::Refusal::Malformed(
                 w::RefusalMalformed::new(&l, w::RefusalMalformedParts { at: 3, why: w::Malformed::Cycle }).unwrap(),
+            ),
+        ),
+        (
+            "proposed AsAllowed",
+            p::Refusal::NotWellFormed { at: 4, why: p::Malformed::ProposedAsAllowed },
+            w::Refusal::Malformed(
+                w::RefusalMalformed::new(&l, w::RefusalMalformedParts { at: 4, why: w::Malformed::ProposedAsAllowed })
+                    .unwrap(),
             ),
         ),
         (

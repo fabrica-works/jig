@@ -579,6 +579,10 @@ pub(crate) fn wire_holding(value: &c::Holding, limits: &w::Limits) -> Result<w::
 #[expect(clippy::too_many_lines, reason = "one exhaustive field translation arm per client ask")]
 pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
     Ok(match value {
+        c::Ask::Propose { project, action, reason } => super::operations::propose(*project, action, reason, limits)?,
+        c::Ask::Withdraw { project, proposal } => {
+            w::Ask::Withdraw(w::Withdraw::new(limits, w::WithdrawParts { project: *project, proposal: *proposal })?)
+        }
         c::Ask::Create { project, tasks } => super::operations::create(*project, tasks, limits)?,
         c::Ask::Compound { project, operations } => super::compound::encode(*project, operations, limits)?,
         c::Ask::StartChat { project, words } => w::Ask::StartChat(w::StartChat::new(

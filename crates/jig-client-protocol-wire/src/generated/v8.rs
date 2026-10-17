@@ -98,6 +98,8 @@ pub struct Limits {
     pub new_task_dependencies: u32,
     pub new_task_named: u32,
     pub create_tasks: u32,
+    pub propose_batch_tasks: u32,
+    pub propose_reason: u32,
     pub made_tasks_tasks: u32,
     pub made_service_credential: u32,
     pub cursor_value: u32,
@@ -379,6 +381,8 @@ pub const CEILINGS: Limits = Limits {
     new_task_dependencies: 32,
     new_task_named: 16_777_216,
     create_tasks: 1_048_576,
+    propose_batch_tasks: 1_048_576,
+    propose_reason: 65_536,
     made_tasks_tasks: 32,
     made_service_credential: 40,
     cursor_value: 1_024,
@@ -2307,6 +2311,34 @@ pub enum Path {
     CreateTasks,
     /// Bytes after `Create`.
     CreateTail,
+    /// The `tasks` field of `ProposeBatch`.
+    ProposeBatchTasks,
+    /// Bytes after `ProposeBatch`.
+    ProposeBatchTail,
+    /// The `task` field of `ProposeAmendment`.
+    ProposeAmendmentTask,
+    /// The `revision` field of `ProposeAmendment`.
+    ProposeAmendmentRevision,
+    /// The `change` field of `ProposeAmendment`.
+    ProposeAmendmentChange,
+    /// Bytes after `ProposeAmendment`.
+    ProposeAmendmentTail,
+    /// The tag of `ProposeAction`.
+    ProposeActionTag,
+    /// The `project` field of `Propose`.
+    ProposeProject,
+    /// The `action` field of `Propose`.
+    ProposeAction,
+    /// The `reason` field of `Propose`.
+    ProposeReason,
+    /// Bytes after `Propose`.
+    ProposeTail,
+    /// The `project` field of `Withdraw`.
+    WithdrawProject,
+    /// The `proposal` field of `Withdraw`.
+    WithdrawProposal,
+    /// Bytes after `Withdraw`.
+    WithdrawTail,
     /// The tag of `Ask`.
     AskTag,
     /// The tag of `OwnerProposalChoice`.
@@ -2405,12 +2437,14 @@ pub enum Path {
     OwnerOutcomeAmendedTask,
     /// Bytes after `OwnerOutcomeAmended`.
     OwnerOutcomeAmendedTail,
-    /// The `task` field of `OwnerOutcomeAmendProposed`.
-    OwnerOutcomeAmendProposedTask,
-    /// The `proposal` field of `OwnerOutcomeAmendProposed`.
-    OwnerOutcomeAmendProposedProposal,
-    /// Bytes after `OwnerOutcomeAmendProposed`.
-    OwnerOutcomeAmendProposedTail,
+    /// The `proposal` field of `OwnerOutcomeProposed`.
+    OwnerOutcomeProposedProposal,
+    /// Bytes after `OwnerOutcomeProposed`.
+    OwnerOutcomeProposedTail,
+    /// The `proposal` field of `OwnerOutcomeWithdrawn`.
+    OwnerOutcomeWithdrawnProposal,
+    /// Bytes after `OwnerOutcomeWithdrawn`.
+    OwnerOutcomeWithdrawnTail,
     /// The `project` field of `OwnerOutcomeRolesSet`.
     OwnerOutcomeRolesSetProject,
     /// Bytes after `OwnerOutcomeRolesSet`.
@@ -5972,6 +6006,8 @@ fn check_limits_0(limits: &Limits) -> Result<(), Problem> {
 fn check_limits_1(limits: &Limits) -> Result<(), Problem> {
     if limits.new_task_named > CEILINGS.new_task_named { return Err(Problem { path: Path::NewTaskNamed, reason: skein_codec::Reason::Bound }); }
     if limits.create_tasks > CEILINGS.create_tasks { return Err(Problem { path: Path::CreateTasks, reason: skein_codec::Reason::Bound }); }
+    if limits.propose_batch_tasks > CEILINGS.propose_batch_tasks { return Err(Problem { path: Path::ProposeBatchTasks, reason: skein_codec::Reason::Bound }); }
+    if limits.propose_reason > CEILINGS.propose_reason { return Err(Problem { path: Path::ProposeReason, reason: skein_codec::Reason::Bound }); }
     if limits.made_tasks_tasks > CEILINGS.made_tasks_tasks { return Err(Problem { path: Path::MadeTasksTasks, reason: skein_codec::Reason::Bound }); }
     if limits.made_service_credential > CEILINGS.made_service_credential { return Err(Problem { path: Path::MadeServiceCredential, reason: skein_codec::Reason::Bound }); }
     if limits.cursor_value > CEILINGS.cursor_value { return Err(Problem { path: Path::CursorValue, reason: skein_codec::Reason::Bound }); }
@@ -6058,12 +6094,12 @@ fn check_limits_1(limits: &Limits) -> Result<(), Problem> {
     if limits.inbox_replies_seen > CEILINGS.inbox_replies_seen { return Err(Problem { path: Path::InboxRepliesSeen, reason: skein_codec::Reason::Bound }); }
     if limits.conversations_rows > CEILINGS.conversations_rows { return Err(Problem { path: Path::ConversationsRows, reason: skein_codec::Reason::Bound }); }
     if limits.goals_rows > CEILINGS.goals_rows { return Err(Problem { path: Path::GoalsRows, reason: skein_codec::Reason::Bound }); }
-    if limits.tasks_rows > CEILINGS.tasks_rows { return Err(Problem { path: Path::TasksRows, reason: skein_codec::Reason::Bound }); }
-    if limits.call_tool > CEILINGS.call_tool { return Err(Problem { path: Path::CallTool, reason: skein_codec::Reason::Bound }); }
     Ok(())
 }
 
 fn check_limits_2(limits: &Limits) -> Result<(), Problem> {
+    if limits.tasks_rows > CEILINGS.tasks_rows { return Err(Problem { path: Path::TasksRows, reason: skein_codec::Reason::Bound }); }
+    if limits.call_tool > CEILINGS.call_tool { return Err(Problem { path: Path::CallTool, reason: skein_codec::Reason::Bound }); }
     if limits.call_input > CEILINGS.call_input { return Err(Problem { path: Path::CallInput, reason: skein_codec::Reason::Bound }); }
     if limits.call_outcome_some > CEILINGS.call_outcome_some { return Err(Problem { path: Path::CallOutcome, reason: skein_codec::Reason::Bound }); }
     if limits.call_objects > CEILINGS.call_objects { return Err(Problem { path: Path::CallObjects, reason: skein_codec::Reason::Bound }); }
@@ -6152,12 +6188,12 @@ fn check_limits_2(limits: &Limits) -> Result<(), Problem> {
     if limits.owner_deployment_accounts > CEILINGS.owner_deployment_accounts { return Err(Problem { path: Path::OwnerDeploymentAccounts, reason: skein_codec::Reason::Bound }); }
     if limits.owner_deployment_projects > CEILINGS.owner_deployment_projects { return Err(Problem { path: Path::OwnerDeploymentProjects, reason: skein_codec::Reason::Bound }); }
     if limits.owner_deployment_hello_refusals > CEILINGS.owner_deployment_hello_refusals { return Err(Problem { path: Path::OwnerDeploymentHelloRefusals, reason: skein_codec::Reason::Bound }); }
-    if limits.owner_deployment_person_room_refusals > CEILINGS.owner_deployment_person_room_refusals { return Err(Problem { path: Path::OwnerDeploymentPersonRoomRefusals, reason: skein_codec::Reason::Bound }); }
-    if limits.owner_deployment_task_room_refusals > CEILINGS.owner_deployment_task_room_refusals { return Err(Problem { path: Path::OwnerDeploymentTaskRoomRefusals, reason: skein_codec::Reason::Bound }); }
     Ok(())
 }
 
 fn check_limits_3(limits: &Limits) -> Result<(), Problem> {
+    if limits.owner_deployment_person_room_refusals > CEILINGS.owner_deployment_person_room_refusals { return Err(Problem { path: Path::OwnerDeploymentPersonRoomRefusals, reason: skein_codec::Reason::Bound }); }
+    if limits.owner_deployment_task_room_refusals > CEILINGS.owner_deployment_task_room_refusals { return Err(Problem { path: Path::OwnerDeploymentTaskRoomRefusals, reason: skein_codec::Reason::Bound }); }
     if limits.owner_deployment_connectors > CEILINGS.owner_deployment_connectors { return Err(Problem { path: Path::OwnerDeploymentConnectors, reason: skein_codec::Reason::Bound }); }
     if limits.kept_record > CEILINGS.kept_record { return Err(Problem { path: Path::KeptRecord, reason: skein_codec::Reason::Bound }); }
     if limits.table_entry_request > CEILINGS.table_entry_request { return Err(Problem { path: Path::TableEntryRequest, reason: skein_codec::Reason::Bound }); }
@@ -18462,6 +18498,207 @@ impl Create {
     }
 }
 
+/// Movable fields of `ProposeBatch`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ProposeBatchParts {
+    /// The `tasks` field.
+    pub tasks: Box<[u8]>,
+}
+
+/// `ProposeBatch` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ProposeBatch {
+    tasks: Box<[u8]>,
+}
+
+impl ProposeBatch {
+    /// Makes a value within the given limits.
+    pub fn new(limits: &Limits, parts: ProposeBatchParts) -> Result<Self, Problem> {
+        let ProposeBatchParts { tasks } = parts;
+        let value = Self { tasks };
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    /// Reads the `tasks` field.
+    #[must_use]
+    pub fn tasks(&self) -> &[u8] { &self.tasks }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> ProposeBatchParts { ProposeBatchParts { tasks: self.tasks } }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        if self.tasks.len() > usize::try_from(limits.propose_batch_tasks.min(CEILINGS.propose_batch_tasks)).expect("u32 fits usize") { return Err(Problem { path: Path::ProposeBatchTasks, reason: skein_codec::Reason::Bound }); }
+        Ok(())
+    }
+}
+
+/// Movable fields of `ProposeAmendment`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ProposeAmendmentParts {
+    /// The `task` field.
+    pub task: u64,
+    /// The `revision` field.
+    pub revision: Revision,
+    /// The `change` field.
+    pub change: Amendment,
+}
+
+/// `ProposeAmendment` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ProposeAmendment {
+    task: u64,
+    revision: Revision,
+    change: Amendment,
+}
+
+impl ProposeAmendment {
+    /// Makes a value within the given limits.
+    pub fn new(limits: &Limits, parts: ProposeAmendmentParts) -> Result<Self, Problem> {
+        let ProposeAmendmentParts { task, revision, change } = parts;
+        let value = Self { task, revision, change };
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    /// Reads the `task` field.
+    #[must_use]
+    pub fn task(&self) -> u64 { self.task }
+
+    /// Reads the `revision` field.
+    #[must_use]
+    pub fn revision(&self) -> &Revision { &self.revision }
+
+    /// Reads the `change` field.
+    #[must_use]
+    pub fn change(&self) -> &Amendment { &self.change }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> ProposeAmendmentParts { ProposeAmendmentParts { task: self.task, revision: self.revision, change: self.change } }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        self.change.check(limits)?;
+        Ok(())
+    }
+}
+
+/// `ProposeAction` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ProposeAction {
+    /// `batch` carrying `ProposeBatch`.
+    Batch(ProposeBatch),
+    /// `amendment` carrying `Box<ProposeAmendment>`.
+    Amendment(Box<ProposeAmendment>),
+}
+
+impl ProposeAction {
+    /// Checks the payload against the given limits.
+    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        match self {
+            Self::Batch(record) => ProposeBatch::check(record, limits),
+            Self::Amendment(record) => ProposeAmendment::check(record, limits),
+        }?;
+        Ok(())
+    }
+}
+
+/// Movable fields of `Propose`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ProposeParts {
+    /// The `project` field.
+    pub project: u32,
+    /// The `action` field.
+    pub action: ProposeAction,
+    /// The `reason` field.
+    pub reason: Box<[u8]>,
+}
+
+/// `Propose` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Propose {
+    project: u32,
+    action: ProposeAction,
+    reason: Box<[u8]>,
+}
+
+impl Propose {
+    /// Makes a value within the given limits.
+    pub fn new(limits: &Limits, parts: ProposeParts) -> Result<Self, Problem> {
+        let ProposeParts { project, action, reason } = parts;
+        let value = Self { project, action, reason };
+        value.check(limits)?;
+        Ok(value)
+    }
+
+    /// Reads the `project` field.
+    #[must_use]
+    pub fn project(&self) -> u32 { self.project }
+
+    /// Reads the `action` field.
+    #[must_use]
+    pub fn action(&self) -> &ProposeAction { &self.action }
+
+    /// Reads the `reason` field.
+    #[must_use]
+    pub fn reason(&self) -> &[u8] { &self.reason }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> ProposeParts { ProposeParts { project: self.project, action: self.action, reason: self.reason } }
+
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        self.action.check(limits)?;
+        if self.reason.len() > usize::try_from(limits.propose_reason.min(CEILINGS.propose_reason)).expect("u32 fits usize") { return Err(Problem { path: Path::ProposeReason, reason: skein_codec::Reason::Bound }); }
+        if !skein_codec::text_is_valid(self.reason.as_ref()) { return Err(Problem { path: Path::ProposeReason, reason: skein_codec::Reason::Utf8 }); }
+        Ok(())
+    }
+}
+
+/// Movable fields of `Withdraw`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct WithdrawParts {
+    /// The `project` field.
+    pub project: u32,
+    /// The `proposal` field.
+    pub proposal: u64,
+}
+
+/// `Withdraw` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Withdraw {
+    project: u32,
+    proposal: u64,
+}
+
+impl Withdraw {
+    /// Makes a value within the given limits.
+    pub fn new(_limits: &Limits, parts: WithdrawParts) -> Result<Self, Problem> {
+        let WithdrawParts { project, proposal } = parts;
+        let value = Self { project, proposal };
+        Ok(value)
+    }
+
+    /// Reads the `project` field.
+    #[must_use]
+    pub fn project(&self) -> u32 { self.project }
+
+    /// Reads the `proposal` field.
+    #[must_use]
+    pub fn proposal(&self) -> u64 { self.proposal }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> WithdrawParts { WithdrawParts { project: self.project, proposal: self.proposal } }
+
+}
+
 /// `Ask` in this codec family.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ask {
@@ -18511,6 +18748,10 @@ pub enum Ask {
     Compound(Compound),
     /// `create` carrying `Create`.
     Create(Create),
+    /// `propose` carrying `Propose`.
+    Propose(Propose),
+    /// `withdraw` carrying `Withdraw`.
+    Withdraw(Withdraw),
 }
 
 impl Ask {
@@ -18539,7 +18780,8 @@ impl Ask {
             Self::MakeService(record) => MakeService::check(record, limits),
             Self::Compound(record) => Compound::check(record, limits),
             Self::Create(record) => Create::check(record, limits),
-            Self::Take(_) | Self::HandBack(_) | Self::Release(_) | Self::Stop(_) | Self::Seen(_) | Self::SetPool(_) => Ok(()),
+            Self::Propose(record) => Propose::check(record, limits),
+            Self::Take(_) | Self::HandBack(_) | Self::Release(_) | Self::Stop(_) | Self::Seen(_) | Self::SetPool(_) | Self::Withdraw(_) => Ok(()),
         }?;
         Ok(())
     }
@@ -19232,33 +19474,26 @@ impl OwnerOutcomeAmended {
 
 }
 
-/// Movable fields of `OwnerOutcomeAmendProposed`.
+/// Movable fields of `OwnerOutcomeProposed`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct OwnerOutcomeAmendProposedParts {
-    /// The `task` field.
-    pub task: u64,
+pub struct OwnerOutcomeProposedParts {
     /// The `proposal` field.
     pub proposal: u64,
 }
 
-/// `OwnerOutcomeAmendProposed` in this codec family.
+/// `OwnerOutcomeProposed` in this codec family.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct OwnerOutcomeAmendProposed {
-    task: u64,
+pub struct OwnerOutcomeProposed {
     proposal: u64,
 }
 
-impl OwnerOutcomeAmendProposed {
+impl OwnerOutcomeProposed {
     /// Makes a value within the given limits.
-    pub fn new(_limits: &Limits, parts: OwnerOutcomeAmendProposedParts) -> Result<Self, Problem> {
-        let OwnerOutcomeAmendProposedParts { task, proposal } = parts;
-        let value = Self { task, proposal };
+    pub fn new(_limits: &Limits, parts: OwnerOutcomeProposedParts) -> Result<Self, Problem> {
+        let OwnerOutcomeProposedParts { proposal } = parts;
+        let value = Self { proposal };
         Ok(value)
     }
-
-    /// Reads the `task` field.
-    #[must_use]
-    pub fn task(&self) -> u64 { self.task }
 
     /// Reads the `proposal` field.
     #[must_use]
@@ -19266,7 +19501,38 @@ impl OwnerOutcomeAmendProposed {
 
     /// Moves the fields out without copying.
     #[must_use]
-    pub fn into_parts(self) -> OwnerOutcomeAmendProposedParts { OwnerOutcomeAmendProposedParts { task: self.task, proposal: self.proposal } }
+    pub fn into_parts(self) -> OwnerOutcomeProposedParts { OwnerOutcomeProposedParts { proposal: self.proposal } }
+
+}
+
+/// Movable fields of `OwnerOutcomeWithdrawn`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct OwnerOutcomeWithdrawnParts {
+    /// The `proposal` field.
+    pub proposal: u64,
+}
+
+/// `OwnerOutcomeWithdrawn` in this codec family.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct OwnerOutcomeWithdrawn {
+    proposal: u64,
+}
+
+impl OwnerOutcomeWithdrawn {
+    /// Makes a value within the given limits.
+    pub fn new(_limits: &Limits, parts: OwnerOutcomeWithdrawnParts) -> Result<Self, Problem> {
+        let OwnerOutcomeWithdrawnParts { proposal } = parts;
+        let value = Self { proposal };
+        Ok(value)
+    }
+
+    /// Reads the `proposal` field.
+    #[must_use]
+    pub fn proposal(&self) -> u64 { self.proposal }
+
+    /// Moves the fields out without copying.
+    #[must_use]
+    pub fn into_parts(self) -> OwnerOutcomeWithdrawnParts { OwnerOutcomeWithdrawnParts { proposal: self.proposal } }
 
 }
 
@@ -19629,8 +19895,10 @@ pub enum OwnerOutcome {
     Prioritised(OwnerOutcomePrioritised),
     /// `amended` carrying `OwnerOutcomeAmended`.
     Amended(OwnerOutcomeAmended),
-    /// `amend_proposed` carrying `OwnerOutcomeAmendProposed`.
-    AmendProposed(OwnerOutcomeAmendProposed),
+    /// `proposed` carrying `OwnerOutcomeProposed`.
+    Proposed(OwnerOutcomeProposed),
+    /// `withdrawn` carrying `OwnerOutcomeWithdrawn`.
+    Withdrawn(OwnerOutcomeWithdrawn),
     /// `roles_set` carrying `OwnerOutcomeRolesSet`.
     RolesSet(OwnerOutcomeRolesSet),
     /// `policy_changed` carrying `OwnerOutcomePolicyChanged`.
@@ -21384,6 +21652,8 @@ pub enum Malformed {
     ConversationNotAgent,
     /// `cycle` without a payload.
     Cycle,
+    /// `proposed_as_allowed` without a payload.
+    ProposedAsAllowed,
 }
 
 impl Malformed {
@@ -54309,6 +54579,188 @@ impl Create {
     }
 }
 
+impl ProposeBatch {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        let field_tasks = &self.tasks;
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        size = size.checked_add(u32::try_from(field_tasks.len()).expect("field ceiling fits u32")).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        let field_tasks = &self.tasks;
+        writer.put(&u32::try_from(field_tasks.len()).expect("field ceiling fits u32").to_be_bytes())?;
+        writer.put(field_tasks.as_ref())?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::ProposeBatchTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let decoded_tasks = { let length = match skein_codec::read_len(reader, limits.propose_batch_tasks.min(CEILINGS.propose_batch_tasks)) { Ok(length) => length, Err(reason) => return Err(Problem { path: Path::ProposeBatchTasks, reason }), }; Box::from(reader.bytes(length).ok_or(Problem { path: Path::ProposeBatchTasks, reason: skein_codec::Reason::Short })?) };
+        Ok(Self { tasks: decoded_tasks })
+    }
+}
+
+impl ProposeAmendment {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        size = size.checked_add(8).expect("schema ceilings fit u32");
+        let field_revision = &self.revision;
+        size = size.checked_add(field_revision.measure()).expect("schema ceilings fit u32");
+        let field_change = &self.change;
+        size = size.checked_add(field_change.measure()).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        let field_task = &self.task;
+        writer.put(&field_task.to_be_bytes())?;
+        let field_revision = &self.revision;
+        field_revision.encode(writer)?;
+        let field_change = &self.change;
+        field_change.encode(writer)?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::ProposeAmendmentTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let decoded_task = reader.u64().ok_or(Problem { path: Path::ProposeAmendmentTask, reason: skein_codec::Reason::Short })?;
+        let decoded_revision = Revision::decode_from(limits, reader)?;
+        let decoded_change = Amendment::decode_from(limits, reader)?;
+        Ok(Self { task: decoded_task, revision: decoded_revision, change: decoded_change })
+    }
+}
+
+impl ProposeAction {
+    /// Measures this variant's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        match self {
+            Self::Batch(record) => 1_u32.checked_add(ProposeBatch::measure(record)).expect("schema ceilings fit u32"),
+            Self::Amendment(record) => 1_u32.checked_add(ProposeAmendment::measure(record)).expect("schema ceilings fit u32"),
+        }
+    }
+
+    /// Writes this variant's tag and payload.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        match self {
+            Self::Batch(record) => { writer.put(&[0_u8])?; record.encode(writer)?; }
+            Self::Amendment(record) => { writer.put(&[1_u8])?; record.encode(writer)?; }
+        }
+        Ok(())
+    }
+
+    /// Reads a whole variant and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::ProposeActionTag, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let tag = reader.u8().ok_or(Problem { path: Path::ProposeActionTag, reason: skein_codec::Reason::Short })?;
+        let value = match tag {
+            0 => Self::Batch(ProposeBatch::decode_from(limits, reader)?),
+            1 => Self::Amendment(Box::new(ProposeAmendment::decode_from(limits, reader)?)),
+            _ => return Err(Problem { path: Path::ProposeActionTag, reason: skein_codec::Reason::Tag }),
+        };
+        Ok(value)
+    }
+}
+
+impl Propose {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        let field_action = &self.action;
+        size = size.checked_add(field_action.measure()).expect("schema ceilings fit u32");
+        let field_reason = &self.reason;
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        size = size.checked_add(u32::try_from(field_reason.len()).expect("field ceiling fits u32")).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        let field_project = &self.project;
+        writer.put(&field_project.to_be_bytes())?;
+        let field_action = &self.action;
+        field_action.encode(writer)?;
+        let field_reason = &self.reason;
+        writer.put(&u32::try_from(field_reason.len()).expect("field ceiling fits u32").to_be_bytes())?;
+        writer.put(field_reason.as_ref())?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::ProposeTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let decoded_project = reader.u32().ok_or(Problem { path: Path::ProposeProject, reason: skein_codec::Reason::Short })?;
+        let decoded_action = ProposeAction::decode_from(limits, reader)?;
+        let decoded_reason = match skein_codec::read_text(reader, limits.propose_reason.min(CEILINGS.propose_reason)) { Ok(text) => text, Err(reason) => return Err(Problem { path: Path::ProposeReason, reason }), };
+        Ok(Self { project: decoded_project, action: decoded_action, reason: decoded_reason })
+    }
+}
+
+impl Withdraw {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        size = size.checked_add(8).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        let field_project = &self.project;
+        writer.put(&field_project.to_be_bytes())?;
+        let field_proposal = &self.proposal;
+        writer.put(&field_proposal.to_be_bytes())?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::WithdrawTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let decoded_project = reader.u32().ok_or(Problem { path: Path::WithdrawProject, reason: skein_codec::Reason::Short })?;
+        let decoded_proposal = reader.u64().ok_or(Problem { path: Path::WithdrawProposal, reason: skein_codec::Reason::Short })?;
+        Ok(Self { project: decoded_project, proposal: decoded_proposal })
+    }
+}
+
 impl Ask {
     /// Measures this variant's wire encoding.
     #[must_use]
@@ -54337,6 +54789,8 @@ impl Ask {
             Self::SetPool(record) => 1_u32.checked_add(SetPool::measure(record)).expect("schema ceilings fit u32"),
             Self::Compound(record) => 1_u32.checked_add(Compound::measure(record)).expect("schema ceilings fit u32"),
             Self::Create(record) => 1_u32.checked_add(Create::measure(record)).expect("schema ceilings fit u32"),
+            Self::Propose(record) => 1_u32.checked_add(Propose::measure(record)).expect("schema ceilings fit u32"),
+            Self::Withdraw(record) => 1_u32.checked_add(Withdraw::measure(record)).expect("schema ceilings fit u32"),
         }
     }
 
@@ -54366,6 +54820,8 @@ impl Ask {
             Self::SetPool(record) => { writer.put(&[20_u8])?; record.encode(writer)?; }
             Self::Compound(record) => { writer.put(&[21_u8])?; record.encode(writer)?; }
             Self::Create(record) => { writer.put(&[22_u8])?; record.encode(writer)?; }
+            Self::Propose(record) => { writer.put(&[23_u8])?; record.encode(writer)?; }
+            Self::Withdraw(record) => { writer.put(&[24_u8])?; record.encode(writer)?; }
         }
         Ok(())
     }
@@ -54403,6 +54859,8 @@ impl Ask {
             20 => Self::SetPool(SetPool::decode_from(limits, reader)?),
             21 => Self::Compound(Compound::decode_from(limits, reader)?),
             22 => Self::Create(Create::decode_from(limits, reader)?),
+            23 => Self::Propose(Propose::decode_from(limits, reader)?),
+            24 => Self::Withdraw(Withdraw::decode_from(limits, reader)?),
             _ => return Err(Problem { path: Path::AskTag, reason: skein_codec::Reason::Tag }),
         };
         Ok(value)
@@ -55075,20 +55533,17 @@ impl OwnerOutcomeAmended {
     }
 }
 
-impl OwnerOutcomeAmendProposed {
+impl OwnerOutcomeProposed {
     /// Measures this record's wire encoding.
     #[must_use]
     pub fn measure(&self) -> u32 {
         let mut size = 0_u32;
-        size = size.checked_add(8).expect("schema ceilings fit u32");
         size = size.checked_add(8).expect("schema ceilings fit u32");
         size
     }
 
     /// Writes into a writer with room for the measured bytes.
     pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
-        let field_task = &self.task;
-        writer.put(&field_task.to_be_bytes())?;
         let field_proposal = &self.proposal;
         writer.put(&field_proposal.to_be_bytes())?;
         Ok(())
@@ -55097,14 +55552,42 @@ impl OwnerOutcomeAmendProposed {
     /// Reads a whole record and refuses trailing bytes.
     pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
         let value = Self::decode_from(limits, reader)?;
-        if !reader.is_empty() { return Err(Problem { path: Path::OwnerOutcomeAmendProposedTail, reason: skein_codec::Reason::Trailing }); }
+        if !reader.is_empty() { return Err(Problem { path: Path::OwnerOutcomeProposedTail, reason: skein_codec::Reason::Trailing }); }
         Ok(value)
     }
 
     fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        let decoded_task = reader.u64().ok_or(Problem { path: Path::OwnerOutcomeAmendProposedTask, reason: skein_codec::Reason::Short })?;
-        let decoded_proposal = reader.u64().ok_or(Problem { path: Path::OwnerOutcomeAmendProposedProposal, reason: skein_codec::Reason::Short })?;
-        Ok(Self { task: decoded_task, proposal: decoded_proposal })
+        let decoded_proposal = reader.u64().ok_or(Problem { path: Path::OwnerOutcomeProposedProposal, reason: skein_codec::Reason::Short })?;
+        Ok(Self { proposal: decoded_proposal })
+    }
+}
+
+impl OwnerOutcomeWithdrawn {
+    /// Measures this record's wire encoding.
+    #[must_use]
+    pub fn measure(&self) -> u32 {
+        let mut size = 0_u32;
+        size = size.checked_add(8).expect("schema ceilings fit u32");
+        size
+    }
+
+    /// Writes into a writer with room for the measured bytes.
+    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
+        let field_proposal = &self.proposal;
+        writer.put(&field_proposal.to_be_bytes())?;
+        Ok(())
+    }
+
+    /// Reads a whole record and refuses trailing bytes.
+    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let value = Self::decode_from(limits, reader)?;
+        if !reader.is_empty() { return Err(Problem { path: Path::OwnerOutcomeWithdrawnTail, reason: skein_codec::Reason::Trailing }); }
+        Ok(value)
+    }
+
+    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+        let decoded_proposal = reader.u64().ok_or(Problem { path: Path::OwnerOutcomeWithdrawnProposal, reason: skein_codec::Reason::Short })?;
+        Ok(Self { proposal: decoded_proposal })
     }
 }
 
@@ -55416,7 +55899,8 @@ impl OwnerOutcome {
             Self::QuestionAnswered(record) => 1_u32.checked_add(OwnerOutcomeQuestionAnswered::measure(record)).expect("schema ceilings fit u32"),
             Self::Prioritised(record) => 1_u32.checked_add(OwnerOutcomePrioritised::measure(record)).expect("schema ceilings fit u32"),
             Self::Amended(record) => 1_u32.checked_add(OwnerOutcomeAmended::measure(record)).expect("schema ceilings fit u32"),
-            Self::AmendProposed(record) => 1_u32.checked_add(OwnerOutcomeAmendProposed::measure(record)).expect("schema ceilings fit u32"),
+            Self::Proposed(record) => 1_u32.checked_add(OwnerOutcomeProposed::measure(record)).expect("schema ceilings fit u32"),
+            Self::Withdrawn(record) => 1_u32.checked_add(OwnerOutcomeWithdrawn::measure(record)).expect("schema ceilings fit u32"),
             Self::RolesSet(record) => 1_u32.checked_add(OwnerOutcomeRolesSet::measure(record)).expect("schema ceilings fit u32"),
             Self::PolicyChanged(record) => 1_u32.checked_add(OwnerOutcomePolicyChanged::measure(record)).expect("schema ceilings fit u32"),
             Self::PoolSet(record) => 1_u32.checked_add(OwnerOutcomePoolSet::measure(record)).expect("schema ceilings fit u32"),
@@ -55449,14 +55933,15 @@ impl OwnerOutcome {
             Self::QuestionAnswered(record) => { writer.put(&[16_u8])?; record.encode(writer)?; }
             Self::Prioritised(record) => { writer.put(&[17_u8])?; record.encode(writer)?; }
             Self::Amended(record) => { writer.put(&[18_u8])?; record.encode(writer)?; }
-            Self::AmendProposed(record) => { writer.put(&[19_u8])?; record.encode(writer)?; }
-            Self::RolesSet(record) => { writer.put(&[20_u8])?; record.encode(writer)?; }
-            Self::PolicyChanged(record) => { writer.put(&[21_u8])?; record.encode(writer)?; }
-            Self::PoolSet(record) => { writer.put(&[22_u8])?; record.encode(writer)?; }
-            Self::EscalationDecided(record) => { writer.put(&[23_u8])?; record.encode(writer)?; }
-            Self::Started(record) => { writer.put(&[24_u8])?; record.encode(writer)?; }
-            Self::Compound(record) => { writer.put(&[25_u8])?; record.encode(writer)?; }
-            Self::Created(record) => { writer.put(&[26_u8])?; record.encode(writer)?; }
+            Self::Proposed(record) => { writer.put(&[19_u8])?; record.encode(writer)?; }
+            Self::Withdrawn(record) => { writer.put(&[20_u8])?; record.encode(writer)?; }
+            Self::RolesSet(record) => { writer.put(&[21_u8])?; record.encode(writer)?; }
+            Self::PolicyChanged(record) => { writer.put(&[22_u8])?; record.encode(writer)?; }
+            Self::PoolSet(record) => { writer.put(&[23_u8])?; record.encode(writer)?; }
+            Self::EscalationDecided(record) => { writer.put(&[24_u8])?; record.encode(writer)?; }
+            Self::Started(record) => { writer.put(&[25_u8])?; record.encode(writer)?; }
+            Self::Compound(record) => { writer.put(&[26_u8])?; record.encode(writer)?; }
+            Self::Created(record) => { writer.put(&[27_u8])?; record.encode(writer)?; }
         }
         Ok(())
     }
@@ -55490,14 +55975,15 @@ impl OwnerOutcome {
             16 => Self::QuestionAnswered(OwnerOutcomeQuestionAnswered::decode_from(limits, reader)?),
             17 => Self::Prioritised(OwnerOutcomePrioritised::decode_from(limits, reader)?),
             18 => Self::Amended(OwnerOutcomeAmended::decode_from(limits, reader)?),
-            19 => Self::AmendProposed(OwnerOutcomeAmendProposed::decode_from(limits, reader)?),
-            20 => Self::RolesSet(OwnerOutcomeRolesSet::decode_from(limits, reader)?),
-            21 => Self::PolicyChanged(OwnerOutcomePolicyChanged::decode_from(limits, reader)?),
-            22 => Self::PoolSet(OwnerOutcomePoolSet::decode_from(limits, reader)?),
-            23 => Self::EscalationDecided(OwnerOutcomeEscalationDecided::decode_from(limits, reader)?),
-            24 => Self::Started(OwnerOutcomeStarted::decode_from(limits, reader)?),
-            25 => Self::Compound(OwnerOutcomeCompound::decode_from(limits, reader)?),
-            26 => Self::Created(OwnerOutcomeCreated::decode_from(limits, reader)?),
+            19 => Self::Proposed(OwnerOutcomeProposed::decode_from(limits, reader)?),
+            20 => Self::Withdrawn(OwnerOutcomeWithdrawn::decode_from(limits, reader)?),
+            21 => Self::RolesSet(OwnerOutcomeRolesSet::decode_from(limits, reader)?),
+            22 => Self::PolicyChanged(OwnerOutcomePolicyChanged::decode_from(limits, reader)?),
+            23 => Self::PoolSet(OwnerOutcomePoolSet::decode_from(limits, reader)?),
+            24 => Self::EscalationDecided(OwnerOutcomeEscalationDecided::decode_from(limits, reader)?),
+            25 => Self::Started(OwnerOutcomeStarted::decode_from(limits, reader)?),
+            26 => Self::Compound(OwnerOutcomeCompound::decode_from(limits, reader)?),
+            27 => Self::Created(OwnerOutcomeCreated::decode_from(limits, reader)?),
             _ => return Err(Problem { path: Path::OwnerOutcomeTag, reason: skein_codec::Reason::Tag }),
         };
         Ok(value)
@@ -57266,7 +57752,7 @@ impl Malformed {
     #[must_use]
     pub fn measure(&self) -> u32 {
         match self {
-            Self::ProjectMismatch | Self::TwoAsAllowed | Self::ConversationNotAgent | Self::Cycle => 1,
+            Self::ProjectMismatch | Self::TwoAsAllowed | Self::ConversationNotAgent | Self::Cycle | Self::ProposedAsAllowed => 1,
         }
     }
 
@@ -57277,6 +57763,7 @@ impl Malformed {
             Self::TwoAsAllowed => writer.put(&[1_u8])?,
             Self::ConversationNotAgent => writer.put(&[2_u8])?,
             Self::Cycle => writer.put(&[3_u8])?,
+            Self::ProposedAsAllowed => writer.put(&[4_u8])?,
         }
         Ok(())
     }
@@ -57295,6 +57782,7 @@ impl Malformed {
             1 => Self::TwoAsAllowed,
             2 => Self::ConversationNotAgent,
             3 => Self::Cycle,
+            4 => Self::ProposedAsAllowed,
             _ => return Err(Problem { path: Path::MalformedTag, reason: skein_codec::Reason::Tag }),
         };
         Ok(value)
@@ -86471,6 +86959,150 @@ impl Create {
     }
 }
 
+impl ProposeBatch {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 0_u64;
+        size = size.checked_add(4_u64.checked_add(u64::from(limits.propose_batch_tasks))?)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(u64::from(limits.propose_batch_tasks))?;
+        heap.checked_add(0)
+    }
+}
+
+impl ProposeAmendment {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 0_u64;
+        size = size.checked_add(8_u64)?.checked_add(Revision::worst_case_bytes_within(limits)?)?;
+        size = size.checked_add(Amendment::worst_case_bytes_within(limits)?)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(0_u64)?.checked_add(Revision::worst_case_heap_within(limits)?)?;
+        heap = heap.checked_add(Amendment::worst_case_heap_within(limits)?)?;
+        heap.checked_add(0)
+    }
+}
+
+impl ProposeAction {
+    /// Maximum encoded bytes among variants.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut biggest = 0_u64;
+        biggest = biggest.max(ProposeBatch::worst_case_bytes_within(limits)?).max(ProposeAmendment::worst_case_bytes_within(limits)?);
+        1_u64.checked_add(biggest)
+    }
+
+    /// Maximum heap held by any decoded variant.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut biggest = 0_u64;
+        biggest = biggest.max(ProposeBatch::worst_case_heap_within(limits)?).max(ProposeAmendment::worst_case_heap_within(limits)?.checked_add(u64::try_from(size_of::<ProposeAmendment>()).ok()?)?);
+        biggest.checked_add(0)
+    }
+}
+
+impl Propose {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
+        let mut size = 0_u64;
+        size = size.checked_add(4_u64)?.checked_add(ProposeAction::worst_case_bytes_within(limits)?)?;
+        size = size.checked_add(4_u64.checked_add(u64::from(limits.propose_reason))?)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(0_u64)?.checked_add(ProposeAction::worst_case_heap_within(limits)?)?;
+        heap = heap.checked_add(u64::from(limits.propose_reason))?;
+        heap.checked_add(0)
+    }
+}
+
+impl Withdraw {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
+        let mut size = 0_u64;
+        size = size.checked_add(4_u64)?.checked_add(8_u64)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(_limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap.checked_add(0)
+    }
+}
+
 impl Ask {
     /// Maximum encoded bytes among variants.
     #[must_use]
@@ -86492,7 +87124,8 @@ impl Ask {
         biggest = biggest.max(DeleteNote::worst_case_bytes_within(limits)?).max(ChangePolicy::worst_case_bytes_within(limits)?);
         biggest = biggest.max(SetRoles::worst_case_bytes_within(limits)?).max(MakeService::worst_case_bytes_within(limits)?);
         biggest = biggest.max(SetPool::worst_case_bytes_within(limits)?).max(Compound::worst_case_bytes_within(limits)?);
-        biggest = biggest.max(Create::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(Create::worst_case_bytes_within(limits)?).max(Propose::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(Withdraw::worst_case_bytes_within(limits)?);
         1_u64.checked_add(biggest)
     }
 
@@ -86516,7 +87149,8 @@ impl Ask {
         biggest = biggest.max(DeleteNote::worst_case_heap_within(limits)?).max(ChangePolicy::worst_case_heap_within(limits)?);
         biggest = biggest.max(SetRoles::worst_case_heap_within(limits)?).max(MakeService::worst_case_heap_within(limits)?);
         biggest = biggest.max(SetPool::worst_case_heap_within(limits)?).max(Compound::worst_case_heap_within(limits)?);
-        biggest = biggest.max(Create::worst_case_heap_within(limits)?);
+        biggest = biggest.max(Create::worst_case_heap_within(limits)?).max(Propose::worst_case_heap_within(limits)?);
+        biggest = biggest.max(Withdraw::worst_case_heap_within(limits)?);
         biggest.checked_add(0)
     }
 }
@@ -87111,7 +87745,7 @@ impl OwnerOutcomeAmended {
     }
 }
 
-impl OwnerOutcomeAmendProposed {
+impl OwnerOutcomeProposed {
     /// Maximum encoded bytes under these limits.
     #[must_use]
     pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
@@ -87121,7 +87755,7 @@ impl OwnerOutcomeAmendProposed {
 
     pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
         let mut size = 0_u64;
-        size = size.checked_add(8_u64)?.checked_add(8_u64)?;
+        size = size.checked_add(8_u64)?;
         size.checked_add(0)
     }
 
@@ -87134,7 +87768,35 @@ impl OwnerOutcomeAmendProposed {
 
     pub(crate) fn worst_case_heap_within(_limits: &Limits) -> Option<u64> {
         let mut heap = 0_u64;
-        heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?;
+        heap.checked_add(0)
+    }
+}
+
+impl OwnerOutcomeWithdrawn {
+    /// Maximum encoded bytes under these limits.
+    #[must_use]
+    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_bytes_within(limits)
+    }
+
+    pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
+        let mut size = 0_u64;
+        size = size.checked_add(8_u64)?;
+        size.checked_add(0)
+    }
+
+    /// Maximum heap held by one decoded value under these limits.
+    #[must_use]
+    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
+        if check_limits(limits).is_err() { return None; }
+        Self::worst_case_heap_within(limits)
+    }
+
+    pub(crate) fn worst_case_heap_within(_limits: &Limits) -> Option<u64> {
+        let mut heap = 0_u64;
+        heap = heap.checked_add(0_u64)?;
         heap.checked_add(0)
     }
 }
@@ -87390,11 +88052,11 @@ impl OwnerOutcome {
         biggest = biggest.max(OwnerOutcomePersonAnswered::worst_case_bytes_within(limits)?).max(OwnerOutcomeMoved::worst_case_bytes_within(limits)?);
         biggest = biggest.max(OwnerOutcomeProposalDecided::worst_case_bytes_within(limits)?).max(OwnerOutcomeSaid::worst_case_bytes_within(limits)?);
         biggest = biggest.max(OwnerOutcomeQuestionAnswered::worst_case_bytes_within(limits)?).max(OwnerOutcomePrioritised::worst_case_bytes_within(limits)?);
-        biggest = biggest.max(OwnerOutcomeAmended::worst_case_bytes_within(limits)?).max(OwnerOutcomeAmendProposed::worst_case_bytes_within(limits)?);
-        biggest = biggest.max(OwnerOutcomeRolesSet::worst_case_bytes_within(limits)?).max(OwnerOutcomePolicyChanged::worst_case_bytes_within(limits)?);
-        biggest = biggest.max(OwnerOutcomePoolSet::worst_case_bytes_within(limits)?).max(OwnerOutcomeEscalationDecided::worst_case_bytes_within(limits)?);
-        biggest = biggest.max(OwnerOutcomeStarted::worst_case_bytes_within(limits)?).max(OwnerOutcomeCompound::worst_case_bytes_within(limits)?);
-        biggest = biggest.max(OwnerOutcomeCreated::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(OwnerOutcomeAmended::worst_case_bytes_within(limits)?).max(OwnerOutcomeProposed::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(OwnerOutcomeWithdrawn::worst_case_bytes_within(limits)?).max(OwnerOutcomeRolesSet::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(OwnerOutcomePolicyChanged::worst_case_bytes_within(limits)?).max(OwnerOutcomePoolSet::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(OwnerOutcomeEscalationDecided::worst_case_bytes_within(limits)?).max(OwnerOutcomeStarted::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(OwnerOutcomeCompound::worst_case_bytes_within(limits)?).max(OwnerOutcomeCreated::worst_case_bytes_within(limits)?);
         1_u64.checked_add(biggest)
     }
 
@@ -87416,11 +88078,11 @@ impl OwnerOutcome {
         biggest = biggest.max(OwnerOutcomePersonAnswered::worst_case_heap_within(limits)?).max(OwnerOutcomeMoved::worst_case_heap_within(limits)?);
         biggest = biggest.max(OwnerOutcomeProposalDecided::worst_case_heap_within(limits)?).max(OwnerOutcomeSaid::worst_case_heap_within(limits)?);
         biggest = biggest.max(OwnerOutcomeQuestionAnswered::worst_case_heap_within(limits)?).max(OwnerOutcomePrioritised::worst_case_heap_within(limits)?);
-        biggest = biggest.max(OwnerOutcomeAmended::worst_case_heap_within(limits)?).max(OwnerOutcomeAmendProposed::worst_case_heap_within(limits)?);
-        biggest = biggest.max(OwnerOutcomeRolesSet::worst_case_heap_within(limits)?).max(OwnerOutcomePolicyChanged::worst_case_heap_within(limits)?);
-        biggest = biggest.max(OwnerOutcomePoolSet::worst_case_heap_within(limits)?).max(OwnerOutcomeEscalationDecided::worst_case_heap_within(limits)?);
-        biggest = biggest.max(OwnerOutcomeStarted::worst_case_heap_within(limits)?).max(OwnerOutcomeCompound::worst_case_heap_within(limits)?);
-        biggest = biggest.max(OwnerOutcomeCreated::worst_case_heap_within(limits)?);
+        biggest = biggest.max(OwnerOutcomeAmended::worst_case_heap_within(limits)?).max(OwnerOutcomeProposed::worst_case_heap_within(limits)?);
+        biggest = biggest.max(OwnerOutcomeWithdrawn::worst_case_heap_within(limits)?).max(OwnerOutcomeRolesSet::worst_case_heap_within(limits)?);
+        biggest = biggest.max(OwnerOutcomePolicyChanged::worst_case_heap_within(limits)?).max(OwnerOutcomePoolSet::worst_case_heap_within(limits)?);
+        biggest = biggest.max(OwnerOutcomeEscalationDecided::worst_case_heap_within(limits)?).max(OwnerOutcomeStarted::worst_case_heap_within(limits)?);
+        biggest = biggest.max(OwnerOutcomeCompound::worst_case_heap_within(limits)?).max(OwnerOutcomeCreated::worst_case_heap_within(limits)?);
         biggest.checked_add(0)
     }
 }
@@ -102161,6 +102823,11 @@ fn worst_case_bytes_3(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(TaskFlags::worst_case_bytes_within(limits)?);
     biggest = biggest.max(NewTask::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Create::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(ProposeBatch::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(ProposeAmendment::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(ProposeAction::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(Propose::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(Withdraw::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Ask::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerProposalChoice::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerEscalationChoice::worst_case_bytes_within(limits)?);
@@ -102183,7 +102850,8 @@ fn worst_case_bytes_3(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerOutcomeQuestionAnswered::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerOutcomePrioritised::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerOutcomeAmended::worst_case_bytes_within(limits)?);
-    biggest = biggest.max(OwnerOutcomeAmendProposed::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(OwnerOutcomeProposed::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(OwnerOutcomeWithdrawn::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerOutcomeRolesSet::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerOutcomePolicyChanged::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerOutcomePoolSet::worst_case_bytes_within(limits)?);
@@ -102202,16 +102870,16 @@ fn worst_case_bytes_3(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(Made::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OutcomeOwner::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OutcomeMade::worst_case_bytes_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_bytes_4(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OutcomeProposed::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OutcomeDecided::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OutcomeDecidedFirst::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Outcome::worst_case_bytes_within(limits)?);
     biggest = biggest.max(DisposalIssue::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Grant::worst_case_bytes_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_bytes_4(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(LackingBudget::worst_case_bytes_within(limits)?);
     biggest = biggest.max(LackingGrant::worst_case_bytes_within(limits)?);
     biggest = biggest.max(LackingGrantKind::worst_case_bytes_within(limits)?);
@@ -102296,16 +102964,16 @@ fn worst_case_bytes_4(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerMessageKindNotice::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerMessageKindTimer::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerMessageKindNews::worst_case_bytes_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_bytes_5(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerMessageKindResult::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerMessageKind::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerWord::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRunWhyMessage::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRunWhyRetry::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRunWhy::worst_case_bytes_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_bytes_5(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerRunEndFailed::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRunEnd::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerActivityWords::worst_case_bytes_within(limits)?);
@@ -102390,16 +103058,16 @@ fn worst_case_bytes_5(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(ParameterDocument::worst_case_bytes_within(limits)?);
     biggest = biggest.max(DocumentSpecification::worst_case_bytes_within(limits)?);
     biggest = biggest.max(SpecificationDocument::worst_case_bytes_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_bytes_6(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(ProposedTask::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRetainedAmendment::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionBatch::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionEffect::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionProcedureEffect::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionAmend::worst_case_bytes_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_bytes_6(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerRetainedActionWiden::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionRelease::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerRetainedAction::worst_case_bytes_within(limits)?);
@@ -102484,16 +103152,16 @@ fn worst_case_bytes_6(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(Passed::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Escalation::worst_case_bytes_within(limits)?);
     biggest = biggest.max(TaskContext::worst_case_bytes_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_bytes_7(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(TaskResultDocument::worst_case_bytes_within(limits)?);
     biggest = biggest.max(TaskResultEnding::worst_case_bytes_within(limits)?);
     biggest = biggest.max(TaskResult::worst_case_bytes_within(limits)?);
     biggest = biggest.max(TaskResourcePart::worst_case_bytes_within(limits)?);
     biggest = biggest.max(TaskResourceOwner::worst_case_bytes_within(limits)?);
     biggest = biggest.max(TaskResource::worst_case_bytes_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_bytes_7(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(TaskHoldDocument::worst_case_bytes_within(limits)?);
     biggest = biggest.max(TaskHoldOwner::worst_case_bytes_within(limits)?);
     biggest = biggest.max(TaskHold::worst_case_bytes_within(limits)?);
@@ -102578,16 +103246,16 @@ fn worst_case_bytes_7(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerEscalationDecision::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerEscalationDecisionRecord::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerHistoricalValueEscalation::worst_case_bytes_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_bytes_8(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerHistoricalValueQuestion::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerHistoricalValuePersonTask::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerHistoricalValue::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerHistorical::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerTreeRow::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerTreeFold::worst_case_bytes_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_bytes_8(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerTree::worst_case_bytes_within(limits)?);
     biggest = biggest.max(EntranceRefusal::worst_case_bytes_within(limits)?);
     biggest = biggest.max(SubjectTask::worst_case_bytes_within(limits)?);
@@ -102672,16 +103340,16 @@ fn worst_case_bytes_8(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerTaskCapacityCause::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerTaskCapacityRequest::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OwnerTaskCapacityRefusal::worst_case_bytes_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_bytes_9(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(WatchEnd::worst_case_bytes_within(limits)?);
     biggest = biggest.max(WatchRefusal::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Open::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OpenAnswerRefused::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OpenAnswer::worst_case_bytes_within(limits)?);
     biggest = biggest.max(WatchClose::worst_case_bytes_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_bytes_9(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(CloseAnswer::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Gone::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Hello::worst_case_bytes_within(limits)?);
@@ -103049,6 +103717,11 @@ fn worst_case_heap_3(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(TaskFlags::worst_case_heap_within(limits)?);
     biggest = biggest.max(NewTask::worst_case_heap_within(limits)?);
     biggest = biggest.max(Create::worst_case_heap_within(limits)?);
+    biggest = biggest.max(ProposeBatch::worst_case_heap_within(limits)?);
+    biggest = biggest.max(ProposeAmendment::worst_case_heap_within(limits)?);
+    biggest = biggest.max(ProposeAction::worst_case_heap_within(limits)?);
+    biggest = biggest.max(Propose::worst_case_heap_within(limits)?);
+    biggest = biggest.max(Withdraw::worst_case_heap_within(limits)?);
     biggest = biggest.max(Ask::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerProposalChoice::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerEscalationChoice::worst_case_heap_within(limits)?);
@@ -103071,7 +103744,8 @@ fn worst_case_heap_3(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerOutcomeQuestionAnswered::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerOutcomePrioritised::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerOutcomeAmended::worst_case_heap_within(limits)?);
-    biggest = biggest.max(OwnerOutcomeAmendProposed::worst_case_heap_within(limits)?);
+    biggest = biggest.max(OwnerOutcomeProposed::worst_case_heap_within(limits)?);
+    biggest = biggest.max(OwnerOutcomeWithdrawn::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerOutcomeRolesSet::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerOutcomePolicyChanged::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerOutcomePoolSet::worst_case_heap_within(limits)?);
@@ -103090,16 +103764,16 @@ fn worst_case_heap_3(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(Made::worst_case_heap_within(limits)?);
     biggest = biggest.max(OutcomeOwner::worst_case_heap_within(limits)?);
     biggest = biggest.max(OutcomeMade::worst_case_heap_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_heap_4(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OutcomeProposed::worst_case_heap_within(limits)?);
     biggest = biggest.max(OutcomeDecided::worst_case_heap_within(limits)?);
     biggest = biggest.max(OutcomeDecidedFirst::worst_case_heap_within(limits)?);
     biggest = biggest.max(Outcome::worst_case_heap_within(limits)?);
     biggest = biggest.max(DisposalIssue::worst_case_heap_within(limits)?);
     biggest = biggest.max(Grant::worst_case_heap_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_heap_4(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(LackingBudget::worst_case_heap_within(limits)?);
     biggest = biggest.max(LackingGrant::worst_case_heap_within(limits)?);
     biggest = biggest.max(LackingGrantKind::worst_case_heap_within(limits)?);
@@ -103184,16 +103858,16 @@ fn worst_case_heap_4(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerMessageKindNotice::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerMessageKindTimer::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerMessageKindNews::worst_case_heap_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_heap_5(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerMessageKindResult::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerMessageKind::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerWord::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRunWhyMessage::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRunWhyRetry::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRunWhy::worst_case_heap_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_heap_5(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerRunEndFailed::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRunEnd::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerActivityWords::worst_case_heap_within(limits)?);
@@ -103278,16 +103952,16 @@ fn worst_case_heap_5(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(ParameterDocument::worst_case_heap_within(limits)?);
     biggest = biggest.max(DocumentSpecification::worst_case_heap_within(limits)?);
     biggest = biggest.max(SpecificationDocument::worst_case_heap_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_heap_6(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(ProposedTask::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRetainedAmendment::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionBatch::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionEffect::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionProcedureEffect::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionAmend::worst_case_heap_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_heap_6(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerRetainedActionWiden::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRetainedActionRelease::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerRetainedAction::worst_case_heap_within(limits)?);
@@ -103372,16 +104046,16 @@ fn worst_case_heap_6(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(Passed::worst_case_heap_within(limits)?);
     biggest = biggest.max(Escalation::worst_case_heap_within(limits)?);
     biggest = biggest.max(TaskContext::worst_case_heap_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_heap_7(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(TaskResultDocument::worst_case_heap_within(limits)?);
     biggest = biggest.max(TaskResultEnding::worst_case_heap_within(limits)?);
     biggest = biggest.max(TaskResult::worst_case_heap_within(limits)?);
     biggest = biggest.max(TaskResourcePart::worst_case_heap_within(limits)?);
     biggest = biggest.max(TaskResourceOwner::worst_case_heap_within(limits)?);
     biggest = biggest.max(TaskResource::worst_case_heap_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_heap_7(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(TaskHoldDocument::worst_case_heap_within(limits)?);
     biggest = biggest.max(TaskHoldOwner::worst_case_heap_within(limits)?);
     biggest = biggest.max(TaskHold::worst_case_heap_within(limits)?);
@@ -103466,16 +104140,16 @@ fn worst_case_heap_7(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerEscalationDecision::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerEscalationDecisionRecord::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerHistoricalValueEscalation::worst_case_heap_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_heap_8(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerHistoricalValueQuestion::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerHistoricalValuePersonTask::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerHistoricalValue::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerHistorical::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerTreeRow::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerTreeFold::worst_case_heap_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_heap_8(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerTree::worst_case_heap_within(limits)?);
     biggest = biggest.max(EntranceRefusal::worst_case_heap_within(limits)?);
     biggest = biggest.max(SubjectTask::worst_case_heap_within(limits)?);
@@ -103560,16 +104234,16 @@ fn worst_case_heap_8(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(OwnerTaskCapacityCause::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerTaskCapacityRequest::worst_case_heap_within(limits)?);
     biggest = biggest.max(OwnerTaskCapacityRefusal::worst_case_heap_within(limits)?);
+    Some(biggest)
+}
+
+fn worst_case_heap_9(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(WatchEnd::worst_case_heap_within(limits)?);
     biggest = biggest.max(WatchRefusal::worst_case_heap_within(limits)?);
     biggest = biggest.max(Open::worst_case_heap_within(limits)?);
     biggest = biggest.max(OpenAnswerRefused::worst_case_heap_within(limits)?);
     biggest = biggest.max(OpenAnswer::worst_case_heap_within(limits)?);
     biggest = biggest.max(WatchClose::worst_case_heap_within(limits)?);
-    Some(biggest)
-}
-
-fn worst_case_heap_9(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(CloseAnswer::worst_case_heap_within(limits)?);
     biggest = biggest.max(Gone::worst_case_heap_within(limits)?);
     biggest = biggest.max(Hello::worst_case_heap_within(limits)?);
@@ -103595,7 +104269,7 @@ fn worst_case_heap_9(limits: &Limits, mut biggest: u64) -> Option<u64> {
 
 #[cfg(test)]
 mod golden_tests {
-    use super::{CEILINGS, Family, FamilyParts, Owner, Keyed, KeyedParts, Owned, OwnedParts, Served, ServedParts, NotServed, NotServedParts, KeyedAnswer, LinkSignIn, LinkSignInParts, SignedIn, SignedInParts, SignInAnswer, SignOut, SignOutParts, SignOutAnswer, DocumentText, DocumentTextParts, ExecutorAgent, ExecutorAgentParts, ExecutorProcedure, ExecutorProcedureParts, ExecutorParty, ExecutorPartyParts, ExecutorRole, ExecutorRoleParts, Executor, Phase, RunStageClaimed, RunStageClaimedParts, RunStageRunning, RunStageRunningParts, RunStageBackingOff, RunStageBackingOffParts, RunStage, PersonAddressParty, PersonAddressPartyParts, PersonAddressRole, PersonAddressRoleParts, PersonAddress, ClosingStageRun, ClosingStageRunParts, ClosingStage, HoldFailure, HoldCategoryFailures, HoldCategoryFailuresParts, HoldCategoryDependency, HoldCategoryDependencyParts, HoldCategoryStoppedBy, HoldCategoryStoppedByParts, HoldCategoryUncertain, HoldCategoryUncertainParts, HoldCategoryPoolLost, HoldCategoryPoolLostParts, HoldCategory, OwnerChipPhaseWaiting, OwnerChipPhaseWaitingParts, OwnerChipPhaseActive, OwnerChipPhaseActiveParts, OwnerChipPhasePerson, OwnerChipPhasePersonParts, OwnerChipPhaseClosing, OwnerChipPhaseClosingParts, OwnerChipPhaseHeld, OwnerChipPhaseHeldParts, OwnerChipPhase, FailureClass, RetryNoticeOwnerFailed, RetryNoticeOwnerFailedParts, RetryNoticeFailed, RetryNoticeFailedParts, RetryNoticeRefused, RetryNoticeRefusedParts, RetryNotice, CallIdentity, CallIdentityParts, RunWorkTool, RunWorkToolParts, RunWork, RunObservation, RunObservationParts, ActiveRun, ActiveRunParts, ProposerTask, ProposerTaskParts, ProposerParty, ProposerPartyParts, Proposer, ProposalKey, ProposalKeyParts, PartScopeProject, PartScopeProjectParts, PartScope, PartConnector, PartConnectorParts, PartResource, PartResourceParts, PartKind, PartKindParts, PartPanel, PartPanelParts, PartResult, PartResultParts, PartEffect, PartEffectParts, PartOwnerEffect, PartOwnerEffectParts, PartOutbox, PartOutboxParts, PartHold, PartHoldParts, PartProject, PartProjectParts, PartDeployment, PartDeploymentParts, Part, WakePolicy, WakePolicyParts, RecipientTask, RecipientTaskParts, RecipientParty, RecipientPartyParts, RecipientRole, RecipientRoleParts, RecipientRoles, RecipientRolesParts, Recipient, TakenBy, TakenByParts, Revision, RevisionParts, ActorParty, ActorPartyParts, ActorTask, ActorTaskParts, ActorProjectDeployment, ActorProjectDeploymentParts, Actor, PartyKind, Party, PartyParts, DecisionRejected, DecisionRejectedParts, DecisionReleased, DecisionReleasedParts, DecisionLeftHeld, DecisionLeftHeldParts, Decision, AttemptFailure, AttemptFailureParts, OwnerExecutorAgent, OwnerExecutorAgentParts, OwnerExecutorProcedure, OwnerExecutorProcedureParts, OwnerExecutorPerson, OwnerExecutorPersonParts, OwnerExecutor, WakeRuleBatch, WakeRuleBatchParts, WakeRule, ResultsWake, OwnerWakePolicy, OwnerWakePolicyParts, OwnerPersonStallNotice, OwnerPersonStallNoticeParts, OwnerPersonWait, OwnerPersonWaitParts, OwnerPartKind, OwnerPartKeyPath, OwnerPartKeyPathParts, OwnerPartKeyNumber, OwnerPartKeyNumberParts, OwnerPartKey, OwnerPart, OwnerPartParts, OwnerPriorPhaseActive, OwnerPriorPhaseActiveParts, OwnerPriorPhaseClosing, OwnerPriorPhaseClosingParts, OwnerPriorPhase, OwnerEscalationHolderTask, OwnerEscalationHolderTaskParts, OwnerEscalationHolderPerson, OwnerEscalationHolderPersonParts, OwnerEscalationHolderRole, OwnerEscalationHolderRoleParts, OwnerEscalationHolder, OwnerHoldEscalationWaiting, OwnerHoldEscalationWaitingParts, OwnerHoldEscalationRejected, OwnerHoldEscalationRejectedParts, OwnerHoldEscalation, OwnerFailureTries, OwnerFailureTriesParts, OwnerChipHold, OwnerChipHoldParts, OwnerNumbers, OwnerNumbersParts, FunderTask, FunderTaskParts, FunderPool, FunderPoolParts, FunderRecurring, FunderRecurringParts, FunderPeriod, FunderPeriodParts, Funder, OwnerBudget, OwnerBudgetParts, OwnerResourceWriterRun, OwnerResourceWriterRunParts, OwnerResourceWriterEffect, OwnerResourceWriterEffectParts, OwnerResourceWriter, OwnerResourceLine, OwnerResourceLineParts, OwnerChipWorkTool, OwnerChipWorkToolParts, OwnerChipWork, OwnerChipObservation, OwnerChipObservationParts, OwnerRequesterTask, OwnerRequesterTaskParts, OwnerRequesterPerson, OwnerRequesterPersonParts, OwnerRequesterDeployment, OwnerRequesterDeploymentParts, OwnerRequester, ResultField, ResultFieldParts, ChipFields, ChipFieldsParts, ChipRow, ChipRowParts, ChipPhaseOwnerFields, ChipPhaseOwnerFieldsParts, ChipPhaseActiveFields, ChipPhaseActiveFieldsParts, ChipPhaseWaitingFields, ChipPhaseWaitingFieldsParts, ChipPhaseIdleFields, ChipPhaseIdleFieldsParts, ChipPhaseRunningFields, ChipPhaseRunningFieldsParts, ChipPhaseWaitingForWordsFields, ChipPhaseWaitingForWordsFieldsParts, ChipPhaseBackingOffFields, ChipPhaseBackingOffFieldsParts, ChipPhaseProcedureFields, ChipPhaseProcedureFieldsParts, ChipPhasePersonFields, ChipPhasePersonFieldsParts, ChipPhaseClosingFields, ChipPhaseClosingFieldsParts, ChipPhaseHeldFields, ChipPhaseHeldFieldsParts, ChipPhaseEndedFields, ChipPhaseEndedFieldsParts, ChipPhaseFields, ChipPhaseRow, ChipPhaseRowParts, ClosingFields, ClosingFieldsParts, ClosingRow, ClosingRowParts, EndingTaskFields, EndingTaskFieldsParts, EndingFailedFields, EndingFailedFieldsParts, EndingCancelledFields, EndingCancelledFieldsParts, EndingWithdrawnFields, EndingWithdrawnFieldsParts, EndingDecidedFields, EndingDecidedFieldsParts, EndingFields, EndingRow, EndingRowParts, HeldRuntimeActiveFields, HeldRuntimeActiveFieldsParts, HeldRuntimeClosingFields, HeldRuntimeClosingFieldsParts, HeldRuntimeFields, HeldRuntimeRow, HeldRuntimeRowParts, HoldReasonTriesFields, HoldReasonTriesFieldsParts, HoldReasonStalledFields, HoldReasonStalledFieldsParts, HoldReasonDependencyFields, HoldReasonDependencyFieldsParts, HoldReasonDriftFields, HoldReasonDriftFieldsParts, HoldReasonEffectFailedFields, HoldReasonEffectFailedFieldsParts, HoldReasonEffectUncertainFields, HoldReasonEffectUncertainFieldsParts, HoldReasonBudgetFields, HoldReasonBudgetFieldsParts, HoldReasonDeadlineFields, HoldReasonDeadlineFieldsParts, HoldReasonStoppedFields, HoldReasonStoppedFieldsParts, HoldReasonResourceFields, HoldReasonResourceFieldsParts, HoldReasonPoolFields, HoldReasonPoolFieldsParts, HoldReasonProcedureFields, HoldReasonProcedureFieldsParts, HoldReasonFields, HoldReasonRow, HoldReasonRowParts, OwnerChipDetailsFields, OwnerChipDetailsFieldsParts, OwnerChipDetailsRow, OwnerChipDetailsRowParts, OwnerChipEndingDoneFields, OwnerChipEndingDoneFieldsParts, OwnerChipEndingFailedFields, OwnerChipEndingFailedFieldsParts, OwnerChipEndingCancelledFields, OwnerChipEndingCancelledFieldsParts, OwnerChipEndingFields, OwnerChipEndingRow, OwnerChipEndingRowParts, ResultValueReportFields, ResultValueReportFieldsParts, ResultValueOwnerVerdictFields, ResultValueOwnerVerdictFieldsParts, ResultValueVerdictFields, ResultValueVerdictFieldsParts, ResultValueConnectorFields, ResultValueConnectorFieldsParts, ResultValueChangeFields, ResultValueChangeFieldsParts, ResultValueChoiceFields, ResultValueChoiceFieldsParts, ResultValueApprovedFields, ResultValueApprovedFieldsParts, ResultValueFailureFields, ResultValueFailureFieldsParts, ResultValueWordsFields, ResultValueWordsFieldsParts, ResultValueFields, ResultValueRow, ResultValueRowParts, Fact, Chip, ChipParts, ChipPhase, ChipPhaseParts, Closing, ClosingParts, Ending, EndingParts, HeldRuntime, HeldRuntimeParts, HoldReason, HoldReasonParts, OwnerChipDetails, OwnerChipDetailsParts, OwnerChipEnding, OwnerChipEndingParts, ResultValue, ResultValueParts, PersonAnswerChoice, PersonAnswerChoiceParts, PersonAnswerApproved, PersonAnswerApprovedParts, PersonAnswerWords, PersonAnswerWordsParts, PersonAnswerCannot, PersonAnswerCannotParts, PersonAnswer, AddressChange, AddressChangeParts, ParameterNumber, ParameterNumberParts, ParameterBytes, ParameterBytesParts, ParameterResource, ParameterResourceParts, Parameter, Specification, SpecificationParts, OwnerPatternEndExact, OwnerPatternEndExactParts, OwnerPatternEndOpen, OwnerPatternEndOpenParts, OwnerPatternEnd, OwnerPattern, OwnerPatternParts, OwnerGrant, OwnerGrantParts, OwnerAuthorityExecutorCharter, OwnerAuthorityExecutorCharterParts, OwnerAuthorityExecutorProcedure, OwnerAuthorityExecutorProcedureParts, OwnerAuthorityExecutorRole, OwnerAuthorityExecutorRoleParts, OwnerAuthorityExecutor, OwnerDelegation, OwnerDelegationParts, OwnerResourceScope, OwnerResourceScopeParts, OwnerAuthority, OwnerAuthorityParts, TrackingTracked, TrackingTrackedParts, Tracking, Amendment, AmendmentParts, DisposalCancel, DisposalCancelParts, DisposalTakeOver, DisposalTakeOverParts, Disposal, GoalExecutorCharter, GoalExecutorCharterParts, GoalExecutorProcedure, GoalExecutorProcedureParts, GoalExecutor, Priority, PriorityParts, SeenResults, SeenResultsParts, SeenConversation, SeenConversationParts, SeenThrough, NoteScopeProject, NoteScopeProjectParts, NoteScopeResource, NoteScopeResourceParts, NoteScopeGoal, NoteScopeGoalParts, NoteScope, PolicyEditRole, PolicyEditRoleParts, PolicyJudge, PolicyJudgeParts, PolicyGuardObserved, PolicyGuardObservedParts, PolicyGuard, PolicyRequirement, PolicyRequirementParts, PolicyPermission, PolicyPermissionParts, PolicyEditProjectSpend, PolicyEditProjectSpendParts, PolicyEditRoleValue, PolicyEditRoleValueParts, PolicyEditRequirements, PolicyEditRequirementsParts, PolicyEditProjections, PolicyEditProjectionsParts, PolicyEditPermissions, PolicyEditPermissionsParts, TemplateCharter, TemplateCharterParts, TemplateExecutor, TemplateAmount, TemplateAmountParts, TemplateAsAllowed, TemplateAsAllowedParts, TemplateBudget, TemplateSpan, TemplateSpanParts, TemplateDeadline, TemplateOverride, TemplateOverrideParts, PolicyEditTemplates, PolicyEditTemplatesParts, PolicyEdit, HeldRolePolicy, HeldRolePolicyParts, HeldRole, Holding, HoldingParts, StartChat, StartChatParts, Message, MessageParts, AnswerQuestion, AnswerQuestionParts, AnswerPerson, AnswerPersonParts, AnswerOn, Answer, AnswerParts, Take, TakeParts, HandBack, HandBackParts, DecideProposal, DecideProposalParts, DecideEscalation, DecideEscalationParts, DecideOn, Decide, DecideParts, Release, ReleaseParts, Amend, AmendParts, Stop, StopParts, Cancel, CancelParts, Close, CloseParts, Move, MoveParts, SetGoal, SetGoalParts, Prioritise, PrioritiseParts, Seen, SeenParts, EditNote, EditNoteParts, DeleteNote, DeleteNoteParts, ChangePolicy, ChangePolicyParts, SetRoles, SetRolesParts, MakeService, MakeServiceParts, SetPool, SetPoolParts, Operation, Compound, CompoundParts, FieldRule, FieldRuleParts, VerdictChoice, VerdictChoiceParts, TaskRefMember, TaskRefMemberParts, TaskRefTask, TaskRefTaskParts, TaskRef, ContractReport, ContractReportParts, ContractVerdict, ContractVerdictParts, ContractChange, ContractChangeParts, NewContract, BudgetAsAllowed, BudgetAsAllowedParts, NewBudget, Retention, TaskFlags, TaskFlagsParts, NewTask, NewTaskParts, Create, CreateParts, Ask, OwnerProposalChoice, OwnerEscalationChoice, OwnerOutcomeClosing, OwnerOutcomeClosingParts, OwnerOutcomeMarkedSeen, OwnerOutcomeMarkedSeenParts, OwnerOutcomeNoteEdited, OwnerOutcomeNoteEditedParts, OwnerOutcomeServiceMade, OwnerOutcomeServiceMadeParts, OwnerOutcomeAdopted, OwnerOutcomeAdoptedParts, OwnerOutcomeGoalStarted, OwnerOutcomeGoalStartedParts, OwnerOutcomeGoalProposed, OwnerOutcomeGoalProposedParts, OwnerOutcomeStopped, OwnerOutcomeStoppedParts, OwnerOutcomeCancelled, OwnerOutcomeCancelledParts, OwnerOutcomeReleased, OwnerOutcomeReleasedParts, OwnerOutcomePersonTaken, OwnerOutcomePersonTakenParts, OwnerOutcomePersonHandedBack, OwnerOutcomePersonHandedBackParts, OwnerOutcomePersonAnswered, OwnerOutcomePersonAnsweredParts, OwnerOutcomeMoved, OwnerOutcomeMovedParts, OwnerOutcomeProposalDecided, OwnerOutcomeProposalDecidedParts, OwnerOutcomeSaid, OwnerOutcomeSaidParts, OwnerOutcomeQuestionAnswered, OwnerOutcomeQuestionAnsweredParts, OwnerOutcomePrioritised, OwnerOutcomePrioritisedParts, OwnerOutcomeAmended, OwnerOutcomeAmendedParts, OwnerOutcomeAmendProposed, OwnerOutcomeAmendProposedParts, OwnerOutcomeRolesSet, OwnerOutcomeRolesSetParts, OwnerOutcomePolicyChanged, OwnerOutcomePolicyChangedParts, OwnerOutcomePoolSet, OwnerOutcomePoolSetParts, OwnerOutcomeEscalationDecided, OwnerOutcomeEscalationDecidedParts, OwnerOutcomeStarted, OwnerOutcomeStartedParts, OwnerOutcomeCompound, OwnerOutcomeCompoundParts, CreatedGiven, CreatedGivenParts, OwnerOutcomeCreated, OwnerOutcomeCreatedParts, OwnerOutcome, MadeChat, MadeChatParts, MadeGoal, MadeGoalParts, MadeTasks, MadeTasksParts, MadeService, MadeServiceParts, MadePersonResult, MadePersonResultParts, MadeNote, MadeNoteParts, Made, OutcomeOwner, OutcomeOwnerParts, OutcomeMade, OutcomeMadeParts, OutcomeProposed, OutcomeProposedParts, OutcomeDecided, OutcomeDecidedParts, OutcomeDecidedFirst, OutcomeDecidedFirstParts, Outcome, DisposalIssue, Grant, GrantParts, LackingBudget, LackingBudgetParts, LackingGrant, LackingGrantParts, LackingGrantKind, LackingGrantKindParts, LackingAgain, LackingAgainParts, LackingRequired, LackingRequiredParts, LackingFailed, LackingFailedParts, LackingUnguarded, LackingUnguardedParts, LackingTaskKind, LackingTaskKindParts, LackingDepth, LackingDepthParts, LackingDeadline, LackingDeadlineParts, LackingTasks, LackingTasksParts, Lacking, AdmissionLimit, LimitAdmission, LimitAdmissionParts, LimitLiveTasks, LimitLiveTasksParts, LimitInbox, LimitInboxParts, LimitWords, LimitWordsParts, LimitConversationWords, LimitConversationWordsParts, Limit, CurrentHoldDocument, CurrentHoldDocumentParts, CurrentHoldReason, CurrentHoldReasonParts, CurrentHold, MovedHold, MovedHoldParts, Moved, RefusalRole, RefusalRoleParts, RefusalDisposal, RefusalDisposalParts, RefusalTaken, RefusalTakenParts, RefusalAuthority, RefusalAuthorityParts, RefusalLimit, RefusalLimitParts, RefusalMoved, RefusalMovedParts, RefusalEnded, RefusalEndedParts, Malformed, RefusalMalformed, RefusalMalformedParts, Refusal, Done, DoneParts, Refused, RefusedParts, Final, Cursor, CursorParts, ScopeProject, ScopeProjectParts, Scope, Window, WindowParts, FamilyRecord, FamilyRecordParts, FamilyRequest, FamilyRequestParts, InboxReadGroup, InboxGroup, ReadTask, ReadTaskParts, ReadProposal, ReadProposalParts, ReadEscalation, ReadEscalationParts, ReadQuestion, ReadQuestionParts, ReadPersonTask, ReadPersonTaskParts, ReadResult, ReadResultParts, ReadEnded, ReadEndedParts, ReadHistory, ReadHistoryParts, ReadActivity, ReadActivityParts, ReadInbox, ReadInboxParts, ReadConversations, ReadConversationsParts, ReadGoals, ReadGoalsParts, ReadSpend, ReadSpendParts, ReadProject, ReadProjectParts, ReadNotes, ReadNotesParts, Read, ReadNone, ReadAnswerNone, ReadAnswerNoneParts, ReadAnswer, OwnerPeriodTimes, OwnerPeriodTimesParts, OwnerFundingRecord, OwnerFundingRecordParts, OwnerSpendPage, OwnerSpendPageParts, OwnerMessageProposalKind, OwnerNoticeState, OwnerNewsClass, OwnerWordResultApproved, OwnerWordResultApprovedParts, OwnerWordResultVerdict, OwnerWordResultVerdictParts, OwnerWordResultChange, OwnerWordResultChangeParts, OwnerWordResult, OwnerMessageKindEscalation, OwnerMessageKindEscalationParts, OwnerMessageKindProposal, OwnerMessageKindProposalParts, OwnerMessageKindPersonStalled, OwnerMessageKindPersonStalledParts, OwnerMessageKindProposalDecision, OwnerMessageKindProposalDecisionParts, OwnerMessageKindEffectNotMade, OwnerMessageKindEffectNotMadeParts, OwnerMessageKindAmendment, OwnerMessageKindAmendmentParts, OwnerMessageKindAnswer, OwnerMessageKindAnswerParts, OwnerMessageKindNotice, OwnerMessageKindNoticeParts, OwnerMessageKindTimer, OwnerMessageKindTimerParts, OwnerMessageKindNews, OwnerMessageKindNewsParts, OwnerMessageKindResult, OwnerMessageKindResultParts, OwnerMessageKind, OwnerWord, OwnerWordParts, OwnerRunWhyMessage, OwnerRunWhyMessageParts, OwnerRunWhyRetry, OwnerRunWhyRetryParts, OwnerRunWhy, OwnerRunEndFailed, OwnerRunEndFailedParts, OwnerRunEnd, OwnerActivityWords, OwnerActivityWordsParts, OwnerActivityHeard, OwnerActivityHeardParts, OwnerActivityNotified, OwnerActivityNotifiedParts, OwnerActivityRunBegan, OwnerActivityRunBeganParts, OwnerActivityRunEnded, OwnerActivityRunEndedParts, OwnerActivityTurn, OwnerActivityTurnParts, OwnerActivityDecided, OwnerActivityDecidedParts, OwnerActivityMilestone, OwnerActivityMilestoneParts, OwnerActivity, OwnerActivityLine, OwnerActivityLineParts, TurnName, TurnNameParts, TurnCarried, TurnCarriedParts, TurnTooLarge, TurnTooLargeParts, TurnBytes, ArchivedTurn, ArchivedTurnParts, RunBeginningFresh, RunBeginningFreshParts, RunBeginning, RunEndingFailed, RunEndingFailedParts, RunEnding, TaskContractDocumentApproval, TaskContractDocumentApprovalParts, TaskContractDocumentReport, TaskContractDocumentReportParts, TaskContractDocumentVerdict, TaskContractDocumentVerdictParts, TaskContractDocumentChange, TaskContractDocumentChangeParts, TaskContractDocument, OwnerTaskStatus, OwnerTaskLinkLive, OwnerTaskLinkLiveParts, OwnerTaskLinkRetained, OwnerTaskLinkRetainedParts, OwnerTaskLinkStored, OwnerTaskLinkStoredParts, OwnerTaskLink, ResultDetails, ResultDetailsParts, ActKind, GoalProcedure, GoalProcedureParts, OwnerKindImplication, OwnerKindImplicationParts, OwnerAuthorityDocument, OwnerAuthorityDocumentParts, BoundsGoal, BoundsGoalParts, BoundsAmend, BoundsAmendParts, Bounds, BeyondProposed, BeyondProposedParts, BeyondRefused, BeyondRefusedParts, Beyond, AdmissionProposed, AdmissionProposedParts, AdmissionBounded, AdmissionBoundedParts, AdmissionRefused, AdmissionRefusedParts, Admission, Offered, OfferedParts, ResultDocument, ResultDocumentParts, ObjectKeyTask, ObjectKeyTaskParts, ObjectKeyProposal, ObjectKeyProposalParts, ObjectKeyEscalation, ObjectKeyEscalationParts, ObjectKeyQuestion, ObjectKeyQuestionParts, ObjectKeyPersonTask, ObjectKeyPersonTaskParts, ObjectKeyResult, ObjectKeyResultParts, ObjectKeyNote, ObjectKeyNoteParts, ObjectKey, ActivityOwner, ActivityOwnerParts, ActivityWords, ActivityWordsParts, ActivityRunBegan, ActivityRunBeganParts, ActivityRunEnded, ActivityRunEndedParts, ActivityTurn, ActivityTurnParts, ActivityResult, ActivityResultParts, ActivityNews, ActivityNewsParts, ActivityDecision, ActivityDecisionParts, Activity, ActivityLine, ActivityLineParts, ActivityPage, ActivityPageParts, SpendLine, SpendLineParts, Hold, HoldParts, HistoryChangeMade, HistoryChangeMadeParts, HistoryChangeAmended, HistoryChangeAmendedParts, HistoryChangeHeld, HistoryChangeHeldParts, HistoryChangeCancelled, HistoryChangeCancelledParts, HistoryChangeMoved, HistoryChangeMovedParts, HistoryChange, HistoryLine, HistoryLineParts, OwnerHistoryChangePrioritised, OwnerHistoryChangePrioritisedParts, OwnerHistoryChange, ParameterDocumentNumber, ParameterDocumentNumberParts, ParameterDocumentBytes, ParameterDocumentBytesParts, ParameterDocumentResource, ParameterDocumentResourceParts, ParameterDocument, DocumentSpecification, DocumentSpecificationParts, SpecificationDocument, SpecificationDocumentParts, ProposedTask, ProposedTaskParts, OwnerRetainedAmendment, OwnerRetainedAmendmentParts, OwnerRetainedActionBatch, OwnerRetainedActionBatchParts, OwnerRetainedActionEffect, OwnerRetainedActionEffectParts, OwnerRetainedActionProcedureEffect, OwnerRetainedActionProcedureEffectParts, OwnerRetainedActionAmend, OwnerRetainedActionAmendParts, OwnerRetainedActionWiden, OwnerRetainedActionWidenParts, OwnerRetainedActionRelease, OwnerRetainedActionReleaseParts, OwnerRetainedAction, OwnerHistoryHolderTask, OwnerHistoryHolderTaskParts, OwnerHistoryHolderPerson, OwnerHistoryHolderPersonParts, OwnerHistoryHolderPolicy, OwnerHistoryHolderPolicyParts, OwnerHistoryHolder, OwnerProposalHistoryStatePending, OwnerProposalHistoryStatePendingParts, OwnerProposalHistoryStateAccepted, OwnerProposalHistoryStateAcceptedParts, OwnerProposalHistoryStateRejected, OwnerProposalHistoryStateRejectedParts, OwnerProposalHistoryState, OwnerProposalHistory, OwnerProposalHistoryParts, OwnerAmendmentState, OwnerAmendmentStateParts, OwnerHistoryAmendment, OwnerHistoryAmendmentParts, OwnerHistoryLine, OwnerHistoryLineParts, OwnerMilestonePhaseActive, OwnerMilestonePhaseActiveParts, OwnerMilestonePhaseClosing, OwnerMilestonePhaseClosingParts, OwnerMilestonePhaseHeld, OwnerMilestonePhaseHeldParts, OwnerMilestonePhaseEnded, OwnerMilestonePhaseEndedParts, OwnerMilestonePhase, OwnerMilestoneLine, OwnerMilestoneLineParts, HistoryRowLine, HistoryRowLineParts, HistoryRowChange, HistoryRowChangeParts, HistoryRowMilestone, HistoryRowMilestoneParts, HistoryRow, HistoryPage, HistoryPageParts, RuntimeActive, RuntimeActiveParts, RuntimeWaiting, RuntimeWaitingParts, RuntimeRunning, RuntimeRunningParts, RuntimeWaitingForWords, RuntimeWaitingForWordsParts, RuntimeBackingOff, RuntimeBackingOffParts, RuntimeProcedure, RuntimeProcedureParts, RuntimePerson, RuntimePersonParts, RuntimeClosing, RuntimeClosingParts, RuntimeHeld, RuntimeHeldParts, Runtime, Count, CountParts, ConversationLine, ConversationLineParts, InboxEntry, InboxEntryParts, InboxPage, InboxPageParts, ConversationPage, ConversationPageParts, OwnerPhaseCounts, OwnerPhaseCountsParts, GoalLine, GoalLineParts, GoalPage, GoalPageParts, Budget, BudgetParts, Pool, PoolParts, TaskSpend, TaskSpendParts, SpendPeriod, SpendPeriodParts, SpendPage, SpendPageParts, NoteAuthorParty, NoteAuthorPartyParts, NoteAuthorTask, NoteAuthorTaskParts, NoteAuthor, Note, NoteParts, NotePage, NotePageParts, ObjectPage, ObjectPageParts, OwnerEndedDelegate, OwnerEndedDelegateParts, OwnerEndedPage, OwnerEndedPageParts, OwnerInboxObjectQuestion, OwnerInboxObjectQuestionParts, OwnerInboxObjectProposal, OwnerInboxObjectProposalParts, OwnerInboxObjectEscalation, OwnerInboxObjectEscalationParts, OwnerInboxObjectReply, OwnerInboxObjectReplyParts, OwnerInboxObjectResult, OwnerInboxObjectResultParts, OwnerInboxObject, OwnerInboxCursorNumber, OwnerInboxCursorNumberParts, OwnerInboxCursorInbox, OwnerInboxCursorInboxParts, OwnerInboxCursor, OwnerInboxSelection, OwnerInboxSelectionParts, OwnerInboxEntry, OwnerInboxEntryParts, OwnerInboxPage, OwnerInboxPageParts, PoolLedger, PoolLedgerParts, FrameParty, FramePartyParts, Needs, NeedsParts, ProjectRole, ProjectRoleParts, Charter, CharterParts, OfferedCharters, OfferedChartersParts, Frame, FrameParts, PhaseCounts, PhaseCountsParts, Impact, ImpactParts, WriterSlot, WriterSlotParts, LiveDelegate, LiveDelegateParts, Steering, SteeringParts, Passed, PassedParts, Escalation, EscalationParts, TaskContext, TaskContextParts, TaskResultDocument, TaskResultDocumentParts, TaskResultEnding, TaskResultEndingParts, TaskResult, TaskResourcePart, TaskResourcePartParts, TaskResourceOwner, TaskResourceOwnerParts, TaskResource, TaskHoldDocument, TaskHoldDocumentParts, TaskHoldOwner, TaskHoldOwnerParts, TaskHold, SubscriptionKindTask, SubscriptionKindTaskParts, SubscriptionKindTimer, SubscriptionKindTimerParts, SubscriptionKindTopic, SubscriptionKindTopicParts, SubscriptionKind, Subscription, SubscriptionParts, Subscriptions, SubscriptionsParts, Task, TaskParts, TreeNode, TreeNodeParts, Tree, TreeParts, ReplyPosition, ReplyPositionParts, Inbox, InboxParts, Conversations, ConversationsParts, Goals, GoalsParts, TaskFilter, TaskFilterParts, TaskLine, TaskLineParts, Tasks, TasksParts, Call, CallParts, CurrentCall, CurrentCallParts, LiveCallDecoded, LiveCallDecodedParts, LiveCallRaw, LiveCallRawParts, LiveCall, ProvisionalTurnName, ProvisionalTurnNameParts, RunText, RunTextParts, RunState, RunStateParts, ProposalActionBatch, ProposalActionBatchParts, ProposalActionEffect, ProposalActionEffectParts, Authority, AuthorityParts, ProposalActionWiden, ProposalActionWidenParts, ProposalActionAmend, ProposalActionAmendParts, ProposalAction, Proposal, ProposalParts, OwnerProposalActionBatch, OwnerProposalActionBatchParts, OwnerProposalActionEffect, OwnerProposalActionEffectParts, OwnerProposalActionProcedureEffect, OwnerProposalActionProcedureEffectParts, OwnerProposalActionAmend, OwnerProposalActionAmendParts, OwnerProposalActionWiden, OwnerProposalActionWidenParts, OwnerProposalActionRelease, OwnerProposalActionReleaseParts, OwnerProposalAction, OwnerProposalWaiting, OwnerProposalWaitingParts, OwnerFundingOffer, OwnerFundingOfferParts, OwnerProposal, OwnerProposalParts, OwnerEscalation, OwnerEscalationParts, Question, QuestionParts, OptionLine, OptionLineParts, PersonContractChoice, PersonContractChoiceParts, PersonContractApproval, PersonContractApprovalParts, PersonContract, PersonTask, PersonTaskParts, OwnerShownResult, OwnerShownResultParts, OwnerPersonTask, OwnerPersonTaskParts, RolePolicy, RolePolicyParts, Decider, DeciderParts, Policy, PolicyParts, RecurringOverlap, Recurring, RecurringParts, Project, ProjectParts, OwnerProjectResourceRole, OwnerProjectResource, OwnerProjectResourceParts, OwnerProjectPolicyRole, OwnerProjectPolicyRoleParts, OwnerProjectPolicy, OwnerProjectPolicyParts, OwnerProjectMember, OwnerProjectMemberParts, OwnerProjectSpend, OwnerProjectSpendParts, OwnerProject, OwnerProjectParts, OwnerHistoricalValueTask, OwnerHistoricalValueTaskParts, OwnerHistoricalValueProposal, OwnerHistoricalValueProposalParts, OwnerGoalHoldingWrite, OwnerGoalHoldingWriteParts, OwnerGoalHoldingSlot, OwnerGoalHoldingSlotParts, OwnerGoalHolding, OwnerPersonProposalGoal, OwnerPersonProposalGoalParts, OwnerPersonProposalStatePending, OwnerPersonProposalStatePendingParts, OwnerPersonProposalStateAccepted, OwnerPersonProposalStateAcceptedParts, OwnerPersonProposalStateRejected, OwnerPersonProposalStateRejectedParts, OwnerPersonProposalState, OwnerPersonProposal, OwnerPersonProposalParts, OwnerProposalDecisionCreated, OwnerProposalDecisionCreatedParts, OwnerProposalDecision, OwnerProposalDecisionParts, OwnerHistoricalValuePersonProposal, OwnerHistoricalValuePersonProposalParts, OwnerEscalationDecisionReject, OwnerEscalationDecisionRejectParts, OwnerEscalationDecision, OwnerEscalationDecisionRecord, OwnerEscalationDecisionRecordParts, OwnerHistoricalValueEscalation, OwnerHistoricalValueEscalationParts, OwnerHistoricalValueQuestion, OwnerHistoricalValueQuestionParts, OwnerHistoricalValuePersonTask, OwnerHistoricalValuePersonTaskParts, OwnerHistoricalValue, OwnerHistorical, OwnerHistoricalParts, OwnerTreeRow, OwnerTreeRowParts, OwnerTreeFold, OwnerTreeFoldParts, OwnerTree, OwnerTreeParts, EntranceRefusal, EntranceRefusalParts, SubjectTask, SubjectTaskParts, SubjectTree, SubjectTreeParts, SubjectChips, SubjectChipsParts, SubjectInbox, SubjectInboxParts, SubjectGoals, SubjectGoalsParts, SubjectTasks, SubjectTasksParts, SubjectRun, SubjectRunParts, Subject, Host, HostParts, Account, AccountParts, Capacity, CapacityParts, Deployment, DeploymentParts, StoreFill, StoreFillParts, OwnerCapacity, OwnerCapacityParts, OwnerProjectCapacity, OwnerProjectCapacityParts, OwnerHostKind, OwnerAttemptState, OwnerRunLocationConnected, OwnerRunLocationConnectedParts, OwnerRunLocationAdrift, OwnerRunLocationAdriftParts, OwnerRunLocation, OwnerHostRun, OwnerHostRunParts, OwnerHost, OwnerHostParts, OwnerAgentShortfallModel, OwnerAgentShortfallModelParts, OwnerAgentShortfallWindow, OwnerAgentShortfallWindowParts, OwnerAgentShortfallOutput, OwnerAgentShortfallOutputParts, OwnerAgentShortfall, OwnerHelloRefusalAgent, OwnerHelloRefusalAgentParts, OwnerHelloRefusalWorkers, OwnerHelloRefusalWorkersParts, OwnerHelloRefusalStopBound, OwnerHelloRefusalStopBoundParts, OwnerHelloRefusal, OwnerHelloRefusalLine, OwnerHelloRefusalLineParts, OwnerRequestKey, OwnerRequestKeyParts, OwnerPersonCapacityActionApplication, OwnerPersonCapacityActionApplicationParts, OwnerPersonCapacityActionNote, OwnerPersonCapacityActionNoteParts, OwnerPersonCapacityActionPool, OwnerPersonCapacityActionPoolParts, OwnerPersonCapacityActionEscalation, OwnerPersonCapacityActionEscalationParts, OwnerPersonCapacityActionProposal, OwnerPersonCapacityActionProposalParts, OwnerPersonCapacityActionWords, OwnerPersonCapacityActionWordsParts, OwnerPersonCapacityActionQuestion, OwnerPersonCapacityActionQuestionParts, OwnerPersonCapacityActionAmend, OwnerPersonCapacityActionAmendParts, OwnerPersonCapacityActionMove, OwnerPersonCapacityActionMoveParts, OwnerPersonCapacityActionTakePerson, OwnerPersonCapacityActionTakePersonParts, OwnerPersonCapacityActionHandBackPerson, OwnerPersonCapacityActionHandBackPersonParts, OwnerPersonCapacityActionAnswerPerson, OwnerPersonCapacityActionAnswerPersonParts, OwnerPersonCapacityActionStop, OwnerPersonCapacityActionStopParts, OwnerPersonCapacityActionCancel, OwnerPersonCapacityActionCancelParts, OwnerPersonCapacityActionRelease, OwnerPersonCapacityActionReleaseParts, OwnerPersonCapacityActionMarkSeen, OwnerPersonCapacityActionMarkSeenParts, OwnerPersonCapacityAction, OwnerPersonCapacityCauseRequests, OwnerPersonCapacityCauseRequestsParts, OwnerPersonCapacityCausePending, OwnerPersonCapacityCausePendingParts, OwnerPersonCapacityCauseWaiters, OwnerPersonCapacityCauseWaitersParts, OwnerPersonCapacityCauseLimit, OwnerPersonCapacityCauseLimitParts, OwnerPersonCapacityCause, OwnerPersonCapacityRefusal, OwnerPersonCapacityRefusalParts, OwnerTaskCapacityActionBatch, OwnerTaskCapacityActionBatchParts, OwnerTaskCapacityActionProposal, OwnerTaskCapacityActionProposalParts, OwnerTaskCapacityActionPersonProposal, OwnerTaskCapacityActionPersonProposalParts, OwnerTaskCapacityActionMessage, OwnerTaskCapacityActionMessageParts, OwnerTaskCapacityActionSource, OwnerTaskCapacityActionSourceParts, OwnerTaskCapacityActionIntroduce, OwnerTaskCapacityActionIntroduceParts, OwnerTaskCapacityActionSubscription, OwnerTaskCapacityActionSubscriptionParts, OwnerTaskCapacityActionEffect, OwnerTaskCapacityActionEffectParts, OwnerTaskCapacityActionClaim, OwnerTaskCapacityActionClaimParts, OwnerTaskCapacityAction, OwnerTaskCapacityCauseTasks, OwnerTaskCapacityCauseTasksParts, OwnerTaskCapacityCauseCreationFlights, OwnerTaskCapacityCauseCreationFlightsParts, OwnerTaskCapacityCauseResourceReports, OwnerTaskCapacityCauseResourceReportsParts, OwnerTaskCapacityCauseProjectTasks, OwnerTaskCapacityCauseProjectTasksParts, OwnerTaskCapacityCauseTree, OwnerTaskCapacityCauseTreeParts, OwnerTaskCapacityCauseDelegates, OwnerTaskCapacityCauseDelegatesParts, OwnerTaskCapacityCauseInbox, OwnerTaskCapacityCauseInboxParts, OwnerTaskCapacityCauseHoldings, OwnerTaskCapacityCauseHoldingsParts, OwnerTaskCapacityCauseHoldWaiters, OwnerTaskCapacityCauseHoldWaitersParts, OwnerTaskCapacityCauseProposals, OwnerTaskCapacityCauseProposalsParts, OwnerTaskCapacityCauseReferences, OwnerTaskCapacityCauseReferencesParts, OwnerTaskCapacityCauseSubscriptions, OwnerTaskCapacityCauseSubscriptionsParts, OwnerTaskCapacityCauseFunders, OwnerTaskCapacityCauseFundersParts, OwnerTaskCapacityCauseWriters, OwnerTaskCapacityCauseWritersParts, OwnerTaskCapacityCause, OwnerTaskCapacityRequest, OwnerTaskCapacityRequestParts, OwnerTaskCapacityRefusal, OwnerTaskCapacityRefusalParts, WatchEnd, WatchRefusal, Open, OpenParts, OpenAnswerRefused, OpenAnswerRefusedParts, OpenAnswer, WatchClose, WatchCloseParts, CloseAnswer, Gone, GoneParts, Hello, HelloParts, Delivery, DeliveryParts, Ended, EndedParts, StreamText, StreamTextParts, StreamEvent, OwnerAccountStateLater, OwnerAccountStateLaterParts, OwnerAccountPlace, OwnerAccountUnread, OwnerAccountStateUnloaded, OwnerAccountStateUnloadedParts, OwnerAccountState, OwnerAccount, OwnerAccountParts, OwnerDeployment, OwnerDeploymentParts, Kept, KeptParts, TableEntry, TableEntryParts, ReadValue, Chips, ChipsParts, OwnerInbox, OwnerInboxParts, DeliveryValue, Path};
+    use super::{CEILINGS, Family, FamilyParts, Owner, Keyed, KeyedParts, Owned, OwnedParts, Served, ServedParts, NotServed, NotServedParts, KeyedAnswer, LinkSignIn, LinkSignInParts, SignedIn, SignedInParts, SignInAnswer, SignOut, SignOutParts, SignOutAnswer, DocumentText, DocumentTextParts, ExecutorAgent, ExecutorAgentParts, ExecutorProcedure, ExecutorProcedureParts, ExecutorParty, ExecutorPartyParts, ExecutorRole, ExecutorRoleParts, Executor, Phase, RunStageClaimed, RunStageClaimedParts, RunStageRunning, RunStageRunningParts, RunStageBackingOff, RunStageBackingOffParts, RunStage, PersonAddressParty, PersonAddressPartyParts, PersonAddressRole, PersonAddressRoleParts, PersonAddress, ClosingStageRun, ClosingStageRunParts, ClosingStage, HoldFailure, HoldCategoryFailures, HoldCategoryFailuresParts, HoldCategoryDependency, HoldCategoryDependencyParts, HoldCategoryStoppedBy, HoldCategoryStoppedByParts, HoldCategoryUncertain, HoldCategoryUncertainParts, HoldCategoryPoolLost, HoldCategoryPoolLostParts, HoldCategory, OwnerChipPhaseWaiting, OwnerChipPhaseWaitingParts, OwnerChipPhaseActive, OwnerChipPhaseActiveParts, OwnerChipPhasePerson, OwnerChipPhasePersonParts, OwnerChipPhaseClosing, OwnerChipPhaseClosingParts, OwnerChipPhaseHeld, OwnerChipPhaseHeldParts, OwnerChipPhase, FailureClass, RetryNoticeOwnerFailed, RetryNoticeOwnerFailedParts, RetryNoticeFailed, RetryNoticeFailedParts, RetryNoticeRefused, RetryNoticeRefusedParts, RetryNotice, CallIdentity, CallIdentityParts, RunWorkTool, RunWorkToolParts, RunWork, RunObservation, RunObservationParts, ActiveRun, ActiveRunParts, ProposerTask, ProposerTaskParts, ProposerParty, ProposerPartyParts, Proposer, ProposalKey, ProposalKeyParts, PartScopeProject, PartScopeProjectParts, PartScope, PartConnector, PartConnectorParts, PartResource, PartResourceParts, PartKind, PartKindParts, PartPanel, PartPanelParts, PartResult, PartResultParts, PartEffect, PartEffectParts, PartOwnerEffect, PartOwnerEffectParts, PartOutbox, PartOutboxParts, PartHold, PartHoldParts, PartProject, PartProjectParts, PartDeployment, PartDeploymentParts, Part, WakePolicy, WakePolicyParts, RecipientTask, RecipientTaskParts, RecipientParty, RecipientPartyParts, RecipientRole, RecipientRoleParts, RecipientRoles, RecipientRolesParts, Recipient, TakenBy, TakenByParts, Revision, RevisionParts, ActorParty, ActorPartyParts, ActorTask, ActorTaskParts, ActorProjectDeployment, ActorProjectDeploymentParts, Actor, PartyKind, Party, PartyParts, DecisionRejected, DecisionRejectedParts, DecisionReleased, DecisionReleasedParts, DecisionLeftHeld, DecisionLeftHeldParts, Decision, AttemptFailure, AttemptFailureParts, OwnerExecutorAgent, OwnerExecutorAgentParts, OwnerExecutorProcedure, OwnerExecutorProcedureParts, OwnerExecutorPerson, OwnerExecutorPersonParts, OwnerExecutor, WakeRuleBatch, WakeRuleBatchParts, WakeRule, ResultsWake, OwnerWakePolicy, OwnerWakePolicyParts, OwnerPersonStallNotice, OwnerPersonStallNoticeParts, OwnerPersonWait, OwnerPersonWaitParts, OwnerPartKind, OwnerPartKeyPath, OwnerPartKeyPathParts, OwnerPartKeyNumber, OwnerPartKeyNumberParts, OwnerPartKey, OwnerPart, OwnerPartParts, OwnerPriorPhaseActive, OwnerPriorPhaseActiveParts, OwnerPriorPhaseClosing, OwnerPriorPhaseClosingParts, OwnerPriorPhase, OwnerEscalationHolderTask, OwnerEscalationHolderTaskParts, OwnerEscalationHolderPerson, OwnerEscalationHolderPersonParts, OwnerEscalationHolderRole, OwnerEscalationHolderRoleParts, OwnerEscalationHolder, OwnerHoldEscalationWaiting, OwnerHoldEscalationWaitingParts, OwnerHoldEscalationRejected, OwnerHoldEscalationRejectedParts, OwnerHoldEscalation, OwnerFailureTries, OwnerFailureTriesParts, OwnerChipHold, OwnerChipHoldParts, OwnerNumbers, OwnerNumbersParts, FunderTask, FunderTaskParts, FunderPool, FunderPoolParts, FunderRecurring, FunderRecurringParts, FunderPeriod, FunderPeriodParts, Funder, OwnerBudget, OwnerBudgetParts, OwnerResourceWriterRun, OwnerResourceWriterRunParts, OwnerResourceWriterEffect, OwnerResourceWriterEffectParts, OwnerResourceWriter, OwnerResourceLine, OwnerResourceLineParts, OwnerChipWorkTool, OwnerChipWorkToolParts, OwnerChipWork, OwnerChipObservation, OwnerChipObservationParts, OwnerRequesterTask, OwnerRequesterTaskParts, OwnerRequesterPerson, OwnerRequesterPersonParts, OwnerRequesterDeployment, OwnerRequesterDeploymentParts, OwnerRequester, ResultField, ResultFieldParts, ChipFields, ChipFieldsParts, ChipRow, ChipRowParts, ChipPhaseOwnerFields, ChipPhaseOwnerFieldsParts, ChipPhaseActiveFields, ChipPhaseActiveFieldsParts, ChipPhaseWaitingFields, ChipPhaseWaitingFieldsParts, ChipPhaseIdleFields, ChipPhaseIdleFieldsParts, ChipPhaseRunningFields, ChipPhaseRunningFieldsParts, ChipPhaseWaitingForWordsFields, ChipPhaseWaitingForWordsFieldsParts, ChipPhaseBackingOffFields, ChipPhaseBackingOffFieldsParts, ChipPhaseProcedureFields, ChipPhaseProcedureFieldsParts, ChipPhasePersonFields, ChipPhasePersonFieldsParts, ChipPhaseClosingFields, ChipPhaseClosingFieldsParts, ChipPhaseHeldFields, ChipPhaseHeldFieldsParts, ChipPhaseEndedFields, ChipPhaseEndedFieldsParts, ChipPhaseFields, ChipPhaseRow, ChipPhaseRowParts, ClosingFields, ClosingFieldsParts, ClosingRow, ClosingRowParts, EndingTaskFields, EndingTaskFieldsParts, EndingFailedFields, EndingFailedFieldsParts, EndingCancelledFields, EndingCancelledFieldsParts, EndingWithdrawnFields, EndingWithdrawnFieldsParts, EndingDecidedFields, EndingDecidedFieldsParts, EndingFields, EndingRow, EndingRowParts, HeldRuntimeActiveFields, HeldRuntimeActiveFieldsParts, HeldRuntimeClosingFields, HeldRuntimeClosingFieldsParts, HeldRuntimeFields, HeldRuntimeRow, HeldRuntimeRowParts, HoldReasonTriesFields, HoldReasonTriesFieldsParts, HoldReasonStalledFields, HoldReasonStalledFieldsParts, HoldReasonDependencyFields, HoldReasonDependencyFieldsParts, HoldReasonDriftFields, HoldReasonDriftFieldsParts, HoldReasonEffectFailedFields, HoldReasonEffectFailedFieldsParts, HoldReasonEffectUncertainFields, HoldReasonEffectUncertainFieldsParts, HoldReasonBudgetFields, HoldReasonBudgetFieldsParts, HoldReasonDeadlineFields, HoldReasonDeadlineFieldsParts, HoldReasonStoppedFields, HoldReasonStoppedFieldsParts, HoldReasonResourceFields, HoldReasonResourceFieldsParts, HoldReasonPoolFields, HoldReasonPoolFieldsParts, HoldReasonProcedureFields, HoldReasonProcedureFieldsParts, HoldReasonFields, HoldReasonRow, HoldReasonRowParts, OwnerChipDetailsFields, OwnerChipDetailsFieldsParts, OwnerChipDetailsRow, OwnerChipDetailsRowParts, OwnerChipEndingDoneFields, OwnerChipEndingDoneFieldsParts, OwnerChipEndingFailedFields, OwnerChipEndingFailedFieldsParts, OwnerChipEndingCancelledFields, OwnerChipEndingCancelledFieldsParts, OwnerChipEndingFields, OwnerChipEndingRow, OwnerChipEndingRowParts, ResultValueReportFields, ResultValueReportFieldsParts, ResultValueOwnerVerdictFields, ResultValueOwnerVerdictFieldsParts, ResultValueVerdictFields, ResultValueVerdictFieldsParts, ResultValueConnectorFields, ResultValueConnectorFieldsParts, ResultValueChangeFields, ResultValueChangeFieldsParts, ResultValueChoiceFields, ResultValueChoiceFieldsParts, ResultValueApprovedFields, ResultValueApprovedFieldsParts, ResultValueFailureFields, ResultValueFailureFieldsParts, ResultValueWordsFields, ResultValueWordsFieldsParts, ResultValueFields, ResultValueRow, ResultValueRowParts, Fact, Chip, ChipParts, ChipPhase, ChipPhaseParts, Closing, ClosingParts, Ending, EndingParts, HeldRuntime, HeldRuntimeParts, HoldReason, HoldReasonParts, OwnerChipDetails, OwnerChipDetailsParts, OwnerChipEnding, OwnerChipEndingParts, ResultValue, ResultValueParts, PersonAnswerChoice, PersonAnswerChoiceParts, PersonAnswerApproved, PersonAnswerApprovedParts, PersonAnswerWords, PersonAnswerWordsParts, PersonAnswerCannot, PersonAnswerCannotParts, PersonAnswer, AddressChange, AddressChangeParts, ParameterNumber, ParameterNumberParts, ParameterBytes, ParameterBytesParts, ParameterResource, ParameterResourceParts, Parameter, Specification, SpecificationParts, OwnerPatternEndExact, OwnerPatternEndExactParts, OwnerPatternEndOpen, OwnerPatternEndOpenParts, OwnerPatternEnd, OwnerPattern, OwnerPatternParts, OwnerGrant, OwnerGrantParts, OwnerAuthorityExecutorCharter, OwnerAuthorityExecutorCharterParts, OwnerAuthorityExecutorProcedure, OwnerAuthorityExecutorProcedureParts, OwnerAuthorityExecutorRole, OwnerAuthorityExecutorRoleParts, OwnerAuthorityExecutor, OwnerDelegation, OwnerDelegationParts, OwnerResourceScope, OwnerResourceScopeParts, OwnerAuthority, OwnerAuthorityParts, TrackingTracked, TrackingTrackedParts, Tracking, Amendment, AmendmentParts, DisposalCancel, DisposalCancelParts, DisposalTakeOver, DisposalTakeOverParts, Disposal, GoalExecutorCharter, GoalExecutorCharterParts, GoalExecutorProcedure, GoalExecutorProcedureParts, GoalExecutor, Priority, PriorityParts, SeenResults, SeenResultsParts, SeenConversation, SeenConversationParts, SeenThrough, NoteScopeProject, NoteScopeProjectParts, NoteScopeResource, NoteScopeResourceParts, NoteScopeGoal, NoteScopeGoalParts, NoteScope, PolicyEditRole, PolicyEditRoleParts, PolicyJudge, PolicyJudgeParts, PolicyGuardObserved, PolicyGuardObservedParts, PolicyGuard, PolicyRequirement, PolicyRequirementParts, PolicyPermission, PolicyPermissionParts, PolicyEditProjectSpend, PolicyEditProjectSpendParts, PolicyEditRoleValue, PolicyEditRoleValueParts, PolicyEditRequirements, PolicyEditRequirementsParts, PolicyEditProjections, PolicyEditProjectionsParts, PolicyEditPermissions, PolicyEditPermissionsParts, TemplateCharter, TemplateCharterParts, TemplateExecutor, TemplateAmount, TemplateAmountParts, TemplateAsAllowed, TemplateAsAllowedParts, TemplateBudget, TemplateSpan, TemplateSpanParts, TemplateDeadline, TemplateOverride, TemplateOverrideParts, PolicyEditTemplates, PolicyEditTemplatesParts, PolicyEdit, HeldRolePolicy, HeldRolePolicyParts, HeldRole, Holding, HoldingParts, StartChat, StartChatParts, Message, MessageParts, AnswerQuestion, AnswerQuestionParts, AnswerPerson, AnswerPersonParts, AnswerOn, Answer, AnswerParts, Take, TakeParts, HandBack, HandBackParts, DecideProposal, DecideProposalParts, DecideEscalation, DecideEscalationParts, DecideOn, Decide, DecideParts, Release, ReleaseParts, Amend, AmendParts, Stop, StopParts, Cancel, CancelParts, Close, CloseParts, Move, MoveParts, SetGoal, SetGoalParts, Prioritise, PrioritiseParts, Seen, SeenParts, EditNote, EditNoteParts, DeleteNote, DeleteNoteParts, ChangePolicy, ChangePolicyParts, SetRoles, SetRolesParts, MakeService, MakeServiceParts, SetPool, SetPoolParts, Operation, Compound, CompoundParts, FieldRule, FieldRuleParts, VerdictChoice, VerdictChoiceParts, TaskRefMember, TaskRefMemberParts, TaskRefTask, TaskRefTaskParts, TaskRef, ContractReport, ContractReportParts, ContractVerdict, ContractVerdictParts, ContractChange, ContractChangeParts, NewContract, BudgetAsAllowed, BudgetAsAllowedParts, NewBudget, Retention, TaskFlags, TaskFlagsParts, NewTask, NewTaskParts, Create, CreateParts, ProposeBatch, ProposeBatchParts, ProposeAmendment, ProposeAmendmentParts, ProposeAction, Propose, ProposeParts, Withdraw, WithdrawParts, Ask, OwnerProposalChoice, OwnerEscalationChoice, OwnerOutcomeClosing, OwnerOutcomeClosingParts, OwnerOutcomeMarkedSeen, OwnerOutcomeMarkedSeenParts, OwnerOutcomeNoteEdited, OwnerOutcomeNoteEditedParts, OwnerOutcomeServiceMade, OwnerOutcomeServiceMadeParts, OwnerOutcomeAdopted, OwnerOutcomeAdoptedParts, OwnerOutcomeGoalStarted, OwnerOutcomeGoalStartedParts, OwnerOutcomeGoalProposed, OwnerOutcomeGoalProposedParts, OwnerOutcomeStopped, OwnerOutcomeStoppedParts, OwnerOutcomeCancelled, OwnerOutcomeCancelledParts, OwnerOutcomeReleased, OwnerOutcomeReleasedParts, OwnerOutcomePersonTaken, OwnerOutcomePersonTakenParts, OwnerOutcomePersonHandedBack, OwnerOutcomePersonHandedBackParts, OwnerOutcomePersonAnswered, OwnerOutcomePersonAnsweredParts, OwnerOutcomeMoved, OwnerOutcomeMovedParts, OwnerOutcomeProposalDecided, OwnerOutcomeProposalDecidedParts, OwnerOutcomeSaid, OwnerOutcomeSaidParts, OwnerOutcomeQuestionAnswered, OwnerOutcomeQuestionAnsweredParts, OwnerOutcomePrioritised, OwnerOutcomePrioritisedParts, OwnerOutcomeAmended, OwnerOutcomeAmendedParts, OwnerOutcomeProposed, OwnerOutcomeProposedParts, OwnerOutcomeWithdrawn, OwnerOutcomeWithdrawnParts, OwnerOutcomeRolesSet, OwnerOutcomeRolesSetParts, OwnerOutcomePolicyChanged, OwnerOutcomePolicyChangedParts, OwnerOutcomePoolSet, OwnerOutcomePoolSetParts, OwnerOutcomeEscalationDecided, OwnerOutcomeEscalationDecidedParts, OwnerOutcomeStarted, OwnerOutcomeStartedParts, OwnerOutcomeCompound, OwnerOutcomeCompoundParts, CreatedGiven, CreatedGivenParts, OwnerOutcomeCreated, OwnerOutcomeCreatedParts, OwnerOutcome, MadeChat, MadeChatParts, MadeGoal, MadeGoalParts, MadeTasks, MadeTasksParts, MadeService, MadeServiceParts, MadePersonResult, MadePersonResultParts, MadeNote, MadeNoteParts, Made, OutcomeOwner, OutcomeOwnerParts, OutcomeMade, OutcomeMadeParts, OutcomeProposed, OutcomeProposedParts, OutcomeDecided, OutcomeDecidedParts, OutcomeDecidedFirst, OutcomeDecidedFirstParts, Outcome, DisposalIssue, Grant, GrantParts, LackingBudget, LackingBudgetParts, LackingGrant, LackingGrantParts, LackingGrantKind, LackingGrantKindParts, LackingAgain, LackingAgainParts, LackingRequired, LackingRequiredParts, LackingFailed, LackingFailedParts, LackingUnguarded, LackingUnguardedParts, LackingTaskKind, LackingTaskKindParts, LackingDepth, LackingDepthParts, LackingDeadline, LackingDeadlineParts, LackingTasks, LackingTasksParts, Lacking, AdmissionLimit, LimitAdmission, LimitAdmissionParts, LimitLiveTasks, LimitLiveTasksParts, LimitInbox, LimitInboxParts, LimitWords, LimitWordsParts, LimitConversationWords, LimitConversationWordsParts, Limit, CurrentHoldDocument, CurrentHoldDocumentParts, CurrentHoldReason, CurrentHoldReasonParts, CurrentHold, MovedHold, MovedHoldParts, Moved, RefusalRole, RefusalRoleParts, RefusalDisposal, RefusalDisposalParts, RefusalTaken, RefusalTakenParts, RefusalAuthority, RefusalAuthorityParts, RefusalLimit, RefusalLimitParts, RefusalMoved, RefusalMovedParts, RefusalEnded, RefusalEndedParts, Malformed, RefusalMalformed, RefusalMalformedParts, Refusal, Done, DoneParts, Refused, RefusedParts, Final, Cursor, CursorParts, ScopeProject, ScopeProjectParts, Scope, Window, WindowParts, FamilyRecord, FamilyRecordParts, FamilyRequest, FamilyRequestParts, InboxReadGroup, InboxGroup, ReadTask, ReadTaskParts, ReadProposal, ReadProposalParts, ReadEscalation, ReadEscalationParts, ReadQuestion, ReadQuestionParts, ReadPersonTask, ReadPersonTaskParts, ReadResult, ReadResultParts, ReadEnded, ReadEndedParts, ReadHistory, ReadHistoryParts, ReadActivity, ReadActivityParts, ReadInbox, ReadInboxParts, ReadConversations, ReadConversationsParts, ReadGoals, ReadGoalsParts, ReadSpend, ReadSpendParts, ReadProject, ReadProjectParts, ReadNotes, ReadNotesParts, Read, ReadNone, ReadAnswerNone, ReadAnswerNoneParts, ReadAnswer, OwnerPeriodTimes, OwnerPeriodTimesParts, OwnerFundingRecord, OwnerFundingRecordParts, OwnerSpendPage, OwnerSpendPageParts, OwnerMessageProposalKind, OwnerNoticeState, OwnerNewsClass, OwnerWordResultApproved, OwnerWordResultApprovedParts, OwnerWordResultVerdict, OwnerWordResultVerdictParts, OwnerWordResultChange, OwnerWordResultChangeParts, OwnerWordResult, OwnerMessageKindEscalation, OwnerMessageKindEscalationParts, OwnerMessageKindProposal, OwnerMessageKindProposalParts, OwnerMessageKindPersonStalled, OwnerMessageKindPersonStalledParts, OwnerMessageKindProposalDecision, OwnerMessageKindProposalDecisionParts, OwnerMessageKindEffectNotMade, OwnerMessageKindEffectNotMadeParts, OwnerMessageKindAmendment, OwnerMessageKindAmendmentParts, OwnerMessageKindAnswer, OwnerMessageKindAnswerParts, OwnerMessageKindNotice, OwnerMessageKindNoticeParts, OwnerMessageKindTimer, OwnerMessageKindTimerParts, OwnerMessageKindNews, OwnerMessageKindNewsParts, OwnerMessageKindResult, OwnerMessageKindResultParts, OwnerMessageKind, OwnerWord, OwnerWordParts, OwnerRunWhyMessage, OwnerRunWhyMessageParts, OwnerRunWhyRetry, OwnerRunWhyRetryParts, OwnerRunWhy, OwnerRunEndFailed, OwnerRunEndFailedParts, OwnerRunEnd, OwnerActivityWords, OwnerActivityWordsParts, OwnerActivityHeard, OwnerActivityHeardParts, OwnerActivityNotified, OwnerActivityNotifiedParts, OwnerActivityRunBegan, OwnerActivityRunBeganParts, OwnerActivityRunEnded, OwnerActivityRunEndedParts, OwnerActivityTurn, OwnerActivityTurnParts, OwnerActivityDecided, OwnerActivityDecidedParts, OwnerActivityMilestone, OwnerActivityMilestoneParts, OwnerActivity, OwnerActivityLine, OwnerActivityLineParts, TurnName, TurnNameParts, TurnCarried, TurnCarriedParts, TurnTooLarge, TurnTooLargeParts, TurnBytes, ArchivedTurn, ArchivedTurnParts, RunBeginningFresh, RunBeginningFreshParts, RunBeginning, RunEndingFailed, RunEndingFailedParts, RunEnding, TaskContractDocumentApproval, TaskContractDocumentApprovalParts, TaskContractDocumentReport, TaskContractDocumentReportParts, TaskContractDocumentVerdict, TaskContractDocumentVerdictParts, TaskContractDocumentChange, TaskContractDocumentChangeParts, TaskContractDocument, OwnerTaskStatus, OwnerTaskLinkLive, OwnerTaskLinkLiveParts, OwnerTaskLinkRetained, OwnerTaskLinkRetainedParts, OwnerTaskLinkStored, OwnerTaskLinkStoredParts, OwnerTaskLink, ResultDetails, ResultDetailsParts, ActKind, GoalProcedure, GoalProcedureParts, OwnerKindImplication, OwnerKindImplicationParts, OwnerAuthorityDocument, OwnerAuthorityDocumentParts, BoundsGoal, BoundsGoalParts, BoundsAmend, BoundsAmendParts, Bounds, BeyondProposed, BeyondProposedParts, BeyondRefused, BeyondRefusedParts, Beyond, AdmissionProposed, AdmissionProposedParts, AdmissionBounded, AdmissionBoundedParts, AdmissionRefused, AdmissionRefusedParts, Admission, Offered, OfferedParts, ResultDocument, ResultDocumentParts, ObjectKeyTask, ObjectKeyTaskParts, ObjectKeyProposal, ObjectKeyProposalParts, ObjectKeyEscalation, ObjectKeyEscalationParts, ObjectKeyQuestion, ObjectKeyQuestionParts, ObjectKeyPersonTask, ObjectKeyPersonTaskParts, ObjectKeyResult, ObjectKeyResultParts, ObjectKeyNote, ObjectKeyNoteParts, ObjectKey, ActivityOwner, ActivityOwnerParts, ActivityWords, ActivityWordsParts, ActivityRunBegan, ActivityRunBeganParts, ActivityRunEnded, ActivityRunEndedParts, ActivityTurn, ActivityTurnParts, ActivityResult, ActivityResultParts, ActivityNews, ActivityNewsParts, ActivityDecision, ActivityDecisionParts, Activity, ActivityLine, ActivityLineParts, ActivityPage, ActivityPageParts, SpendLine, SpendLineParts, Hold, HoldParts, HistoryChangeMade, HistoryChangeMadeParts, HistoryChangeAmended, HistoryChangeAmendedParts, HistoryChangeHeld, HistoryChangeHeldParts, HistoryChangeCancelled, HistoryChangeCancelledParts, HistoryChangeMoved, HistoryChangeMovedParts, HistoryChange, HistoryLine, HistoryLineParts, OwnerHistoryChangePrioritised, OwnerHistoryChangePrioritisedParts, OwnerHistoryChange, ParameterDocumentNumber, ParameterDocumentNumberParts, ParameterDocumentBytes, ParameterDocumentBytesParts, ParameterDocumentResource, ParameterDocumentResourceParts, ParameterDocument, DocumentSpecification, DocumentSpecificationParts, SpecificationDocument, SpecificationDocumentParts, ProposedTask, ProposedTaskParts, OwnerRetainedAmendment, OwnerRetainedAmendmentParts, OwnerRetainedActionBatch, OwnerRetainedActionBatchParts, OwnerRetainedActionEffect, OwnerRetainedActionEffectParts, OwnerRetainedActionProcedureEffect, OwnerRetainedActionProcedureEffectParts, OwnerRetainedActionAmend, OwnerRetainedActionAmendParts, OwnerRetainedActionWiden, OwnerRetainedActionWidenParts, OwnerRetainedActionRelease, OwnerRetainedActionReleaseParts, OwnerRetainedAction, OwnerHistoryHolderTask, OwnerHistoryHolderTaskParts, OwnerHistoryHolderPerson, OwnerHistoryHolderPersonParts, OwnerHistoryHolderPolicy, OwnerHistoryHolderPolicyParts, OwnerHistoryHolder, OwnerProposalHistoryStatePending, OwnerProposalHistoryStatePendingParts, OwnerProposalHistoryStateAccepted, OwnerProposalHistoryStateAcceptedParts, OwnerProposalHistoryStateRejected, OwnerProposalHistoryStateRejectedParts, OwnerProposalHistoryState, OwnerProposalHistory, OwnerProposalHistoryParts, OwnerAmendmentState, OwnerAmendmentStateParts, OwnerHistoryAmendment, OwnerHistoryAmendmentParts, OwnerHistoryLine, OwnerHistoryLineParts, OwnerMilestonePhaseActive, OwnerMilestonePhaseActiveParts, OwnerMilestonePhaseClosing, OwnerMilestonePhaseClosingParts, OwnerMilestonePhaseHeld, OwnerMilestonePhaseHeldParts, OwnerMilestonePhaseEnded, OwnerMilestonePhaseEndedParts, OwnerMilestonePhase, OwnerMilestoneLine, OwnerMilestoneLineParts, HistoryRowLine, HistoryRowLineParts, HistoryRowChange, HistoryRowChangeParts, HistoryRowMilestone, HistoryRowMilestoneParts, HistoryRow, HistoryPage, HistoryPageParts, RuntimeActive, RuntimeActiveParts, RuntimeWaiting, RuntimeWaitingParts, RuntimeRunning, RuntimeRunningParts, RuntimeWaitingForWords, RuntimeWaitingForWordsParts, RuntimeBackingOff, RuntimeBackingOffParts, RuntimeProcedure, RuntimeProcedureParts, RuntimePerson, RuntimePersonParts, RuntimeClosing, RuntimeClosingParts, RuntimeHeld, RuntimeHeldParts, Runtime, Count, CountParts, ConversationLine, ConversationLineParts, InboxEntry, InboxEntryParts, InboxPage, InboxPageParts, ConversationPage, ConversationPageParts, OwnerPhaseCounts, OwnerPhaseCountsParts, GoalLine, GoalLineParts, GoalPage, GoalPageParts, Budget, BudgetParts, Pool, PoolParts, TaskSpend, TaskSpendParts, SpendPeriod, SpendPeriodParts, SpendPage, SpendPageParts, NoteAuthorParty, NoteAuthorPartyParts, NoteAuthorTask, NoteAuthorTaskParts, NoteAuthor, Note, NoteParts, NotePage, NotePageParts, ObjectPage, ObjectPageParts, OwnerEndedDelegate, OwnerEndedDelegateParts, OwnerEndedPage, OwnerEndedPageParts, OwnerInboxObjectQuestion, OwnerInboxObjectQuestionParts, OwnerInboxObjectProposal, OwnerInboxObjectProposalParts, OwnerInboxObjectEscalation, OwnerInboxObjectEscalationParts, OwnerInboxObjectReply, OwnerInboxObjectReplyParts, OwnerInboxObjectResult, OwnerInboxObjectResultParts, OwnerInboxObject, OwnerInboxCursorNumber, OwnerInboxCursorNumberParts, OwnerInboxCursorInbox, OwnerInboxCursorInboxParts, OwnerInboxCursor, OwnerInboxSelection, OwnerInboxSelectionParts, OwnerInboxEntry, OwnerInboxEntryParts, OwnerInboxPage, OwnerInboxPageParts, PoolLedger, PoolLedgerParts, FrameParty, FramePartyParts, Needs, NeedsParts, ProjectRole, ProjectRoleParts, Charter, CharterParts, OfferedCharters, OfferedChartersParts, Frame, FrameParts, PhaseCounts, PhaseCountsParts, Impact, ImpactParts, WriterSlot, WriterSlotParts, LiveDelegate, LiveDelegateParts, Steering, SteeringParts, Passed, PassedParts, Escalation, EscalationParts, TaskContext, TaskContextParts, TaskResultDocument, TaskResultDocumentParts, TaskResultEnding, TaskResultEndingParts, TaskResult, TaskResourcePart, TaskResourcePartParts, TaskResourceOwner, TaskResourceOwnerParts, TaskResource, TaskHoldDocument, TaskHoldDocumentParts, TaskHoldOwner, TaskHoldOwnerParts, TaskHold, SubscriptionKindTask, SubscriptionKindTaskParts, SubscriptionKindTimer, SubscriptionKindTimerParts, SubscriptionKindTopic, SubscriptionKindTopicParts, SubscriptionKind, Subscription, SubscriptionParts, Subscriptions, SubscriptionsParts, Task, TaskParts, TreeNode, TreeNodeParts, Tree, TreeParts, ReplyPosition, ReplyPositionParts, Inbox, InboxParts, Conversations, ConversationsParts, Goals, GoalsParts, TaskFilter, TaskFilterParts, TaskLine, TaskLineParts, Tasks, TasksParts, Call, CallParts, CurrentCall, CurrentCallParts, LiveCallDecoded, LiveCallDecodedParts, LiveCallRaw, LiveCallRawParts, LiveCall, ProvisionalTurnName, ProvisionalTurnNameParts, RunText, RunTextParts, RunState, RunStateParts, ProposalActionBatch, ProposalActionBatchParts, ProposalActionEffect, ProposalActionEffectParts, Authority, AuthorityParts, ProposalActionWiden, ProposalActionWidenParts, ProposalActionAmend, ProposalActionAmendParts, ProposalAction, Proposal, ProposalParts, OwnerProposalActionBatch, OwnerProposalActionBatchParts, OwnerProposalActionEffect, OwnerProposalActionEffectParts, OwnerProposalActionProcedureEffect, OwnerProposalActionProcedureEffectParts, OwnerProposalActionAmend, OwnerProposalActionAmendParts, OwnerProposalActionWiden, OwnerProposalActionWidenParts, OwnerProposalActionRelease, OwnerProposalActionReleaseParts, OwnerProposalAction, OwnerProposalWaiting, OwnerProposalWaitingParts, OwnerFundingOffer, OwnerFundingOfferParts, OwnerProposal, OwnerProposalParts, OwnerEscalation, OwnerEscalationParts, Question, QuestionParts, OptionLine, OptionLineParts, PersonContractChoice, PersonContractChoiceParts, PersonContractApproval, PersonContractApprovalParts, PersonContract, PersonTask, PersonTaskParts, OwnerShownResult, OwnerShownResultParts, OwnerPersonTask, OwnerPersonTaskParts, RolePolicy, RolePolicyParts, Decider, DeciderParts, Policy, PolicyParts, RecurringOverlap, Recurring, RecurringParts, Project, ProjectParts, OwnerProjectResourceRole, OwnerProjectResource, OwnerProjectResourceParts, OwnerProjectPolicyRole, OwnerProjectPolicyRoleParts, OwnerProjectPolicy, OwnerProjectPolicyParts, OwnerProjectMember, OwnerProjectMemberParts, OwnerProjectSpend, OwnerProjectSpendParts, OwnerProject, OwnerProjectParts, OwnerHistoricalValueTask, OwnerHistoricalValueTaskParts, OwnerHistoricalValueProposal, OwnerHistoricalValueProposalParts, OwnerGoalHoldingWrite, OwnerGoalHoldingWriteParts, OwnerGoalHoldingSlot, OwnerGoalHoldingSlotParts, OwnerGoalHolding, OwnerPersonProposalGoal, OwnerPersonProposalGoalParts, OwnerPersonProposalStatePending, OwnerPersonProposalStatePendingParts, OwnerPersonProposalStateAccepted, OwnerPersonProposalStateAcceptedParts, OwnerPersonProposalStateRejected, OwnerPersonProposalStateRejectedParts, OwnerPersonProposalState, OwnerPersonProposal, OwnerPersonProposalParts, OwnerProposalDecisionCreated, OwnerProposalDecisionCreatedParts, OwnerProposalDecision, OwnerProposalDecisionParts, OwnerHistoricalValuePersonProposal, OwnerHistoricalValuePersonProposalParts, OwnerEscalationDecisionReject, OwnerEscalationDecisionRejectParts, OwnerEscalationDecision, OwnerEscalationDecisionRecord, OwnerEscalationDecisionRecordParts, OwnerHistoricalValueEscalation, OwnerHistoricalValueEscalationParts, OwnerHistoricalValueQuestion, OwnerHistoricalValueQuestionParts, OwnerHistoricalValuePersonTask, OwnerHistoricalValuePersonTaskParts, OwnerHistoricalValue, OwnerHistorical, OwnerHistoricalParts, OwnerTreeRow, OwnerTreeRowParts, OwnerTreeFold, OwnerTreeFoldParts, OwnerTree, OwnerTreeParts, EntranceRefusal, EntranceRefusalParts, SubjectTask, SubjectTaskParts, SubjectTree, SubjectTreeParts, SubjectChips, SubjectChipsParts, SubjectInbox, SubjectInboxParts, SubjectGoals, SubjectGoalsParts, SubjectTasks, SubjectTasksParts, SubjectRun, SubjectRunParts, Subject, Host, HostParts, Account, AccountParts, Capacity, CapacityParts, Deployment, DeploymentParts, StoreFill, StoreFillParts, OwnerCapacity, OwnerCapacityParts, OwnerProjectCapacity, OwnerProjectCapacityParts, OwnerHostKind, OwnerAttemptState, OwnerRunLocationConnected, OwnerRunLocationConnectedParts, OwnerRunLocationAdrift, OwnerRunLocationAdriftParts, OwnerRunLocation, OwnerHostRun, OwnerHostRunParts, OwnerHost, OwnerHostParts, OwnerAgentShortfallModel, OwnerAgentShortfallModelParts, OwnerAgentShortfallWindow, OwnerAgentShortfallWindowParts, OwnerAgentShortfallOutput, OwnerAgentShortfallOutputParts, OwnerAgentShortfall, OwnerHelloRefusalAgent, OwnerHelloRefusalAgentParts, OwnerHelloRefusalWorkers, OwnerHelloRefusalWorkersParts, OwnerHelloRefusalStopBound, OwnerHelloRefusalStopBoundParts, OwnerHelloRefusal, OwnerHelloRefusalLine, OwnerHelloRefusalLineParts, OwnerRequestKey, OwnerRequestKeyParts, OwnerPersonCapacityActionApplication, OwnerPersonCapacityActionApplicationParts, OwnerPersonCapacityActionNote, OwnerPersonCapacityActionNoteParts, OwnerPersonCapacityActionPool, OwnerPersonCapacityActionPoolParts, OwnerPersonCapacityActionEscalation, OwnerPersonCapacityActionEscalationParts, OwnerPersonCapacityActionProposal, OwnerPersonCapacityActionProposalParts, OwnerPersonCapacityActionWords, OwnerPersonCapacityActionWordsParts, OwnerPersonCapacityActionQuestion, OwnerPersonCapacityActionQuestionParts, OwnerPersonCapacityActionAmend, OwnerPersonCapacityActionAmendParts, OwnerPersonCapacityActionMove, OwnerPersonCapacityActionMoveParts, OwnerPersonCapacityActionTakePerson, OwnerPersonCapacityActionTakePersonParts, OwnerPersonCapacityActionHandBackPerson, OwnerPersonCapacityActionHandBackPersonParts, OwnerPersonCapacityActionAnswerPerson, OwnerPersonCapacityActionAnswerPersonParts, OwnerPersonCapacityActionStop, OwnerPersonCapacityActionStopParts, OwnerPersonCapacityActionCancel, OwnerPersonCapacityActionCancelParts, OwnerPersonCapacityActionRelease, OwnerPersonCapacityActionReleaseParts, OwnerPersonCapacityActionMarkSeen, OwnerPersonCapacityActionMarkSeenParts, OwnerPersonCapacityAction, OwnerPersonCapacityCauseRequests, OwnerPersonCapacityCauseRequestsParts, OwnerPersonCapacityCausePending, OwnerPersonCapacityCausePendingParts, OwnerPersonCapacityCauseWaiters, OwnerPersonCapacityCauseWaitersParts, OwnerPersonCapacityCauseLimit, OwnerPersonCapacityCauseLimitParts, OwnerPersonCapacityCause, OwnerPersonCapacityRefusal, OwnerPersonCapacityRefusalParts, OwnerTaskCapacityActionBatch, OwnerTaskCapacityActionBatchParts, OwnerTaskCapacityActionProposal, OwnerTaskCapacityActionProposalParts, OwnerTaskCapacityActionPersonProposal, OwnerTaskCapacityActionPersonProposalParts, OwnerTaskCapacityActionMessage, OwnerTaskCapacityActionMessageParts, OwnerTaskCapacityActionSource, OwnerTaskCapacityActionSourceParts, OwnerTaskCapacityActionIntroduce, OwnerTaskCapacityActionIntroduceParts, OwnerTaskCapacityActionSubscription, OwnerTaskCapacityActionSubscriptionParts, OwnerTaskCapacityActionEffect, OwnerTaskCapacityActionEffectParts, OwnerTaskCapacityActionClaim, OwnerTaskCapacityActionClaimParts, OwnerTaskCapacityAction, OwnerTaskCapacityCauseTasks, OwnerTaskCapacityCauseTasksParts, OwnerTaskCapacityCauseCreationFlights, OwnerTaskCapacityCauseCreationFlightsParts, OwnerTaskCapacityCauseResourceReports, OwnerTaskCapacityCauseResourceReportsParts, OwnerTaskCapacityCauseProjectTasks, OwnerTaskCapacityCauseProjectTasksParts, OwnerTaskCapacityCauseTree, OwnerTaskCapacityCauseTreeParts, OwnerTaskCapacityCauseDelegates, OwnerTaskCapacityCauseDelegatesParts, OwnerTaskCapacityCauseInbox, OwnerTaskCapacityCauseInboxParts, OwnerTaskCapacityCauseHoldings, OwnerTaskCapacityCauseHoldingsParts, OwnerTaskCapacityCauseHoldWaiters, OwnerTaskCapacityCauseHoldWaitersParts, OwnerTaskCapacityCauseProposals, OwnerTaskCapacityCauseProposalsParts, OwnerTaskCapacityCauseReferences, OwnerTaskCapacityCauseReferencesParts, OwnerTaskCapacityCauseSubscriptions, OwnerTaskCapacityCauseSubscriptionsParts, OwnerTaskCapacityCauseFunders, OwnerTaskCapacityCauseFundersParts, OwnerTaskCapacityCauseWriters, OwnerTaskCapacityCauseWritersParts, OwnerTaskCapacityCause, OwnerTaskCapacityRequest, OwnerTaskCapacityRequestParts, OwnerTaskCapacityRefusal, OwnerTaskCapacityRefusalParts, WatchEnd, WatchRefusal, Open, OpenParts, OpenAnswerRefused, OpenAnswerRefusedParts, OpenAnswer, WatchClose, WatchCloseParts, CloseAnswer, Gone, GoneParts, Hello, HelloParts, Delivery, DeliveryParts, Ended, EndedParts, StreamText, StreamTextParts, StreamEvent, OwnerAccountStateLater, OwnerAccountStateLaterParts, OwnerAccountPlace, OwnerAccountUnread, OwnerAccountStateUnloaded, OwnerAccountStateUnloadedParts, OwnerAccountState, OwnerAccount, OwnerAccountParts, OwnerDeployment, OwnerDeploymentParts, Kept, KeptParts, TableEntry, TableEntryParts, ReadValue, Chips, ChipsParts, OwnerInbox, OwnerInboxParts, DeliveryValue, Path};
     use super::Limits;
 
     use alloc::boxed::Box;
@@ -104713,6 +105387,18 @@ mod golden_tests {
         ("record_new_task_full", || { let value = NewTask::new(&CEILINGS, NewTaskParts { executor: OwnerExecutor::Agent(OwnerExecutorAgent::new(&CEILINGS, OwnerExecutorAgentParts { charter: u32::MAX }).expect("golden within ceilings")), spec: Specification::new(&CEILINGS, SpecificationParts { words: Box::from([97_u8, 98_u8, 99_u8].as_slice()), parameters: { let mut items = skein_lib::List::with_capacity(1); items.push(Parameter::Number(ParameterNumber::new(&CEILINGS, ParameterNumberParts { name: u32::MAX, value: u64::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, inputs: { let mut items = skein_lib::List::with_capacity(1); items.push(u64::MAX).expect("one slot"); items } }).expect("golden within ceilings"), contract: NewContract::Report(ContractReport::new(&CEILINGS, ContractReportParts { words: u32::MAX }).expect("golden within ceilings")), authority: OwnerAuthority::new(&CEILINGS, OwnerAuthorityParts { tools: u64::MAX, grants: Box::from([0_u8, 127_u8, 255_u8].as_slice()), delegation: OwnerDelegation::new(&CEILINGS, OwnerDelegationParts { kinds: { let mut items = skein_lib::List::with_capacity(1); items.push(OwnerAuthorityExecutor::Charter(OwnerAuthorityExecutorCharter::new(&CEILINGS, OwnerAuthorityExecutorCharterParts { value: u32::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, tasks: u32::MAX, depth: u32::MAX }).expect("golden within ceilings"), spend: u64::MAX, deadline: Some(u64::MAX), notes: u8::MAX, note_resources: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), budget: NewBudget::Named, wake: OwnerWakePolicy::new(&CEILINGS, OwnerWakePolicyParts { words: WakeRule::Never, notices: WakeRule::Never, news: WakeRule::Never, results: ResultsWake::Never, questions: true, answers: true, timers: true }).expect("golden within ceilings"), dependencies: { let mut items = skein_lib::List::with_capacity(1); items.push(TaskRef::Member(TaskRefMember::new(&CEILINGS, TaskRefMemberParts { value: u32::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, named: Box::from([0_u8, 127_u8, 255_u8].as_slice()), tracked: Some(u32::MAX), label: u32::MAX, flags: TaskFlags::new(&CEILINGS, TaskFlagsParts { conversation: true, listed: true, retention: Retention::Kept }).expect("golden within ceilings") }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 255, 255, 255, 255, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 1, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, NewTask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_create_smallest", || { let value = Create::new(&CEILINGS, CreateParts { project: 0_u32, tasks: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Create::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_create_full", || { let value = Create::new(&CEILINGS, CreateParts { project: u32::MAX, tasks: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Create::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_propose_batch_smallest", || { let value = ProposeBatch::new(&CEILINGS, ProposeBatchParts { tasks: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ProposeBatch::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_propose_batch_full", || { let value = ProposeBatch::new(&CEILINGS, ProposeBatchParts { tasks: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ProposeBatch::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_propose_amendment_smallest", || { let value = ProposeAmendment::new(&CEILINGS, ProposeAmendmentParts { task: 0_u64, revision: Revision::new(&CEILINGS, RevisionParts { value: 0_u64 }).expect("golden within ceilings"), change: Amendment::new(&CEILINGS, AmendmentParts { addressed: None, spec: None, wake: None, dependencies: None, authority: None, instructions: None, tracked: None }).expect("golden within ceilings") }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ProposeAmendment::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_propose_amendment_full", || { let value = ProposeAmendment::new(&CEILINGS, ProposeAmendmentParts { task: u64::MAX, revision: Revision::new(&CEILINGS, RevisionParts { value: u64::MAX }).expect("golden within ceilings"), change: Amendment::new(&CEILINGS, AmendmentParts { addressed: Some(AddressChange::new(&CEILINGS, AddressChangeParts { revision: Revision::new(&CEILINGS, RevisionParts { value: u64::MAX }).expect("golden within ceilings"), address: PersonAddress::Party(PersonAddressParty::new(&CEILINGS, PersonAddressPartyParts { value: u64::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")), spec: Some(Specification::new(&CEILINGS, SpecificationParts { words: Box::from([97_u8, 98_u8, 99_u8].as_slice()), parameters: { let mut items = skein_lib::List::with_capacity(1); items.push(Parameter::Number(ParameterNumber::new(&CEILINGS, ParameterNumberParts { name: u32::MAX, value: u64::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, inputs: { let mut items = skein_lib::List::with_capacity(1); items.push(u64::MAX).expect("one slot"); items } }).expect("golden within ceilings")), wake: Some(OwnerWakePolicy::new(&CEILINGS, OwnerWakePolicyParts { words: WakeRule::Never, notices: WakeRule::Never, news: WakeRule::Never, results: ResultsWake::Never, questions: true, answers: true, timers: true }).expect("golden within ceilings")), dependencies: Some({ let mut items = skein_lib::List::with_capacity(1); items.push(u64::MAX).expect("one slot"); items }), authority: Some(OwnerAuthority::new(&CEILINGS, OwnerAuthorityParts { tools: u64::MAX, grants: Box::from([0_u8, 127_u8, 255_u8].as_slice()), delegation: OwnerDelegation::new(&CEILINGS, OwnerDelegationParts { kinds: { let mut items = skein_lib::List::with_capacity(1); items.push(OwnerAuthorityExecutor::Charter(OwnerAuthorityExecutorCharter::new(&CEILINGS, OwnerAuthorityExecutorCharterParts { value: u32::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, tasks: u32::MAX, depth: u32::MAX }).expect("golden within ceilings"), spend: u64::MAX, deadline: Some(u64::MAX), notes: u8::MAX, note_resources: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), instructions: Some(Box::from([97_u8, 98_u8, 99_u8].as_slice())), tracked: Some(Tracking::Tracked(TrackingTracked::new(&CEILINGS, TrackingTrackedParts { priority: u32::MAX }).expect("golden within ceilings"))) }).expect("golden within ceilings") }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 97, 98, 99, 1, 0, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ProposeAmendment::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_propose_action_batch_smallest", || { let value = ProposeAction::Batch(ProposeBatch::new(&CEILINGS, ProposeBatchParts { tasks: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ProposeAction::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_propose_action_batch_full", || { let value = ProposeAction::Batch(ProposeBatch::new(&CEILINGS, ProposeBatchParts { tasks: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ProposeAction::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_propose_action_amendment_smallest", || { let value = ProposeAction::Amendment(Box::new(ProposeAmendment::new(&CEILINGS, ProposeAmendmentParts { task: 0_u64, revision: Revision::new(&CEILINGS, RevisionParts { value: 0_u64 }).expect("golden within ceilings"), change: Amendment::new(&CEILINGS, AmendmentParts { addressed: None, spec: None, wake: None, dependencies: None, authority: None, instructions: None, tracked: None }).expect("golden within ceilings") }).expect("golden within ceilings"))); let bytes: &[u8] = &[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ProposeAction::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_propose_action_amendment_full", || { let value = ProposeAction::Amendment(Box::new(ProposeAmendment::new(&CEILINGS, ProposeAmendmentParts { task: u64::MAX, revision: Revision::new(&CEILINGS, RevisionParts { value: u64::MAX }).expect("golden within ceilings"), change: Amendment::new(&CEILINGS, AmendmentParts { addressed: Some(AddressChange::new(&CEILINGS, AddressChangeParts { revision: Revision::new(&CEILINGS, RevisionParts { value: u64::MAX }).expect("golden within ceilings"), address: PersonAddress::Party(PersonAddressParty::new(&CEILINGS, PersonAddressPartyParts { value: u64::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")), spec: Some(Specification::new(&CEILINGS, SpecificationParts { words: Box::from([97_u8, 98_u8, 99_u8].as_slice()), parameters: { let mut items = skein_lib::List::with_capacity(1); items.push(Parameter::Number(ParameterNumber::new(&CEILINGS, ParameterNumberParts { name: u32::MAX, value: u64::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, inputs: { let mut items = skein_lib::List::with_capacity(1); items.push(u64::MAX).expect("one slot"); items } }).expect("golden within ceilings")), wake: Some(OwnerWakePolicy::new(&CEILINGS, OwnerWakePolicyParts { words: WakeRule::Never, notices: WakeRule::Never, news: WakeRule::Never, results: ResultsWake::Never, questions: true, answers: true, timers: true }).expect("golden within ceilings")), dependencies: Some({ let mut items = skein_lib::List::with_capacity(1); items.push(u64::MAX).expect("one slot"); items }), authority: Some(OwnerAuthority::new(&CEILINGS, OwnerAuthorityParts { tools: u64::MAX, grants: Box::from([0_u8, 127_u8, 255_u8].as_slice()), delegation: OwnerDelegation::new(&CEILINGS, OwnerDelegationParts { kinds: { let mut items = skein_lib::List::with_capacity(1); items.push(OwnerAuthorityExecutor::Charter(OwnerAuthorityExecutorCharter::new(&CEILINGS, OwnerAuthorityExecutorCharterParts { value: u32::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, tasks: u32::MAX, depth: u32::MAX }).expect("golden within ceilings"), spend: u64::MAX, deadline: Some(u64::MAX), notes: u8::MAX, note_resources: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), instructions: Some(Box::from([97_u8, 98_u8, 99_u8].as_slice())), tracked: Some(Tracking::Tracked(TrackingTracked::new(&CEILINGS, TrackingTrackedParts { priority: u32::MAX }).expect("golden within ceilings"))) }).expect("golden within ceilings") }).expect("golden within ceilings"))); let bytes: &[u8] = &[1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 97, 98, 99, 1, 0, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ProposeAction::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_propose_smallest", || { let value = Propose::new(&CEILINGS, ProposeParts { project: 0_u32, action: ProposeAction::Batch(ProposeBatch::new(&CEILINGS, ProposeBatchParts { tasks: Box::from([].as_slice()) }).expect("golden within ceilings")), reason: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Propose::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_propose_full", || { let value = Propose::new(&CEILINGS, ProposeParts { project: u32::MAX, action: ProposeAction::Batch(ProposeBatch::new(&CEILINGS, ProposeBatchParts { tasks: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), reason: Box::from([97_u8, 98_u8, 99_u8].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 97, 98, 99]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Propose::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_withdraw_smallest", || { let value = Withdraw::new(&CEILINGS, WithdrawParts { project: 0_u32, proposal: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Withdraw::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_withdraw_full", || { let value = Withdraw::new(&CEILINGS, WithdrawParts { project: u32::MAX, proposal: u64::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Withdraw::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_ask_start_chat_smallest", || { let value = Ask::StartChat(StartChat::new(&CEILINGS, StartChatParts { project: 0_u32, words: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_ask_start_chat_full", || { let value = Ask::StartChat(StartChat::new(&CEILINGS, StartChatParts { project: u32::MAX, words: Box::from([97_u8, 98_u8, 99_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 255, 255, 255, 255, 0, 0, 0, 3, 97, 98, 99]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_ask_message_smallest", || { let value = Ask::Message(Message::new(&CEILINGS, MessageParts { project: 0_u32, task: 0_u64, words: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -104759,6 +105445,10 @@ mod golden_tests {
         ("enum_ask_compound_full", || { let value = Ask::Compound(Compound::new(&CEILINGS, CompoundParts { project: u32::MAX, operations: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[21, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_ask_create_smallest", || { let value = Ask::Create(Create::new(&CEILINGS, CreateParts { project: 0_u32, tasks: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[22, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_ask_create_full", || { let value = Ask::Create(Create::new(&CEILINGS, CreateParts { project: u32::MAX, tasks: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[22, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_ask_propose_smallest", || { let value = Ask::Propose(Propose::new(&CEILINGS, ProposeParts { project: 0_u32, action: ProposeAction::Batch(ProposeBatch::new(&CEILINGS, ProposeBatchParts { tasks: Box::from([].as_slice()) }).expect("golden within ceilings")), reason: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_ask_propose_full", || { let value = Ask::Propose(Propose::new(&CEILINGS, ProposeParts { project: u32::MAX, action: ProposeAction::Batch(ProposeBatch::new(&CEILINGS, ProposeBatchParts { tasks: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), reason: Box::from([97_u8, 98_u8, 99_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[23, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 97, 98, 99]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_ask_withdraw_smallest", || { let value = Ask::Withdraw(Withdraw::new(&CEILINGS, WithdrawParts { project: 0_u32, proposal: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_ask_withdraw_full", || { let value = Ask::Withdraw(Withdraw::new(&CEILINGS, WithdrawParts { project: u32::MAX, proposal: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[24, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Ask::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_owner_proposal_choice_accepted_smallest", || { let value = OwnerProposalChoice::Accepted; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerProposalChoice::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_owner_proposal_choice_accepted_full", || { let value = OwnerProposalChoice::Accepted; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerProposalChoice::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_owner_proposal_choice_rejected_smallest", || { let value = OwnerProposalChoice::Rejected; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerProposalChoice::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -104813,8 +105503,10 @@ mod golden_tests {
         ("record_owner_outcome_prioritised_full", || { let value = OwnerOutcomePrioritised::new(&CEILINGS, OwnerOutcomePrioritisedParts { project: u32::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomePrioritised::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_owner_outcome_amended_smallest", || { let value = OwnerOutcomeAmended::new(&CEILINGS, OwnerOutcomeAmendedParts { task: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeAmended::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_owner_outcome_amended_full", || { let value = OwnerOutcomeAmended::new(&CEILINGS, OwnerOutcomeAmendedParts { task: u64::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeAmended::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_owner_outcome_amend_proposed_smallest", || { let value = OwnerOutcomeAmendProposed::new(&CEILINGS, OwnerOutcomeAmendProposedParts { task: 0_u64, proposal: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeAmendProposed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_owner_outcome_amend_proposed_full", || { let value = OwnerOutcomeAmendProposed::new(&CEILINGS, OwnerOutcomeAmendProposedParts { task: u64::MAX, proposal: u64::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeAmendProposed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_owner_outcome_proposed_smallest", || { let value = OwnerOutcomeProposed::new(&CEILINGS, OwnerOutcomeProposedParts { proposal: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeProposed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_owner_outcome_proposed_full", || { let value = OwnerOutcomeProposed::new(&CEILINGS, OwnerOutcomeProposedParts { proposal: u64::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeProposed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_owner_outcome_withdrawn_smallest", || { let value = OwnerOutcomeWithdrawn::new(&CEILINGS, OwnerOutcomeWithdrawnParts { proposal: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeWithdrawn::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_owner_outcome_withdrawn_full", || { let value = OwnerOutcomeWithdrawn::new(&CEILINGS, OwnerOutcomeWithdrawnParts { proposal: u64::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeWithdrawn::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_owner_outcome_roles_set_smallest", || { let value = OwnerOutcomeRolesSet::new(&CEILINGS, OwnerOutcomeRolesSetParts { project: 0_u32 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeRolesSet::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_owner_outcome_roles_set_full", || { let value = OwnerOutcomeRolesSet::new(&CEILINGS, OwnerOutcomeRolesSetParts { project: u32::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomeRolesSet::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_owner_outcome_policy_changed_smallest", || { let value = OwnerOutcomePolicyChanged::new(&CEILINGS, OwnerOutcomePolicyChangedParts { project: 0_u32 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcomePolicyChanged::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -104869,22 +105561,24 @@ mod golden_tests {
         ("enum_owner_outcome_prioritised_full", || { let value = OwnerOutcome::Prioritised(OwnerOutcomePrioritised::new(&CEILINGS, OwnerOutcomePrioritisedParts { project: u32::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[17, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_owner_outcome_amended_smallest", || { let value = OwnerOutcome::Amended(OwnerOutcomeAmended::new(&CEILINGS, OwnerOutcomeAmendedParts { task: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[18, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_owner_outcome_amended_full", || { let value = OwnerOutcome::Amended(OwnerOutcomeAmended::new(&CEILINGS, OwnerOutcomeAmendedParts { task: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[18, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_amend_proposed_smallest", || { let value = OwnerOutcome::AmendProposed(OwnerOutcomeAmendProposed::new(&CEILINGS, OwnerOutcomeAmendProposedParts { task: 0_u64, proposal: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[19, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_amend_proposed_full", || { let value = OwnerOutcome::AmendProposed(OwnerOutcomeAmendProposed::new(&CEILINGS, OwnerOutcomeAmendProposedParts { task: u64::MAX, proposal: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[19, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_roles_set_smallest", || { let value = OwnerOutcome::RolesSet(OwnerOutcomeRolesSet::new(&CEILINGS, OwnerOutcomeRolesSetParts { project: 0_u32 }).expect("golden within ceilings")); let bytes: &[u8] = &[20, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_roles_set_full", || { let value = OwnerOutcome::RolesSet(OwnerOutcomeRolesSet::new(&CEILINGS, OwnerOutcomeRolesSetParts { project: u32::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[20, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_policy_changed_smallest", || { let value = OwnerOutcome::PolicyChanged(OwnerOutcomePolicyChanged::new(&CEILINGS, OwnerOutcomePolicyChangedParts { project: 0_u32 }).expect("golden within ceilings")); let bytes: &[u8] = &[21, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_policy_changed_full", || { let value = OwnerOutcome::PolicyChanged(OwnerOutcomePolicyChanged::new(&CEILINGS, OwnerOutcomePolicyChangedParts { project: u32::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[21, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_pool_set_smallest", || { let value = OwnerOutcome::PoolSet(OwnerOutcomePoolSet::new(&CEILINGS, OwnerOutcomePoolSetParts { project: 0_u32, person: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_pool_set_full", || { let value = OwnerOutcome::PoolSet(OwnerOutcomePoolSet::new(&CEILINGS, OwnerOutcomePoolSetParts { project: u32::MAX, person: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[22, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_escalation_decided_smallest", || { let value = OwnerOutcome::EscalationDecided(OwnerOutcomeEscalationDecided::new(&CEILINGS, OwnerOutcomeEscalationDecidedParts { task: 0_u64, revision: Revision::new(&CEILINGS, RevisionParts { value: 0_u64 }).expect("golden within ceilings"), by: 0_u64, at: 0_u64, choice: OwnerEscalationChoice::Released }).expect("golden within ceilings")); let bytes: &[u8] = &[23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_escalation_decided_full", || { let value = OwnerOutcome::EscalationDecided(OwnerOutcomeEscalationDecided::new(&CEILINGS, OwnerOutcomeEscalationDecidedParts { task: u64::MAX, revision: Revision::new(&CEILINGS, RevisionParts { value: u64::MAX }).expect("golden within ceilings"), by: u64::MAX, at: u64::MAX, choice: OwnerEscalationChoice::Released }).expect("golden within ceilings")); let bytes: &[u8] = &[23, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_started_smallest", || { let value = OwnerOutcome::Started(OwnerOutcomeStarted::new(&CEILINGS, OwnerOutcomeStartedParts { task: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[24, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_started_full", || { let value = OwnerOutcome::Started(OwnerOutcomeStarted::new(&CEILINGS, OwnerOutcomeStartedParts { task: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[24, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_compound_smallest", || { let value = OwnerOutcome::Compound(OwnerOutcomeCompound::new(&CEILINGS, OwnerOutcomeCompoundParts { project: 0_u32, operations: 0_u32, first_message: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[25, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_compound_full", || { let value = OwnerOutcome::Compound(OwnerOutcomeCompound::new(&CEILINGS, OwnerOutcomeCompoundParts { project: u32::MAX, operations: u32::MAX, first_message: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[25, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_created_smallest", || { let value = OwnerOutcome::Created(OwnerOutcomeCreated::new(&CEILINGS, OwnerOutcomeCreatedParts { first: 0_u64, last: 0_u64, given: None }).expect("golden within ceilings")); let bytes: &[u8] = &[26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_owner_outcome_created_full", || { let value = OwnerOutcome::Created(OwnerOutcomeCreated::new(&CEILINGS, OwnerOutcomeCreatedParts { first: u64::MAX, last: u64::MAX, given: Some(CreatedGiven::new(&CEILINGS, CreatedGivenParts { task: u64::MAX, amount: u64::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[26, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_proposed_smallest", || { let value = OwnerOutcome::Proposed(OwnerOutcomeProposed::new(&CEILINGS, OwnerOutcomeProposedParts { proposal: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[19, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_proposed_full", || { let value = OwnerOutcome::Proposed(OwnerOutcomeProposed::new(&CEILINGS, OwnerOutcomeProposedParts { proposal: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[19, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_withdrawn_smallest", || { let value = OwnerOutcome::Withdrawn(OwnerOutcomeWithdrawn::new(&CEILINGS, OwnerOutcomeWithdrawnParts { proposal: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[20, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_withdrawn_full", || { let value = OwnerOutcome::Withdrawn(OwnerOutcomeWithdrawn::new(&CEILINGS, OwnerOutcomeWithdrawnParts { proposal: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[20, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_roles_set_smallest", || { let value = OwnerOutcome::RolesSet(OwnerOutcomeRolesSet::new(&CEILINGS, OwnerOutcomeRolesSetParts { project: 0_u32 }).expect("golden within ceilings")); let bytes: &[u8] = &[21, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_roles_set_full", || { let value = OwnerOutcome::RolesSet(OwnerOutcomeRolesSet::new(&CEILINGS, OwnerOutcomeRolesSetParts { project: u32::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[21, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_policy_changed_smallest", || { let value = OwnerOutcome::PolicyChanged(OwnerOutcomePolicyChanged::new(&CEILINGS, OwnerOutcomePolicyChangedParts { project: 0_u32 }).expect("golden within ceilings")); let bytes: &[u8] = &[22, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_policy_changed_full", || { let value = OwnerOutcome::PolicyChanged(OwnerOutcomePolicyChanged::new(&CEILINGS, OwnerOutcomePolicyChangedParts { project: u32::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[22, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_pool_set_smallest", || { let value = OwnerOutcome::PoolSet(OwnerOutcomePoolSet::new(&CEILINGS, OwnerOutcomePoolSetParts { project: 0_u32, person: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[23, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_pool_set_full", || { let value = OwnerOutcome::PoolSet(OwnerOutcomePoolSet::new(&CEILINGS, OwnerOutcomePoolSetParts { project: u32::MAX, person: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[23, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_escalation_decided_smallest", || { let value = OwnerOutcome::EscalationDecided(OwnerOutcomeEscalationDecided::new(&CEILINGS, OwnerOutcomeEscalationDecidedParts { task: 0_u64, revision: Revision::new(&CEILINGS, RevisionParts { value: 0_u64 }).expect("golden within ceilings"), by: 0_u64, at: 0_u64, choice: OwnerEscalationChoice::Released }).expect("golden within ceilings")); let bytes: &[u8] = &[24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_escalation_decided_full", || { let value = OwnerOutcome::EscalationDecided(OwnerOutcomeEscalationDecided::new(&CEILINGS, OwnerOutcomeEscalationDecidedParts { task: u64::MAX, revision: Revision::new(&CEILINGS, RevisionParts { value: u64::MAX }).expect("golden within ceilings"), by: u64::MAX, at: u64::MAX, choice: OwnerEscalationChoice::Released }).expect("golden within ceilings")); let bytes: &[u8] = &[24, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_started_smallest", || { let value = OwnerOutcome::Started(OwnerOutcomeStarted::new(&CEILINGS, OwnerOutcomeStartedParts { task: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[25, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_started_full", || { let value = OwnerOutcome::Started(OwnerOutcomeStarted::new(&CEILINGS, OwnerOutcomeStartedParts { task: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[25, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_compound_smallest", || { let value = OwnerOutcome::Compound(OwnerOutcomeCompound::new(&CEILINGS, OwnerOutcomeCompoundParts { project: 0_u32, operations: 0_u32, first_message: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_compound_full", || { let value = OwnerOutcome::Compound(OwnerOutcomeCompound::new(&CEILINGS, OwnerOutcomeCompoundParts { project: u32::MAX, operations: u32::MAX, first_message: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[26, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_created_smallest", || { let value = OwnerOutcome::Created(OwnerOutcomeCreated::new(&CEILINGS, OwnerOutcomeCreatedParts { first: 0_u64, last: 0_u64, given: None }).expect("golden within ceilings")); let bytes: &[u8] = &[27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_owner_outcome_created_full", || { let value = OwnerOutcome::Created(OwnerOutcomeCreated::new(&CEILINGS, OwnerOutcomeCreatedParts { first: u64::MAX, last: u64::MAX, given: Some(CreatedGiven::new(&CEILINGS, CreatedGivenParts { task: u64::MAX, amount: u64::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[27, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OwnerOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_made_chat_smallest", || { let value = MadeChat::new(&CEILINGS, MadeChatParts { task: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, MadeChat::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_made_chat_full", || { let value = MadeChat::new(&CEILINGS, MadeChatParts { task: u64::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, MadeChat::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_made_goal_smallest", || { let value = MadeGoal::new(&CEILINGS, MadeGoalParts { task: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, MadeGoal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -105153,6 +105847,8 @@ mod golden_tests {
         ("enum_malformed_conversation_not_agent_full", || { let value = Malformed::ConversationNotAgent; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Malformed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_malformed_cycle_smallest", || { let value = Malformed::Cycle; let bytes: &[u8] = &[3]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Malformed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_malformed_cycle_full", || { let value = Malformed::Cycle; let bytes: &[u8] = &[3]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Malformed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_malformed_proposed_as_allowed_smallest", || { let value = Malformed::ProposedAsAllowed; let bytes: &[u8] = &[4]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Malformed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_malformed_proposed_as_allowed_full", || { let value = Malformed::ProposedAsAllowed; let bytes: &[u8] = &[4]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Malformed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_refusal_malformed_smallest", || { let value = RefusalMalformed::new(&CEILINGS, RefusalMalformedParts { at: 0_u32, why: Malformed::ProjectMismatch }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RefusalMalformed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_refusal_malformed_full", || { let value = RefusalMalformed::new(&CEILINGS, RefusalMalformedParts { at: u32::MAX, why: Malformed::ProjectMismatch }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RefusalMalformed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_refusal_malformed_smallest", || { let value = Refusal::Malformed(RefusalMalformed::new(&CEILINGS, RefusalMalformedParts { at: 0_u32, why: Malformed::ProjectMismatch }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -105683,6 +106379,14 @@ mod golden_tests {
         ("enum_activity_decision_full", || { let value = Activity::Decision(ActivityDecision::new(&CEILINGS, ActivityDecisionParts { object: ObjectKey::Task(ObjectKeyTask::new(&CEILINGS, ObjectKeyTaskParts { value: u64::MAX }).expect("golden within ceilings")), by: Actor::Party(ActorParty::new(&CEILINGS, ActorPartyParts { value: u64::MAX }).expect("golden within ceilings")), how: Decision::Accepted }).expect("golden within ceilings")); let bytes: &[u8] = &[7, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Activity::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_activity_line_smallest", || { let value = ActivityLine::new(&CEILINGS, ActivityLineParts { position: 0_u64, at: 0_u64, event: Activity::Owner(ActivityOwner::new(&CEILINGS, ActivityOwnerParts { source: OwnerActivityLine::new(&CEILINGS, OwnerActivityLineParts { task: 0_u64, position: 0_u64, at: 0_u64, line: OwnerActivity::Words(OwnerActivityWords::new(&CEILINGS, OwnerActivityWordsParts { message: 0_u64, by: OwnerRequester::Task(OwnerRequesterTask::new(&CEILINGS, OwnerRequesterTaskParts { value: 0_u64 }).expect("golden within ceilings")), kind: OwnerMessageKind::Escalation(OwnerMessageKindEscalation::new(&CEILINGS, OwnerMessageKindEscalationParts { task: 0_u64, revision: 0_u64 }).expect("golden within ceilings")), words: Box::from([].as_slice()) }).expect("golden within ceilings")) }).expect("golden within ceilings"), decoded: None }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ActivityLine::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_activity_line_full", || { let value = ActivityLine::new(&CEILINGS, ActivityLineParts { position: u64::MAX, at: u64::MAX, event: Activity::Owner(ActivityOwner::new(&CEILINGS, ActivityOwnerParts { source: OwnerActivityLine::new(&CEILINGS, OwnerActivityLineParts { task: u64::MAX, position: u64::MAX, at: u64::MAX, line: OwnerActivity::Words(OwnerActivityWords::new(&CEILINGS, OwnerActivityWordsParts { message: u64::MAX, by: OwnerRequester::Task(OwnerRequesterTask::new(&CEILINGS, OwnerRequesterTaskParts { value: u64::MAX }).expect("golden within ceilings")), kind: OwnerMessageKind::Escalation(OwnerMessageKindEscalation::new(&CEILINGS, OwnerMessageKindEscalationParts { task: u64::MAX, revision: u64::MAX }).expect("golden within ceilings")), words: Box::from([97_u8, 98_u8, 99_u8].as_slice()) }).expect("golden within ceilings")) }).expect("golden within ceilings"), decoded: Some(ArchivedTurn::new(&CEILINGS, ArchivedTurnParts { task: u64::MAX, name: TurnName::new(&CEILINGS, TurnNameParts { attempt: u64::MAX, number: u32::MAX }).expect("golden within ceilings"), cumulative: u64::MAX, read: Some(u64::MAX), at: u64::MAX, turn: TurnBytes::Carried(TurnCarried::new(&CEILINGS, TurnCarriedParts { bytes: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 97, 98, 99, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ActivityLine::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+    ];
+
+    #[test]
+    fn golden_1() {
+        table(&GOLDEN_1);
+    }
+
+    static GOLDEN_2: [Case; 1024] = [
         ("record_activity_page_smallest", || { let value = ActivityPage::new(&CEILINGS, ActivityPageParts { cut: false, rows: Box::from([].as_slice()), before: None, after: None }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ActivityPage::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_activity_page_full", || { let value = ActivityPage::new(&CEILINGS, ActivityPageParts { cut: true, rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()), before: Some(Cursor::new(&CEILINGS, CursorParts { value: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), after: Some(Cursor::new(&CEILINGS, CursorParts { value: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ActivityPage::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_spend_line_smallest", || { let value = SpendLine::new(&CEILINGS, SpendLineParts { task: 0_u64, attempt: None, spent: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, SpendLine::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -105705,14 +106409,6 @@ mod golden_tests {
         ("enum_history_change_amended_full", || { let value = HistoryChange::Amended(HistoryChangeAmended::new(&CEILINGS, HistoryChangeAmendedParts { before: Box::from([97_u8, 98_u8, 99_u8].as_slice()), after: Box::from([97_u8, 98_u8, 99_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[1, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0, 3, 97, 98, 99]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HistoryChange::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_history_change_held_smallest", || { let value = HistoryChange::Held(HistoryChangeHeld::new(&CEILINGS, HistoryChangeHeldParts { value: Hold::new(&CEILINGS, HoldParts { revision: Revision::new(&CEILINGS, RevisionParts { value: 0_u64 }).expect("golden within ceilings"), reason: HoldReason::new(&CEILINGS, HoldReasonParts { rows: Box::from([].as_slice()) }).expect("golden within ceilings"), before: Phase::Waiting, since: 0_u64, result: None, spend: skein_lib::List::with_capacity(0) }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HistoryChange::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_history_change_held_full", || { let value = HistoryChange::Held(HistoryChangeHeld::new(&CEILINGS, HistoryChangeHeldParts { value: Hold::new(&CEILINGS, HoldParts { revision: Revision::new(&CEILINGS, RevisionParts { value: u64::MAX }).expect("golden within ceilings"), reason: HoldReason::new(&CEILINGS, HoldReasonParts { rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), before: Phase::Waiting, since: u64::MAX, result: Some(ResultValue::new(&CEILINGS, ResultValueParts { rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), spend: { let mut items = skein_lib::List::with_capacity(1); items.push(SpendLine::new(&CEILINGS, SpendLineParts { task: u64::MAX, attempt: Some(u64::MAX), spent: u64::MAX }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[2, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HistoryChange::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-    ];
-
-    #[test]
-    fn golden_1() {
-        table(&GOLDEN_1);
-    }
-
-    static GOLDEN_2: [Case; 1024] = [
         ("enum_history_change_released_smallest", || { let value = HistoryChange::Released; let bytes: &[u8] = &[3]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HistoryChange::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_history_change_released_full", || { let value = HistoryChange::Released; let bytes: &[u8] = &[3]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HistoryChange::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_history_change_cancelled_smallest", || { let value = HistoryChange::Cancelled(HistoryChangeCancelled::new(&CEILINGS, HistoryChangeCancelledParts { reason: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[4, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, HistoryChange::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -106715,6 +107411,14 @@ mod golden_tests {
         ("enum_read_value_person_task_full", || { let value = ReadValue::PersonTask(PersonTask::new(&CEILINGS, PersonTaskParts { task: Chip::new(&CEILINGS, ChipParts { rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), revision: Revision::new(&CEILINGS, RevisionParts { value: u64::MAX }).expect("golden within ceilings"), requester: Actor::Party(ActorParty::new(&CEILINGS, ActorPartyParts { value: u64::MAX }).expect("golden within ceilings")), spec: SpecificationDocument::new(&CEILINGS, SpecificationDocumentParts { specification: DocumentSpecification::new(&CEILINGS, DocumentSpecificationParts { words: DocumentText::new(&CEILINGS, DocumentTextParts { bytes: Box::from([97_u8, 98_u8, 99_u8].as_slice()), cut: true }).expect("golden within ceilings"), parameters: { let mut items = skein_lib::List::with_capacity(1); items.push(ParameterDocument::Number(ParameterDocumentNumber::new(&CEILINGS, ParameterDocumentNumberParts { name: u32::MAX, value: u64::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, inputs: { let mut items = skein_lib::List::with_capacity(1); items.push(u64::MAX).expect("one slot"); items } }).expect("golden within ceilings"), cut: true }).expect("golden within ceilings"), contract: PersonContract::Choice(PersonContractChoice::new(&CEILINGS, PersonContractChoiceParts { options: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), inputs: Box::from([0_u8, 127_u8, 255_u8].as_slice()), addressed: Recipient::Task(RecipientTask::new(&CEILINGS, RecipientTaskParts { value: u64::MAX }).expect("golden within ceilings")), taken: Some(TakenBy::new(&CEILINGS, TakenByParts { number: u64::MAX, name: Some(Box::from([97_u8, 98_u8, 99_u8].as_slice())) }).expect("golden within ceilings")), since: Some(u64::MAX), stall: Some(skein_lib::Duration::from_nanos(u64::MAX)), deadline: Some(u64::MAX), acts: Box::from([0_u8, 127_u8, 255_u8].as_slice()), ending: Some(Ending::new(&CEILINGS, EndingParts { rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[9, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 97, 98, 99, 1, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 3, 97, 98, 99, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_value_owner_person_task_smallest", || { let value = ReadValue::OwnerPersonTask(OwnerPersonTask::new(&CEILINGS, OwnerPersonTaskParts { task: Chip::new(&CEILINGS, ChipParts { rows: Box::from([].as_slice()) }).expect("golden within ceilings"), revision: Revision::new(&CEILINGS, RevisionParts { value: 0_u64 }).expect("golden within ceilings"), requester: OwnerRequester::Task(OwnerRequesterTask::new(&CEILINGS, OwnerRequesterTaskParts { value: 0_u64 }).expect("golden within ceilings")), spec: SpecificationDocument::new(&CEILINGS, SpecificationDocumentParts { specification: DocumentSpecification::new(&CEILINGS, DocumentSpecificationParts { words: DocumentText::new(&CEILINGS, DocumentTextParts { bytes: Box::from([].as_slice()), cut: false }).expect("golden within ceilings"), parameters: skein_lib::List::with_capacity(0), inputs: skein_lib::List::with_capacity(0) }).expect("golden within ceilings"), cut: false }).expect("golden within ceilings"), address: PersonAddress::Party(PersonAddressParty::new(&CEILINGS, PersonAddressPartyParts { value: 0_u64 }).expect("golden within ceilings")), taken_by: None, since: None, stall: None, deadline: None, contract: TaskContractDocument::Approval(TaskContractDocumentApproval::new(&CEILINGS, TaskContractDocumentApprovalParts { state: Box::from([].as_slice()), part: OwnerPart::new(&CEILINGS, OwnerPartParts { connector: 0_u16, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(OwnerPartKeyPath::new(&CEILINGS, OwnerPartKeyPathParts { value: skein_lib::List::with_capacity(0) }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")), results: Box::from([].as_slice()), cut: false, acts: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_value_owner_person_task_full", || { let value = ReadValue::OwnerPersonTask(OwnerPersonTask::new(&CEILINGS, OwnerPersonTaskParts { task: Chip::new(&CEILINGS, ChipParts { rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), revision: Revision::new(&CEILINGS, RevisionParts { value: u64::MAX }).expect("golden within ceilings"), requester: OwnerRequester::Task(OwnerRequesterTask::new(&CEILINGS, OwnerRequesterTaskParts { value: u64::MAX }).expect("golden within ceilings")), spec: SpecificationDocument::new(&CEILINGS, SpecificationDocumentParts { specification: DocumentSpecification::new(&CEILINGS, DocumentSpecificationParts { words: DocumentText::new(&CEILINGS, DocumentTextParts { bytes: Box::from([97_u8, 98_u8, 99_u8].as_slice()), cut: true }).expect("golden within ceilings"), parameters: { let mut items = skein_lib::List::with_capacity(1); items.push(ParameterDocument::Number(ParameterDocumentNumber::new(&CEILINGS, ParameterDocumentNumberParts { name: u32::MAX, value: u64::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, inputs: { let mut items = skein_lib::List::with_capacity(1); items.push(u64::MAX).expect("one slot"); items } }).expect("golden within ceilings"), cut: true }).expect("golden within ceilings"), address: PersonAddress::Party(PersonAddressParty::new(&CEILINGS, PersonAddressPartyParts { value: u64::MAX }).expect("golden within ceilings")), taken_by: Some(u64::MAX), since: Some(u64::MAX), stall: Some(skein_lib::Duration::from_nanos(u64::MAX)), deadline: Some(u64::MAX), contract: TaskContractDocument::Approval(TaskContractDocumentApproval::new(&CEILINGS, TaskContractDocumentApprovalParts { state: Box::from([0_u8, 127_u8, 255_u8].as_slice()), part: OwnerPart::new(&CEILINGS, OwnerPartParts { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(OwnerPartKeyPath::new(&CEILINGS, OwnerPartKeyPathParts { value: { let mut items = skein_lib::List::with_capacity(1); items.push(Box::from([0_u8, 127_u8, 255_u8].as_slice())).expect("one slot"); items } }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")), results: Box::from([0_u8, 127_u8, 255_u8].as_slice()), cut: true, acts: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[10, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 97, 98, 99, 1, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 3, 0, 127, 255, 255, 255, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+    ];
+
+    #[test]
+    fn golden_2() {
+        table(&GOLDEN_2);
+    }
+
+    static GOLDEN_3: [Case; 66] = [
         ("enum_read_value_result_smallest", || { let value = ReadValue::Result(ResultDocument::new(&CEILINGS, ResultDocumentParts { task: Chip::new(&CEILINGS, ChipParts { rows: Box::from([].as_slice()) }).expect("golden within ceilings"), ending: Ending::new(&CEILINGS, EndingParts { rows: Box::from([].as_slice()) }).expect("golden within ceilings"), value: None, at: None, details: None, acts: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_value_result_full", || { let value = ReadValue::Result(ResultDocument::new(&CEILINGS, ResultDocumentParts { task: Chip::new(&CEILINGS, ChipParts { rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), ending: Ending::new(&CEILINGS, EndingParts { rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), value: Some(ResultValue::new(&CEILINGS, ResultValueParts { rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), at: Some(u64::MAX), details: Some(ResultDetails::new(&CEILINGS, ResultDetailsParts { contract: TaskContractDocument::Approval(TaskContractDocumentApproval::new(&CEILINGS, TaskContractDocumentApprovalParts { state: Box::from([0_u8, 127_u8, 255_u8].as_slice()), part: OwnerPart::new(&CEILINGS, OwnerPartParts { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(OwnerPartKeyPath::new(&CEILINGS, OwnerPartKeyPathParts { value: { let mut items = skein_lib::List::with_capacity(1); items.push(Box::from([0_u8, 127_u8, 255_u8].as_slice())).expect("one slot"); items } }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")), requester: OwnerRequester::Task(OwnerRequesterTask::new(&CEILINGS, OwnerRequesterTaskParts { value: u64::MAX }).expect("golden within ceilings")), executor: OwnerExecutor::Agent(OwnerExecutorAgent::new(&CEILINGS, OwnerExecutorAgentParts { charter: u32::MAX }).expect("golden within ceilings")), chosen_by: Some(u64::MAX), delegates: Box::from([0_u8, 127_u8, 255_u8].as_slice()), followups: Some(Box::from([0_u8, 127_u8, 255_u8].as_slice())), proposal: Some(ProposalKey::new(&CEILINGS, ProposalKeyParts { proposer: Proposer::Task(ProposerTask::new(&CEILINGS, ProposerTaskParts { value: u64::MAX }).expect("golden within ceilings")), number: u64::MAX }).expect("golden within ceilings")), cut: true }).expect("golden within ceilings")), acts: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[11, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 0, 3, 0, 127, 255, 255, 255, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_value_ended_smallest", || { let value = ReadValue::Ended(ObjectPage::new(&CEILINGS, ObjectPageParts { cut: false, rows: Box::from([].as_slice()), before: None, after: None }).expect("golden within ceilings")); let bytes: &[u8] = &[12, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -106737,14 +107441,6 @@ mod golden_tests {
         ("enum_read_value_spend_full", || { let value = ReadValue::Spend(SpendPage::new(&CEILINGS, SpendPageParts { cut: true, rows: Box::from([0_u8, 127_u8, 255_u8].as_slice()), before: Some(Cursor::new(&CEILINGS, CursorParts { value: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), after: Some(Cursor::new(&CEILINGS, CursorParts { value: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[20, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_value_owner_spend_smallest", || { let value = ReadValue::OwnerSpend(OwnerSpendPage::new(&CEILINGS, OwnerSpendPageParts { rows: skein_lib::List::with_capacity(0), before: None, after: None, cut: false }).expect("golden within ceilings")); let bytes: &[u8] = &[21, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_value_owner_spend_full", || { let value = ReadValue::OwnerSpend(OwnerSpendPage::new(&CEILINGS, OwnerSpendPageParts { rows: { let mut items = skein_lib::List::with_capacity(1); items.push(OwnerFundingRecord::new(&CEILINGS, OwnerFundingRecordParts { period: Some(OwnerPeriodTimes::new(&CEILINGS, OwnerPeriodTimesParts { began: u64::MAX, next: Some(u64::MAX) }).expect("golden within ceilings")), funder: Funder::Task(FunderTask::new(&CEILINGS, FunderTaskParts { value: u64::MAX }).expect("golden within ceilings")), parent: Some(Funder::Task(FunderTask::new(&CEILINGS, FunderTaskParts { value: u64::MAX }).expect("golden within ceilings"))), numbers: OwnerNumbers::new(&CEILINGS, OwnerNumbersParts { budget: u64::MAX, spent: u64::MAX, spent_below: u64::MAX, reserved: u64::MAX }).expect("golden within ceilings"), made: u32::MAX, closed: true }).expect("golden within ceilings")).expect("one slot"); items }, before: Some(Cursor::new(&CEILINGS, CursorParts { value: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), after: Some(Cursor::new(&CEILINGS, CursorParts { value: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")), cut: true }).expect("golden within ceilings")); let bytes: &[u8] = &[21, 0, 0, 0, 1, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 1, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-    ];
-
-    #[test]
-    fn golden_2() {
-        table(&GOLDEN_2);
-    }
-
-    static GOLDEN_3: [Case; 44] = [
         ("enum_read_value_project_smallest", || { let value = ReadValue::Project(Project::new(&CEILINGS, ProjectParts { period: 0_u64, spend_lines: Box::from([].as_slice()), number: 0_u32, name: Box::from([].as_slice()), policy: Policy::new(&CEILINGS, PolicyParts { ceiling: Authority::new(&CEILINGS, AuthorityParts { budget: 0_u64, grants: Box::from([].as_slice()), task_kinds: skein_lib::List::with_capacity(0), depth: 0_u32, tasks: 0_u32, deadline: None, tools: skein_lib::List::with_capacity(0), note_scopes: Box::from([].as_slice()) }).expect("golden within ceilings"), period: 0_u64, spend: 0_u64, roles: Box::from([].as_slice()), requirements: Box::from([].as_slice()), deciders: skein_lib::List::with_capacity(0) }).expect("golden within ceilings"), roles: skein_lib::List::with_capacity(0), spend: Budget::new(&CEILINGS, BudgetParts { total: 0_u64, own: 0_u64, ended: 0_u64, reserved: 0_u64, left: 0_u64, funder: Actor::Party(ActorParty::new(&CEILINGS, ActorPartyParts { value: 0_u64 }).expect("golden within ceilings")) }).expect("golden within ceilings"), pools: skein_lib::List::with_capacity(0), resources: Box::from([].as_slice()), services: skein_lib::List::with_capacity(0), recurring: Box::from([].as_slice()), parts: Box::from([].as_slice()), acts: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[22, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_value_project_full", || { let value = ReadValue::Project(Project::new(&CEILINGS, ProjectParts { period: u64::MAX, spend_lines: Box::from([0_u8, 127_u8, 255_u8].as_slice()), number: u32::MAX, name: Box::from([97_u8, 98_u8, 99_u8].as_slice()), policy: Policy::new(&CEILINGS, PolicyParts { ceiling: Authority::new(&CEILINGS, AuthorityParts { budget: u64::MAX, grants: Box::from([0_u8, 127_u8, 255_u8].as_slice()), task_kinds: { let mut items = skein_lib::List::with_capacity(1); items.push(Executor::Agent(ExecutorAgent::new(&CEILINGS, ExecutorAgentParts { charter: u32::MAX }).expect("golden within ceilings"))).expect("one slot"); items }, depth: u32::MAX, tasks: u32::MAX, deadline: Some(u64::MAX), tools: { let mut items = skein_lib::List::with_capacity(1); items.push(u16::MAX).expect("one slot"); items }, note_scopes: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"), period: u64::MAX, spend: u64::MAX, roles: Box::from([0_u8, 127_u8, 255_u8].as_slice()), requirements: Box::from([0_u8, 127_u8, 255_u8].as_slice()), deciders: { let mut items = skein_lib::List::with_capacity(1); items.push(Decider::new(&CEILINGS, DeciderParts { kind: u16::MAX, role: u16::MAX }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings"), roles: { let mut items = skein_lib::List::with_capacity(1); items.push(Holding::new(&CEILINGS, HoldingParts { party: u64::MAX, role: HeldRole::Owner }).expect("golden within ceilings")).expect("one slot"); items }, spend: Budget::new(&CEILINGS, BudgetParts { total: u64::MAX, own: u64::MAX, ended: u64::MAX, reserved: u64::MAX, left: u64::MAX, funder: Actor::Party(ActorParty::new(&CEILINGS, ActorPartyParts { value: u64::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings"), pools: { let mut items = skein_lib::List::with_capacity(1); items.push(Pool::new(&CEILINGS, PoolParts { party: u64::MAX, period: u64::MAX, budget: Budget::new(&CEILINGS, BudgetParts { total: u64::MAX, own: u64::MAX, ended: u64::MAX, reserved: u64::MAX, left: u64::MAX, funder: Actor::Party(ActorParty::new(&CEILINGS, ActorPartyParts { value: u64::MAX }).expect("golden within ceilings")) }).expect("golden within ceilings") }).expect("golden within ceilings")).expect("one slot"); items }, resources: Box::from([0_u8, 127_u8, 255_u8].as_slice()), services: { let mut items = skein_lib::List::with_capacity(1); items.push(Party::new(&CEILINGS, PartyParts { number: u64::MAX, kind: PartyKind::Person, name: Box::from([97_u8, 98_u8, 99_u8].as_slice()) }).expect("golden within ceilings")).expect("one slot"); items }, recurring: Box::from([0_u8, 127_u8, 255_u8].as_slice()), parts: Box::from([0_u8, 127_u8, 255_u8].as_slice()), acts: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[22, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 0, 0, 0, 3, 97, 98, 99, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 1, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_read_value_notes_smallest", || { let value = ReadValue::Notes(NotePage::new(&CEILINGS, NotePageParts { cut: false, rows: Box::from([].as_slice()), before: None, after: None }).expect("golden within ceilings")); let bytes: &[u8] = &[23, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ReadValue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -106897,6 +107593,8 @@ mod golden_tests {
         ("bound_new_task_dependencies", || bound((Path::NewTaskDependencies, skein_codec::Reason::Bound), &Limits { new_task_dependencies: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match NewTask::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_new_task_named", || bound((Path::NewTaskNamed, skein_codec::Reason::Bound), &Limits { new_task_named: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match NewTask::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_create_tasks", || bound((Path::CreateTasks, skein_codec::Reason::Bound), &Limits { create_tasks: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Create::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_propose_batch_tasks", || bound((Path::ProposeBatchTasks, skein_codec::Reason::Bound), &Limits { propose_batch_tasks: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match ProposeBatch::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_propose_reason", || bound((Path::ProposeReason, skein_codec::Reason::Bound), &Limits { propose_reason: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Propose::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_made_tasks_tasks", || bound((Path::MadeTasksTasks, skein_codec::Reason::Bound), &Limits { made_tasks_tasks: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match MadeTasks::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_made_service_credential", || bound((Path::MadeServiceCredential, skein_codec::Reason::Bound), &Limits { made_service_credential: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match MadeService::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_cursor_value", || bound((Path::CursorValue, skein_codec::Reason::Bound), &Limits { cursor_value: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Cursor::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
@@ -106931,8 +107629,6 @@ mod golden_tests {
         ("bound_history_change_moved_reason", || bound((Path::HistoryChangeMovedReason, skein_codec::Reason::Bound), &Limits { history_change_moved_reason: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match HistoryChangeMoved::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_document_specification_parameters", || bound((Path::DocumentSpecificationParameters, skein_codec::Reason::Bound), &Limits { document_specification_parameters: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match DocumentSpecification::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_document_specification_inputs", || bound((Path::DocumentSpecificationInputs, skein_codec::Reason::Bound), &Limits { document_specification_inputs: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match DocumentSpecification::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_proposed_task_dependencies", || bound((Path::ProposedTaskDependencies, skein_codec::Reason::Bound), &Limits { proposed_task_dependencies: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ProposedTask::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_proposed_task_resources", || bound((Path::ProposedTaskResources, skein_codec::Reason::Bound), &Limits { proposed_task_resources: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ProposedTask::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
     ];
 
     #[test]
@@ -106941,6 +107637,8 @@ mod golden_tests {
     }
 
     static BOUNDS_2: [Case; 64] = [
+        ("bound_proposed_task_dependencies", || bound((Path::ProposedTaskDependencies, skein_codec::Reason::Bound), &Limits { proposed_task_dependencies: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ProposedTask::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_proposed_task_resources", || bound((Path::ProposedTaskResources, skein_codec::Reason::Bound), &Limits { proposed_task_resources: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ProposedTask::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_retained_amendment_dependencies_some", || bound((Path::OwnerRetainedAmendmentDependencies, skein_codec::Reason::Bound), &Limits { owner_retained_amendment_dependencies_some: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerRetainedAmendment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_retained_action_batch_value", || bound((Path::OwnerRetainedActionBatchValue, skein_codec::Reason::Bound), &Limits { owner_retained_action_batch_value: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match OwnerRetainedActionBatch::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_amendment_state_dependencies", || bound((Path::OwnerAmendmentStateDependencies, skein_codec::Reason::Bound), &Limits { owner_amendment_state_dependencies: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerAmendmentState::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
@@ -107003,8 +107701,6 @@ mod golden_tests {
         ("bound_proposal_action_batch_tasks", || bound((Path::ProposalActionBatchTasks, skein_codec::Reason::Bound), &Limits { proposal_action_batch_tasks: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0], |limits, bytes| match ProposalActionBatch::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_authority_grants", || bound((Path::AuthorityGrants, skein_codec::Reason::Bound), &Limits { authority_grants: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Authority::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_authority_task_kinds", || bound((Path::AuthorityTaskKinds, skein_codec::Reason::Bound), &Limits { authority_task_kinds: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Authority::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_authority_tools", || bound((Path::AuthorityTools, skein_codec::Reason::Bound), &Limits { authority_tools: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Authority::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_authority_note_scopes", || bound((Path::AuthorityNoteScopes, skein_codec::Reason::Bound), &Limits { authority_note_scopes: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Authority::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
     ];
 
     #[test]
@@ -107013,6 +107709,8 @@ mod golden_tests {
     }
 
     static BOUNDS_3: [Case; 64] = [
+        ("bound_authority_tools", || bound((Path::AuthorityTools, skein_codec::Reason::Bound), &Limits { authority_tools: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Authority::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_authority_note_scopes", || bound((Path::AuthorityNoteScopes, skein_codec::Reason::Bound), &Limits { authority_note_scopes: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Authority::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_proposal_action_amend_before", || bound((Path::ProposalActionAmendBefore, skein_codec::Reason::Bound), &Limits { proposal_action_amend_before: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ProposalActionAmend::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_proposal_why", || bound((Path::ProposalWhy, skein_codec::Reason::Bound), &Limits { proposal_why: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Proposal::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_proposal_trail", || bound((Path::ProposalTrail, skein_codec::Reason::Bound), &Limits { proposal_trail: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Proposal::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
@@ -107075,8 +107773,6 @@ mod golden_tests {
         ("bound_account_reason_some", || bound((Path::AccountReason, skein_codec::Reason::Bound), &Limits { account_reason_some: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Account::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_account_runs", || bound((Path::AccountRuns, skein_codec::Reason::Bound), &Limits { account_runs: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Account::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_account_waiting", || bound((Path::AccountWaiting, skein_codec::Reason::Bound), &Limits { account_waiting: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Account::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_deployment_hosts", || bound((Path::DeploymentHosts, skein_codec::Reason::Bound), &Limits { deployment_hosts: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Deployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_deployment_accounts", || bound((Path::DeploymentAccounts, skein_codec::Reason::Bound), &Limits { deployment_accounts: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Deployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
     ];
 
     #[test]
@@ -107084,7 +107780,9 @@ mod golden_tests {
         table(&BOUNDS_3);
     }
 
-    static BOUNDS_4: [Case; 21] = [
+    static BOUNDS_4: [Case; 23] = [
+        ("bound_deployment_hosts", || bound((Path::DeploymentHosts, skein_codec::Reason::Bound), &Limits { deployment_hosts: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Deployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_deployment_accounts", || bound((Path::DeploymentAccounts, skein_codec::Reason::Bound), &Limits { deployment_accounts: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Deployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_deployment_capacity", || bound((Path::DeploymentCapacity, skein_codec::Reason::Bound), &Limits { deployment_capacity: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Deployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_deployment_refusals", || bound((Path::DeploymentRefusals, skein_codec::Reason::Bound), &Limits { deployment_refusals: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Deployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_deployment_parts", || bound((Path::DeploymentParts, skein_codec::Reason::Bound), &Limits { deployment_parts: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Deployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),

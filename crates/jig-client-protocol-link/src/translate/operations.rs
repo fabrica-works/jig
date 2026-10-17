@@ -157,12 +157,18 @@ pub(super) fn restore_tracking(value: &w::Tracking) -> c::Tracking {
 }
 
 pub(super) fn create(project: u32, tasks: &List<c::NewTask>, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
+    Ok(w::Ask::Create(w::Create::new(
+        limits,
+        w::CreateParts { project, tasks: batch(tasks, limits.create_tasks, limits)? },
+    )?))
+}
+fn batch(tasks: &List<c::NewTask>, bound: u32, limits: &w::Limits) -> Result<Box<[u8]>, w::Problem> {
     let mut records = List::with_capacity(tasks.len());
     let mut size = 0_u32;
     for task in tasks {
         let record = new_task(task, limits)?;
         size = size.checked_add(record.measure()).ok_or(super::too_large())?.checked_add(4).ok_or(super::too_large())?;
-        if size > limits.create_tasks {
+        if size > bound {
             return Err(super::too_large());
         }
         records.push(record).expect("same capacity");
@@ -172,7 +178,7 @@ pub(super) fn create(project: u32, tasks: &List<c::NewTask>, limits: &w::Limits)
         out.put(&record.measure().to_be_bytes()).expect("measured piece");
         record.encode(&mut out).expect("measured task");
     }
-    Ok(w::Ask::Create(w::Create::new(limits, w::CreateParts { project, tasks: out.finish() })?))
+    Ok(out.finish())
 }
 fn new_task(v: &c::NewTask, limits: &w::Limits) -> Result<w::NewTask, w::Problem> {
     let mut dependencies = List::with_capacity(v.dependencies.len());
@@ -270,7 +276,10 @@ fn new_contract(value: &c::NewContract, limits: &w::Limits) -> Result<w::NewCont
     })
 }
 pub(super) fn restore_create(value: &w::Create, limits: &crate::Limits) -> Result<c::Ask, w::Problem> {
-    let mut reader = skein_lib::Reader::new(value.tasks());
+    Ok(c::Ask::Create { project: value.project(), tasks: restore_batch(value.tasks(), limits)? })
+}
+fn restore_batch(bytes: &[u8], limits: &crate::Limits) -> Result<List<c::NewTask>, w::Problem> {
+    let mut reader = skein_lib::Reader::new(bytes);
     let mut tasks = List::with_capacity(limits.client.rows);
     while let Some(bytes) = create_piece(&mut reader)? {
         if tasks.len() == tasks.capacity() {
@@ -279,7 +288,7 @@ pub(super) fn restore_create(value: &w::Create, limits: &crate::Limits) -> Resul
         let v = w::NewTask::decode(&limits.wire, &mut skein_lib::Reader::new(&bytes))?;
         tasks.push(restore_task(&v, limits)?).expect("checked capacity");
     }
-    Ok(c::Ask::Create { project: value.project(), tasks })
+    Ok(tasks)
 }
 fn restore_task(v: &w::NewTask, limits: &crate::Limits) -> Result<c::NewTask, w::Problem> {
     let mut dependencies = List::with_capacity(v.dependencies().len());
@@ -334,4 +343,44 @@ fn create_piece(reader: &mut skein_lib::Reader<'_>) -> Result<Option<Box<[u8]>>,
         Ok(value) => Ok(value),
         Err(reason) => Err(super::piece_problem(reason)),
     }
+}
+
+pub(super) fn propose(
+    project: u32,
+    action: &c::ProposeAction,
+    reason: &c::Text,
+    limits: &w::Limits,
+) -> Result<w::Ask, w::Problem> {
+    let action = match action {
+        c::ProposeAction::Batch { tasks } => w::ProposeAction::Batch(w::ProposeBatch::new(
+            limits,
+            w::ProposeBatchParts { tasks: batch(tasks, limits.propose_batch_tasks, limits)? },
+        )?),
+        c::ProposeAction::Amendment { task, revision, change } => {
+            w::ProposeAction::Amendment(Box::new(w::ProposeAmendment::new(
+                limits,
+                w::ProposeAmendmentParts {
+                    task: *task,
+                    revision: asks::wire_revision(*revision, limits)?,
+                    change: asks::wire_amendment(change, limits)?,
+                },
+            )?))
+        }
+    };
+    Ok(w::Ask::Propose(w::Propose::new(
+        limits,
+        w::ProposeParts { project, action, reason: bytes::copy_of(reason.bytes()) },
+    )?))
+}
+pub(super) fn restore_propose(value: &w::Propose, limits: &crate::Limits) -> Result<c::Ask, w::Problem> {
+    let action = match value.action() {
+        w::ProposeAction::Batch(value) => c::ProposeAction::Batch { tasks: restore_batch(value.tasks(), limits)? },
+        w::ProposeAction::Amendment(value) => c::ProposeAction::Amendment {
+            task: value.task(),
+            revision: super::answers::revision(value.revision(), limits),
+            change: Box::new(super::pages::amendment_fields(value.change(), limits)?),
+        },
+    };
+    let reason = super::store::text(value.reason(), limits)?;
+    Ok(c::Ask::Propose { project: value.project(), action, reason })
 }

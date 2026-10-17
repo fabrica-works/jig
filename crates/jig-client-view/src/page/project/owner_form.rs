@@ -25,6 +25,8 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
         Ask::SetPool { project, .. } => (*project, ActKind::SetPool, !doc.configured_pools_cut),
         Ask::StartChat { .. }
         | Ask::Message { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::Create { .. }
         | Ask::Compound { .. }
         | Ask::Answer { .. }
@@ -189,6 +191,8 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
         Ask::MakeService { .. }
         | Ask::StartChat { .. }
         | Ask::Message { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::Create { .. }
         | Ask::Compound { .. }
         | Ask::Answer { .. }
@@ -234,6 +238,8 @@ pub(crate) fn review(domain: &mut Ui, ask: Box<Ask>) {
             | Ask::SetRoles { .. }
             | Ask::StartChat { .. }
             | Ask::Message { .. }
+            | Ask::Propose { .. }
+            | Ask::Withdraw { .. }
             | Ask::Create { .. }
             | Ask::Compound { .. }
             | Ask::Answer { .. }
@@ -285,6 +291,8 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>) {
         | Ask::SetRoles { .. }
         | Ask::StartChat { .. }
         | Ask::Message { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::Create { .. }
         | Ask::Compound { .. }
         | Ask::Answer { .. }

@@ -137,6 +137,10 @@ pub enum AnswerOn {
 pub enum Ask {
     /// Admit and create a batch together.
     Create { project: u32, tasks: List<super::NewTask> },
+    /// Submit a proposal in the party's own name.
+    Propose { project: u32, action: super::ProposeAction, reason: Text },
+    /// Withdraw the party's pending proposal.
+    Withdraw { project: u32, proposal: u64 },
     /// Start a chat.
     StartChat { project: u32, words: Text },
     /// Add words to a task inbox.

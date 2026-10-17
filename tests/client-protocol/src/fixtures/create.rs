@@ -63,6 +63,14 @@ pub fn batch_config(seed: u64) -> jig_test_domain::Config {
     config.core.authority = authority;
     config
 }
+#[must_use]
+pub fn proposed_tasks() -> List<c::NewTask> {
+    let mut tasks = create_tasks();
+    tasks.get_mut(0).expect("first root").budget = c::NewBudget::Named;
+    tasks.get_mut(0).expect("first root").authority.spend = 150;
+    tasks
+}
+
 #[cfg(test)]
 mod tests {
     use jig_domain_authority as a;

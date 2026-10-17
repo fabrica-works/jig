@@ -67,6 +67,14 @@ fn problem() -> w::Problem {
 #[expect(clippy::too_many_lines, reason = "one total match names every people outcome")]
 fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::Problem> {
     Ok(match value {
+        p::Outcome::Proposed { proposal, .. } => w::OwnerOutcome::Proposed(w::OwnerOutcomeProposed::new(
+            limits,
+            w::OwnerOutcomeProposedParts { proposal: *proposal },
+        )?),
+        p::Outcome::Withdrawn { proposal } => w::OwnerOutcome::Withdrawn(w::OwnerOutcomeWithdrawn::new(
+            limits,
+            w::OwnerOutcomeWithdrawnParts { proposal: *proposal },
+        )?),
         p::Outcome::Created { first, last, given } => w::OwnerOutcome::Created(w::OwnerOutcomeCreated::new(
             limits,
             w::OwnerOutcomeCreatedParts {
@@ -205,8 +213,6 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
             )?)
         }
         p::Outcome::CompoundRefused { .. }
-        | p::Outcome::Proposed { .. }
-        | p::Outcome::Withdrawn { .. }
         | p::Outcome::Applied { .. }
         | p::Outcome::Again(_)
         | p::Outcome::SignedOut
@@ -240,28 +246,4 @@ fn escalation_choice(value: p::EscalationChoice) -> w::OwnerEscalationChoice {
         p::EscalationChoice::Rejected => w::OwnerEscalationChoice::Rejected,
         p::EscalationChoice::Passed => w::OwnerEscalationChoice::Passed,
     }
-}
-
-/// Translate the explicit follow-up of the temporary v8 amendment confirmation.
-pub(crate) fn amend_answer(
-    reply: &p::Reply,
-    kept: Option<&p::Ask>,
-    limits: &w::Limits,
-) -> Result<w::KeyedAnswer, w::Problem> {
-    if let (
-        Some(p::Ask::Propose { action: p::Action::Amend { task, .. }, .. }),
-        p::Reply::Outcome(p::Outcome::Proposed { proposal, .. }),
-    ) = (kept, reply)
-    {
-        let value = w::OwnerOutcome::AmendProposed(w::OwnerOutcomeAmendProposed::new(
-            limits,
-            w::OwnerOutcomeAmendProposedParts { task: *task, proposal: *proposal },
-        )?);
-        let outcome = w::Outcome::Owner(w::OutcomeOwner::new(limits, w::OutcomeOwnerParts { value })?);
-        let final_answer = w::Final::Done(w::Done::new(limits, w::DoneParts { outcome })?);
-        let mut out = Writer::new(usize::try_from(final_answer.measure()).expect("wire size fits"));
-        final_answer.encode(&mut out).expect("measured final answer");
-        return owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits);
-    }
-    answer(reply, limits)
 }

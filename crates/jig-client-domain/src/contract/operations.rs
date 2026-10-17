@@ -19,6 +19,7 @@ pub enum Malformed {
     TwoAsAllowed,
     ConversationNotAgent,
     Cycle,
+    ProposedAsAllowed,
 }
 
 /// A dependency names a place in this batch or an existing task.
@@ -73,4 +74,11 @@ pub struct NewTask {
 pub struct CreatedGiven {
     pub task: u64,
     pub amount: u64,
+}
+
+/// A party's explicitly proposed batch or amendment.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum ProposeAction {
+    Batch { tasks: skein_lib::List<NewTask> },
+    Amendment { task: u64, revision: Revision, change: Box<Amendment> },
 }

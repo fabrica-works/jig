@@ -413,3 +413,72 @@ fn a_root_task_with_no_one_to_escalate_to_is_refused_saying_so() {
     );
     assert_eq!((story.task_budget(1), story.task_budget(2)), (None, None));
 }
+
+const PROPOSE: Key = Key { asker: Asker::JIG, number: 86 };
+const WITHDRAW: Key = Key { asker: Asker::JIG, number: 87 };
+const PROPOSAL: Handle = Handle { asker: Asker::JIG, number: 88 };
+#[test]
+fn a_party_proposes_a_batch_and_withdraws_it_before_it_is_decided() {
+    let mut story = Story::live_batch(fixtures::SEED, true);
+    story.send(
+        PROPOSE,
+        Ask::Jig(Box::new(contract::Ask::Propose {
+            project: 1,
+            action: contract::ProposeAction::Batch { tasks: fixtures::proposed_tasks() },
+            reason: contract::Text::new(b"more work".as_slice().into(), 32).expect("bounded proposal reason"),
+        })),
+    );
+    assert!(story.run_until(|s| !s.answered(PROPOSE).is_empty(), PROOF_WAIT));
+    assert_eq!(
+        story.answered(PROPOSE),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::Proposed { proposal: 1 }
+        ))))]
+    );
+    let key = contract::ProposalKey { proposer: contract::Proposer::Party(fixtures::FIRST_OWNER), number: 1 };
+    story.read(PROPOSAL, Readable::Jig(contract::Read::Proposal { proposal: key }));
+    assert!(story.run_until(|s| !s.pages(PROPOSAL).is_empty(), PROOF_WAIT));
+    let pages = story.pages(PROPOSAL);
+    let [Readout::Jig(contract::ReadResult::Value(contract::ReadValue::OwnerProposal(value)))] = pages.as_slice()
+    else {
+        panic!("proposal document: {pages:?}")
+    };
+    assert_eq!(value.key, key);
+    assert_eq!(
+        value.waiting.holder,
+        contract::OwnerHistoryHolder::Policy { project: 1, kind: contract::OwnerMessageProposalKind::Batch }
+    );
+    assert_eq!(story.party_proposal(1).expect("durable party proposal").proposer, fixtures::FIRST_OWNER);
+    story.send(WITHDRAW, Ask::Jig(Box::new(contract::Ask::Withdraw { project: 1, proposal: 1 })));
+    assert!(story.run_until(|s| !s.answered(WITHDRAW).is_empty(), PROOF_WAIT));
+    assert_eq!(
+        story.answered(WITHDRAW),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::Withdrawn { proposal: 1 }
+        ))))]
+    );
+    assert!(matches!(
+        story.party_proposal(1).expect("durable party proposal").state,
+        jig_domain_tasks::PersonProposalState::Withdrawn { .. }
+    ));
+    assert_eq!(story.party_proposal(1).expect("durable party proposal").proposer, fixtures::FIRST_OWNER);
+    assert_eq!((story.task_budget(1), story.task_budget(2)), (None, None));
+}
+#[test]
+fn a_create_beyond_authority_is_refused_saying_a_proposal_could_be_accepted() {
+    let mut story = Story::live_batch(fixtures::SEED, true);
+    story.send(CREATE, Ask::Jig(Box::new(contract::Ask::Create { project: 1, tasks: fixtures::proposed_tasks() })));
+    assert!(story.run_until(|s| !s.answered(CREATE).is_empty(), PROOF_WAIT));
+    assert_eq!(
+        story.answered(CREATE),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Refused {
+            refusal: contract::Refusal::Authority {
+                lacking: contract::Lacking::Budget { needed: 160, left: 100 },
+                proposable: Some(true)
+            },
+            at: None,
+        }))]
+    );
+    assert_eq!(story.party_proposal(1), None);
+    assert_eq!((story.task_budget(1), story.task_budget(2)), (None, None));
+}

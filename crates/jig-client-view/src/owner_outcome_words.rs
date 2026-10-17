@@ -60,8 +60,8 @@ pub enum OutcomePhrase {
     Prioritised,
     /// The task amended saying.
     Amended,
-    /// The amendment proposed saying.
-    AmendProposed,
+    /// The proposal admitted saying.
+    Proposed,
     /// The project roles set saying.
     RolesSet,
     /// The project policy changed saying.
@@ -146,7 +146,7 @@ pub const ALL: [OutcomePhrase; 55] = [
     OutcomePhrase::QuestionAnswered,
     OutcomePhrase::Prioritised,
     OutcomePhrase::Amended,
-    OutcomePhrase::AmendProposed,
+    OutcomePhrase::Proposed,
     OutcomePhrase::RolesSet,
     OutcomePhrase::PolicyChanged,
     OutcomePhrase::PoolSet,
@@ -207,7 +207,7 @@ impl OutcomePhrase {
             Self::QuestionAnswered => 6416,
             Self::Prioritised => 6417,
             Self::Amended => 6418,
-            Self::AmendProposed => 6419,
+            Self::Proposed => 6419,
             Self::RolesSet => 6420,
             Self::PolicyChanged => 6421,
             Self::PoolSet => 6422,
@@ -284,7 +284,7 @@ impl OutcomePhrase {
             | Self::QuestionAnswered
             | Self::Prioritised
             | Self::Amended
-            | Self::AmendProposed
+            | Self::Proposed
             | Self::RolesSet
             | Self::PolicyChanged
             | Self::PoolSet
@@ -344,7 +344,7 @@ pub fn english() -> Language {
             OutcomePhrase::QuestionAnswered => b"Question answered",
             OutcomePhrase::Prioritised => b"Goal priorities changed",
             OutcomePhrase::Amended => b"Task amended",
-            OutcomePhrase::AmendProposed => b"Amendment proposed",
+            OutcomePhrase::Proposed => b"Proposed",
             OutcomePhrase::RolesSet => b"Project roles set",
             OutcomePhrase::PolicyChanged => b"Project policy changed",
             OutcomePhrase::PoolSet => b"Person pool set",

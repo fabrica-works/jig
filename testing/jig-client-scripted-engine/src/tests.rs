@@ -2349,3 +2349,6 @@ use jig_client_domain::contract::DecideOn;
 
 mod compound;
 use compound::releasing;
+
+mod fixtures;
+mod propose;

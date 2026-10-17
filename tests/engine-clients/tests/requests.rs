@@ -169,40 +169,40 @@ fn amendment_setup(seed: u64) -> (Peer, jig_core_world::effects::World, Box<[u8]
     jig_core_world::fixtures::ask_as(
         &mut world,
         sign_in,
-        30,
+        CREATE_TASK,
         people::Ask::Create { project: 1, batch: Box::new([jig_core_world::fixtures::people_member(b"work", 20)]) },
     );
     let mut peer = Peer::started(&fixtures::settings());
     let bearer = bearer(&mut peer, world.sign_in.expect("member"), 1);
     (peer, world, bearer)
 }
-const FOLLOWUP_KEY: [u8; 16] = [61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 61, 189];
+
 #[test]
 fn a_v8_amend_beyond_the_role_is_proposed_and_answered_amend_proposed() {
     let (mut peer, mut world, bearer) = amendment_setup(349);
     let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
-    let socket = peer.post(b"/jig/v1/request", amend_request(revision, 150), Some(&bearer));
+    let socket = peer.post(b"/jig/v1/request", propose_request(revision, 150), Some(&bearer));
     assert_eq!(
         route_real_core(&mut peer, &mut world),
-        [[61; 16], FOLLOWUP_KEY],
+        [[61; 16]],
         "real core reply: {:?}",
         world.people_answers.last()
     );
     let w::Final::Done(done) = final_answer(&peer, socket) else { panic!("done") };
     let w::Outcome::Owner(owner) = done.outcome() else { panic!("owner outcome") };
-    let w::OwnerOutcome::AmendProposed(row) = owner.value() else { panic!("amend proposed") };
-    assert_eq!((row.task(), row.proposal()), (2, 1));
+    let w::OwnerOutcome::Proposed(row) = owner.value() else { panic!("amend proposed") };
+    assert_eq!(row.proposal(), 1);
     assert_eq!(jig_core_world::fixtures::live_row(&world, 2).numbers.budget, 20);
 }
 #[test]
 fn a_v8_amend_sent_again_replays_the_same_proposal() {
     let (mut peer, mut world, bearer) = amendment_setup(350);
     let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
-    let body = amend_request(revision, 150);
+    let body = propose_request(revision, 150);
     let first = peer.post(b"/jig/v1/request", body.clone(), Some(&bearer));
     assert_eq!(
         route_real_core(&mut peer, &mut world),
-        [[61; 16], FOLLOWUP_KEY],
+        [[61; 16]],
         "real core reply: {:?}",
         world.people_answers.last()
     );
@@ -210,7 +210,7 @@ fn a_v8_amend_sent_again_replays_the_same_proposal() {
     let second = peer.post(b"/jig/v1/request", body, Some(&bearer));
     assert_eq!(
         route_real_core(&mut peer, &mut world),
-        [[61; 16], FOLLOWUP_KEY],
+        [[61; 16]],
         "real core reply: {:?}",
         world.people_answers.last()
     );
@@ -227,3 +227,46 @@ fn a_v8_amend_beyond_the_ceiling_stays_refused() {
     assert_eq!(row.proposable(), &Some(false));
     assert_eq!(jig_core_world::fixtures::live_row(&world, 2).proposal, None);
 }
+
+fn propose_request(revision: u64, spend: u64) -> Box<[u8]> {
+    let limits = fixtures::limits().wire;
+    let keyed = w::Keyed::decode(&limits, &mut skein_lib::Reader::new(&amend_request(revision, spend)))
+        .expect("bounded proposal fixture")
+        .into_parts();
+    let w::Ask::Amend(value) =
+        w::Ask::decode(&limits, &mut skein_lib::Reader::new(&keyed.request)).expect("bounded proposal fixture")
+    else {
+        panic!("amend fixture")
+    };
+    let v = value.into_parts();
+    let ask = w::Ask::Propose(
+        w::Propose::new(
+            &limits,
+            w::ProposeParts {
+                project: v.project,
+                action: w::ProposeAction::Amendment(Box::new(
+                    w::ProposeAmendment::new(
+                        &limits,
+                        w::ProposeAmendmentParts {
+                            task: v.task,
+                            revision: v.revision.expect("amendment revision"),
+                            change: v.change,
+                        },
+                    )
+                    .expect("bounded proposal fixture"),
+                )),
+                reason: v.reason,
+            },
+        )
+        .expect("bounded proposal fixture"),
+    );
+    let mut out = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
+    ask.encode(&mut out).expect("bounded proposal fixture");
+    let keyed =
+        w::Keyed::new(&limits, w::KeyedParts { request: out.finish(), ..keyed }).expect("bounded proposal fixture");
+    let mut out = Writer::new(usize::try_from(keyed.measure()).expect("keyed size"));
+    keyed.encode(&mut out).expect("bounded proposal fixture");
+    out.finish()
+}
+
+const CREATE_TASK: u8 = 30;

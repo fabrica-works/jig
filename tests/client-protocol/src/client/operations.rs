@@ -138,3 +138,19 @@ impl Story {
             .map(|v| v.budget)
     }
 }
+
+impl Story {
+    #[must_use]
+    pub fn party_proposal(&self, number: u64) -> Option<&tasks::PersonProposal> {
+        self.engine.driver.world.store.rows.values().find_map(|row| stored_party_proposal(row, number))
+    }
+}
+
+fn stored_party_proposal(row: &jig_test_domain::Record, number: u64) -> Option<&tasks::PersonProposal> {
+    match row {
+        jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(
+            tasks::Stored::PersonProposal(value) | tasks::Stored::DecidedProposal(value),
+        )) if value.number == number => Some(value.as_ref()),
+        jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
+    }
+}

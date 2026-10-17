@@ -53,7 +53,8 @@ fn header(value: &OwnerOutcome) -> P {
         OwnerOutcome::QuestionAnswered { .. } => P::QuestionAnswered,
         OwnerOutcome::Prioritised { .. } => P::Prioritised,
         OwnerOutcome::Amended { .. } => P::Amended,
-        OwnerOutcome::AmendProposed { .. } => P::AmendProposed,
+        OwnerOutcome::Proposed { .. } => P::Proposed,
+        OwnerOutcome::Withdrawn { .. } => P::Withdrawn,
         OwnerOutcome::RolesSet { .. } => P::RolesSet,
         OwnerOutcome::PolicyChanged { .. } => P::PolicyChanged,
         OwnerOutcome::PoolSet { .. } => P::PoolSet,
@@ -157,8 +158,7 @@ fn details(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
         OwnerOutcome::Amended { task } => {
             number(b, words, P::Task, *task);
         }
-        OwnerOutcome::AmendProposed { task, proposal } => {
-            number(b, words, P::Task, *task);
+        OwnerOutcome::Proposed { proposal } | OwnerOutcome::Withdrawn { proposal } => {
             number(b, words, P::ProposalNumber, *proposal);
         }
         OwnerOutcome::PoolSet { project, person } => {

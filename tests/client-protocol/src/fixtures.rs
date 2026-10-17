@@ -173,4 +173,4 @@ pub fn starter() -> jig_fake_parties::Party {
     )
 }
 mod create;
-pub use create::{batch_config, create_tasks};
+pub use create::{batch_config, create_tasks, proposed_tasks};

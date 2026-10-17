@@ -39,6 +39,9 @@ pub fn store_asks() -> List<c::Ask> {
     list([
         start_chat(),
         create_ask(),
+        propose_amendment(revision),
+        propose_batch(),
+        c::Ask::Withdraw { project: 7, proposal: u64::MAX },
         compound_ask(revision),
         c::Ask::Message { project: 7, task: u64::MAX, words: store_text() },
         c::Ask::Answer {
@@ -286,5 +289,18 @@ fn compound_ask(revision: c::Revision) -> c::Ask {
             c::Operation::Move { project: 7, task: u64::MAX, reason: store_text() },
             c::Operation::Stop { project: 7, task: u64::MAX },
         ]),
+    }
+}
+
+fn propose_batch() -> c::Ask {
+    let c::Ask::Create { project, tasks } = create_ask() else { panic!("create fixture") };
+    c::Ask::Propose { project, action: c::ProposeAction::Batch { tasks }, reason: store_text() }
+}
+
+fn propose_amendment(revision: c::Revision) -> c::Ask {
+    c::Ask::Propose {
+        project: 7,
+        action: c::ProposeAction::Amendment { task: u64::MAX, revision, change: Box::new(amendment()) },
+        reason: store_text(),
     }
 }

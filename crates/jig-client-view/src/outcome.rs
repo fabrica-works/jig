@@ -16,8 +16,9 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
             OwnerOutcome::Started { task } => Route::Chat { task: *task },
             OwnerOutcome::GoalStarted { task } => Route::Goal { task: *task },
             OwnerOutcome::Said { task, message, .. } => Route::Words { task: *task, message: *message },
-            OwnerOutcome::GoalProposed { .. } | OwnerOutcome::AmendProposed { .. } => Route::Proposed,
-            OwnerOutcome::Created { .. }
+            OwnerOutcome::GoalProposed { .. } | OwnerOutcome::Proposed { .. } => Route::Proposed,
+            OwnerOutcome::Withdrawn { .. }
+            | OwnerOutcome::Created { .. }
             | OwnerOutcome::Compound { .. }
             | OwnerOutcome::Closing { .. }
             | OwnerOutcome::MarkedSeen { .. }

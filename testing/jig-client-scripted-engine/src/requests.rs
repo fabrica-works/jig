@@ -86,7 +86,10 @@ impl<A: crate::Application> Engine<A> {
         ask: &Ask,
         wall: Wall,
     ) -> core::result::Result<(Answer, Vec<crate::Change>), Invalid> {
-        if let Ask::Create { .. } = ask {
+        if let Ask::Create { .. }
+        | Ask::Withdraw { .. }
+        | Ask::Propose { action: jig_client_domain::contract::ProposeAction::Batch { .. }, .. } = ask
+        {
             return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
         }
         if let Ask::Compound { project, operations } = ask
@@ -267,6 +270,8 @@ impl<A: crate::Application> Engine<A> {
                 self.truth.notes.get(note).map(|note| &note.acts)
             }
             Ask::StartChat { .. }
+            | Ask::Propose { .. }
+            | Ask::Withdraw { .. }
             | Ask::Create { .. }
             | Ask::Compound { .. }
             | Ask::Message { .. }
@@ -303,7 +308,11 @@ impl<A: crate::Application> Engine<A> {
                 Ask::SetGoal { executor, budget, deadline, .. } => {
                     jig_client_domain::contract::admission::goal(offer, *executor, *budget, *deadline)
                 }
-                Ask::Amend { task, change, .. } => self.amendment_admission(offer, *task, change),
+                Ask::Amend { task, change, .. }
+                | Ask::Propose {
+                    action: jig_client_domain::contract::ProposeAction::Amendment { task, change, .. },
+                    ..
+                } => self.amendment_admission(offer, *task, change),
                 Ask::Compound { operations, .. } => {
                     let [Operation::Amend { task, change, .. }, Operation::Release { .. }] = operations.as_slice()
                     else {
@@ -329,6 +338,8 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::ChangePolicy { .. }
                 | Ask::SetRoles { .. }
                 | Ask::MakeService { .. }
+                | Ask::Propose { .. }
+                | Ask::Withdraw { .. }
                 | Ask::Create { .. }
                 | Ask::SetPool { .. } => Admission::Refused(Refusal::NotOffered),
             },
@@ -356,14 +367,27 @@ impl<A: crate::Application> Engine<A> {
                 return Err(Invalid::Script);
             }
             if matches!(rule.answer, Answer::Done(_)) {
-                if matches!(admission, Some(Admission::Proposed { .. }))
-                    && !matches!(rule.answer, Answer::Done(Outcome::Proposed { .. }))
+                if (matches!(admission, Some(Admission::Proposed { .. })) || matches!(ask, Ask::Propose { .. }))
+                    && !matches!(
+                        rule.answer,
+                        Answer::Done(
+                            Outcome::Proposed { .. }
+                                | Outcome::Owner(jig_client_domain::contract::OwnerOutcome::Proposed { .. })
+                        )
+                    )
                 {
                     return Err(Invalid::Script);
                 }
                 if bounded
+                    && !matches!(ask, Ask::Propose { .. })
                     && matches!(admission, Some(Admission::Allowed))
-                    && matches!(rule.answer, Answer::Done(Outcome::Proposed { .. }))
+                    && matches!(
+                        rule.answer,
+                        Answer::Done(
+                            Outcome::Proposed { .. }
+                                | Outcome::Owner(jig_client_domain::contract::OwnerOutcome::Proposed { .. })
+                        )
+                    )
                 {
                     return Err(Invalid::Script);
                 }
@@ -389,6 +413,8 @@ impl<A: crate::Application> Engine<A> {
             | Ask::Decide { on: DecideOn::Escalation { decision, .. }, .. } => Some(decision.clone()),
             Ask::Release { again, .. } => Some(Decision::Released { again: *again }),
             Ask::StartChat { .. }
+            | Ask::Propose { .. }
+            | Ask::Withdraw { .. }
             | Ask::Create { .. }
             | Ask::Compound { .. }
             | Ask::Message { .. }
@@ -622,6 +648,12 @@ fn target(ask: &Ask) -> Target {
             ActKind::Release,
             Some((*revision, Moved::Hold { reason: None })),
         ),
+        Ask::Propose { project, action, .. } => match action {
+            jig_client_domain::contract::ProposeAction::Amendment { task, revision, .. } => {
+                (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Amend, Some((*revision, Moved::Spec)))
+            }
+            jig_client_domain::contract::ProposeAction::Batch { .. } => (Some(*project), None, ActKind::SetGoal, None),
+        },
         Ask::Amend { project, task, revision, .. } => {
             (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Amend, revision.map(|value| (value, Moved::Spec)))
         }
@@ -629,7 +661,7 @@ fn target(ask: &Ask) -> Target {
         Ask::Cancel { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Cancel, None),
         Ask::Close { project, chat, .. } => (Some(*project), Some(ObjectKey::Task(*chat)), ActKind::Close, None),
         Ask::Move { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::TakeOver, None),
-        Ask::SetGoal { project, .. } => (Some(*project), None, ActKind::SetGoal, None),
+        Ask::Withdraw { project, .. } | Ask::SetGoal { project, .. } => (Some(*project), None, ActKind::SetGoal, None),
         Ask::Prioritise { project, .. } => (Some(*project), None, ActKind::Prioritise, None),
         Ask::Seen { .. } => (None, None, ActKind::MarkSeen, None),
         Ask::EditNote { project, .. } => (Some(*project), None, ActKind::EditNote, None),

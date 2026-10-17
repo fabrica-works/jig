@@ -43,7 +43,9 @@ impl Payload for OwnerOutcome {
             | Self::PersonAnswered { task }
             | Self::Moved { task }
             | Self::Started { task } => task.heap(bounds),
-            Self::GoalProposed { proposal } => proposal.heap(bounds),
+            Self::GoalProposed { proposal } | Self::Proposed { proposal } | Self::Withdrawn { proposal } => {
+                proposal.heap(bounds)
+            }
             Self::ProposalDecided { proposal, by, at, choice } => {
                 sum(&[proposal.heap(bounds), by.heap(bounds), at.heap(bounds), choice.heap(bounds)])
             }
@@ -52,7 +54,6 @@ impl Payload for OwnerOutcome {
                 sum(&[task.heap(bounds), question.heap(bounds), message.heap(bounds)])
             }
             Self::Amended { task } => sum(&[task.heap(bounds).heap(bounds)]),
-            Self::AmendProposed { task, proposal } => sum(&[task.heap(bounds), proposal.heap(bounds).heap(bounds)]),
             Self::PoolSet { project, person } => sum(&[project.heap(bounds), person.heap(bounds)]),
             Self::EscalationDecided { task, revision, by, at, choice } => {
                 sum(&[task.heap(bounds), revision.heap(bounds), by.heap(bounds), at.heap(bounds), choice.heap(bounds)])

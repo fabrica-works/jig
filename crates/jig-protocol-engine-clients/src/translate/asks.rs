@@ -8,6 +8,8 @@ use skein_lib::{List, Reader, Wall};
 #[expect(clippy::too_many_lines, reason = "one total match names every wire ask")]
 pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
     Ok(match record {
+        w::Ask::Propose(value) => super::operations::propose(value, limits)?,
+        w::Ask::Withdraw(value) => p::Ask::Withdraw { project: value.project(), proposal: value.proposal() },
         w::Ask::Create(value) => super::operations::create(value, limits)?,
         w::Ask::Compound(value) => super::operations::compound(value, limits)?,
         w::Ask::StartChat(value) => {

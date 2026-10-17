@@ -161,6 +161,8 @@ impl Payload for Ask {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Create { tasks, .. } => tasks.heap(bounds),
+            Self::Propose { action, reason, .. } => sum(&[action.heap(bounds), reason.heap(bounds)]),
+            Self::Withdraw { .. } => Some(0),
             Self::Compound { operations, .. } => operations.heap(bounds),
             Self::StartChat { project, words } => sum(&[project.heap(bounds), words.heap(bounds)]),
             Self::Message { project, task, words } => {

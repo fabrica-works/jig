@@ -100,7 +100,12 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
                     4,
                     value.revision().value(),
                 )),
-                w::Ask::Create(_)
+                w::Ask::Propose(value) => match value.action() {
+                    w::ProposeAction::Batch(_) => None,
+                    w::ProposeAction::Amendment(v) => Some((c::ObjectKey::Task(v.task()), 1, v.revision().value())),
+                },
+                w::Ask::Withdraw(_)
+                | w::Ask::Create(_)
                 | w::Ask::StartChat(_)
                 | w::Ask::Take(_)
                 | w::Ask::HandBack(_)

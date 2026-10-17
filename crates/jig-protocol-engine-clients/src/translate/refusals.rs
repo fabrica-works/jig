@@ -48,7 +48,7 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
                     p::Malformed::AsAllowedTwice => w::Malformed::TwoAsAllowed,
                     p::Malformed::Conversation => w::Malformed::ConversationNotAgent,
                     p::Malformed::Cycle => w::Malformed::Cycle,
-                    p::Malformed::ProposedAsAllowed => return Err(super::problem(skein_codec::Reason::Tag)),
+                    p::Malformed::ProposedAsAllowed => w::Malformed::ProposedAsAllowed,
                 },
             },
         )?),

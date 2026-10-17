@@ -65,6 +65,8 @@ pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<A
         Ask::SetRoles { .. }
         | Ask::StartChat { .. }
         | Ask::Message { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::Create { .. }
         | Ask::Compound { .. }
         | Ask::Answer { .. }
@@ -618,6 +620,8 @@ fn policy_request(ask: &Ask) -> Option<&PolicyEdit> {
         Ask::ChangePolicy { edit, .. } => Some(edit),
         Ask::StartChat { .. }
         | Ask::Message { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::Create { .. }
         | Ask::Compound { .. }
         | Ask::Answer { .. }
@@ -695,6 +699,8 @@ fn holdings_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::
         Ask::SetRoles { holdings, .. } => Some(holdings),
         Ask::StartChat { .. }
         | Ask::Message { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::Create { .. }
         | Ask::Compound { .. }
         | Ask::Answer { .. }
@@ -722,6 +728,8 @@ fn pool_request(ask: &Ask) -> bool {
         Ask::SetPool { .. } => true,
         Ask::StartChat { .. }
         | Ask::Message { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::Create { .. }
         | Ask::Compound { .. }
         | Ask::Answer { .. }
@@ -749,6 +757,8 @@ fn service_request(ask: &Ask) -> Option<(&jig_client::contract::Text, jig_client
         Ask::MakeService { name, role, .. } => Some((name, *role)),
         Ask::StartChat { .. }
         | Ask::Message { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::Create { .. }
         | Ask::Compound { .. }
         | Ask::Answer { .. }
@@ -1194,6 +1204,8 @@ fn render_request(b: &mut Builder, ask: &Ask, words: &Words, text_limit: u32) {
         }
         Ask::StartChat { .. }
         | Ask::Message { .. }
+        | Ask::Propose { .. }
+        | Ask::Withdraw { .. }
         | Ask::Create { .. }
         | Ask::Compound { .. }
         | Ask::Answer { .. }

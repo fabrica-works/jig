@@ -62,3 +62,23 @@ fn member(v: &c::NewTask) -> p::Member {
         },
     }
 }
+
+pub(super) fn propose(project: u32, action: &c::ProposeAction, reason: &c::Text) -> Result<p::Ask, super::Invalid> {
+    let action = match action {
+        c::ProposeAction::Batch { tasks } => p::Action::Batch(tasks.iter().map(member).collect()),
+        c::ProposeAction::Amendment { task, revision, change } => {
+            let ask = c::Ask::Amend {
+                project,
+                task: *task,
+                revision: Some(*revision),
+                change: change.clone(),
+                reason: reason.clone(),
+            };
+            let p::Ask::Amend { task, revision, amendment, .. } = super::ask(&ask)? else {
+                unreachable!("amend translation")
+            };
+            p::Action::Amend { task, revision, amendment: Box::new(amendment) }
+        }
+    };
+    Ok(p::Ask::Propose { project, action, reason: reason.bytes().into() })
+}

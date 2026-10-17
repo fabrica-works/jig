@@ -531,14 +531,9 @@ impl Component {
         exchange: Token,
         reply: people::Reply,
         out: &mut Queue<Request>,
-        mut waiting: Waiting,
+        waiting: Waiting,
     ) {
-        let Waiting::Ask { sign_in, ref mut amendment, .. } = waiting else { unreachable!("ask reply route") };
-        if let Some(event) = sign_in::propose_amend(amendment, &reply, sign_in, exchange) {
-            self.pending.exchanges.insert(exchange, waiting).expect("same slot");
-            out.push(Request::Core(Box::new(core::Event::People(event))));
-            return;
-        }
+        let Waiting::Ask { sign_in, .. } = waiting else { unreachable!("ask reply route") };
         match reply {
             people::Reply::Outcome(people::Outcome::ServiceMade { person }) => {
                 self.pending.exchanges.insert(exchange, Waiting::Made { sign_in, party: person }).expect("same slot");
@@ -552,14 +547,7 @@ impl Component {
             | people::Reply::Outcome(_)
             | people::Reply::Again(_)
             | people::Reply::Refused(_) => {
-                let answer = crate::translate::answers::amend_answer(
-                    &reply,
-                    match amendment.as_ref() {
-                        Some((_, ask)) => Some(ask.as_ref()),
-                        None => None,
-                    },
-                    &env.limits.wire,
-                );
+                let answer = crate::translate::answers::answer(&reply, &env.limits.wire);
                 self.answer(env, exchange, answer, out);
             }
         }

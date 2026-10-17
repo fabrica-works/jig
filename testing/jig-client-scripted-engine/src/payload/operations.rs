@@ -75,3 +75,12 @@ impl Payload for jig_client_domain::contract::NewContract {
         }
     }
 }
+
+impl Payload for jig_client_domain::contract::ProposeAction {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Batch { tasks } => tasks.heap(bounds),
+            Self::Amendment { change, .. } => change.heap(bounds),
+        }
+    }
+}

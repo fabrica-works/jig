@@ -38,7 +38,6 @@ impl Component {
             self.respond(env, exchange, routes::encoded(&answer));
             return;
         }
-        let mut amendment = None;
         let request = match keyed.owner {
             w::Owner::Jig => {
                 let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
@@ -55,9 +54,6 @@ impl Component {
                     self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
                     return;
                 };
-                if let people::Ask::Amend { .. } = &ask {
-                    amendment = Some((keyed.key, Box::new(ask.clone())));
-                }
                 Request::Core(Box::new(core::Event::People(people::Event::Ask {
                     reply_to: ReplyTo::new(exchange),
                     sign_in,
@@ -88,7 +84,7 @@ impl Component {
         };
         self.pending
             .exchanges
-            .insert(exchange, Waiting::Ask { sign_in, family, version: keyed.version, amendment })
+            .insert(exchange, Waiting::Ask { sign_in, family, version: keyed.version })
             .expect("get released slot");
         out.push(request);
     }

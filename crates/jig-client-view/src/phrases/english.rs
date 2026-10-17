@@ -315,6 +315,10 @@ pub fn language() -> Language {
                 Segment::Text(copy_of(b"Conversation task is not an agent at ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
             ]),
+            JigPhrase::MalformedProposedAsAllowed => Box::new([
+                Segment::Text(copy_of(b"Proposed AsAllowed budget at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
             JigPhrase::MalformedCycle => Box::new([
                 Segment::Text(copy_of(b"Dependency cycle at ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

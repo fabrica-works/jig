@@ -89,9 +89,8 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::Owne
         }
         w::OwnerOutcome::Prioritised(row) => c::OwnerOutcome::Prioritised { project: row.project() },
         w::OwnerOutcome::Amended(row) => c::OwnerOutcome::Amended { task: row.task() },
-        w::OwnerOutcome::AmendProposed(row) => {
-            c::OwnerOutcome::AmendProposed { task: row.task(), proposal: row.proposal() }
-        }
+        w::OwnerOutcome::Proposed(row) => c::OwnerOutcome::Proposed { proposal: row.proposal() },
+        w::OwnerOutcome::Withdrawn(row) => c::OwnerOutcome::Withdrawn { proposal: row.proposal() },
         w::OwnerOutcome::RolesSet(row) => c::OwnerOutcome::RolesSet { project: row.project() },
         w::OwnerOutcome::PolicyChanged(row) => c::OwnerOutcome::PolicyChanged { project: row.project() },
         w::OwnerOutcome::PoolSet(row) => c::OwnerOutcome::PoolSet { project: row.project(), person: row.person() },
@@ -466,6 +465,7 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
                 w::Malformed::TwoAsAllowed => c::Malformed::TwoAsAllowed,
                 w::Malformed::ConversationNotAgent => c::Malformed::ConversationNotAgent,
                 w::Malformed::Cycle => c::Malformed::Cycle,
+                w::Malformed::ProposedAsAllowed => c::Malformed::ProposedAsAllowed,
                 w::Malformed::ProjectMismatch => c::Malformed::ProjectMismatch,
             },
         },

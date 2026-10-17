@@ -27,7 +27,9 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
             client::OwnerOutcome::Compound { project: *project, operations: *operations, first_message: *first_message }
         }
         people::Outcome::CompoundRefused { at, why } => return Outcome::CompoundRefused { at: *at, why: *why },
-        people::Outcome::Created { .. } | people::Outcome::Proposed { .. } | people::Outcome::Withdrawn { .. } => {
+        people::Outcome::Proposed { proposal, .. } => client::OwnerOutcome::Proposed { proposal: *proposal },
+        people::Outcome::Withdrawn { proposal } => client::OwnerOutcome::Withdrawn { proposal: *proposal },
+        people::Outcome::Created { .. } => {
             unreachable!("no v8 ask leads to these outcomes")
         }
         people::Outcome::GoalStarted { task } => client::OwnerOutcome::GoalStarted { task: *task },

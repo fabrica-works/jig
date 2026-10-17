@@ -327,12 +327,10 @@ fn a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_w
     assert!(open.missing.is_none());
     assert_eq!(
         sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })),
-        &Ask::Amend {
-            reason: text(b""),
+        &Ask::Propose {
             project: 1,
-            task: 8,
-            revision: Some(Revision { value: 9 }),
-            change: Box::new(change()),
+            action: ProposeAction::Amendment { task: 8, revision: Revision { value: 9 }, change: Box::new(change()) },
+            reason: text(b""),
         }
     );
 }
@@ -571,12 +569,10 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
     assert!(domain.confirmation().unwrap().missing.is_none());
     assert_eq!(
         sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })),
-        &Ask::Amend {
-            reason: text(b""),
+        &Ask::Propose {
             project: 1,
-            task: 8,
-            revision: Some(row.spec_revision),
-            change: Box::new(draft),
+            action: ProposeAction::Amendment { task: 8, revision: row.spec_revision, change: Box::new(draft) },
+            reason: text(b""),
         }
     );
 }
@@ -796,12 +792,24 @@ fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserve
             let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
             assert_eq!(
                 sent(&out),
-                &Ask::Amend {
-                    reason: text(b""),
-                    project: 1,
-                    task: 8,
-                    revision: Some(row.spec_revision),
-                    change: Box::new(draft),
+                &if relation == 1 {
+                    Ask::Amend {
+                        project: 1,
+                        task: 8,
+                        revision: Some(row.spec_revision),
+                        change: Box::new(draft),
+                        reason: text(b""),
+                    }
+                } else {
+                    Ask::Propose {
+                        project: 1,
+                        action: ProposeAction::Amendment {
+                            task: 8,
+                            revision: row.spec_revision,
+                            change: Box::new(draft),
+                        },
+                        reason: text(b""),
+                    }
                 }
             );
             let Bounds::Amend { implications: retained, .. } = within else { panic!("whole amendment offer") };
@@ -818,3 +826,23 @@ mod task_hold;
 mod owner_escalation;
 
 const UTF8_TEXTS: [&[u8]; 1] = [b"\0~\x01"];
+
+#[test]
+fn an_amendment_beyond_the_offer_says_to_whom_it_will_be_proposed() {
+    let (mut domain, _) = live();
+    let mut row = task();
+    row.acts = offered(ActKind::Amend, Admission::Proposed { to: Recipient::Party(9) });
+    let id = install(&mut domain, Body::Task(Box::new(row)));
+    intend(&mut domain, id, ActKind::Amend);
+    edit(&mut domain, Purpose::Reason, b"more work");
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
+    assert_eq!(domain.confirmation().unwrap().proposed, Some(Recipient::Party(9)));
+    assert_eq!(
+        sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })),
+        &Ask::Propose {
+            project: 1,
+            action: ProposeAction::Amendment { task: 8, revision: Revision { value: 9 }, change: Box::new(change()) },
+            reason: text(b"more work"),
+        }
+    );
+}

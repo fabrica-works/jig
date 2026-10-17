@@ -1011,6 +1011,7 @@ pub enum JigPhrase {
     MalformedTwoAsAllowed,
     MalformedConversation,
     MalformedCycle,
+    MalformedProposedAsAllowed,
     EngineLimitOperations,
     MalformedProject,
     EngineLimitGrace,
@@ -1650,6 +1651,7 @@ impl JigPhrase {
             Self::MalformedTwoAsAllowed => 7415,
             Self::MalformedConversation => 7416,
             Self::MalformedCycle => 7417,
+            Self::MalformedProposedAsAllowed => 7418,
             Self::EngineLimitOperations => 7411,
             Self::MalformedProject => 7412,
             Self::EngineLimitGrace => 7410,
@@ -2282,6 +2284,7 @@ impl JigPhrase {
             | Self::MadeGoal
             | Self::MalformedTwoAsAllowed
             | Self::MalformedConversation
+            | Self::MalformedProposedAsAllowed
             | Self::MalformedCycle
             | Self::MalformedProject
             | Self::MadeTask
@@ -2438,7 +2441,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 638] = [
+pub const ALL: [JigPhrase; 639] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2976,6 +2979,7 @@ pub const ALL: [JigPhrase; 638] = [
     JigPhrase::MalformedTwoAsAllowed,
     JigPhrase::MalformedConversation,
     JigPhrase::MalformedCycle,
+    JigPhrase::MalformedProposedAsAllowed,
     JigPhrase::EngineLimitOperations,
     JigPhrase::MalformedProject,
     JigPhrase::EngineLimitGrace,

@@ -22,7 +22,7 @@ pub(crate) enum Waiting {
     Made { sign_in: u64, party: u64 },
     Read { sign_in: u64, what: Box<jig_domain_core::reads::Read> },
     ApplicationRead { sign_in: u64, family: u16, version: u32 },
-    Ask { sign_in: u64, family: Option<u16>, version: u32, amendment: Option<([u8; 16], Box<jig_domain_people::Ask>)> },
+    Ask { sign_in: u64, family: Option<u16>, version: u32 },
     Checked { sign_in: u64, body: Box<[u8]>, route: Route },
 }
 #[derive(Debug)]
@@ -120,30 +120,4 @@ fn address_text(address: core::net::SocketAddr) -> Option<Box<[u8]>> {
     text.append(b":").ok()?;
     text.append(skein_lib::Decimal::of(u64::from(address.port())).as_bytes()).ok()?;
     text.meet(skein_lib::stream::Read::Fill(text.len()))
-}
-
-/// v8 amendment confirmations use explicit engine proposals until jig 14.5.
-pub(crate) fn propose_amend(
-    kept: &mut Option<([u8; 16], Box<jig_domain_people::Ask>)>,
-    reply: &jig_domain_people::Reply,
-    sign_in: u64,
-    exchange: Token,
-) -> Option<jig_domain_people::Event> {
-    use jig_domain_people as p;
-    let p::Reply::Outcome(p::Outcome::Refused(p::Refusal::Authority {
-        proposable: Some(p::Accepter::Role(_)), ..
-    })) = reply
-    else {
-        return None;
-    };
-    let (key, ask) = kept.as_mut()?;
-    let p::Ask::Amend { project, task, revision, amendment, .. } = ask.as_ref() else { return None };
-    let next = p::Ask::Propose {
-        project: *project,
-        action: p::Action::Amend { task: *task, revision: *revision, amendment: Box::new(amendment.clone()) },
-        reason: amendment.reason.clone(),
-    };
-    *key.last_mut().expect("fixed request key") ^= 0x80;
-    **ask = next.clone();
-    Some(p::Event::Ask { reply_to: skein_lib::ReplyTo::new(exchange), sign_in, key: *key, ask: next })
 }

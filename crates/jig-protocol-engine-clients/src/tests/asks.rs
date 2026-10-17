@@ -230,3 +230,27 @@ fn a_policy_change_of_template_overrides_reaches_the_people_child() {
         })
     );
 }
+
+#[test]
+fn a_propose_of_an_amendment_reaches_the_people_child_with_its_reason() {
+    let limits = f::wire();
+    let action = w::ProposeAction::Amendment(Box::new(
+        w::ProposeAmendment::new(
+            &limits,
+            w::ProposeAmendmentParts { task: 8, revision: f::revision(9), change: f::empty_amendment(None) },
+        )
+        .expect("amendment"),
+    ));
+    let value = w::Ask::Propose(
+        w::Propose::new(&limits, w::ProposeParts { project: 3, action, reason: b"more work".as_slice().into() })
+            .expect("proposal"),
+    );
+    assert_eq!(
+        ask(value, &limits),
+        Ok(p::Ask::Propose {
+            project: 3,
+            action: p::Action::Amend { task: 8, revision: 9, amendment: Box::new(f::person_unchanged(b"more work")) },
+            reason: b"more work".as_slice().into(),
+        })
+    );
+}

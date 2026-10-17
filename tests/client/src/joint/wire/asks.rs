@@ -25,6 +25,8 @@ pub enum Invalid {
 )]
 pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
     Ok(match value {
+        client::Ask::Propose { project, action, reason } => create::propose(*project, action, reason)?,
+        client::Ask::Withdraw { project, proposal } => people::Ask::Withdraw { project: *project, proposal: *proposal },
         client::Ask::Create { project, tasks } => create::ask(*project, tasks),
         client::Ask::Compound { project, operations } => compound::ask(*project, operations)?,
         client::Ask::StartChat { project, words } => {

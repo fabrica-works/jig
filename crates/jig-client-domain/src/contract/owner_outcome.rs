@@ -75,8 +75,10 @@ pub enum OwnerOutcome {
     Prioritised { project: u32 },
     /// A task accepted an amendment, with the supplied release fact.
     Amended { task: u64 },
-    /// An amendment awaits the supplied proposal number, without an inferred maker.
-    AmendProposed { task: u64, proposal: u64 },
+    /// A party's action awaits the supplied proposal number.
+    Proposed { proposal: u64 },
+    /// A party withdrew its own proposal.
+    Withdrawn { proposal: u64 },
     /// A project's roster and affected waiting recipients changed together.
     RolesSet { project: u32 },
     /// A project's policy changed for later checks.

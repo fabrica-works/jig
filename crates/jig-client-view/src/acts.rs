@@ -458,6 +458,12 @@ fn amend(confirmation: &Confirmation, fields: &Fields, project: u32, task: u64) 
             confirmation.release_revision?,
             jig_client::contract::Operation::Amend { project, task, revision, change, reason },
         ))
+    } else if confirmation.proposed.is_some() {
+        Some(Ask::Propose {
+            project,
+            action: jig_client::contract::ProposeAction::Amendment { task, revision: confirmation.revision?, change },
+            reason,
+        })
     } else {
         Some(Ask::Amend { project, task, revision, change, reason })
     }

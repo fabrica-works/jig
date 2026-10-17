@@ -15,6 +15,7 @@ impl Words {
                     Malformed::TwoAsAllowed => JigPhrase::MalformedTwoAsAllowed,
                     Malformed::ConversationNotAgent => JigPhrase::MalformedConversation,
                     Malformed::Cycle => JigPhrase::MalformedCycle,
+                    Malformed::ProposedAsAllowed => JigPhrase::MalformedProposedAsAllowed,
                 },
                 &[Hole::Number(u64::from(*at))],
             ),

@@ -203,9 +203,11 @@ fn wire_piece(reader: &mut skein_lib::Reader<'_>) -> Result<Option<Box<[u8]>>, w
 
 /// Batch members remain data until people admission resolves their authority.
 pub(super) fn create(value: w::Create, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
-    let path = w::Path::CreateTasks;
-    let mut tasks = List::with_capacity(asks::count(value.tasks(), path)?);
-    let mut reader = skein_lib::Reader::new(value.tasks());
+    Ok(p::Ask::Create { project: value.project(), batch: batch(value.tasks(), w::Path::CreateTasks, limits)? })
+}
+fn batch(bytes: &[u8], path: w::Path, limits: &w::Limits) -> Result<Box<[p::Member]>, Untranslatable> {
+    let mut tasks = List::with_capacity(asks::count(bytes, path)?);
+    let mut reader = skein_lib::Reader::new(bytes);
     for _ in 0..tasks.capacity() {
         let bytes = asks::item(&mut reader, path)?;
         let Ok(task) = w::NewTask::decode(limits, &mut skein_lib::Reader::new(&bytes)) else {
@@ -213,7 +215,7 @@ pub(super) fn create(value: w::Create, limits: &w::Limits) -> Result<p::Ask, Unt
         };
         tasks.push(member(task, limits)?).expect("counted pieces");
     }
-    Ok(p::Ask::Create { project: value.project(), batch: tasks.into_boxed() })
+    Ok(tasks.into_boxed())
 }
 fn member(value: w::NewTask, limits: &w::Limits) -> Result<p::Member, Untranslatable> {
     let v = value.into_parts();
@@ -286,4 +288,20 @@ fn new_contract(value: w::NewContract) -> p::Contract {
             p::Contract::Verdict { choices: choices.into_boxed() }
         }
     }
+}
+
+pub(super) fn propose(value: w::Propose, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
+    let v = value.into_parts();
+    let action = match v.action {
+        w::ProposeAction::Batch(value) => p::Action::Batch(batch(value.tasks(), w::Path::ProposeBatchTasks, limits)?),
+        w::ProposeAction::Amendment(value) => {
+            let value = value.into_parts();
+            p::Action::Amend {
+                task: value.task,
+                revision: value.revision.value(),
+                amendment: Box::new(asks::amendment(value.change, v.reason.clone(), limits)?),
+            }
+        }
+    };
+    Ok(p::Ask::Propose { project: v.project, action, reason: v.reason })
 }

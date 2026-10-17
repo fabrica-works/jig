@@ -7,7 +7,7 @@ use jig_client_domain::{Ask, Family};
 use jig_client_protocol_wire::{self as wire, v8 as w};
 use skein_lib::{List, Reader, RequestRecord, Wall, Writer, bytes};
 
-fn text(value: &[u8], limits: &Limits) -> Result<c::Text, w::Problem> {
+pub(super) fn text(value: &[u8], limits: &Limits) -> Result<c::Text, w::Problem> {
     match c::Text::new(bytes::copy_of(value), limits.client.text) {
         Ok(value) => Ok(value),
         Err(_) => Err(too_large()),
@@ -78,6 +78,8 @@ fn policy_edit(value: &w::PolicyEdit, limits: &Limits) -> Result<c::PolicyEdit, 
 #[expect(clippy::too_many_lines, reason = "one exhaustive translation arm per kept client ask")]
 pub(crate) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
     Ok(match value {
+        w::Ask::Propose(value) => super::operations::restore_propose(&value, limits)?,
+        w::Ask::Withdraw(value) => c::Ask::Withdraw { project: value.project(), proposal: value.proposal() },
         w::Ask::Create(value) => super::operations::restore_create(&value, limits)?,
         w::Ask::Compound(value) => super::compound::restore(value, limits)?,
         w::Ask::StartChat(value) => c::Ask::StartChat { project: value.project(), words: text(value.words(), limits)? },
