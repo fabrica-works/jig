@@ -385,7 +385,7 @@ fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_h
         assert!(domain.inbox().rows.is_empty());
     }
 }
-fn opening_updates_sends_one_mark_seen_for_the_newest_result_displayed() {
+fn opening_updates_marks_the_newest_result_displayed_as_seen() {
     let (mut domain, page) = live_inbox();
     drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::OpenUpdates });
     let mut rows = List::with_capacity(2);
@@ -736,6 +736,7 @@ fn project_document() -> Project {
     let mut charters = List::with_capacity(1);
     charters.push(1).unwrap();
     acts.push(Offered {
+        effect: None,
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
             within: Bounds::Create(CreateBounds {
@@ -861,7 +862,7 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
     task.goal = Some(task.chip.task);
     task.priority = Some(1);
     task.acts = List::with_capacity(1);
-    task.acts.push(Offered { act: ActKind::Prioritise, admission: Admission::Allowed }).unwrap();
+    task.acts.push(Offered { effect: None, act: ActKind::Prioritise, admission: Admission::Allowed }).unwrap();
     drive(&mut domain, Time::ZERO, ReadPage { read, result: ReadResult::Value(ReadValue::Task(Box::new(task))) });
     let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
     assert_eq!(crate::acts::offered(&domain.objects().get(id).unwrap(), ActKind::Prioritise), Admission::Allowed);
@@ -946,10 +947,10 @@ fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
     assert!(domain.confirmation().is_none());
     let mut task = super::confirmation::task();
     task.acts = List::with_capacity(1);
-    task.acts.push(Offered { act: ActKind::Write, admission: Admission::Allowed }).unwrap();
+    task.acts.push(Offered { effect: None, act: ActKind::Message, admission: Admission::Allowed }).unwrap();
     let id = domain.objects.name(ObjectKey::Task(8), crate::objects::Source::Window { number: 99 }).unwrap();
     assert!(domain.objects.put(ObjectKey::Task(8), crate::objects::Body::Task(Box::new(task))));
-    crate::confirm::open(&mut domain.ui, &super::spine::env(Time::ZERO), id, ActKind::Write, &domain.client);
+    crate::confirm::open(&mut domain.ui, &super::spine::env(Time::ZERO), id, ActKind::Message, &domain.client);
     assert!(domain.project_page().form.confirmation.is_none());
     assert!(domain.confirmation().is_some());
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
@@ -1093,8 +1094,8 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
         panic!("notes read")
     };
     let mut acts = List::with_capacity(2);
-    acts.push(Offered { act: ActKind::EditNote, admission: Admission::Allowed }).unwrap();
-    acts.push(Offered { act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
+    acts.push(Offered { effect: None, act: ActKind::EditNote, admission: Admission::Allowed }).unwrap();
+    acts.push(Offered { effect: None, act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
     let note = Note {
         number: 3,
         revision: Revision { value: 1 },
@@ -1308,7 +1309,7 @@ fn frame_navigation_and_non_work_pages_follow_owner_facts() {
 #[test]
 fn inbox_and_conversation_pages_preserve_context_order_and_request_lifetimes() {
     inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder();
-    opening_updates_sends_one_mark_seen_for_the_newest_result_displayed();
+    opening_updates_marks_the_newest_result_displayed_as_seen();
     conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor();
     starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer();
 }
@@ -2212,7 +2213,7 @@ fn note_reads_keep_full_writer_identity_and_optional_time_without_changing_the_n
                 panic!("notes read")
             };
             let mut acts = List::with_capacity(1);
-            acts.push(Offered { act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
+            acts.push(Offered { effect: None, act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
             let note = Note {
                 number: 3,
                 revision: Revision { value: u64::MAX },

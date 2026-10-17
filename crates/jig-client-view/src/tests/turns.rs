@@ -48,7 +48,7 @@ fn ready_task(task: u64) -> (Fixture, jig_client::Handle, jig_client::Handle, ji
                 _ => None,
             })
             .unwrap();
-    let mut doc = super::cards_objects::task_doc(&[ActKind::Write]);
+    let mut doc = super::cards_objects::task_doc(&[ActKind::Message]);
     doc.chip.task = task;
     doc.chip.executor = Executor::Agent { charter: 2 };
     doc.chip.phase = Phase::Running;
@@ -213,7 +213,7 @@ fn replacement(words: &Words) {
     .unwrap();
     drive(&mut d, Event::Act { action: closed });
     assert!(!contains(&build(&d, 3, words).0, b"whole private input"));
-    let mut doc = super::cards_objects::task_doc(&[ActKind::Write]);
+    let mut doc = super::cards_objects::task_doc(&[ActKind::Message]);
     doc.chip.executor = Executor::Agent { charter: 2 };
     doc.chip.title = DocumentText::complete(text(b"Updated live task"));
     doc.activity = 2;

@@ -8,24 +8,24 @@ use skein_lib::List;
 #[must_use]
 pub fn act(value: acts::Act) -> client::ActKind {
     match value {
-        acts::Act::Write => client::ActKind::Write,
+        acts::Act::Message => client::ActKind::Message,
         acts::Act::Answer => client::ActKind::Answer,
         acts::Act::Take => client::ActKind::Take,
         acts::Act::HandBack => client::ActKind::HandBack,
         acts::Act::Accept => client::ActKind::Accept,
+        acts::Act::Withdraw => client::ActKind::Withdraw,
         acts::Act::Reject => client::ActKind::Reject,
         acts::Act::PassUp => client::ActKind::PassUp,
         acts::Act::Release => client::ActKind::Release,
         acts::Act::LeaveHeld => client::ActKind::LeaveHeld,
         acts::Act::Amend => client::ActKind::Amend,
-        acts::Act::AmendRelease => client::ActKind::AmendRelease,
         acts::Act::Stop => client::ActKind::Stop,
         acts::Act::Cancel => client::ActKind::Cancel,
         acts::Act::Close => client::ActKind::Close,
-        acts::Act::TakeOver => client::ActKind::TakeOver,
+        acts::Act::Move => client::ActKind::Move,
         acts::Act::SetGoal => client::ActKind::SetGoal,
         acts::Act::Prioritise => client::ActKind::Prioritise,
-        acts::Act::MarkSeen => client::ActKind::MarkSeen,
+        acts::Act::Seen => client::ActKind::Seen,
         acts::Act::EditNote => client::ActKind::EditNote,
         acts::Act::DeleteNote => client::ActKind::DeleteNote,
         acts::Act::Adopt => client::ActKind::Adopt,
@@ -118,10 +118,39 @@ pub fn offered(value: &List<acts::Offered>, limits: &Limits) -> Result<List<clie
     let mut result = List::with_capacity(value.capacity());
     for value in value {
         result
-            .push(client::Offered { act: act(value.act), admission: admission(&value.admission, limits)? })
+            .push(client::Offered {
+                effect: value.effect.map(effect),
+                act: act(value.act),
+                admission: admission(&value.admission, limits)?,
+            })
             .map_err(|_| owner::Invalid::TooLarge)?;
     }
     Ok(result)
+}
+
+fn effect(value: acts::Effect) -> client::Effect {
+    match value {
+        acts::Effect::Release(value) => client::Effect::Release(match value {
+            acts::ReleaseEffect::Judged => client::ReleaseEffect::Judged,
+            acts::ReleaseEffect::RunAgain => client::ReleaseEffect::RunAgain,
+            acts::ReleaseEffect::Uncertain => client::ReleaseEffect::Uncertain,
+        }),
+        acts::Effect::Move { reservation } => client::Effect::Move { reservation },
+        acts::Effect::Cancel(value) => client::Effect::Cancel(client::Impact {
+            tasks: client::PhaseCounts {
+                ended: 0,
+                waiting: value.tasks.waiting,
+                running: value.tasks.idle + value.tasks.starting + value.tasks.running + value.tasks.backing_off,
+                closing: value.tasks.closing,
+                held: value.tasks.held,
+                done: value.tasks.done,
+                failed: value.tasks.failed,
+                cancelled: value.tasks.cancelled,
+            },
+            live_runs: value.live_runs,
+            proposals: value.proposals,
+        }),
+    }
 }
 
 #[cfg(test)]

@@ -122,7 +122,7 @@ fn goals_keep_all_ten_phase_counts_and_budget() {
         Ok(jig_client_test_records::goals_rows_record())
     );
 }
-fn tasks_keep_the_filter_requester_goal_and_changed_wall() {
+fn a_lines_document_becomes_its_tasks_rows_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
         translate::queries::lines(&fixtures::tasks_document(), &limits),
@@ -169,10 +169,7 @@ fn documents_become_their_literal_records() {
         ("a_deployment_document_becomes_its_record", a_deployment_document_becomes_its_record),
         ("conversations_keep_their_rows_more_and_opaque_cursor", conversations_keep_their_rows_more_and_opaque_cursor),
         ("goals_keep_all_ten_phase_counts_and_budget", goals_keep_all_ten_phase_counts_and_budget),
-        (
-            "tasks_keep_the_filter_requester_goal_and_changed_wall",
-            tasks_keep_the_filter_requester_goal_and_changed_wall,
-        ),
+        ("a_lines_document_becomes_its_tasks_rows_record", a_lines_document_becomes_its_tasks_rows_record),
         (
             "a_tree_keeps_its_rows_folds_dependencies_and_opaque_cursor",
             a_tree_keeps_its_rows_folds_dependencies_and_opaque_cursor,
@@ -195,6 +192,8 @@ fn table<const N: usize>(cases: [Case; N]) {
 }
 
 const TEMPLATE: u32 = 2;
+const POOL_LEFT: u64 = 70;
+const BUDGET: u64 = 50;
 const TEMPLATE_CHARTER: u32 = 1;
 const TEMPLATE_HOLDER_ROLE: u32 = 0;
 #[test]
@@ -226,26 +225,7 @@ fn a_me_document_carries_each_project_s_template() {
 }
 #[test]
 fn a_me_document_carries_each_project_s_creating_bounds() {
-    use jig_domain_core::acts;
-    let mut frame = fixtures::frame_two_projects();
-    for index in 0..frame.projects.len() {
-        let project = frame.projects.get_mut(index).unwrap();
-        project.creating = Some(acts::Creating {
-            within: acts::Bounds::Goal {
-                authority: Box::new(fixtures::authority()),
-                pool_left: 50,
-                charters: fixtures::list([TEMPLATE_CHARTER]),
-                procedures: skein_lib::List::with_capacity(0),
-                latest: None,
-                budget: 50,
-                maximum_budget: 100,
-                maximum_deadline: None,
-            },
-            beyond: acts::Beyond::Proposed {
-                to: acts::Recipient::Role { project: project.project, role: TEMPLATE_HOLDER_ROLE },
-            },
-        });
-    }
+    let frame = frame_with_creating_bounds();
     let record = translate::owner::frame(&frame, &w::CEILINGS).unwrap();
     let mut reader = skein_lib::Reader::new(record.projects());
     for source in &frame.projects {
@@ -253,7 +233,8 @@ fn a_me_document_carries_each_project_s_creating_bounds() {
         let project = w::MeProject::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&bytes)).unwrap();
         assert_eq!(project.project(), source.project);
         let creating = project.creating().as_ref().unwrap();
-        assert_eq!(creating.within().budget(), 50);
+        assert_eq!(creating.within().budget(), BUDGET);
+        assert_eq!(creating.within().pool_left(), POOL_LEFT);
         let w::Beyond::Proposed(beyond) = creating.beyond() else { panic!("proposed") };
         let w::Recipient::Role(to) = beyond.to() else { panic!("role") };
         assert_eq!(to.project(), source.project);
@@ -280,4 +261,28 @@ fn a_project_document_carries_its_policy_s_template_overrides() {
             w::TemplateAmount::new(&w::CEILINGS, w::TemplateAmountParts { value: 42 }).unwrap()
         ))
     );
+}
+
+fn frame_with_creating_bounds() -> jig_domain_core::documents::Frame {
+    use jig_domain_core::acts;
+    let mut frame = fixtures::frame_two_projects();
+    for index in 0..frame.projects.len() {
+        let project = frame.projects.get_mut(index).unwrap();
+        project.creating = Some(acts::Creating {
+            within: acts::Bounds::Goal {
+                authority: Box::new(fixtures::authority()),
+                pool_left: POOL_LEFT,
+                charters: fixtures::list([TEMPLATE_CHARTER]),
+                procedures: skein_lib::List::with_capacity(0),
+                latest: None,
+                budget: BUDGET,
+                maximum_budget: 100,
+                maximum_deadline: None,
+            },
+            beyond: acts::Beyond::Proposed {
+                to: acts::Recipient::Role { project: project.project, role: TEMPLATE_HOLDER_ROLE },
+            },
+        });
+    }
+    frame
 }

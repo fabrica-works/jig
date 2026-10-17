@@ -55,8 +55,8 @@ fn settled_note_answer(act: ActKind, cut: bool) {
         tasks: list([91, u64::MAX]),
         changed: Some(Wall::EPOCH),
         acts: list([
-            Offered { act: ActKind::EditNote, admission: Admission::Allowed },
-            Offered { act: ActKind::DeleteNote, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::EditNote, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::DeleteNote, admission: Admission::Allowed },
         ]),
         cut,
     };

@@ -464,7 +464,7 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
         v.key.proposer = maker;
         v.funding = List::with_capacity(2);
         v.acts = List::with_capacity(2);
-        v.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+        v.acts.push(Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
         let (mut client, id) =
             super::cards_objects::loaded(ObjectKey::Proposal(v.key), ReadValue::OwnerProposal(Box::new(v.clone())));
         let f = view::worst_case(&limits(), &w).unwrap();

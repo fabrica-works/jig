@@ -206,25 +206,25 @@ fn signing_in_and_starting_a_chat_on_the_engine() {
     assert_eq!(
         offers.source.iter().map(|value| value.act).collect::<Vec<_>>(),
         vec![
-            jig_domain_core::acts::Act::Write,
+            jig_domain_core::acts::Act::Message,
             jig_domain_core::acts::Act::Amend,
-            jig_domain_core::acts::Act::TakeOver,
+            jig_domain_core::acts::Act::Move,
             jig_domain_core::acts::Act::Close,
             jig_domain_core::acts::Act::Stop,
             jig_domain_core::acts::Act::Cancel,
-            jig_domain_core::acts::Act::MarkSeen,
+            jig_domain_core::acts::Act::Seen,
         ]
     );
     assert_eq!(
         offers.native.iter().map(|value| value.act).collect::<Vec<_>>(),
         vec![
-            client::ActKind::Write,
+            client::ActKind::Message,
             client::ActKind::Amend,
-            client::ActKind::TakeOver,
+            client::ActKind::Move,
             client::ActKind::Close,
             client::ActKind::Stop,
             client::ActKind::Cancel,
-            client::ActKind::MarkSeen,
+            client::ActKind::Seen,
         ]
     );
     assert!(world.tree(client).nodes().iter().any(|node| node.name.as_deref() == Some(b"Provisional".as_slice())));

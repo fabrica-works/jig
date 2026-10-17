@@ -56,13 +56,15 @@ fn list(core: &Core, limits: &Limits, party: u64, subject: &Subject, kinds: &[Ac
     let mut result = List::with_capacity(u32::try_from(kinds.len()).expect("closed act list"));
     for act in kinds {
         let value = acts::admit(core, limits, party, *act, subject);
-        if (*act == Act::SetGoal || *act == Act::Amend || *act == Act::AmendRelease)
+        if (*act == Act::SetGoal || *act == Act::Amend)
             && value == Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority })
         {
             return Err(Missing::TooLarge);
         }
         let admission = receiving(value, &limits.documents)?;
-        result.push(Offered { act: *act, admission }).expect("one offer per listed act");
+        result
+            .push(Offered { effect: effect(core, limits, *act, subject), act: *act, admission })
+            .expect("one offer per listed act");
     }
     if heap_bytes(&result).ok_or(Missing::TooLarge)? > heap_worst_case(&limits.documents).ok_or(Missing::TooLarge)? {
         return Err(Missing::TooLarge);
@@ -87,20 +89,16 @@ pub(super) fn task(
     };
     if mutable {
         if let tasks::Executor::Agent { .. } = row.executor {
-            kinds.push(Act::Write).expect("task act bound");
+            kinds.push(Act::Message).expect("task act bound");
         }
         kinds.push(Act::Amend).expect("task act bound");
-        kinds.push(Act::TakeOver).expect("task act bound");
+        kinds.push(Act::Move).expect("task act bound");
         if core.conversation_requester(row).is_some() {
             kinds.push(Act::Close).expect("task act bound");
         }
     }
     match row.phase {
-        tasks::Phase::Held { was: tasks::Was::Waiting | tasks::Was::Active(_), .. } => {
-            kinds.push(Act::AmendRelease).expect("task act bound");
-            kinds.push(Act::Release).expect("task act bound");
-        }
-        tasks::Phase::Held { was: tasks::Was::Closing(_), .. } => {
+        tasks::Phase::Held { .. } => {
             kinds.push(Act::Release).expect("task act bound");
         }
         tasks::Phase::Active(_) => match row.executor {
@@ -115,7 +113,7 @@ pub(super) fn task(
         tasks::Phase::Waiting | tasks::Phase::Active(_) | tasks::Phase::Closing(_) | tasks::Phase::Held { .. } => {
             kinds.push(Act::Cancel).expect("task act bound");
             if core.conversation_requester(row).is_some() {
-                kinds.push(Act::MarkSeen).expect("task act bound");
+                kinds.push(Act::Seen).expect("task act bound");
             }
         }
         tasks::Phase::Ended(_) => {}
@@ -140,7 +138,14 @@ pub(super) fn subject(core: &Core, limits: &Limits, party: u64, subject: &Subjec
                 Act::SetPool,
             ],
         ),
-        Subject::Proposal { .. } => list(core, limits, party, subject, &[Act::Accept, Act::Reject, Act::PassUp]),
+        Subject::Proposal { proposer, .. } => {
+            let kinds = if *proposer == super::Proposer::Party(party) {
+                &[Act::Accept, Act::Reject, Act::PassUp, Act::Withdraw][..]
+            } else {
+                &[Act::Accept, Act::Reject, Act::PassUp][..]
+            };
+            list(core, limits, party, subject, kinds)
+        }
         Subject::Escalation { task } => {
             let row = core.tasks.task(*task).ok_or(Missing::Unknown)?;
             let kinds = match row.phase {
@@ -151,14 +156,12 @@ pub(super) fn subject(core: &Core, limits: &Limits, party: u64, subject: &Subjec
                 | tasks::Phase::Active(_)
                 | tasks::Phase::Closing(_)
                 | tasks::Phase::Held { was: tasks::Was::Waiting | tasks::Was::Active(_), .. }
-                | tasks::Phase::Ended(_) => {
-                    &[Act::Release, Act::LeaveHeld, Act::PassUp, Act::AmendRelease, Act::Cancel][..]
-                }
+                | tasks::Phase::Ended(_) => &[Act::Release, Act::LeaveHeld, Act::PassUp, Act::Amend, Act::Cancel][..],
             };
             list(core, limits, party, subject, kinds)
         }
         Subject::Question { .. } => list(core, limits, party, subject, &[Act::Answer]),
-        Subject::Result { .. } => list(core, limits, party, &Subject::Inbox { party }, &[Act::MarkSeen]),
+        Subject::Result { .. } => list(core, limits, party, &Subject::Inbox { party }, &[Act::Seen]),
         Subject::Frame { .. }
         | Subject::Task { .. }
         | Subject::Tree { .. }
@@ -212,7 +215,7 @@ pub(super) fn note(core: &Core, party: u64, project: u32, scope: &people::NoteSc
             Ok(()) => Admission::Allowed,
             Err(why) => Admission::Refused(why),
         };
-        result.push(Offered { act, admission }).expect("two note acts");
+        result.push(Offered { effect: None, act, admission }).expect("two note acts");
     }
     result
 }
@@ -227,7 +230,7 @@ pub(super) fn heap_worst_case(limits: &DocumentLimits) -> Option<u64> {
         .checked_add(grants)?
         .checked_add(List::<jig_domain_authority::Implication>::worst_case(limits.lines)?)?;
     let recipient = List::<u32>::worst_case(limits.lines)?;
-    // Only Amend and AmendRelease carry the full amendment facts on a task;
+    // Amend carries the full amendment facts on a task;
     // all other object kinds carry at most one bounded act.
     let goal = List::<u32>::worst_case(1)?
         .checked_add(List::<acts::GoalProcedure>::worst_case(limits.lines)?)?
@@ -311,3 +314,97 @@ pub(super) fn heap_bytes(value: &List<Offered>) -> Option<u64> {
 
 #[cfg(test)]
 mod tests;
+
+fn effect(core: &Core, limits: &Limits, act: Act, subject: &Subject) -> Option<acts::Effect> {
+    let number = match subject {
+        Subject::Task { task } | Subject::Escalation { task } => *task,
+        Subject::Application { .. }
+        | Subject::Frame { .. }
+        | Subject::Tree { .. }
+        | Subject::Chips { .. }
+        | Subject::Inbox { .. }
+        | Subject::Goals { .. }
+        | Subject::Tasks { .. }
+        | Subject::Query { .. }
+        | Subject::Conversations { .. }
+        | Subject::Run { .. }
+        | Subject::Deployment
+        | Subject::Proposal { .. }
+        | Subject::Question { .. }
+        | Subject::PersonTask { .. }
+        | Subject::Result { .. }
+        | Subject::Project { .. }
+        | Subject::Note { .. } => return None,
+    };
+    let row = core.tasks.task(number)?;
+    match act {
+        Act::Release => {
+            let tasks::Phase::Held { why, .. } = row.phase else { return None };
+            let what = match why {
+                tasks::Hold::Uncertain { .. } => acts::ReleaseEffect::Uncertain,
+                tasks::Hold::Failures(_)
+                | tasks::Hold::Stalled
+                | tasks::Hold::Stopped
+                | tasks::Hold::StoppedBy { .. } => acts::ReleaseEffect::RunAgain,
+                tasks::Hold::Dependency(_)
+                | tasks::Hold::Drift
+                | tasks::Hold::Effects
+                | tasks::Hold::EffectFailed
+                | tasks::Hold::Budget
+                | tasks::Hold::Deadline
+                | tasks::Hold::HoldsWaited
+                | tasks::Hold::ResourceUnavailable
+                | tasks::Hold::ResourceAccess
+                | tasks::Hold::PoolLost { .. }
+                | tasks::Hold::Procedure => acts::ReleaseEffect::Judged,
+            };
+            Some(acts::Effect::Release(what))
+        }
+        Act::Cancel => {
+            let mut impact = acts::Impact { tasks: super::PhaseCounts::ZERO, live_runs: 0, proposals: 0 };
+            for candidate in core.tasks.view_tasks().as_ref() {
+                if candidate.number != number
+                    && !super::task_tree::descendant(core, candidate.number, number, limits.tasks.depth)
+                {
+                    continue;
+                }
+                let child = core.tasks.task(candidate.number).expect("live census task");
+                if candidate.number != number {
+                    impact.tasks.add(&child.phase);
+                }
+                if tasks::run_attempt(&child.phase).is_some() {
+                    impact.live_runs = impact.live_runs.checked_add(1).expect("live task bound");
+                }
+                if let Some(proposal) = &child.proposal
+                    && let tasks::ProposalState::Pending { .. } = proposal.state
+                {
+                    impact.proposals = impact.proposals.checked_add(1).expect("live task bound");
+                }
+            }
+            Some(acts::Effect::Cancel(impact))
+        }
+        Act::Move => Some(acts::Effect::Move { reservation: core.tasks.takeover_budget(number)? }),
+        Act::Message
+        | Act::Answer
+        | Act::Take
+        | Act::HandBack
+        | Act::Accept
+        | Act::Reject
+        | Act::PassUp
+        | Act::LeaveHeld
+        | Act::Amend
+        | Act::Stop
+        | Act::Close
+        | Act::SetGoal
+        | Act::Prioritise
+        | Act::Seen
+        | Act::EditNote
+        | Act::DeleteNote
+        | Act::Adopt
+        | Act::ChangePolicy
+        | Act::SetRoles
+        | Act::MakeService
+        | Act::SetPool
+        | Act::Withdraw => None,
+    }
+}

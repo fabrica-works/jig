@@ -36,8 +36,8 @@ fn escalation() -> OwnerEscalation {
     OwnerEscalation {
         task: Box::new(task),
         acts: list([
-            Offered { act: ActKind::Release, admission: Admission::Allowed },
-            Offered { act: ActKind::AmendRelease, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::Release, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::Amend, admission: Admission::Allowed },
         ]),
     }
 }
@@ -111,7 +111,7 @@ fn owner_escalation_amendment_inputs_keep_whole_source_baselines_and_selected_de
         }
         let original = row.clone();
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row)));
-        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { action: Action::AmendRelease { object: id.token() } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, words(), &mut bindings);
         assert!(contains(&tree, b"whole task specification"));
@@ -155,7 +155,7 @@ fn build_closed_offers(row: &OwnerEscalation, allocation: skein_ui::Limits, w: &
 }
 
 fn closed_offers(refused: bool) -> OwnerEscalation {
-    let kinds = [ActKind::Release, ActKind::LeaveHeld, ActKind::PassUp, ActKind::AmendRelease, ActKind::Cancel];
+    let kinds = [ActKind::Release, ActKind::LeaveHeld, ActKind::PassUp, ActKind::Amend, ActKind::Cancel];
     let mut row = escalation();
     row.acts = List::with_capacity(MAX_OFFERED_ACTS);
     let reason = HoldReason::Tries {
@@ -184,7 +184,7 @@ fn closed_offers(refused: bool) -> OwnerEscalation {
             } else {
                 Admission::Allowed
             };
-            row.acts.push(Offered { act, admission }).unwrap();
+            row.acts.push(Offered { effect: None, act, admission }).unwrap();
         }
     }
     row

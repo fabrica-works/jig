@@ -14,7 +14,7 @@ use jig_client::contract::*;
 use skein_lib::{List, Wall};
 
 const KINDS: [ActKind; 25] = [
-    ActKind::Write,
+    ActKind::Message,
     ActKind::Answer,
     ActKind::Take,
     ActKind::HandBack,
@@ -24,14 +24,14 @@ const KINDS: [ActKind; 25] = [
     ActKind::Release,
     ActKind::LeaveHeld,
     ActKind::Amend,
-    ActKind::AmendRelease,
+    ActKind::Withdraw,
     ActKind::Stop,
     ActKind::Cancel,
     ActKind::Close,
-    ActKind::TakeOver,
+    ActKind::Move,
     ActKind::SetGoal,
     ActKind::Prioritise,
-    ActKind::MarkSeen,
+    ActKind::Seen,
     ActKind::EditNote,
     ActKind::DeleteNote,
     ActKind::Adopt,

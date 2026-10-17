@@ -17,23 +17,23 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
             allowed(question(core, limits, party, act, *number, *message))
         }
         documents::Subject::Escalation { task } => match act {
-            Act::AmendRelease | Act::Cancel => task::admit(core, limits, party, act, *task),
-            Act::Write
+            Act::Amend | Act::Cancel => task::admit(core, limits, party, act, *task),
+            Act::Message
             | Act::Answer
             | Act::Take
             | Act::HandBack
+            | Act::Withdraw
             | Act::Accept
             | Act::Reject
             | Act::PassUp
             | Act::Release
             | Act::LeaveHeld
-            | Act::Amend
             | Act::Stop
             | Act::Close
-            | Act::TakeOver
+            | Act::Move
             | Act::SetGoal
             | Act::Prioritise
-            | Act::MarkSeen
+            | Act::Seen
             | Act::EditNote
             | Act::DeleteNote
             | Act::Adopt
@@ -50,7 +50,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
         }
         documents::Subject::Result { task } => {
             let Some(row) = core.tasks.task(*task) else { return Admission::Refused(people::Refusal::Unknown) };
-            if act == Act::MarkSeen && core.people.role(party, row.project).is_some() {
+            if act == Act::Seen && core.people.role(party, row.project).is_some() {
                 Admission::Allowed
             } else {
                 Admission::Refused(people::Refusal::NotOffered)
@@ -59,7 +59,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
         documents::Subject::Inbox { party: owner }
         | documents::Subject::Conversations { party: owner }
         | documents::Subject::Frame { party: owner } => {
-            if act == Act::MarkSeen && *owner == party {
+            if act == Act::Seen && *owner == party {
                 Admission::Allowed
             } else {
                 Admission::Refused(people::Refusal::NotOffered)
@@ -87,22 +87,22 @@ fn project_admission(core: &Core, limits: &Limits, party: u64, act: Act, project
         Act::Adopt | Act::ChangePolicy | Act::SetRoles | Act::MakeService | Act::SetPool => {
             allowed(core.role_allowed(party, project, limits.tasks.tree_tasks))
         }
-        Act::MarkSeen => Admission::Allowed,
-        Act::Write
+        Act::Seen => Admission::Allowed,
+        Act::Message
         | Act::Answer
         | Act::Take
         | Act::HandBack
+        | Act::Withdraw
         | Act::Accept
         | Act::Reject
         | Act::PassUp
         | Act::Release
         | Act::LeaveHeld
         | Act::Amend
-        | Act::AmendRelease
         | Act::Stop
         | Act::Cancel
         | Act::Close
-        | Act::TakeOver
+        | Act::Move
         | Act::EditNote
         | Act::DeleteNote => Admission::Refused(people::Refusal::NotOffered),
     }

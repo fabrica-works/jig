@@ -717,7 +717,7 @@ mod tests {
         );
     }
     #[test]
-    fn normal_tasks_check_the_original_filter_before_opening_the_exact_tab_flight() {
+    fn normal_tasks_check_the_original_query_before_opening_the_exact_tab_flight() {
         let mut transport = transport();
         let native = Token::new(u64::MAX);
         let query = client::TaskQuery {

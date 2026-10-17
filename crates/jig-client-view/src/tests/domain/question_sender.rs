@@ -29,7 +29,7 @@ fn question_sender_closed_widths_and_absence_keep_whole_facts_and_original_answe
         supplied.words = text(UTF8_TEXT);
         supplied.since = Wall::from_nanos(u64::MAX);
         supplied.acts = List::with_capacity(2);
-        supplied.acts.push(Offered { act: ActKind::Answer, admission: Admission::Allowed }).unwrap();
+        supplied.acts.push(Offered { effect: None, act: ActKind::Answer, admission: Admission::Allowed }).unwrap();
         let key = ObjectKey::Question { task: supplied.task.task, message: supplied.message };
         let id = domain.objects.name(key, Source::Window { number: 4 }).unwrap();
         assert!(domain.objects.put(key, Body::Question(Box::new(supplied.clone()))));

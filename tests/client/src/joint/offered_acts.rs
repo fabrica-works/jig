@@ -21,16 +21,15 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
         Found::Absent | Found::Pending => panic!("the current source Task has a public card"),
     };
     let mut face = TreeFace::subtree(tree, card).expect("whole public Task card");
-    let captions: [(Act, &[u8]); 9] = [
-        (Act::Write, b"Write"),
+    let captions: [(Act, &[u8]); 8] = [
+        (Act::Message, b"Write"),
         (Act::Amend, b"Amend"),
-        (Act::TakeOver, b"Take over"),
+        (Act::Move, b"Take over"),
         (Act::Close, b"Close"),
-        (Act::AmendRelease, b"Amend and release"),
         (Act::Release, b"Release"),
         (Act::Stop, b"Stop"),
         (Act::Cancel, b"Cancel"),
-        (Act::MarkSeen, b"Mark read"),
+        (Act::Seen, b"Mark read"),
     ];
     assert!(source.iter().all(|offer| captions.iter().any(|(act, _)| *act == offer.act)));
     for (act, caption) in captions {
@@ -47,6 +46,12 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
     }
     // The card has no unrelated navigation controls; every button names one
     // of this source packet's actionable acts.
+    let composed = composed(source.as_slice());
+    assert_eq!(
+        matches!(face.find(&Find::exactly_named(Role::Button, b"Amend and release")), Found::Node(_)),
+        composed,
+        "composed Amend and Release"
+    );
     let start = tree.nodes().iter().position(|node| node.id == card).expect("card index");
     let end = start + usize::try_from(tree.nodes()[start].size).expect("card size");
     let count = tree.nodes()[start..end].iter().filter(|node| node.role == Role::Button).count();
@@ -57,7 +62,7 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
             Admission::Refused(_) => false,
         })
         .count();
-    assert_eq!(count, expected);
+    assert_eq!(count, expected + usize::from(composed));
 }
 
 pub(super) fn card(world: &mut World<Test, Joint>, client: crate::ClientId, key: client::ObjectKey, title: &[u8]) {
@@ -74,19 +79,19 @@ pub(super) fn card(world: &mut World<Test, Joint>, client: crate::ClientId, key:
     };
     let mut face = TreeFace::subtree(tree, card).expect("whole public card");
     let captions: [(Act, &[u8]); 15] = [
-        (Act::Write, b"Write"),
+        (Act::Message, b"Write"),
         (Act::Answer, b"Answer"),
         (Act::Take, b"Take it"),
         (Act::HandBack, b"Hand it back"),
         (Act::Accept, b"Accept"),
         (Act::Reject, b"Reject"),
+        (Act::Withdraw, b"Withdraw proposal"),
         (Act::PassUp, b"Pass up"),
         (Act::Release, b"Release"),
         (Act::LeaveHeld, b"Leave it held"),
         (Act::Amend, b"Amend"),
-        (Act::AmendRelease, b"Amend and release"),
         (Act::Cancel, b"Cancel"),
-        (Act::MarkSeen, b"Mark read"),
+        (Act::Seen, b"Mark read"),
         (Act::EditNote, b"Edit note"),
         (Act::DeleteNote, b"Delete note"),
     ];
@@ -105,6 +110,12 @@ pub(super) fn card(world: &mut World<Test, Joint>, client: crate::ClientId, key:
             assert!(matches!(face.find(&Find::text(caption)), Found::Node(_)));
         }
     }
+    let composed = composed(source.as_slice());
+    assert_eq!(
+        matches!(face.find(&Find::exactly_named(Role::Button, b"Amend and release")), Found::Node(_)),
+        composed,
+        "composed Amend and Release"
+    );
     let start = tree.nodes().iter().position(|node| node.id == card).expect("card index");
     let end = start + usize::try_from(tree.nodes()[start].size).expect("card size");
     let actual = tree.nodes()[start..end].iter().filter(|node| node.role == Role::Button).count();
@@ -114,5 +125,18 @@ pub(super) fn card(world: &mut World<Test, Joint>, client: crate::ClientId, key:
             matches!(&offer.admission, Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. })
         })
         .count();
-    assert_eq!(actual, expected, "no unoffered card buttons");
+    assert_eq!(actual, expected + usize::from(composed), "no unoffered card buttons");
+}
+
+fn composed(source: &[jig_domain_core::acts::Offered]) -> bool {
+    use jig_domain_core::acts::{Act, Admission};
+    [Act::Amend, Act::Release].iter().all(|act| {
+        source.iter().any(|offer| {
+            offer.act == *act
+                && match &offer.admission {
+                    Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => true,
+                    Admission::Refused(_) => false,
+                }
+        })
+    })
 }

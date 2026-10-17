@@ -188,7 +188,11 @@ fn project_offers(populated: u32, capacity: u32) -> List<Offered> {
     let mut offers = List::with_capacity(capacity);
     for index in 0..populated {
         offers
-            .push(Offered { act: kinds[usize::try_from(index % 5).unwrap()], admission: Admission::Allowed })
+            .push(Offered {
+                effect: None,
+                act: kinds[usize::try_from(index % 5).unwrap()],
+                admission: Admission::Allowed,
+            })
             .unwrap();
     }
     offers

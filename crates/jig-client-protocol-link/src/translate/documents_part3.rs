@@ -73,9 +73,6 @@ pub(crate) fn impact_fields(value: &w::Impact, limits: &Limits) -> c::Impact {
         tasks: phase_counts_fields(value.tasks(), limits),
         live_runs: value.live_runs(),
         proposals: value.proposals(),
-        effects_pending: value.effects_pending(),
-        effects_settling: value.effects_settling(),
-        takeover_budget: value.takeover_budget(),
     }
 }
 

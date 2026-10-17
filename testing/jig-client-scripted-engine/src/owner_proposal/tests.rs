@@ -67,7 +67,7 @@ fn hold() -> OwnerChipHold {
 }
 fn proposal(action: OwnerProposalAction) -> OwnerProposal {
     let mut acts = List::with_capacity(3);
-    acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+    acts.push(Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
     OwnerProposal {
         key: ProposalKey { proposer: Proposer::Party(u64::MAX), number: u64::MAX },
         project: u32::MAX,

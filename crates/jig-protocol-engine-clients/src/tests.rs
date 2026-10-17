@@ -32,5 +32,7 @@ mod closing;
 mod compound;
 #[path = "tests/create.rs"]
 mod create;
+#[path = "tests/effects.rs"]
+mod effects;
 #[path = "tests/queries.rs"]
 mod queries;

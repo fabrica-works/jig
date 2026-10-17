@@ -1395,14 +1395,10 @@ pub fn language() -> Language {
                 Segment::Hole { index: 0, kind: HoleKind::Number },
                 Segment::Text(copy_of(b" proposals will be withdrawn")),
             ]),
-            JigPhrase::PendingEffects => Box::new([
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" effects not yet begun will be cancelled")),
-            ]),
-            JigPhrase::SettlingEffects => Box::new([
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" begun effects will settle")),
-            ]),
+            JigPhrase::EffectsSettle => Box::new([Segment::Text(copy_of(
+                b"Effects not yet begun will be withdrawn; begun effects will settle",
+            ))]),
+            JigPhrase::ActWithdraw => Box::new([Segment::Text(copy_of(b"Withdraw proposal"))]),
             JigPhrase::TakeoverFunds => Box::new([
                 Segment::Text(copy_of(b"Takeover reserves ")),
                 Segment::Hole { index: 0, kind: HoleKind::Amount },

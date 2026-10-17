@@ -109,9 +109,9 @@ fn check(
         people::Operation::Cancel { task, .. } => (*task, crate::acts::Act::Cancel),
         people::Operation::Stop { task, .. } => (*task, crate::acts::Act::Stop),
         people::Operation::Release { task, .. } => (*task, crate::acts::Act::Release),
-        people::Operation::Move { task, .. } => (*task, crate::acts::Act::TakeOver),
+        people::Operation::Move { task, .. } => (*task, crate::acts::Act::Move),
         people::Operation::Amend { task, .. } => (*task, crate::acts::Act::Amend),
-        people::Operation::Message { task, .. } => (*task, crate::acts::Act::Write),
+        people::Operation::Message { task, .. } => (*task, crate::acts::Act::Message),
     };
     let row = admission.task(task).ok_or(people::Refusal::Unknown)?;
     if row.project != route.project {

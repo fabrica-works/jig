@@ -79,7 +79,7 @@ fn amendment_reason_receipt_resets_without_losing_domain_clear_write_counts() {
 
 #[test]
 fn amendment_release_keeps_opaque_reason_delta_and_independent_revisions_in_one_send() {
-    let (mut domain, _) = opened(ActKind::AmendRelease);
+    let (mut domain, _) = opened_release();
     let bytes = UTF8_TEXTS[1];
     edit(&mut domain, Purpose::Reason, bytes);
     let selected = domain.confirmation().unwrap().choices.change.clone().unwrap();
@@ -135,3 +135,13 @@ fn a_late_amendment_answer_preserves_another_forms_supplied_reason_until_page_sw
 }
 
 const UTF8_TEXTS: [&[u8]; 2] = [&[b'x'; 33], &[b'x'; 32]];
+
+fn opened_release() -> (Fixture, Id<Object>) {
+    let (mut domain, _) = live();
+    let mut row = task();
+    row.acts = offered(ActKind::Amend, Admission::Allowed);
+    let id = install(&mut domain, Body::Task(Box::new(row)));
+    intend_amend_release(&mut domain, id);
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
+    (domain, id)
+}

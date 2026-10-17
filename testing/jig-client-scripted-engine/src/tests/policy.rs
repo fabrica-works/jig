@@ -20,7 +20,7 @@ fn policy_project() -> Project {
         recurring: list(vec![]),
         parts: list(vec![]),
         spend_lines: list(vec![]),
-        acts: list(vec![Offered { act: ActKind::ChangePolicy, admission: Admission::Allowed }]),
+        acts: list(vec![Offered { effect: None, act: ActKind::ChangePolicy, admission: Admission::Allowed }]),
     }
 }
 #[test]

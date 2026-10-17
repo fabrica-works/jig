@@ -196,7 +196,7 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
         people::Ask::SetGoal { project, .. } | people::Ask::Propose { project, .. } => {
             (Act::SetGoal, Subject::Project { project: *project })
         }
-        people::Ask::Say { task, .. } => (Act::Write, Subject::Task { task: *task }),
+        people::Ask::Say { task, .. } => (Act::Message, Subject::Task { task: *task }),
         people::Ask::AnswerQuestion { task, question, .. } => {
             (Act::Answer, Subject::Question { task: *task, message: *question })
         }
@@ -220,17 +220,13 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
             Subject::Escalation { task: *task },
         ),
         people::Ask::Release { task, .. } => (Act::Release, Subject::Task { task: *task }),
-        people::Ask::Amend { task, release, .. } => {
-            (if release.is_some() { Act::AmendRelease } else { Act::Amend }, Subject::Task { task: *task })
-        }
+        people::Ask::Amend { task, .. } => (Act::Amend, Subject::Task { task: *task }),
         people::Ask::Stop { task, .. } => (Act::Stop, Subject::Task { task: *task }),
         people::Ask::Cancel { task, .. } => (Act::Cancel, Subject::Task { task: *task }),
         people::Ask::Close { chat, .. } => (Act::Close, Subject::Task { task: *chat }),
-        people::Ask::Move { task, .. } => (Act::TakeOver, Subject::Task { task: *task }),
+        people::Ask::Move { task, .. } => (Act::Move, Subject::Task { task: *task }),
         people::Ask::Prioritise { project, .. } => (Act::Prioritise, Subject::Goals { project: *project }),
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task, .. } } => {
-            (Act::MarkSeen, Subject::Task { task: *task })
-        }
+        people::Ask::MarkSeen { seen: people::Seen::Chat { task, .. } } => (Act::Seen, Subject::Task { task: *task }),
         people::Ask::EditNote { name, change, .. } => (
             match &**change {
                 people::NoteChange::Correct { .. } => Act::EditNote,

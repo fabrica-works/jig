@@ -17,19 +17,14 @@ pub(crate) fn role(core: &Core, project: u32, held: Option<people::Role>, act: A
                 Err(people::Refusal::Role { held })
             }
         },
-        Act::Write
-        | Act::Answer
-        | Act::Close
-        | Act::SetGoal
-        | Act::Amend
-        | Act::AmendRelease
-        | Act::EditNote
-        | Act::DeleteNote => match held {
-            Some(
-                people::Role::Owner | people::Role::Maintainer | people::Role::Member | people::Role::Policy { .. },
-            ) => Ok(()),
-            Some(people::Role::Observer) | None => Err(people::Refusal::Role { held }),
-        },
+        Act::Message | Act::Answer | Act::Close | Act::SetGoal | Act::Amend | Act::EditNote | Act::DeleteNote => {
+            match held {
+                Some(
+                    people::Role::Owner | people::Role::Maintainer | people::Role::Member | people::Role::Policy { .. },
+                ) => Ok(()),
+                Some(people::Role::Observer) | None => Err(people::Refusal::Role { held }),
+            }
+        }
         Act::Take
         | Act::HandBack
         | Act::Accept
@@ -39,7 +34,8 @@ pub(crate) fn role(core: &Core, project: u32, held: Option<people::Role>, act: A
         | Act::LeaveHeld
         | Act::Stop
         | Act::Cancel
-        | Act::TakeOver
-        | Act::MarkSeen => Ok(()),
+        | Act::Move
+        | Act::Seen
+        | Act::Withdraw => Ok(()),
     }
 }

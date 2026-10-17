@@ -4,6 +4,7 @@ pub(super) fn proposed_amendment(bounded: bool, changed: bool) -> (Script, Ask, 
     let mut setup = live_script();
     let mut row = task();
     row.acts = list(vec![Offered {
+        effect: None,
         act: ActKind::Amend,
         admission: if bounded {
             Admission::Bounded {

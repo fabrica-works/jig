@@ -182,12 +182,15 @@ fn person_owner_reserved_offer_slots_use_the_closed_ceiling_at_whole_byte_bounda
     let mut value = value();
     let baseline = bytes(&value, &b).expect("initial whole value fits");
     value.acts = List::with_capacity(MAX_OFFERED_ACTS);
-    value.acts.push(Offered { act: ActKind::Answer, admission: Admission::Allowed }).expect("answer fits");
+    value
+        .acts
+        .push(Offered { effect: None, act: ActKind::Answer, admission: Admission::Allowed })
+        .expect("answer fits");
     let result = value.results.get_mut(1).expect("second row").result.as_mut().expect("whole result");
     result.acts = List::with_capacity(MAX_OFFERED_ACTS);
     result
         .acts
-        .push(Offered { act: ActKind::MarkSeen, admission: Admission::Refused(Refusal::NotWaiting) })
+        .push(Offered { effect: None, act: ActKind::Seen, admission: Admission::Refused(Refusal::NotWaiting) })
         .expect("refused offer fits");
     let slots = List::<Offered>::worst_case(MAX_OFFERED_ACTS).expect("closed offer slots fit")
         - List::<Offered>::worst_case(3).expect("initial offer slots fit");

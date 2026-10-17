@@ -74,8 +74,8 @@ fn two_maximal_amendment_offers_attain_the_whole_declared_heap_including_the_kin
     let admission = bounded(&limits, limits.lines);
     assert_eq!(receiving(admission.clone(), &limits), Ok(admission.clone()));
     let mut offers = List::with_capacity(MAX_ACTS);
-    offers.push(Offered { act: Act::Amend, admission: admission.clone() }).unwrap();
-    offers.push(Offered { act: Act::AmendRelease, admission }).unwrap();
+    offers.push(Offered { effect: None, act: Act::Amend, admission: admission.clone() }).unwrap();
+    offers.push(Offered { effect: None, act: Act::Amend, admission }).unwrap();
     let whole = heap_bytes(&offers).unwrap();
     assert_eq!(whole, heap_worst_case(&limits).unwrap());
     let pair_heap = List::<jig_domain_authority::Implication>::worst_case(limits.lines).unwrap();

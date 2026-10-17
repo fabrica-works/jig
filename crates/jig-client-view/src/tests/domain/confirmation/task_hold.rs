@@ -84,9 +84,9 @@ fn owner_task_hold_live_revision_moves_independently_before_atomic_amend_release
     let mut held = owner(HoldCategory::Budget);
     held.revision = u64::MAX - 1;
     row.hold = Some(TaskHold::Owner(Box::new(held.clone())));
-    row.acts = offered(ActKind::AmendRelease, Admission::Allowed);
+    row.acts = offered(ActKind::Amend, Admission::Allowed);
     let id = install(&mut domain, Body::Task(Box::new(row.clone())));
-    intend(&mut domain, id, ActKind::AmendRelease);
+    intend_amend_release(&mut domain, id);
     edit(&mut domain, Purpose::Reason, b"");
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     assert!(domain.confirmation().unwrap().missing.is_none());
@@ -101,7 +101,7 @@ fn owner_task_hold_live_revision_moves_independently_before_atomic_amend_release
         Some(Missing::ChangedHold { now: Some(Revision { value: u64::MAX }) })
     );
     assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
-    intend(&mut domain, id, ActKind::AmendRelease);
+    intend_amend_release(&mut domain, id);
     edit(&mut domain, Purpose::Reason, b"");
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     let output = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });

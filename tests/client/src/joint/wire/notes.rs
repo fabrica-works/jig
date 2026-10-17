@@ -57,10 +57,11 @@ mod tests {
         tasks.push(u64::MAX).expect("full reference");
         let mut offers = List::with_capacity(2);
         offers
-            .push(acts::Offered { act: acts::Act::EditNote, admission: acts::Admission::Allowed })
+            .push(acts::Offered { effect: None, act: acts::Act::EditNote, admission: acts::Admission::Allowed })
             .expect("actual edit offer");
         offers
             .push(acts::Offered {
+                effect: None,
                 act: acts::Act::DeleteNote,
                 admission: acts::Admission::Refused(people::Refusal::KeyConflict),
             })
@@ -121,8 +122,13 @@ mod tests {
                 assert_eq!(
                     value.acts.as_slice(),
                     &[
-                        client::Offered { act: client::ActKind::EditNote, admission: client::Admission::Allowed },
                         client::Offered {
+                            effect: None,
+                            act: client::ActKind::EditNote,
+                            admission: client::Admission::Allowed
+                        },
+                        client::Offered {
+                            effect: None,
                             act: client::ActKind::DeleteNote,
                             admission: client::Admission::Refused(client::Refusal::KeyConflict)
                         }

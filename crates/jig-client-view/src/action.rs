@@ -19,6 +19,8 @@ pub enum Act {
     Submit { field: Purpose },
     /// Open a confirmation for an object act.
     Intend { object: Token, act: ActKind },
+    /// Amend and release where the document offers both operations.
+    AmendRelease { object: Token },
     /// Choose an option in the confirmation.
     Choose { option: u32 },
     /// Answer that a person task cannot be done.

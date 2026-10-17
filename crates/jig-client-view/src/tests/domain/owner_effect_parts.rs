@@ -182,7 +182,7 @@ fn native_effect_registration_refuses_other_kinds_and_paths_and_preserves_the_se
 fn native_effect_parts_refuse_full_capacity_while_retaining_the_whole_pending_document_and_offers() {
     let (mut domain, _) = objects::live();
     let mut value = source(Proposer::Party(8), native(11));
-    value.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+    value.acts.push(Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
     let (read, _) = shown(&mut domain, value.key);
     let limits = crate::Limits { parts: 0, ..LIMITS };
     domain.ui.limits = limits;
@@ -237,7 +237,7 @@ fn native_effect_card_refresh_registers_only_shown_current_facts_within_capacity
     for (shown_card, part_capacity) in [(true, LIMITS.parts), (true, 0), (false, LIMITS.parts)] {
         let (mut domain, _) = objects::live();
         let mut value = source(Proposer::Party(8), native(11));
-        value.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+        value.acts.push(Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
         let (read, _) = shown(&mut domain, value.key);
         drive(
             &mut domain,

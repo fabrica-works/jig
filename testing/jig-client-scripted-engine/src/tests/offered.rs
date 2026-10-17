@@ -6,7 +6,7 @@ use core::mem::size_of;
 fn offered(kinds: &[ActKind], capacity: u32) -> List<Offered> {
     let mut result = List::with_capacity(capacity);
     for act in kinds {
-        result.push(Offered { act: *act, admission: Admission::Allowed }).unwrap();
+        result.push(Offered { effect: None, act: *act, admission: Admission::Allowed }).unwrap();
     }
     result
 }
@@ -14,13 +14,13 @@ fn seven() -> Task {
     let mut value = task();
     value.acts = offered(
         &[
-            ActKind::Write,
+            ActKind::Message,
             ActKind::Amend,
-            ActKind::TakeOver,
+            ActKind::Move,
             ActKind::Close,
             ActKind::Stop,
             ActKind::Cancel,
-            ActKind::MarkSeen,
+            ActKind::Seen,
         ],
         7,
     );
@@ -102,13 +102,13 @@ fn seven_offers_cross_normal_task_read_and_delivery_whole_with_two_paged_rows() 
     assert_eq!(
         value.acts.iter().map(|v| v.act).collect::<Vec<_>>(),
         vec![
-            ActKind::Write,
+            ActKind::Message,
             ActKind::Amend,
-            ActKind::TakeOver,
+            ActKind::Move,
             ActKind::Close,
             ActKind::Stop,
             ActKind::Cancel,
-            ActKind::MarkSeen,
+            ActKind::Seen,
         ]
     );
 }
@@ -117,11 +117,11 @@ fn reserved_closed_offer_ceiling_is_priced_and_one_more_is_refused_whole() {
     let bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
     for populated in [false, true] {
         let mut value = seven();
-        value.acts = offered(if populated { &[ActKind::Write] } else { &[] }, MAX_OFFERED_ACTS);
+        value.acts = offered(if populated { &[ActKind::Message] } else { &[] }, MAX_OFFERED_ACTS);
         let before = value.clone();
         assert_eq!(crate::offered::heap(&value.acts, &bounds), List::<Offered>::worst_case(MAX_OFFERED_ACTS));
         exact_packets(&value, &bounds);
-        value.acts = offered(if populated { &[ActKind::Write] } else { &[] }, MAX_OFFERED_ACTS + 1);
+        value.acts = offered(if populated { &[ActKind::Message] } else { &[] }, MAX_OFFERED_ACTS + 1);
         let oversized = value.clone();
         assert!(!payload::fits(&ReadValue::Task(Box::new(value.clone())), &bounds));
         assert!(!payload::fits(&Delivery::Task(Box::new(value.clone())), &bounds));
@@ -152,6 +152,7 @@ fn nested() -> List<Offered> {
     let authority = authority_full();
     list(vec![
         Offered {
+            effect: None,
             act: ActKind::SetGoal,
             admission: Admission::Bounded {
                 within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
@@ -168,6 +169,7 @@ fn nested() -> List<Offered> {
             },
         },
         Offered {
+            effect: None,
             act: ActKind::Amend,
             admission: Admission::Bounded {
                 within: jig_client_domain::contract::Bounds::Amend {
@@ -186,14 +188,19 @@ fn nested() -> List<Offered> {
                 }),
             },
         },
-        Offered { act: ActKind::TakeOver, admission: Admission::Proposed { to: Recipient::Task(u64::MAX) } },
-        Offered { act: ActKind::Cancel, admission: Admission::Proposed { to: Recipient::Party(u64::MAX) } },
+        Offered { effect: None, act: ActKind::Move, admission: Admission::Proposed { to: Recipient::Task(u64::MAX) } },
         Offered {
+            effect: None,
+            act: ActKind::Cancel,
+            admission: Admission::Proposed { to: Recipient::Party(u64::MAX) },
+        },
+        Offered {
+            effect: None,
             act: ActKind::Close,
             admission: Admission::Proposed { to: Recipient::Role { project: u32::MAX, role: u32::MAX } },
         },
-        Offered { act: ActKind::MarkSeen, admission: Admission::Refused(Refusal::NotWaiting) },
-        Offered { act: ActKind::Write, admission: Admission::Allowed },
+        Offered { effect: None, act: ActKind::Seen, admission: Admission::Refused(Refusal::NotWaiting) },
+        Offered { effect: None, act: ActKind::Message, admission: Admission::Allowed },
     ])
 }
 #[test]

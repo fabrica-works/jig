@@ -55,24 +55,24 @@ pub fn proposal(value: &d::ProposalRef, limits: &w::Limits) -> Result<w::Proposa
 }
 pub fn act(value: acts::Act, _limits: &w::Limits) -> Result<w::ActKind, w::Problem> {
     Ok(match value {
-        acts::Act::Write => w::ActKind::Write,
+        acts::Act::Message => w::ActKind::Message,
         acts::Act::Answer => w::ActKind::Answer,
         acts::Act::Take => w::ActKind::Take,
         acts::Act::HandBack => w::ActKind::HandBack,
         acts::Act::Accept => w::ActKind::Accept,
+        acts::Act::Withdraw => w::ActKind::Withdraw,
         acts::Act::Reject => w::ActKind::Reject,
         acts::Act::PassUp => w::ActKind::PassUp,
         acts::Act::Release => w::ActKind::Release,
         acts::Act::LeaveHeld => w::ActKind::LeaveHeld,
         acts::Act::Amend => w::ActKind::Amend,
-        acts::Act::AmendRelease => w::ActKind::AmendRelease,
         acts::Act::Stop => w::ActKind::Stop,
         acts::Act::Cancel => w::ActKind::Cancel,
         acts::Act::Close => w::ActKind::Close,
-        acts::Act::TakeOver => w::ActKind::TakeOver,
+        acts::Act::Move => w::ActKind::MoveTask,
         acts::Act::SetGoal => w::ActKind::SetGoal,
         acts::Act::Prioritise => w::ActKind::Prioritise,
-        acts::Act::MarkSeen => w::ActKind::MarkSeen,
+        acts::Act::Seen => w::ActKind::Seen,
         acts::Act::EditNote => w::ActKind::EditNote,
         acts::Act::DeleteNote => w::ActKind::DeleteNote,
         acts::Act::Adopt => w::ActKind::Adopt,
@@ -217,7 +217,14 @@ pub fn offered(
     for item in value {
         rows.push(w::Offered::new(
             limits,
-            w::OfferedParts { act: act(item.act, limits)?, admission: admission(&item.admission, limits)? },
+            w::OfferedParts {
+                effect: match &item.effect {
+                    Some(value) => Some(effect(value, limits)?),
+                    None => None,
+                },
+                act: act(item.act, limits)?,
+                admission: admission(&item.admission, limits)?,
+            },
         )?)
         .expect("supplied offered acts");
     }
@@ -421,4 +428,50 @@ fn delegates(value: &List<d::LiveDelegate>, limits: &w::Limits) -> Result<Box<[u
             .expect("supplied delegates");
     }
     delegates_pieces(&delegate_rows, limits.task_delegates.min(w::CEILINGS.task_delegates), w::Path::TaskDelegates)
+}
+
+pub fn effect(value: &acts::Effect, limits: &w::Limits) -> Result<w::Effect, w::Problem> {
+    Ok(match value {
+        acts::Effect::Release(value) => w::Effect::Release(w::EffectRelease::new(
+            limits,
+            w::EffectReleaseParts {
+                what: match value {
+                    acts::ReleaseEffect::Judged => w::ReleaseEffect::Judged,
+                    acts::ReleaseEffect::RunAgain => w::ReleaseEffect::RunAgain,
+                    acts::ReleaseEffect::Uncertain => w::ReleaseEffect::Uncertain,
+                },
+            },
+        )?),
+        acts::Effect::Move { reservation } => {
+            w::Effect::MoveTask(w::EffectMove::new(limits, w::EffectMoveParts { reservation: *reservation })?)
+        }
+        acts::Effect::Cancel(value) => w::Effect::Cancel(w::Impact::new(
+            limits,
+            w::ImpactParts {
+                tasks: w::PhaseCounts::new(
+                    limits,
+                    w::PhaseCountsParts {
+                        ended: 0,
+                        waiting: value.tasks.waiting,
+                        running: value
+                            .tasks
+                            .idle
+                            .checked_add(value.tasks.starting)
+                            .expect("task bound")
+                            .checked_add(value.tasks.running)
+                            .expect("task bound")
+                            .checked_add(value.tasks.backing_off)
+                            .expect("task bound"),
+                        closing: value.tasks.closing,
+                        held: value.tasks.held,
+                        done: value.tasks.done,
+                        failed: value.tasks.failed,
+                        cancelled: value.tasks.cancelled,
+                    },
+                )?,
+                live_runs: value.live_runs,
+                proposals: value.proposals,
+            },
+        )?),
+    })
 }

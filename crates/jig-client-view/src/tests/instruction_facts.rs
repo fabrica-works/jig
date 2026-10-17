@@ -128,10 +128,10 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
 #[test]
 fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_revision_selection() {
     for source in sources() {
-        let mut row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
+        let mut row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::Amend]);
         row.steering.instructions = source.clone();
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
-        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { action: Action::AmendRelease { object: id.token() } });
         drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, words(), &mut bindings);

@@ -217,7 +217,7 @@ fn owner_inbox_live_goal_context_is_explicitly_pending_and_bounded_read_membersh
     assert!(page.goal_context_pending);
 }
 #[test]
-fn owner_inbox_reply_keeps_preview_unread_runtime_options_and_activity_distinct_from_mark_seen() {
+fn reply_preview_preserves_runtime_and_activity_apart_from_seen() {
     let (mut domain, watch, out) = begin();
     super::pages::finish_initial_inbox_reads(&mut domain, &out);
     let line = ConversationLine {

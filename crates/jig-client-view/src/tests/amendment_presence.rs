@@ -165,9 +165,9 @@ fn amendment_loss_in_specification_does_not_select_or_block_independent_fields()
 
 #[test]
 fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_revisions() {
-    let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
+    let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::Amend]);
     let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
-    drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+    drive(&mut domain, Event::Act { action: Action::AmendRelease { object: id.token() } });
     drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     let words = words();
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
@@ -221,9 +221,9 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
         (b"Address to party number".as_slice(), b"18446744073709551615".as_slice(), PersonAddress::Party(u64::MAX)),
         (b"Address to role number in this project".as_slice(), b"4294967295".as_slice(), PersonAddress::Role(u32::MAX)),
     ] {
-        let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
+        let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::Amend]);
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
-        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { action: Action::AmendRelease { object: id.token() } });
         drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
@@ -282,11 +282,11 @@ fn address_controls_require_actual_person_revision_and_keep_task_recipients_outs
         (Some(Revision { value: 12 }), Some(Recipient::Roles { project: 4, roles: list([7, 2]) })),
         (Some(Revision { value: 12 }), Some(Recipient::Role { project: 99, role: 7 })),
     ] {
-        let mut row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
+        let mut row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::Amend]);
         row.steering.person_revision = revision;
         row.steering.addressed = recipient;
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row)));
-        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { action: Action::AmendRelease { object: id.token() } });
         drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let tree = dialog(&domain, words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
         assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to party number")));

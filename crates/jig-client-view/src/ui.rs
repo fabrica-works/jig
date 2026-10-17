@@ -610,7 +610,7 @@ fn act_event(domain: &mut Ui, env: &Env<Limits>, act: Act, out: &mut Queue<Reque
         }
         Act::Submit { field: crate::fields::Purpose::Composer { task } } => {
             if let Some(id) = domain.objects.find(jig_client::contract::ObjectKey::Task(task)) {
-                crate::confirm::open(domain, env, id, jig_client::contract::ActKind::Write, lent);
+                crate::confirm::open(domain, env, id, jig_client::contract::ActKind::Message, lent);
             }
         }
         Act::WriteRelease { release } => crate::confirm::write_release(domain, release),
@@ -622,6 +622,7 @@ fn act_event(domain: &mut Ui, env: &Env<Limits>, act: Act, out: &mut Queue<Reque
                 crate::page::conversations::about(domain, env, key, out, lent);
             }
         }
+        Act::AmendRelease { object } => crate::confirm::amend_release(domain, env, Id::from_token(object), lent),
         Act::Intend { object, act } => crate::confirm::open(domain, env, Id::from_token(object), act, lent),
         Act::Choose { option } => crate::confirm::choose(domain, option),
         Act::CannotDo => crate::confirm::cannot(domain),

@@ -15,8 +15,11 @@ use jig_client::contract::*;
 use jig_client::contract::{AnswerOn, DecideOn};
 use skein_lib::{Id, List, Time, Wall};
 fn offered(act: ActKind, admission: Admission) -> List<Offered> {
-    let mut rows = List::with_capacity(1);
-    rows.push(Offered { act, admission }).unwrap();
+    let mut rows = List::with_capacity(2);
+    rows.push(Offered { effect: None, act, admission }).unwrap();
+    if act == ActKind::Amend {
+        rows.push(Offered { effect: None, act: ActKind::Release, admission: Admission::Allowed }).unwrap();
+    }
     rows
 }
 pub(super) fn install(domain: &mut Fixture, body: Body) -> Id<Object> {
@@ -98,14 +101,7 @@ pub(super) fn task() -> Task {
             closing: None,
             spend: List::with_capacity(0),
             runtime: Runtime::Held { was: None },
-            impact: Impact {
-                tasks: counts(),
-                live_runs: 0,
-                proposals: 0,
-                effects_pending: 0,
-                effects_settling: 0,
-                takeover_budget: 0,
-            },
+            impact: Impact { tasks: counts(), live_runs: 0, proposals: 0 },
             writer_slots: List::with_capacity(0),
         })),
     }
@@ -244,8 +240,8 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
         acts: List::with_capacity(2),
         cut: false,
     };
-    note.acts.push(Offered { act: ActKind::EditNote, admission: Admission::Allowed }).unwrap();
-    note.acts.push(Offered { act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
+    note.acts.push(Offered { effect: None, act: ActKind::EditNote, admission: Admission::Allowed }).unwrap();
+    note.acts.push(Offered { effect: None, act: ActKind::DeleteNote, admission: Admission::Allowed }).unwrap();
     assert_eq!(
         acts::note_ask(1, &note, ActKind::EditNote, text(b"after"), text(b"new")),
         Some(Ask::EditNote {
@@ -367,17 +363,11 @@ fn only_engine_offers_open_and_new_confirmations_or_dismissals_clear_the_old_fie
 #[test]
 fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_offer() {
     bounded_amendment_dimensions();
-    for act in [ActKind::Amend, ActKind::AmendRelease] {
+    for release in [false, true] {
+        let act = ActKind::Amend;
         let (mut domain, _) = live();
         let mut row = task();
-        let grant = OwnerGrant {
-            connector: 1,
-            kind: 2,
-            pattern: OwnerPattern {
-                segments: List::with_capacity(0),
-                last: OwnerPatternEnd::Exact(Box::from(*b"listed")),
-            },
-        };
+        let grant = bounded_grant();
         let mut grants = List::with_capacity(1);
         grants.push(grant.clone()).unwrap();
         row.acts = offered(
@@ -404,7 +394,11 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
             },
         );
         let id = install(&mut domain, Body::Task(Box::new(row.clone())));
-        intend(&mut domain, id, act);
+        if release {
+            intend_amend_release(&mut domain, id);
+        } else {
+            intend(&mut domain, id, act);
+        }
         assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Change));
         let mut draft = change();
         let mut after = row.authority.whole().unwrap();
@@ -458,7 +452,7 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
                     revision: Some(row.spec_revision),
                     change: Box::new(draft),
                 },
-                if act == ActKind::AmendRelease { Some(row.hold.as_ref().unwrap().revision()) } else { None }
+                if release { Some(row.hold.as_ref().unwrap().revision()) } else { None }
             )
         );
     }
@@ -850,3 +844,17 @@ fn an_amendment_beyond_the_offer_says_to_whom_it_will_be_proposed() {
         }
     );
 }
+
+fn intend_amend_release(domain: &mut Fixture, id: Id<Object>) -> Box<[Request]> {
+    drive(domain, Time::ZERO, Event::Act { action: Act::AmendRelease { object: id.token() } })
+}
+
+fn bounded_grant() -> OwnerGrant {
+    OwnerGrant {
+        connector: 1,
+        kind: 2,
+        pattern: OwnerPattern { segments: List::with_capacity(0), last: OwnerPatternEnd::Exact(Box::from(*b"listed")) },
+    }
+}
+
+mod compound;

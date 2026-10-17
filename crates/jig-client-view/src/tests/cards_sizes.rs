@@ -212,7 +212,7 @@ fn acquire(d: &mut Fixture, watch: jig_client::Handle, root: ObjectKey, key: Obj
 fn dependencies_and_proposal(d: &mut Fixture, watch: jig_client::Handle, root: ObjectKey) {
     let p = full_proposal(full_batch());
     acquire(d, watch, root, ObjectKey::Proposal(p.key), ReadValue::Proposal(Box::new(p)));
-    let mut task = task_doc(&[ActKind::Close, ActKind::AmendRelease]);
+    let mut task = task_doc(&[ActKind::Close, ActKind::Amend]);
     task.chip = full_chip(9);
     acquire(d, watch, root, ObjectKey::Task(9), ReadValue::Task(Box::new(task)));
     assert_eq!(d.objects().len(), CLIENT.objects);
@@ -275,7 +275,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     card_tree(&d, id, words, sized, crate::result_nodes(&CLIENT).unwrap());
     let failure = AttemptFailure { attempt: 1, class: FailureClass::Permanent, reason: full_name(), at: Wall::EPOCH };
     let reason = HoldReason::Tries { failures: list([failure.clone(), failure]) };
-    let mut escalation_value = escalation_doc(reason, &[ActKind::Release, ActKind::AmendRelease]);
+    let mut escalation_value = escalation_doc(reason, &[ActKind::Release, ActKind::Amend]);
     escalation_value.task.title = DocumentText::complete(full_name());
     escalation_value.hold.result = Some(full_value());
     escalation_value.trail = full_trail();
@@ -288,7 +288,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     let (mut d, id, watch) = loaded_with_watch(root, ReadValue::Escalation(Box::new(escalation_value)));
     dependencies_and_proposal(&mut d, watch, root);
     card_tree(&d, id, words, sized, crate::escalation_nodes(&CLIENT).unwrap());
-    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+    drive(&mut d, Event::Act { action: Action::AmendRelease { object: id.token() } });
     full_dialog(&d, words, sized);
     let note = Note {
         number: 1,
@@ -323,7 +323,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     let tree = builder.finish();
     assert!(tree.len() <= crate::refusal_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
     super::super::cards_access::check(&tree);
-    let mut task = task_doc(&[ActKind::Close, ActKind::AmendRelease]);
+    let mut task = task_doc(&[ActKind::Close, ActKind::Amend]);
     task.chip = full_chip(8);
     task.spec = specification(full_text());
     task.instructions = Some(DocumentText { bytes: full_text(), cut: true });

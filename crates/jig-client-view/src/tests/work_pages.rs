@@ -389,7 +389,11 @@ pub(super) fn project_rows(d: &mut Fixture, out: &[Request]) {
                                 writer: NoteAuthor::Party { party: 1 },
                                 tasks: list([8]),
                                 changed: Some(Wall::EPOCH),
-                                acts: list([Offered { act: ActKind::EditNote, admission: Admission::Allowed }]),
+                                acts: list([Offered {
+                                    effect: None,
+                                    act: ActKind::EditNote,
+                                    admission: Admission::Allowed,
+                                }]),
                                 cut: false,
                             }]),
                             before: Some(
@@ -626,6 +630,7 @@ fn procedure_goal_choices_preserve_pairs_without_me_charters() {
         .unwrap();
     let mut doc = project_doc();
     doc.acts = list([Offered {
+        effect: None,
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
             within: Bounds::Create(CreateBounds {

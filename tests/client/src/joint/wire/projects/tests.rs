@@ -148,7 +148,7 @@ fn recurring_source(overlap: tasks::RecurringOverlap) -> documents::Recurring {
 pub(crate) fn source() -> documents::Project {
     let mut acts = List::with_capacity(client::MAX_OFFERED_ACTS);
     for act in [acts::Act::Release, acts::Act::Stop, acts::Act::Release] {
-        acts.push(acts::Offered { act, admission: acts::Admission::Allowed }).expect("ordered offers");
+        acts.push(acts::Offered { effect: None, act, admission: acts::Admission::Allowed }).expect("ordered offers");
     }
     let mut resources = List::with_capacity(7);
     for role in [
@@ -424,7 +424,7 @@ fn project_read_rejects_reserved_empty_collections_final_nested_text_and_the_twe
     for _ in 0..client::MAX_OFFERED_ACTS {
         source
             .acts
-            .push(acts::Offered { act: acts::Act::Release, admission: acts::Admission::Allowed })
+            .push(acts::Offered { effect: None, act: acts::Act::Release, admission: acts::Admission::Allowed })
             .expect("offer");
     }
     assert!(super::super::documents::project_read(&source, &limits).is_ok());

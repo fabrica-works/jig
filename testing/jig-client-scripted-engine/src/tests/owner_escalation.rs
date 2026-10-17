@@ -33,10 +33,10 @@ fn owner_escalation_script_preserves_supplied_identity_scope_and_outer_offer_wit
     let mut setup = script();
     let mut task = task();
     task.context = None;
-    task.acts = list(vec![Offered { act: ActKind::Stop, admission: Admission::Allowed }]);
+    task.acts = list(vec![Offered { effect: None, act: ActKind::Stop, admission: Admission::Allowed }]);
     let value = ReadValue::OwnerEscalation(Box::new(OwnerEscalation {
         task: Box::new(task),
-        acts: list(vec![Offered { act: ActKind::Release, admission: Admission::Allowed }]),
+        acts: list(vec![Offered { effect: None, act: ActKind::Release, admission: Admission::Allowed }]),
     }));
     setup.truth.objects.insert(ObjectKey::Escalation(8), value.clone());
     setup.truth.object_projects.insert(ObjectKey::Escalation(8), 1);
@@ -58,7 +58,7 @@ fn owner_escalation_script_preserves_supplied_identity_scope_and_outer_offer_wit
 fn reserved_offers(kinds: &[ActKind], capacity: u32) -> List<Offered> {
     let mut offers = List::with_capacity(capacity);
     for act in kinds {
-        offers.push(Offered { act: *act, admission: Admission::Allowed }).unwrap();
+        offers.push(Offered { effect: None, act: *act, admission: Admission::Allowed }).unwrap();
     }
     offers
 }
@@ -119,7 +119,7 @@ fn owner_escalation_reserved_closed_offers_are_independent_of_task_rows_at_whole
 
 #[test]
 fn owner_escalation_normal_read_preserves_offer_order_recursive_admissions_and_both_reserved_allocations() {
-    let kinds = [ActKind::Release, ActKind::LeaveHeld, ActKind::PassUp, ActKind::AmendRelease, ActKind::Cancel];
+    let kinds = [ActKind::Release, ActKind::LeaveHeld, ActKind::PassUp, ActKind::Amend, ActKind::Cancel];
     let mut row = OwnerEscalation { task: Box::new(task()), acts: reserved_offers(&kinds, MAX_OFFERED_ACTS) };
     row.task.context = None;
     row.task.acts = reserved_offers(&[ActKind::Stop], MAX_OFFERED_ACTS);

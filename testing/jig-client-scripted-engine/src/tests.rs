@@ -132,7 +132,7 @@ fn proposal() -> Proposal {
         waiting: Recipient::Role { project: 1, role: 1 },
         trail: list(vec![]),
         since: Wall::EPOCH,
-        acts: list(vec![Offered { act: ActKind::Accept, admission: Admission::Allowed }]),
+        acts: list(vec![Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }]),
         ending: None,
     }
 }
@@ -276,13 +276,10 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
             },
             live_runs: 0,
             proposals: 0,
-            effects_pending: 0,
-            effects_settling: 0,
-            takeover_budget: 0,
         },
         waiting: Recipient::Party(1),
         trail: list(vec![]),
-        acts: list(vec![Offered { act: ActKind::Release, admission: Admission::Allowed }]),
+        acts: list(vec![Offered { effect: None, act: ActKind::Release, admission: Admission::Allowed }]),
     };
     nested_escalation_payload_bounds(&escalation);
     setup.truth.object_projects.insert(ObjectKey::Escalation(8), 1);
@@ -407,14 +404,7 @@ fn task() -> Task {
             closing: None,
             spend: list(vec![]),
             runtime: Runtime::Running { attempt: 1, since: Wall::EPOCH, tool: None },
-            impact: Impact {
-                tasks: counts(),
-                live_runs: 1,
-                proposals: 0,
-                effects_pending: 0,
-                effects_settling: 0,
-                takeover_budget: 0,
-            },
+            impact: Impact { tasks: counts(), live_runs: 1, proposals: 0 },
             writer_slots: list(vec![]),
         })),
     }
@@ -962,7 +952,7 @@ fn bounded_offer_payloads_and_predictions() {
     ] {
         let mut setup = live_script();
         let mut row = task();
-        row.acts = list(vec![Offered { act: ActKind::Amend, admission: offer.clone() }]);
+        row.acts = list(vec![Offered { effect: None, act: ActKind::Amend, admission: offer.clone() }]);
         setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
         let mut after = owner_authority().whole().unwrap();
         after.spend = budget;
@@ -1036,6 +1026,7 @@ fn oversized_bounded_offer_payloads() {
             }
         };
         row.acts = list(vec![Offered {
+            effect: None,
             act: ActKind::Amend,
             admission: Admission::Bounded { within, beyond: Beyond::Proposed { to: Recipient::Party(2) } },
         }]);
@@ -1173,7 +1164,7 @@ fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
             result: None,
             spend: list(vec![]),
         })));
-        row.acts = list(vec![Offered { act: ActKind::AmendRelease, admission: Admission::Allowed }]);
+        row.acts = list(vec![Offered { effect: None, act: ActKind::Amend, admission: Admission::Allowed }]);
         setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
         let mut engine = Engine::new(setup, 1).unwrap();
         send(
@@ -1660,7 +1651,7 @@ fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
             recurring: list(vec![]),
             parts: list(vec![]),
             spend_lines: list(vec![]),
-            acts: list(vec![Offered { act: ActKind::SetGoal, admission: offer.clone() }]),
+            acts: list(vec![Offered { effect: None, act: ActKind::SetGoal, admission: offer.clone() }]),
         };
         setup.truth.projects.insert(1, project);
         let ask =

@@ -14,7 +14,9 @@ use crate::{
     fields::Purpose,
     objects::{Body, Object},
 };
-use jig_client::contract::{ActKind, Hold, HoldReason, Impact, ObjectKey, OwnerChipHold, TaskHold};
+use jig_client::contract::{
+    ActKind, Effect, Hold, HoldReason, Impact, ObjectKey, OwnerChipHold, ReleaseEffect, TaskHold,
+};
 
 pub mod amendment;
 /// Build the domain's one object or goal confirmation, or nothing when closed.
@@ -166,18 +168,14 @@ fn action(
                 words.text(b, if again { JigPhrase::RepeatEffect } else { JigPhrase::SkipEffect }, &[]);
             }
         }
-        ActKind::Amend | ActKind::AmendRelease => {
-            words.text(
-                b,
-                if open.act == ActKind::Amend { JigPhrase::WillAmend } else { JigPhrase::WillAmendRelease },
-                &[],
-            );
+        ActKind::Amend => {
+            words.text(b, if open.choices.release { JigPhrase::WillAmendRelease } else { JigPhrase::WillAmend }, &[]);
             amendment::form(b, client, object, open, words, bindings);
             common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
             if let Some(revision) = open.release_revision {
                 words.text(b, JigPhrase::HoldRevision, &[Hole::Number(revision.value)]);
             }
-            if open.act == ActKind::AmendRelease {
+            if open.choices.release {
                 release_object(b, client, object, words, bindings);
             }
         }
@@ -208,7 +206,7 @@ fn action(
         }
         ActKind::Cancel => {
             words.text(b, JigPhrase::WillCancel, &[]);
-            if let Some(impact) = impact(object) {
+            if let Some(Effect::Cancel(impact)) = effect(object, open.act) {
                 impact_words(b, impact, words);
             }
             common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
@@ -220,14 +218,14 @@ fn action(
             }
             delegates(b, client, object, open, words, bindings);
         }
-        ActKind::TakeOver => {
+        ActKind::Move => {
             words.text(b, JigPhrase::WillTakeOver, &[]);
-            if let Some(impact) = impact(object) {
-                words.text(b, JigPhrase::TakeoverFunds, &[Hole::Amount(impact.takeover_budget)]);
+            if let Some(Effect::Move { reservation }) = effect(object, open.act) {
+                words.text(b, JigPhrase::TakeoverFunds, &[Hole::Amount(*reservation)]);
             }
             common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
         }
-        ActKind::Write => {
+        ActKind::Message => {
             words.text(b, JigPhrase::WillWrite, &[]);
             match object.key {
                 ObjectKey::Task(task) => {
@@ -303,13 +301,14 @@ fn action(
             );
             common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
         }
+        ActKind::Withdraw => words.text(b, JigPhrase::ActWithdraw, &[]),
         ActKind::PassUp => words.text(b, JigPhrase::WillPassUp, &[]),
         ActKind::Take => words.text(b, JigPhrase::WillTake, &[]),
         ActKind::HandBack => words.text(b, JigPhrase::WillHandBack, &[]),
         ActKind::Stop => words.text(b, JigPhrase::WillStop, &[]),
         ActKind::DeleteNote => words.text(b, JigPhrase::WillDeleteNote, &[]),
         ActKind::SetGoal => words.text(b, JigPhrase::WillGoal, &[]),
-        ActKind::MarkSeen
+        ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy
         | ActKind::SetRoles
@@ -337,6 +336,13 @@ fn held(object: &Object) -> bool {
     }
 }
 fn release_object(b: &mut Builder, client: &Borrowed<'_>, object: &Object, words: &Words, bindings: &mut JigBindings) {
+    if let Some(Effect::Release(effect)) = effect(object, ActKind::Release) {
+        match effect {
+            ReleaseEffect::Judged => words.text(b, JigPhrase::ReleaseFresh, &[]),
+            ReleaseEffect::RunAgain => words.text(b, JigPhrase::ResumeRelease, &[]),
+            ReleaseEffect::Uncertain => words.text(b, JigPhrase::EngineFollowsChoice, &[]),
+        }
+    }
     match &object.body {
         Some(Body::Task(doc)) => match &doc.hold {
             Some(TaskHold::Document(hold)) => release(b, client, hold, words, bindings),
@@ -426,44 +432,14 @@ pub fn impact_words(b: &mut Builder, impact: &Impact, words: &Words) {
     words.text(b, JigPhrase::TasksCancelled, &[Hole::Number(u64::from(impact.tasks.cancelled))]);
     words.text(b, JigPhrase::LiveRuns, &[Hole::Number(u64::from(impact.live_runs))]);
     words.text(b, JigPhrase::PendingProposals, &[Hole::Number(u64::from(impact.proposals))]);
-    words.text(b, JigPhrase::PendingEffects, &[Hole::Number(u64::from(impact.effects_pending))]);
-    words.text(b, JigPhrase::SettlingEffects, &[Hole::Number(u64::from(impact.effects_settling))]);
+    words.text(b, JigPhrase::EffectsSettle, &[]);
 }
 fn release(b: &mut Builder, client: &Borrowed<'_>, facts: &Hold, words: &Words, bindings: &mut JigBindings) {
-    let closing = facts.before == jig_client::contract::Phase::Closing;
-    if closing {
-        words.text(b, JigPhrase::ContinueClosing, &[]);
-    }
     match &facts.reason {
-        HoldReason::Tries { .. } | HoldReason::Stopped { .. } | HoldReason::Stalled { .. } => {
-            if !closing {
-                words.text(b, JigPhrase::ResumeRelease, &[]);
-            }
-        }
-        HoldReason::Dependency { .. } | HoldReason::Budget { .. } | HoldReason::Deadline { .. } => {
-            if !closing {
-                words.text(b, JigPhrase::ReleaseFresh, &[]);
-            }
-        }
-        HoldReason::Resource { .. } | HoldReason::Pool { .. } => {
-            if !closing {
-                words.text(b, JigPhrase::ReleaseWait, &[]);
-            }
-        }
-        HoldReason::Procedure { part } => {
-            if !closing {
-                words.text(b, JigPhrase::ReleaseProcedure, &[]);
-            }
-            common::part(b, part, words, bindings);
-        }
-        HoldReason::Drift { part } | HoldReason::EffectFailed { part } => {
-            if !closing {
-                words.text(b, JigPhrase::ReleaseFresh, &[]);
-            }
+        HoldReason::Procedure { part } | HoldReason::Drift { part } | HoldReason::EffectFailed { part } => {
             common::part(b, part, words, bindings);
         }
         HoldReason::EffectUncertain { part } => {
-            words.text(b, JigPhrase::EngineFollowsChoice, &[]);
             common::part(b, part, words, bindings);
             crate::frame::control(
                 b,
@@ -484,6 +460,14 @@ fn release(b: &mut Builder, client: &Borrowed<'_>, facts: &Hold, words: &Words, 
                 Act::Again { again: false },
             );
         }
+        HoldReason::Tries { .. }
+        | HoldReason::Stopped { .. }
+        | HoldReason::Stalled { .. }
+        | HoldReason::Dependency { .. }
+        | HoldReason::Budget { .. }
+        | HoldReason::Deadline { .. }
+        | HoldReason::Resource { .. }
+        | HoldReason::Pool { .. } => {}
     }
     if let Some(result) = &facts.result {
         crate::cards::result::value_nodes(b, client, result, words, bindings);
@@ -583,4 +567,9 @@ pub fn missing_words(b: &mut Builder, missing: &Missing, words: &Words, text_lim
         Missing::Refused { why } => words.refusal(b, why, text_limit),
     }
     b.close();
+}
+
+fn effect(object: &Object, act: ActKind) -> Option<&Effect> {
+    let offer = crate::acts::offer(object, act)?;
+    offer.effect.as_ref()
 }

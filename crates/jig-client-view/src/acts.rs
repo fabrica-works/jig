@@ -17,6 +17,14 @@ use skein_lib::List;
 /// Returns the engine's admission, or not offered when its document has no such act.
 #[must_use]
 pub fn offered(object: &Object, act: ActKind) -> Admission {
+    match offer(object, act) {
+        Some(value) => value.admission.clone(),
+        None => Admission::Refused(Refusal::NotOffered),
+    }
+}
+/// The engine's whole offer, including its consequence.
+#[must_use]
+pub fn offer(object: &Object, act: ActKind) -> Option<&Offered> {
     let rows = match &object.body {
         Some(Body::Task(document)) => &document.acts,
         Some(Body::Proposal(document)) => &document.acts,
@@ -28,17 +36,18 @@ pub fn offered(object: &Object, act: ActKind) -> Admission {
         Some(Body::OwnerPersonTask(document)) => &document.acts,
         Some(Body::Result(document)) => &document.acts,
         Some(Body::Note { document, .. }) => &document.acts,
-        Some(Body::Historical(_) | Body::Chip(_)) | None => return Admission::Refused(Refusal::NotOffered),
+        Some(Body::Historical(_) | Body::Chip(_)) | None => return None,
     };
-    admission(rows, act)
+    offer_in(rows, act)
 }
-fn admission(rows: &List<Offered>, act: ActKind) -> Admission {
+#[expect(clippy::manual_find, reason = "step code selects offers without closures")]
+fn offer_in(rows: &List<Offered>, act: ActKind) -> Option<&Offered> {
     for row in rows {
         if row.act == act {
-            return row.admission.clone();
+            return Some(row);
         }
     }
-    Admission::Refused(Refusal::NotOffered)
+    None
 }
 /// The revision this act decides; unrelated spend and runtime facts are never named.
 #[must_use]
@@ -61,7 +70,7 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
             )
             | None => None,
         },
-        ActKind::Amend | ActKind::AmendRelease => match &object.body {
+        ActKind::Amend => match &object.body {
             Some(Body::Task(document)) => Some(document.spec_revision),
             Some(Body::Escalation(document)) => Some(document.steering.revision),
             Some(Body::OwnerEscalation(document)) => Some(document.task.spec_revision),
@@ -112,18 +121,19 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
             )
             | None => None,
         },
-        ActKind::Write
+        ActKind::Message
         | ActKind::Take
         | ActKind::HandBack
+        | ActKind::Withdraw
         | ActKind::Accept
         | ActKind::Reject
         | ActKind::Stop
         | ActKind::Cancel
         | ActKind::Close
-        | ActKind::TakeOver
+        | ActKind::Move
         | ActKind::SetGoal
         | ActKind::Prioritise
-        | ActKind::MarkSeen
+        | ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy
         | ActKind::SetRoles
@@ -194,7 +204,9 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
     };
     let choices = &confirmation.choices;
     match confirmation.act {
-        ActKind::Accept | ActKind::Reject | ActKind::PassUp => decide(object, confirmation, fields, project),
+        ActKind::Accept | ActKind::Reject | ActKind::PassUp | ActKind::Withdraw => {
+            decide(object, confirmation, fields, project)
+        }
         ActKind::LeaveHeld => Some(Ask::Decide {
             project,
             on: DecideOn::Escalation {
@@ -206,12 +218,12 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
         ActKind::Release => {
             Some(Ask::Release { project, task, revision: confirmation.revision?, again: choices.again })
         }
-        ActKind::Amend | ActKind::AmendRelease => amend(confirmation, fields, project, task),
+        ActKind::Amend => amend(confirmation, fields, project, task),
 
         ActKind::Answer => answer(object, confirmation, fields, project, task),
         ActKind::Take => Some(Ask::Take { project, task }),
         ActKind::HandBack => Some(Ask::HandBack { project, task }),
-        ActKind::Write => {
+        ActKind::Message => {
             let words = words(fields, Purpose::Composer { task })?;
             if choices.release {
                 Some(releasing(
@@ -227,7 +239,7 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
         ActKind::Stop => Some(Ask::Stop { project, task }),
         ActKind::Cancel => Some(Ask::Cancel { project, task, reason: words(fields, Purpose::Reason)?, grace: None }),
         ActKind::Close => Some(Ask::Close { project, chat: task, disposals: choices.disposals.clone() }),
-        ActKind::TakeOver => Some(Ask::Move { project, task, reason: words(fields, Purpose::Reason)? }),
+        ActKind::Move => Some(Ask::Move { project, task, reason: words(fields, Purpose::Reason)? }),
         ActKind::Prioritise => {
             let mut goals = List::with_capacity(1);
             goals.push(Priority { task, priority: choices.priority? }).expect("one priority fits");
@@ -264,7 +276,7 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
             }
         }
         ActKind::SetGoal
-        | ActKind::MarkSeen
+        | ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy
         | ActKind::SetRoles
@@ -275,25 +287,28 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
 fn decide(object: &Object, confirmation: &Confirmation, fields: &Fields, project: u32) -> Option<Ask> {
     match object.key {
         ObjectKey::Proposal(proposal) => {
+            if confirmation.act == ActKind::Withdraw {
+                return Some(Ask::Withdraw { project, proposal: proposal.number });
+            }
             let decision = match confirmation.act {
                 ActKind::Accept => Decision::Accepted,
                 ActKind::Reject => Decision::Rejected { reason: words(fields, Purpose::Reason)? },
                 ActKind::PassUp => Decision::PassedUp,
-                ActKind::Write
+                ActKind::Withdraw
+                | ActKind::Message
                 | ActKind::Answer
                 | ActKind::Take
                 | ActKind::HandBack
                 | ActKind::Release
                 | ActKind::LeaveHeld
                 | ActKind::Amend
-                | ActKind::AmendRelease
                 | ActKind::Stop
                 | ActKind::Cancel
                 | ActKind::Close
-                | ActKind::TakeOver
+                | ActKind::Move
                 | ActKind::SetGoal
                 | ActKind::Prioritise
-                | ActKind::MarkSeen
+                | ActKind::Seen
                 | ActKind::EditNote
                 | ActKind::DeleteNote
                 | ActKind::Adopt
@@ -385,7 +400,8 @@ fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project
 /// A note edit or deletion uses its recalled revision and its own offered acts.
 #[must_use]
 pub fn note_ask(project: u32, note: &Note, act: ActKind, description: Text, body: Text) -> Option<Ask> {
-    match admission(&note.acts, act) {
+    let offer = offer_in(&note.acts, act)?;
+    match &offer.admission {
         Admission::Allowed | Admission::Proposed { .. } => {}
         Admission::Bounded { .. } | Admission::Refused(_) => return None,
     }
@@ -407,24 +423,24 @@ pub fn note_ask(project: u32, note: &Note, act: ActKind, description: Text, body
         ActKind::DeleteNote => {
             Some(Ask::DeleteNote { project, note: note.number, scope: note.scope.clone(), revision: note.revision })
         }
-        ActKind::Write
+        ActKind::Message
         | ActKind::Answer
         | ActKind::Take
         | ActKind::HandBack
+        | ActKind::Withdraw
         | ActKind::Accept
         | ActKind::Reject
         | ActKind::PassUp
         | ActKind::Release
         | ActKind::LeaveHeld
         | ActKind::Amend
-        | ActKind::AmendRelease
         | ActKind::Stop
         | ActKind::Cancel
         | ActKind::Close
-        | ActKind::TakeOver
+        | ActKind::Move
         | ActKind::SetGoal
         | ActKind::Prioritise
-        | ActKind::MarkSeen
+        | ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy
         | ActKind::SetRoles
@@ -451,7 +467,7 @@ fn amend(confirmation: &Confirmation, fields: &Fields, project: u32, task: u64) 
     let change = Box::new(choices.change.clone()?);
     let revision = Some(confirmation.revision?);
     let reason = words(fields, Purpose::Reason)?;
-    if confirmation.act == ActKind::AmendRelease {
+    if choices.release {
         Some(releasing(
             project,
             task,

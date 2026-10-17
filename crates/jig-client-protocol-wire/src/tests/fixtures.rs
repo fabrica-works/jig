@@ -2,12 +2,14 @@
 mod delivery_values;
 mod read_values;
 mod stream;
+mod task_values;
 use crate::*;
 use alloc::boxed::Box;
 pub use delivery_values::delivery_values;
 pub use read_values::read_values;
 use skein_lib::{List, Overflow, Writer};
 pub use stream::*;
+pub use task_values::task;
 
 pub fn limits() -> Limits {
     limits_with_activity_bytes(CEILINGS.activity_page_rows)
@@ -364,69 +366,6 @@ pub fn owner_wake_policy(limits: &Limits) -> OwnerWakePolicy {
     .expect("bounded owner_wake_policy")
 }
 
-pub fn document_specification(limits: &Limits) -> DocumentSpecification {
-    DocumentSpecification::new(
-        limits,
-        DocumentSpecificationParts {
-            words: document_text(limits),
-            parameters: List::with_capacity(0),
-            inputs: List::with_capacity(0),
-        },
-    )
-    .expect("bounded document_specification")
-}
-
-pub fn specification_document(limits: &Limits) -> SpecificationDocument {
-    SpecificationDocument::new(
-        limits,
-        SpecificationDocumentParts { specification: document_specification(limits), cut: true },
-    )
-    .expect("bounded specification_document")
-}
-
-pub fn subscriptions(limits: &Limits) -> Subscriptions {
-    Subscriptions::new(limits, SubscriptionsParts { entries: List::with_capacity(0) }).expect("bounded subscriptions")
-}
-
-pub fn task_contract_document_report(limits: &Limits) -> TaskContractDocumentReport {
-    TaskContractDocumentReport::new(limits, TaskContractDocumentReportParts { words: u32::MAX })
-        .expect("bounded task_contract_document_report")
-}
-
-pub fn owner_delegation(limits: &Limits) -> OwnerDelegation {
-    OwnerDelegation::new(
-        limits,
-        OwnerDelegationParts { kinds: List::with_capacity(0), tasks: u32::MAX, depth: u32::MAX },
-    )
-    .expect("bounded owner_delegation")
-}
-
-pub fn owner_authority(limits: &Limits) -> OwnerAuthority {
-    OwnerAuthority::new(
-        limits,
-        OwnerAuthorityParts {
-            tools: u64::MAX,
-            grants: Box::from([]),
-            delegation: owner_delegation(limits),
-            spend: u64::MAX,
-            deadline: None,
-            notes: u8::MAX,
-            note_resources: Box::from([]),
-        },
-    )
-    .expect("bounded owner_authority")
-}
-
-pub fn owner_authority_document(limits: &Limits) -> OwnerAuthorityDocument {
-    OwnerAuthorityDocument::new(limits, OwnerAuthorityDocumentParts { authority: owner_authority(limits), cut: true })
-        .expect("bounded owner_authority_document")
-}
-
-pub fn owner_requester_person(limits: &Limits) -> OwnerRequesterPerson {
-    OwnerRequesterPerson::new(limits, OwnerRequesterPersonParts { value: u64::MAX })
-        .expect("bounded owner_requester_person")
-}
-
 pub fn active_run(limits: &Limits) -> ActiveRun {
     ActiveRun::new(
         limits,
@@ -737,54 +676,6 @@ pub fn decode_chip_facts(limits: &Limits, bytes: &[u8]) -> List<Fact> {
         rows.push(fact).expect("bounded fact rows");
     }
     rows
-}
-
-pub fn task(limits: &Limits) -> Task {
-    let rows = chip_facts(limits, ChipPhaseFields::Starting);
-    Task::new(
-        limits,
-        TaskParts {
-            label: 0,
-            flags: TaskFlags::new(
-                limits,
-                TaskFlagsParts { conversation: false, listed: true, retention: Retention::Kept },
-            )
-            .expect("fixture flags"),
-            last_activity: 0,
-            waits_on: WaitsOn::Nothing,
-            chip: chip(limits, &rows),
-            goal: Some(u64::MAX),
-            priority: Some(u32::MAX),
-            lineage_chips: Box::from([]),
-            inputs: Box::from([]),
-            project: u32::MAX,
-            requester: OwnerRequester::Person(owner_requester_person(limits)),
-            lineage: List::with_capacity(0),
-            spec: specification_document(limits),
-            spec_revision: revision(limits),
-            person_revision: None,
-            taken_by: Some(u64::MAX),
-            instructions: Some(document_text(limits)),
-            wake: owner_wake_policy(limits),
-            subscriptions: subscriptions(limits),
-            result_contract: TaskContractDocument::Report(task_contract_document_report(limits)),
-            dependencies: Box::from([]),
-            references: Box::from([]),
-            cut: true,
-            resources: Box::from([]),
-            budget: owner_budget(limits),
-            authority: owner_authority_document(limits),
-            hold: None,
-            proposals: List::with_capacity(0),
-            activity: u64::MAX,
-            changed: u64::MAX,
-            acts: Box::from([]),
-            result: None,
-            delegates: Box::from([]),
-            context: None,
-        },
-    )
-    .expect("whole task")
 }
 
 pub fn not_served() -> NotServed {

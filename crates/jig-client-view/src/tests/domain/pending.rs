@@ -25,7 +25,7 @@ fn ready() -> (Fixture, Id<crate::objects::Object>, Handle) {
 }
 fn card(fixture: &mut Fixture) -> Id<crate::objects::Object> {
     let mut task = confirmation::task();
-    task.acts = one(Offered { act: ActKind::Stop, admission: Admission::Allowed });
+    task.acts = one(Offered { effect: None, act: ActKind::Stop, admission: Admission::Allowed });
     confirmation::install(fixture, crate::objects::Body::Task(Box::new(task)))
 }
 fn press(fixture: &mut Fixture, id: Id<crate::objects::Object>) -> Box<[Request]> {

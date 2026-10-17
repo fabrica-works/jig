@@ -24,10 +24,13 @@ pub(crate) mod tests {
     pub(crate) fn source() -> documents::Escalation {
         let mut task = task::tests::source();
         task.acts = List::with_capacity(client::MAX_OFFERED_ACTS);
-        task.acts.push(acts::Offered { act: acts::Act::Stop, admission: acts::Admission::Allowed }).expect("one act");
+        task.acts
+            .push(acts::Offered { effect: None, act: acts::Act::Stop, admission: acts::Admission::Allowed })
+            .expect("one act");
         let mut acts = List::with_capacity(client::MAX_OFFERED_ACTS);
         for act in [acts::Act::Release, acts::Act::PassUp, acts::Act::Release] {
-            acts.push(acts::Offered { act, admission: acts::Admission::Allowed }).expect("three outer acts");
+            acts.push(acts::Offered { effect: None, act, admission: acts::Admission::Allowed })
+                .expect("three outer acts");
         }
         documents::Escalation { acts, task: Box::new(task) }
     }

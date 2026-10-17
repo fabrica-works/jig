@@ -446,7 +446,7 @@ fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
     let id = domain.objects.name(ObjectKey::Task(8), Source::Window { number: 4 }).unwrap();
     let mut document = super::confirmation::task();
     document.acts = List::with_capacity(1);
-    document.acts.push(Offered { act: ActKind::Write, admission: Admission::Allowed }).unwrap();
+    document.acts.push(Offered { effect: None, act: ActKind::Message, admission: Admission::Allowed }).unwrap();
     assert!(domain.objects.put(ObjectKey::Task(8), crate::objects::Body::Task(Box::new(document))));
     domain.objects.get_mut(id).unwrap().project = Some(1);
     let submitted = submit_words(&mut domain, b"first");
@@ -459,7 +459,7 @@ fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
         crate::intents::send_card(
             &mut domain.ui,
             ObjectKey::Task(8),
-            ActKind::Write,
+            ActKind::Message,
             Box::new(Ask::Message { project: 1, task: 8, words: text(b"changed") }),
             &mut out,
             &domain.client
@@ -525,7 +525,7 @@ fn card_words(domain: &mut Fixture) -> Box<[Request]> {
         skein_lib::Time::ZERO,
         crate::tests::fixtures::CardAsk {
             object: ObjectKey::Task(8),
-            act: jig_client::contract::ActKind::Write,
+            act: jig_client::contract::ActKind::Message,
             ask: jig_client::contract::Ask::Message { project: 1, task: 8, words: text(b"program") },
         },
     )
@@ -711,7 +711,10 @@ fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_ed
                 let id = domain.objects.name(ObjectKey::Task(8), Source::Window { number: 4 }).unwrap();
                 let mut document = super::confirmation::task();
                 document.acts = List::with_capacity(1);
-                document.acts.push(Offered { act: ActKind::Write, admission: Admission::Allowed }).unwrap();
+                document
+                    .acts
+                    .push(Offered { effect: None, act: ActKind::Message, admission: Admission::Allowed })
+                    .unwrap();
                 assert!(domain.objects.put(ObjectKey::Task(8), crate::objects::Body::Task(Box::new(document))));
                 domain.objects.get_mut(id).unwrap().project = Some(1);
                 let request = submit_words(&mut domain, b"submitted");

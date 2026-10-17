@@ -126,7 +126,9 @@ pub(crate) fn started(domain: &mut Domain, env: &Env<Limits>, number: u64, attem
     }
 }
 
-pub(crate) fn run_attempt(phase: &Phase) -> Option<u64> {
+/// The claimed attempt whose answer this phase has not heard.
+#[must_use]
+pub fn run_attempt(phase: &Phase) -> Option<u64> {
     match phase {
         Phase::Active(Active::Claimed { attempt } | Active::Running { attempt })
         | Phase::Closing(Closing { stage: Stage::Run { attempt }, .. })

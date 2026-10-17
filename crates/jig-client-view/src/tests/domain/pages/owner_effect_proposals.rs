@@ -6,7 +6,7 @@ use skein_lib::Wall;
 
 fn proposal(proposer: Proposer, effect: u64) -> OwnerProposal {
     let mut acts = List::with_capacity(1);
-    acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+    acts.push(Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
     OwnerProposal {
         key: ProposalKey { proposer, number: 7 },
         project: 41,

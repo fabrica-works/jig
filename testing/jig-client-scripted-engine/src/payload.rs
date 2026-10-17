@@ -492,7 +492,7 @@ fields!(SpendLine { task, attempt, spent });
 impl Payload for ActKind {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Write
+            Self::Message
             | Self::Answer
             | Self::Take
             | Self::HandBack
@@ -502,21 +502,21 @@ impl Payload for ActKind {
             | Self::Release
             | Self::LeaveHeld
             | Self::Amend
-            | Self::AmendRelease
             | Self::Stop
             | Self::Cancel
             | Self::Close
-            | Self::TakeOver
+            | Self::Move
             | Self::SetGoal
             | Self::Prioritise
-            | Self::MarkSeen
+            | Self::Seen
             | Self::EditNote
             | Self::DeleteNote
             | Self::Adopt
             | Self::ChangePolicy
             | Self::SetRoles
             | Self::MakeService
-            | Self::SetPool => Some(0),
+            | Self::SetPool
+            | Self::Withdraw => Some(0),
         }
     }
 }
@@ -552,7 +552,8 @@ impl Payload for Beyond {
         }
     }
 }
-fields!(Offered { act, admission });
+fields!(Offered { act, admission, effect });
+plain!(jig_client_domain::contract::Effect, jig_client_domain::contract::ReleaseEffect);
 impl Payload for Recipient {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
@@ -904,7 +905,7 @@ impl Payload for Runtime {
         }
     }
 }
-fields!(Impact { tasks, live_runs, proposals, effects_pending, effects_settling, takeover_budget });
+fields!(Impact { tasks, live_runs, proposals });
 fields!(WriterSlot { resource, task, attempt });
 fields!(LiveDelegate { chip, takeover_budget });
 plain!(

@@ -66,8 +66,9 @@ pub(super) fn authority() -> Authority {
 }
 fn offered(act: ActKind) -> List<Offered> {
     list([
-        Offered { act, admission: Admission::Allowed },
+        Offered { effect: None, act, admission: Admission::Allowed },
         Offered {
+            effect: None,
             act: ActKind::PassUp,
             admission: Admission::Refused(Refusal::Authority {
                 lacking: Lacking::Budget { needed: 40, left: 12 },
@@ -126,7 +127,7 @@ fn result() -> Result {
         ending: Ending::Failed { reason: Some(text(b"whole failure")) },
         value: Some(ResultValue::Report(DocumentText::complete(text(b"whole report")))),
         at: Some(Wall::EPOCH),
-        acts: offered(ActKind::MarkSeen),
+        acts: offered(ActKind::Seen),
         details: None,
     }
 }
@@ -744,9 +745,6 @@ fn impact() -> Impact {
         tasks: PhaseCounts { ended: 0, waiting: 1, running: 2, held: 3, closing: 4, done: 5, failed: 6, cancelled: 7 },
         live_runs: 8,
         proposals: 9,
-        effects_pending: 10,
-        effects_settling: 11,
-        takeover_budget: 12,
     }
 }
 fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
@@ -757,6 +755,11 @@ fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
         revision: Revision { value: 4 },
         was: None,
     });
+    let release = match &reason {
+        HoldReason::Tries { .. } | HoldReason::Stopped { .. } | HoldReason::Stalled { .. } => ReleaseEffect::RunAgain,
+        HoldReason::EffectUncertain { .. } => ReleaseEffect::Uncertain,
+        _ => ReleaseEffect::Judged,
+    };
     Escalation {
         task,
         hold: Hold {
@@ -798,7 +801,7 @@ fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
             reason: text(b"previous holder reason"),
             lacking: None,
         }]),
-        acts: list(acts.iter().map(|act| Offered { act: *act, admission: Admission::Allowed })),
+        acts: offered_acts(acts, release),
         ending: None,
     }
 }
@@ -858,7 +861,7 @@ pub(super) fn task_doc(acts: &[ActKind]) -> Task {
         proposals: list([]),
         activity: 0,
         changed: Wall::EPOCH,
-        acts: list(acts.iter().map(|act| Offered { act: *act, admission: Admission::Allowed })),
+        acts: offered_acts(acts, ReleaseEffect::Judged),
         result: None,
         delegates: list([LiveDelegate { chip: chip(), takeover_budget: 13 }]),
 
@@ -881,7 +884,7 @@ fn escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_se
     words: &crate::words::Words,
 ) {
     use crate::confirmation::amendment::deadline;
-    use ActKind::{AmendRelease, Cancel, Release};
+    use ActKind::{Amend, Cancel, Release};
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
     let part = Part::Hold { connector: 2, task: 8 };
     let reasons = [
@@ -894,40 +897,36 @@ fn escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_se
                     at: Wall::EPOCH,
                 }]),
             },
-            vec![Release, AmendRelease, Cancel],
+            vec![Release, Amend, Cancel],
             b"attempt refusal".as_slice(),
         ),
         (
             HoldReason::Stalled { since: Wall::EPOCH, waiting: text(b"the person") },
-            vec![Release, AmendRelease, Cancel],
+            vec![Release, Amend, Cancel],
             b"the person".as_slice(),
         ),
         (
             HoldReason::Dependency { task: 9, how: Ending::Failed { reason: Some(text(b"dependency refusal")) } },
-            vec![AmendRelease, Cancel],
+            vec![Amend, Cancel],
             b"dependency refusal".as_slice(),
         ),
         (HoldReason::Drift { part: part.clone() }, vec![Release, Cancel], b"system changed".as_slice()),
         (HoldReason::EffectFailed { part: part.clone() }, vec![Release, Cancel], b"failed for good".as_slice()),
         (HoldReason::EffectUncertain { part: part.clone() }, vec![Release, Cancel], b"may or may not".as_slice()),
-        (HoldReason::Budget { spent: 10, limit: 10 }, vec![AmendRelease, Cancel], b"spent 10".as_slice()),
-        (HoldReason::Deadline { at: Wall::EPOCH }, vec![AmendRelease, Cancel], b"past deadline".as_slice()),
+        (HoldReason::Budget { spent: 10, limit: 10 }, vec![Amend, Cancel], b"spent 10".as_slice()),
+        (HoldReason::Deadline { at: Wall::EPOCH }, vec![Amend, Cancel], b"past deadline".as_slice()),
         (
             HoldReason::Stopped { by: super::cards::party(), at: Wall::EPOCH },
-            vec![Release, AmendRelease, Cancel],
+            vec![Release, Amend, Cancel],
             b"stopped by Pat".as_slice(),
         ),
         (
             HoldReason::Resource { resource: part.clone(), holder: Actor::Task(9) },
-            vec![Release, AmendRelease, Cancel],
+            vec![Release, Amend, Cancel],
             b"past its bound".as_slice(),
         ),
         (HoldReason::Pool { part: part.clone() }, vec![Release, Cancel], b"pool lost".as_slice()),
-        (
-            HoldReason::Procedure { part: part.clone() },
-            vec![Release, AmendRelease, Cancel],
-            b"procedure needs".as_slice(),
-        ),
+        (HoldReason::Procedure { part: part.clone() }, vec![Release, Amend, Cancel], b"procedure needs".as_slice()),
     ];
     for (reason, acts, expected) in reasons {
         escalation_row_scenario(reason, &acts, expected, words, &mut bindings);
@@ -943,35 +942,42 @@ fn escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_se
     assert!(deadline(b"9999-12-31 00:00").is_none());
 }
 fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBindings) {
-    for act in [
-        ActKind::Write,
-        ActKind::Take,
-        ActKind::HandBack,
-        ActKind::Release,
-        ActKind::LeaveHeld,
-        ActKind::Amend,
-        ActKind::AmendRelease,
-        ActKind::Stop,
-        ActKind::Cancel,
-        ActKind::Close,
-        ActKind::TakeOver,
-        ActKind::Prioritise,
-        ActKind::SetGoal,
-        ActKind::MarkSeen,
-        ActKind::Adopt,
-        ActKind::ChangePolicy,
-        ActKind::SetRoles,
-        ActKind::MakeService,
-        ActKind::SetPool,
+    for (act, composed) in [
+        (ActKind::Message, false),
+        (ActKind::Take, false),
+        (ActKind::HandBack, false),
+        (ActKind::Release, false),
+        (ActKind::LeaveHeld, false),
+        (ActKind::Amend, false),
+        (ActKind::Amend, true),
+        (ActKind::Stop, false),
+        (ActKind::Cancel, false),
+        (ActKind::Close, false),
+        (ActKind::Move, false),
+        (ActKind::Prioritise, false),
+        (ActKind::SetGoal, false),
+        (ActKind::Seen, false),
+        (ActKind::Adopt, false),
+        (ActKind::ChangePolicy, false),
+        (ActKind::SetRoles, false),
+        (ActKind::MakeService, false),
+        (ActKind::SetPool, false),
     ] {
         let task = task_doc(&[act]);
         let (mut d, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(task)));
-        drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act } });
+        let action = if composed {
+            Action::AmendRelease { object: id.token() }
+        } else {
+            Action::Intend { object: id.token(), act }
+        };
+        drive(&mut d, Event::Act { action });
         let tree = dialog(&d, words, bindings);
-        assert!(contains(&tree, &words.say(cards::common::act_phrase(act), &[])));
+        let phrase =
+            if composed { crate::phrases::jig::JigPhrase::ActAmendRelease } else { cards::common::act_phrase(act) };
+        assert!(contains(&tree, &words.say(phrase, &[])));
         if act == ActKind::Cancel {
             assert!(contains(&tree, b"Dangerous action"));
-            assert!(contains(&tree, b"11 begun effects will settle"));
+            assert!(contains(&tree, b"Effects not yet begun will be withdrawn; begun effects will settle"));
             assert!(tree.nodes().iter().any(|n| n.role == Role::Button
                 && n.styles.as_slice().contains(&crate::JigStyle::Danger.token())
                 && n.states.as_slice().contains(&State::Disabled)));
@@ -995,7 +1001,7 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
     }
     for act in [ActKind::Accept, ActKind::Reject, ActKind::PassUp] {
         let mut p = proposal(ProposalAction::Batch { tasks: list([]), own: true });
-        p.acts = list([Offered { act, admission: Admission::Proposed { to: Recipient::Task(2) } }]);
+        p.acts = list([Offered { effect: None, act, admission: Admission::Proposed { to: Recipient::Task(2) } }]);
         let (mut d, id) = loaded(ObjectKey::Proposal(p.key), ReadValue::Proposal(Box::new(p)));
         drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act } });
         let tree = dialog(&d, words, bindings);
@@ -1079,6 +1085,7 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
         recurring: list([]),
         parts: list([]),
         acts: list([Offered {
+            effect: None,
             act: ActKind::SetGoal,
             admission: Admission::Proposed { to: Recipient::Role { project: 4, role: 2 } },
         }]),
@@ -1203,7 +1210,12 @@ fn escalation_row_scenario(
                 && n.name.as_deref() == Some(&words.say(cards::common::act_phrase(*act), &[])))
         );
     }
-    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: acts[0] } });
+    let action = if acts[0] == ActKind::Amend {
+        Action::AmendRelease { object: id.token() }
+    } else {
+        Action::Intend { object: id.token(), act: acts[0] }
+    };
+    drive(&mut d, Event::Act { action });
     let tree = dialog(&d, words, bindings);
     assert!(tree.nodes().iter().any(|n| n.role == Role::Dialog && n.name.is_some()));
     if match row.hold.reason {
@@ -1226,7 +1238,7 @@ fn escalation_row_scenario(
             _ => false,
         }));
     }
-    if acts[0] == ActKind::AmendRelease {
+    if acts[0] == ActKind::Amend {
         assert!(contains(&tree, b"held specification"));
         assert!(contains(&tree, b"Hold revision 4"));
         assert_eq!(d.confirmation().unwrap().release_revision, Some(Revision { value: 4 }));
@@ -1262,7 +1274,7 @@ fn escalation_row_scenario(
     if expected == b"spent 10" {
         let initial_writes = d.confirmation().unwrap().writes;
         drive(&mut d, Event::Act { action: Action::Dismiss });
-        drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut d, Event::Act { action: Action::AmendRelease { object: id.token() } });
         drive(&mut d, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         assert!(d.confirmation().unwrap().writes > initial_writes);
         let tree = dialog(&d, words, bindings);
@@ -2017,3 +2029,6 @@ fn moved_effect_facts_say_the_supplied_connector_proposal_without_inventing_a_ma
 const UTF8_TEXTS: [&[u8]; 1] = [b"\0~\x01"];
 
 use jig_client::contract::DecideOn;
+
+mod effect_fixtures;
+use effect_fixtures::offered_acts;

@@ -495,7 +495,7 @@ record OwnerTaskLinkRetained { chip: Chip at: option u64 }
 record OwnerTaskLinkStored { number: u64 status: option OwnerTaskStatus }
 enum OwnerTaskLink { live: OwnerTaskLinkLive, retained: OwnerTaskLinkRetained, stored: OwnerTaskLinkStored }
 record ResultDetails { contract: TaskContractDocument requester: OwnerRequester executor: OwnerExecutor chosen_by: option u64 delegates: bytes 16777216 followups: option bytes 16777216 proposal: option ProposalKey cut: bool }
-enum ActKind { write, answer, take, hand_back, accept, reject, pass_up, release, leave_held, amend, amend_release, stop, cancel, close, take_over, set_goal, prioritise, mark_seen, edit_note, delete_note, adopt, change_policy, set_roles, make_service, set_pool }
+enum ActKind { message, answer, take, hand_back, accept, reject, pass_up, release, leave_held, amend, stop, cancel, close, move_task, set_goal, prioritise, seen, edit_note, delete_note, adopt, change_policy, set_roles, make_service, set_pool, withdraw }
 record CreateProcedure { connector: u16 code: u32 }
 record OwnerKindImplication { connector: u16 kind: u16 implies: u16 }
 record OwnerAuthorityDocument { authority: OwnerAuthority cut: bool }
@@ -509,7 +509,13 @@ record AdmissionProposed { to: Recipient }
 record AdmissionBounded { within: Bounds beyond: Beyond }
 record AdmissionRefused { value: Refusal }
 enum Admission { allowed, proposed: AdmissionProposed, bounded: boxed AdmissionBounded, refused: AdmissionRefused }
-record Offered { act: ActKind admission: Admission }
+record PhaseCounts { ended: u32 waiting: u32 running: u32 held: u32 closing: u32 done: u32 failed: u32 cancelled: u32 }
+record Impact { tasks: PhaseCounts live_runs: u32 proposals: u32 }
+enum ReleaseEffect { judged, run_again, uncertain }
+record EffectRelease { what: ReleaseEffect }
+record EffectMove { reservation: u64 }
+enum Effect { release: EffectRelease, cancel: Impact, move_task: EffectMove }
+record Offered { act: ActKind admission: Admission effect: option Effect }
 record ResultDocument { task: Chip ending: Ending value: option ResultValue at: option u64 details: option ResultDetails acts: bytes 16777216 }
 record ObjectKeyTask { value: u64 }
 record ObjectKeyProposal { value: ProposalKey }
@@ -631,8 +637,6 @@ record MeProject { project: u32 name: option DocumentText role: HeldRole pool: o
 record Charter { number: u32 name: option DocumentText }
 record OfferedCharters { project: u32 chats: list 4 Charter goals: list 4 Charter cut: bool }
 record Me { party: MeParty projects: bytes 16777216 needs: Needs needs_total: u32 updates: Count results_seen: u64 charters: bytes 16777216 cut: bool retention: duration deployment_role: option HeldRole }
-record PhaseCounts { ended: u32 waiting: u32 running: u32 held: u32 closing: u32 done: u32 failed: u32 cancelled: u32 }
-record Impact { tasks: PhaseCounts live_runs: u32 proposals: u32 effects_pending: u32 effects_settling: u32 takeover_budget: u64 }
 record WriterSlot { resource: Part task: u64 attempt: option u64 }
 record LiveDelegate { chip: Chip takeover_budget: u64 }
 record Steering { addressed: option Recipient person_revision: option Revision taken_by: option u64 revision: Revision spec: SpecificationDocument instructions: option DocumentText wake: OwnerWakePolicy dependencies: list 32 u64 authority: OwnerAuthorityDocument budget: Budget }

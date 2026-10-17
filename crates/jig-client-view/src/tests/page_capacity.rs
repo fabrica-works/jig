@@ -246,6 +246,7 @@ fn task_pages(words: &Words) {
 
 fn goal_offers(doc: &mut Project) {
     doc.acts = list([Offered {
+        effect: None,
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
             within: Bounds::Create(CreateBounds {
@@ -721,8 +722,8 @@ fn fill_notes(d: &mut Fixture, read: jig_client::Handle) {
         tasks: list([8, 9]),
         changed: Some(Wall::EPOCH),
         acts: list([
-            Offered { act: ActKind::EditNote, admission: Admission::Allowed },
-            Offered { act: ActKind::DeleteNote, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::EditNote, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::DeleteNote, admission: Admission::Allowed },
         ]),
         cut: false,
     };

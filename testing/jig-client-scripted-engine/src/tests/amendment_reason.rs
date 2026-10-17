@@ -41,7 +41,7 @@ fn whole_amendment_request_prices_full_reason_and_rejects_text_or_document_overf
 fn durable_amendment_key_replay_keeps_reason_and_changed_reason_is_a_conflict() {
     let mut setup = script();
     let mut row = task();
-    row.acts = list(vec![Offered { act: ActKind::Amend, admission: Admission::Allowed }]);
+    row.acts = list(vec![Offered { effect: None, act: ActKind::Amend, admission: Admission::Allowed }]);
     setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
     let ask = amendment(UTF8_TEXTS[2]);
     let mut engine = Engine::new(setup, 1).unwrap();

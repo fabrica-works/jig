@@ -19,6 +19,7 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
         context.writer_slots =
             list([WriterSlot { resource: reference.clone(), task: u64::MAX, attempt: Some(u64::MAX) }]);
         context.impact.tasks.running = u32::MAX;
+        row.acts.get_mut(0).unwrap().effect = if present { Some(Effect::Cancel(context.impact)) } else { None };
         if !present {
             row.context = None;
         }

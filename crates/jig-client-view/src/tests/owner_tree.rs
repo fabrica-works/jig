@@ -310,7 +310,7 @@ fn owner_tree_departure_keeps_a_separately_named_deciding_card_until_its_answer_
             })
             .unwrap();
     let mut acts = List::with_capacity(1);
-    acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+    acts.push(Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
     let proposal = OwnerProposal {
         key,
         project: 4,

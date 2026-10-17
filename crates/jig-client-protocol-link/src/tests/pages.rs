@@ -82,9 +82,11 @@ fn a_escalation_record_becomes_its_literal_contract_value() {
 fn owner_escalation_acts_fit_the_contract_bound() {
     let mut limits = fixtures::limits();
     limits.client.rows = 32;
-    let offered =
-        w::Offered::new(&limits.wire, w::OfferedParts { act: w::ActKind::Accept, admission: w::Admission::Allowed })
-            .unwrap();
+    let offered = w::Offered::new(
+        &limits.wire,
+        w::OfferedParts { effect: None, act: w::ActKind::Accept, admission: w::Admission::Allowed },
+    )
+    .unwrap();
     let mut encoded = skein_lib::Writer::new(usize::try_from(offered.measure()).unwrap());
     offered.encode(&mut encoded).unwrap();
     let encoded = encoded.finish();
@@ -373,4 +375,24 @@ fn a_task_page_decodes_its_two_groups_with_their_cursors() {
     assert_eq!(rows.len(), 0);
     assert_eq!(after.as_ref().unwrap().value.bytes(), b"ended");
     assert!(cut);
+}
+
+#[test]
+fn an_offer_decodes_the_effect_with_its_counts_or_reservation() {
+    let limits = fixtures::limits();
+    let mut impact = fixtures::read_wire_impact().into_parts();
+    impact.live_runs = 11;
+    impact.proposals = 13;
+    let effect = w::Effect::Cancel(w::Impact::new(&limits.wire, impact).unwrap());
+    let value = w::Offered::new(
+        &limits.wire,
+        w::OfferedParts { act: w::ActKind::Cancel, admission: w::Admission::Allowed, effect: Some(effect) },
+    )
+    .unwrap();
+    let value = translate::documents::offered_fields(&value, &limits).unwrap();
+    let Some(c::Effect::Cancel(impact)) = value.effect else { panic!("cancel effect") };
+    assert_eq!((impact.live_runs, impact.proposals), (11, 13));
+    assert_eq!(impact.tasks, fixtures::read_value_impact().tasks);
+    let effect = w::Effect::MoveTask(w::EffectMove::new(&limits.wire, w::EffectMoveParts { reservation: 17 }).unwrap());
+    assert_eq!(translate::documents::effect_fields(&effect, &limits), c::Effect::Move { reservation: 17 });
 }

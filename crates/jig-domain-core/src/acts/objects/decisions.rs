@@ -16,6 +16,15 @@ pub(crate) fn proposal(
     match proposer {
         documents::Proposer::Party(person) => {
             let row = core.tasks.person_proposal(person, number).ok_or(people::Refusal::Unknown)?;
+            if act == Act::Withdraw {
+                return match row.state {
+                    tasks::PersonProposalState::Pending { .. } if person == party => Ok(()),
+                    tasks::PersonProposalState::Pending { .. }
+                    | tasks::PersonProposalState::Accepted { .. }
+                    | tasks::PersonProposalState::Rejected { .. }
+                    | tasks::PersonProposalState::Withdrawn { .. } => Err(people::Refusal::NotOffered),
+                };
+            }
             let role = core.people.role(party, row.project);
             core.goal_standing(&row, row.project, role)?;
             match &row.state {
@@ -44,21 +53,21 @@ pub(crate) fn proposal(
                 }
                 Act::Reject => Ok(()),
                 Act::PassUp => Err(people::Refusal::NoFurther),
-                Act::Write
+                Act::Withdraw
+                | Act::Message
                 | Act::Answer
                 | Act::Take
                 | Act::HandBack
                 | Act::Release
                 | Act::LeaveHeld
                 | Act::Amend
-                | Act::AmendRelease
                 | Act::Stop
                 | Act::Cancel
                 | Act::Close
-                | Act::TakeOver
+                | Act::Move
                 | Act::SetGoal
                 | Act::Prioritise
-                | Act::MarkSeen
+                | Act::Seen
                 | Act::EditNote
                 | Act::DeleteNote
                 | Act::Adopt
@@ -107,21 +116,21 @@ pub(crate) fn proposal(
                     tasks::ProposalHolder::Policy { .. } => Err(people::Refusal::NoFurther),
                     tasks::ProposalHolder::Task(_) => unreachable!("party standing checked"),
                 },
-                Act::Write
+                Act::Withdraw
+                | Act::Message
                 | Act::Answer
                 | Act::Take
                 | Act::HandBack
                 | Act::Release
                 | Act::LeaveHeld
                 | Act::Amend
-                | Act::AmendRelease
                 | Act::Stop
                 | Act::Cancel
                 | Act::Close
-                | Act::TakeOver
+                | Act::Move
                 | Act::SetGoal
                 | Act::Prioritise
-                | Act::MarkSeen
+                | Act::Seen
                 | Act::EditNote
                 | Act::DeleteNote
                 | Act::Adopt
@@ -170,21 +179,21 @@ pub(crate) fn escalation(
                 Err(people::Refusal::NoFurther)
             }
         }
-        Act::Write
+        Act::Message
         | Act::Answer
         | Act::Take
         | Act::HandBack
+        | Act::Withdraw
         | Act::Accept
         | Act::Reject
         | Act::Amend
-        | Act::AmendRelease
         | Act::Stop
         | Act::Cancel
         | Act::Close
-        | Act::TakeOver
+        | Act::Move
         | Act::SetGoal
         | Act::Prioritise
-        | Act::MarkSeen
+        | Act::Seen
         | Act::EditNote
         | Act::DeleteNote
         | Act::Adopt

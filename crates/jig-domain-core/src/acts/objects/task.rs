@@ -15,8 +15,8 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
         return Admission::Refused(why);
     }
     match act {
-        Act::Write => allowed(write(core, limits, party, number)),
-        Act::Amend | Act::AmendRelease => {
+        Act::Message => allowed(write(core, limits, party, number)),
+        Act::Amend => {
             let admission = bounds::amend(core, limits, party, number, held);
             if let Admission::Refused(_) = admission {
                 return admission;
@@ -24,15 +24,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
             if let Err(why) = mutable(row) {
                 return Admission::Refused(why);
             }
-            if act == Act::AmendRelease {
-                match row.phase {
-                    tasks::Phase::Held { .. } => {}
-                    tasks::Phase::Waiting
-                    | tasks::Phase::Active(_)
-                    | tasks::Phase::Closing(_)
-                    | tasks::Phase::Ended(_) => return Admission::Refused(people::Refusal::NotWaiting),
-                }
-            }
+
             admission
         }
         Act::Stop | Act::Cancel | Act::Release => {
@@ -47,21 +39,21 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
                     revision: row.revisions.hold,
                     again: None,
                 },
-                Act::Write
+                Act::Message
                 | Act::Answer
                 | Act::Take
                 | Act::HandBack
+                | Act::Withdraw
                 | Act::Accept
                 | Act::Reject
                 | Act::PassUp
                 | Act::LeaveHeld
                 | Act::Amend
-                | Act::AmendRelease
                 | Act::Close
-                | Act::TakeOver
+                | Act::Move
                 | Act::SetGoal
                 | Act::Prioritise
-                | Act::MarkSeen
+                | Act::Seen
                 | Act::EditNote
                 | Act::DeleteNote
                 | Act::Adopt
@@ -97,11 +89,11 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
             }
             Admission::Allowed
         }
-        Act::TakeOver => {
+        Act::Move => {
             allowed(core.move_admit(party, held, row.project, number, limits.tasks.tree_tasks, limits.tasks.depth))
         }
         Act::Close => allowed(close(core, party, row)),
-        Act::MarkSeen => {
+        Act::Seen => {
             if core.conversation_requester(row) == Some(party) && held.is_some() {
                 Admission::Allowed
             } else {
@@ -112,6 +104,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
         Act::Answer
         | Act::Take
         | Act::HandBack
+        | Act::Withdraw
         | Act::Accept
         | Act::Reject
         | Act::PassUp
@@ -139,7 +132,7 @@ pub(crate) fn write_in(
 ) -> Result<(), people::Refusal> {
     let row = admission.task(number).ok_or(people::Refusal::Unknown)?;
     let held = core.people.role(party, row.project);
-    standing::role(core, row.project, held, Act::Write)?;
+    standing::role(core, row.project, held, Act::Message)?;
     let any = match held {
         Some(people::Role::Owner | people::Role::Maintainer) => true,
         Some(people::Role::Policy { role: number }) => match core.authority.role(row.project, number) {
@@ -256,21 +249,21 @@ pub(crate) fn person(
                 Err(people::Refusal::Limit { which: people::LimitKind::LiveDelegates })
             }
         }
-        Act::Write
+        Act::Message
+        | Act::Withdraw
         | Act::Accept
         | Act::Reject
         | Act::PassUp
         | Act::Release
         | Act::LeaveHeld
         | Act::Amend
-        | Act::AmendRelease
         | Act::Stop
         | Act::Cancel
         | Act::Close
-        | Act::TakeOver
+        | Act::Move
         | Act::SetGoal
         | Act::Prioritise
-        | Act::MarkSeen
+        | Act::Seen
         | Act::EditNote
         | Act::DeleteNote
         | Act::Adopt

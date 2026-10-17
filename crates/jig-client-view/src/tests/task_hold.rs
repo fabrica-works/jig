@@ -40,6 +40,7 @@ fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repe
                 };
                 let mut row = task_doc(&[ActKind::Release]);
                 row.hold = Some(TaskHold::Owner(Box::new(held.clone())));
+                row.acts.get_mut(0).unwrap().effect = None;
                 let (mut domain, id, _) = loaded_with_watch(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
                 drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Release } });
                 let envelope = limits();

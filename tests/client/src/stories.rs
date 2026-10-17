@@ -218,7 +218,7 @@ pub fn task() -> Task {
         proposals: list([]),
         activity: 0,
         changed: Wall::EPOCH,
-        acts: list([Offered { act: ActKind::Write, admission: Admission::Allowed }]),
+        acts: list([Offered { effect: None, act: ActKind::Message, admission: Admission::Allowed }]),
         result: None,
         delegates: list([]),
 
@@ -241,9 +241,6 @@ pub fn task() -> Task {
                 },
                 live_runs: 0,
                 proposals: 0,
-                effects_pending: 0,
-                effects_settling: 0,
-                takeover_budget: 0,
             },
             writer_slots: list([]),
         })),
@@ -367,7 +364,7 @@ pub fn project() -> Project {
         ]),
         recurring: list([recurring.clone(), Recurring { key: 2, ..recurring }]),
         parts: list([part.clone(), part]),
-        acts: list([Offered { act: ActKind::SetGoal, admission: Admission::Allowed }]),
+        acts: list([Offered { effect: None, act: ActKind::SetGoal, admission: Admission::Allowed }]),
     }
 }
 /// Full bounded deployment facts for every capacity panel.
@@ -423,7 +420,7 @@ pub fn proposal() -> Proposal {
         waiting: Recipient::Party(7),
         trail: list([]),
         since: Wall::EPOCH,
-        acts: list([Offered { act: ActKind::Accept, admission: Admission::Allowed }]),
+        acts: list([Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }]),
         ending: None,
     }
 }
@@ -661,7 +658,7 @@ pub fn held_chat(seed: u64) -> World<Test, Scripted> {
     held.chip.details =
         Box::new(ChipPhase::Held { reason, since: Wall::EPOCH, revision: Revision { value: 4 }, was: None });
     held.context.as_mut().expect("supplied task context").runtime = Runtime::Held { was: None };
-    held.acts = list([Offered { act: ActKind::Release, admission: Admission::Allowed }]);
+    held.acts = list([Offered { effect: None, act: ActKind::Release, admission: Admission::Allowed }]);
     world
         .front()
         .engine
@@ -695,6 +692,7 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
     let mut world = world(seed);
     let mut doc = project();
     doc.acts = list([Offered {
+        effect: None,
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
             within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
@@ -753,6 +751,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
         .expect("procedure-only frame fits");
     let mut doc = project();
     doc.acts = list([Offered {
+        effect: None,
         act: ActKind::SetGoal,
         admission: Admission::Bounded {
             within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {

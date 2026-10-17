@@ -136,6 +136,7 @@ impl JigBindings {
                         }
                         crate::action::Act::Edit { .. }
                         | crate::action::Act::Submit { .. }
+                        | crate::action::Act::AmendRelease { .. }
                         | crate::action::Act::Intend { .. }
                         | crate::action::Act::Choose { .. }
                         | crate::action::Act::CannotDo

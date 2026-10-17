@@ -214,11 +214,7 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
         act,
         object: id,
         revision,
-        release_revision: if act == ActKind::AmendRelease || act == ActKind::Write {
-            acts::hold_revision(&object)
-        } else {
-            None
-        },
+        release_revision: if act == ActKind::Message { acts::hold_revision(&object) } else { None },
         release_changed: false,
         reason_input: ReasonInput::Missing,
         choices,
@@ -237,7 +233,7 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
 pub(crate) fn edited(domain: &mut Ui, field: Purpose) {
     if field == Purpose::Reason
         && let Some(open) = domain.confirming.as_mut()
-        && (open.act == ActKind::Amend || open.act == ActKind::AmendRelease)
+        && open.act == ActKind::Amend
     {
         open.reason_input = ReasonInput::Supplied;
     }
@@ -253,7 +249,7 @@ pub(crate) fn sync(domain: &mut Ui, lent: &jig_client::Client) {
         return;
     };
     let now = acts::revision(&object, open.act);
-    let hold_now = if open.act == ActKind::AmendRelease || open.act == ActKind::Write {
+    let hold_now = if (open.act == ActKind::Amend && open.choices.release) || open.act == ActKind::Message {
         acts::hold_revision(&object)
     } else {
         None
@@ -416,12 +412,18 @@ fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
 }
 
 fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
+    if open.act == ActKind::Amend
+        && open.choices.release
+        && let Admission::Refused(why) = acts::offered(object, ActKind::Release)
+    {
+        return Admission::Refused(why);
+    }
     let offer = acts::offered(object, open.act);
     let Some(change) = &open.choices.change else {
         return offer;
     };
     match open.act {
-        ActKind::Amend | ActKind::AmendRelease => {
+        ActKind::Amend => {
             let before = match &object.body {
                 Some(Body::Task(document)) => &document.authority,
                 Some(Body::OwnerEscalation(document)) => &document.task.authority,
@@ -441,7 +443,8 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
             };
             jig_client::contract::admission::amendment(&offer, change, before)
         }
-        ActKind::Write
+        ActKind::Withdraw
+        | ActKind::Message
         | ActKind::Answer
         | ActKind::Take
         | ActKind::HandBack
@@ -453,10 +456,10 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
         | ActKind::Stop
         | ActKind::Cancel
         | ActKind::Close
-        | ActKind::TakeOver
+        | ActKind::Move
         | ActKind::SetGoal
         | ActKind::Prioritise
-        | ActKind::MarkSeen
+        | ActKind::Seen
         | ActKind::EditNote
         | ActKind::DeleteNote
         | ActKind::Adopt
@@ -512,12 +515,12 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
         return owner_answer_missing(domain, open, document);
     }
     let field = match open.act {
-        ActKind::Reject | ActKind::LeaveHeld | ActKind::Cancel | ActKind::TakeOver => Some(Purpose::Reason),
+        ActKind::Reject | ActKind::LeaveHeld | ActKind::Cancel | ActKind::Move => Some(Purpose::Reason),
         ActKind::Answer => match answer_field(open, object) {
             Ok(field) => field,
             Err(missing) => return Some(missing),
         },
-        ActKind::Write => {
+        ActKind::Message => {
             let task = match object.key {
                 ObjectKey::Task(task) => task,
                 ObjectKey::Proposal(_)
@@ -535,18 +538,7 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
             }
             None
         }
-        ActKind::Amend | ActKind::AmendRelease => {
-            if open.choices.change.is_none() {
-                return Some(Missing::Change);
-            }
-            if open.act == ActKind::AmendRelease && open.release_revision.is_none() {
-                return Some(Missing::Refused { why: Refusal::NotOffered });
-            }
-            if open.reason_input == ReasonInput::Missing || domain.fields.get(Purpose::Reason).is_none() {
-                return Some(Missing::Words { field: Purpose::Reason });
-            }
-            None
-        }
+        ActKind::Amend => return amendment_missing(domain, open),
         ActKind::Close => {
             if let Some(missing) = delegates_missing(open, object) {
                 return Some(missing);
@@ -559,9 +551,13 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
             }
             None
         }
-        ActKind::Take | ActKind::HandBack | ActKind::Accept | ActKind::PassUp | ActKind::Stop | ActKind::DeleteNote => {
-            None
-        }
+        ActKind::Take
+        | ActKind::HandBack
+        | ActKind::Accept
+        | ActKind::PassUp
+        | ActKind::Stop
+        | ActKind::DeleteNote
+        | ActKind::Withdraw => None,
         ActKind::EditNote => {
             if let Some(Body::Note { document, .. }) = &object.body
                 && (document.cut || document.description.cut || document.body.cut)
@@ -577,7 +573,7 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
             None
         }
         ActKind::SetGoal
-        | ActKind::MarkSeen
+        | ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy
         | ActKind::SetRoles
@@ -645,7 +641,7 @@ pub(crate) fn change(domain: &mut Ui, change: Amendment) {
 /// Records whether the one write also releases the held task.
 pub(crate) fn write_release(domain: &mut Ui, release: bool) {
     if let Some(open) = &mut domain.confirming
-        && open.act == ActKind::Write
+        && open.act == ActKind::Message
     {
         open.choices.release = release;
         domain.changed();
@@ -682,4 +678,38 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client:
     } else if let Some(open) = &mut domain.confirming {
         open.missing = Some(Missing::Refused { why: Refusal::Limit { which: Limit::Requests } });
     }
+}
+
+/// Open the composition of two independently offered operations.
+pub(crate) fn amend_release(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, lent: &jig_client::Client) {
+    let hold = {
+        let Some(object) = domain.borrow(lent).objects().get(id) else { return };
+        if let Admission::Refused(_) = acts::offered(&object, ActKind::Release) {
+            return;
+        }
+        acts::hold_revision(&object)
+    };
+    let Some(hold) = hold else { return };
+    open(domain, env, id, ActKind::Amend, lent);
+    if let Some(open) = domain.confirming.as_mut()
+        && open.object == id
+        && open.act == ActKind::Amend
+    {
+        open.choices.release = true;
+        open.release_revision = Some(hold);
+    }
+    sync(domain, lent);
+}
+
+fn amendment_missing(domain: &Ui, open: &Confirmation) -> Option<Missing> {
+    if open.choices.change.is_none() {
+        return Some(Missing::Change);
+    }
+    if open.choices.release && open.release_revision.is_none() {
+        return Some(Missing::Refused { why: Refusal::NotOffered });
+    }
+    if open.reason_input == ReasonInput::Missing || domain.fields.get(Purpose::Reason).is_none() {
+        return Some(Missing::Words { field: Purpose::Reason });
+    }
+    None
 }

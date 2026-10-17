@@ -41,18 +41,21 @@ fn only_send(rows: &[Request]) -> (jig_client::Key, &Ask) {
 }
 fn steering_document(act: ActKind) -> Task {
     let mut document = task();
-    document.acts = List::with_capacity(1);
-    document.acts.push(Offered { act, admission: Admission::Allowed }).unwrap();
+    document.acts = List::with_capacity(2);
+    document.acts.push(Offered { effect: None, act, admission: Admission::Allowed }).unwrap();
+    if act == ActKind::Amend {
+        document.acts.push(Offered { effect: None, act: ActKind::Release, admission: Admission::Allowed }).unwrap();
+    }
     document
 }
 #[test]
 fn steering_sends_one_ask_with_each_choice_and_amend_release_is_atomic() {
     for act in [
-        ActKind::Write,
+        ActKind::Message,
         ActKind::Stop,
         ActKind::Cancel,
-        ActKind::TakeOver,
-        ActKind::AmendRelease,
+        ActKind::Move,
+        ActKind::Amend,
         ActKind::Prioritise,
         ActKind::Release,
     ] {
@@ -63,7 +66,7 @@ fn steering_sends_one_ask_with_each_choice_and_amend_release_is_atomic() {
             hold.reason = HoldReason::EffectUncertain { part: Part::Kind { connector: 1, kind: 2 } };
         }
         let id = install(&mut domain, document);
-        if act == ActKind::Write {
+        if act == ActKind::Message {
             assert!(edit(&mut domain, 8, b"wake up").is_empty());
             assert!(
                 drive(
@@ -73,6 +76,8 @@ fn steering_sends_one_ask_with_each_choice_and_amend_release_is_atomic() {
                 )
                 .is_empty()
             );
+        } else if act == ActKind::Amend {
+            intend_amend_release(&mut domain, id);
         } else {
             intend(&mut domain, id, act);
         }
@@ -84,7 +89,7 @@ fn steering_sends_one_ask_with_each_choice_and_amend_release_is_atomic() {
 }
 fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
     match act {
-        ActKind::Write => {
+        ActKind::Message => {
             drive(domain, Time::ZERO, Event::Act { action: Act::WriteRelease { release: true } });
             crate::tests::fixtures::releasing(
                 Ask::Message { project: 1, task: 8, words: text(b"wake up") },
@@ -92,7 +97,7 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
             )
         }
         ActKind::Stop => Ask::Stop { project: 1, task: 8 },
-        ActKind::Cancel | ActKind::TakeOver => {
+        ActKind::Cancel | ActKind::Move => {
             drive(domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"why") } });
             if act == ActKind::Cancel {
                 Ask::Cancel { project: 1, task: 8, reason: text(b"why"), grace: None }
@@ -100,7 +105,7 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
                 Ask::Move { project: 1, task: 8, reason: text(b"why") }
             }
         }
-        ActKind::AmendRelease => {
+        ActKind::Amend => {
             drive(domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } });
             drive(domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
             crate::tests::fixtures::releasing(
@@ -126,17 +131,17 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
             drive(domain, Time::ZERO, Event::Act { action: Act::Again { again: false } });
             Ask::Release { project: 1, task: 8, revision: Revision { value: 3 }, again: Some(false) }
         }
-        ActKind::Answer
+        ActKind::Withdraw
+        | ActKind::Answer
         | ActKind::Take
         | ActKind::HandBack
         | ActKind::Accept
         | ActKind::Reject
         | ActKind::PassUp
         | ActKind::LeaveHeld
-        | ActKind::Amend
         | ActKind::Close
         | ActKind::SetGoal
-        | ActKind::MarkSeen
+        | ActKind::Seen
         | ActKind::EditNote
         | ActKind::DeleteNote
         | ActKind::Adopt
@@ -278,7 +283,7 @@ fn check_drafts_survive_pages_and_restart_evict_oldest_untouched_and_coalesce_on
 fn a_words_answer_clears_only_the_submitted_touch_and_refused_or_unknown_words_keep_the_draft() {
     for case in 0_u32..5 {
         let (mut domain, _) = live();
-        install(&mut domain, steering_document(ActKind::Write));
+        install(&mut domain, steering_document(ActKind::Message));
         assert!(edit(&mut domain, 8, b"words").is_empty());
         drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::Composer { task: 8 } } });
         let rows = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
@@ -325,9 +330,9 @@ fn a_words_answer_clears_only_the_submitted_touch_and_refused_or_unknown_words_k
 fn amend_release_recalls_the_hold_independently_and_requires_review_when_either_revision_moves() {
     for which in 0_u8..3 {
         let (mut domain, _) = live();
-        let mut document = steering_document(ActKind::AmendRelease);
+        let mut document = steering_document(ActKind::Amend);
         let id = install(&mut domain, document.clone());
-        intend(&mut domain, id, ActKind::AmendRelease);
+        intend_amend_release(&mut domain, id);
         assert_eq!(domain.confirmation().unwrap().revision, Some(Revision { value: 9 }));
         assert_eq!(domain.confirmation().unwrap().release_revision, Some(Revision { value: 3 }));
         drive(&mut domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } });
@@ -358,7 +363,7 @@ fn amend_release_recalls_the_hold_independently_and_requires_review_when_either_
         assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
         if which < 2 {
             drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dismiss });
-            intend(&mut domain, id, ActKind::AmendRelease);
+            intend_amend_release(&mut domain, id);
             drive(
                 &mut domain,
                 Time::ZERO,
@@ -381,4 +386,8 @@ fn amend_release_recalls_the_hold_independently_and_requires_review_when_either_
             );
         }
     }
+}
+
+fn intend_amend_release(domain: &mut Fixture, id: Id<Object>) {
+    assert!(drive(domain, Time::ZERO, Event::Act { action: Act::AmendRelease { object: id.token() } }).is_empty());
 }

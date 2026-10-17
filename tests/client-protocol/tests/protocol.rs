@@ -222,3 +222,36 @@ fn words_to_a_stopped_task_release_it_in_one_compound_request() {
         assert_eq!(world.front().runs_started() - runs, 1, "resumed worker seed {seed}");
     }
 }
+
+const EFFECT_WAIT: skein_lib::Duration = skein_lib::Duration::from_secs(1);
+#[test]
+fn cancelling_a_task_says_what_ends_before_it_is_sent() {
+    use jig_client_world::{Settings, World};
+    use skein_fake_person::{Find, Step};
+    use skein_ui::Role;
+    let mut world = World::new(
+        Settings { seed: fixtures::SEED, ..Settings::default() },
+        jig_client_protocol_world::Protocol::two_run_slots(fixtures::SEED),
+    );
+    let client = world.client(fixtures::FIRST_OWNER, stories::conversation());
+    world.person(client, jig_client_protocol_world::stories::start());
+    jig_client_protocol_world::stories::finish(&mut world);
+    world.front().make_live_delegate();
+    let before = world.front().requests_made();
+    world.person(
+        client,
+        vec![
+            Step::See { find: Find::exactly_named(Role::Button, b"Cancel"), within: EFFECT_WAIT },
+            Step::Press { find: Find::exactly_named(Role::Button, b"Cancel") },
+            Step::See { find: Find::text(b"1 running tasks"), within: EFFECT_WAIT },
+            Step::See { find: Find::text(b"2 live runs"), within: EFFECT_WAIT },
+            Step::See {
+                find: Find::text(b"Effects not yet begun will be withdrawn; begun effects will settle"),
+                within: EFFECT_WAIT,
+            },
+        ],
+    );
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert_eq!(world.front().requests_made(), before);
+}

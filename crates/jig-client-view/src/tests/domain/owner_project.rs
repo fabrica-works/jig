@@ -46,7 +46,7 @@ pub(super) fn source(number: u32) -> OwnerProject {
     });
     OwnerProject {
         number,
-        acts: list(2, [Offered { act: ActKind::ChangePolicy, admission: Admission::Allowed }]),
+        acts: list(2, [Offered { effect: None, act: ActKind::ChangePolicy, admission: Admission::Allowed }]),
         resources: List::with_capacity(2),
         policy: OwnerProjectPolicy {
             templates: List::with_capacity(0),
@@ -229,7 +229,7 @@ fn owner_project_policy_scalar_and_complete_lists_are_offered_without_inferred_p
 #[test]
 fn owner_project_configured_pool_review_keeps_zero_target_distinct_and_refuses_changed_period_or_cut_absence() {
     let mut value = source(0);
-    value.acts = list(2, [Offered { act: ActKind::SetPool, admission: Admission::Allowed }]);
+    value.acts = list(2, [Offered { effect: None, act: ActKind::SetPool, admission: Admission::Allowed }]);
     let numbers = OwnerNumbers { budget: 11, spent: 2, spent_below: 3, reserved: 4 };
     let observed = PoolLedger {
         source: Funder::Pool { project: 0, person: u64::MAX, period: 9 },
@@ -320,7 +320,7 @@ fn owner_project_permission_review_preserves_full_width_order_and_distinguishes_
 #[test]
 fn owner_project_service_requires_explicit_role_before_name_without_emitting_an_implicit_request() {
     let mut value = source(0);
-    value.acts = list(2, [Offered { act: ActKind::MakeService, admission: Admission::Allowed }]);
+    value.acts = list(2, [Offered { effect: None, act: ActKind::MakeService, admission: Admission::Allowed }]);
     let (mut domain, token) = live(0);
     install(&mut domain, token, value.clone());
     assert!(domain.project_page().settings.service_role.is_none());

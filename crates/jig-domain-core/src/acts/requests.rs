@@ -23,7 +23,7 @@ pub(crate) fn request(
         | people::Ask::SetGoal { .. } => {
             return standing::role(core, project, role, Act::SetGoal);
         }
-        people::Ask::Say { task, .. } => (Act::Write, documents::Subject::Task { task: *task }),
+        people::Ask::Say { task, .. } => (Act::Message, documents::Subject::Task { task: *task }),
         people::Ask::AnswerQuestion { task, question, .. } => {
             (Act::Answer, documents::Subject::Question { task: *task, message: *question })
         }
@@ -59,11 +59,11 @@ pub(crate) fn request(
         people::Ask::Stop { task, .. } => (Act::Stop, documents::Subject::Task { task: *task }),
         people::Ask::Cancel { task, .. } => (Act::Cancel, documents::Subject::Task { task: *task }),
         people::Ask::Close { chat, .. } => (Act::Close, documents::Subject::Task { task: *chat }),
-        people::Ask::Move { task, .. } => (Act::TakeOver, documents::Subject::Task { task: *task }),
+        people::Ask::Move { task, .. } => (Act::Move, documents::Subject::Task { task: *task }),
         people::Ask::Prioritise { .. } => (Act::Prioritise, documents::Subject::Goals { project }),
         people::Ask::MarkSeen { seen } => match seen {
-            people::Seen::Results { .. } => (Act::MarkSeen, documents::Subject::Inbox { party: person }),
-            people::Seen::Chat { task, .. } => (Act::MarkSeen, documents::Subject::Task { task: *task }),
+            people::Seen::Results { .. } => (Act::Seen, documents::Subject::Inbox { party: person }),
+            people::Seen::Chat { task, .. } => (Act::Seen, documents::Subject::Task { task: *task }),
         },
         people::Ask::EditNote { scope, change, .. } => {
             return super::note(
@@ -140,7 +140,7 @@ pub(crate) fn request(
                 return Ok(());
             }
         }
-        documents::Subject::Task { task } if act == Act::MarkSeen && core.tasks.task(*task).is_none() => return Ok(()),
+        documents::Subject::Task { task } if act == Act::Seen && core.tasks.task(*task).is_none() => return Ok(()),
         documents::Subject::Task { .. }
         | documents::Subject::Application { .. }
         | documents::Subject::Frame { .. }

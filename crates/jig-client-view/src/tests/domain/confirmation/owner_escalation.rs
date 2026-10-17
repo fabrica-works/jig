@@ -68,7 +68,7 @@ fn owner_escalation_original_reads_keep_whole_task_and_independent_offers_and_re
     assert_eq!(acts::offered(&object, ActKind::Release), Admission::Allowed);
     assert_eq!(acts::offered(&object, ActKind::Stop), Admission::Refused(Refusal::NotOffered));
     assert_eq!(acts::revision(&object, ActKind::Release), Some(Revision { value: u64::MAX }));
-    assert_eq!(acts::revision(&object, ActKind::AmendRelease), Some(Revision { value: 9 }));
+    assert_eq!(acts::revision(&object, ActKind::Amend), Some(Revision { value: 9 }));
     assert_eq!(object.body.as_ref().unwrap().terminal(), None);
     assert_eq!(original.task.context, None);
     assert_eq!(original.task.person_revision, Some(Revision { value: 23 }));
@@ -163,21 +163,21 @@ fn owner_escalation_decisions_name_supplied_hold_and_outer_offers_without_guessi
                     decision: Decision::PassedUp,
                 },
             },
-            ActKind::Write
+            ActKind::Withdraw
+            | ActKind::Message
             | ActKind::Answer
             | ActKind::Take
             | ActKind::HandBack
             | ActKind::Accept
             | ActKind::Reject
             | ActKind::Amend
-            | ActKind::AmendRelease
             | ActKind::Stop
             | ActKind::Cancel
             | ActKind::Close
-            | ActKind::TakeOver
+            | ActKind::Move
             | ActKind::SetGoal
             | ActKind::Prioritise
-            | ActKind::MarkSeen
+            | ActKind::Seen
             | ActKind::EditNote
             | ActKind::DeleteNote
             | ActKind::Adopt
@@ -199,9 +199,9 @@ fn owner_escalation_decisions_name_supplied_hold_and_outer_offers_without_guessi
 #[test]
 fn owner_escalation_atomic_amend_release_preserves_supplied_reason_and_independent_whole_baseline() {
     let (mut domain, _) = live();
-    let mut original = row(ActKind::AmendRelease, HoldCategory::Budget);
+    let mut original = row(ActKind::Amend, HoldCategory::Budget);
     original.acts = offered(
-        ActKind::AmendRelease,
+        ActKind::Amend,
         Admission::Bounded {
             within: Bounds::Amend {
                 budget_left: 0,
@@ -214,7 +214,7 @@ fn owner_escalation_atomic_amend_release_preserves_supplied_reason_and_independe
         },
     );
     let id = install(&mut domain, Body::OwnerEscalation(Box::new(original.clone())));
-    intend(&mut domain, id, ActKind::AmendRelease);
+    intend_amend_release(&mut domain, id);
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Words { field: Purpose::Reason }));
     edit(&mut domain, Purpose::Reason, b"");

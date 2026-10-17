@@ -17,7 +17,7 @@ use skein_lib::{Id, List};
 #[must_use]
 pub const fn act_phrase(act: ActKind) -> JigPhrase {
     match act {
-        ActKind::Write => JigPhrase::ActWrite,
+        ActKind::Message => JigPhrase::ActWrite,
         ActKind::Answer => JigPhrase::ActAnswer,
         ActKind::Take => JigPhrase::ActTake,
         ActKind::HandBack => JigPhrase::ActHandBack,
@@ -27,14 +27,14 @@ pub const fn act_phrase(act: ActKind) -> JigPhrase {
         ActKind::Release => JigPhrase::ActRelease,
         ActKind::LeaveHeld => JigPhrase::ActLeaveHeld,
         ActKind::Amend => JigPhrase::ActAmend,
-        ActKind::AmendRelease => JigPhrase::ActAmendRelease,
+        ActKind::Withdraw => JigPhrase::ActWithdraw,
         ActKind::Stop => JigPhrase::ActStop,
         ActKind::Cancel => JigPhrase::ActCancel,
         ActKind::Close => JigPhrase::ActClose,
-        ActKind::TakeOver => JigPhrase::ActTakeOver,
+        ActKind::Move => JigPhrase::ActTakeOver,
         ActKind::SetGoal => JigPhrase::ActSetGoal,
         ActKind::Prioritise => JigPhrase::ActPrioritise,
-        ActKind::MarkSeen => JigPhrase::ActMarkSeen,
+        ActKind::Seen => JigPhrase::ActMarkSeen,
         ActKind::EditNote => JigPhrase::ActEditNote,
         ActKind::DeleteNote => JigPhrase::ActDeleteNote,
         ActKind::Adopt => JigPhrase::ActAdopt,
@@ -57,6 +57,17 @@ pub fn acts(
     match card {
         Card::Open | Card::NotSent { .. } | Card::Refused { .. } => {}
         Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => return,
+    }
+    if admitted(rows, ActKind::Amend) && admitted(rows, ActKind::Release) {
+        crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Button,
+            JigPhrase::ActAmendRelease,
+            &[],
+            Act::AmendRelease { object: object.token() },
+        );
     }
     for offered in rows {
         match &offered.admission {
@@ -253,4 +264,16 @@ pub fn answer(b: &mut Builder, object: &Object, words: &Words, text_limit: u32) 
             jig_client::contract::Answer::Refused { refusal: why, .. } => words.refusal(b, why, text_limit),
         }
     }
+}
+
+fn admitted(rows: &List<Offered>, act: ActKind) -> bool {
+    for offer in rows {
+        if offer.act == act {
+            return match offer.admission {
+                Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => true,
+                Admission::Refused(_) => false,
+            };
+        }
+    }
+    false
 }

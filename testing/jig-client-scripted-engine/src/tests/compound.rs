@@ -13,7 +13,8 @@ fn bounded_release() -> (Script, Ask, Answer) {
         spend: List::with_capacity(0),
     })));
     row.acts = list(vec![Offered {
-        act: ActKind::AmendRelease,
+        effect: None,
+        act: ActKind::Amend,
         admission: Admission::Bounded {
             within: jig_client_domain::contract::Bounds::Amend {
                 budget_left: 10,

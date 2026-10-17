@@ -161,9 +161,6 @@ pub(super) fn escalation() -> Escalation {
             },
             live_runs: 0,
             proposals: 0,
-            effects_pending: 0,
-            effects_settling: 0,
-            takeover_budget: 0,
         },
         waiting: Recipient::Party(7),
         trail: List::with_capacity(0),
@@ -440,7 +437,7 @@ fn equal_number_task_and_party_proposals_keep_separate_requests_and_terminal_car
         row.key = ProposalKey { proposer: maker, number: u64::MAX };
         row.proposer = maker;
         row.acts = List::with_capacity(1);
-        row.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+        row.acts.push(Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
         let key = ObjectKey::Proposal(row.key);
         let id = domain.objects.name(key, Source::Window { number: 4 }).unwrap();
         assert!(domain.objects.put(key, objects::Body::Proposal(Box::new(row.clone()))));

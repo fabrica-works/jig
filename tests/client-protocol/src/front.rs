@@ -8,6 +8,7 @@ use skein_lib::{
     stream::{Down, Up},
 };
 use std::collections::BTreeMap;
+mod effects;
 mod faults;
 pub mod observe;
 pub(crate) mod persistence;
@@ -62,8 +63,12 @@ impl Protocol {
     }
     #[must_use]
     pub fn bounded(seed: u64, limits: &jig_test_domain::Limits) -> Self {
+        Self::with_engine(Engine::bounded(seed, limits))
+    }
+    fn with_engine(engine: Engine) -> Self {
+        let seed = engine.seed;
         let mut value = Self {
-            engine: Engine::bounded(seed, limits),
+            engine,
             clients: BTreeMap::new(),
             net: Net::new(seed),
             callbacks: Vec::new(),

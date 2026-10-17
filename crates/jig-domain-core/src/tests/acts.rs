@@ -337,7 +337,7 @@ fn an_observers_core_role_refusals_match_their_offers() {
 fn a_maintainer_word_uses_the_trusted_entrance_and_keeps_its_actor() {
     let (mut core, limits) = make_tree();
     holding(&mut core, &limits, people::Role::Maintainer);
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Write, &Subject::Task { task: 2 }), Admission::Allowed);
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Message, &Subject::Task { task: 2 }), Admission::Allowed);
     let event = core
         .person_message(
             &limits,
@@ -494,7 +494,7 @@ fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
         lacking: people::Lack::Tasks { left: 3 },
         proposable: Some(people::Accepter::Role(0)),
     };
-    assert_eq!(offers::admit(&core, &limits, 1, Act::TakeOver, &Subject::Task { task: 2 }), Admission::Refused(why));
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Move, &Subject::Task { task: 2 }), Admission::Refused(why));
     assert_eq!(
         core.move_admit(1, Some(people::Role::Owner), 1, 2, limits.tasks.tree_tasks, limits.tasks.depth),
         Err(why)
@@ -638,7 +638,7 @@ fn leaving_an_escalation_held_closing_a_chat_and_marking_it_seen_are_admitted() 
         },
     );
     let task = Subject::Task { task: 1 };
-    assert_eq!(offers::admit(&core, &limits, 1, Act::MarkSeen, &task), Admission::Allowed);
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Seen, &task), Admission::Allowed);
     assert_eq!(
         ask_now(&mut core, &limits, 1, people::Ask::MarkSeen { seen: people::Seen::Chat { task: 1, through: 0 } }),
         people::Outcome::MarkedSeen { seen: people::Seen::Chat { task: 1, through: 0 } }
@@ -647,7 +647,7 @@ fn leaving_an_escalation_held_closing_a_chat_and_marking_it_seen_are_admitted() 
     assert_eq!(offers::admit(&core, &limits, 1, Act::Close, &task), Admission::Allowed);
     assert_eq!(offers::close(&core, 1, core.tasks.task(1).unwrap()), Ok(()));
     send_task(&mut core, &limits, tasks::Event::Hold { task: 1, why: tasks::Hold::Uncertain { entry: 1 } });
-    let Admission::Bounded { .. } = offers::admit(&core, &limits, 1, Act::AmendRelease, &task) else {
+    let Admission::Bounded { .. } = offers::admit(&core, &limits, 1, Act::Amend, &task) else {
         panic!("amend and release remains bounded with an explicit uncertainty choice")
     };
     let revision = core.tasks.escalation(1).unwrap().escalation.revision();
@@ -687,7 +687,7 @@ fn leaving_an_escalation_held_closing_a_chat_and_marking_it_seen_are_admitted() 
 }
 
 #[test]
-fn a_takeover_offer_uses_the_childs_current_requester_and_changes_after_adoption() {
+fn a_move_offer_tracks_requester_changes_after_adoption() {
     let (mut core, limits) = make_tree();
     sign_in(&mut core, &limits);
     let mut row = new_row(&core, 5, tasks::Funder::Task(1), None);
@@ -703,7 +703,7 @@ fn a_takeover_offer_uses_the_childs_current_requester_and_changes_after_adoption
         },
     );
     let object = Subject::Task { task: 5 };
-    assert_eq!(offers::admit(&core, &limits, 1, Act::TakeOver, &object), Admission::Allowed);
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Move, &object), Admission::Allowed);
     assert_eq!(
         ask_now(
             &mut core,
@@ -716,7 +716,7 @@ fn a_takeover_offer_uses_the_childs_current_requester_and_changes_after_adoption
     assert_eq!(core.tasks.task(5).unwrap().requester, tasks::Party::Person(1));
     assert!(!core.tasks.takeover_state(5, 1));
     let why = people::Refusal::NotWaiting;
-    assert_eq!(offers::admit(&core, &limits, 1, Act::TakeOver, &object), Admission::Refused(why));
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Move, &object), Admission::Refused(why));
     assert_eq!(
         core.move_admit(1, Some(people::Role::Owner), 1, 5, limits.tasks.tree_tasks, limits.tasks.depth),
         Err(why)
@@ -1003,3 +1003,5 @@ mod escalation;
 mod proposals;
 
 mod tracking;
+
+mod decision_effects;

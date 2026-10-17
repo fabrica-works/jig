@@ -140,7 +140,7 @@ mod tests {
     }
 
     #[test]
-    fn task_watch_filters_keep_full_executor_identity_and_refuse_a_different_role_project() {
+    fn a_task_watch_query_keeps_every_key_and_refuses_a_deployment_requester() {
         let query = client::TaskQuery {
             project: Some(8),
             requester: None,

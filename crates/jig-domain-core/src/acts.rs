@@ -5,6 +5,8 @@
 //! listed bounds; the client compares its form with these engine facts.
 
 pub(crate) mod bounds;
+mod effects;
+pub use effects::{Effect, Impact, ReleaseEffect};
 mod objects;
 mod requests;
 mod standing;
@@ -21,7 +23,7 @@ pub(crate) use standing::role;
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Act {
     /// Write to an agent.
-    Write,
+    Message,
     /// Answer a question or person task.
     Answer,
     /// Take a role task.
@@ -40,8 +42,6 @@ pub enum Act {
     LeaveHeld,
     /// Amend a specification.
     Amend,
-    /// Amend and release together.
-    AmendRelease,
     /// Stop a live run.
     Stop,
     /// Cancel a subtree.
@@ -49,13 +49,13 @@ pub enum Act {
     /// Close a chat.
     Close,
     /// Become a requester.
-    TakeOver,
+    Move,
     /// Set a goal.
     SetGoal,
     /// Reorder goals.
     Prioritise,
     /// Mark updates read.
-    MarkSeen,
+    Seen,
     /// Edit a note.
     EditNote,
     /// Delete a note.
@@ -70,6 +70,8 @@ pub enum Act {
     MakeService,
     /// Set a pool.
     SetPool,
+    /// Withdraw the party's own pending proposal.
+    Withdraw,
 }
 
 /// What a current engine judgment says about an act.
@@ -150,6 +152,7 @@ pub enum Recipient {
 /// One act and its current engine judgment.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Offered {
+    pub effect: Option<Effect>,
     pub act: Act,
     pub admission: Admission,
 }

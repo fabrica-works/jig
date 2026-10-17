@@ -19,7 +19,7 @@ use jig_client::contract::*;
 use skein_lib::{List, Time, Wall};
 fn value(maker: Proposer, offered: ActKind) -> OwnerProposal {
     let mut acts = List::with_capacity(2);
-    acts.push(Offered { act: offered, admission: Admission::Allowed }).unwrap();
+    acts.push(Offered { effect: None, act: offered, admission: Admission::Allowed }).unwrap();
     OwnerProposal {
         key: ProposalKey { proposer: maker, number: u64::MAX },
         project: u32::MAX,
@@ -159,7 +159,7 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
     let (mut control, _) = live();
     let mut old = super::objects::proposal();
     old.acts = List::with_capacity(1);
-    old.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
+    old.acts.push(Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
     let old_key = ObjectKey::Proposal(old.key);
     let old_id = control.objects.name(old_key, Source::Window { number: 4 }).unwrap();
     assert!(control.objects.put(old_key, Body::Proposal(Box::new(old.clone()))));
@@ -176,7 +176,7 @@ fn owner_proposal_native_read_consumes_once_watch_keeps_same_card_and_wrong_key_
     for admission in
         [Admission::Refused(Refusal::NotOffered), Admission::Refused(Refusal::Limit { which: Limit::Objects })]
     {
-        changed.acts.push(Offered { act: ActKind::Reject, admission }).unwrap();
+        changed.acts.push(Offered { effect: None, act: ActKind::Reject, admission }).unwrap();
         assert!(domain.objects.put(key, Body::OwnerProposal(Box::new(changed.clone()))));
         drive(&mut domain, Time::ZERO, Event::Act { action: Act::Intend { object: id.token(), act: ActKind::Reject } });
         assert!(!drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).iter().any(sent));

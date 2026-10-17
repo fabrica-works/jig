@@ -91,18 +91,7 @@ pub fn read_wire_owner_delegation() -> w::OwnerDelegation {
 
 pub fn read_wire_impact() -> w::Impact {
     let lim = w::CEILINGS;
-    w::Impact::new(
-        &lim,
-        w::ImpactParts {
-            tasks: read_wire_phase_counts(),
-            live_runs: 7,
-            proposals: 7,
-            effects_pending: 7,
-            effects_settling: 7,
-            takeover_budget: 7,
-        },
-    )
-    .unwrap()
+    w::Impact::new(&lim, w::ImpactParts { tasks: read_wire_phase_counts(), live_runs: 7, proposals: 7 }).unwrap()
 }
 
 pub fn read_wire_phase_counts() -> w::PhaseCounts {

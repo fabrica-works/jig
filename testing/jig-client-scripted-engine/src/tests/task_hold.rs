@@ -66,7 +66,8 @@ fn scripted_owner_hold_moves_return_exact_category_for_release_and_atomic_amend_
             hold_wait_since: None,
         })));
         row.acts = list(vec![Offered {
-            act: if amendment { ActKind::AmendRelease } else { ActKind::Release },
+            effect: None,
+            act: if amendment { ActKind::Amend } else { ActKind::Release },
             admission: Admission::Allowed,
         }]);
         let spec_revision = row.spec_revision;

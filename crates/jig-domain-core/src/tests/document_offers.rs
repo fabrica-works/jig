@@ -27,7 +27,7 @@ fn document_offers_fit_the_object_and_preserve_actor_specific_refusals() {
     let Document::Task(value) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window()).unwrap() else {
         panic!("task")
     };
-    assert_eq!(find(&value.acts, Act::Write), Some(&Admission::Allowed));
+    assert_eq!(find(&value.acts, Act::Message), Some(&Admission::Allowed));
     assert_eq!(find(&value.acts, Act::Stop), Some(&Admission::Allowed));
     assert_eq!(find(&value.acts, Act::Answer), None);
     assert_eq!(find(&value.acts, Act::Take), None);
@@ -45,7 +45,7 @@ fn document_offers_fit_the_object_and_preserve_actor_specific_refusals() {
         panic!("task")
     };
     assert_eq!(
-        find(&value.acts, Act::Write),
+        find(&value.acts, Act::Message),
         Some(&Admission::Refused(people::Refusal::Role { held: Some(people::Role::Observer) }))
     );
     let Document::Project(value) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap() else {
@@ -160,7 +160,7 @@ fn cancellation_during_closing_and_release_of_a_held_closing_task_keep_the_owner
         panic!("held closing task")
     };
     assert_eq!(find(&value.acts, Act::Release), Some(&Admission::Allowed));
-    assert_eq!(find(&value.acts, Act::AmendRelease), None);
+    assert_eq!(find(&value.acts, Act::Amend), None);
     assert_eq!(
         crate::acts::request(
             &core,

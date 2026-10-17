@@ -625,10 +625,10 @@ type Target = (Option<u32>, Option<ObjectKey>, ActKind, Option<(Revision, Moved)
 fn target(ask: &Ask) -> Target {
     match ask {
         Ask::Compound { project, operations } => {
-            compound_target(*project, operations).unwrap_or((Some(*project), None, ActKind::Write, None))
+            compound_target(*project, operations).unwrap_or((Some(*project), None, ActKind::Message, None))
         }
-        Ask::Create { project, .. } | Ask::StartChat { project, .. } => (Some(*project), None, ActKind::Write, None),
-        Ask::Message { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Write, None),
+        Ask::Create { project, .. } | Ask::StartChat { project, .. } => (Some(*project), None, ActKind::Message, None),
+        Ask::Message { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Message, None),
         Ask::Answer { project, on: AnswerOn::Question { task, message, .. }, .. } => {
             (Some(*project), Some(ObjectKey::Question { task: *task, message: *message }), ActKind::Answer, None)
         }
@@ -666,10 +666,11 @@ fn target(ask: &Ask) -> Target {
         Ask::Stop { project, task } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Stop, None),
         Ask::Cancel { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Cancel, None),
         Ask::Close { project, chat, .. } => (Some(*project), Some(ObjectKey::Task(*chat)), ActKind::Close, None),
-        Ask::Move { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::TakeOver, None),
-        Ask::Withdraw { project, .. } | Ask::SetGoal { project, .. } => (Some(*project), None, ActKind::SetGoal, None),
+        Ask::Move { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Move, None),
+        Ask::Withdraw { project, .. } => (Some(*project), None, ActKind::Withdraw, None),
+        Ask::SetGoal { project, .. } => (Some(*project), None, ActKind::SetGoal, None),
         Ask::Prioritise { project, .. } => (Some(*project), None, ActKind::Prioritise, None),
-        Ask::Seen { .. } => (None, None, ActKind::MarkSeen, None),
+        Ask::Seen { .. } => (None, None, ActKind::Seen, None),
         Ask::EditNote { project, .. } => (Some(*project), None, ActKind::EditNote, None),
         Ask::DeleteNote { project, .. } => (Some(*project), None, ActKind::DeleteNote, None),
         Ask::ChangePolicy { project, .. } => (Some(*project), None, ActKind::ChangePolicy, None),
@@ -684,17 +685,14 @@ fn compound_target(project: u32, operations: &List<Operation>) -> Option<Target>
         [Operation::Message { project: first, task, .. }, Operation::Release { project: last, task: released, .. }]
             if *first == project && *last == project && task == released =>
         {
-            Some((Some(project), Some(ObjectKey::Task(*task)), ActKind::Write, None))
+            Some((Some(project), Some(ObjectKey::Task(*task)), ActKind::Message, None))
         }
         [
             Operation::Amend { project: first, task, revision, .. },
             Operation::Release { project: last, task: released, .. },
-        ] if *first == project && *last == project && task == released => Some((
-            Some(project),
-            Some(ObjectKey::Task(*task)),
-            ActKind::AmendRelease,
-            revision.map(|v| (v, Moved::Spec)),
-        )),
+        ] if *first == project && *last == project && task == released => {
+            Some((Some(project), Some(ObjectKey::Task(*task)), ActKind::Amend, revision.map(|v| (v, Moved::Spec))))
+        }
         _ => None,
     }
 }

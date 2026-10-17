@@ -150,7 +150,7 @@ fn a_policy_narrowed_withdraws_an_offer_in_the_next_delivery() {
         panic!("task");
     };
     assert_eq!(
-        value.acts.iter().find(|value| value.act == Act::TakeOver).expect("offered takeover").admission,
+        value.acts.iter().find(|value| value.act == Act::Move).expect("offered takeover").admission,
         Admission::Allowed
     );
     let first = world.watches.as_ref().expect("watches").deliveries.len();
@@ -191,7 +191,7 @@ fn a_policy_narrowed_withdraws_an_offer_in_the_next_delivery() {
         panic!("task");
     };
     let Admission::Refused(refused) =
-        value.acts.iter().find(|value| value.act == Act::TakeOver).expect("withdrawn takeover").admission
+        value.acts.iter().find(|value| value.act == Act::Move).expect("withdrawn takeover").admission
     else {
         panic!("withdrawn offer");
     };

@@ -47,9 +47,9 @@ fn value(contract: TaskContractDocument) -> OwnerPersonTask {
         results: List::with_capacity(3),
         cut: false,
         acts: values([
-            Offered { act: ActKind::Answer, admission: Admission::Allowed },
-            Offered { act: ActKind::Take, admission: Admission::Allowed },
-            Offered { act: ActKind::HandBack, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::Answer, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::Take, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::HandBack, admission: Admission::Allowed },
         ]),
     }
 }

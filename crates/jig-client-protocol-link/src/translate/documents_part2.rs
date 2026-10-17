@@ -46,24 +46,24 @@ pub(crate) fn task_hold_fields(value: &w::TaskHold, limits: &Limits) -> Result<c
 
 pub(crate) fn act_kind_fields(value: &w::ActKind, _limits: &Limits) -> c::ActKind {
     match value {
-        w::ActKind::Write => c::ActKind::Write,
+        w::ActKind::Message => c::ActKind::Message,
         w::ActKind::Answer => c::ActKind::Answer,
         w::ActKind::Take => c::ActKind::Take,
         w::ActKind::HandBack => c::ActKind::HandBack,
         w::ActKind::Accept => c::ActKind::Accept,
+        w::ActKind::Withdraw => c::ActKind::Withdraw,
         w::ActKind::Reject => c::ActKind::Reject,
         w::ActKind::PassUp => c::ActKind::PassUp,
         w::ActKind::Release => c::ActKind::Release,
         w::ActKind::LeaveHeld => c::ActKind::LeaveHeld,
         w::ActKind::Amend => c::ActKind::Amend,
-        w::ActKind::AmendRelease => c::ActKind::AmendRelease,
         w::ActKind::Stop => c::ActKind::Stop,
         w::ActKind::Cancel => c::ActKind::Cancel,
         w::ActKind::Close => c::ActKind::Close,
-        w::ActKind::TakeOver => c::ActKind::TakeOver,
+        w::ActKind::MoveTask => c::ActKind::Move,
         w::ActKind::SetGoal => c::ActKind::SetGoal,
         w::ActKind::Prioritise => c::ActKind::Prioritise,
-        w::ActKind::MarkSeen => c::ActKind::MarkSeen,
+        w::ActKind::Seen => c::ActKind::Seen,
         w::ActKind::EditNote => c::ActKind::EditNote,
         w::ActKind::DeleteNote => c::ActKind::DeleteNote,
         w::ActKind::Adopt => c::ActKind::Adopt,
@@ -162,8 +162,13 @@ pub(crate) fn admission_fields(value: &w::Admission, limits: &Limits) -> Result<
     })
 }
 
+#[expect(clippy::manual_map, reason = "step code matches the optional engine effect")]
 pub(crate) fn offered_fields(value: &w::Offered, limits: &Limits) -> Result<c::Offered, w::Problem> {
     Ok(c::Offered {
+        effect: match value.effect() {
+            Some(value) => Some(effect_fields(value, limits)),
+            None => None,
+        },
         act: act_kind_fields(value.act(), limits),
         admission: admission_fields(value.admission(), limits)?,
     })
@@ -321,4 +326,16 @@ pub(crate) fn live_delegate_piece(
         }
     }
     Err(too_large())
+}
+
+pub(crate) fn effect_fields(value: &w::Effect, limits: &Limits) -> c::Effect {
+    match value {
+        w::Effect::Release(value) => c::Effect::Release(match value.what() {
+            w::ReleaseEffect::Judged => c::ReleaseEffect::Judged,
+            w::ReleaseEffect::RunAgain => c::ReleaseEffect::RunAgain,
+            w::ReleaseEffect::Uncertain => c::ReleaseEffect::Uncertain,
+        }),
+        w::Effect::Cancel(value) => c::Effect::Cancel(super::impact_fields(value, limits)),
+        w::Effect::MoveTask(value) => c::Effect::Move { reservation: value.reservation() },
+    }
 }

@@ -537,7 +537,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
     value.policy.cut = false;
     value.policy.ceiling.cut = false;
     value.policy.roles.get_mut(0).unwrap().authority.cut = false;
-    value.acts.push(Offered { act: ActKind::ChangePolicy, admission: Admission::Allowed }).unwrap();
+    value.acts.push(Offered { effect: None, act: ActKind::ChangePolicy, admission: Admission::Allowed }).unwrap();
     native_drive(
         &mut d,
         ReadPage { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value.clone()))) },
@@ -743,8 +743,11 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
     value.policy.cut = false;
     value.acts = list(
         4,
-        [ActKind::MakeService, ActKind::SetPool, ActKind::SetRoles]
-            .map(|act| Offered { act, admission: Admission::Allowed }),
+        [ActKind::MakeService, ActKind::SetPool, ActKind::SetRoles].map(|act| Offered {
+            effect: None,
+            act,
+            admission: Admission::Allowed,
+        }),
     );
     let mut domain = native_owner(value.clone());
     let (tree, mut bindings) = owner_page(&domain);
@@ -877,6 +880,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     value.acts = list(
         4,
         [Offered {
+            effect: None,
             act: ActKind::SetGoal,
             admission: Admission::Bounded {
                 within: Bounds::Create(CreateBounds {
@@ -993,6 +997,7 @@ fn owner_project_public_offer_ceiling_preserves_twenty_five_in_order_and_rejects
             value
                 .acts
                 .push(Offered {
+                    effect: None,
                     act: if index % 2 == 0 { ActKind::SetPool } else { ActKind::ChangePolicy },
                     admission: Admission::Allowed,
                 })
@@ -1015,6 +1020,7 @@ fn owner_project_public_offer_ceiling_preserves_twenty_five_in_order_and_rejects
     value
         .acts
         .push(Offered {
+            effect: None,
             act: ActKind::SetGoal,
             admission: Admission::Bounded {
                 within: Bounds::Create(CreateBounds {

@@ -8,7 +8,7 @@ fn question(from: Option<OwnerRequester>) -> Question {
     let mut dependencies = List::with_capacity(3);
     dependencies.push(u64::MAX).unwrap();
     let mut acts = List::with_capacity(2);
-    acts.push(Offered { act: ActKind::Answer, admission: Admission::Allowed }).unwrap();
+    acts.push(Offered { effect: None, act: ActKind::Answer, admission: Admission::Allowed }).unwrap();
     Question {
         task: Chip {
             task: u64::MAX,

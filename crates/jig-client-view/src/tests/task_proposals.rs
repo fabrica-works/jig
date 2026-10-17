@@ -63,7 +63,7 @@ fn proposal(key: ProposalKey) -> Proposal {
         waiting: Recipient::Party(1),
         trail: list([]),
         since: Wall::EPOCH,
-        acts: list([Offered { act: ActKind::Accept, admission: Admission::Allowed }]),
+        acts: list([Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }]),
         ending: None,
     }
 }
@@ -274,7 +274,7 @@ fn a_task_activity_renders_the_native_whole_pending_proposal_with_its_supplied_f
             left: Some(250),
             after: Some(100),
         }]),
-        acts: list([Offered { act: ActKind::Accept, admission: Admission::Allowed }]),
+        acts: list([Offered { effect: None, act: ActKind::Accept, admission: Admission::Allowed }]),
     };
     drive(
         &mut d,

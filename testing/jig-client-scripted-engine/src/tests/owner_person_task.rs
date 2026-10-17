@@ -49,11 +49,14 @@ fn person_owner_public_read_preserves_reserved_offers_and_nested_result_admissio
         (ActKind::Answer, Admission::Allowed),
         (ActKind::Take, Admission::Refused(Refusal::NotWaiting)),
     ] {
-        value.acts.push(Offered { act, admission }).expect("ordered offer fits");
+        value.acts.push(Offered { effect: None, act, admission }).expect("ordered offer fits");
     }
     let result = value.results.get_mut(1).expect("second row").result.as_mut().expect("whole result");
     result.acts = skein_lib::List::with_capacity(MAX_OFFERED_ACTS);
-    result.acts.push(Offered { act: ActKind::MarkSeen, admission: Admission::Allowed }).expect("result offer fits");
+    result
+        .acts
+        .push(Offered { effect: None, act: ActKind::Seen, admission: Admission::Allowed })
+        .expect("result offer fits");
     let original = value.clone();
     let mut setup = script();
     setup.bounds.rows = 3;

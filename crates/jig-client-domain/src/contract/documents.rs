@@ -198,7 +198,7 @@ pub const MAX_OFFERED_ACTS: u32 = 25;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ActKind {
     /// Write to an agent.
-    Write,
+    Message,
     /// Answer a question or person task.
     Answer,
     /// Take a role task.
@@ -217,8 +217,6 @@ pub enum ActKind {
     LeaveHeld,
     /// Amend a specification.
     Amend,
-    /// Amend and release together.
-    AmendRelease,
     /// Stop a live run.
     Stop,
     /// Cancel a subtree.
@@ -226,13 +224,13 @@ pub enum ActKind {
     /// Close a chat.
     Close,
     /// Become a requester.
-    TakeOver,
+    Move,
     /// Set a goal.
     SetGoal,
     /// Reorder goals.
     Prioritise,
     /// Mark updates read.
-    MarkSeen,
+    Seen,
     /// Edit a note.
     EditNote,
     /// Delete a note.
@@ -247,6 +245,8 @@ pub enum ActKind {
     MakeService,
     /// Set a pool.
     SetPool,
+    /// Withdraw the party's own pending proposal.
+    Withdraw,
 }
 
 /// What the engine says would happen on an act.
@@ -292,6 +292,7 @@ pub enum Beyond {
 /// An act and its admission judged by the engine.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Offered {
+    pub effect: Option<super::Effect>,
     pub act: ActKind,
     pub admission: Admission,
 }
@@ -1051,9 +1052,6 @@ pub struct Impact {
     pub tasks: PhaseCounts,
     pub live_runs: u32,
     pub proposals: u32,
-    pub effects_pending: u32,
-    pub effects_settling: u32,
-    pub takeover_budget: u64,
 }
 
 /// A resource held for writing and the run holding its writer slot.

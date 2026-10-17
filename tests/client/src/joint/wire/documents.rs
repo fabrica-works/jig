@@ -476,6 +476,7 @@ pub(crate) mod tests {
     pub(crate) fn question_source() -> documents::Question {
         let mut acts = List::with_capacity(4);
         acts.push(jig_domain_core::acts::Offered {
+            effect: None,
             act: jig_domain_core::acts::Act::Answer,
             admission: jig_domain_core::acts::Admission::Allowed,
         })
@@ -513,7 +514,7 @@ pub(crate) mod tests {
             assert_eq!((value.acts.capacity(), value.acts.len()), (4, 1));
             assert_eq!(
                 value.acts.get(0).expect("actual offer"),
-                &client::Offered { act: client::ActKind::Answer, admission: client::Admission::Allowed }
+                &client::Offered { effect: None, act: client::ActKind::Answer, admission: client::Admission::Allowed }
             );
             assert_eq!(source, original);
             assert_eq!(question_read(&source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
@@ -602,7 +603,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn live_tasks_keep_the_original_filter_supplied_requester_goal_clock_and_reserved_rows() {
+    fn task_lines_keep_the_query_requester_clock_and_reserved_rows() {
         let limits = rows::tests::limits();
         let query = client::TaskQuery {
             project: Some(u32::MAX),
@@ -697,7 +698,8 @@ pub(crate) mod tests {
                 source
                     .acts
                     .push(jig_domain_core::acts::Offered {
-                        act: jig_domain_core::acts::Act::Write,
+                        effect: None,
+                        act: jig_domain_core::acts::Act::Message,
                         admission: jig_domain_core::acts::Admission::Allowed,
                     })
                     .expect("original offer");
@@ -711,7 +713,11 @@ pub(crate) mod tests {
                 assert_eq!(value.acts.capacity(), 4);
                 assert_eq!(
                     value.acts.as_slice(),
-                    &[client::Offered { act: client::ActKind::Write, admission: client::Admission::Allowed }]
+                    &[client::Offered {
+                        effect: None,
+                        act: client::ActKind::Message,
+                        admission: client::Admission::Allowed
+                    }]
                 );
                 let expected = results::ending(&source.ending, &limits).expect("whole source terminal");
                 assert_eq!(value.ending, client::Ending::Task(Box::new(expected.clone())));

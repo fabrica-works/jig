@@ -198,7 +198,7 @@ pub fn send_card(
     match domain.intents.ask(scope, origin, ask, out) {
         Some(id) => {
             crate::conversation::sending::pending(domain, id, lent);
-            if act == ActKind::Write && !joined {
+            if act == ActKind::Message && !joined {
                 let task = match object {
                     ObjectKey::Task(task) => Some(task),
                     ObjectKey::Proposal(_)
@@ -273,7 +273,7 @@ pub(crate) fn answered(
             crate::page::conversations::answered(domain, env, (request, handle), purpose, receipt.answer, out, lent);
         }
         Origin::Card { object, act } => {
-            if act == ActKind::Write {
+            if act == ActKind::Message {
                 match object {
                     ObjectKey::Task(task) => crate::drafts::sent(
                         domain,

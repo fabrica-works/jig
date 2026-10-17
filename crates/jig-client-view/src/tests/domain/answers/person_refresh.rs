@@ -20,7 +20,7 @@ fn document(taken_by: Option<u64>, offered: &[ActKind]) -> OwnerPersonTask {
     });
     let mut acts = List::with_capacity(3);
     for act in offered {
-        acts.push(Offered { act: *act, admission: Admission::Allowed }).unwrap();
+        acts.push(Offered { effect: None, act: *act, admission: Admission::Allowed }).unwrap();
     }
     OwnerPersonTask {
         task,

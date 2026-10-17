@@ -84,9 +84,9 @@ fn value() -> OwnerPersonTask {
         results: List::with_capacity(4),
         cut: true,
         acts: rows([
-            Offered { act: ActKind::Answer, admission: Admission::Allowed },
-            Offered { act: ActKind::Take, admission: Admission::Allowed },
-            Offered { act: ActKind::HandBack, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::Answer, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::Take, admission: Admission::Allowed },
+            Offered { effect: None, act: ActKind::HandBack, admission: Admission::Allowed },
         ]),
     }
 }
@@ -482,7 +482,7 @@ fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result
     }]);
     value.acts = List::with_capacity(MAX_OFFERED_ACTS);
     for act in [ActKind::HandBack, ActKind::Answer, ActKind::Take] {
-        value.acts.push(Offered { act, admission: Admission::Allowed }).unwrap();
+        value.acts.push(Offered { effect: None, act, admission: Admission::Allowed }).unwrap();
     }
     value.results.get_mut(0).unwrap().result.as_mut().unwrap().acts = List::with_capacity(MAX_OFFERED_ACTS);
     let original = value.clone();

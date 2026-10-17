@@ -462,6 +462,8 @@ pub enum JigPhrase {
     ActAmend,
     /// Amend and release.
     ActAmendRelease,
+    /// Withdraw the party's pending proposal.
+    ActWithdraw,
     /// Stop.
     ActStop,
     /// Cancel.
@@ -632,10 +634,8 @@ pub enum JigPhrase {
     LiveRuns,
     /// (0) proposals will be withdrawn.
     PendingProposals,
-    /// (0) effects not yet begun will be cancelled.
-    PendingEffects,
-    /// (0) begun effects will settle.
-    SettlingEffects,
+    /// Effects not yet begun are withdrawn and begun effects settle.
+    EffectsSettle,
     /// Takeover reserves (0) from your pool.
     TakeoverFunds,
     /// Cancel delegate (0) and its subtree.
@@ -1385,6 +1385,7 @@ impl JigPhrase {
             Self::ActLeaveHeld => 166,
             Self::ActAmend => 167,
             Self::ActAmendRelease => 168,
+            Self::ActWithdraw => 809,
             Self::ActStop => 169,
             Self::ActCancel => 170,
             Self::ActClose => 171,
@@ -1470,8 +1471,7 @@ impl JigPhrase {
             Self::TasksCancelled => 251,
             Self::LiveRuns => 252,
             Self::PendingProposals => 253,
-            Self::PendingEffects => 254,
-            Self::SettlingEffects => 255,
+            Self::EffectsSettle => 254,
             Self::TakeoverFunds => 256,
             Self::DelegateCancel => 257,
             Self::DelegateTake => 258,
@@ -1772,7 +1772,9 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::OwnerHoldRelease
+            Self::EffectsSettle
+            | Self::ActWithdraw
+            | Self::OwnerHoldRelease
             | Self::PageCut
             | Self::NoteChangedNotSupplied
             | Self::TaskListsCut
@@ -2323,8 +2325,6 @@ impl JigPhrase {
             | Self::TasksCancelled
             | Self::LiveRuns
             | Self::PendingProposals
-            | Self::PendingEffects
-            | Self::SettlingEffects
             | Self::DelegateCancel
             | Self::DropDependency
             | Self::Charter
@@ -2714,6 +2714,7 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::ActLeaveHeld,
     JigPhrase::ActAmend,
     JigPhrase::ActAmendRelease,
+    JigPhrase::ActWithdraw,
     JigPhrase::ActStop,
     JigPhrase::ActCancel,
     JigPhrase::ActClose,
@@ -2799,8 +2800,7 @@ pub const ALL: [JigPhrase; 639] = [
     JigPhrase::TasksCancelled,
     JigPhrase::LiveRuns,
     JigPhrase::PendingProposals,
-    JigPhrase::PendingEffects,
-    JigPhrase::SettlingEffects,
+    JigPhrase::EffectsSettle,
     JigPhrase::TakeoverFunds,
     JigPhrase::DelegateCancel,
     JigPhrase::DelegateTake,

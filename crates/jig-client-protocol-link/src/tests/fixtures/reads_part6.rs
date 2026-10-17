@@ -72,14 +72,7 @@ pub fn read_value_owner_delegation() -> c::OwnerDelegation {
 }
 
 pub fn read_value_impact() -> c::Impact {
-    c::Impact {
-        tasks: read_value_phase_counts(),
-        live_runs: 7,
-        proposals: 7,
-        effects_pending: 7,
-        effects_settling: 7,
-        takeover_budget: 7,
-    }
+    c::Impact { tasks: read_value_phase_counts(), live_runs: 7, proposals: 7 }
 }
 
 pub fn read_value_phase_counts() -> c::PhaseCounts {
