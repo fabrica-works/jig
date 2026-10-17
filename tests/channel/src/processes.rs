@@ -390,10 +390,10 @@ pub(crate) fn window_provider(scripts: Box<[skein_fake_llm_domain::api::Script]>
     config.too_long = 200;
     let mut protocol = skein_llm_world::fake::limits(&skein_llm_world::limits());
     protocol.documents.openai.request = 32_768;
-    protocol.documents.openai.strings = 16_384;
-    protocol.documents.openai.tokens = 4096;
-    protocol.documents.openai.output_items = 256;
-    protocol.documents.anthropic.output_items = 256;
+    protocol.documents.openai.strings = 4096;
+    protocol.documents.openai.tokens = 1024;
+    protocol.documents.openai.output_items = 16;
+    protocol.documents.anthropic.output_items = 16;
     skein_fake_peers::llm::Peer::new(
         (std::net::Ipv4Addr::LOCALHOST, 443).into(),
         skein_fake_peers::Transport::Plaintext,

@@ -108,9 +108,9 @@ fn accept_restart(seed: u64) {
         vec![
             see(b"Restart checkout in production"),
             see(b"Accepted"),
-            Step::Pause { span: Duration::from_millis(50) },
+            Step::Pause { span: Duration::from_millis(5) },
             see(b"Accepted"),
-            Step::Pause { span: Ops::limits().jig.linger.saturating_add(Duration::from_millis(100)) },
+            Step::Pause { span: Ops::limits().jig.linger.saturating_add(Duration::from_millis(10)) },
             Step::Gone { find: Find::text(b"Restart checkout in production"), within: WITHIN },
         ],
     );

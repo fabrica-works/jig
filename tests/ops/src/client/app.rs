@@ -32,7 +32,7 @@ pub fn limits() -> domain::Limits {
             notices: 2,
             notice_life: Duration::from_secs(5),
             // A finite fixture keeps the same before/after-linger behavior at a short scale.
-            linger: Duration::from_millis(250),
+            linger: Duration::from_millis(25),
             save_delay: Duration::from_millis(10),
             intents: 2,
             fields: 4,
@@ -114,9 +114,9 @@ fn view_bounds(
 ) -> view::Limits {
     let mut bounds = view::Limits::of(limits, jig, obs, infra).expect("composed view fits");
     assert!(bounds.tree.nodes >= 1024, "world profile fits the composition envelope");
-    bounds.tree.nodes = 1024;
-    bounds.tree.bindings = 1024;
-    bounds.tree.slots = 256;
+    bounds.tree.nodes = 512;
+    bounds.tree.bindings = 512;
+    bounds.tree.slots = 128;
     bounds.tree.patches = 5 * bounds.tree.nodes;
     bounds.tree.text_bytes = bounds.tree.nodes.checked_mul(bounds.tree.text_per_node).expect("world text fits");
     view::worst_case(&bounds, limits, jig, obs, infra).expect("world profile fits");
