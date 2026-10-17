@@ -22,7 +22,7 @@ pub enum Invalid {
     Payload,
     Document(wire::documents::Invalid),
     PendingDocument,
-    Application(wire::family::Invalid),
+    Application(jig_client_test_domain::family::wire::Invalid),
 }
 /// A terminal provider exchange, outside the keyed request table.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -253,7 +253,8 @@ pub fn application_document(
     if supplied_scope != scope {
         return Err(Invalid::OwnerRoute);
     }
-    let value = wire::family::document(subject, source, limits).map_err(Invalid::Application)?;
+    let value =
+        jig_client_test_domain::family::wire::document(subject, source, limits).map_err(Invalid::Application)?;
     assert!(transport.delivered(watcher, Pace::Document), "validated original application route");
     Ok(Incoming::Callback {
         client: route.client,
@@ -283,7 +284,7 @@ pub fn application_read(
     }
     let result = match source {
         Ok(source) => family::ReadResult::Value(family::Document::Connector(
-            wire::family::document(subject, source, limits).map_err(Invalid::Application)?,
+            jig_client_test_domain::family::wire::document(subject, source, limits).map_err(Invalid::Application)?,
         )),
         Err(jig_test_connector::DocumentMissing::Unknown) => family::ReadResult::Unknown,
         Err(jig_test_connector::DocumentMissing::NotAllowed) => family::ReadResult::NotAllowed,
@@ -382,7 +383,7 @@ pub fn application_reply(
     }
     let client = *client;
     let attempt = *attempt;
-    let answer = wire::family::answer(outcome);
+    let answer = jig_client_test_domain::family::wire::answer(outcome);
     if !jig_client_test_domain::connector_bounds::answer_fits(&answer, limits) {
         return Err(Invalid::Payload);
     }
@@ -985,7 +986,7 @@ mod tests {
                 jig_test_connector::ClientDocument::Result { task: 1, code: u16::MAX },
                 &limits
             ),
-            Err(Invalid::Application(wire::family::Invalid::Identity))
+            Err(Invalid::Application(jig_client_test_domain::family::wire::Invalid::Identity))
         ));
         assert!(transport.application_taken(ClientId(0), native).is_none());
         let Incoming::Callback {

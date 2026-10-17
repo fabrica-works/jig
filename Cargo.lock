@@ -311,6 +311,7 @@ name = "jig-client-test-domain"
 version = "0.0.0"
 dependencies = [
  "jig-client-domain",
+ "jig-client-test-protocol-wire",
  "jig-client-view",
  "jig-test-connector",
  "skein-lib",
@@ -329,6 +330,7 @@ dependencies = [
 name = "jig-client-test-protocol-wire"
 version = "0.0.0"
 dependencies = [
+ "jig-test-connector",
  "skein-codec",
  "skein-lib",
 ]

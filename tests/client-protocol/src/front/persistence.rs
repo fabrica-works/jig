@@ -99,9 +99,11 @@ pub(crate) fn restored(saved: link::Saved) -> client::store::Record {
                 request: match record.request.request {
                     jig_client_domain::Ask::Jig(value) => client::Ask::Jig(value),
                     jig_client_domain::Ask::Family(value) => {
-                        let decoded =
-                            jig_test_service::family::request(&value.bytes, &fixtures::owner_limits().connector)
-                                .expect("family ask");
+                        let decoded = jig_client_test_protocol_wire::codec::request(
+                            &value.bytes,
+                            &fixtures::owner_limits().connector,
+                        )
+                        .expect("family ask");
                         client::Ask::First(client::first::Ask::ChangeObject {
                             project: decoded.project,
                             object: decoded.value.object,

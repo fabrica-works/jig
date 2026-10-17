@@ -161,18 +161,18 @@ impl Engine {
                     self.event(Event::Application(clients::FromApplication::Answered {
                         to,
                         family: number,
-                        record: jig_test_service::family::outcome(&outcome),
+                        record: jig_client_test_protocol_wire::codec::outcome(&outcome),
                     }));
                 }
                 root::Delivery::ApplicationDocument { watcher, number, document } => {
                     self.event(Event::Application(clients::FromApplication::Delivery {
                         watcher,
                         family: number,
-                        record: jig_test_service::family::document(&document),
+                        record: jig_client_test_protocol_wire::codec::document(&document),
                     }));
                 }
                 root::Delivery::ApplicationRead { reply, number, answer } => {
-                    let record = Some(jig_test_service::family::read_answer(&answer));
+                    let record = Some(jig_client_test_protocol_wire::codec::read_answer(&answer));
                     self.event(Event::Application(clients::FromApplication::Read { reply, family: number, record }));
                 }
                 root::Delivery::Core(held) => {

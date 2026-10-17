@@ -1,9 +1,9 @@
 //! The client's family records, retaining the originally scoped route.
 use jig_client_domain::Family;
+use jig_client_test_domain::family::wire as application;
 use jig_client_test_domain::{connector_values::ConnectorDocument, family as d, first};
+use jig_client_test_protocol_wire::codec;
 use jig_client_test_protocol_wire::v1 as w;
-use jig_client_world::joint::wire::family as application;
-use jig_test_service::family as codec;
 use skein_lib::{Reader, Writer};
 
 #[must_use]

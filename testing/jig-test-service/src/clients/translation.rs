@@ -1,5 +1,5 @@
 //! Exhaustive clients' boundary translations (client.md, 2 and 11).
-use crate::family;
+use jig_client_test_protocol_wire::codec;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_protocol_engine_clients as kit;
@@ -92,13 +92,13 @@ pub(crate) fn immediate(now: core::Now, admission: &mut Option<Token>) -> Option
 pub(crate) fn application(value: root::Delivery) -> Option<kit::Event> {
     let value = match value {
         root::Delivery::ApplicationDocument { watcher, number, document } => {
-            kit::FromApplication::Delivery { watcher, family: number, record: family::document(&document) }
+            kit::FromApplication::Delivery { watcher, family: number, record: codec::document(&document) }
         }
         root::Delivery::ApplicationRead { reply, number, answer } => {
-            kit::FromApplication::Read { reply, family: number, record: Some(family::read_answer(&answer)) }
+            kit::FromApplication::Read { reply, family: number, record: Some(codec::read_answer(&answer)) }
         }
         root::Delivery::Application { to, number, outcome } => {
-            kit::FromApplication::Answered { to, family: number, record: family::outcome(&outcome) }
+            kit::FromApplication::Answered { to, family: number, record: codec::outcome(&outcome) }
         }
         root::Delivery::Link { .. }
         | root::Delivery::CallBusy { .. }

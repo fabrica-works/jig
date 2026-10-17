@@ -371,7 +371,7 @@ fn application_read(engine: &crate::Engine) -> Box<[u8]> {
         w::OwnedParts {
             owner,
             version: jig_client_test_protocol_wire::VERSION,
-            record: crate::family::read(&jig_test_connector::ClientSubject::Deployment),
+            record: jig_client_test_protocol_wire::codec::read(&jig_test_connector::ClientSubject::Deployment),
         },
     )
     .expect("test owned read");

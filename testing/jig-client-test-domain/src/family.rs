@@ -255,3 +255,5 @@ pub fn owner_effect(part: &OwnerPart) -> Option<Part> {
         | OwnerPartKind::Outbox => None,
     }
 }
+
+pub mod wire;

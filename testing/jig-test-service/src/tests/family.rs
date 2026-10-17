@@ -1,4 +1,5 @@
-use crate::{family as codec, tests::fixtures::family as f};
+use crate::tests::fixtures::family as f;
+use jig_client_test_protocol_wire::codec;
 use jig_protocol_engine_clients::{Event, FromApplication, ToApplication};
 use jig_test_connector as d;
 use jig_test_domain as root;
@@ -31,7 +32,7 @@ fn an_application_request_round_trips_through_its_record() {
             "{label}"
         );
         let root::Event::Application { reply_to, sign_in, key, scope, number, digest, value: request_value } =
-            codec::to_root(request(record), &f::limits(), 2).expect("root input")
+            crate::family::to_root(request(record), &f::limits(), 2).expect("root input")
         else {
             panic!("{label}: application input")
         };
@@ -72,7 +73,7 @@ fn a_request_that_does_not_decode_reaches_no_root() {
         ("trailing", trailing),
     ];
     for (label, record) in cases {
-        let answer = codec::to_root(request(record), &f::limits(), 2).expect_err("no root input");
+        let answer = crate::family::to_root(request(record), &f::limits(), 2).expect_err("no root input");
         let Event::Application(FromApplication::Undecodable { to }) = *answer else {
             panic!("{label}: undecodable terminal")
         };
