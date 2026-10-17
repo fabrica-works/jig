@@ -28,7 +28,14 @@ fn read(tool: &[u8], input: &[u8], limits: &Limits) -> Result<Decoded, Problem> 
         b"message" => message(&value)?,
         b"cancel" => core::NamedAction::Control {
             target: value.required(b"target")?.number()?,
-            control: tasks::Control::Cancel { reason: value.required(b"reason")?.text()?, grace: None, message: None },
+            control: tasks::Control::Cancel {
+                reason: value.required(b"reason")?.text()?,
+                grace: match value.field(b"grace")? {
+                    Some(value) => Some(skein_lib::Duration::from_nanos(value.number()?)),
+                    None => None,
+                },
+                message: None,
+            },
         },
         b"release" => core::NamedAction::Release {
             target: value.required(b"target")?.number()?,
@@ -44,11 +51,7 @@ fn read(tool: &[u8], input: &[u8], limits: &Limits) -> Result<Decoded, Problem> 
         },
         b"withdraw" => core::NamedAction::WithdrawProposal { proposal: value.required(b"proposal")?.number()? },
         b"unsubscribe" => core::NamedAction::Unsubscribe { subscription: value.required(b"subscription")?.number()? },
-        b"amend" => core::NamedAction::Amend {
-            target: value.required(b"target")?.number()?,
-            revision: value.required(b"revision")?.number()?,
-            amendment: nested::amendment(value.required(b"amendment")?)?,
-        },
+        b"amend" => amend(&value)?,
         b"decide" => match value.required(b"kind")?.text()?.as_ref() {
             b"proposal" => {
                 let choice = match value.required(b"decision")?.text()?.as_ref() {
@@ -177,4 +180,26 @@ fn propose(value: &json::Value, limits: &Limits) -> Result<core::NamedAction, Pr
         },
         _ => return Err(Problem { field: b"action", why: Why::Range }),
     })
+}
+
+fn amend(value: &json::Value) -> Result<core::NamedAction, Problem> {
+    let amendment = nested::amendment(value.required(b"amendment")?)?;
+    let priority = match amendment.tracked {
+        Some(tasks::Tracking::Tracked { .. }) => true,
+        Some(tasks::Tracking::Untracked) | None => false,
+    };
+    let revision = match value.field(b"revision")? {
+        Some(value) => value.number()?,
+        None if priority
+            && amendment.spec.is_none()
+            && amendment.wake.is_none()
+            && amendment.dependencies.is_none()
+            && amendment.authority.is_none()
+            && amendment.instructions.is_none() =>
+        {
+            0
+        }
+        None => return Err(Problem { field: b"revision", why: Why::Missing }),
+    };
+    Ok(core::NamedAction::Amend { target: value.required(b"target")?.number()?, revision, amendment })
 }

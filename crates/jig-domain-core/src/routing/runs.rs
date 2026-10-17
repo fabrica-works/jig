@@ -566,17 +566,7 @@ pub(super) fn named_action(
             }));
         }
         NamedAction::Control { target, control } => {
-            assert!(core.pending_calls.insert(key, true).is_ok(), "call record room reserved");
-            assert!(
-                core.routing_calls.insert(token, RoutedCall::Control { key, target, revised: false }) == Ok(None),
-                "one live routed call"
-            );
-            work.push(Event::Tasks(tasks::Event::Control {
-                reply_to: ReplyTo::new(token),
-                by: tasks::Party::Task(key.task),
-                task: target,
-                control,
-            }));
+            return super::run_controls::control(core, work, ReplyTo::new(token), key, target, control);
         }
         NamedAction::Amend { target, revision, amendment } => {
             let stop_run =
@@ -604,7 +594,7 @@ pub(super) fn named_action(
                         return Requests::Out(out);
                     }
                 };
-            let moved = match core.spec_revision(target, revision) {
+            let moved = match core.party_amend_revision(target, revision, &amendment) {
                 Ok(()) => None,
                 Err(jig_domain_people::Refusal::Moved { now }) => Some(now),
                 Err(_) => unreachable!("admitted amendment target exists"),
@@ -650,7 +640,14 @@ pub(super) fn named_action(
         }
         NamedAction::WithdrawProposal { proposal } => {
             if core.tasks.proposal(key.task, proposal).is_none() {
-                return proposal_refused(core, ReplyTo::new(token), key, tasks::Refusal::Unknown);
+                assert!(core.pending_calls.insert(key, true).is_ok(), "proposal call room reserved");
+                out.push(Request::Now(Box::new(crate::Now::DecidedProposal {
+                    to: ReplyTo::new(token),
+                    key,
+                    proposal,
+                })));
+                out.push(Request::Decided);
+                return Requests::Out(out);
             }
             assert!(core.pending_calls.insert(key, true).is_ok(), "proposal call room reserved");
             assert!(

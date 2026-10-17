@@ -267,6 +267,8 @@ pub enum Now {
     LoadEndedRead { request: Token, task: u64, party: u64 },
     /// Load one proposal decision that has left live task memory.
     HistoricalProposal { request: Token, person: u64, project: u32, proposer: people::Proposer, proposal: u64 },
+    /// Load a task proposal from the proposer's retained history.
+    DecidedProposal { to: ReplyTo, key: CallKey, proposal: u64 },
     /// Load the ended owner row for a person-task act whose live row is gone.
     HistoricalPersonTask { request: Token, person: u64, project: u32, task: u64 },
     /// Load the first input or ended tree root; later inputs return to the core between gets.
@@ -507,6 +509,8 @@ pub enum Event {
     SeenChatLoaded { request: Token, row: Option<Box<tasks::TaskRecord>>, busy: bool },
     /// The ended position loaded for an authenticated mark, zero if absent.
     EndedReadLoaded { request: Token, task: u64, party: u64, through: u64, busy: bool },
+    /// The proposal loaded from its task proposer's durable history.
+    DecidedProposal { to: ReplyTo, key: CallKey, proposal: u64, row: Option<tasks::Proposal>, busy: bool },
     /// One archived proposal decision, translated from the root's store row.
     HistoricalProposal {
         request: Token,

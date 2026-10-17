@@ -84,9 +84,6 @@ impl Core {
     }
 
     /// Compare only the task spec, independent of progress or history.
-    pub(crate) fn spec_revision(&self, task: u64, revision: u64) -> Result<(), people::Refusal> {
-        Self::spec_revision_in(task, revision, &tasks::CompoundAdmission::new(&self.tasks, 0))
-    }
     pub(crate) fn spec_revision_in(
         task: u64,
         revision: u64,

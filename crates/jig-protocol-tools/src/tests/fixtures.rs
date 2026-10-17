@@ -20,7 +20,7 @@ pub const RECALL: &[u8] = br#"{"kind":"name","name":1}"#;
 pub const FIELDS: &[(&[u8], &[&[u8]])] = &[
     (b"delegate", &[b"batch"]),
     (b"message", &[b"target", b"form", b"words", b"question"]),
-    (b"cancel", &[b"target", b"reason"]),
+    (b"cancel", &[b"target", b"reason", b"grace"]),
     (b"release", &[b"target", b"revision", b"again"]),
     (b"introduce", &[b"left", b"right"]),
     (b"decide", &[b"kind", b"proposer", b"proposal", b"task", b"revision", b"decision", b"reason"]),

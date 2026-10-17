@@ -354,6 +354,7 @@ impl Application for OpsApplication {
                 | core::Now::SeenChat { .. }
                 | core::Now::LoadEndedRead { .. }
                 | core::Now::HistoricalProposal { .. }
+                | core::Now::DecidedProposal { .. }
                 | core::Now::HistoricalPersonTask { .. }
                 | core::Now::PartyInputs { .. }
                 | core::Now::CompleteBrief { .. }

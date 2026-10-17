@@ -12,6 +12,7 @@ use skein_lib::{Queue, ReplyTo, Token, Wall};
 
 /// One store response, belonging to its named owner.
 #[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "store replies carry the core's bounded proposal event whole")]
 pub enum Store {
     /// This whole transaction is durable.
     Committed { number: u64, fill: u64 },

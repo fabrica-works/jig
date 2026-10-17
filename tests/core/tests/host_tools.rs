@@ -351,3 +351,78 @@ fn a_delegate_call_answers_its_tasks_spec_revisions() {
         &core::CallPart::Delegated(Box::new([core::Made { task: CHILD, revision: 0, given: None }]))
     );
 }
+
+const TRACK_CHILD: &[u8] = br#"{"target":2,"revision":0,"amendment":{"tracked":{"priority":7},"reason":"track"}}"#;
+const PRIORITISE_CHILD: &[u8] = br#"{"target":2,"amendment":{"tracked":{"priority":8},"reason":"urgent"}}"#;
+const UNTRACK_CHILD: &[u8] = br#"{"target":2,"revision":0,"amendment":{"tracked":"untracked","reason":"finished"}}"#;
+const CANCEL_CHILD: &[u8] = br#"{"target":2,"reason":"wrap up","grace":5000000000}"#;
+
+#[test]
+fn a_cancel_with_a_grace_asks_the_delegate_to_finish_first() {
+    let mut world = World::new(201, false);
+    world.hold_procedures = true;
+    world.delegate();
+    world.tool_call(b"cancel", CANCEL_CHILD, true);
+    assert_eq!(answer(&world), &core::SettledAnswer::Host { error: false, body: b"Done".as_slice().into() });
+    let child = jig_core_world::fixtures::live_row(&world, CHILD);
+    let grace = child.grace.as_ref().expect("finish requested before cancellation");
+    assert_eq!(grace.by, jig_domain_tasks::Party::Task(REQUESTER));
+    assert_eq!(grace.reason.as_ref(), b"wrap up");
+    assert_eq!(child.inbox.last().expect("finish word").number, grace.message);
+}
+#[test]
+fn a_runs_priority_change_without_a_revision_commits_after_a_spec_change() {
+    let mut world = World::new(202, false);
+    world.hold_procedures = true;
+    world.delegate();
+    world.tool_call(b"amend", TRACK_CHILD, true);
+    world.turn(1, 0, None, b"record calls");
+    world.turn(2, 0, None, b"record calls");
+    world.tool_call(b"amend", DIRECT_AMEND, true);
+    world.turn(3, 0, None, b"record spec amendment");
+    world.tool_call(b"amend", PRIORITISE_CHILD, true);
+    assert_eq!(
+        answer(&world),
+        &core::SettledAnswer::Host { error: false, body: b"Done: task 2 is at spec revision 1".as_slice().into() }
+    );
+    let child = jig_core_world::fixtures::live_row(&world, CHILD);
+    assert_eq!(child.tracked, Some(8));
+    assert_eq!(child.spec.words.as_ref(), b"newer");
+    assert_eq!(child.revisions.spec, 1);
+}
+#[test]
+fn a_runs_amendment_untracks_its_delegate() {
+    let mut world = World::new(203, false);
+    world.hold_procedures = true;
+    world.delegate();
+    world.tool_call(b"amend", TRACK_CHILD, true);
+    assert_eq!(jig_core_world::fixtures::live_row(&world, CHILD).tracked, Some(7));
+    world.turn(1, 0, None, b"record calls");
+    world.turn(2, 0, None, b"record calls");
+    world.tool_call(b"amend", UNTRACK_CHILD, true);
+    assert_eq!(
+        answer(&world),
+        &core::SettledAnswer::Host { error: false, body: b"Done: task 2 is at spec revision 0".as_slice().into() }
+    );
+    assert_eq!(jig_core_world::fixtures::live_row(&world, CHILD).tracked, None);
+}
+
+#[test]
+fn withdrawing_an_accepted_proposal_answers_already_accepted() {
+    jig_core_world::agents_tools::withdraw_decided(&mut World::new(204, false), None);
+}
+const UNKNOWN_PROPOSAL: &[u8] = br#"{"proposal":42}"#;
+#[test]
+fn withdrawing_an_unknown_proposal_is_refused_unknown() {
+    let mut world = World::new(205, false);
+    world.tool_call(b"withdraw", UNKNOWN_PROPOSAL, true);
+    assert_eq!(
+        world.answers.last().expect("withdraw answer").2,
+        core::CallPart::ProposalRefused(jig_domain_tasks::Problem {
+            task: Some(REQUESTER),
+            why: jig_domain_tasks::Refusal::Unknown,
+            blocked_by: None,
+            capacity: None,
+        })
+    );
+}

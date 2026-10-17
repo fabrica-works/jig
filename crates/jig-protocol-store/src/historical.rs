@@ -13,6 +13,7 @@ pub fn key(now: &Now) -> Option<Key> {
         Now::SeenChat { task, .. } | Now::HistoricalPersonTask { task, .. } => {
             Some(Key::Tasks(tasks::Key::Ended(*task)))
         }
+        Now::DecidedProposal { key, .. } => Some(Key::Tasks(tasks::Key::Live(key.task))),
         Now::HistoricalProposal { proposer, proposal, .. } => {
             Some(Key::Core(CoreKey::ProposalDecision { proposer: *proposer, proposal: *proposal }))
         }
@@ -70,6 +71,9 @@ pub fn answer(now: Now, row: Option<Record>) -> Option<core::Event> {
         Now::SeenChat { request, .. } => core::Event::SeenChatLoaded { request, row: ended(row), busy: false },
         Now::HistoricalPersonTask { request, person, project, task } => {
             core::Event::HistoricalPersonTask { request, person, project, task, row: ended(row), busy: false }
+        }
+        Now::DecidedProposal { to, key, proposal } => {
+            core::Event::DecidedProposal { to, key, proposal, row: task_proposal(row), busy: false }
         }
         Now::HistoricalProposal { request, person, project, proposer, proposal } => core::Event::HistoricalProposal {
             request,
@@ -187,4 +191,21 @@ fn escalation_row(row: Option<Record>) -> Option<core::EscalationDecisionRecord>
         | Record::People(_)
         | Record::Notes(_) => None,
     }
+}
+
+/// Follow a task owner's retained proposal position before answering the call.
+#[must_use]
+pub fn next(now: &Now, row: &Option<Record>) -> Option<Key> {
+    if let Now::DecidedProposal { key, proposal, .. } = now
+        && let Some(Record::Tasks(tasks::Stored::Live(owner))) = row
+        && owner.number == key.task
+    {
+        return crate::reads::proposal_key(owner, *proposal);
+    }
+    None
+}
+
+fn task_proposal(row: Option<Record>) -> Option<tasks::Proposal> {
+    let Some(Record::Tasks(tasks::Stored::History(row))) = row else { return None };
+    Some(*row.proposal?)
 }

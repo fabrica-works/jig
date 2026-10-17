@@ -555,3 +555,70 @@ fn a_delegate_batch_with_two_as_allowed_budgets_is_not_well_formed() {
     };
     assert_eq!(problem, Problem { field: b"budget", why: Why::Malformed });
 }
+
+const CANCEL_GRACE: &[u8] = br#"{"target":3,"reason":"wrap up","grace":5000000000}"#;
+const TRACK_PRIORITY: &[u8] = br#"{"target":3,"amendment":{"tracked":{"priority":7},"reason":"urgent"}}"#;
+const SPEC_NO_REVISION: &[u8] = br#"{"target":3,"amendment":{"spec":{"words":"new"},"reason":"evidence"}}"#;
+
+#[test]
+fn a_cancel_call_gives_a_grace() {
+    let Decoded::Action(core::NamedAction::Control { target, control }) =
+        crate::decode(b"cancel", CANCEL_GRACE, &fixtures::LIMITS)
+    else {
+        panic!("decoded cancellation")
+    };
+    assert_eq!(target, fixtures::TARGET);
+    assert_eq!(
+        control,
+        jig_domain_tasks::Control::Cancel {
+            reason: b"wrap up".as_slice().into(),
+            grace: Some(skein_lib::Duration::from_secs(5)),
+            message: None,
+        }
+    );
+}
+#[test]
+fn a_cancel_call_without_a_grace_decodes_as_before() {
+    let Decoded::Action(core::NamedAction::Control { target, control }) =
+        crate::decode(b"cancel", fixtures::CANCEL, &fixtures::LIMITS)
+    else {
+        panic!("decoded cancellation")
+    };
+    assert_eq!(target, fixtures::TARGET);
+    assert_eq!(
+        control,
+        jig_domain_tasks::Control::Cancel { reason: b"no longer needed".as_slice().into(), grace: None, message: None }
+    );
+}
+#[test]
+fn an_amend_of_a_priority_alone_needs_no_revision() {
+    let Decoded::Action(core::NamedAction::Amend { target, revision, amendment }) =
+        crate::decode(b"amend", TRACK_PRIORITY, &fixtures::LIMITS)
+    else {
+        panic!("decoded priority amendment")
+    };
+    assert_eq!((target, revision), (fixtures::TARGET, 0));
+    assert_eq!(amendment.tracked, Some(jig_domain_tasks::Tracking::Tracked { priority: 7 }));
+}
+#[test]
+fn an_amend_changing_the_spec_without_a_revision_is_answered_missing() {
+    let Decoded::Problem(problem) = crate::decode(b"amend", SPEC_NO_REVISION, &fixtures::LIMITS) else {
+        panic!("missing revision")
+    };
+    assert_eq!(problem, Problem { field: b"revision", why: Why::Missing });
+}
+
+const DECIDED_OUTCOMES: &[(jig_domain_tasks::ProposalOutcome, &[u8])] = &[
+    (jig_domain_tasks::ProposalOutcome::Accepted, b"Already decided: proposal 9 was accepted"),
+    (jig_domain_tasks::ProposalOutcome::Rejected, b"Already decided: proposal 9 was rejected"),
+    (jig_domain_tasks::ProposalOutcome::Withdrawn, b"Already decided: proposal 9 was withdrawn"),
+    (jig_domain_tasks::ProposalOutcome::Stale, b"Already decided: proposal 9 was stale"),
+];
+#[test]
+fn a_decided_proposal_answer_names_its_outcome() {
+    for &(outcome, expected) in DECIDED_OUTCOMES {
+        let answer = crate::render(&core::CallPart::ProposalDecided { proposal: PROPOSED_NUMBER, outcome });
+        assert_eq!(answer.text.as_ref(), expected, "{outcome:?}");
+        assert!(!answer.error, "{outcome:?}");
+    }
+}

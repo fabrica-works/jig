@@ -327,6 +327,7 @@ impl World {
                         | core::Now::HistoricalPersonTask { .. }
                         | core::Now::PartyInputs { .. }
                         | core::Now::HistoricalProposal { .. }
+                        | core::Now::DecidedProposal { .. }
                         | core::Now::HistoricalEscalation { .. }),
                     ) => self.store.ask(StoreOut::Now(now)),
                     root::Request::Now(now) => {

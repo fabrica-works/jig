@@ -18,6 +18,7 @@ pub const STORIES: &[Story] = &[
     Story { name: "release moved", run: release_moved },
     Story { name: "held notice", run: held_notice },
     Story { name: "delegate given", run: delegate_given },
+    Story { name: "withdraw decided", run: withdraw_decided },
 ];
 fn amend_done(world: &mut World, cut: Option<Cut>) -> u64 {
     amend(world, cut, false)
@@ -205,6 +206,75 @@ pub fn delegate_given(world: &mut World, cut: Option<Cut>) -> u64 {
         }
     );
     assert_eq!(crate::fixtures::live_row(world, CHILD).numbers.budget, 40);
+    let commits = world.store.applied - before;
+    if cut.is_some() {
+        world.reached_cut = cut;
+    }
+    commits
+}
+
+const PROPOSE_TRACK: &[u8] = br#"{"action":"amend","target":2,"revision":0,"amendment":{"tracked":{"priority":7},"reason":"track"},"reason":"please"}"#;
+const EVIDENCE: &[u8] = br#"{"target":2,"form":"words","words":"evidence"}"#;
+const WITHDRAW: &[u8] = br#"{"proposal":3}"#;
+const ACCEPTED_PROPOSAL: u64 = 3;
+const ACCEPT: u8 = 73;
+const WITHDRAW_COMPLETION: u32 = 5;
+fn accepted_proposal(world: &mut World) {
+    world.hold_procedures = true;
+    world.delegate();
+    world.tool_call(b"message", EVIDENCE, true);
+    world.turn(1, 0, None, b"record delegate");
+    world.turn(2, 0, None, b"record message");
+    world.tool_call(b"message", EVIDENCE, true);
+    world.turn(3, 0, None, b"record message");
+    world.tool_call(b"propose", PROPOSE_TRACK, true);
+    assert_eq!(
+        world.answers.last().expect("proposed").2,
+        core::CallPart::Proposed { proposal: ACCEPTED_PROPOSAL, holder: tasks::ProposalHolder::Person(REQUESTER) }
+    );
+    world.turn(4, 0, None, b"record proposal");
+    crate::fixtures::ask_as(
+        world,
+        world.sign_in.expect("signed in"),
+        ACCEPT,
+        jig_domain_people::Ask::DecideProposal {
+            project: 1,
+            proposer: jig_domain_people::Proposer::Task(REQUESTER),
+            proposal: ACCEPTED_PROPOSAL,
+            decision: jig_domain_people::ProposalDecision::Accept,
+        },
+    );
+    let Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::ProposalDecided {
+        choice: jig_domain_people::ProposalChoice::Accepted,
+        ..
+    })) = world.people_answers.last()
+    else {
+        panic!("acceptance: {:?}", world.people_answers.last())
+    };
+}
+/// A withdrawal loads the accepted proposal from history and retains its answer.
+pub fn withdraw_decided(world: &mut World, cut: Option<Cut>) -> u64 {
+    accepted_proposal(world);
+    let before = world.store.applied;
+    world.cut = cut.map(|cut| match cut {
+        Cut::Submitted(at) => Cut::Submitted(before + at),
+        Cut::Durable(at) => Cut::Durable(before + at),
+    });
+    world.tool_call(b"withdraw", WITHDRAW, true);
+    let key = world.call_key(WITHDRAW_COMPLETION);
+    if cut.is_some() {
+        assert!(world.reached_cut.is_some(), "withdraw reaches its cut");
+        world.restart(190, false);
+        reconnect(world, key);
+    }
+    replay(world, key, b"withdraw", WITHDRAW);
+    assert_eq!(
+        &world.host_answers.last().expect("withdraw answer").1.answer,
+        &core::SettledAnswer::Host {
+            error: false,
+            body: b"Already decided: proposal 3 was accepted".as_slice().into()
+        }
+    );
     let commits = world.store.applied - before;
     if cut.is_some() {
         world.reached_cut = cut;

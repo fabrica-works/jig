@@ -1376,6 +1376,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         load @ (core::Now::SeenChat { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalProposal { .. }
+        | core::Now::DecidedProposal { .. }
         | core::Now::HistoricalEscalation { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }) => {

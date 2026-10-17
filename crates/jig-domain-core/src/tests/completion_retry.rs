@@ -46,6 +46,7 @@ fn current_stream(out: &[Request]) -> &Request {
                 | Now::SeenChat { .. }
                 | Now::LoadEndedRead { .. }
                 | Now::HistoricalProposal { .. }
+                | Now::DecidedProposal { .. }
                 | Now::HistoricalPersonTask { .. }
                 | Now::PartyInputs { .. }
                 | Now::CompleteBrief { .. }

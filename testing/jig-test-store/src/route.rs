@@ -175,6 +175,7 @@ fn window(now: core::Now) -> Option<(u64, u64, u32)> {
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }
+        | core::Now::DecidedProposal { .. }
         | core::Now::HistoricalEscalation { .. } => None,
     }
 }
@@ -217,6 +218,11 @@ pub fn up(routes: &mut Routes, event: Event, into: &mut Queue<Up>) {
                         return;
                     }
                 };
+                if let Some(key) = store::historical::next(&now, &row) {
+                    assert!(routes.pending.insert(owner, Flight::Historical(now)).is_ok(), "historical slot retained");
+                    into.push(Up::Ask(Request::Get { owner, key: store::Get::Jig(key) }));
+                    return;
+                }
                 if let Some(event) = store::historical::answer(now, row) {
                     into.push(Up::Root(root::Event::Core(event)));
                 }

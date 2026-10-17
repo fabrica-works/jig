@@ -157,6 +157,7 @@ fn immediate(engine: &mut Engine, now: core::Now) {
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }
+        | core::Now::DecidedProposal { .. }
         | core::Now::HistoricalEscalation { .. }
         | core::Now::StartPreparation { .. }) => {
             crate::store::request(engine, jig_test_store::StoreOut::Now(value));

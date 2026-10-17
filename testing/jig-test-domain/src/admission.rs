@@ -21,6 +21,7 @@ pub fn try_step(domain: &mut Domain, env: &Env<Limits>, event: Event) -> Result<
             | core::Event::HistoricalPersonTask { .. }
             | core::Event::PartyInputsLoaded { .. }
             | core::Event::HistoricalProposal { .. }
+            | core::Event::DecidedProposal { .. }
             | core::Event::HistoricalEscalation { .. }
             | core::Event::Notes(_),
         )) => {

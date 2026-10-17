@@ -116,7 +116,14 @@ pub(crate) fn amendment(value: &Value) -> Result<tasks::Amendment, Problem> {
         None => None,
     };
     Ok(tasks::Amendment {
-        tracked: None,
+        tracked: match value.field(b"tracked")? {
+            Some(value @ Value { kind: crate::json::Kind::Object(_), .. }) => {
+                Some(tasks::Tracking::Tracked { priority: value.required(b"priority")?.small()? })
+            }
+            Some(value) if value.text()?.as_ref() == b"untracked" => Some(tasks::Tracking::Untracked),
+            Some(_) => return Err(Problem { field: b"tracked", why: crate::Why::Range }),
+            None => None,
+        },
         addressed: None,
         instructions,
         release: None,

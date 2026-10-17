@@ -307,6 +307,7 @@ fn now_event(now: core::Now) -> Option<Event> {
         | core::Now::SeenChat { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalProposal { .. }
+        | core::Now::DecidedProposal { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::CompleteBrief { .. }
@@ -368,6 +369,7 @@ fn watcher(event: &core::Event) -> Option<Token> {
         | core::Event::EndedReadLoaded { .. }
         | core::Event::SeenChatLoaded { .. }
         | core::Event::HistoricalProposal { .. }
+        | core::Event::DecidedProposal { .. }
         | core::Event::HistoricalPersonTask { .. }
         | core::Event::PartyInputsLoaded { .. }
         | core::Event::HistoricalEscalation { .. }

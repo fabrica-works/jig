@@ -58,6 +58,7 @@ pub enum StoreOut {
 }
 /// A restored row, a root terminal or the next store request.
 #[derive(Debug)]
+#[expect(clippy::large_enum_variant, reason = "store replies carry the core's bounded proposal event whole")]
 pub enum Up {
     Restore(jig_test_domain::Record),
     Root(jig_test_domain::Event),

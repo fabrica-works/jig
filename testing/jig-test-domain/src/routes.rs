@@ -528,6 +528,7 @@ fn route_now(
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }
         | core::Now::HistoricalProposal { .. }
+        | core::Now::DecidedProposal { .. }
         | core::Now::HistoricalEscalation { .. }
         | core::Now::SettledCallRefused { .. }
         | core::Now::Call { .. }

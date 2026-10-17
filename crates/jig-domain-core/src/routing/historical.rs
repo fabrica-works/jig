@@ -139,3 +139,33 @@ pub(super) fn route_historical_proposal(
     out.push(Request::Decided);
     Requests::Out(out)
 }
+
+/// Finish a withdrawal against a proposal that has left the live task state.
+pub(super) fn decided_proposal(
+    core: &mut Core,
+    to: skein_lib::ReplyTo,
+    key: crate::CallKey,
+    proposal: u64,
+    row: Option<tasks::Proposal>,
+    busy: bool,
+) -> Requests {
+    let part = if busy {
+        crate::CallPart::Unavailable
+    } else if let Some(row) = row
+        && row.number == proposal
+        && row.proposer == key.task
+    {
+        let outcome = match row.state {
+            tasks::ProposalState::Accepted { .. } => tasks::ProposalOutcome::Accepted,
+            tasks::ProposalState::Rejected { .. } => tasks::ProposalOutcome::Rejected,
+            tasks::ProposalState::Withdrawn => tasks::ProposalOutcome::Withdrawn,
+            tasks::ProposalState::Pending { .. } => {
+                return super::runs::proposal_refused(core, to, key, tasks::Refusal::Unknown);
+            }
+        };
+        crate::CallPart::ProposalDecided { proposal, outcome }
+    } else {
+        return super::runs::proposal_refused(core, to, key, tasks::Refusal::Unknown);
+    };
+    super::runs::route_named_answer(core, to, key, part)
+}

@@ -60,6 +60,7 @@ mod people_routes;
 mod procedure_steps;
 mod proposal_revisions;
 pub(crate) mod refusals;
+mod run_controls;
 mod run_delegation;
 mod run_payloads;
 mod run_preparation;
@@ -382,6 +383,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::EndedReadLoaded { .. }
         | Event::SeenChatLoaded { .. }
         | Event::HistoricalProposal { .. }
+        | Event::DecidedProposal { .. }
         | Event::HistoricalPersonTask { .. }
         | Event::PartyInputsLoaded { .. }
         | Event::HistoricalEscalation { .. }
@@ -550,6 +552,9 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         ),
         Event::SeenChatLoaded { request, row, busy } => {
             crate::inbox::seen_chat_loaded(core, env, work, request, row, busy)
+        }
+        Event::DecidedProposal { to, key, proposal, row, busy } => {
+            historical::decided_proposal(core, to, key, proposal, row, busy)
         }
         Event::HistoricalProposal { request, person, project, proposer, proposal, row, busy } => {
             route_historical_proposal(core, work, request, person, project, proposer, proposal, row, busy)

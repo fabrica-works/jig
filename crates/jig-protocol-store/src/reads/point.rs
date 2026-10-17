@@ -79,12 +79,9 @@ pub(super) fn proposal(
         }
         Proposer::Task(task) => {
             let Some(owner) = joins::owner(store, task, spent)? else { return Ok(empty()) };
-            for kept in &owner.proposal_rows {
-                if kept.proposal == proposal {
-                    let key = core::Key::Tasks(tasks::Key::History { task, revision: kept.revision });
-                    let Some(value) = record(store, &key)? else { return Ok(empty()) };
-                    return page(store, range, value, Some(&owner), None, spent);
-                }
+            if let Some(key) = proposal_key(&owner, proposal) {
+                let Some(value) = record(store, &key)? else { return Ok(empty()) };
+                return page(store, range, value, Some(&owner), None, spent);
             }
             Ok(reads::Loaded::Gone)
         }
@@ -224,4 +221,14 @@ pub(crate) fn finish(
         return Err(Failure::Cut);
     }
     Ok(reads::Loaded::Page { rows: Box::new([row]), next: None })
+}
+
+/// Exact history key for the newest retained occurrence of a task proposal.
+pub(crate) fn proposal_key(owner: &tasks::TaskRecord, proposal: u64) -> Option<core::Key> {
+    for kept in &owner.proposal_rows {
+        if kept.proposal == proposal {
+            return Some(core::Key::Tasks(tasks::Key::History { task: owner.number, revision: kept.revision }));
+        }
+    }
+    None
 }

@@ -22,7 +22,7 @@ pub(crate) enum Failure {
 pub(crate) fn empty() -> Loaded {
     Loaded::Page { rows: Box::new([]), next: None }
 }
-pub(crate) use point::finish;
+pub(crate) use point::{finish, proposal_key};
 
 pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Queue<Event>, below: &mut Below) {
     if store.phase == Phase::Closed {

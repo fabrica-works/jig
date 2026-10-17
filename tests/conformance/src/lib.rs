@@ -454,6 +454,7 @@ impl Application for Testing {
                     | core::Now::HistoricalPersonTask { .. }
                     | core::Now::PartyInputs { .. }
                     | core::Now::HistoricalProposal { .. }
+                    | core::Now::DecidedProposal { .. }
                     | core::Now::HistoricalEscalation { .. }),
                 ) => {
                     store.ask(StoreOut::Now(now));

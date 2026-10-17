@@ -48,8 +48,15 @@ pub fn render(part: &CallPart) -> Rendered {
         }
         CallPart::Connector { .. } => text(&[b"Connector answer"], false),
         CallPart::Proposed { proposal, holder } => proposed(*proposal, *holder),
-        CallPart::ProposalDecided { proposal, .. } => {
-            text(&[b"Decided proposal ", Decimal::of(*proposal).as_bytes()], false)
+        CallPart::ProposalDecided { proposal, outcome } => {
+            let outcome: &[u8] = match outcome {
+                jig_domain_tasks::ProposalOutcome::Accepted => b"accepted",
+                jig_domain_tasks::ProposalOutcome::Rejected => b"rejected",
+                jig_domain_tasks::ProposalOutcome::Withdrawn => b"withdrawn",
+                jig_domain_tasks::ProposalOutcome::Stale => b"stale",
+                jig_domain_tasks::ProposalOutcome::Passed => b"passed",
+            };
+            text(&[b"Already decided: proposal ", Decimal::of(*proposal).as_bytes(), b" was ", outcome], false)
         }
         CallPart::Sent { message } => text(&[b"Sent message ", Decimal::of(*message).as_bytes()], false),
         CallPart::Subscribed { subscription } => text(&[b"Subscribed ", Decimal::of(*subscription).as_bytes()], false),
