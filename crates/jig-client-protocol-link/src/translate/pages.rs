@@ -36,6 +36,8 @@ pub(crate) fn receiving(limits: &Limits) -> Result<Limits, Undecodable> {
     }
 }
 fn receiving_part0(checked: &mut Limits, limits: &Limits) {
+    checked.wire.task_page_live = u32::try_from(limits.client.document_bytes).expect("validated bytes");
+    checked.wire.ended_rows_rows = u32::try_from(limits.client.document_bytes).expect("validated bytes");
     checked.wire.activity_page_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.amendment_dependencies_some = limits.client.rows;
     checked.wire.amendment_instructions_some = limits.client.text;
@@ -391,4 +393,37 @@ pub(crate) fn turn_fields(value: &[u8], limits: &Limits) -> c::TurnRead {
         Err(jig_protocol_transcript::Undecodable::TooLarge) => c::TurnProblem::TooLarge,
     };
     c::TurnRead::Undecodable { why }
+}
+
+pub(crate) fn task_page(value: w::TaskPage, limits: &Limits) -> Result<c::TaskPage, Undecodable> {
+    if u64::from(value.measure()) > limits.client.document_bytes {
+        return Err(Undecodable::TooLarge);
+    }
+    let value = match w::TaskPage::new(&limits.wire, value.into_parts()) {
+        Ok(value) => value,
+        Err(problem) => return Err(classify(problem)),
+    };
+    match task_page_fields(&value, limits) {
+        Ok(value) => Ok(value),
+        Err(problem) => Err(classify(problem)),
+    }
+}
+fn task_page_fields(value: &w::TaskPage, limits: &Limits) -> Result<c::TaskPage, w::Problem> {
+    let live = super::documents::task_line_piece(value.live(), limits, limits.client.rows)?;
+    let live_after = match value.live_after() {
+        Some(v) => Some(cursor_fields(v, limits)?),
+        None => None,
+    };
+    let ended = match value.ended() {
+        w::EndedGroup::None => c::EndedGroup::None,
+        w::EndedGroup::Rows(v) => c::EndedGroup::Rows {
+            rows: super::documents::task_line_piece(v.rows(), limits, limits.client.rows)?,
+            after: match v.after() {
+                Some(v) => Some(cursor_fields(v, limits)?),
+                None => None,
+            },
+            cut: v.cut(),
+        },
+    };
+    Ok(c::TaskPage { live, live_after, ended })
 }

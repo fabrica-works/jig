@@ -7,19 +7,19 @@ use jig_client_domain::contract::{
     Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Bytes, Call, Capacity, Charter, Chip,
     ChipPhase, Closing, ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CreateProcedure,
     CurrentCall, CurrentHold, Cursor, Decider, Decision, Delivery, Deployment, Disposal, DisposalIssue,
-    DocumentSpecification, DocumentText, Ending, Escalation, Executor, FailureClass, FieldRule, GoalExecutor, GoalLine,
-    GoalPage, Goals, Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine, HistoryPage, Hold, HoldCategory,
-    HoldFailure, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking, Limit, LiveCall,
-    LiveDelegate, Made, Me, MeParty, MeProject, Message, Moved, Needs, Note, NoteAuthor, NotePage, NoteScope,
-    ObjectKey, ObjectPage, Offered, OfferedCharters, OptionLine, Outcome, OwnerChipPhase, Parameter, ParameterDocument,
-    Part, PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy,
-    Pool, Priority, Project, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, ProvisionalTurnName,
-    Question, Read, ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result,
-    ResultContract, ResultField, ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding,
+    DocumentSpecification, DocumentText, EndedGroup, Ending, Escalation, Executor, FailureClass, FieldRule,
+    GoalExecutor, GoalLine, GoalPage, Goals, Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine, HistoryPage,
+    Hold, HoldCategory, HoldFailure, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage,
+    Lacking, Limit, LiveCall, LiveDelegate, Made, Me, MeParty, MeProject, Message, Moved, Needs, Note, NoteAuthor,
+    NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OfferedCharters, OptionLine, Outcome, OwnerChipPhase,
+    Parameter, ParameterDocument, Part, PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask,
+    Phase, PhaseCounts, Policy, Pool, Priority, Project, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer,
+    ProvisionalTurnName, Question, Read, ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition,
+    Result, ResultContract, ResultField, ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding,
     RunObservation, RunStage, RunState, RunText, RunWork, Runtime, SeenThrough, Speaker, Specification,
     SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskContext, TaskHold,
-    TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy,
-    WatchEnd, WatchEvent, WriterSlot,
+    TaskLine, TaskPage, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange,
+    WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Token, Wall};
 
@@ -935,6 +935,7 @@ fields!(Cursor { value });
 impl Payload for Read {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Tasks { query, live, ended } => sum(&[query.heap(bounds), live.heap(bounds), ended.heap(bounds)]),
             Self::Me | Self::Deployment => Some(0),
             Self::Task { task } | Self::Escalation { task } | Self::PersonTask { task } | Self::Result { task } => {
                 sum(&[task.heap(bounds)])
@@ -970,6 +971,7 @@ fields!(NotePage { cut, rows, before, after });
 impl Payload for ReadValue {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Tasks(value0) => value0.heap(bounds),
             Self::Me(value0) => sum(&[value0.heap(bounds)]),
             Self::Task(value0) => sum(&[value0.heap(bounds)]),
             Self::Proposal(value0) => sum(&[value0.heap(bounds)]),
@@ -1380,3 +1382,13 @@ plain!(
     jig_client_domain::contract::TemplateDeadline,
     jig_client_domain::contract::TaskFlags
 );
+
+fields!(TaskPage { live, live_after, ended });
+impl Payload for EndedGroup {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::None => Some(0),
+            Self::Rows { rows, after, cut } => sum(&[rows.heap(bounds), after.heap(bounds), cut.heap(bounds)]),
+        }
+    }
+}

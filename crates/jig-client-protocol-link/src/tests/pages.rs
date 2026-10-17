@@ -355,3 +355,22 @@ fn table<const N: usize>(cases: [Case; N]) {
     }
     assert!(passed, "{failures:?}");
 }
+
+#[test]
+fn a_task_page_decodes_its_two_groups_with_their_cursors() {
+    let limits = fixtures::limits();
+    let mut page = jig_client_test_records::task_page_record().into_parts();
+    page.live = jig_client_test_records::tasks_rows_record().into_parts().rows;
+    page.live_after = Some(w::Cursor::new(&limits.wire, w::CursorParts { value: b"live".as_slice().into() }).unwrap());
+    let after = Some(w::Cursor::new(&limits.wire, w::CursorParts { value: b"ended".as_slice().into() }).unwrap());
+    page.ended = w::EndedGroup::Rows(
+        w::EndedRows::new(&limits.wire, w::EndedRowsParts { rows: Box::new([]), after, cut: true }).unwrap(),
+    );
+    let page = translate::pages::task_page(w::TaskPage::new(&limits.wire, page).unwrap(), &limits).unwrap();
+    assert_eq!(page.live.len(), 1);
+    assert_eq!(page.live_after.as_ref().unwrap().value.bytes(), b"live");
+    let c::EndedGroup::Rows { rows, after, cut } = page.ended else { panic!("ended rows") };
+    assert_eq!(rows.len(), 0);
+    assert_eq!(after.as_ref().unwrap().value.bytes(), b"ended");
+    assert!(cut);
+}

@@ -124,9 +124,24 @@ fn query_page(
     query: core::documents::TaskQuery,
     from: Option<core::reads::Cursor>,
 ) -> core::reads::Page {
-    jig_core_world::reads::ask(world, 900, core::reads::Read::Tasks { query, from });
-    let core::reads::Answer::Page(page) = jig_core_world::reads::latest(world) else { panic!("query page") };
-    *page.clone()
+    jig_core_world::reads::ask(world, 900, core::reads::Read::Tasks { query, live: None, ended: from });
+    let core::reads::Answer::Tasks(page) = jig_core_world::reads::latest(world) else { panic!("query page") };
+    match &page.ended {
+        core::reads::EndedGroup::Rows { rows, next, cut } => {
+            let mut values = skein_lib::List::with_capacity(rows.len());
+            for row in rows {
+                values.push(core::reads::PageRow::Line(row.clone())).expect("one value per bounded line");
+            }
+            core::reads::Page { rows: values, before: None, next: next.clone(), cut: *cut, inbox_selection: None }
+        }
+        core::reads::EndedGroup::None => {
+            let mut rows = skein_lib::List::with_capacity(page.live.len());
+            for row in &page.live {
+                rows.push(core::reads::PageRow::Line(row.clone())).expect("one value per bounded line");
+            }
+            core::reads::Page { rows, before: None, next: page.live_next.clone(), cut: false, inbox_selection: None }
+        }
+    }
 }
 
 fn query_ended(

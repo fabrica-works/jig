@@ -541,3 +541,10 @@ fn task_refusal_record() -> w::OwnerTaskCapacityRefusal {
     )
     .expect("literal")
 }
+
+/// A page fixture with defaults for every field, before a test selects its facts.
+#[must_use]
+pub fn task_page_record() -> w::TaskPage {
+    w::TaskPage::new(&limits(), w::TaskPageParts { live: Box::new([]), live_after: None, ended: w::EndedGroup::None })
+        .expect("empty page fits")
+}

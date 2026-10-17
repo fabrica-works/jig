@@ -618,3 +618,52 @@ fn a_task_line_says_what_its_task_waits_on() {
         }
     );
 }
+
+fn query_read(story: &mut Story, query: contract::TaskQuery) -> contract::TaskPage {
+    story.read(QUERY, Readable::Jig(contract::Read::Tasks { query, live: None, ended: None }));
+    assert!(story.run_until(|s| !s.pages(QUERY).is_empty(), PROOF_WAIT));
+    let pages = story.pages(QUERY);
+    let [Readout::Jig(contract::ReadResult::Value(contract::ReadValue::Tasks(page)))] = pages.as_slice() else {
+        panic!("task query page: {pages:?}")
+    };
+    *page.clone()
+}
+#[test]
+fn an_ended_task_is_read_through_its_requester_s_index_after_the_live_ones() {
+    let mut story = Story::live_batch(fixtures::SEED, true);
+    let mut tasks = fixtures::create_tasks();
+    tasks.get_mut(1).expect("second independent member").dependencies = skein_lib::List::with_capacity(0);
+    story.send(CREATE, Ask::Jig(Box::new(contract::Ask::Create { project: PROJECT_NUMBER, tasks })));
+    assert!(story.run_until(|s| !s.answered(CREATE).is_empty(), PROOF_WAIT));
+    story.send(
+        CANCEL,
+        Ask::Jig(Box::new(contract::Ask::Cancel {
+            project: PROJECT_NUMBER,
+            task: fixtures::FIRST_QUERY_TASK,
+            reason: contract::Text::new(b"done".as_slice().into(), 32).expect("reason fits"),
+            grace: None,
+        })),
+    );
+    assert!(story.run_until(|s| s.phase(fixtures::FIRST_QUERY_TASK) == Some(contract::Phase::Cancelled), PROOF_WAIT));
+    let mut query = fixtures::task_query(PROJECT_NUMBER);
+    query.project = None;
+    query.tracked = None;
+    query.requester = Some(contract::OwnerRequester::Person(fixtures::FIRST_OWNER));
+    let page = query_read(&mut story, query);
+    assert_eq!(page.live.iter().map(|line| line.chip.task).collect::<Vec<_>>(), [fixtures::SECOND_QUERY_TASK]);
+    let contract::EndedGroup::Rows { rows, after, cut } = page.ended else { panic!("requester index") };
+    assert_eq!(rows.iter().map(|line| line.chip.task).collect::<Vec<_>>(), [fixtures::FIRST_QUERY_TASK]);
+    assert_eq!((page.live_after, after, cut), (None, None, false));
+}
+#[test]
+fn a_query_naming_no_index_key_reads_no_ended_group() {
+    let mut story = Story::live(fixtures::SEED);
+    let task = story.running_task();
+    let mut query = fixtures::task_query(PROJECT_NUMBER);
+    query.project = None;
+    query.tracked = None;
+    let page = query_read(&mut story, query);
+    assert_eq!(page.live.iter().map(|line| line.chip.task).collect::<Vec<_>>(), [task]);
+    assert_eq!(page.ended, contract::EndedGroup::None);
+    assert_eq!(page.live_after, None);
+}

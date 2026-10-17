@@ -692,7 +692,8 @@ fn read_key(what: &jig_client::contract::Read) -> Option<ObjectKey> {
         Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
         Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
         Read::Result { task } => Some(ObjectKey::Result(*task)),
-        Read::Me
+        Read::Tasks { .. }
+        | Read::Me
         | Read::Ended { .. }
         | Read::History { .. }
         | Read::Activity { .. }
@@ -892,7 +893,8 @@ pub(crate) fn historical_read(
     match result {
         ReadResult::Value(value) => match value {
             ReadValue::Historical(value) => Some(value),
-            ReadValue::Me(_)
+            ReadValue::Tasks(_)
+            | ReadValue::Me(_)
             | ReadValue::Task(_)
             | ReadValue::Proposal(_)
             | ReadValue::OwnerProposal(_)
@@ -940,7 +942,8 @@ fn read_body(key: ObjectKey, value: jig_client::contract::ReadValue) -> Option<B
         ReadValue::PersonTask(task) => Some(Body::PersonTask(task)),
         ReadValue::OwnerPersonTask(task) => Some(Body::OwnerPersonTask(task)),
         ReadValue::Result(result) => Some(Body::Result(result)),
-        ReadValue::Me(_)
+        ReadValue::Tasks(_)
+        | ReadValue::Me(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
         | ReadValue::Activity(_)

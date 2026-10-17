@@ -43,6 +43,8 @@ impl InboxReadGroup {
 /// A document or a bounded page requested without a key.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Read {
+    /// A task query with independent group continuations.
+    Tasks { query: super::TaskQuery, live: Option<Cursor>, ended: Option<Cursor> },
     /// The frame.
     Me,
     /// One task.
@@ -158,6 +160,8 @@ pub struct NotePage {
 /// A read document or page.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ReadValue {
+    /// A task query's two groups.
+    Tasks(Box<super::TaskPage>),
     /// Whole authentic project owner document.
     OwnerProject(Box<super::OwnerProject>),
     /// Whole historical facts for one existing object query.

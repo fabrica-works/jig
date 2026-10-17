@@ -198,26 +198,38 @@ const TEMPLATE: u32 = 2;
 const TEMPLATE_CHARTER: u32 = 1;
 const TEMPLATE_HOLDER_ROLE: u32 = 0;
 #[test]
-fn a_me_document_carries_each_project_s_templates_and_bounds() {
-    use jig_domain_core::acts;
-    use jig_domain_people as p;
-    use jig_domain_tasks as t;
+fn a_me_document_carries_each_project_s_template() {
     let mut frame = fixtures::frame_two_projects();
     for index in 0..frame.projects.len() {
         let project = frame.projects.get_mut(index).unwrap();
-        project.templates = fixtures::list([jig_domain_core::Template {
-            number: TEMPLATE,
-            name: b"task".as_slice().into(),
-            executor: p::TemplateExecutor::Charter(TEMPLATE_CHARTER),
-            contract: t::Contract::Report { words: 32 },
-            shallower: 1,
-            budget: p::TemplateBudget::Amount(42),
-            deadline: p::TemplateDeadline::Given,
-            tracked: Some(1),
-            flags: t::Flags::PLAIN,
-            label: TEMPLATE,
-            grace: None,
-        }]);
+        let mut template = fixtures::template();
+        template.number = TEMPLATE;
+        template.budget = jig_domain_people::TemplateBudget::Amount(42);
+        template.label = 5;
+        project.templates = fixtures::list([template]);
+    }
+    let record = translate::owner::frame(&frame, &w::CEILINGS).unwrap();
+    let mut reader = skein_lib::Reader::new(record.projects());
+    for source in &frame.projects {
+        let bytes = skein_codec::piece::split(&mut reader).unwrap().unwrap();
+        let project = w::MeProject::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert_eq!(project.project(), source.project);
+        let mut templates = skein_lib::Reader::new(project.templates());
+        let bytes = skein_codec::piece::split(&mut templates).unwrap().unwrap();
+        let template = w::Template::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert_eq!(template.number(), TEMPLATE);
+        assert_eq!(template.label(), 5);
+        let w::TemplateBudget::Amount(budget) = template.budget() else { panic!("amount") };
+        assert_eq!(budget.value(), 42);
+    }
+    assert_eq!(skein_codec::piece::split(&mut reader), Ok(None));
+}
+#[test]
+fn a_me_document_carries_each_project_s_creating_bounds() {
+    use jig_domain_core::acts;
+    let mut frame = fixtures::frame_two_projects();
+    for index in 0..frame.projects.len() {
+        let project = frame.projects.get_mut(index).unwrap();
         project.creating = Some(acts::Creating {
             within: acts::Bounds::Goal {
                 authority: Box::new(fixtures::authority()),
@@ -240,35 +252,12 @@ fn a_me_document_carries_each_project_s_templates_and_bounds() {
         let bytes = skein_codec::piece::split(&mut reader).unwrap().unwrap();
         let project = w::MeProject::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&bytes)).unwrap();
         assert_eq!(project.project(), source.project);
-        let mut templates = skein_lib::Reader::new(project.templates());
-        let bytes = skein_codec::piece::split(&mut templates).unwrap().unwrap();
-        let template = w::Template::decode(&w::CEILINGS, &mut skein_lib::Reader::new(&bytes)).unwrap();
-        assert_eq!(template.number(), TEMPLATE);
-        assert_eq!(
-            template.budget(),
-            &w::TemplateBudget::Amount(
-                w::TemplateAmount::new(&w::CEILINGS, w::TemplateAmountParts { value: 42 }).unwrap()
-            )
-        );
-        assert_eq!(project.creating().as_ref().unwrap().within().budget(), 50);
-        assert_eq!(
-            project.creating().as_ref().unwrap().beyond(),
-            &w::Beyond::Proposed(
-                w::BeyondProposed::new(
-                    &w::CEILINGS,
-                    w::BeyondProposedParts {
-                        to: w::Recipient::Role(
-                            w::RecipientRole::new(
-                                &w::CEILINGS,
-                                w::RecipientRoleParts { project: source.project, role: TEMPLATE_HOLDER_ROLE }
-                            )
-                            .unwrap()
-                        )
-                    }
-                )
-                .unwrap()
-            )
-        );
+        let creating = project.creating().as_ref().unwrap();
+        assert_eq!(creating.within().budget(), 50);
+        let w::Beyond::Proposed(beyond) = creating.beyond() else { panic!("proposed") };
+        let w::Recipient::Role(to) = beyond.to() else { panic!("role") };
+        assert_eq!(to.project(), source.project);
+        assert_eq!(to.role(), TEMPLATE_HOLDER_ROLE);
     }
     assert_eq!(skein_codec::piece::split(&mut reader), Ok(None));
 }

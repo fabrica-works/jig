@@ -12,6 +12,14 @@ use skein_lib::{Reader, Writer, bytes};
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 pub fn read(read: &c::Read, limits: &w::Limits) -> Result<w::Read, w::Problem> {
     Ok(match read {
+        c::Read::Tasks { query, live, ended } => w::Read::Tasks(w::ReadTasks::new(
+            limits,
+            w::ReadTasksParts {
+                query: super::queries::query(*query, limits)?,
+                live: cursor(live.as_ref(), limits)?,
+                ended: cursor(ended.as_ref(), limits)?,
+            },
+        )?),
         c::Read::Me => w::Read::Me,
         c::Read::Task { task } => w::Read::Task(w::ReadTask::new(limits, w::ReadTaskParts { task: *task })?),
         c::Read::Proposal { proposal } => w::Read::Proposal(w::ReadProposal::new(
@@ -155,6 +163,7 @@ pub fn value(bytes: &[u8], limits: &Limits) -> Result<c::ReadValue, Undecodable>
         w::ReadValue::Historical(record) => {
             c::ReadValue::Historical(Box::new(objects::owner_historical(*record, limits)?))
         }
+        w::ReadValue::Tasks(record) => c::ReadValue::Tasks(Box::new(pages::task_page(record, limits)?)),
         w::ReadValue::Me(record) => c::ReadValue::Me(Box::new(documents::frame(record, limits)?)),
         w::ReadValue::Task(record) => c::ReadValue::Task(Box::new(documents::task(record, limits)?)),
         w::ReadValue::Proposal(record) => c::ReadValue::Proposal(Box::new(objects::proposal(record, limits)?)),

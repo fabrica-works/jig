@@ -137,7 +137,8 @@ impl<A: crate::Application> Engine<A> {
                     (ReadValue::PersonTask(value), Moved::PersonTask) => Some(value.revision),
                     (ReadValue::OwnerPersonTask(value), Moved::PersonTask) => Some(value.revision),
                     (
-                        ReadValue::Me(_)
+                        ReadValue::Tasks(_)
+                        | ReadValue::Me(_)
                         | ReadValue::Task(_)
                         | ReadValue::Proposal(_)
                         | ReadValue::Historical(_)
@@ -176,7 +177,8 @@ impl<A: crate::Application> Engine<A> {
                                     ReadValue::Escalation(escalation) => {
                                         Some(CurrentHold::Document(Box::new(escalation.hold.reason.clone())))
                                     }
-                                    ReadValue::Me(_)
+                                    ReadValue::Tasks(_)
+                                    | ReadValue::Me(_)
                                     | ReadValue::Proposal(_)
                                     | ReadValue::Historical(_)
                                     | ReadValue::OwnerProposal(_)
@@ -233,6 +235,7 @@ impl<A: crate::Application> Engine<A> {
                 ReadValue::Historical(_)
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerEscalation(_)
+                | ReadValue::Tasks(_)
                 | ReadValue::Me(_)
                 | ReadValue::Task(_)
                 | ReadValue::Question(_)
@@ -465,6 +468,7 @@ impl<A: crate::Application> Engine<A> {
                 ReadValue::Historical(_)
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerEscalation(_)
+                | ReadValue::Tasks(_)
                 | ReadValue::Me(_)
                 | ReadValue::Question(_)
                 | ReadValue::PersonTask(_)
@@ -549,6 +553,7 @@ fn offers(value: &ReadValue) -> Option<&List<Offered>> {
         ReadValue::OwnerPersonTask(v) => Some(&v.acts),
         ReadValue::Result(v) => Some(&v.acts),
         ReadValue::Historical(_)
+        | ReadValue::Tasks(_)
         | ReadValue::Me(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)
@@ -588,6 +593,7 @@ fn ending(value: &ReadValue) -> Option<Ending> {
         | ReadValue::Historical(_)
         | ReadValue::OwnerProposal(_)
         | ReadValue::OwnerEscalation(_)
+        | ReadValue::Tasks(_)
         | ReadValue::Me(_)
         | ReadValue::Ended(_)
         | ReadValue::History(_)

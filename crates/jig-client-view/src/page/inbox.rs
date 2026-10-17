@@ -405,7 +405,8 @@ pub const fn query_filter(query: Option<&Read>) -> Option<Filter> {
     match query {
         Some(Read::Inbox { project, kind, goal, .. }) => Some(Filter { project: *project, kind: *kind, goal: *goal }),
         Some(
-            Read::Me
+            Read::Tasks { .. }
+            | Read::Me
             | Read::Task { .. }
             | Read::Proposal { .. }
             | Read::Escalation { .. }

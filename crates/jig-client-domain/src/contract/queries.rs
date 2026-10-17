@@ -1,5 +1,5 @@
 //! The fixed task query and the single task line (contract.md, 5.1 and 6.1).
-use super::{Chip, Count, OwnerBudget, OwnerPhaseCounts, OwnerRequester, TaskFlags};
+use super::{Chip, Count, Cursor, OwnerBudget, OwnerPhaseCounts, OwnerRequester, TaskFlags};
 use skein_lib::Wall;
 /// A query's order; ties go by task number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -84,4 +84,18 @@ pub struct TaskLine {
     pub phases: OwnerPhaseCounts,
     pub held_below: u32,
     pub conversation: Option<ConversationRead>,
+}
+
+/// A query's ended index, or no index for its keys.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum EndedGroup {
+    Rows { rows: skein_lib::List<TaskLine>, after: Option<Cursor>, cut: bool },
+    None,
+}
+/// One query page's independent live and ended groups.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TaskPage {
+    pub live: skein_lib::List<TaskLine>,
+    pub live_after: Option<Cursor>,
+    pub ended: EndedGroup,
 }

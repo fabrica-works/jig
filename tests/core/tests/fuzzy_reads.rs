@@ -42,7 +42,11 @@ fn seeded_reads_wait_for_prior_commits_and_keep_receipts_across_restart_cuts() {
             ask(&mut world, 3, reads::Read::Activity { task, before: None });
             let reads::Answer::Page(page) = latest(&world) else { panic!("durable owner page") };
             assert!(page.rows.len() <= 2);
-            ask(&mut world, QUERY_READ, reads::Read::Tasks { query: jig_core_world::fixtures::OWN_TASKS, from: None });
+            ask(
+                &mut world,
+                QUERY_READ,
+                reads::Read::Tasks { query: jig_core_world::fixtures::OWN_TASKS, live: None, ended: None },
+            );
             assert_eq!(jig_core_world::fixtures::query_numbers(&world), [task]);
             assert_eq!(world.reads.as_ref().expect("party").receipts.len(), observed + 3);
         });

@@ -264,9 +264,6 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
                 Some(after) => {
                     Some(Cursor::Live { scope: Scope::Tasks { query: value.query }, after, store_after: None })
                 }
-                None if super::ended::ended_part(&value.query) != super::ended::EndedPart::None => {
-                    Some(Cursor::Store { scope: Scope::Tasks { query: value.query }, after: None })
-                }
                 None => None,
             };
             return Answer::Page(Box::new(Page { rows, before: None, next, cut: false, inbox_selection: None }));

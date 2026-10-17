@@ -324,7 +324,8 @@ impl Front<Test> for Scripted {
                     Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
                     Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
                     Read::Result { task } => Some(ObjectKey::Result(*task)),
-                    Read::Me
+                    Read::Tasks { .. }
+                    | Read::Me
                     | Read::Ended { .. }
                     | Read::History { .. }
                     | Read::Activity { .. }
@@ -567,6 +568,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::Historical(_)
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerEscalation(_)
+                | ReadValue::Tasks(_)
                 | ReadValue::Me(_)
                 | ReadValue::Ended(_)
                 | ReadValue::History(_)
@@ -591,6 +593,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 ReadValue::Task(t) if t.result.is_some() => seen.push(Observed::Ended { task: t.chip.task, commit }),
                 ReadValue::Result(r) => seen.push(Observed::Ended { task: r.task.task, commit }),
                 ReadValue::Task(_)
+                | ReadValue::Tasks(_)
                 | ReadValue::Me(_)
                 | ReadValue::Proposal(_)
                 | ReadValue::Historical(_)

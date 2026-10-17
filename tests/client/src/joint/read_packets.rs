@@ -38,6 +38,7 @@ pub fn read_with_codec(
     let client = *client;
     let read = *read;
     let result = match answer {
+        reads::Answer::Tasks(_) => return Err(Invalid::PendingValue),
         reads::Answer::None(why) => client::ReadResult::None(missing(*why)),
         reads::Answer::Page(value) => {
             let value = match what {
@@ -55,7 +56,8 @@ pub fn read_with_codec(
                 }
                 client::Read::Ended { task, .. } => wire::ledger_pages::ended(*task, value, limits),
                 client::Read::Spend { project, .. } => wire::ledger_pages::spend(*project, value, limits),
-                client::Read::Me
+                client::Read::Tasks { .. }
+                | client::Read::Me
                 | client::Read::Task { .. }
                 | client::Read::Proposal { .. }
                 | client::Read::Escalation { .. }
@@ -106,13 +108,7 @@ pub fn read_with_codec(
                 }
                 client::ReadResult::Value(wire::documents::result_read(value, limits).map_err(Invalid::Document)?)
             }
-            documents::Document::Question(value) => {
-                let client::Read::Question { task, message } = what else { return Err(Invalid::OwnerRoute) };
-                if *task != value.task.number || *message != value.message {
-                    return Err(Invalid::OwnerRoute);
-                }
-                client::ReadResult::Value(wire::documents::question_read(value, limits).map_err(Invalid::Document)?)
-            }
+            documents::Document::Question(value) => question(what, value, limits)?,
             documents::Document::Chips(_)
             | documents::Document::Run(_)
             | documents::Document::Tree(_)
@@ -723,4 +719,12 @@ fn missing(why: reads::Why) -> client::ReadNone {
         reads::Why::Gone => client::ReadNone::Gone,
         reads::Why::SignedOut => client::ReadNone::SignedOut,
     }
+}
+
+fn question(what: &client::Read, value: &documents::Question, limits: &Limits) -> Result<client::ReadResult, Invalid> {
+    let client::Read::Question { task, message } = what else { return Err(Invalid::OwnerRoute) };
+    if *task != value.task.number || *message != value.message {
+        return Err(Invalid::OwnerRoute);
+    }
+    Ok(client::ReadResult::Value(wire::documents::question_read(value, limits).map_err(Invalid::Document)?))
 }

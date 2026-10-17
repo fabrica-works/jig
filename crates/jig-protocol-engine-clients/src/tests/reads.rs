@@ -120,3 +120,60 @@ fn an_application_read_is_routed_and_answered_under_its_family() {
         assert!(exchange.component.pending.exchanges.is_empty(), "{label}");
     }
 }
+
+const TASK_QUERY: jig_domain_core::documents::TaskQuery = jig_domain_core::documents::TaskQuery {
+    project: Some(3),
+    requester: Some(jig_domain_tasks::Party::Person(5)),
+    root: Some(7),
+    parent: Some(11),
+    label: Some(13),
+    phase: None,
+    executor: None,
+    tracked: None,
+    order: jig_domain_core::documents::QueryOrder::Number,
+};
+const QUERY_ORDERS: [jig_domain_core::documents::QueryOrder; 5] = {
+    use jig_domain_core::documents::QueryOrder as O;
+    [O::Number, O::Changed, O::Activity, O::Priority, O::Ended]
+};
+const QUERY_PHASES: [Option<jig_domain_core::documents::PhaseClass>; 6] = {
+    use jig_domain_core::documents::PhaseClass as P;
+    [None, Some(P::Working), Some(P::Waiting), Some(P::Held), Some(P::Closing), Some(P::Ended)]
+};
+const QUERY_EXECUTORS: [Option<jig_domain_core::documents::ExecutorKind>; 4] = {
+    use jig_domain_core::documents::ExecutorKind as E;
+    [None, Some(E::Agent), Some(E::Procedure), Some(E::Person)]
+};
+#[test]
+fn task_query_cursors_preserve_their_keys_orders_and_phases() {
+    for order in QUERY_ORDERS {
+        for phase in QUERY_PHASES {
+            for executor in QUERY_EXECUTORS {
+                let query = jig_domain_core::documents::TaskQuery { order, phase, executor, ..TASK_QUERY };
+                for query in [
+                    query,
+                    jig_domain_core::documents::TaskQuery { requester: None, tracked: Some(true), ..query },
+                    jig_domain_core::documents::TaskQuery {
+                        requester: Some(jig_domain_tasks::Party::Task(19)),
+                        tracked: Some(false),
+                        ..query
+                    },
+                ] {
+                    let scope = reads::Scope::Tasks { query };
+                    let cursors = [
+                        reads::Cursor::Store { scope: scope.clone(), after: None },
+                        reads::Cursor::Live {
+                            scope,
+                            after: jig_domain_core::documents::Cursor::Number { number: 17 },
+                            store_after: None,
+                        },
+                    ];
+                    for cursor in cursors {
+                        let bytes = crate::translate::cursor::encode(&cursor, 1024).unwrap();
+                        assert_eq!(crate::translate::cursor::decode(&bytes), Some(cursor));
+                    }
+                }
+            }
+        }
+    }
+}

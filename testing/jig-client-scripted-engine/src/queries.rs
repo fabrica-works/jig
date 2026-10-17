@@ -88,6 +88,31 @@ pub(crate) fn order(rows: &mut [TaskLine], order: QueryOrder) {
     });
 }
 impl<A: crate::Application> crate::Engine<A> {
+    pub(crate) fn task_lines(&self, party: u64, query: &TaskQuery) -> Result<Vec<TaskLine>, c::WatchEnd> {
+        use c::ReadValue;
+        let mut rows = Vec::new();
+        for doc in self.truth.objects.values() {
+            if let ReadValue::Task(task) = doc {
+                if !crate::queries::selects(query, task) || !self.truth.visible(party, task.project) {
+                    continue;
+                }
+                let subtree = self.truth.objects.values().filter_map(|value| {
+                    if let ReadValue::Task(member) = value {
+                        if member.chip.task == task.chip.task || member.lineage.as_slice().contains(&task.chip.task) {
+                            Some(member.as_ref())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                });
+                rows.push(crate::queries::line(task, subtree, self.conversation_read(task)?));
+            }
+        }
+        crate::queries::order(&mut rows, query.order);
+        Ok(rows)
+    }
     pub(crate) fn conversation_read(&self, task: &Task) -> Result<Option<c::ConversationRead>, c::WatchEnd> {
         let c::OwnerRequester::Person(requester) = task.requester else { return Ok(None) };
         if !task.flags.conversation {

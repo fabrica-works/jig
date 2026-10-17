@@ -148,7 +148,8 @@ fn read(v: &ReadValue) -> Vec<Receipt> {
                 NoteScope::Deployment => None,
             })
             .collect(),
-        ReadValue::Proposal(_)
+        ReadValue::Tasks(_)
+        | ReadValue::Proposal(_)
         | ReadValue::Historical(_)
         | ReadValue::OwnerProposal(_)
         | ReadValue::Question(_)

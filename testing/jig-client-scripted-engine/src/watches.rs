@@ -284,29 +284,7 @@ impl<A: crate::Application> Engine<A> {
                 }))
             }
             Subject::Tasks { query, window } => {
-                let mut rows = Vec::new();
-                for doc in self.truth.objects.values() {
-                    if let ReadValue::Task(task) = doc {
-                        if !crate::queries::selects(query, task) || !self.truth.visible(party, task.project) {
-                            continue;
-                        }
-                        let subtree = self.truth.objects.values().filter_map(|value| {
-                            if let ReadValue::Task(member) = value {
-                                if member.chip.task == task.chip.task
-                                    || member.lineage.as_slice().contains(&task.chip.task)
-                                {
-                                    Some(member.as_ref())
-                                } else {
-                                    None
-                                }
-                            } else {
-                                None
-                            }
-                        });
-                        rows.push(crate::queries::line(task, subtree, self.conversation_read(task)?));
-                    }
-                }
-                crate::queries::order(&mut rows, query.order);
+                let rows = self.task_lines(party, query)?;
                 let count = rows.len().min((*window).min(self.bounds.rows) as usize);
                 Delivery::Tasks(Box::new(Tasks { rows: list(&rows[..count]), more: count < rows.len() }))
             }

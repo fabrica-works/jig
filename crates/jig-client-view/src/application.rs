@@ -185,7 +185,8 @@ pub(crate) fn read_result(
                     put(domain, env, key, Body::OwnerPersonTask(document), out, lent, true)
                 }
                 ReadValue::Result(document) => put(domain, env, key, Body::Result(document), out, lent, true),
-                ReadValue::Me(_)
+                ReadValue::Tasks(_)
+                | ReadValue::Me(_)
                 | ReadValue::Ended(_)
                 | ReadValue::History(_)
                 | ReadValue::Activity(_)
@@ -216,7 +217,8 @@ fn key(what: &Read) -> Option<ObjectKey> {
         Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
         Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
         Read::Result { task } => Some(ObjectKey::Result(*task)),
-        Read::Me
+        Read::Tasks { .. }
+        | Read::Me
         | Read::Ended { .. }
         | Read::History { .. }
         | Read::Activity { .. }

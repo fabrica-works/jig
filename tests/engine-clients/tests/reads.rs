@@ -4,7 +4,10 @@ use jig_engine_clients_world::fixtures::{self, Peer};
 use skein_lib::{Reader, Writer};
 fn read() -> Box<[u8]> {
     let limits = fixtures::limits().wire;
-    let value = w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: 8, record: Box::new([0]) })
+    let read = w::Read::Me;
+    let mut record = Writer::new(usize::try_from(read.measure()).expect("read size"));
+    read.encode(&mut record).expect("me read");
+    let value = w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: 8, record: record.finish() })
         .expect("frame read");
     let mut bytes = Writer::new(usize::try_from(value.measure()).expect("wire size"));
     value.encode(&mut bytes).expect("read envelope");

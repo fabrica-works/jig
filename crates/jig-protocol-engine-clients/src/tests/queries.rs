@@ -36,26 +36,14 @@ fn a_task_query_subject_reaches_the_core_with_its_keys() {
     else {
         panic!("watch")
     };
+    assert_eq!((watcher, sign_in, window), (QUERY_WATCHER, QUERY_SIGN_IN, d::Window { rows: 2, after: None }));
+    let d::Watched::Query { query } = subject else { panic!("task query") };
+    assert_eq!(query.project, Some(QUERY_PROJECT));
+    assert_eq!(query.requester, Some(t::Party::Person(QUERY_REQUESTER)));
+    assert_eq!((query.root, query.parent, query.label), (Some(QUERY_ROOT), Some(QUERY_PARENT), Some(5)));
     assert_eq!(
-        (watcher, sign_in, subject, window),
-        (
-            QUERY_WATCHER,
-            QUERY_SIGN_IN,
-            d::Watched::Query {
-                query: d::TaskQuery {
-                    project: Some(QUERY_PROJECT),
-                    requester: Some(t::Party::Person(QUERY_REQUESTER)),
-                    root: Some(QUERY_ROOT),
-                    parent: Some(QUERY_PARENT),
-                    label: Some(5),
-                    phase: Some(d::PhaseClass::Held),
-                    executor: Some(d::ExecutorKind::Person),
-                    tracked: Some(true),
-                    order: d::QueryOrder::Priority,
-                }
-            },
-            d::Window { rows: 2, after: None }
-        )
+        (query.phase, query.executor, query.tracked, query.order),
+        (Some(d::PhaseClass::Held), Some(d::ExecutorKind::Person), Some(true), d::QueryOrder::Priority)
     );
 }
 const WAITING_ROLE: u32 = 2;
@@ -83,22 +71,8 @@ fn a_task_document_carries_its_label_flags_activity_and_oldest_waiting_entry() {
         ),
         (5, true, true, &w::Retention::ForgottenOnceRead, 13)
     );
-    assert_eq!(
-        value.waits_on(),
-        &w::WaitsOn::Party(
-            w::WaitsOnParty::new(
-                &limits,
-                w::WaitsOnPartyParts {
-                    whom: w::Whom::Role(
-                        w::WhomRole::new(&limits, w::WhomRoleParts { project: QUERY_PROJECT, role: WAITING_ROLE })
-                            .unwrap()
-                    ),
-                    entries: 3,
-                    task: QUERY_ROOT,
-                    kind: w::WaitedFor::Question,
-                }
-            )
-            .unwrap()
-        )
-    );
+    let w::WaitsOn::Party(wait) = value.waits_on() else { panic!("party") };
+    let w::Whom::Role(whom) = wait.whom() else { panic!("role") };
+    assert_eq!((whom.project(), whom.role()), (QUERY_PROJECT, WAITING_ROLE));
+    assert_eq!((wait.entries(), wait.task(), wait.kind()), (3, QUERY_ROOT, &w::WaitedFor::Question));
 }

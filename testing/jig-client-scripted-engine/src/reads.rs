@@ -11,6 +11,7 @@ use skein_lib::{List, Time, Token};
 /// Every row is checked as a whole payload; the protocol chooses bounded pages.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Rows {
+    Tasks(Vec<jig_client_domain::contract::TaskLine>),
     Ended(Vec<Result>),
     History(Vec<HistoryRow>),
     Activity(Vec<ActivityLine>),
@@ -65,6 +66,7 @@ impl Source {
 impl Rows {
     pub(crate) fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
         let fits = match self {
+            Self::Tasks(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
             Self::Ended(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
             Self::History(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
             Self::Activity(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
@@ -79,7 +81,8 @@ impl Rows {
     fn matches(&self, read: &Read) -> bool {
         matches!(
             (self, read),
-            (Self::Ended(_), Read::Ended { .. })
+            (Self::Tasks(_), Read::Tasks { .. })
+                | (Self::Ended(_), Read::Ended { .. })
                 | (Self::History(_), Read::History { .. })
                 | (Self::Activity(_), Read::Activity { .. })
                 | (Self::Inbox(_), Read::Inbox { .. })
@@ -91,6 +94,7 @@ impl Rows {
     }
     fn len(&self) -> usize {
         match self {
+            Self::Tasks(rows) => rows.len(),
             Self::Ended(rows) => rows.len(),
             Self::History(rows) => rows.len(),
             Self::Activity(rows) => rows.len(),
@@ -103,6 +107,11 @@ impl Rows {
     }
     fn page(&self, start: usize, end: usize, before: Option<Cursor>, after: Option<Cursor>) -> ReadValue {
         match self {
+            Self::Tasks(rows) => ReadValue::Tasks(Box::new(jig_client_domain::contract::TaskPage {
+                live: list(&rows[start..end]),
+                live_after: after,
+                ended: jig_client_domain::contract::EndedGroup::None,
+            })),
             Self::Ended(rows) => {
                 ReadValue::Ended(Box::new(ObjectPage { cut: false, rows: list(&rows[start..end]), before, after }))
             }
@@ -158,6 +167,10 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
         | Read::Goals { after, .. }
         | Read::Spend { after, .. }
         | Read::Notes { after, .. } => after.take(),
+        Read::Tasks { live, ended, .. } => {
+            ended.take();
+            live.take()
+        }
         Read::Activity { before, .. } => before.take(),
         Read::Me
         | Read::Task { .. }
@@ -201,6 +214,9 @@ impl<A: crate::Application> Engine<A> {
         Ok(())
     }
     pub(crate) fn read_value(&mut self, party: u64, read: Read) -> core::result::Result<ReadValue, ReadNone> {
+        if let Read::Tasks { ended: Some(_), .. } = &read {
+            return Err(ReadNone::Unknown);
+        }
         let (query, position) = plain(read);
         if !self.read_visible(party, &query) {
             return Err(ReadNone::Unknown);
@@ -228,7 +244,8 @@ impl<A: crate::Application> Engine<A> {
                 }
                 return self.checked_read(self.truth.deployment.clone().map(|v| ReadValue::Deployment(Box::new(v))));
             }
-            Read::Ended { .. }
+            Read::Tasks { .. }
+            | Read::Ended { .. }
             | Read::History { .. }
             | Read::Activity { .. }
             | Read::Inbox { .. }
@@ -240,7 +257,11 @@ impl<A: crate::Application> Engine<A> {
         if let Some(key) = object {
             return self.checked_read(self.truth.objects.get(&key).cloned());
         }
-        let rows = self.rows_for(party, &query);
+        let rows = if let Read::Tasks { query, .. } = &query {
+            Rows::Tasks(self.task_lines(party, query).map_err(|_| ReadNone::Unknown)?)
+        } else {
+            self.rows_for(party, &query)
+        };
         let backward = matches!(query, Read::Activity { .. });
         let index = if let Some(cursor) = position {
             let bytes: [u8; 8] = cursor.value.bytes().try_into().map_err(|_| ReadNone::Gone)?;
@@ -312,7 +333,7 @@ impl<A: crate::Application> Engine<A> {
                 if !self.truth.visible(party,row.project) { return false; }
                 match query {
                     Read::Inbox { group, project, kind, goal, .. } => *group == InboxReadGroup::of(row.group) && project.is_none_or(|p| p == row.project) && kind.is_none_or(|k| k == row.group) && goal.is_none_or(|g| row.goal == Some(g)),
-                    Read::Me | Read::Task { .. } | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. }
+                    Read::Tasks { .. } | Read::Me | Read::Task { .. } | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. }
                     | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. }
                     | Read::Conversations { .. } | Read::Goals { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Deployment => false,
                 }
@@ -329,6 +350,7 @@ impl<A: crate::Application> Engine<A> {
             Rows::Notes(rows) => Rows::Notes(rows.into_iter().filter(|row| {
                 matches!(query, Read::Notes { scope, description, .. } if *scope == row.scope && description.as_ref().is_none_or(|needle| needle.bytes().is_empty() || row.description.bytes().windows(needle.bytes().len()).any(|window| window == needle.bytes())))
             }).collect()),
+            Rows::Tasks(rows) => Rows::Tasks(rows),
             Rows::Goals(rows) => Rows::Goals(rows),
             Rows::Ended(rows) => Rows::Ended(rows), Rows::History(rows) => Rows::History(rows),
             Rows::Activity(rows) => Rows::Activity(rows), Rows::Spend(rows) => Rows::Spend(rows),
@@ -364,6 +386,12 @@ impl<A: crate::Application> Engine<A> {
                     NoteScope::Goal { project, .. } => self.truth.visible(party, *project),
                 };
             }
+            Read::Tasks { query, .. } => {
+                return query.project.map_or_else(
+                    || self.truth.frames.contains_key(&party),
+                    |project| self.truth.visible(party, project),
+                );
+            }
             Read::Me | Read::Conversations { .. } => return self.truth.frames.contains_key(&party),
             Read::Deployment => return self.truth.frames.get(&party).is_some_and(|f| f.deployment_role.is_some()),
         };
@@ -372,6 +400,7 @@ impl<A: crate::Application> Engine<A> {
 }
 fn empty(read: &Read) -> Rows {
     match read {
+        Read::Tasks { .. } => Rows::Tasks(vec![]),
         Read::Ended { .. } => Rows::Ended(vec![]),
         Read::History { .. } => Rows::History(vec![]),
         Read::Activity { .. } => Rows::Activity(vec![]),

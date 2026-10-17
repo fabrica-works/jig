@@ -16,8 +16,8 @@
 
 mod vocabulary;
 pub use vocabulary::{
-    Answer, Cursor, Filter, Group, Historical, Loaded, Page, PageRow, PageTurn, Past, Position, Range, Read, Row,
-    Scope, UnjoinedTurn, Why,
+    Answer, Cursor, EndedGroup, Filter, Group, Historical, Loaded, Page, PageRow, PageTurn, Past, Position, Range,
+    Read, Row, Scope, TaskPage, UnjoinedTurn, Why,
 };
 pub(crate) mod activity;
 mod answers;
@@ -113,6 +113,7 @@ pub(crate) struct Pending {
     sign_in: u64,
     party: u64,
     range: Range,
+    tasks: Option<Box<TaskPage>>,
 }
 
 fn terminal(reply: ReplyTo, answer: Answer) -> Requests {
@@ -154,7 +155,7 @@ fn cursor(read: &Read) -> Option<&Cursor> {
         | Read::History { from, .. }
         | Read::Inbox { from, .. }
         | Read::Conversations { from }
-        | Read::Tasks { from, .. }
+        | Read::Tasks { ended: from, .. }
         | Read::Goals { from, .. }
         | Read::Notes { from, .. }
         | Read::ScopedNotes { from, .. }
@@ -349,6 +350,15 @@ struct ReadStart {
 }
 
 fn read_start(read: &Read, party: u64) -> Option<ReadStart> {
+    if let Read::Tasks { ended: Some(cursor), .. } = read {
+        match cursor {
+            Cursor::Store { .. } => {}
+            Cursor::Live { .. }
+            | Cursor::ConversationsStart
+            | Cursor::ConversationsBefore { .. }
+            | Cursor::ConversationsLiveBefore { .. } => return None,
+        }
+    }
     let target = scope(read);
     let mut live_before = None;
     let mut reverse_live = false;
@@ -399,6 +409,19 @@ fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, p
     let Some(start) = read_start(&read, party) else {
         return terminal(reply, Answer::None(Why::Unknown));
     };
+    let mut tasks = if let Read::Tasks { query, live, .. } = &read {
+        match task_live(core, env, party, *query, live.as_ref()) {
+            Ok(page) => Some(Box::new(page)),
+            Err(why) => return terminal(reply, Answer::None(why)),
+        }
+    } else {
+        None
+    };
+    if let Some(page) = &tasks
+        && page.ended == EndedGroup::None
+    {
+        return terminal(reply, Answer::Tasks(tasks.take().expect("task page")));
+    }
     if start.reverse_live {
         return terminal(reply, cursors::live_before(core, env, party, start.live_before.as_ref()));
     }
@@ -411,7 +434,10 @@ fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, p
     {
         return terminal(reply, Answer::None(Why::Unknown));
     }
-    if !stored && let Some(subject) = subject(&read, party) {
+    if tasks.is_none()
+        && !stored
+        && let Some(subject) = subject(&read, party)
+    {
         let window = Window { rows: env.limits.documents.rows, after: after_live };
         match documents::make_with_clock(
             core,
@@ -459,7 +485,7 @@ fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, p
         bytes: env.limits.load_bytes,
     };
     let emitted = range.clone();
-    let pending = Pending { reply: Some(reply), sign_in, party, range };
+    let pending = Pending { reply: Some(reply), sign_in, party, range, tasks };
     let load = match core.reads.insert(pending) {
         Ok(load) => load.token(),
         Err(pending) => return terminal(pending.reply.expect("new read owns its reply"), Answer::None(Why::Busy)),
@@ -489,9 +515,62 @@ pub(crate) fn loaded(core: &mut Core, env: &Env<Limits>, load: Token, result: Lo
             Loaded::Page { rows, next } => rows::from_store(core, &env.limits, &pending.range, rows, next),
         }
     };
+    let answer = match (core.reads.get_mut(name).expect("live read").tasks.take(), answer) {
+        (Some(mut tasks), Answer::Page(page)) => {
+            let mut lines = List::with_capacity(env.limits.documents.rows);
+            for row in page.rows.into_boxed() {
+                let PageRow::Line(line) = row else { unreachable!("task index supplies lines") };
+                lines.push(line).expect("bounded ended group");
+            }
+            tasks.ended = EndedGroup::Rows { rows: lines, next: page.next, cut: page.cut };
+            Answer::Tasks(tasks)
+        }
+        (_, answer) => answer,
+    };
     let reply = core.reads.get_mut(name).expect("live read").reply.take().expect("terminal consumes its reply");
     core.reads.retire(name);
     terminal(reply, answer)
+}
+
+#[expect(clippy::manual_map, reason = "step code matches the optional live continuation")]
+fn task_live(
+    core: &Core,
+    env: &Env<Limits>,
+    party: u64,
+    query: documents::TaskQuery,
+    cursor: Option<&Cursor>,
+) -> Result<TaskPage, Why> {
+    let after = match cursor {
+        None => None,
+        Some(Cursor::Live { scope: Scope::Tasks { query: owner }, after, store_after: None }) if *owner == query => {
+            Some(*after)
+        }
+        Some(_) => return Err(Why::Unknown),
+    };
+    let document = match documents::make_with_clock(
+        core,
+        &env.limits,
+        party,
+        &Subject::Query { query },
+        &Window { rows: env.limits.documents.rows, after },
+        DocumentClock { now: env.now, wall: env.wall },
+    ) {
+        Ok(document) => document,
+        Err(Missing::TooLarge) => return Err(Why::Busy),
+        Err(Missing::Unknown | Missing::NotAllowed | Missing::Ended) => return Err(Why::Unknown),
+    };
+    let documents::Document::Lines(lines) = document else { unreachable!("query makes task lines") };
+    let live_next = match lines.next {
+        Some(after) => Some(Cursor::Live { scope: Scope::Tasks { query }, after, store_after: None }),
+        None => None,
+    };
+    let ended = match ended::ended_part(&query) {
+        ended::EndedPart::None => EndedGroup::None,
+        ended::EndedPart::ByParty { .. } | ended::EndedPart::ByProject { .. } | ended::EndedPart::Delegates { .. } => {
+            EndedGroup::Rows { rows: List::with_capacity(0), next: None, cut: false }
+        }
+    };
+    Ok(TaskPage { live: lines.lines, live_next, ended })
 }
 
 /// Maximum answer payload retained in a root's held-output slot.
@@ -528,6 +607,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.load_slots).checked_add(3)?.checked_mul(query_worst_case(limits)?)?)?
         .checked_add(u64::from(limits.load_slots).checked_mul(u64::try_from(size_of::<Position>()).ok()?)?)?
         .checked_add(limits.load_bytes)?
+        .checked_add(u64::from(limits.load_slots).checked_mul(documents::document_with_context_worst_case(limits)?)?)?
         // Reverse live reads retain one bounded tail while making producer pages.
         .checked_add(Queue::<PageRow>::worst_case(limits.documents.rows)?)?
         .checked_add(answer_worst_case(limits)?)

@@ -285,7 +285,10 @@ fn put_scope(w: &mut Writer, value: &reads::Scope) -> Option<()> {
         reads::Scope::Conversations => {
             w.byte(12)?;
         }
-        reads::Scope::Tasks { .. } => return None,
+        reads::Scope::Tasks { query } => {
+            w.byte(17)?;
+            put_query(w, query)?;
+        }
         reads::Scope::Goals { project } => {
             w.byte(13)?;
             w.u32(*project)?;
@@ -325,6 +328,7 @@ fn take_scope(r: &mut skein_lib::Reader<'_>) -> Option<reads::Scope> {
         14 => reads::Scope::Notes { project: u32(r)? },
         15 => reads::Scope::ScopedNotes { scope: take_note_scope(r)?, description: optional_blob(r)? },
         16 => reads::Scope::Spend { project: u32(r)? },
+        17 => reads::Scope::Tasks { query: take_query(r)? },
         _ => return None,
     })
 }
@@ -577,4 +581,101 @@ pub(crate) fn decode_window(bytes: &[u8]) -> Option<documents::Cursor> {
         return None;
     }
     Some(cursor)
+}
+
+#[expect(clippy::manual_map, reason = "step code matches the optional query keys")]
+fn put_query(w: &mut Writer, query: &documents::TaskQuery) -> Option<()> {
+    use documents::{ExecutorKind as E, PhaseClass as P, QueryOrder as O};
+    w.optional_u32(query.project)?;
+    match query.requester {
+        None => w.byte(0)?,
+        Some(jig_domain_tasks::Party::Person(v)) => {
+            w.byte(1)?;
+            w.u64(v)?;
+        }
+        Some(jig_domain_tasks::Party::Task(v)) => {
+            w.byte(2)?;
+            w.u64(v)?;
+        }
+        Some(jig_domain_tasks::Party::Deployment { .. }) => return None,
+    }
+    w.optional_u64(query.root)?;
+    w.optional_u64(query.parent)?;
+    w.optional_u32(query.label)?;
+    w.optional_u32(match query.phase {
+        Some(v) => Some(match v {
+            P::Working => 0,
+            P::Waiting => 1,
+            P::Held => 2,
+            P::Closing => 3,
+            P::Ended => 4,
+        }),
+        None => None,
+    })?;
+    w.optional_u32(match query.executor {
+        Some(v) => Some(match v {
+            E::Agent => 0,
+            E::Procedure => 1,
+            E::Person => 2,
+        }),
+        None => None,
+    })?;
+    w.optional_u32(match query.tracked {
+        Some(v) => Some(u32::from(v)),
+        None => None,
+    })?;
+    w.u32(match query.order {
+        O::Number => 0,
+        O::Changed => 1,
+        O::Activity => 2,
+        O::Priority => 3,
+        O::Ended => 4,
+    })
+}
+fn take_query(r: &mut skein_lib::Reader<'_>) -> Option<documents::TaskQuery> {
+    use documents::{ExecutorKind as E, PhaseClass as P, QueryOrder as O};
+    let project = optional_u32(r)?;
+    let requester = match r.u8()? {
+        0 => None,
+        1 => Some(jig_domain_tasks::Party::Person(u64(r)?)),
+        2 => Some(jig_domain_tasks::Party::Task(u64(r)?)),
+        _ => return None,
+    };
+    Some(documents::TaskQuery {
+        project,
+        requester,
+        root: optional_u64(r)?,
+        parent: optional_u64(r)?,
+        label: optional_u32(r)?,
+        phase: match optional_u32(r)? {
+            None => None,
+            Some(0) => Some(P::Working),
+            Some(1) => Some(P::Waiting),
+            Some(2) => Some(P::Held),
+            Some(3) => Some(P::Closing),
+            Some(4) => Some(P::Ended),
+            Some(_) => return None,
+        },
+        executor: match optional_u32(r)? {
+            None => None,
+            Some(0) => Some(E::Agent),
+            Some(1) => Some(E::Procedure),
+            Some(2) => Some(E::Person),
+            Some(_) => return None,
+        },
+        tracked: match optional_u32(r)? {
+            None => None,
+            Some(0) => Some(false),
+            Some(1) => Some(true),
+            Some(_) => return None,
+        },
+        order: match u32(r)? {
+            0 => O::Number,
+            1 => O::Changed,
+            2 => O::Activity,
+            3 => O::Priority,
+            4 => O::Ended,
+            _ => return None,
+        },
+    })
 }

@@ -46,7 +46,7 @@ fn a_query_by_requester_party_selects_only_their_tasks() {
 fn a_query_naming_no_project_admits_only_the_requester_themself() {
     let (core, limits) = query_fixture();
     for (requester, expected) in [
-        (None, Err(Missing::NotAllowed)),
+        (None, Ok(())),
         (Some(tasks::Party::Person(OTHER_REQUESTER)), Err(Missing::NotAllowed)),
         (Some(tasks::Party::Deployment { project: 1 }), Err(Missing::Unknown)),
     ] {

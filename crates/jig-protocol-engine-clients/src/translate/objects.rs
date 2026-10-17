@@ -121,7 +121,7 @@ pub fn document(answer: &reads::Answer, limits: &w::Limits) -> Result<w::ReadVal
             }
         },
         reads::Answer::Historical(value) => w::ReadValue::Historical(Box::new(historical(value, limits)?)),
-        reads::Answer::Page(_) | reads::Answer::None(_) => {
+        reads::Answer::Tasks(_) | reads::Answer::Page(_) | reads::Answer::None(_) => {
             return Err(w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag });
         }
     })

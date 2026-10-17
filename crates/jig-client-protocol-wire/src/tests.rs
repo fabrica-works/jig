@@ -112,7 +112,7 @@ fn a_page_of_many_small_rows_and_one_of_a_few_large_rows_fit_one_bound() {
     }
 }
 
-fn a_frame_at_its_ceilings_round_trips_unchanged() {
+fn me_at_its_ceilings_round_trips_unchanged() {
     let limits = fixtures::document_limits();
     let frame = fixtures::frame_at_ceilings(&limits);
     let bytes = fixtures::encoded(&frame, Me::measure, Me::encode);
@@ -339,7 +339,7 @@ fn wire_values_round_trip_unchanged() {
         ("each_read_none_round_trips_unchanged", each_read_none_round_trips_unchanged),
         ("a_read_value_round_trips_with_its_owner_version", a_read_value_round_trips_with_its_owner_version),
         ("an_activity_line_carries_its_turn_bytes_unchanged", an_activity_line_carries_its_turn_bytes_unchanged),
-        ("a_frame_at_its_ceilings_round_trips_unchanged", a_frame_at_its_ceilings_round_trips_unchanged),
+        ("me_at_its_ceilings_round_trips_unchanged", me_at_its_ceilings_round_trips_unchanged),
         ("a_run_state_without_writing_or_call_round_trips", a_run_state_without_writing_or_call_round_trips),
         ("a_chip_with_each_phase_round_trips_unchanged", a_chip_with_each_phase_round_trips_unchanged),
         ("a_hello_naming_two_owners_round_trips_unchanged", a_hello_naming_two_owners_round_trips_unchanged),

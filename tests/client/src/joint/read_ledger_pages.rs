@@ -35,7 +35,8 @@ fn retained(source: reads::Page, what: &client::Read, wrong: client::Read) {
     let expected = match what {
         client::Read::Ended { task, .. } => wire::ledger_pages::ended(*task, &original, &l),
         client::Read::Spend { project, .. } => wire::ledger_pages::spend(*project, &original, &l),
-        client::Read::Me
+        client::Read::Tasks { .. }
+        | client::Read::Me
         | client::Read::Task { .. }
         | client::Read::Proposal { .. }
         | client::Read::Escalation { .. }

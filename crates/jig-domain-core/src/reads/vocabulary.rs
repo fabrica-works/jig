@@ -126,9 +126,13 @@ pub enum Cursor {
 
 /// One document or bounded page, without a request key.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the read carries two independent inline owner cursors, priced in the read bounds"
+)]
 pub enum Read {
-    /// A task query's live group, in its requested order.
-    Tasks { query: documents::TaskQuery, from: Option<Cursor> },
+    /// A task query's independent live and ended groups.
+    Tasks { query: documents::TaskQuery, live: Option<Cursor>, ended: Option<Cursor> },
     /// A connector-owned document within the client's stated role scope.
     Application {
         scope: jig_domain_people::ApplicationScope,
@@ -317,9 +321,29 @@ pub struct Page {
     pub inbox_selection: Option<List<documents::InboxSelection>>,
 }
 
+/// One task query's two independently continued groups (engine.md, 11.2).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct TaskPage {
+    pub live: List<documents::TaskLine>,
+    pub live_next: Option<Cursor>,
+    pub ended: EndedGroup,
+}
+/// An ended index's rows, or no index for these query keys.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the ended group carries its inline owner cursor, priced in the answer bound"
+)]
+pub enum EndedGroup {
+    Rows { rows: List<documents::TaskLine>, next: Option<Cursor>, cut: bool },
+    None,
+}
+
 /// Exactly one terminal, held until its preceding decisions are durable.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    /// A task query's two groups.
+    Tasks(Box<TaskPage>),
     /// A current document.
     Document(Box<Document>),
     /// An ended or decided object, with kept actor and wall time.

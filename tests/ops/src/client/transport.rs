@@ -540,7 +540,8 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 ReadValue::Escalation(row) => row.ending.is_some(),
                 ReadValue::Question(row) => row.ending.is_some(),
                 ReadValue::PersonTask(row) => row.ending.is_some(),
-                ReadValue::Me(_)
+                ReadValue::Tasks(_)
+                | ReadValue::Me(_)
                 | ReadValue::Ended(_)
                 | ReadValue::OwnerEnded(_)
                 | ReadValue::History(_)
@@ -570,6 +571,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 }
                 ReadValue::Result(result) => out.push(Observed::Ended { task: result.task.task, commit }),
                 ReadValue::Task(_)
+                | ReadValue::Tasks(_)
                 | ReadValue::Me(_)
                 | ReadValue::Proposal(_)
                 | ReadValue::Escalation(_)
@@ -619,7 +621,8 @@ impl Scripted {
             Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
             Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
             Read::Result { task } => Some(ObjectKey::Result(*task)),
-            Read::Me
+            Read::Tasks { .. }
+            | Read::Me
             | Read::Ended { .. }
             | Read::History { .. }
             | Read::Activity { .. }

@@ -7,6 +7,14 @@ use jig_domain_people as people;
 use skein_lib::{Reader, Writer};
 pub(crate) fn read(value: w::Read) -> Option<reads::Read> {
     Some(match value {
+        w::Read::Tasks(value) => {
+            let value = value.into_parts();
+            reads::Read::Tasks {
+                query: super::queries::query(value.query)?,
+                live: decode_cursor(value.live)?,
+                ended: decode_cursor(value.ended)?,
+            }
+        }
         w::Read::Me => reads::Read::Frame,
         w::Read::Task(value) => reads::Read::Task { task: value.task() },
         w::Read::Proposal(value) => reads::Read::Proposal {
@@ -145,6 +153,7 @@ pub(crate) fn answer(
 ) -> Result<w::ReadAnswer, w::Problem> {
     let value = match answer {
         reads::Answer::None(why) => return Ok(none(*why, limits)),
+        reads::Answer::Tasks(page) => pages::tasks(page, limits)?,
         reads::Answer::Page(page) => pages::page(read, page, limits)?,
         reads::Answer::Document(_) | reads::Answer::Historical(_) => objects::document(answer, limits)?,
     };
@@ -167,4 +176,12 @@ pub(crate) fn decode(bytes: &[u8], limits: &w::Limits) -> Option<reads::Read> {
         return None;
     }
     read(value)
+}
+
+#[expect(clippy::option_option, reason = "outer absence is malformed, inner absence is the initial cursor")]
+fn decode_cursor(value: Option<w::Cursor>) -> Option<Option<reads::Cursor>> {
+    match value {
+        Some(value) => Some(Some(cursor::decode(value.value())?)),
+        None => Some(None),
+    }
 }
