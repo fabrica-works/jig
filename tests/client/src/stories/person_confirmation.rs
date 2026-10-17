@@ -27,7 +27,7 @@ impl Form {
             Self::OwnerChoice | Self::Choice => PersonAnswer::Choice { option: 2, reason: text(b"second report") },
             Self::OwnerReport | Self::Words => PersonAnswer::Words(text(b"my complete answer")),
         };
-        Ask::AnswerPerson { project: 1, task: 9, revision: Revision { value: 17 }, answer }
+        Ask::Answer { project: 1, on: AnswerOn::Person { task: 9, revision: Revision { value: 17 }, answer } }
     }
 }
 
@@ -211,3 +211,5 @@ pub fn world(seed: u64, form: Form) -> World<Test, Scripted> {
         .expect("whole confirmed answer fits");
     world
 }
+
+use jig_client::contract::AnswerOn;

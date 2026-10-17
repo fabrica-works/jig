@@ -47,8 +47,8 @@ fn amendment_requires_person_reason_presence_and_accepts_explicit_empty() {
         &Ask::Amend {
             project: 1,
             task: 8,
-            revision: Revision { value: 9 },
-            change: change(),
+            revision: Some(Revision { value: 9 }),
+            change: Box::new(change()),
             release: None,
             reason: text(b"")
         }
@@ -90,8 +90,8 @@ fn amendment_release_keeps_opaque_reason_delta_and_independent_revisions_in_one_
         &Ask::Amend {
             project: 1,
             task: 8,
-            revision: Revision { value: 9 },
-            change: selected,
+            revision: Some(Revision { value: 9 }),
+            change: Box::new(selected),
             release: Some(Revision { value: 3 }),
             reason: text(bytes)
         }

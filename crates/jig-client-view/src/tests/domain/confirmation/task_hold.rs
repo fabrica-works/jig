@@ -111,9 +111,9 @@ fn owner_task_hold_live_revision_moves_independently_before_atomic_amend_release
             reason: text(b""),
             project: 1,
             task: 8,
-            revision: Revision { value: 9 },
-            change: change(),
-            release: Some(Revision { value: u64::MAX }),
+            revision: Some(Revision { value: 9 }),
+            change: Box::new(change()),
+            release: Some(Revision { value: u64::MAX })
         }
     );
     let Some(Body::Task(retained)) = &domain.objects().get(id).unwrap().body else { panic!("whole task") };

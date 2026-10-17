@@ -138,7 +138,7 @@ fn keyed_contract_durability_sign_ins_conflict_and_decided_first() {
     let mut setup = script();
     let p = proposal();
     setup.truth.objects.insert(ObjectKey::Proposal(p.key), ReadValue::Proposal(Box::new(p.clone())));
-    let ask = Ask::DecideProposal { project: 1, proposal: p.key, decision: Decision::Accepted };
+    let ask = Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: p.key, decision: Decision::Accepted } };
     let mut engine = Engine::new(setup, 1).expect("valid script");
     send(&mut engine, 0, 11, 1, 1, ask.clone());
     send(&mut engine, 1, 12, 1, 2, ask.clone());
@@ -161,7 +161,7 @@ fn keyed_contract_durability_sign_ins_conflict_and_decided_first() {
         11,
         1,
         4,
-        Ask::DecideProposal { project: 1, proposal: p.key, decision: Decision::PassedUp },
+        Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: p.key, decision: Decision::PassedUp } },
     );
     assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), &Answer::Refused(Refusal::KeyConflict));
     send(&mut engine, 20_000_000, 11, 1, 5, ask);
@@ -282,11 +282,13 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     setup.truth.object_projects.insert(ObjectKey::Escalation(8), 1);
     setup.truth.objects.insert(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(escalation)));
     let mut engine = Engine::new(setup, 2).expect("valid script");
-    let ask = Ask::DecideEscalation {
+    let ask = Ask::Decide {
         project: 1,
-        task: 8,
-        revision: Revision { value: 1 },
-        decision: Decision::Released { again: None },
+        on: DecideOn::Escalation {
+            task: 8,
+            revision: Revision { value: 1 },
+            decision: Decision::Released { again: None },
+        },
     };
     send(&mut engine, 0, 11, 1, 1, ask);
     assert_eq!(
@@ -959,16 +961,17 @@ fn bounded_offer_payloads_and_predictions() {
             reason: text(b""),
             project: 1,
             task: 8,
-            revision: Revision { value: 1 },
+            revision: Some(Revision { value: 1 }),
             release: None,
-            change: Amendment {
+            change: Box::new(Amendment {
                 addressed: None,
                 spec: None,
                 wake: None,
                 dependencies: None,
                 authority: Some(after),
                 instructions: None,
-            },
+                tracked: None,
+            }),
         };
         setup.rules.push(Rule { party: Some(1), ask: ask.clone(), answer: answer.clone(), changes: vec![] });
         let mut engine = Engine::new(setup, 1).unwrap();
@@ -1092,7 +1095,14 @@ fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list(
     row.waiting = recipient.clone();
     setup.truth.objects.insert(ObjectKey::Proposal(row.key), ReadValue::Proposal(Box::new(row.clone())));
     let mut engine = Engine::new(setup, 1).unwrap();
-    send(&mut engine, 0, 11, 1, 1, Ask::DecideProposal { project: 1, proposal: row.key, decision: Decision::Accepted });
+    send(
+        &mut engine,
+        0,
+        11,
+        1,
+        1,
+        Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: row.key, decision: Decision::Accepted } },
+    );
     let up = engine.poll(Time::from_nanos(10_000_000));
     assert_eq!(
         final_answer(&up[0]),
@@ -1131,7 +1141,7 @@ fn collective_policy_recipients_accept_any_listed_role_and_price_the_whole_list(
 
 #[test]
 fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
-    let change = Change::Request(Box::new(Ask::MarkSeen { seen: Seen::Results { through: 1 } }));
+    let change = Change::Request(Box::new(Ask::Seen { through: SeenThrough::Results { through: 1 } }));
     let mut exact = Bounds {
         document_bytes: u64::try_from(core::mem::size_of::<Box<Ask>>())
             .unwrap()
@@ -1166,16 +1176,17 @@ fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
                 reason: text(b""),
                 project: 1,
                 task: 8,
-                revision: Revision { value: if stale_hold { 1 } else { 2 } },
+                revision: Some(Revision { value: if stale_hold { 1 } else { 2 } }),
                 release: Some(Revision { value: if stale_hold { 6 } else { 7 } }),
-                change: Amendment {
+                change: Box::new(Amendment {
                     addressed: None,
                     spec: Some(specification(text(b"new spec")).whole().unwrap()),
                     wake: None,
                     dependencies: None,
                     authority: None,
                     instructions: None,
-                },
+                    tracked: None,
+                }),
             },
         );
         assert_eq!(
@@ -1739,7 +1750,8 @@ fn full_width_task_and_party_makers_remain_distinct_in_scripted_reads_decisions_
         assert_eq!(row.proposer, key.proposer);
         assert_eq!(row.why.bytes(), if index == 0 { b"task maker".as_slice() } else { b"party maker".as_slice() });
     }
-    let asks = keys.map(|proposal| Ask::DecideProposal { project: 1, proposal, decision: Decision::Accepted });
+    let asks = keys
+        .map(|proposal| Ask::Decide { project: 1, on: DecideOn::Proposal { proposal, decision: Decision::Accepted } });
     send(&mut engine, 0, 11, 1, 10, asks[0].clone());
     send(&mut engine, 1, 11, 2, 11, asks[1].clone());
     let answers = engine.poll(Time::from_nanos(10_000_001));
@@ -2258,6 +2270,7 @@ fn task_subscription_capacity_is_priced_separately_from_whole_activation_replace
             dependencies: None,
             authority: None,
             instructions: None,
+            tracked: None,
         };
         let heap = change.heap(&bounds).unwrap();
         assert_eq!(heap, 0);
@@ -2306,3 +2319,5 @@ const UTF8_TEXTS: [&[u8]; 9] = [
     b"tool/\x21",
     &[b'?'; 4096],
 ];
+
+use jig_client_domain::contract::DecideOn;

@@ -46,6 +46,7 @@ fn goal_executor(value: &w::GoalExecutor) -> c::GoalExecutor {
 }
 fn policy_edit(value: &w::PolicyEdit, limits: &Limits) -> Result<c::PolicyEdit, w::Problem> {
     Ok(match value {
+        w::PolicyEdit::Templates(value) => super::operations::restore_templates(value.overrides()),
         w::PolicyEdit::ProjectSpend(value) => c::PolicyEdit::ProjectSpend { period_spend: value.period_spend() },
         w::PolicyEdit::Role(value) => {
             let value = value.value();
@@ -84,30 +85,34 @@ fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
             words: text(value.words(), limits)?,
             release: value.release(),
         },
-        w::Ask::AnswerQuestion(value) => c::Ask::AnswerQuestion {
+        w::Ask::Answer(value) => c::Ask::Answer {
             project: value.project(),
-            task: value.task(),
-            message: value.message(),
-            words: text(value.words(), limits)?,
-        },
-        w::Ask::AnswerPerson(value) => c::Ask::AnswerPerson {
-            project: value.project(),
-            task: value.task(),
-            revision: answers::revision(value.revision(), limits),
-            answer: person_answer(value.answer(), limits)?,
+            on: match value.on() {
+                w::AnswerOn::Question(v) => {
+                    c::AnswerOn::Question { task: v.task(), message: v.message(), words: text(v.words(), limits)? }
+                }
+                w::AnswerOn::Person(v) => c::AnswerOn::Person {
+                    task: v.task(),
+                    revision: answers::revision(v.revision(), limits),
+                    answer: person_answer(v.answer(), limits)?,
+                },
+            },
         },
         w::Ask::Take(value) => c::Ask::Take { project: value.project(), task: value.task() },
         w::Ask::HandBack(value) => c::Ask::HandBack { project: value.project(), task: value.task() },
-        w::Ask::DecideProposal(value) => c::Ask::DecideProposal {
+        w::Ask::Decide(value) => c::Ask::Decide {
             project: value.project(),
-            proposal: answers::proposal_key(value.proposal(), limits),
-            decision: answers::decision(value.decision(), limits)?,
-        },
-        w::Ask::DecideEscalation(value) => c::Ask::DecideEscalation {
-            project: value.project(),
-            task: value.task(),
-            revision: answers::revision(value.revision(), limits),
-            decision: answers::decision(value.decision(), limits)?,
+            on: match value.on() {
+                w::DecideOn::Proposal(v) => c::DecideOn::Proposal {
+                    proposal: answers::proposal_key(v.proposal(), limits),
+                    decision: answers::decision(v.decision(), limits)?,
+                },
+                w::DecideOn::Escalation(v) => c::DecideOn::Escalation {
+                    task: v.task(),
+                    revision: answers::revision(v.revision(), limits),
+                    decision: answers::decision(v.decision(), limits)?,
+                },
+            },
         },
         w::Ask::Release(value) => c::Ask::Release {
             project: value.project(),
@@ -123,16 +128,22 @@ fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
             c::Ask::Amend {
                 project: value.project(),
                 task: value.task(),
-                revision: answers::revision(value.revision(), limits),
-                change: pages::amendment_fields(value.change(), limits)?,
+                revision: match value.revision() {
+                    Some(value) => Some(answers::revision(value, limits)),
+                    None => None,
+                },
+                change: Box::new(pages::amendment_fields(value.change(), limits)?),
                 release,
                 reason: text(value.reason(), limits)?,
             }
         }
         w::Ask::Stop(value) => c::Ask::Stop { project: value.project(), task: value.task() },
-        w::Ask::Cancel(value) => {
-            c::Ask::Cancel { project: value.project(), task: value.task(), reason: text(value.reason(), limits)? }
-        }
+        w::Ask::Cancel(value) => c::Ask::Cancel {
+            project: value.project(),
+            task: value.task(),
+            reason: text(value.reason(), limits)?,
+            grace: *value.grace(),
+        },
         w::Ask::Close(value) => {
             let mut disposals = List::with_capacity(value.disposals().len());
             for row in value.disposals() {
@@ -140,8 +151,8 @@ fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
             }
             c::Ask::Close { project: value.project(), chat: value.chat(), disposals }
         }
-        w::Ask::TakeOver(value) => {
-            c::Ask::TakeOver { project: value.project(), task: value.task(), reason: text(value.reason(), limits)? }
+        w::Ask::MoveTask(value) => {
+            c::Ask::Move { project: value.project(), task: value.task(), reason: text(value.reason(), limits)? }
         }
         w::Ask::SetGoal(value) => {
             let deadline = match value.deadline() {
@@ -164,7 +175,7 @@ fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
             }
             c::Ask::Prioritise { project: value.project(), goals }
         }
-        w::Ask::MarkSeen(value) => c::Ask::MarkSeen { seen: answers::seen(value.seen(), limits) },
+        w::Ask::Seen(value) => c::Ask::Seen { through: answers::seen(value.through(), limits) },
         w::Ask::EditNote(value) => c::Ask::EditNote {
             project: value.project(),
             note: value.note(),

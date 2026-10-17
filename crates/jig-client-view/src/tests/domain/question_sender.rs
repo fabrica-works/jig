@@ -54,11 +54,9 @@ fn question_sender_closed_widths_and_absence_keep_whole_facts_and_original_answe
         let sent = sent.expect("original question Answer request");
         assert_eq!(
             sent.as_ref(),
-            &Ask::AnswerQuestion {
+            &Ask::Answer {
                 project: 1,
-                task: supplied.task.task,
-                message: u64::MAX,
-                words: text(b"whole answer")
+                on: AnswerOn::Question { task: supplied.task.task, message: u64::MAX, words: text(b"whole answer") }
             }
         );
         assert_eq!(objects::question::facts(&domain.objects().get(id).unwrap()), Some(&supplied));
@@ -66,3 +64,5 @@ fn question_sender_closed_widths_and_absence_keep_whole_facts_and_original_answe
 }
 
 const UTF8_TEXT: &[u8] = b"~\0!?";
+
+use jig_client::contract::AnswerOn;

@@ -25,21 +25,19 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
         Ask::SetPool { project, .. } => (*project, ActKind::SetPool, !doc.configured_pools_cut),
         Ask::StartChat { .. }
         | Ask::Write { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. } => return false,
     };
@@ -106,6 +104,7 @@ pub fn service_offered(doc: &OwnerProject) -> bool {
 }
 fn policy_complete(doc: &OwnerProject, edit: &PolicyEdit) -> bool {
     match edit {
+        PolicyEdit::Templates { .. } => false,
         PolicyEdit::ProjectSpend { .. } => true,
         PolicyEdit::Role(role) => {
             if doc.cut || doc.policy.cut {
@@ -133,6 +132,7 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
     match ask {
         Ask::ChangePolicy { edit, .. } => {
             let edit = match edit {
+                PolicyEdit::Templates { .. } => return None,
                 PolicyEdit::ProjectSpend { .. } => PolicyEdit::ProjectSpend { period_spend: doc.policy.period_spend },
                 PolicyEdit::Role(role) => {
                     let mut source = None;
@@ -187,21 +187,19 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
         Ask::MakeService { .. }
         | Ask::StartChat { .. }
         | Ask::Write { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. } => None,
     }
@@ -232,21 +230,19 @@ pub(crate) fn review(domain: &mut Ui, ask: Box<Ask>) {
             | Ask::SetRoles { .. }
             | Ask::StartChat { .. }
             | Ask::Write { .. }
-            | Ask::AnswerQuestion { .. }
-            | Ask::AnswerPerson { .. }
+            | Ask::Answer { .. }
             | Ask::Take { .. }
             | Ask::HandBack { .. }
-            | Ask::DecideProposal { .. }
-            | Ask::DecideEscalation { .. }
+            | Ask::Decide { .. }
             | Ask::Release { .. }
             | Ask::Amend { .. }
             | Ask::Stop { .. }
             | Ask::Cancel { .. }
             | Ask::Close { .. }
-            | Ask::TakeOver { .. }
+            | Ask::Move { .. }
             | Ask::SetGoal { .. }
             | Ask::Prioritise { .. }
-            | Ask::MarkSeen { .. }
+            | Ask::Seen { .. }
             | Ask::EditNote { .. }
             | Ask::DeleteNote { .. } => None,
         };
@@ -283,21 +279,19 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>) {
         | Ask::SetRoles { .. }
         | Ask::StartChat { .. }
         | Ask::Write { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. } => false,
     };

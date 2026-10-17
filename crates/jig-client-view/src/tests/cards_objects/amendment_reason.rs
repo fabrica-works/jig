@@ -29,7 +29,8 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
                 instructions: Some(text(b"")),
                 wake: None,
                 dependencies: None,
-                authority: None
+                authority: None,
+                tracked: None
             }
         );
         let tree = dialog(&domain, words, &mut bindings);
@@ -56,8 +57,8 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
             &Ask::Amend {
                 project: 4,
                 task: 8,
-                revision: Revision { value: 6 },
-                change: selected,
+                revision: Some(Revision { value: 6 }),
+                change: Box::new(selected),
                 release: None,
                 reason: text(bytes)
             }

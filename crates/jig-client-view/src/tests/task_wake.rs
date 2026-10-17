@@ -59,7 +59,7 @@ fn whole_wake_channel_edits_preserve_batched_rules_flags_and_separate_subscripti
                 .filter_map(|request| match request {
                     Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
                         match &**ask {
-                            Ask::Amend { change, .. } => Some(change),
+                            Ask::Amend { change, .. } => Some(change.as_ref()),
                             _ => None,
                         }
                     }

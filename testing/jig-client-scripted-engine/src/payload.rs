@@ -16,13 +16,14 @@ use jig_client_domain::contract::{
     Priority, Project, ProjectRole, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, ProvisionalTurnName,
     Question, Read, ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition, Result,
     ResultContract, ResultField, ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding,
-    RunObservation, RunStage, RunState, RunText, RunWork, Runtime, Seen, Speaker, Specification, SpecificationDocument,
-    SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskContext, TaskFilter, TaskHold, TaskLine,
-    TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd,
-    WatchEvent, WriterSlot,
+    RunObservation, RunStage, RunState, RunText, RunWork, Runtime, SeenThrough, Speaker, Specification,
+    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskContext,
+    TaskFilter, TaskHold, TaskLine, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage,
+    VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Token, Wall};
 
+mod operations;
 mod result_details;
 
 pub(crate) trait Payload {
@@ -124,7 +125,7 @@ macro_rules! fields {
     };
 }
 fields!(AddressChange { revision, address });
-fields!(Amendment { addressed, spec, wake, dependencies, authority, instructions });
+fields!(Amendment { addressed, spec, wake, dependencies, authority, instructions, tracked });
 fields!(WakePolicy { words, results, topics, subscriptions });
 impl Payload for PersonAnswer {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
@@ -144,11 +145,11 @@ impl Payload for Disposal {
     }
 }
 fields!(Priority { task, priority });
-impl Payload for Seen {
+impl Payload for SeenThrough {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Results { through } => sum(&[through.heap(bounds)]),
-            Self::Replies { chat, through } => sum(&[chat.heap(bounds), through.heap(bounds)]),
+            Self::Conversation { task, through } => sum(&[task.heap(bounds), through.heap(bounds)]),
         }
     }
 }
@@ -163,21 +164,11 @@ impl Payload for Ask {
             Self::Write { project, task, words, release } => {
                 sum(&[project.heap(bounds), task.heap(bounds), words.heap(bounds), release.heap(bounds)])
             }
-            Self::AnswerQuestion { project, task, message, words } => {
-                sum(&[project.heap(bounds), task.heap(bounds), message.heap(bounds), words.heap(bounds)])
-            }
-            Self::AnswerPerson { project, task, revision, answer } => {
-                sum(&[project.heap(bounds), task.heap(bounds), revision.heap(bounds), answer.heap(bounds)])
-            }
+            Self::Answer { project, on } => sum(&[project.heap(bounds), on.heap(bounds)]),
             Self::Take { project, task } | Self::HandBack { project, task } | Self::Stop { project, task } => {
                 sum(&[project.heap(bounds), task.heap(bounds)])
             }
-            Self::DecideProposal { project, proposal, decision } => {
-                sum(&[project.heap(bounds), proposal.heap(bounds), decision.heap(bounds)])
-            }
-            Self::DecideEscalation { project, task, revision, decision } => {
-                sum(&[project.heap(bounds), task.heap(bounds), revision.heap(bounds), decision.heap(bounds)])
-            }
+            Self::Decide { project, on } => sum(&[project.heap(bounds), on.heap(bounds)]),
             Self::Release { project, task, revision, again } => {
                 sum(&[project.heap(bounds), task.heap(bounds), revision.heap(bounds), again.heap(bounds)])
             }
@@ -189,7 +180,7 @@ impl Payload for Ask {
                 release.heap(bounds),
                 reason.heap(bounds),
             ]),
-            Self::Cancel { project, task, reason } | Self::TakeOver { project, task, reason } => {
+            Self::Cancel { project, task, reason, .. } | Self::Move { project, task, reason } => {
                 sum(&[project.heap(bounds), task.heap(bounds), reason.heap(bounds)])
             }
             Self::Close { project, chat, disposals } => {
@@ -204,7 +195,7 @@ impl Payload for Ask {
                 deadline.heap(bounds),
             ]),
             Self::Prioritise { project, goals } => sum(&[project.heap(bounds), goals.heap(bounds)]),
-            Self::MarkSeen { seen } => sum(&[seen.heap(bounds)]),
+            Self::Seen { through } => through.heap(bounds),
             Self::EditNote { project, note, scope, revision, description, body, references } => sum(&[
                 project.heap(bounds),
                 note.heap(bounds),
@@ -1197,7 +1188,8 @@ fn sum(values: &[Option<u64>]) -> Option<u64> {
 impl Payload for AdmissionLimit {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Words
+            Self::Grace
+            | Self::Words
             | Self::Identity
             | Self::Roles
             | Self::Arithmetic

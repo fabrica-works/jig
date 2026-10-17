@@ -5,6 +5,7 @@ use jig_client_domain::contract::{
     ActKind, Actor, Admission, Answer, Ask, ChipPhase, CurrentHold, Decision, Ending, Moved, ObjectKey, Offered,
     Outcome, OwnerRequester, Phase, ReadValue, Recipient, Refusal, Revision, Runtime, TaskHold,
 };
+use jig_client_domain::contract::{AnswerOn, DecideOn};
 use skein_lib::{List, Time, Token, Wall};
 
 impl<A: crate::Application> Engine<A> {
@@ -245,21 +246,19 @@ impl<A: crate::Application> Engine<A> {
             }
             Ask::StartChat { .. }
             | Ask::Write { .. }
-            | Ask::AnswerQuestion { .. }
-            | Ask::AnswerPerson { .. }
+            | Ask::Answer { .. }
             | Ask::Take { .. }
             | Ask::HandBack { .. }
-            | Ask::DecideProposal { .. }
-            | Ask::DecideEscalation { .. }
+            | Ask::Decide { .. }
             | Ask::Release { .. }
             | Ask::Amend { .. }
             | Ask::Stop { .. }
             | Ask::Cancel { .. }
             | Ask::Close { .. }
-            | Ask::TakeOver { .. }
+            | Ask::Move { .. }
             | Ask::SetGoal { .. }
             | Ask::Prioritise { .. }
-            | Ask::MarkSeen { .. }
+            | Ask::Seen { .. }
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
             | Ask::MakeService { .. }
@@ -296,19 +295,17 @@ impl<A: crate::Application> Engine<A> {
                 },
                 Ask::StartChat { .. }
                 | Ask::Write { .. }
-                | Ask::AnswerQuestion { .. }
-                | Ask::AnswerPerson { .. }
+                | Ask::Answer { .. }
                 | Ask::Take { .. }
                 | Ask::HandBack { .. }
-                | Ask::DecideProposal { .. }
-                | Ask::DecideEscalation { .. }
+                | Ask::Decide { .. }
                 | Ask::Release { .. }
                 | Ask::Stop { .. }
                 | Ask::Cancel { .. }
                 | Ask::Close { .. }
-                | Ask::TakeOver { .. }
+                | Ask::Move { .. }
                 | Ask::Prioritise { .. }
-                | Ask::MarkSeen { .. }
+                | Ask::Seen { .. }
                 | Ask::EditNote { .. }
                 | Ask::DeleteNote { .. }
                 | Ask::ChangePolicy { .. }
@@ -351,7 +348,7 @@ impl<A: crate::Application> Engine<A> {
                 {
                     return Err(Invalid::Script);
                 }
-                if admission.is_none() && !matches!(ask, Ask::StartChat { .. } | Ask::MarkSeen { .. }) {
+                if admission.is_none() && !matches!(ask, Ask::StartChat { .. } | Ask::Seen { .. }) {
                     return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
                 }
             }
@@ -369,22 +366,22 @@ impl<A: crate::Application> Engine<A> {
             return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
         }
         let how = match ask {
-            Ask::DecideProposal { decision, .. } | Ask::DecideEscalation { decision, .. } => Some(decision.clone()),
+            Ask::Decide { on: DecideOn::Proposal { decision, .. }, .. }
+            | Ask::Decide { on: DecideOn::Escalation { decision, .. }, .. } => Some(decision.clone()),
             Ask::Release { again, .. } => Some(Decision::Released { again: *again }),
             Ask::StartChat { .. }
             | Ask::Write { .. }
-            | Ask::AnswerQuestion { .. }
-            | Ask::AnswerPerson { .. }
+            | Ask::Answer { .. }
             | Ask::Take { .. }
             | Ask::HandBack { .. }
             | Ask::Amend { .. }
             | Ask::Stop { .. }
             | Ask::Cancel { .. }
             | Ask::Close { .. }
-            | Ask::TakeOver { .. }
+            | Ask::Move { .. }
             | Ask::SetGoal { .. }
             | Ask::Prioritise { .. }
-            | Ask::MarkSeen { .. }
+            | Ask::Seen { .. }
             | Ask::EditNote { .. }
             | Ask::DeleteNote { .. }
             | Ask::ChangePolicy { .. }
@@ -553,20 +550,20 @@ fn target(ask: &Ask) -> Target {
     match ask {
         Ask::StartChat { project, .. } => (Some(*project), None, ActKind::Write, None),
         Ask::Write { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Write, None),
-        Ask::AnswerQuestion { project, task, message, .. } => {
+        Ask::Answer { project, on: AnswerOn::Question { task, message, .. }, .. } => {
             (Some(*project), Some(ObjectKey::Question { task: *task, message: *message }), ActKind::Answer, None)
         }
-        Ask::AnswerPerson { project, task, revision, .. } => {
+        Ask::Answer { project, on: AnswerOn::Person { task, revision, .. }, .. } => {
             (Some(*project), Some(ObjectKey::PersonTask(*task)), ActKind::Answer, Some((*revision, Moved::PersonTask)))
         }
         Ask::Take { project, task } => (Some(*project), Some(ObjectKey::PersonTask(*task)), ActKind::Take, None),
         Ask::HandBack { project, task } => {
             (Some(*project), Some(ObjectKey::PersonTask(*task)), ActKind::HandBack, None)
         }
-        Ask::DecideProposal { project, proposal, decision } => {
+        Ask::Decide { project, on: DecideOn::Proposal { proposal, decision } } => {
             (Some(*project), Some(ObjectKey::Proposal(*proposal)), decision_kind(decision), None)
         }
-        Ask::DecideEscalation { project, task, revision, decision } => (
+        Ask::Decide { project, on: DecideOn::Escalation { task, revision, decision } } => (
             Some(*project),
             Some(ObjectKey::Escalation(*task)),
             decision_kind(decision),
@@ -582,15 +579,15 @@ fn target(ask: &Ask) -> Target {
             Some(*project),
             Some(ObjectKey::Task(*task)),
             if release.is_some() { ActKind::AmendRelease } else { ActKind::Amend },
-            Some((*revision, Moved::Spec)),
+            revision.map(|value| (value, Moved::Spec)),
         ),
         Ask::Stop { project, task } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Stop, None),
         Ask::Cancel { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Cancel, None),
         Ask::Close { project, chat, .. } => (Some(*project), Some(ObjectKey::Task(*chat)), ActKind::Close, None),
-        Ask::TakeOver { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::TakeOver, None),
+        Ask::Move { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::TakeOver, None),
         Ask::SetGoal { project, .. } => (Some(*project), None, ActKind::SetGoal, None),
         Ask::Prioritise { project, .. } => (Some(*project), None, ActKind::Prioritise, None),
-        Ask::MarkSeen { .. } => (None, None, ActKind::MarkSeen, None),
+        Ask::Seen { .. } => (None, None, ActKind::MarkSeen, None),
         Ask::EditNote { project, .. } => (Some(*project), None, ActKind::EditNote, None),
         Ask::DeleteNote { project, .. } => (Some(*project), None, ActKind::DeleteNote, None),
         Ask::ChangePolicy { project, .. } => (Some(*project), None, ActKind::ChangePolicy, None),

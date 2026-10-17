@@ -12,6 +12,7 @@ use crate::{
     objects::{Body, Card, Object, Source},
 };
 use jig_client::contract::*;
+use jig_client::contract::{AnswerOn, DecideOn};
 use skein_lib::{Id, List, Time, Wall};
 fn offered(act: ActKind, admission: Admission) -> List<Offered> {
     let mut rows = List::with_capacity(1);
@@ -36,6 +37,7 @@ pub(super) fn change() -> Amendment {
         dependencies: None,
         authority: None,
         instructions: None,
+        tracked: None,
     }
 }
 fn counts() -> PhaseCounts {
@@ -191,17 +193,22 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
                 reason: text(b""),
                 project: 1,
                 task: 8,
-                revision: Revision { value: 9 },
-                change: change(),
+                revision: Some(Revision { value: 9 }),
+                change: Box::new(change()),
                 release: None,
             },
-            2 => Ask::AnswerPerson {
+            2 => Ask::Answer {
                 project: 1,
-                task: 8,
-                revision: Revision { value: 4 },
-                answer: PersonAnswer::Words(text(b"the answer")),
+                on: AnswerOn::Person {
+                    task: 8,
+                    revision: Revision { value: 4 },
+                    answer: PersonAnswer::Words(text(b"the answer")),
+                },
             },
-            3 => Ask::DecideProposal { project: 1, proposal: proposal().key, decision: Decision::Accepted },
+            3 => Ask::Decide {
+                project: 1,
+                on: DecideOn::Proposal { proposal: proposal().key, decision: Decision::Accepted },
+            },
             4 => Ask::Stop { project: 1, task: 8 },
             _ => unreachable!(),
         };
@@ -325,8 +332,8 @@ fn a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_w
             reason: text(b""),
             project: 1,
             task: 8,
-            revision: Revision { value: 9 },
-            change: change(),
+            revision: Some(Revision { value: 9 }),
+            change: Box::new(change()),
             release: None
         }
     );
@@ -447,8 +454,8 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
                 reason: text(b""),
                 project: 1,
                 task: 8,
-                revision: row.spec_revision,
-                change: draft,
+                revision: Some(row.spec_revision),
+                change: Box::new(draft),
                 release: if act == ActKind::AmendRelease { Some(row.hold.as_ref().unwrap().revision()) } else { None }
             }
         );
@@ -568,8 +575,8 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
             reason: text(b""),
             project: 1,
             task: 8,
-            revision: row.spec_revision,
-            change: draft,
+            revision: Some(row.spec_revision),
+            change: Box::new(draft),
             release: None
         }
     );
@@ -600,11 +607,13 @@ fn person_verdict_choices_preserve_full_codes_and_refuse_missing_machine_fields(
         } else {
             assert_eq!(
                 sent(&rows),
-                &Ask::AnswerPerson {
+                &Ask::Answer {
                     project: 1,
-                    task: 8,
-                    revision: Revision { value: 4 },
-                    answer: PersonAnswer::Choice { option: u32::MAX, reason: text(b"") },
+                    on: AnswerOn::Person {
+                        task: 8,
+                        revision: Revision { value: 4 },
+                        answer: PersonAnswer::Choice { option: u32::MAX, reason: text(b"") }
+                    }
                 }
             );
         }
@@ -639,11 +648,13 @@ fn approval_confirmation_keeps_the_whole_state_and_actual_optional_explanation()
         }
         assert_eq!(
             sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })),
-            &Ask::AnswerPerson {
+            &Ask::Answer {
                 project: 1,
-                task: 8,
-                revision: Revision { value: 4 },
-                answer: PersonAnswer::Approved { state: Box::from(UTF8_TEXTS[0]), words: explanation },
+                on: AnswerOn::Person {
+                    task: 8,
+                    revision: Revision { value: 4 },
+                    answer: PersonAnswer::Approved { state: Box::from(UTF8_TEXTS[0]), words: explanation }
+                }
             }
         );
     }
@@ -719,8 +730,8 @@ fn bounded_authority_drafts_use_literal_pattern_order_and_complete_source_facts(
                         reason: text(b""),
                         project: 1,
                         task: 8,
-                        revision: row.spec_revision,
-                        change: draft,
+                        revision: Some(row.spec_revision),
+                        change: Box::new(draft),
                         release: None
                     }
                 );
@@ -791,8 +802,8 @@ fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserve
                     reason: text(b""),
                     project: 1,
                     task: 8,
-                    revision: row.spec_revision,
-                    change: draft,
+                    revision: Some(row.spec_revision),
+                    change: Box::new(draft),
                     release: None
                 }
             );

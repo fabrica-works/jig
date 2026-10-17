@@ -514,6 +514,7 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crat
                     wake: None,
                     dependencies: None,
                     authority: None,
+                    tracked: None,
                 },
             },
             b"full after",
@@ -1684,10 +1685,12 @@ fn equal_number_proposal_makers_keep_distinct_card_keys_words_and_decoding() {
         };
         assert_eq!(
             ask.as_ref(),
-            &Ask::DecideProposal {
+            &Ask::Decide {
                 project: 4,
-                proposal: ProposalKey { proposer: maker, number: u64::MAX },
-                decision: Decision::Accepted,
+                on: DecideOn::Proposal {
+                    proposal: ProposalKey { proposer: maker, number: u64::MAX },
+                    decision: Decision::Accepted
+                }
             }
         );
     }
@@ -2009,3 +2012,5 @@ fn moved_effect_facts_say_the_supplied_connector_proposal_without_inventing_a_ma
 }
 
 const UTF8_TEXTS: [&[u8]; 1] = [b"\0~\x01"];
+
+use jig_client::contract::DecideOn;

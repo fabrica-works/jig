@@ -785,3 +785,5 @@ pub fn not_served() -> NotServed {
         .expect("range slot");
     NotServed::new(&lim, NotServedParts { owner: Owner::Jig, served }).expect("version refusal")
 }
+mod operations;
+pub use operations::merged_targets;

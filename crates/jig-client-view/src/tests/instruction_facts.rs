@@ -20,7 +20,7 @@ fn sent(out: &[Request]) -> &Amendment {
         .find_map(|request| match request {
             Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
                 match &**ask {
-                    Ask::Amend { change, .. } => Some(change),
+                    Ask::Amend { change, .. } => Some(change.as_ref()),
                     _ => None,
                 }
             }
@@ -106,6 +106,7 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
             wake: None,
             dependencies: None,
             authority: Some(row.authority.whole().unwrap()),
+            tracked: None,
         };
         expected.authority.as_mut().unwrap().spend = 25;
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
@@ -146,6 +147,7 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
             wake: None,
             dependencies: None,
             authority: Some(authority),
+            tracked: None,
         };
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
         let tree = dialog(&domain, words(), &mut bindings);
@@ -165,7 +167,7 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
         let Ask::Amend { revision, release, .. } = ask else {
             panic!("amend request");
         };
-        assert_eq!(*revision, Revision { value: 6 });
+        assert_eq!(*revision, Some(Revision { value: 6 }));
         assert_eq!(*release, Some(Revision { value: 4 }));
         let projected = domain.objects().get(id).unwrap();
         let Body::Escalation(retained) = projected.body.as_ref().unwrap() else {

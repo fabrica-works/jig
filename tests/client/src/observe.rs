@@ -1,6 +1,7 @@
 //! Shared jig observations and the Test application's family vocabulary.
 #![allow(clippy::wildcard_imports, reason = "boundary adapter covers the owner vocabulary")]
 use crate::harness::{CardKey, CardSeen, Receipt, Seen, Sent};
+use jig_client::contract::{AnswerOn, DecideOn};
 use jig_client_domain::contract::*;
 use jig_client_test_domain::{self as domain, Event, Request, family};
 use jig_client_view::Owner;
@@ -55,31 +56,35 @@ pub fn sent(request: &Request) -> Option<Sent> {
 #[must_use]
 pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> Sent {
     let (card, revision, words) = match ask {
-        Ask::Write { task, words, .. } | Ask::AnswerQuestion { task, words, .. } => {
+        Ask::Write { task, words, .. } | Ask::Answer { on: AnswerOn::Question { task, words, .. }, .. } => {
             (None, None, Some((*task, words.bytes().to_vec())))
         }
-        Ask::AnswerPerson { task, revision, .. } => {
+        Ask::Answer { on: AnswerOn::Person { task, revision, .. }, .. } => {
             (Some(key(ObjectKey::PersonTask(*task))), Some((3, revision.value)), None)
         }
         Ask::Release { task, revision, .. } => (Some(key(ObjectKey::Task(*task))), Some((2, revision.value)), None),
-        Ask::DecideEscalation { task, revision, .. } => {
+        Ask::Decide { on: DecideOn::Escalation { task, revision, .. }, .. } => {
             (Some(key(ObjectKey::Escalation(*task))), Some((2, revision.value)), None)
         }
-        Ask::Amend { task, revision, .. } => (Some(key(ObjectKey::Task(*task))), Some((1, revision.value)), None),
+        Ask::Amend { task, revision, .. } => {
+            (Some(key(ObjectKey::Task(*task))), revision.map(|value| (1, value.value)), None)
+        }
         Ask::EditNote { project, note, revision, .. } | Ask::DeleteNote { project, note, revision, .. } => {
             (Some(key(ObjectKey::Note { project: *project, note: *note })), Some((4, revision.value)), None)
         }
-        Ask::DecideProposal { proposal, .. } => (Some(key(ObjectKey::Proposal(*proposal))), None, None),
+        Ask::Decide { on: DecideOn::Proposal { proposal, .. }, .. } => {
+            (Some(key(ObjectKey::Proposal(*proposal))), None, None)
+        }
         Ask::StartChat { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetRoles { .. }
         | Ask::MakeService { .. }
@@ -532,7 +537,10 @@ mod tests {
             let sent = super::jig_sent(
                 skein_lib::Token::new(1),
                 [7; 16],
-                &Ask::DecideProposal { project: 4, proposal, decision: Decision::Accepted },
+                &Ask::Decide {
+                    project: 4,
+                    on: jig_client_domain::contract::DecideOn::Proposal { proposal, decision: Decision::Accepted },
+                },
             );
             assert_eq!(sent.card, Some(card.clone()));
             builder.open(Role::Item);

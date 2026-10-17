@@ -1008,6 +1008,7 @@ pub enum JigPhrase {
     HeldPriorLifecycle,
     HeldPriorWaiting,
 
+    EngineLimitGrace,
     EngineLimitWords,
     EngineLimitIdentity,
     EngineLimitRoles,
@@ -1640,6 +1641,7 @@ impl JigPhrase {
             Self::OutboxEntry => 508,
             Self::TakenByNumber => 509,
 
+            Self::EngineLimitGrace => 7410,
             Self::EngineLimitWords => 413,
             Self::EngineLimitIdentity => 414,
             Self::EngineLimitRoles => 415,
@@ -1808,6 +1810,7 @@ impl JigPhrase {
             | Self::PanelPart
             | Self::ResultPart
             | Self::HoldPart
+            | Self::EngineLimitGrace
             | Self::EngineLimitWords
             | Self::EngineLimitIdentity
             | Self::EngineLimitRoles
@@ -2418,7 +2421,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 631] = [
+pub const ALL: [JigPhrase; 632] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2952,6 +2955,7 @@ pub const ALL: [JigPhrase; 631] = [
     JigPhrase::HoldPart,
     JigPhrase::OutboxEntry,
     JigPhrase::TakenByNumber,
+    JigPhrase::EngineLimitGrace,
     JigPhrase::EngineLimitWords,
     JigPhrase::EngineLimitIdentity,
     JigPhrase::EngineLimitRoles,

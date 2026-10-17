@@ -12,6 +12,7 @@ use jig_client::contract::{
     ActKind, Admission, Ask, Decision, Note, ObjectKey, Offered, PersonAnswer, PersonContract, Priority, Refusal,
     Revision, Text,
 };
+use jig_client::contract::{AnswerOn, DecideOn};
 use skein_lib::List;
 /// Returns the engine's admission, or not offered when its document has no such act.
 #[must_use]
@@ -194,11 +195,13 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
     let choices = &confirmation.choices;
     match confirmation.act {
         ActKind::Accept | ActKind::Reject | ActKind::PassUp => decide(object, confirmation, fields, project),
-        ActKind::LeaveHeld => Some(Ask::DecideEscalation {
+        ActKind::LeaveHeld => Some(Ask::Decide {
             project,
-            task,
-            revision: confirmation.revision?,
-            decision: Decision::LeftHeld { reason: words(fields, Purpose::Reason)? },
+            on: DecideOn::Escalation {
+                task,
+                revision: confirmation.revision?,
+                decision: Decision::LeftHeld { reason: words(fields, Purpose::Reason)? },
+            },
         }),
         ActKind::Release => {
             Some(Ask::Release { project, task, revision: confirmation.revision?, again: choices.again })
@@ -210,8 +213,8 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
             Some(Ask::Amend {
                 project,
                 task,
-                revision: confirmation.revision?,
-                change: choices.change.clone()?,
+                revision: Some(confirmation.revision?),
+                change: Box::new(choices.change.clone()?),
                 reason: words(fields, Purpose::Reason)?,
                 release: if confirmation.act == ActKind::AmendRelease {
                     Some(confirmation.release_revision?)
@@ -230,9 +233,9 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
             release: choices.release,
         }),
         ActKind::Stop => Some(Ask::Stop { project, task }),
-        ActKind::Cancel => Some(Ask::Cancel { project, task, reason: words(fields, Purpose::Reason)? }),
+        ActKind::Cancel => Some(Ask::Cancel { project, task, reason: words(fields, Purpose::Reason)?, grace: None }),
         ActKind::Close => Some(Ask::Close { project, chat: task, disposals: choices.disposals.clone() }),
-        ActKind::TakeOver => Some(Ask::TakeOver { project, task, reason: words(fields, Purpose::Reason)? }),
+        ActKind::TakeOver => Some(Ask::Move { project, task, reason: words(fields, Purpose::Reason)? }),
         ActKind::Prioritise => {
             let mut goals = List::with_capacity(1);
             goals.push(Priority { task, priority: choices.priority? }).expect("one priority fits");
@@ -307,17 +310,15 @@ fn decide(object: &Object, confirmation: &Confirmation, fields: &Fields, project
                 | ActKind::MakeService
                 | ActKind::SetPool => return None,
             };
-            Some(Ask::DecideProposal { project, proposal, decision })
+            Some(Ask::Decide { project, on: DecideOn::Proposal { proposal, decision } })
         }
         ObjectKey::Escalation(task) => {
             if confirmation.act != ActKind::PassUp {
                 return None;
             }
-            Some(Ask::DecideEscalation {
+            Some(Ask::Decide {
                 project,
-                task,
-                revision: confirmation.revision?,
-                decision: Decision::PassedUp,
+                on: DecideOn::Escalation { task, revision: confirmation.revision?, decision: Decision::PassedUp },
             })
         }
         ObjectKey::Task(_)
@@ -331,11 +332,9 @@ fn decide(object: &Object, confirmation: &Confirmation, fields: &Fields, project
 fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project: u32, task: u64) -> Option<Ask> {
     let choices = &confirmation.choices;
     match &object.body {
-        Some(Body::Question(question)) => Some(Ask::AnswerQuestion {
+        Some(Body::Question(question)) => Some(Ask::Answer {
             project,
-            task,
-            message: question.message,
-            words: words(fields, Purpose::Answer)?,
+            on: AnswerOn::Question { task, message: question.message, words: words(fields, Purpose::Answer)? },
         }),
         Some(Body::OwnerPersonTask(document)) => {
             let answer = if choices.cannot {
@@ -343,7 +342,7 @@ fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project
             } else {
                 crate::objects::person_task::answer(document, choices.option, fields)?
             };
-            Some(Ask::AnswerPerson { project, task, revision: confirmation.revision?, answer })
+            Some(Ask::Answer { project, on: AnswerOn::Person { task, revision: confirmation.revision?, answer } })
         }
         Some(Body::PersonTask(document)) => {
             let answer = if choices.cannot {
@@ -374,7 +373,7 @@ fn answer(object: &Object, confirmation: &Confirmation, fields: &Fields, project
                     PersonContract::Words => PersonAnswer::Words(words(fields, Purpose::Answer)?),
                 }
             };
-            Some(Ask::AnswerPerson { project, task, revision: confirmation.revision?, answer })
+            Some(Ask::Answer { project, on: AnswerOn::Person { task, revision: confirmation.revision?, answer } })
         }
         Some(
             Body::Historical(_)

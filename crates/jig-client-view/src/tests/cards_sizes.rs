@@ -102,6 +102,7 @@ fn full_amendment() -> Amendment {
         wake: Some(full_wake()),
         dependencies: Some(list([9, 10])),
         authority: Some(full_owner_authority().authority),
+        tracked: None,
     }
 }
 fn full_proposal(action: ProposalAction) -> Proposal {

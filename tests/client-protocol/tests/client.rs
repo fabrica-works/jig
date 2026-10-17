@@ -284,3 +284,55 @@ fn a_family_request_in_the_deployment_scope_reaches_the_people_child_with_it() {
     };
     assert_eq!((*scope, *connector), (jig_domain_people::ApplicationScope::Deployment, 1));
 }
+
+const CANCEL: Key = Key { asker: Asker::JIG, number: 81 };
+const OVERRIDE: Key = Key { asker: Asker::JIG, number: 82 };
+const GRACE: Duration = Duration::from_millis(200);
+const OVERRIDE_BUDGET: u64 = 50;
+#[test]
+fn a_cancel_with_a_grace_ends_the_task_once_its_grace_has_passed() {
+    let mut story = Story::live(fixtures::SEED);
+    let task = story.running_task();
+    let reason = contract::Text::new(Box::from(b"enough".as_slice()), 64).expect("fits");
+    let cancel = contract::Ask::Cancel { project: PROJECT_NUMBER, task, reason, grace: Some(GRACE) };
+    story.send(CANCEL, Ask::Jig(Box::new(cancel)));
+    assert!(story.run_until(|s| !s.answered(CANCEL).is_empty(), PROOF_WAIT));
+    assert_eq!(
+        story.answered(CANCEL),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::Cancelled { task }
+        ))))]
+    );
+    assert!(story.heard_asked_to_finish(task));
+    assert!(story.phase(task) != Some(contract::Phase::Cancelled), "the grace has not passed");
+    assert!(story.run_until(|s| s.phase(task) == Some(contract::Phase::Cancelled), PROOF_WAIT));
+    assert!(story.elapsed_since_answer(CANCEL) >= GRACE);
+}
+#[test]
+fn an_owner_s_template_override_is_answered_policy_changed() {
+    let mut story = Story::live(fixtures::SEED);
+    let mut overrides = skein_lib::List::with_capacity(1);
+    overrides
+        .push(contract::TemplateOverride {
+            template: 2,
+            executor: None,
+            budget: Some(contract::TemplateBudget::Amount(OVERRIDE_BUDGET)),
+            deadline: None,
+            priority: None,
+        })
+        .expect("one override");
+    story.send(
+        OVERRIDE,
+        Ask::Jig(Box::new(contract::Ask::ChangePolicy {
+            project: PROJECT_NUMBER,
+            edit: contract::PolicyEdit::Templates { overrides },
+        })),
+    );
+    assert!(story.run_until(|s| !s.answered(OVERRIDE).is_empty(), PROOF_WAIT));
+    assert_eq!(
+        story.answered(OVERRIDE),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::PolicyChanged { project: PROJECT_NUMBER }
+        ))))]
+    );
+}

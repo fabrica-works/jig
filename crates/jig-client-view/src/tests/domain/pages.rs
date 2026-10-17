@@ -392,7 +392,7 @@ fn opening_updates_sends_one_mark_seen_for_the_newest_result_displayed() {
     let mut count = 0_u32;
     for request in &out {
         if let Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } = request {
-            assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Results { through: 8 } });
+            assert_eq!(**ask, Ask::Seen { through: SeenThrough::Results { through: 8 } });
             count = count.checked_add(1).expect("bounded emitted requests");
         }
     }
@@ -464,7 +464,7 @@ fn conversations_show_live_before_ended_and_read_more_using_the_opaque_cursor() 
     let mut mark = false;
     for request in &out {
         if let Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } = request {
-            assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 3 } });
+            assert_eq!(**ask, Ask::Seen { through: SeenThrough::Conversation { task: 8, through: 3 } });
             mark = true;
         }
     }
@@ -1443,7 +1443,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
     let mut marked = false;
     for request in &out {
         if let Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } = request {
-            assert_eq!(**ask, Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 9 } });
+            assert_eq!(**ask, Ask::Seen { through: SeenThrough::Conversation { task: 8, through: 9 } });
             marked = true;
         }
     }

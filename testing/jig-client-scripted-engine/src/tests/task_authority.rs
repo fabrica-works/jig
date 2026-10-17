@@ -39,16 +39,17 @@ fn task_authority_receiving_prices_whole_documents_replacements_and_reserved_nes
             reason: text(b""),
             project: 1,
             task: 8,
-            revision: Revision { value: 1 },
+            revision: Some(Revision { value: 1 }),
             release: None,
-            change: Amendment {
+            change: Box::new(Amendment {
                 addressed: None,
                 spec: None,
                 wake: None,
                 dependencies: None,
                 authority: Some(row.authority.authority.clone()),
                 instructions: None,
-            },
+                tracked: None,
+            }),
         };
         let bytes = u64::try_from(size_of::<Ask>()).unwrap() + ask.heap(&bounds).unwrap();
         bounds.document_bytes = bytes;

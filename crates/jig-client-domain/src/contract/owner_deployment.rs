@@ -2,7 +2,7 @@
 //! Core-owned facts; connector diagnostics are supplied independently.
 //! client/domain/contract.md, 5 and 7.1;
 //! client/domain/pages.md, 7.
-use super::{AdmissionLimit, Chip, Funder, OwnerRequester, OwnerTaskLink, Proposer, Seen};
+use super::{AdmissionLimit, Chip, Funder, OwnerRequester, OwnerTaskLink, Proposer, SeenThrough};
 use skein_lib::{Duration, List, Wall};
 
 /// Whole supplied deployment facts with independent bounded loss counters.
@@ -269,7 +269,7 @@ pub enum OwnerPersonCapacityAction {
     /// Release as supplied by its owner.
     Release { task: u64 },
     /// `MarkSeen` as supplied by its owner.
-    MarkSeen { seen: Seen },
+    MarkSeen { seen: SeenThrough },
 }
 
 /// The supplied closed personcapacitycause vocabulary.

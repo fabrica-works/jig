@@ -52,8 +52,8 @@ impl Application for OwnApplication {
             } else {
                 ask.core.as_ref().map_or_else(
                     || {
-                        vec![Change::Request(Box::new(Ask::MarkSeen {
-                            seen: Seen::Results { through: self.document.revision },
+                        vec![Change::Request(Box::new(Ask::Seen {
+                            through: SeenThrough::Results { through: self.document.revision },
                         }))]
                     },
                     |asks| asks.iter().cloned().map(|ask| Change::Request(Box::new(ask))).collect(),
@@ -122,7 +122,7 @@ fn own_script() -> Script {
         latest.updates.value = u32::try_from(3 - through).expect("three results");
         setup.rules.push(Rule {
             party: Some(1),
-            ask: Ask::MarkSeen { seen: Seen::Results { through } },
+            ask: Ask::Seen { through: SeenThrough::Results { through } },
             answer: Answer::Done(Outcome::Changed),
             changes: vec![
                 Change::Seen { party: 1, results: through, replies: vec![] },
@@ -428,7 +428,7 @@ fn scenario_application_jig_requests_cannot_bypass_admission() {
         (
             false,
             Some(list(vec![
-                Ask::MarkSeen { seen: Seen::Results { through: 1 } },
+                Ask::Seen { through: SeenThrough::Results { through: 1 } },
                 Ask::StartChat { project: 2, words: text(b"hidden") },
             ])),
             Refusal::Unknown,
@@ -436,7 +436,7 @@ fn scenario_application_jig_requests_cannot_bypass_admission() {
         (
             false,
             Some(list(vec![
-                Ask::MarkSeen { seen: Seen::Results { through: 1 } },
+                Ask::Seen { through: SeenThrough::Results { through: 1 } },
                 Ask::Release { project: 1, task: 8, revision: Revision { value: 1 }, again: None },
             ])),
             Refusal::NotOffered,

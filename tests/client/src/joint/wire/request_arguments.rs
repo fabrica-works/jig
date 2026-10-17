@@ -52,10 +52,10 @@ pub fn goal_executor(value: client::GoalExecutor) -> people::GoalExecutor {
 }
 
 #[must_use]
-pub fn seen(value: client::Seen) -> people::Seen {
+pub fn seen(value: client::SeenThrough) -> people::Seen {
     match value {
-        client::Seen::Results { through } => people::Seen::Results { through },
-        client::Seen::Replies { chat, through } => people::Seen::Chat { task: chat, through },
+        client::SeenThrough::Results { through } => people::Seen::Results { through },
+        client::SeenThrough::Conversation { task: chat, through } => people::Seen::Chat { task: chat, through },
     }
 }
 
@@ -64,6 +64,42 @@ pub fn disposal(value: &client::Disposal) -> people::Disposal {
     match value {
         client::Disposal::Cancel { task } => people::Disposal { task: *task, keep: people::Keep::Cancel },
         client::Disposal::TakeOver { task } => people::Disposal { task: *task, keep: people::Keep::MakeMine },
+    }
+}
+
+pub(super) fn tracking(value: client::Tracking) -> people::Tracking {
+    match value {
+        client::Tracking::Tracked { priority } => people::Tracking::Tracked { priority },
+        client::Tracking::Untracked => people::Tracking::Untracked,
+    }
+}
+pub(super) fn template(value: &client::TemplateOverride) -> people::TemplateOverride {
+    people::TemplateOverride {
+        template: value.template,
+        executor: value.executor.map(template_executor),
+        budget: value.budget.map(template_budget),
+        deadline: value.deadline.map(template_deadline),
+        priority: value.priority,
+    }
+}
+fn template_executor(value: client::TemplateExecutor) -> people::TemplateExecutor {
+    match value {
+        client::TemplateExecutor::Charter(v) => people::TemplateExecutor::Charter(v),
+        client::TemplateExecutor::Chosen => people::TemplateExecutor::Chosen,
+    }
+}
+fn template_budget(value: client::TemplateBudget) -> people::TemplateBudget {
+    match value {
+        client::TemplateBudget::Amount(v) => people::TemplateBudget::Amount(v),
+        client::TemplateBudget::AsAllowed { cap } => people::TemplateBudget::AsAllowed { cap },
+        client::TemplateBudget::Given => people::TemplateBudget::Given,
+    }
+}
+fn template_deadline(value: client::TemplateDeadline) -> people::TemplateDeadline {
+    match value {
+        client::TemplateDeadline::None => people::TemplateDeadline::None,
+        client::TemplateDeadline::Span(v) => people::TemplateDeadline::Span(v),
+        client::TemplateDeadline::Given => people::TemplateDeadline::Given,
     }
 }
 
@@ -115,9 +151,12 @@ mod tests {
             goal_executor(client::GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX }),
             people::GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX }
         );
-        assert_eq!(seen(client::Seen::Results { through: u64::MAX }), people::Seen::Results { through: u64::MAX });
         assert_eq!(
-            seen(client::Seen::Replies { chat: u64::MAX, through: u64::MAX }),
+            seen(client::SeenThrough::Results { through: u64::MAX }),
+            people::Seen::Results { through: u64::MAX }
+        );
+        assert_eq!(
+            seen(client::SeenThrough::Conversation { task: u64::MAX, through: u64::MAX }),
             people::Seen::Chat { task: u64::MAX, through: u64::MAX }
         );
         assert_eq!(

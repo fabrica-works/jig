@@ -57,18 +57,21 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
                     sent.words = Some((value.task(), value.words().to_vec()));
                     None
                 }
-                w::Ask::AnswerQuestion(value) => {
-                    sent.words = Some((value.task(), value.words().to_vec()));
-                    None
-                }
-                w::Ask::AnswerPerson(value) => {
-                    Some((c::ObjectKey::PersonTask(value.task()), 3, value.revision().value()))
-                }
+                w::Ask::Answer(value) => match value.on() {
+                    w::AnswerOn::Question(v) => {
+                        sent.words = Some((v.task(), v.words().to_vec()));
+                        None
+                    }
+                    w::AnswerOn::Person(v) => Some((c::ObjectKey::PersonTask(v.task()), 3, v.revision().value())),
+                },
                 w::Ask::Release(value) => Some((c::ObjectKey::Task(value.task()), 2, value.revision().value())),
-                w::Ask::DecideEscalation(value) => {
-                    Some((c::ObjectKey::Escalation(value.task()), 2, value.revision().value()))
+                w::Ask::Decide(value) => match value.on() {
+                    w::DecideOn::Proposal(_) => None,
+                    w::DecideOn::Escalation(v) => Some((c::ObjectKey::Escalation(v.task()), 2, v.revision().value())),
+                },
+                w::Ask::Amend(value) => {
+                    value.revision().as_ref().map(|v| (c::ObjectKey::Task(value.task()), 1, v.value()))
                 }
-                w::Ask::Amend(value) => Some((c::ObjectKey::Task(value.task()), 1, value.revision().value())),
                 w::Ask::EditNote(value) => Some((
                     c::ObjectKey::Note { project: value.project(), note: value.note() },
                     4,
@@ -82,14 +85,13 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
                 w::Ask::StartChat(_)
                 | w::Ask::Take(_)
                 | w::Ask::HandBack(_)
-                | w::Ask::DecideProposal(_)
                 | w::Ask::Stop(_)
                 | w::Ask::Cancel(_)
                 | w::Ask::Close(_)
-                | w::Ask::TakeOver(_)
+                | w::Ask::MoveTask(_)
                 | w::Ask::SetGoal(_)
                 | w::Ask::Prioritise(_)
-                | w::Ask::MarkSeen(_)
+                | w::Ask::Seen(_)
                 | w::Ask::ChangePolicy(_)
                 | w::Ask::SetRoles(_)
                 | w::Ask::MakeService(_)

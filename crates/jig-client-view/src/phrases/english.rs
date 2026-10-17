@@ -305,6 +305,7 @@ pub fn language() -> Language {
             JigPhrase::ResultPart => Box::new([Segment::Text(copy_of(b"Connector result"))]),
             JigPhrase::HoldPart => Box::new([Segment::Text(copy_of(b"Connector hold"))]),
 
+            JigPhrase::EngineLimitGrace => Box::new([Segment::Text(copy_of(b"Engine admission limit: grace"))]),
             JigPhrase::EngineLimitWords => Box::new([Segment::Text(copy_of(b"Engine admission limit: words"))]),
             JigPhrase::EngineLimitIdentity => Box::new([Segment::Text(copy_of(b"Engine admission limit: identity"))]),
             JigPhrase::EngineLimitRoles => Box::new([Segment::Text(copy_of(b"Engine admission limit: roles"))]),

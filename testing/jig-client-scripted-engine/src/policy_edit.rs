@@ -22,6 +22,7 @@ impl Payload for PolicyPermission {
 impl Payload for PolicyEdit {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Templates { overrides } => overrides.heap(bounds),
             Self::ProjectSpend { .. } => Some(0),
             Self::Role(value) => value.heap(bounds),
             Self::Requirements { requirements } => requirements.heap(bounds),

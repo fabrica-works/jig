@@ -404,3 +404,12 @@ fn a_family_record_round_trips_with_its_scope_and_window() {
         assert_eq!(FamilyRecord::decode(&limits, &mut Reader::new(&bytes)), Ok(record));
     }
 }
+
+#[test]
+fn each_merged_operation_target_round_trips_unchanged() {
+    let limits = fixtures::limits();
+    for (name, value) in fixtures::merged_targets() {
+        let bytes = fixtures::encoded(&value, Ask::measure, Ask::encode);
+        assert_eq!(Ask::decode(&limits, &mut Reader::new(&bytes)), Ok(value), "{name}");
+    }
+}

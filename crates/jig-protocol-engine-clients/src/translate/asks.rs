@@ -16,18 +16,9 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
             let v = value.into_parts();
             p::Ask::Say { project: v.project, task: v.task, words: v.words, release: v.release }
         }
-        w::Ask::AnswerQuestion(value) => {
+        w::Ask::Answer(value) => {
             let v = value.into_parts();
-            p::Ask::AnswerQuestion { project: v.project, task: v.task, question: v.message, words: v.words }
-        }
-        w::Ask::AnswerPerson(value) => {
-            let v = value.into_parts();
-            p::Ask::AnswerPerson {
-                project: v.project,
-                task: v.task,
-                revision: v.revision.value(),
-                result: person_answer(v.answer),
-            }
+            super::operations::answer(v.project, v.on)
         }
         w::Ask::Take(value) => {
             let v = value.into_parts();
@@ -37,23 +28,9 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
             let v = value.into_parts();
             p::Ask::HandBackPerson { project: v.project, task: v.task }
         }
-        w::Ask::DecideProposal(value) => {
+        w::Ask::Decide(value) => {
             let v = value.into_parts();
-            p::Ask::DecideProposal {
-                project: v.project,
-                proposer: proposer(v.proposal.proposer()),
-                proposal: v.proposal.number(),
-                decision: proposal_decision(v.decision)?,
-            }
-        }
-        w::Ask::DecideEscalation(value) => {
-            let v = value.into_parts();
-            p::Ask::DecideEscalation {
-                project: v.project,
-                task: v.task,
-                revision: v.revision.value(),
-                decision: escalation_decision(v.decision)?,
-            }
+            super::operations::decide(v.project, v.on)?
         }
         w::Ask::Release(value) => {
             let v = value.into_parts();
@@ -64,7 +41,10 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
             p::Ask::Amend {
                 project: v.project,
                 task: v.task,
-                revision: v.revision.value(),
+                revision: match v.revision {
+                    Some(value) => revision(value),
+                    None => 0,
+                },
                 amendment: amendment(v.change, v.reason, limits)?,
                 release: match v.release {
                     Some(value) => Some(revision(value)),
@@ -78,9 +58,9 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
         }
         w::Ask::Cancel(value) => {
             let v = value.into_parts();
-            p::Ask::Cancel { project: v.project, task: v.task, reason: v.reason, grace: None }
+            p::Ask::Cancel { project: v.project, task: v.task, reason: v.reason, grace: v.grace }
         }
-        w::Ask::TakeOver(value) => {
+        w::Ask::MoveTask(value) => {
             let v = value.into_parts();
             p::Ask::Move { project: v.project, task: v.task, reason: v.reason }
         }
@@ -98,9 +78,9 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
                 },
             }
         }
-        w::Ask::MarkSeen(value) => {
+        w::Ask::Seen(value) => {
             let v = value.into_parts();
-            p::Ask::MarkSeen { seen: seen(v.seen) }
+            p::Ask::MarkSeen { seen: seen(v.through) }
         }
         w::Ask::MakeService(value) => {
             let v = value.into_parts();
@@ -175,13 +155,13 @@ fn recalled(value: w::Revision, path: w::Path) -> Result<u32, Untranslatable> {
         Err(_) => Err(Untranslatable { path }),
     }
 }
-fn proposer(value: &w::Proposer) -> p::Proposer {
+pub(super) fn proposer(value: &w::Proposer) -> p::Proposer {
     match value {
         w::Proposer::Task(v) => p::Proposer::Task(v.value()),
         w::Proposer::Party(v) => p::Proposer::Party(v.value()),
     }
 }
-fn proposal_decision(value: w::Decision) -> Result<p::ProposalDecision, Untranslatable> {
+pub(super) fn proposal_decision(value: w::Decision) -> Result<p::ProposalDecision, Untranslatable> {
     match value {
         w::Decision::Accepted => Ok(p::ProposalDecision::Accept),
         w::Decision::Rejected(v) => Ok(p::ProposalDecision::Reject { reason: v.into_parts().reason }),
@@ -191,7 +171,7 @@ fn proposal_decision(value: w::Decision) -> Result<p::ProposalDecision, Untransl
         }
     }
 }
-fn escalation_decision(value: w::Decision) -> Result<p::EscalationDecision, Untranslatable> {
+pub(super) fn escalation_decision(value: w::Decision) -> Result<p::EscalationDecision, Untranslatable> {
     match value {
         w::Decision::Released(v) => match v.again() {
             None => Ok(p::EscalationDecision::Release),
@@ -203,7 +183,7 @@ fn escalation_decision(value: w::Decision) -> Result<p::EscalationDecision, Untr
         w::Decision::Accepted => Err(Untranslatable { path: w::Path::DecideEscalationDecision }),
     }
 }
-fn person_answer(value: w::PersonAnswer) -> p::PersonResult {
+pub(super) fn person_answer(value: w::PersonAnswer) -> p::PersonResult {
     match value {
         w::PersonAnswer::Choice(v) => {
             let v = v.into_parts();
@@ -229,10 +209,10 @@ fn goal_executor(value: w::GoalExecutor) -> p::GoalExecutor {
         w::GoalExecutor::Procedure(v) => p::GoalExecutor::Procedure { connector: v.connector(), code: v.code() },
     }
 }
-fn seen(value: w::Seen) -> p::Seen {
+fn seen(value: w::SeenThrough) -> p::Seen {
     match value {
-        w::Seen::Results(v) => p::Seen::Results { through: v.through() },
-        w::Seen::Replies(v) => p::Seen::Chat { task: v.chat(), through: v.through() },
+        w::SeenThrough::Results(v) => p::Seen::Results { through: v.through() },
+        w::SeenThrough::Conversation(v) => p::Seen::Chat { task: v.task(), through: v.through() },
     }
 }
 fn role(value: w::HeldRole) -> p::Role {
@@ -337,7 +317,10 @@ fn amendment(value: w::Amendment, reason: Box<[u8]>, limits: &w::Limits) -> Resu
         None => None,
     };
     Ok(p::Amendment {
-        tracked: None,
+        tracked: match v.tracked {
+            Some(value) => Some(super::operations::tracking(value)),
+            None => None,
+        },
         addressed: match v.addressed {
             Some(value) => Some(address(value)),
             None => None,
@@ -468,6 +451,7 @@ fn requirement(value: w::PolicyRequirement) -> p::Requirement {
 }
 fn policy(value: w::PolicyEdit, limits: &w::Limits) -> Result<p::PolicyChange, Untranslatable> {
     Ok(match value {
+        w::PolicyEdit::Templates(v) => super::operations::templates(v),
         w::PolicyEdit::ProjectSpend(v) => p::PolicyChange::ProjectSpend { period_spend: v.period_spend() },
         w::PolicyEdit::Role(v) => {
             let v = v.into_parts().value.into_parts();

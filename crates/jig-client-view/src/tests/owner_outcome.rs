@@ -4,7 +4,7 @@ use skein_ui::phrases::{Hole, HoleKind, Invalid, Language, PhraseLimits, Phraseb
 use skein_ui::{Builder, Role, Tree};
 
 use jig_client::contract::{
-    OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,
+    OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, SeenThrough,
 };
 use skein_lib::{Wall, bytes::copy_of};
 
@@ -85,11 +85,11 @@ fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 26] {
             ],
         ),
         (
-            OwnerOutcome::MarkedSeen { seen: Seen::Results { through: u64::MAX } },
+            OwnerOutcome::MarkedSeen { seen: SeenThrough::Results { through: u64::MAX } },
             &[b"Read position marked seen", b"Results seen through: 18446744073709551615"],
         ),
         (
-            OwnerOutcome::MarkedSeen { seen: Seen::Replies { chat: u64::MAX, through: u64::MAX } },
+            OwnerOutcome::MarkedSeen { seen: SeenThrough::Conversation { task: u64::MAX, through: u64::MAX } },
             &[
                 b"Read position marked seen",
                 b"Chat: 18446744073709551615",
@@ -284,7 +284,7 @@ fn released_flags_and_question_message_identities_remain_independent() {
     }
     let question = render(&OwnerOutcome::QuestionAnswered { task: 7, question: 11, message: 19 }, &words);
     expect_lines(&question, &[b"Question answered", b"Task: 7", b"Question: 11", b"Message: 19"]);
-    let seen = render(&OwnerOutcome::MarkedSeen { seen: Seen::Replies { chat: 13, through: 17 } }, &words);
+    let seen = render(&OwnerOutcome::MarkedSeen { seen: SeenThrough::Conversation { task: 13, through: 17 } }, &words);
     expect_lines(&seen, &[b"Read position marked seen", b"Chat: 13", b"Replies seen through: 17"]);
     let proposed = render(&OwnerOutcome::GoalProposed { proposal: 19 }, &words);
     expect_lines(&proposed, &[b"Goal proposed", b"Proposal number: 19"]);

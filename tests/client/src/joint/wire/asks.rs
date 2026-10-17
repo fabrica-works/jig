@@ -1,8 +1,10 @@
 //! Exact request translation (client/domain/contract.md, 3).
 //! Whole supplied fields preserve independent revisions and optional edits.
 use super::request_arguments;
+mod policy;
 use jig_client_domain::contract as client;
 use jig_domain_people as people;
+use policy::policy_edit;
 use skein_lib::List;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,41 +28,49 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
         client::Ask::Write { project, task, words, release } => {
             people::Ask::Say { project: *project, task: *task, words: Box::from(words.bytes()), release: *release }
         }
-        client::Ask::AnswerQuestion { project, task, message, words } => people::Ask::AnswerQuestion {
-            project: *project,
-            task: *task,
-            question: *message,
-            words: Box::from(words.bytes()),
-        },
-        client::Ask::AnswerPerson { project, task, revision, answer } => people::Ask::AnswerPerson {
-            project: *project,
-            task: *task,
-            revision: revision.value,
-            result: request_arguments::person_answer(answer),
-        },
+        client::Ask::Answer { project, on: client::AnswerOn::Question { task, message, words } } => {
+            people::Ask::AnswerQuestion {
+                project: *project,
+                task: *task,
+                question: *message,
+                words: Box::from(words.bytes()),
+            }
+        }
+        client::Ask::Answer { project, on: client::AnswerOn::Person { task, revision, answer } } => {
+            people::Ask::AnswerPerson {
+                project: *project,
+                task: *task,
+                revision: revision.value,
+                result: request_arguments::person_answer(answer),
+            }
+        }
         client::Ask::Take { project, task } => people::Ask::TakePerson { project: *project, task: *task },
         client::Ask::HandBack { project, task } => people::Ask::HandBackPerson { project: *project, task: *task },
-        client::Ask::DecideProposal { project, proposal, decision } => people::Ask::DecideProposal {
-            project: *project,
-            proposer: match proposal.proposer {
-                client::Proposer::Task(number) => people::Proposer::Task(number),
-                client::Proposer::Party(number) => people::Proposer::Party(number),
-            },
-            proposal: proposal.number,
-            decision: proposal_decision(decision)?,
-        },
-        client::Ask::DecideEscalation { project, task, revision, decision } => people::Ask::DecideEscalation {
-            project: *project,
-            task: *task,
-            revision: revision.value,
-            decision: escalation_decision(decision)?,
-        },
+        client::Ask::Decide { project, on: client::DecideOn::Proposal { proposal, decision } } => {
+            people::Ask::DecideProposal {
+                project: *project,
+                proposer: match proposal.proposer {
+                    client::Proposer::Task(number) => people::Proposer::Task(number),
+                    client::Proposer::Party(number) => people::Proposer::Party(number),
+                },
+                proposal: proposal.number,
+                decision: proposal_decision(decision)?,
+            }
+        }
+        client::Ask::Decide { project, on: client::DecideOn::Escalation { task, revision, decision } } => {
+            people::Ask::DecideEscalation {
+                project: *project,
+                task: *task,
+                revision: revision.value,
+                decision: escalation_decision(decision)?,
+            }
+        }
         client::Ask::Release { project, task, revision, again } => {
             people::Ask::Release { project: *project, task: *task, revision: revision.value, again: *again }
         }
         client::Ask::Stop { project, task } => people::Ask::Stop { project: *project, task: *task },
-        client::Ask::Cancel { project, task, reason } => {
-            people::Ask::Cancel { project: *project, task: *task, reason: Box::from(reason.bytes()), grace: None }
+        client::Ask::Cancel { project, task, reason, grace } => {
+            people::Ask::Cancel { project: *project, task: *task, reason: Box::from(reason.bytes()), grace: *grace }
         }
         client::Ask::Close { project, chat, disposals } => {
             let mut result = List::with_capacity(disposals.capacity());
@@ -69,7 +79,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
             }
             people::Ask::Close { project: *project, chat: *chat, disposals: result }
         }
-        client::Ask::TakeOver { project, task, reason } => {
+        client::Ask::Move { project, task, reason } => {
             people::Ask::Move { project: *project, task: *task, reason: Box::from(reason.bytes()) }
         }
         client::Ask::SetGoal { project, spec, executor, budget, priority, deadline } => people::Ask::SetGoal {
@@ -84,7 +94,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
             project: *project,
             goals: goals.iter().map(|value| (value.task, value.priority)).collect(),
         },
-        client::Ask::MarkSeen { seen } => people::Ask::MarkSeen { seen: request_arguments::seen(*seen) },
+        client::Ask::Seen { through: seen } => people::Ask::MarkSeen { seen: request_arguments::seen(*seen) },
         client::Ask::SetPool { project, party, budget } => {
             people::Ask::SetPool { project: *project, person: *party, budget: *budget }
         }
@@ -112,9 +122,9 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
         client::Ask::Amend { project, task, revision, change, release, reason } => people::Ask::Amend {
             project: *project,
             task: *task,
-            revision: revision.value,
+            revision: revision.map_or(0, |value| value.value),
             amendment: people::Amendment {
-                tracked: None,
+                tracked: change.tracked.map(request_arguments::tracking),
                 addressed: change.addressed.map(|value| people::AddressChange {
                     revision: value.revision.value,
                     address: match value.address {
@@ -220,54 +230,6 @@ fn authority(value: &client::OwnerAuthority) -> people::Authority {
     }
 }
 
-fn policy_edit(value: &client::PolicyEdit) -> people::PolicyChange {
-    match value {
-        client::PolicyEdit::ProjectSpend { period_spend } => {
-            people::PolicyChange::ProjectSpend { period_spend: *period_spend }
-        }
-        client::PolicyEdit::Role(role) => people::PolicyChange::Role(people::PolicyRole {
-            number: role.number,
-            authority: authority(&role.authority),
-            period_spend: role.period_spend,
-            requests: role.requests,
-            decides: role.decides,
-        }),
-        client::PolicyEdit::Requirements { requirements } => people::PolicyChange::Requirements {
-            requirements: requirements
-                .iter()
-                .map(|value| people::Requirement {
-                    connector: value.connector,
-                    kind: value.kind,
-                    pattern: pattern(&value.pattern),
-                    judge: people::Judge {
-                        connector: value.judge.connector,
-                        requirement: value.judge.requirement,
-                        parameters: value.judge.parameters,
-                    },
-                    guard: match value.guard {
-                        client::PolicyGuard::Guarded => people::Guard::Guarded,
-                        client::PolicyGuard::Observed { freshness } => people::Guard::Observed { freshness },
-                    },
-                    must_be_guarded: value.must_be_guarded,
-                })
-                .collect(),
-        },
-        client::PolicyEdit::Projections { grants } => {
-            people::PolicyChange::Projections { grants: grants.iter().map(grant).collect() }
-        }
-        client::PolicyEdit::Permissions { mappings } => people::PolicyChange::Permissions {
-            mappings: mappings
-                .iter()
-                .map(|value| people::PermissionRole {
-                    connector: value.connector,
-                    permission: value.permission,
-                    role: value.role,
-                })
-                .collect(),
-        },
-    }
-}
-
 fn note_scope(value: &client::NoteScope, project: u32) -> Result<people::NoteScope, Invalid> {
     Ok(match value {
         client::NoteScope::Deployment => people::NoteScope::Deployment,
@@ -330,15 +292,16 @@ mod tests {
                 let request = client::Ask::Amend {
                     project: u32::MAX,
                     task: 0,
-                    revision: client::Revision { value: 6 },
-                    change: client::Amendment {
+                    revision: Some(client::Revision { value: 6 }),
+                    change: Box::new(client::Amendment {
                         addressed: Some(client::AddressChange { revision: client::Revision { value: 12 }, address }),
                         instructions: Some(text(b"")),
                         spec: None,
                         wake: None,
                         dependencies: Some(List::with_capacity(7)),
                         authority: None,
-                    },
+                        tracked: None,
+                    }),
                     release: Some(client::Revision { value: 4 }),
                     reason: reason.clone(),
                 };
@@ -390,15 +353,16 @@ mod tests {
         let request = client::Ask::Amend {
             project: 0,
             task: u64::MAX,
-            revision: client::Revision { value: u64::MAX },
-            change: client::Amendment {
+            revision: Some(client::Revision { value: u64::MAX }),
+            change: Box::new(client::Amendment {
                 addressed: None,
                 instructions: None,
                 spec: Some(selected),
                 wake: Some(wake),
                 dependencies: Some(inputs),
                 authority: Some(authority.clone()),
-            },
+                tracked: None,
+            }),
             release: None,
             reason: text(b"supplied"),
         };
@@ -438,7 +402,10 @@ mod tests {
     #[test]
     fn request_translation_keeps_named_question_person_hold_and_proposal_identities_and_empty_words() {
         assert_eq!(
-            ask(&client::Ask::AnswerQuestion { project: u32::MAX, task: u64::MAX, message: 42, words: text(b"") }),
+            ask(&client::Ask::Answer {
+                project: u32::MAX,
+                on: client::AnswerOn::Question { task: u64::MAX, message: 42, words: text(b"") }
+            }),
             Ok(people::Ask::AnswerQuestion { project: u32::MAX, task: u64::MAX, question: 42, words: Box::new([]) })
         );
         for again in [None, Some(false), Some(true)] {
@@ -458,10 +425,12 @@ mod tests {
                 client::Proposer::Party(n) => people::Proposer::Party(n),
             };
             assert_eq!(
-                ask(&client::Ask::DecideProposal {
+                ask(&client::Ask::Decide {
                     project: 4,
-                    proposal: client::ProposalKey { proposer, number: 7 },
-                    decision: client::Decision::Rejected { reason: text(UTF8_TEXTS[0]) }
+                    on: client::DecideOn::Proposal {
+                        proposal: client::ProposalKey { proposer, number: 7 },
+                        decision: client::Decision::Rejected { reason: text(UTF8_TEXTS[0]) }
+                    }
                 }),
                 Ok(people::Ask::DecideProposal {
                     project: 4,

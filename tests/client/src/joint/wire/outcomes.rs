@@ -56,8 +56,10 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::Started { task } => client::OwnerOutcome::Started { task: *task },
         people::Outcome::MarkedSeen { seen } => client::OwnerOutcome::MarkedSeen {
             seen: match seen {
-                people::Seen::Results { through } => client::Seen::Results { through: *through },
-                people::Seen::Chat { task, through } => client::Seen::Replies { chat: *task, through: *through },
+                people::Seen::Results { through } => client::SeenThrough::Results { through: *through },
+                people::Seen::Chat { task, through } => {
+                    client::SeenThrough::Conversation { task: *task, through: *through }
+                }
             },
         },
         people::Outcome::ProposalDecided { proposer, proposal, by, at, choice } => {
@@ -187,12 +189,12 @@ mod tests {
         assert_eq!(
             outcome(&people::Outcome::MarkedSeen { seen: people::Seen::Chat { task: 11, through: u64::MAX } }),
             Outcome::Owner(client::OwnerOutcome::MarkedSeen {
-                seen: client::Seen::Replies { chat: 11, through: u64::MAX }
+                seen: client::SeenThrough::Conversation { task: 11, through: u64::MAX }
             })
         );
         assert_eq!(
             outcome(&people::Outcome::MarkedSeen { seen: people::Seen::Results { through: 0 } }),
-            Outcome::Owner(client::OwnerOutcome::MarkedSeen { seen: client::Seen::Results { through: 0 } })
+            Outcome::Owner(client::OwnerOutcome::MarkedSeen { seen: client::SeenThrough::Results { through: 0 } })
         );
         for why in [people::Again::Busy, people::Again::NotReady] {
             assert_eq!(outcome(&people::Outcome::Again(why)), Outcome::Again(why));

@@ -147,17 +147,21 @@ fn owner_escalation_decisions_name_supplied_hold_and_outer_offers_without_guessi
             ActKind::Release => {
                 Ask::Release { project: 1, task: 8, revision: Revision { value: u64::MAX }, again: Some(false) }
             }
-            ActKind::LeaveHeld => Ask::DecideEscalation {
+            ActKind::LeaveHeld => Ask::Decide {
                 project: 1,
-                task: 8,
-                revision: Revision { value: u64::MAX },
-                decision: Decision::LeftHeld { reason: text(b"keep this held") },
+                on: DecideOn::Escalation {
+                    task: 8,
+                    revision: Revision { value: u64::MAX },
+                    decision: Decision::LeftHeld { reason: text(b"keep this held") },
+                },
             },
-            ActKind::PassUp => Ask::DecideEscalation {
+            ActKind::PassUp => Ask::Decide {
                 project: 1,
-                task: 8,
-                revision: Revision { value: u64::MAX },
-                decision: Decision::PassedUp,
+                on: DecideOn::Escalation {
+                    task: 8,
+                    revision: Revision { value: u64::MAX },
+                    decision: Decision::PassedUp,
+                },
             },
             ActKind::Write
             | ActKind::Answer
@@ -220,11 +224,13 @@ fn owner_escalation_atomic_amend_release_preserves_supplied_reason_and_independe
         &Ask::Amend {
             project: 1,
             task: 8,
-            revision: Revision { value: 9 },
-            change: change(),
+            revision: Some(Revision { value: 9 }),
+            change: Box::new(change()),
             reason: text(b""),
             release: Some(Revision { value: u64::MAX })
         }
     );
     assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original))));
 }
+
+use jig_client::contract::DecideOn;

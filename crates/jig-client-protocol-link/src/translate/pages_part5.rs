@@ -207,6 +207,10 @@ pub(crate) fn amendment_fields(value: &w::Amendment, limits: &Limits) -> Result<
         dependencies: opt3,
         authority: opt4,
         instructions: opt5,
+        tracked: match value.tracked() {
+            Some(value) => Some(crate::translate::operations::restore_tracking(value)),
+            None => None,
+        },
     })
 }
 

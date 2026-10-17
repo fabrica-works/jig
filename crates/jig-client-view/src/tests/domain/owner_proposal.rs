@@ -70,7 +70,10 @@ fn owner_proposal_original_maker_keys_all_three_decisions_and_reason_survive_dou
                 ActKind::PassUp => Decision::PassedUp,
                 _ => unreachable!(),
             };
-            assert_eq!(ask.as_ref(), &Ask::DecideProposal { project: u32::MAX, proposal: supplied.key, decision });
+            assert_eq!(
+                ask.as_ref(),
+                &Ask::Decide { project: u32::MAX, on: DecideOn::Proposal { proposal: supplied.key, decision } }
+            );
             assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
             pending.push((id, *request)).unwrap();
         }
@@ -189,3 +192,5 @@ fn side_or_send(request: &Request) -> bool {
 }
 
 const UTF8_TEXTS: [&[u8]; 2] = [b"!\0!", b"~\0?"];
+
+use jig_client::contract::DecideOn;

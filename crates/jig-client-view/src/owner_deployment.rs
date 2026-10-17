@@ -13,7 +13,7 @@ use jig_client::contract::{
     AdmissionLimit, Chip, ChipPhase, Funder, OwnerAccountPlace, OwnerAccountState, OwnerAccountUnread,
     OwnerAttemptState, OwnerCapacity, OwnerChipPhase, OwnerDeployment, OwnerHelloRefusal, OwnerHelloRefusalLine,
     OwnerHostKind, OwnerHostRun, OwnerPersonCapacityAction, OwnerPersonCapacityCause, OwnerRunLocation,
-    OwnerTaskCapacityAction, OwnerTaskCapacityCause, OwnerTaskLink, Proposer, Seen,
+    OwnerTaskCapacityAction, OwnerTaskCapacityCause, OwnerTaskLink, Proposer, SeenThrough,
 };
 use skein_lib::{Duration, Wall};
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
@@ -165,10 +165,10 @@ fn show_proposer(b: &mut Builder, words: &Words, value: Proposer) {
         Proposer::Party(value) => field_number(b, words, P::PartyProposer, value),
     }
 }
-fn show_seen(b: &mut Builder, words: &Words, value: Seen) {
+fn show_seen(b: &mut Builder, words: &Words, value: SeenThrough) {
     match value {
-        Seen::Results { through } => field_number(b, words, P::Through, through),
-        Seen::Replies { chat, through } => {
+        SeenThrough::Results { through } => field_number(b, words, P::Through, through),
+        SeenThrough::Conversation { task: chat, through } => {
             field_number(b, words, P::Chat, chat);
             field_number(b, words, P::Through, through);
         }
@@ -429,6 +429,7 @@ fn task_cause(b: &mut Builder, words: &Words, value: OwnerTaskCapacityCause) {
 }
 fn admission(b: &mut Builder, words: &Words, value: AdmissionLimit) {
     let phrase = match value {
+        AdmissionLimit::Grace => P::AdmissionGrace,
         AdmissionLimit::Words => P::AdmissionWords,
         AdmissionLimit::Identity => P::AdmissionIdentity,
         AdmissionLimit::Roles => P::AdmissionRoles,

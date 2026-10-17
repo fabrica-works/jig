@@ -1,7 +1,7 @@
 use super::{admit_owner_outcome, owner_outcome_bytes};
 use crate::{Bounds, Invalid};
 use jig_client_domain::contract::{
-    OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,
+    OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, SeenThrough,
 };
 use skein_lib::Wall;
 use std::mem::size_of;
@@ -9,8 +9,8 @@ use std::mem::size_of;
 fn maximum_outcomes() -> [OwnerOutcome; 26] {
     [
         OwnerOutcome::Closing { chat: u64::MAX, cancelled: u32::MAX, kept: u32::MAX },
-        OwnerOutcome::MarkedSeen { seen: Seen::Results { through: u64::MAX } },
-        OwnerOutcome::MarkedSeen { seen: Seen::Replies { chat: u64::MAX, through: u64::MAX } },
+        OwnerOutcome::MarkedSeen { seen: SeenThrough::Results { through: u64::MAX } },
+        OwnerOutcome::MarkedSeen { seen: SeenThrough::Conversation { task: u64::MAX, through: u64::MAX } },
         OwnerOutcome::NoteEdited { name: u64::MAX },
         OwnerOutcome::ServiceMade { person: u64::MAX },
         OwnerOutcome::Adopted { project: u32::MAX },

@@ -4,14 +4,22 @@ use crate::objects::Body;
 use crate::tests::fixtures::Fixture;
 
 fn empty() -> Amendment {
-    Amendment { addressed: None, spec: None, instructions: None, wake: None, dependencies: None, authority: None }
+    Amendment {
+        addressed: None,
+        spec: None,
+        instructions: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        tracked: None,
+    }
 }
 fn sent(out: &[Request]) -> &Amendment {
     out.iter()
         .find_map(|request| match request {
             Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
                 match &**ask {
-                    Ask::Amend { change, .. } => Some(change),
+                    Ask::Amend { change, .. } => Some(change.as_ref()),
                     _ => None,
                 }
             }
@@ -198,7 +206,7 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
     let Ask::Amend { revision, release, .. } = ask else {
         panic!("sent amendment request");
     };
-    assert_eq!(*revision, Revision { value: 6 });
+    assert_eq!(*revision, Some(Revision { value: 6 }));
     assert_eq!(*release, Some(Revision { value: 4 }));
 }
 
@@ -251,7 +259,7 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
             panic!("sent amendment");
         };
         assert_eq!(*project, 4);
-        assert_eq!(*revision, Revision { value: 6 });
+        assert_eq!(*revision, Some(Revision { value: 6 }));
         assert_eq!(*release, Some(Revision { value: 4 }));
     }
 }

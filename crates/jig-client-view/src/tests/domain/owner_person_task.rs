@@ -134,11 +134,13 @@ fn person_owner_approval_copies_opaque_state_and_distinguishes_optional_empty_wo
             }
             assert_eq!(
                 one(&act(&mut d, Act::Confirm)),
-                &Ask::AnswerPerson {
+                &Ask::Answer {
                     project: u32::MAX,
-                    task: 8,
-                    revision: Revision { value: 91 },
-                    answer: PersonAnswer::Approved { state: state.into(), words: words.map(text) }
+                    on: AnswerOn::Person {
+                        task: 8,
+                        revision: Revision { value: 91 },
+                        answer: PersonAnswer::Approved { state: state.into(), words: words.map(text) }
+                    }
                 }
             );
         }
@@ -174,11 +176,13 @@ fn person_owner_numeric_verdict_checks_word_bounds_fields_and_cut_without_invent
         if allowed {
             assert_eq!(
                 one(&rows),
-                &Ask::AnswerPerson {
+                &Ask::Answer {
                     project: u32::MAX,
-                    task: 8,
-                    revision: Revision { value: 91 },
-                    answer: PersonAnswer::Choice { option: u32::MAX, reason: text(reason.unwrap_or(b"")) }
+                    on: AnswerOn::Person {
+                        task: 8,
+                        revision: Revision { value: 91 },
+                        answer: PersonAnswer::Choice { option: u32::MAX, reason: text(reason.unwrap_or(b"")) }
+                    }
                 }
             );
         } else {
@@ -197,11 +201,13 @@ fn person_owner_report_accepts_supplied_empty_and_exact_bound_while_change_retai
         if allowed {
             assert_eq!(
                 one(&rows),
-                &Ask::AnswerPerson {
+                &Ask::Answer {
                     project: u32::MAX,
-                    task: 8,
-                    revision: Revision { value: 91 },
-                    answer: PersonAnswer::Words(text(bytes))
+                    on: AnswerOn::Person {
+                        task: 8,
+                        revision: Revision { value: 91 },
+                        answer: PersonAnswer::Words(text(bytes))
+                    }
                 }
             );
         } else {
@@ -217,11 +223,13 @@ fn person_owner_report_accepts_supplied_empty_and_exact_bound_while_change_retai
     edit(&mut d, Purpose::Reason, b"cannot");
     assert_eq!(
         one(&act(&mut d, Act::Confirm)),
-        &Ask::AnswerPerson {
+        &Ask::Answer {
             project: u32::MAX,
-            task: 8,
-            revision: Revision { value: 91 },
-            answer: PersonAnswer::Cannot { reason: text(b"cannot") }
+            on: AnswerOn::Person {
+                task: 8,
+                revision: Revision { value: 91 },
+                answer: PersonAnswer::Cannot { reason: text(b"cannot") }
+            }
         }
     );
 }
@@ -274,11 +282,13 @@ fn person_owner_changed_revision_fences_old_selection_and_moved_refusal_preserve
     let rows = act(&mut d, Act::Confirm);
     assert_eq!(
         one(&rows),
-        &Ask::AnswerPerson {
+        &Ask::Answer {
             project: u32::MAX,
-            task: 8,
-            revision: Revision { value: 92 },
-            answer: PersonAnswer::Choice { option: 7, reason: text(b"") }
+            on: AnswerOn::Person {
+                task: 8,
+                revision: Revision { value: 92 },
+                answer: PersonAnswer::Choice { option: 7, reason: text(b"") }
+            }
         }
     );
     let Request::Client { asked: jig_client::Event::Send { key: request, .. } } = rows[0] else {
@@ -319,3 +329,5 @@ fn person_owner_original_read_identity_and_late_answer_remain_separate_from_curr
     assert_eq!(crate::objects::person_task::revision(&d.objects().get(id).unwrap()), Some(Revision { value: 100 }));
     assert!(crate::objects::person_task::facts(&d.objects().get(id).unwrap()).is_none());
 }
+
+use jig_client::contract::AnswerOn;

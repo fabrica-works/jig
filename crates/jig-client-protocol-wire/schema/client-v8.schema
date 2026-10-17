@@ -228,7 +228,9 @@ enum OwnerAuthorityExecutor { charter: OwnerAuthorityExecutorCharter, procedure:
 record OwnerDelegation { kinds: list 32 OwnerAuthorityExecutor tasks: u32 depth: u32 }
 record OwnerResourceScope { connector: u16 pattern: OwnerPattern }
 record OwnerAuthority { tools: u64 grants: bytes 16777216 delegation: OwnerDelegation spend: u64 deadline: option u64 notes: u8 note_resources: bytes 16777216 }
-record Amendment { addressed: option AddressChange spec: option Specification wake: option OwnerWakePolicy dependencies: option list 32 u64 authority: option OwnerAuthority instructions: option text 65536 }
+record TrackingTracked { priority: u32 }
+enum Tracking { tracked: TrackingTracked, untracked }
+record Amendment { addressed: option AddressChange spec: option Specification wake: option OwnerWakePolicy dependencies: option list 32 u64 authority: option OwnerAuthority instructions: option text 65536 tracked: option Tracking }
 record DisposalCancel { task: u64 }
 record DisposalTakeOver { task: u64 }
 enum Disposal { cancel: DisposalCancel, take_over: DisposalTakeOver }
@@ -237,8 +239,8 @@ record GoalExecutorProcedure { connector: u16 code: u32 }
 enum GoalExecutor { charter: GoalExecutorCharter, procedure: GoalExecutorProcedure }
 record Priority { task: u64 priority: u32 }
 record SeenResults { through: u64 }
-record SeenReplies { chat: u64 through: u64 }
-enum Seen { results: SeenResults, replies: SeenReplies }
+record SeenConversation { task: u64 through: u64 }
+enum SeenThrough { results: SeenResults, conversation: SeenConversation }
 record NoteScopeProject { value: u32 }
 record NoteScopeResource { project: u32 connector: u16 pattern: OwnerPattern }
 record NoteScopeGoal { project: u32 goal: u64 }
@@ -254,38 +256,51 @@ record PolicyEditRoleValue { value: PolicyEditRole }
 record PolicyEditRequirements { requirements: bytes 16777216 }
 record PolicyEditProjections { grants: bytes 16777216 }
 record PolicyEditPermissions { mappings: list 32 PolicyPermission }
-enum PolicyEdit { project_spend: PolicyEditProjectSpend, role: PolicyEditRoleValue, requirements: PolicyEditRequirements, projections: PolicyEditProjections, permissions: PolicyEditPermissions }
+record TemplateCharter { value: u32 }
+enum TemplateExecutor { charter: TemplateCharter, chosen }
+record TemplateAmount { value: u64 }
+record TemplateAsAllowed { cap: option u64 }
+enum TemplateBudget { amount: TemplateAmount, as_allowed: TemplateAsAllowed, given }
+record TemplateSpan { value: duration }
+enum TemplateDeadline { none, span: TemplateSpan, given }
+record TemplateOverride { template: u32 executor: option TemplateExecutor budget: option TemplateBudget deadline: option TemplateDeadline priority: option u32 }
+record PolicyEditTemplates { overrides: list 16 TemplateOverride }
+enum PolicyEdit { project_spend: PolicyEditProjectSpend, role: PolicyEditRoleValue, requirements: PolicyEditRequirements, projections: PolicyEditProjections, permissions: PolicyEditPermissions, templates: PolicyEditTemplates }
 record HeldRolePolicy { role: u32 }
 enum HeldRole { owner, maintainer, member, observer, policy: HeldRolePolicy }
 record Holding { party: u64 role: HeldRole }
 record StartChat { project: u32 words: text 65536 }
 record Write { project: u32 task: u64 words: text 65536 release: bool }
-record AnswerQuestion { project: u32 task: u64 message: u64 words: text 65536 }
-record AnswerPerson { project: u32 task: u64 revision: Revision answer: PersonAnswer }
+record AnswerQuestion { task: u64 message: u64 words: text 65536 }
+record AnswerPerson { task: u64 revision: Revision answer: PersonAnswer }
+enum AnswerOn { question: AnswerQuestion, person: AnswerPerson }
+record Answer { project: u32 on: AnswerOn }
 record Take { project: u32 task: u64 }
 record HandBack { project: u32 task: u64 }
-record DecideProposal { project: u32 proposal: ProposalKey decision: Decision }
-record DecideEscalation { project: u32 task: u64 revision: Revision decision: Decision }
+record DecideProposal { proposal: ProposalKey decision: Decision }
+record DecideEscalation { task: u64 revision: Revision decision: Decision }
+enum DecideOn { proposal: DecideProposal, escalation: DecideEscalation }
+record Decide { project: u32 on: DecideOn }
 record Release { project: u32 task: u64 revision: Revision again: option bool }
-record Amend { project: u32 task: u64 revision: Revision change: Amendment release: option Revision reason: text 65536 }
+record Amend { project: u32 task: u64 revision: option Revision change: Amendment release: option Revision reason: text 65536 }
 record Stop { project: u32 task: u64 }
-record Cancel { project: u32 task: u64 reason: text 65536 }
+record Cancel { project: u32 task: u64 reason: text 65536 grace: option duration }
 record Close { project: u32 chat: u64 disposals: list 64 Disposal }
-record TakeOver { project: u32 task: u64 reason: text 65536 }
+record Move { project: u32 task: u64 reason: text 65536 }
 record SetGoal { project: u32 spec: text 65536 executor: GoalExecutor budget: u64 priority: u32 deadline: option u64 }
 record Prioritise { project: u32 goals: list 32 Priority }
-record MarkSeen { seen: Seen }
+record Seen { through: SeenThrough }
 record EditNote { project: u32 note: u64 scope: NoteScope revision: Revision description: text 65536 body: text 65536 references: list 32 u64 }
 record DeleteNote { project: u32 note: u64 scope: NoteScope revision: Revision }
 record ChangePolicy { project: u32 edit: PolicyEdit }
 record SetRoles { project: u32 holdings: list 32 Holding }
 record MakeService { project: u32 name: text 65536 role: HeldRole }
 record SetPool { project: u32 party: u64 budget: u64 }
-enum Ask { start_chat: StartChat, write: Write, answer_question: AnswerQuestion, answer_person: AnswerPerson, take: Take, hand_back: HandBack, decide_proposal: DecideProposal, decide_escalation: DecideEscalation, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, close: Close, take_over: TakeOver, set_goal: SetGoal, prioritise: Prioritise, mark_seen: MarkSeen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool }
+enum Ask { start_chat: StartChat, write: Write, answer: Answer, take: Take, hand_back: HandBack, decide: Decide, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, close: Close, move_task: Move, set_goal: SetGoal, prioritise: Prioritise, seen: Seen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool }
 enum OwnerProposalChoice { accepted, rejected, passed, withdrawn, stale }
 enum OwnerEscalationChoice { released, rejected, passed }
 record OwnerOutcomeClosing { chat: u64 cancelled: u32 kept: u32 }
-record OwnerOutcomeMarkedSeen { seen: Seen }
+record OwnerOutcomeMarkedSeen { seen: SeenThrough }
 record OwnerOutcomeNoteEdited { name: u64 }
 record OwnerOutcomeServiceMade { person: u64 }
 record OwnerOutcomeAdopted { project: u32 }
@@ -338,7 +353,7 @@ record LackingDepth { needed: option u32 allowed: u32 }
 record LackingDeadline { asked: option u64 latest: option u64 }
 record LackingTasks { needed: option u32 left: u32 }
 enum Lacking { approver, budget: LackingBudget, grant: LackingGrant, grant_kind: LackingGrantKind, funding, tool, scope, reference, resource_access, resource_unavailable, shape, again: LackingAgain, account, writer, required: LackingRequired, failed: LackingFailed, unguarded: LackingUnguarded, task_kind: LackingTaskKind, depth: LackingDepth, deadline: LackingDeadline, tasks: LackingTasks }
-enum AdmissionLimit { words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service }
+enum AdmissionLimit { grace, words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service }
 record LimitAdmission { which: AdmissionLimit }
 record LimitLiveTasks { project: u32 limit: u32 }
 record LimitInbox { task: u64 limit: u32 }
@@ -736,7 +751,7 @@ record OwnerPersonCapacityActionAnswerPerson { task: u64 }
 record OwnerPersonCapacityActionStop { task: u64 }
 record OwnerPersonCapacityActionCancel { task: u64 }
 record OwnerPersonCapacityActionRelease { task: u64 }
-record OwnerPersonCapacityActionMarkSeen { seen: Seen }
+record OwnerPersonCapacityActionMarkSeen { seen: SeenThrough }
 enum OwnerPersonCapacityAction { close, application: OwnerPersonCapacityActionApplication, note: OwnerPersonCapacityActionNote, service, adoption, roles, policy, pool: OwnerPersonCapacityActionPool, chat, goal, escalation: OwnerPersonCapacityActionEscalation, proposal: OwnerPersonCapacityActionProposal, words: OwnerPersonCapacityActionWords, question: OwnerPersonCapacityActionQuestion, priority, amend: OwnerPersonCapacityActionAmend, move_task: OwnerPersonCapacityActionMove, take_person: OwnerPersonCapacityActionTakePerson, hand_back_person: OwnerPersonCapacityActionHandBackPerson, answer_person: OwnerPersonCapacityActionAnswerPerson, stop: OwnerPersonCapacityActionStop, cancel: OwnerPersonCapacityActionCancel, release: OwnerPersonCapacityActionRelease, mark_seen: OwnerPersonCapacityActionMarkSeen }
 record OwnerPersonCapacityCauseRequests { limit: u32 }
 record OwnerPersonCapacityCausePending { limit: u32 }

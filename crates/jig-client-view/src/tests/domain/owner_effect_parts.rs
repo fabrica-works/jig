@@ -217,7 +217,10 @@ fn confirmed_accept(domain: &mut Fixture, object: Token, value: &OwnerProposal) 
         {
             assert_eq!(
                 ask.as_ref(),
-                &Ask::DecideProposal { project: value.project, proposal: value.key, decision: Decision::Accepted }
+                &Ask::Decide {
+                    project: value.project,
+                    on: DecideOn::Proposal { proposal: value.key, decision: Decision::Accepted }
+                }
             );
             assert!(request.replace(*token).is_none());
         } else {
@@ -320,3 +323,5 @@ fn native_effect_card_refresh_registers_only_shown_current_facts_within_capacity
 }
 
 const UTF8_TEXT: &[u8] = b"~\0\x11";
+
+use jig_client::contract::DecideOn;

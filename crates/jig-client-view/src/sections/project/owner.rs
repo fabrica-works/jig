@@ -47,7 +47,10 @@ pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<A
                 Field::Decides => role.decides = u8::try_from(skein_ui::number(&bytes)?).ok()?,
                 Field::Name => return None,
             },
-            PolicyEdit::Requirements { .. } | PolicyEdit::Projections { .. } | PolicyEdit::Permissions { .. } => {
+            PolicyEdit::Requirements { .. }
+            | PolicyEdit::Projections { .. }
+            | PolicyEdit::Permissions { .. }
+            | PolicyEdit::Templates { .. } => {
                 return None;
             }
         },
@@ -62,21 +65,19 @@ pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<A
         Ask::SetRoles { .. }
         | Ask::StartChat { .. }
         | Ask::Write { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. } => return None,
     }
@@ -615,21 +616,19 @@ fn policy_request(ask: &Ask) -> Option<&PolicyEdit> {
         Ask::ChangePolicy { edit, .. } => Some(edit),
         Ask::StartChat { .. }
         | Ask::Write { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. }
         | Ask::SetRoles { .. }
@@ -643,7 +642,8 @@ fn role_request(ask: &Ask) -> Option<&PolicyEditRole> {
         PolicyEdit::ProjectSpend { .. }
         | PolicyEdit::Requirements { .. }
         | PolicyEdit::Projections { .. }
-        | PolicyEdit::Permissions { .. } => None,
+        | PolicyEdit::Permissions { .. }
+        | PolicyEdit::Templates { .. } => None,
     }
 }
 fn spend_request(ask: &Ask) -> Option<u64> {
@@ -652,7 +652,8 @@ fn spend_request(ask: &Ask) -> Option<u64> {
         PolicyEdit::Role(_)
         | PolicyEdit::Requirements { .. }
         | PolicyEdit::Projections { .. }
-        | PolicyEdit::Permissions { .. } => None,
+        | PolicyEdit::Permissions { .. }
+        | PolicyEdit::Templates { .. } => None,
     }
 }
 fn requirements_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::PolicyRequirement>> {
@@ -661,7 +662,8 @@ fn requirements_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contra
         PolicyEdit::ProjectSpend { .. }
         | PolicyEdit::Role(_)
         | PolicyEdit::Projections { .. }
-        | PolicyEdit::Permissions { .. } => None,
+        | PolicyEdit::Permissions { .. }
+        | PolicyEdit::Templates { .. } => None,
     }
 }
 fn projections_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::OwnerGrant>> {
@@ -670,7 +672,8 @@ fn projections_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contrac
         PolicyEdit::ProjectSpend { .. }
         | PolicyEdit::Role(_)
         | PolicyEdit::Requirements { .. }
-        | PolicyEdit::Permissions { .. } => None,
+        | PolicyEdit::Permissions { .. }
+        | PolicyEdit::Templates { .. } => None,
     }
 }
 fn permissions_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::PolicyPermission>> {
@@ -679,7 +682,8 @@ fn permissions_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contrac
         PolicyEdit::ProjectSpend { .. }
         | PolicyEdit::Role(_)
         | PolicyEdit::Requirements { .. }
-        | PolicyEdit::Projections { .. } => None,
+        | PolicyEdit::Projections { .. }
+        | PolicyEdit::Templates { .. } => None,
     }
 }
 fn holdings_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::Holding>> {
@@ -687,21 +691,19 @@ fn holdings_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::
         Ask::SetRoles { holdings, .. } => Some(holdings),
         Ask::StartChat { .. }
         | Ask::Write { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. }
         | Ask::ChangePolicy { .. }
@@ -714,21 +716,19 @@ fn pool_request(ask: &Ask) -> bool {
         Ask::SetPool { .. } => true,
         Ask::StartChat { .. }
         | Ask::Write { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. }
         | Ask::ChangePolicy { .. }
@@ -741,21 +741,19 @@ fn service_request(ask: &Ask) -> Option<(&jig_client::contract::Text, jig_client
         Ask::MakeService { name, role, .. } => Some((name, *role)),
         Ask::StartChat { .. }
         | Ask::Write { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. }
         | Ask::ChangePolicy { .. }
@@ -1186,21 +1184,19 @@ fn render_request(b: &mut Builder, ask: &Ask, words: &Words, text_limit: u32) {
         }
         Ask::StartChat { .. }
         | Ask::Write { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. } => {}
     }

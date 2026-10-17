@@ -7,7 +7,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
 use crate::{Borrowed, action::Act, notices::kept::Kind, page::IntentPurpose};
-use jig_client::contract::{Answer, ObjectKey, Seen};
+use jig_client::contract::{Answer, ObjectKey, SeenThrough};
 /// Build each visible notice as a named status, with one oldest-notice dismissal.
 pub fn notices(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let text_limit = bindings.text_limit();
@@ -56,8 +56,10 @@ pub fn facts(b: &mut Builder, kind: &Kind, words: &Words, text_limit: u32) {
                 IntentPurpose::StartChat => words.text(b, JigPhrase::Conversations, &[]),
                 IntentPurpose::SetGoal => words.text(b, JigPhrase::ActSetGoal, &[]),
                 IntentPurpose::Seen(seen) => match seen {
-                    Seen::Results { through } => words.text(b, JigPhrase::ResultsThrough, &[Hole::Number(*through)]),
-                    Seen::Replies { chat, through } => {
+                    SeenThrough::Results { through } => {
+                        words.text(b, JigPhrase::ResultsThrough, &[Hole::Number(*through)]);
+                    }
+                    SeenThrough::Conversation { task: chat, through } => {
                         words.text(b, JigPhrase::RepliesThrough, &[Hole::Number(*chat), Hole::Number(*through)]);
                     }
                 },

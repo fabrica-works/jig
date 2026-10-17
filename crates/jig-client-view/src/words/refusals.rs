@@ -91,6 +91,7 @@ impl Words {
     }
     fn engine_limit(&self, b: &mut Builder, which: AdmissionLimit) {
         let phrase = match which {
+            AdmissionLimit::Grace => JigPhrase::EngineLimitGrace,
             AdmissionLimit::Words => JigPhrase::EngineLimitWords,
             AdmissionLimit::Identity => JigPhrase::EngineLimitIdentity,
             AdmissionLimit::Roles => JigPhrase::EngineLimitRoles,

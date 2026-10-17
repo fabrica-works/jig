@@ -190,13 +190,13 @@ fn person_action(
         }
     })
 }
-fn seen_record(value: people::Seen, limits: &w::Limits) -> Result<w::Seen, w::Problem> {
+fn seen_record(value: people::Seen, limits: &w::Limits) -> Result<w::SeenThrough, w::Problem> {
     Ok(match value {
         people::Seen::Results { through } => {
-            w::Seen::Results(w::SeenResults::new(limits, w::SeenResultsParts { through })?)
+            w::SeenThrough::Results(w::SeenResults::new(limits, w::SeenResultsParts { through })?)
         }
         people::Seen::Chat { task, through } => {
-            w::Seen::Replies(w::SeenReplies::new(limits, w::SeenRepliesParts { chat: task, through })?)
+            w::SeenThrough::Conversation(w::SeenConversation::new(limits, w::SeenConversationParts { task, through })?)
         }
     })
 }

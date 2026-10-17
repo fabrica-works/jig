@@ -259,7 +259,7 @@ fn owner_inbox_reply_keeps_preview_unread_runtime_options_and_activity_distinct_
     let out = drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::OpenChat { task: 8 } });
     assert!(out.iter().any(|r| match r {
         Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } =>
-            **ask == Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 9 } },
+            **ask == Ask::Seen { through: SeenThrough::Conversation { task: 8, through: 9 } },
         _ => false,
     }));
 }

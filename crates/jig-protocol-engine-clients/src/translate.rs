@@ -12,6 +12,7 @@ pub mod history;
 pub mod inbox;
 pub mod live;
 pub mod objects;
+mod operations;
 pub mod owner;
 pub mod pages;
 pub(crate) mod reads;

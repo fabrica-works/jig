@@ -15,21 +15,19 @@ fn words(ask: &Ask, task: u64) -> Option<&Text> {
             }
         }
         Ask::StartChat { .. }
-        | Ask::AnswerQuestion { .. }
-        | Ask::AnswerPerson { .. }
+        | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::DecideProposal { .. }
-        | Ask::DecideEscalation { .. }
+        | Ask::Decide { .. }
         | Ask::Release { .. }
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Close { .. }
-        | Ask::TakeOver { .. }
+        | Ask::Move { .. }
         | Ask::SetGoal { .. }
         | Ask::Prioritise { .. }
-        | Ask::MarkSeen { .. }
+        | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. }
         | Ask::ChangePolicy { .. }

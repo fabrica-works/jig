@@ -22,6 +22,7 @@ fn amendment() -> c::Amendment {
         dependencies: Some(List::with_capacity(0)),
         authority: Some(read_value_owner_authority()),
         instructions: Some(store_text()),
+        tracked: None,
     }
 }
 fn policy() -> c::PolicyEdit {
@@ -38,43 +39,52 @@ pub fn store_asks() -> List<c::Ask> {
     list([
         start_chat(),
         c::Ask::Write { project: 7, task: u64::MAX, words: store_text(), release: true },
-        c::Ask::AnswerQuestion { project: 7, task: u64::MAX, message: u64::MAX, words: store_text() },
-        c::Ask::AnswerPerson {
+        c::Ask::Answer {
             project: 7,
-            task: u64::MAX,
-            revision,
-            answer: c::PersonAnswer::Approved { state: b"state".as_slice().into(), words: Some(store_text()) },
+            on: c::AnswerOn::Question { task: u64::MAX, message: u64::MAX, words: store_text() },
+        },
+        c::Ask::Answer {
+            project: 7,
+            on: c::AnswerOn::Person {
+                task: u64::MAX,
+                revision,
+                answer: c::PersonAnswer::Approved { state: b"state".as_slice().into(), words: Some(store_text()) },
+            },
         },
         c::Ask::Take { project: 7, task: u64::MAX },
         c::Ask::HandBack { project: 7, task: u64::MAX },
-        c::Ask::DecideProposal {
+        c::Ask::Decide {
             project: 7,
-            proposal: c::ProposalKey { proposer: c::Proposer::Party(7), number: u64::MAX },
-            decision: c::Decision::Rejected { reason: store_text() },
+            on: c::DecideOn::Proposal {
+                proposal: c::ProposalKey { proposer: c::Proposer::Party(7), number: u64::MAX },
+                decision: c::Decision::Rejected { reason: store_text() },
+            },
         },
-        c::Ask::DecideEscalation {
+        c::Ask::Decide {
             project: 7,
-            task: u64::MAX,
-            revision,
-            decision: c::Decision::LeftHeld { reason: store_text() },
+            on: c::DecideOn::Escalation {
+                task: u64::MAX,
+                revision,
+                decision: c::Decision::LeftHeld { reason: store_text() },
+            },
         },
         c::Ask::Release { project: 7, task: u64::MAX, revision, again: Some(true) },
         c::Ask::Amend {
             project: 7,
             task: u64::MAX,
-            revision,
-            change: amendment(),
+            revision: Some(revision),
+            change: Box::new(amendment()),
             release: Some(revision),
             reason: store_text(),
         },
         c::Ask::Stop { project: 7, task: u64::MAX },
-        c::Ask::Cancel { project: 7, task: u64::MAX, reason: store_text() },
+        c::Ask::Cancel { project: 7, task: u64::MAX, reason: store_text(), grace: None },
         c::Ask::Close {
             project: 7,
             chat: u64::MAX,
             disposals: list([c::Disposal::Cancel { task: 8 }, c::Disposal::TakeOver { task: 9 }]),
         },
-        c::Ask::TakeOver { project: 7, task: u64::MAX, reason: store_text() },
+        c::Ask::Move { project: 7, task: u64::MAX, reason: store_text() },
         c::Ask::SetGoal {
             project: 7,
             spec: store_text(),
@@ -84,7 +94,7 @@ pub fn store_asks() -> List<c::Ask> {
             deadline: Some(Wall::from_nanos(u64::MAX)),
         },
         c::Ask::Prioritise { project: 7, goals: list([c::Priority { task: u64::MAX, priority: u32::MAX }]) },
-        c::Ask::MarkSeen { seen: c::Seen::Replies { chat: u64::MAX, through: u64::MAX } },
+        c::Ask::Seen { through: c::SeenThrough::Conversation { task: u64::MAX, through: u64::MAX } },
         c::Ask::EditNote {
             project: 7,
             note: u64::MAX,
@@ -96,6 +106,26 @@ pub fn store_asks() -> List<c::Ask> {
         },
         c::Ask::DeleteNote { project: 7, note: u64::MAX, scope: c::NoteScope::Deployment, revision },
         c::Ask::ChangePolicy { project: 7, edit: policy() },
+        templates(),
+        c::Ask::Amend {
+            project: 7,
+            task: u64::MAX,
+            revision: None,
+            change: Box::new(c::Amendment {
+                tracked: Some(c::Tracking::Tracked { priority: u32::MAX }),
+                ..amendment()
+            }),
+            release: None,
+            reason: store_text(),
+        },
+        c::Ask::Amend {
+            project: 7,
+            task: u64::MAX,
+            revision: Some(revision),
+            change: Box::new(c::Amendment { tracked: Some(c::Tracking::Untracked), ..amendment() }),
+            release: None,
+            reason: store_text(),
+        },
         c::Ask::SetRoles {
             project: 7,
             holdings: list([c::Holding { party: u64::MAX, role: c::HeldRole::Policy { role: u32::MAX } }]),
@@ -215,3 +245,27 @@ pub fn one_store_read(value: Record) -> List<Record> {
 
 pub const APPLICATION_KEY: jig_client_domain::Key =
     jig_client_domain::Key { asker: jig_client_domain::Asker::JIG, number: u64::MAX };
+
+fn templates() -> c::Ask {
+    c::Ask::ChangePolicy {
+        project: 7,
+        edit: c::PolicyEdit::Templates {
+            overrides: list([
+                c::TemplateOverride {
+                    template: 1,
+                    executor: Some(c::TemplateExecutor::Charter(u32::MAX)),
+                    budget: Some(c::TemplateBudget::Amount(u64::MAX)),
+                    deadline: Some(c::TemplateDeadline::Span(Duration::from_nanos(u64::MAX))),
+                    priority: Some(u32::MAX),
+                },
+                c::TemplateOverride {
+                    template: 2,
+                    executor: Some(c::TemplateExecutor::Chosen),
+                    budget: Some(c::TemplateBudget::AsAllowed { cap: Some(u64::MAX) }),
+                    deadline: Some(c::TemplateDeadline::Given),
+                    priority: None,
+                },
+            ]),
+        },
+    }
+}

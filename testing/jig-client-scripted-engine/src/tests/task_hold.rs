@@ -77,16 +77,17 @@ fn scripted_owner_hold_moves_return_exact_category_for_release_and_atomic_amend_
                 reason: text(b""),
                 project: 1,
                 task: 8,
-                revision: spec_revision,
+                revision: Some(spec_revision),
                 release: Some(Revision { value: 6 }),
-                change: Amendment {
+                change: Box::new(Amendment {
                     addressed: None,
                     spec: None,
                     wake: None,
                     dependencies: None,
                     authority: None,
                     instructions: Some(text(b"")),
-                },
+                    tracked: None,
+                }),
             }
         } else {
             Ask::Release { project: 1, task: 8, revision: Revision { value: 6 }, again: None }

@@ -3,7 +3,7 @@
 //! Adoption uses the connector's application request (client/domain/pages.md, 6.5).
 use super::{Actor, Authority, Decision, HeldRole, NoteScope, Part, Party, ProposalKey, Refusal, Revision, Text};
 use alloc::boxed::Box;
-use skein_lib::{List, Wall};
+use skein_lib::{Duration, List, Wall};
 /// Executors the engine supports for a tracked goal; domain/people.md, 5.1.
 /// Numeric identities stay whole; procedure names and parameters are not supplied.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -19,6 +19,13 @@ pub struct AddressChange {
     pub address: super::PersonAddress,
 }
 
+/// Whether an amendment tracks its task, and its priority if so.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Tracking {
+    Tracked { priority: u32 },
+    Untracked,
+}
+
 /// A task change whose spec revision the request names.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Amendment {
@@ -29,6 +36,7 @@ pub struct Amendment {
     pub dependencies: Option<List<u64>>,
     pub authority: Option<super::OwnerAuthority>,
     pub instructions: Option<Text>,
+    pub tracked: Option<Tracking>,
 }
 
 /// The kinds of news that wake an agent.
@@ -71,11 +79,11 @@ pub struct Priority {
 
 /// The read position moved by an explicit act.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Seen {
+pub enum SeenThrough {
     /// Results seen through this position.
     Results { through: u64 },
-    /// One chat replies seen through this position.
-    Replies { chat: u64, through: u64 },
+    /// One conversation seen through this position.
+    Conversation { task: u64, through: u64 },
 }
 
 /// A party and its project role.
@@ -112,47 +120,58 @@ pub struct Decider {
     pub role: u16,
 }
 
+/// The target and decision of a `Decide`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum DecideOn {
+    Proposal { proposal: ProposalKey, decision: Decision },
+    Escalation { task: u64, revision: Revision, decision: Decision },
+}
+/// The target and result of an `Answer`.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AnswerOn {
+    Question { task: u64, message: u64, words: Text },
+    Person { task: u64, revision: Revision, answer: PersonAnswer },
+}
 /// Every jig request, without keys owned by the root table.
-#[expect(
-    clippy::large_enum_variant,
-    reason = "whole amendments remain inline; the keyed payload envelope prices the largest variant"
-)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ask {
     /// Start a chat.
     StartChat { project: u32, words: Text },
     /// Write words and optionally release a stopped chat.
     Write { project: u32, task: u64, words: Text, release: bool },
-    /// Answer a named question.
-    AnswerQuestion { project: u32, task: u64, message: u64, words: Text },
-    /// Answer the person task revision seen.
-    AnswerPerson { project: u32, task: u64, revision: Revision, answer: PersonAnswer },
+    /// Answer a named question or a person task revision.
+    Answer { project: u32, on: AnswerOn },
     /// Take a role-addressed person task.
     Take { project: u32, task: u64 },
     /// Return a person task to its role.
     HandBack { project: u32, task: u64 },
-    /// Decide an immutable proposal.
-    DecideProposal { project: u32, proposal: ProposalKey, decision: Decision },
-    /// Decide the hold revision seen.
-    DecideEscalation { project: u32, task: u64, revision: Revision, decision: Decision },
+    /// Decide an immutable proposal or the hold revision seen.
+    Decide { project: u32, on: DecideOn },
     /// Release a hold, choosing whether to repeat an uncertain effect.
     Release { project: u32, task: u64, revision: Revision, again: Option<bool> },
     /// Amend and optionally release in one decision.
-    Amend { project: u32, task: u64, revision: Revision, change: Amendment, release: Option<Revision>, reason: Text },
+    Amend {
+        project: u32,
+        task: u64,
+        revision: Option<Revision>,
+        change: Box<Amendment>,
+        release: Option<Revision>,
+        reason: Text,
+    },
     /// Stop a run and hold its task.
     Stop { project: u32, task: u64 },
     /// Cancel a task and its subtree.
-    Cancel { project: u32, task: u64, reason: Text },
+    Cancel { project: u32, task: u64, reason: Text, grace: Option<Duration> },
     /// Close a chat after disposing of every live delegate.
     Close { project: u32, chat: u64, disposals: List<Disposal> },
     /// Become a task requester and fund it.
-    TakeOver { project: u32, task: u64, reason: Text },
+    Move { project: u32, task: u64, reason: Text },
     /// Make or propose a goal.
     SetGoal { project: u32, spec: Text, executor: GoalExecutor, budget: u64, priority: u32, deadline: Option<Wall> },
     /// Change goal priorities together.
     Prioritise { project: u32, goals: List<Priority> },
     /// Move a read position explicitly.
-    MarkSeen { seen: Seen },
+    Seen { through: SeenThrough },
     /// Correct the note revision seen.
     EditNote {
         project: u32,

@@ -253,7 +253,7 @@ pub fn seen_outcomes() -> [(p::Reply, w::Final); 2] {
                 w::OwnerOutcomeMarkedSeen::new(
                     &limits,
                     w::OwnerOutcomeMarkedSeenParts {
-                        seen: w::Seen::Results(
+                        seen: w::SeenThrough::Results(
                             w::SeenResults::new(&limits, w::SeenResultsParts { through: 15 }).expect("results"),
                         ),
                     },
@@ -267,8 +267,8 @@ pub fn seen_outcomes() -> [(p::Reply, w::Final); 2] {
                 w::OwnerOutcomeMarkedSeen::new(
                     &limits,
                     w::OwnerOutcomeMarkedSeenParts {
-                        seen: w::Seen::Replies(
-                            w::SeenReplies::new(&limits, w::SeenRepliesParts { chat: 8, through: 15 })
+                        seen: w::SeenThrough::Conversation(
+                            w::SeenConversation::new(&limits, w::SeenConversationParts { task: 8, through: 15 })
                                 .expect("replies"),
                         ),
                     },

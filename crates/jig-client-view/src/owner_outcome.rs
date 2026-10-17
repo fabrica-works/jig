@@ -8,7 +8,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
 use jig_client::contract::{
-    OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, Seen,
+    OwnerEscalationChoice, OwnerOutcome, OwnerProposalChoice, ProposalKey, Proposer, Revision, SeenThrough,
 };
 use skein_lib::Wall;
 
@@ -69,10 +69,10 @@ fn number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
 fn released(b: &mut Builder, words: &Words, value: bool) {
     text(b, words, if value { P::ReleasedYes } else { P::ReleasedNo }, &[]);
 }
-fn seen(b: &mut Builder, value: &Seen, words: &Words) {
+fn seen(b: &mut Builder, value: &SeenThrough, words: &Words) {
     match value {
-        Seen::Results { through } => number(b, words, P::ResultsThrough, *through),
-        Seen::Replies { chat, through } => {
+        SeenThrough::Results { through } => number(b, words, P::ResultsThrough, *through),
+        SeenThrough::Conversation { task: chat, through } => {
             number(b, words, P::Chat, *chat);
             number(b, words, P::RepliesThrough, *through);
         }

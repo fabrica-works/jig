@@ -241,8 +241,8 @@ fn deployment_person_actions_four_causes_all_structural_limits_and_opaque_reques
         A::Stop { task: u64::MAX },
         A::Cancel { task: u64::MAX },
         A::Release { task: u64::MAX },
-        A::MarkSeen { seen: Seen::Results { through: u64::MAX } },
-        A::MarkSeen { seen: Seen::Replies { chat: u64::MAX, through: u64::MAX } },
+        A::MarkSeen { seen: SeenThrough::Results { through: u64::MAX } },
+        A::MarkSeen { seen: SeenThrough::Conversation { task: u64::MAX, through: u64::MAX } },
     ];
     for action in actions {
         let mut value = empty();

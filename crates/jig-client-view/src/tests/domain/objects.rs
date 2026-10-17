@@ -342,7 +342,10 @@ fn a_deciding_card_survives_a_drop_until_its_durable_answer_then_lingers() {
         &mut domain.ui,
         key,
         ActKind::Accept,
-        Box::new(Ask::DecideProposal { project: 1, proposal: proposal().key, decision: Decision::Accepted }),
+        Box::new(Ask::Decide {
+            project: 1,
+            on: DecideOn::Proposal { proposal: proposal().key, decision: Decision::Accepted },
+        }),
         &mut out,
         &domain.client,
     )
@@ -457,7 +460,10 @@ fn equal_number_task_and_party_proposals_keep_separate_requests_and_terminal_car
         };
         assert_eq!(
             ask.as_ref(),
-            &Ask::DecideProposal { project: row.project, proposal: row.key, decision: Decision::Accepted }
+            &Ask::Decide {
+                project: row.project,
+                on: DecideOn::Proposal { proposal: row.key, decision: Decision::Accepted }
+            }
         );
         assert!(drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::Confirm }).is_empty());
         pending.push((key, id, *request)).unwrap();
@@ -522,3 +528,5 @@ fn a_party_proposal_maker_does_not_supply_a_task_address() {
         );
     }
 }
+
+use jig_client::contract::DecideOn;

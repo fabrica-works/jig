@@ -306,7 +306,15 @@ fn numbers(chips: &skein_lib::List<jig_client::contract::OwnerTaskLink>) -> skei
     numbers
 }
 fn empty() -> Amendment {
-    Amendment { addressed: None, spec: None, instructions: None, wake: None, dependencies: None, authority: None }
+    Amendment {
+        addressed: None,
+        spec: None,
+        instructions: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        tracked: None,
+    }
 }
 // Display/edit values come from the source unless the person selected a whole replacement.
 // The replacement request remains the separate selected delta.
@@ -318,6 +326,7 @@ fn values(before: &Amendment, change: &Amendment) -> Amendment {
         wake: change.wake.or(before.wake),
         dependencies: change.dependencies.clone().or(before.dependencies.clone()),
         authority: change.authority.clone().or(before.authority.clone()),
+        tracked: change.tracked.or(before.tracked),
     }
 }
 fn input(
@@ -373,6 +382,7 @@ fn before(object: &Object) -> Option<Amendment> {
             wake: Some(doc.steering.wake),
             dependencies: Some(doc.steering.dependencies.clone()),
             authority: doc.steering.authority.whole(),
+            tracked: None,
         },
         Some(
             Body::Historical(_)
@@ -421,5 +431,6 @@ fn task_before(doc: &Task) -> Amendment {
         wake: Some(doc.wake),
         dependencies: if doc.cut { None } else { Some(numbers(&doc.dependencies)) },
         authority: doc.authority.whole(),
+        tracked: None,
     }
 }

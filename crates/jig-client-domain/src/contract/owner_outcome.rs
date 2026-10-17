@@ -1,7 +1,7 @@
 //! Committed people request results (client/domain/contract.md, 4).
 //! Keeps only the owner's supplied numbers, choices and clocks. Retry,
 //! signed-out, refusal and connector answers are separate boundary routes.
-use super::{ProposalKey, Revision, Seen};
+use super::{ProposalKey, Revision, SeenThrough};
 use skein_lib::Wall;
 
 /// The retained decision for a proposal, without an inferred explanation.
@@ -36,7 +36,7 @@ pub enum OwnerOutcome {
     /// A chat closed with the supplied counts of cancelled and kept delegates.
     Closing { chat: u64, cancelled: u32, kept: u32 },
     /// A results or chat-replies position was marked seen.
-    MarkedSeen { seen: Seen },
+    MarkedSeen { seen: SeenThrough },
     /// A note correction or deletion was committed.
     NoteEdited { name: u64 },
     /// A service party and its project role were made.

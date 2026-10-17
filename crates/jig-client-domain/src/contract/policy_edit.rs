@@ -11,6 +11,7 @@ pub enum PolicyEdit {
     Requirements { requirements: List<PolicyRequirement> },
     Projections { grants: List<OwnerGrant> },
     Permissions { mappings: List<PolicyPermission> },
+    Templates { overrides: List<TemplateOverride> },
 }
 
 /// A role's actual authority, period allotment and decision flags.
@@ -55,4 +56,34 @@ pub struct PolicyRequirement {
     pub judge: PolicyJudge,
     pub guard: PolicyGuard,
     pub must_be_guarded: bool,
+}
+
+/// A template's executor, named by its charter or chosen by its creator.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum TemplateExecutor {
+    Charter(u32),
+    Chosen,
+}
+/// A template's budget filled in by its creator.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum TemplateBudget {
+    Amount(u64),
+    AsAllowed { cap: Option<u64> },
+    Given,
+}
+/// A template's deadline filled in by its creator.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum TemplateDeadline {
+    None,
+    Span(Duration),
+    Given,
+}
+/// Overrides of a named template; absent fields retain its defaults.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TemplateOverride {
+    pub template: u32,
+    pub executor: Option<TemplateExecutor>,
+    pub budget: Option<TemplateBudget>,
+    pub deadline: Option<TemplateDeadline>,
+    pub priority: Option<u32>,
 }

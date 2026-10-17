@@ -5,10 +5,10 @@ use alloc::boxed::Box;
 use jig_client_domain::contract as c;
 use jig_client_protocol_wire::v8 as w;
 use skein_lib::{List, Reader, Wall, bytes};
-pub(crate) fn seen(value: &w::Seen, _limits: &Limits) -> c::Seen {
+pub(crate) fn seen(value: &w::SeenThrough, _limits: &Limits) -> c::SeenThrough {
     match value {
-        w::Seen::Results(row) => c::Seen::Results { through: row.through() },
-        w::Seen::Replies(row) => c::Seen::Replies { chat: row.chat(), through: row.through() },
+        w::SeenThrough::Results(row) => c::SeenThrough::Results { through: row.through() },
+        w::SeenThrough::Conversation(row) => c::SeenThrough::Conversation { task: row.task(), through: row.through() },
     }
 }
 
@@ -301,6 +301,7 @@ pub(crate) fn lacking(value: &w::Lacking, limits: &Limits) -> c::Lacking {
 
 pub(crate) fn admission_limit(value: &w::AdmissionLimit, _limits: &Limits) -> c::AdmissionLimit {
     match value {
+        w::AdmissionLimit::Grace => c::AdmissionLimit::Grace,
         w::AdmissionLimit::Words => c::AdmissionLimit::Words,
         w::AdmissionLimit::Identity => c::AdmissionLimit::Identity,
         w::AdmissionLimit::Roles => c::AdmissionLimit::Roles,

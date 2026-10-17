@@ -105,10 +105,11 @@ fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
             w::AmendParts {
                 project: 1,
                 task: 2,
-                revision: w::Revision::new(&limits, w::RevisionParts { value: revision }).expect("revision"),
+                revision: Some(w::Revision::new(&limits, w::RevisionParts { value: revision }).expect("revision")),
                 change: w::Amendment::new(
                     &limits,
                     w::AmendmentParts {
+                        tracked: None,
                         addressed: None,
                         spec: None,
                         wake: None,

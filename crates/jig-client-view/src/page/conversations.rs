@@ -22,7 +22,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_client::contract::{
-    self, Answer, Ask, ConversationLine, InboxGroup, InboxReadGroup, Limit, ObjectKey, Read, Refusal, Seen, Text,
+    self, Answer, Ask, ConversationLine, InboxGroup, InboxReadGroup, Limit, ObjectKey, Read, Refusal, SeenThrough, Text,
 };
 use skein_lib::{Env, List, Queue, Token};
 /// First-words submission and its refusal, held apart from the list window.
@@ -220,7 +220,7 @@ pub(crate) fn answered(
         }
     }
 }
-fn seen(domain: &mut Ui, value: Seen, out: &mut Queue<Request>) -> bool {
+fn seen(domain: &mut Ui, value: SeenThrough, out: &mut Queue<Request>) -> bool {
     let Some(scope) = domain.confirmed else {
         return false;
     };
@@ -229,7 +229,7 @@ fn seen(domain: &mut Ui, value: Seen, out: &mut Queue<Request>) -> bool {
         .ask(
             scope,
             Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::Seen(value) },
-            Box::new(Ask::MarkSeen { seen: value }),
+            Box::new(Ask::Seen { through: value }),
             out,
         )
         .is_some()
@@ -254,7 +254,7 @@ pub(crate) fn mark_results(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig
             through = through.max(position);
         }
     }
-    if through > domain.inbox.marked_results && seen(domain, Seen::Results { through }, out) {
+    if through > domain.inbox.marked_results && seen(domain, SeenThrough::Results { through }, out) {
         domain.inbox.marked_results = through;
         domain.inbox.opening_updates = false;
     }
@@ -284,7 +284,7 @@ pub(crate) fn open_chat(
         }
     }
     if let Some(through) = through {
-        let sent = seen(domain, Seen::Replies { chat: task, through }, out);
+        let sent = seen(domain, SeenThrough::Conversation { task, through }, out);
         if !sent {
             crate::page::routing::refuse(domain, Limit::Requests);
         }

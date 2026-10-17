@@ -248,8 +248,8 @@ fn every_owner_outcome_remains_whole_on_its_original_card_after_duplicate_termin
     use OwnerOutcome as O;
     let outcomes = [
         O::Closing { chat: 101, cancelled: 2, kept: 3 },
-        O::MarkedSeen { seen: Seen::Results { through: 103 } },
-        O::MarkedSeen { seen: Seen::Replies { chat: 104, through: 105 } },
+        O::MarkedSeen { seen: SeenThrough::Results { through: 103 } },
+        O::MarkedSeen { seen: SeenThrough::Conversation { task: 104, through: 105 } },
         O::NoteEdited { name: 106 },
         O::ServiceMade { person: 107 },
         O::Adopted { project: 108 },
@@ -318,7 +318,10 @@ fn owner_historical_proposal_choices_keep_the_named_winner_and_clock_without_exp
                 &mut domain.ui,
                 ObjectKey::Proposal(key),
                 ActKind::Accept,
-                Box::new(Ask::DecideProposal { project: 1, proposal: key, decision: Decision::Accepted }),
+                Box::new(Ask::Decide {
+                    project: 1,
+                    on: DecideOn::Proposal { proposal: key, decision: Decision::Accepted },
+                }),
                 &mut out,
                 &domain.client,
             )
@@ -348,3 +351,5 @@ fn owner_historical_proposal_choices_keep_the_named_winner_and_clock_without_exp
         assert!(!crate::objects::stops_waiting(ObjectKey::Proposal(proposal().key), &Outcome::Owner(value)));
     }
 }
+
+use jig_client::contract::DecideOn;

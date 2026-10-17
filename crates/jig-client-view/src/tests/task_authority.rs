@@ -82,7 +82,7 @@ fn task_authority_forms_preserve_all_permissions_and_selected_delta_without_reco
             .filter_map(|request| match request {
                 Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
                     match &**ask {
-                        Ask::Amend { change, .. } => Some(change),
+                        Ask::Amend { change, .. } => Some(change.as_ref()),
                         _ => None,
                     }
                 }

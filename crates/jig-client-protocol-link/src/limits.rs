@@ -96,13 +96,14 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.policy_edit_requirements_requirements = u32::try_from(client.document_bytes).ok()?;
     wire.policy_edit_projections_grants = u32::try_from(client.document_bytes).ok()?;
     wire.policy_edit_permissions_mappings = client.rows;
+    wire.policy_edit_templates_overrides = client.rows.min(w::CEILINGS.policy_edit_templates_overrides);
     wire.start_chat_words = client.text;
     wire.write_words = client.text;
     wire.answer_question_words = client.text;
     wire.amend_reason = client.text;
     wire.cancel_reason = client.text;
     wire.close_disposals = client.delegates;
-    wire.take_over_reason = client.text;
+    wire.move_reason = client.text;
     wire.set_goal_spec = client.text;
     wire.prioritise_goals = client.rows;
     wire.edit_note_description = client.text;

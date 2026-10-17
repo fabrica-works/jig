@@ -44,6 +44,7 @@ impl PolicyFragment {
 #[must_use]
 pub fn required(value: &PolicyEdit, words: &Words) -> Option<PolicyFragment> {
     let phrase = match value {
+        PolicyEdit::Templates { .. } => return None,
         PolicyEdit::ProjectSpend { .. } => JigPhrase::PolicyPeriodSpend,
         PolicyEdit::Role(_) => JigPhrase::PolicyEditRole,
         PolicyEdit::Requirements { .. } => JigPhrase::PolicyRequirements,
@@ -53,6 +54,7 @@ pub fn required(value: &PolicyEdit, words: &Words) -> Option<PolicyFragment> {
     let name_bytes = words.book.capacity(phrase.id())?;
     let mut result = PolicyFragment { nodes: 1, text_bytes: name_bytes, text_per_node: name_bytes, depth: 3 };
     match value {
+        PolicyEdit::Templates { .. } => {}
         PolicyEdit::ProjectSpend { .. } => result.phrase(words, JigPhrase::PolicyPeriodSpend)?,
         PolicyEdit::Role(role) => {
             for phrase in [
@@ -131,8 +133,8 @@ fn effect(b: &mut Builder, connector: u16, kind: u16, words: &Words) {
 }
 /// Display one whole edit without inventing role names or parsing resource names.
 pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words, text_limit: u32) {
-    b.open(Role::Region);
     let name = match value {
+        PolicyEdit::Templates { .. } => return,
         PolicyEdit::ProjectSpend { period_spend } => {
             words.say(JigPhrase::PolicyPeriodSpend, &[Hole::Amount(*period_spend)])
         }
@@ -141,8 +143,10 @@ pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words, text_limit: u3
         PolicyEdit::Projections { .. } => words.say(JigPhrase::PolicyProjections, &[]),
         PolicyEdit::Permissions { .. } => words.say(JigPhrase::PolicyPermissions, &[]),
     };
+    b.open(Role::Region);
     b.name(&name);
     match value {
+        PolicyEdit::Templates { .. } => {}
         PolicyEdit::ProjectSpend { period_spend } => {
             words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(*period_spend)]);
         }

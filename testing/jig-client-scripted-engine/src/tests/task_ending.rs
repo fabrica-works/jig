@@ -17,7 +17,7 @@ fn scripted_task_ending_refusals_keep_whole_owner_facts_after_keyed_durability_a
     let mut row = task();
     row.result = Some(TaskResult::Ending(Box::new(ending.clone())));
     setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
-    let ask = Ask::Cancel { project: 1, task: 8, reason: text(b"cancel") };
+    let ask = Ask::Cancel { project: 1, task: 8, reason: text(b"cancel"), grace: None };
     let expected = Answer::Refused(Refusal::Ended { how: Ending::Task(Box::new(ending)) });
     let mut engine = Engine::new(setup, 1).unwrap();
     send(&mut engine, 0, 11, 1, 1, ask.clone());

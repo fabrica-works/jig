@@ -1,3 +1,6 @@
+#[path = "fixtures/operations.rs"]
+mod operations;
+pub use operations::*;
 #[path = "fixtures/envelope.rs"]
 mod envelope;
 use super::super::*;
@@ -82,12 +85,13 @@ pub fn amendment(release: Option<w::Revision>, reason: &[u8]) -> w::Ask {
             w::AmendParts {
                 project: 3,
                 task: 8,
-                revision: revision(6),
+                revision: Some(revision(6)),
                 release,
                 reason: Box::from(reason),
                 change: w::Amendment::new(
                     &wire(),
                     w::AmendmentParts {
+                        tracked: None,
                         addressed: None,
                         spec: None,
                         wake: None,
@@ -262,13 +266,13 @@ fn write_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
 fn answer_question_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
     use jig_domain_people as p;
     (
-        w::Ask::AnswerQuestion(
+        answer(w::AnswerOn::Question(
             w::AnswerQuestion::new(
                 limits,
-                w::AnswerQuestionParts { project: 3, task: 8, message: 19, words: Box::from(b"answer".as_slice()) },
+                w::AnswerQuestionParts { task: 8, message: 19, words: Box::from(b"answer".as_slice()) },
             )
             .expect("AnswerQuestion"),
-        ),
+        )),
         p::Ask::AnswerQuestion { project: 3, task: 8, question: 19, words: Box::from(b"answer".as_slice()) },
     )
 }
@@ -307,8 +311,11 @@ fn cancel_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
     use jig_domain_people as p;
     (
         w::Ask::Cancel(
-            w::Cancel::new(limits, w::CancelParts { project: 3, task: 8, reason: Box::from(b"cancel".as_slice()) })
-                .expect("Cancel"),
+            w::Cancel::new(
+                limits,
+                w::CancelParts { grace: None, project: 3, task: 8, reason: Box::from(b"cancel".as_slice()) },
+            )
+            .expect("Cancel"),
         ),
         p::Ask::Cancel { project: 3, task: 8, reason: Box::from(b"cancel".as_slice()), grace: None },
     )
@@ -316,8 +323,8 @@ fn cancel_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
 fn take_over_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
     use jig_domain_people as p;
     (
-        w::Ask::TakeOver(
-            w::TakeOver::new(limits, w::TakeOverParts { project: 3, task: 8, reason: Box::from(b"take".as_slice()) })
+        w::Ask::MoveTask(
+            w::Move::new(limits, w::MoveParts { project: 3, task: 8, reason: Box::from(b"take".as_slice()) })
                 .expect("TakeOver"),
         ),
         p::Ask::Move { project: 3, task: 8, reason: Box::from(b"take".as_slice()) },
@@ -356,12 +363,13 @@ fn close_case(
 fn mark_seen_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
     use jig_domain_people as p;
     (
-        w::Ask::MarkSeen(
-            w::MarkSeen::new(
+        w::Ask::Seen(
+            w::Seen::new(
                 limits,
-                w::MarkSeenParts {
-                    seen: w::Seen::Replies(
-                        w::SeenReplies::new(limits, w::SeenRepliesParts { chat: 8, through: u64::MAX }).expect("seen"),
+                w::SeenParts {
+                    through: w::SeenThrough::Conversation(
+                        w::SeenConversation::new(limits, w::SeenConversationParts { task: 8, through: u64::MAX })
+                            .expect("seen"),
                     ),
                 },
             )
@@ -406,11 +414,10 @@ fn set_goal_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
 fn answer_person_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
     use jig_domain_people as p;
     (
-        w::Ask::AnswerPerson(
+        answer(w::AnswerOn::Person(
             w::AnswerPerson::new(
                 limits,
                 w::AnswerPersonParts {
-                    project: 3,
                     task: 8,
                     revision: revision(6),
                     answer: w::PersonAnswer::Approved(
@@ -423,7 +430,7 @@ fn answer_person_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
                 },
             )
             .expect("AnswerPerson"),
-        ),
+        )),
         p::Ask::AnswerPerson {
             project: 3,
             task: 8,
@@ -435,11 +442,10 @@ fn answer_person_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
 fn decide_proposal_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
     use jig_domain_people as p;
     (
-        w::Ask::DecideProposal(
+        decide(w::DecideOn::Proposal(
             w::DecideProposal::new(
                 limits,
                 w::DecideProposalParts {
-                    project: 3,
                     proposal: w::ProposalKey::new(
                         limits,
                         w::ProposalKeyParts {
@@ -455,7 +461,7 @@ fn decide_proposal_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
                 },
             )
             .expect("DecideProposal"),
-        ),
+        )),
         p::Ask::DecideProposal {
             project: 3,
             proposer: p::Proposer::Party(u64::MAX),
@@ -780,18 +786,3 @@ pub use watches::*;
 #[path = "fixtures/closing.rs"]
 mod closing;
 pub use closing::*;
-
-/// An amendment retaining every field, with the supplied explanation.
-#[must_use]
-pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
-    jig_domain_people::Amendment {
-        tracked: None,
-        addressed: None,
-        instructions: None,
-        spec: None,
-        wake: None,
-        dependencies: None,
-        authority: None,
-        reason: reason.into(),
-    }
-}

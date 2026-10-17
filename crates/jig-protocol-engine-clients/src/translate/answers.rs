@@ -190,11 +190,13 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
         }
     })
 }
-fn seen(value: p::Seen, limits: &w::Limits) -> Result<w::Seen, w::Problem> {
+fn seen(value: p::Seen, limits: &w::Limits) -> Result<w::SeenThrough, w::Problem> {
     Ok(match value {
-        p::Seen::Results { through } => w::Seen::Results(w::SeenResults::new(limits, w::SeenResultsParts { through })?),
+        p::Seen::Results { through } => {
+            w::SeenThrough::Results(w::SeenResults::new(limits, w::SeenResultsParts { through })?)
+        }
         p::Seen::Chat { task, through } => {
-            w::Seen::Replies(w::SeenReplies::new(limits, w::SeenRepliesParts { chat: task, through })?)
+            w::SeenThrough::Conversation(w::SeenConversation::new(limits, w::SeenConversationParts { task, through })?)
         }
     })
 }

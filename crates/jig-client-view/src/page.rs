@@ -110,5 +110,5 @@ pub enum IntentPurpose {
     /// A goal made or proposed from the project board.
     SetGoal,
     /// One explicitly opened read position.
-    Seen(jig_client::contract::Seen),
+    Seen(jig_client::contract::SeenThrough),
 }

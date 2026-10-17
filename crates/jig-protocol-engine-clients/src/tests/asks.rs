@@ -26,13 +26,13 @@ fn a_decision_record_keeps_its_revision() {
         ),
     ];
     for (decision, expected) in cases {
-        let value = w::Ask::DecideEscalation(
+        let value = f::decide(w::DecideOn::Escalation(
             w::DecideEscalation::new(
                 &limits,
-                w::DecideEscalationParts { project: 3, task: 8, revision: f::revision(u64::MAX), decision },
+                w::DecideEscalationParts { task: 8, revision: f::revision(u64::MAX), decision },
             )
             .expect("decision"),
-        );
+        ));
         assert_eq!(
             ask(value, &limits),
             Ok(p::Ask::DecideEscalation { project: 3, task: 8, revision: u64::MAX, decision: expected })
@@ -62,13 +62,13 @@ fn an_amendment_record_keeps_its_release_and_reason() {
 }
 fn invalid() -> w::Ask {
     let limits = f::wire();
-    w::Ask::DecideEscalation(
+    f::decide(w::DecideOn::Escalation(
         w::DecideEscalation::new(
             &limits,
-            w::DecideEscalationParts { project: 3, task: 8, revision: f::revision(6), decision: w::Decision::Accepted },
+            w::DecideEscalationParts { task: 8, revision: f::revision(6), decision: w::Decision::Accepted },
         )
         .expect("valid record with inapplicable decision"),
-    )
+    ))
 }
 #[test]
 fn an_ask_that_does_not_translate_reaches_no_core() {
@@ -164,4 +164,66 @@ fn an_undecodable_application_record_is_answered_bad_request() {
     );
     assert_eq!(exchange.response(owner), (400, b"".as_slice()));
     assert!(exchange.out.is_empty());
+}
+
+#[test]
+fn a_decide_on_an_escalation_reaches_the_people_child_with_its_revision() {
+    let limits = f::wire();
+    let target = w::DecideEscalation::new(
+        &limits,
+        w::DecideEscalationParts { task: 8, revision: f::revision(u64::MAX), decision: w::Decision::PassedUp },
+    )
+    .expect("escalation");
+    assert_eq!(
+        ask(f::decide(w::DecideOn::Escalation(target)), &limits),
+        Ok(p::Ask::DecideEscalation { project: 3, task: 8, revision: u64::MAX, decision: p::EscalationDecision::Pass })
+    );
+}
+#[test]
+fn a_cancel_with_a_grace_reaches_the_people_child_with_its_span() {
+    const GRACE: skein_lib::Duration = skein_lib::Duration::from_millis(200);
+    let limits = f::wire();
+    let cancel = w::Cancel::new(
+        &limits,
+        w::CancelParts { project: 3, task: 8, reason: b"enough".as_slice().into(), grace: Some(GRACE) },
+    )
+    .expect("cancel");
+    assert_eq!(
+        ask(w::Ask::Cancel(cancel), &limits),
+        Ok(p::Ask::Cancel { project: 3, task: 8, reason: b"enough".as_slice().into(), grace: Some(GRACE) })
+    );
+}
+#[test]
+fn a_priority_only_amend_names_no_revision() {
+    assert_eq!(
+        ask(f::priority_amend(), &f::wire()),
+        Ok(p::Ask::Amend {
+            project: 3,
+            task: 8,
+            revision: 0,
+            amendment: p::Amendment {
+                tracked: Some(p::Tracking::Tracked { priority: u32::MAX }),
+                ..f::person_unchanged(b"")
+            },
+            release: None
+        })
+    );
+}
+#[test]
+fn a_policy_change_of_template_overrides_reaches_the_people_child() {
+    assert_eq!(
+        ask(f::template_change(), &f::wire()),
+        Ok(p::Ask::ChangePolicy {
+            project: 3,
+            change: p::PolicyChange::Templates {
+                overrides: Box::new([p::TemplateOverride {
+                    template: 2,
+                    executor: Some(p::TemplateExecutor::Chosen),
+                    budget: Some(p::TemplateBudget::Given),
+                    deadline: Some(p::TemplateDeadline::None),
+                    priority: Some(u32::MAX)
+                }])
+            }
+        })
+    );
 }

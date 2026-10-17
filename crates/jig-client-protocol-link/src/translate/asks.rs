@@ -362,6 +362,10 @@ pub(crate) fn wire_amendment(value: &c::Amendment, limits: &w::Limits) -> Result
             dependencies: opt3,
             authority: opt4,
             instructions: opt5,
+            tracked: match value.tracked {
+                Some(v) => Some(super::operations::tracking(v, limits)?),
+                None => None,
+            },
         },
     )
 }
@@ -393,14 +397,15 @@ pub(crate) fn wire_priority(value: &c::Priority, limits: &w::Limits) -> Result<w
     w::Priority::new(limits, w::PriorityParts { task: value.task, priority: value.priority })
 }
 
-pub(crate) fn wire_seen(value: &c::Seen, limits: &w::Limits) -> Result<w::Seen, w::Problem> {
+pub(crate) fn wire_seen(value: &c::SeenThrough, limits: &w::Limits) -> Result<w::SeenThrough, w::Problem> {
     Ok(match value {
-        c::Seen::Results { through } => {
-            w::Seen::Results(w::SeenResults::new(limits, w::SeenResultsParts { through: *through })?)
+        c::SeenThrough::Results { through } => {
+            w::SeenThrough::Results(w::SeenResults::new(limits, w::SeenResultsParts { through: *through })?)
         }
-        c::Seen::Replies { chat, through } => {
-            w::Seen::Replies(w::SeenReplies::new(limits, w::SeenRepliesParts { chat: *chat, through: *through })?)
-        }
+        c::SeenThrough::Conversation { task: chat, through } => w::SeenThrough::Conversation(w::SeenConversation::new(
+            limits,
+            w::SeenConversationParts { task: *chat, through: *through },
+        )?),
     })
 }
 
@@ -512,6 +517,7 @@ pub(crate) fn wire_policy_permission(
 
 pub(crate) fn wire_policy_edit(value: &c::PolicyEdit, limits: &w::Limits) -> Result<w::PolicyEdit, w::Problem> {
     Ok(match value {
+        c::PolicyEdit::Templates { overrides } => super::operations::templates(overrides, limits)?,
         c::PolicyEdit::ProjectSpend { period_spend } => w::PolicyEdit::ProjectSpend(w::PolicyEditProjectSpend::new(
             limits,
             w::PolicyEditProjectSpendParts { period_spend: *period_spend },
@@ -581,23 +587,9 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
             limits,
             w::WriteParts { project: *project, task: *task, words: bytes::copy_of(words.bytes()), release: *release },
         )?),
-        c::Ask::AnswerQuestion { project, task, message, words } => w::Ask::AnswerQuestion(w::AnswerQuestion::new(
+        c::Ask::Answer { project, on } => w::Ask::Answer(w::Answer::new(
             limits,
-            w::AnswerQuestionParts {
-                project: *project,
-                task: *task,
-                message: *message,
-                words: bytes::copy_of(words.bytes()),
-            },
-        )?),
-        c::Ask::AnswerPerson { project, task, revision, answer } => w::Ask::AnswerPerson(w::AnswerPerson::new(
-            limits,
-            w::AnswerPersonParts {
-                project: *project,
-                task: *task,
-                revision: wire_revision(*revision, limits)?,
-                answer: wire_person_answer(answer, limits)?,
-            },
+            w::AnswerParts { project: *project, on: super::operations::answer(on, limits)? },
         )?),
         c::Ask::Take { project, task } => {
             w::Ask::Take(w::Take::new(limits, w::TakeParts { project: *project, task: *task })?)
@@ -605,25 +597,10 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
         c::Ask::HandBack { project, task } => {
             w::Ask::HandBack(w::HandBack::new(limits, w::HandBackParts { project: *project, task: *task })?)
         }
-        c::Ask::DecideProposal { project, proposal, decision } => w::Ask::DecideProposal(w::DecideProposal::new(
+        c::Ask::Decide { project, on } => w::Ask::Decide(w::Decide::new(
             limits,
-            w::DecideProposalParts {
-                project: *project,
-                proposal: wire_proposal_key(proposal, limits)?,
-                decision: wire_decision(decision, limits)?,
-            },
+            w::DecideParts { project: *project, on: super::operations::decide(on, limits)? },
         )?),
-        c::Ask::DecideEscalation { project, task, revision, decision } => {
-            w::Ask::DecideEscalation(w::DecideEscalation::new(
-                limits,
-                w::DecideEscalationParts {
-                    project: *project,
-                    task: *task,
-                    revision: wire_revision(*revision, limits)?,
-                    decision: wire_decision(decision, limits)?,
-                },
-            )?)
-        }
         c::Ask::Release { project, task, revision, again } => {
             let opt0 = match again {
                 Some(item) => Some(*item),
@@ -649,7 +626,10 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
                 w::AmendParts {
                     project: *project,
                     task: *task,
-                    revision: wire_revision(*revision, limits)?,
+                    revision: match revision {
+                        Some(value) => Some(wire_revision(*value, limits)?),
+                        None => None,
+                    },
                     change: wire_amendment(change, limits)?,
                     release: opt0,
                     reason: bytes::copy_of(reason.bytes()),
@@ -659,9 +639,9 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
         c::Ask::Stop { project, task } => {
             w::Ask::Stop(w::Stop::new(limits, w::StopParts { project: *project, task: *task })?)
         }
-        c::Ask::Cancel { project, task, reason } => w::Ask::Cancel(w::Cancel::new(
+        c::Ask::Cancel { project, task, reason, grace } => w::Ask::Cancel(w::Cancel::new(
             limits,
-            w::CancelParts { project: *project, task: *task, reason: bytes::copy_of(reason.bytes()) },
+            w::CancelParts { project: *project, task: *task, reason: bytes::copy_of(reason.bytes()), grace: *grace },
         )?),
         c::Ask::Close { project, chat, disposals } => {
             let mut list0 = List::with_capacity((disposals).len());
@@ -670,9 +650,9 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
             }
             w::Ask::Close(w::Close::new(limits, w::CloseParts { project: *project, chat: *chat, disposals: list0 })?)
         }
-        c::Ask::TakeOver { project, task, reason } => w::Ask::TakeOver(w::TakeOver::new(
+        c::Ask::Move { project, task, reason } => w::Ask::MoveTask(w::Move::new(
             limits,
-            w::TakeOverParts { project: *project, task: *task, reason: bytes::copy_of(reason.bytes()) },
+            w::MoveParts { project: *project, task: *task, reason: bytes::copy_of(reason.bytes()) },
         )?),
         c::Ask::SetGoal { project, spec, executor, budget, priority, deadline } => {
             let opt0 = match deadline {
@@ -698,8 +678,8 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
             }
             w::Ask::Prioritise(w::Prioritise::new(limits, w::PrioritiseParts { project: *project, goals: list0 })?)
         }
-        c::Ask::MarkSeen { seen } => {
-            w::Ask::MarkSeen(w::MarkSeen::new(limits, w::MarkSeenParts { seen: wire_seen(seen, limits)? })?)
+        c::Ask::Seen { through } => {
+            w::Ask::Seen(w::Seen::new(limits, w::SeenParts { through: wire_seen(through, limits)? })?)
         }
         c::Ask::EditNote { project, note, scope, revision, description, body, references } => {
             let mut list0 = List::with_capacity((references).len());

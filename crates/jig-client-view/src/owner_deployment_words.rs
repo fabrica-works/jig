@@ -175,6 +175,7 @@ pub enum DeploymentPhrase {
     FunderRecurring,
     FunderPeriod,
     FunderTask,
+    AdmissionGrace,
     AdmissionWords,
     AdmissionIdentity,
     AdmissionRoles,
@@ -216,7 +217,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 224] = [
+pub const ALL: [DeploymentPhrase; 225] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -401,6 +402,7 @@ pub const ALL: [DeploymentPhrase; 224] = [
     DeploymentPhrase::FunderRecurring,
     DeploymentPhrase::FunderPeriod,
     DeploymentPhrase::FunderTask,
+    DeploymentPhrase::AdmissionGrace,
     DeploymentPhrase::AdmissionWords,
     DeploymentPhrase::AdmissionIdentity,
     DeploymentPhrase::AdmissionRoles,
@@ -612,6 +614,7 @@ impl DeploymentPhrase {
                 Self::FunderRecurring => 9358,
                 Self::FunderPeriod => 9359,
                 Self::FunderTask => 9360,
+                Self::AdmissionGrace => 12001,
                 Self::AdmissionWords => 9361,
                 Self::AdmissionIdentity => 9362,
                 Self::AdmissionRoles => 9363,
@@ -780,6 +783,7 @@ impl DeploymentPhrase {
             | Self::FunderRecurring
             | Self::FunderPeriod
             | Self::FunderTask
+            | Self::AdmissionGrace
             | Self::AdmissionWords
             | Self::AdmissionIdentity
             | Self::AdmissionRoles
@@ -993,7 +997,7 @@ impl DeploymentPhrase {
             Self::PersonCapacityActionStop => b"Person Capacity Action Stop",
             Self::PersonCapacityActionCancel => b"Person Capacity Action Cancel",
             Self::PersonCapacityActionRelease => b"Person Capacity Action Release",
-            Self::PersonCapacityActionMarkSeen => b"Person Capacity Action Mark Seen",
+            Self::PersonCapacityActionMarkSeen => b"Person Capacity Action Mark SeenThrough",
             Self::PersonCapacityCauseRequests => b"Person Capacity Cause Requests",
             Self::PersonCapacityCausePending => b"Person Capacity Cause Pending",
             Self::PersonCapacityCauseWaiters => b"Person Capacity Cause Waiters",
@@ -1027,6 +1031,7 @@ impl DeploymentPhrase {
             Self::FunderRecurring => b"Funding from recurring",
             Self::FunderPeriod => b"Funding from period",
             Self::FunderTask => b"Funding from task",
+            Self::AdmissionGrace => b"Structural limit: grace",
             Self::AdmissionWords => b"Structural limit: words",
             Self::AdmissionIdentity => b"Structural limit: identity",
             Self::AdmissionRoles => b"Structural limit: roles",

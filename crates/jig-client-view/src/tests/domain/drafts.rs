@@ -91,9 +91,9 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
         ActKind::Cancel | ActKind::TakeOver => {
             drive(domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"why") } });
             if act == ActKind::Cancel {
-                Ask::Cancel { project: 1, task: 8, reason: text(b"why") }
+                Ask::Cancel { project: 1, task: 8, reason: text(b"why"), grace: None }
             } else {
-                Ask::TakeOver { project: 1, task: 8, reason: text(b"why") }
+                Ask::Move { project: 1, task: 8, reason: text(b"why") }
             }
         }
         ActKind::AmendRelease => {
@@ -103,8 +103,8 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
                 reason: text(b""),
                 project: 1,
                 task: 8,
-                revision: Revision { value: 9 },
-                change: change(),
+                revision: Some(Revision { value: 9 }),
+                change: Box::new(change()),
                 release: Some(Revision { value: 3 }),
             }
         }
@@ -366,9 +366,9 @@ fn amend_release_recalls_the_hold_independently_and_requires_review_when_either_
                     reason: text(b""),
                     project: 1,
                     task: 8,
-                    revision: document.spec_revision,
-                    change: change(),
-                    release: Some(document.hold.as_ref().unwrap().revision()),
+                    revision: Some(document.spec_revision),
+                    change: Box::new(change()),
+                    release: Some(document.hold.as_ref().unwrap().revision())
                 }
             );
         }

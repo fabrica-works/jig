@@ -6,17 +6,18 @@ fn amendment(reason: &[u8]) -> Ask {
     Ask::Amend {
         project: 1,
         task: 8,
-        revision: Revision { value: 1 },
+        revision: Some(Revision { value: 1 }),
         release: None,
         reason: text(reason),
-        change: Amendment {
+        change: Box::new(Amendment {
             addressed: None,
             spec: None,
             instructions: Some(text(b"")),
             wake: None,
             dependencies: None,
             authority: None,
-        },
+            tracked: None,
+        }),
     }
 }
 #[test]
@@ -25,8 +26,9 @@ fn whole_amendment_request_prices_full_reason_and_rejects_text_or_document_overf
     for bytes in [b"".as_slice(), UTF8_TEXTS[0]] {
         let ask = amendment(bytes);
         let before = ask.clone();
-        assert_eq!(ask.heap(&bounds).unwrap(), u64::try_from(bytes.len()).unwrap());
-        let total = u64::try_from(size_of::<Ask>()).unwrap() + u64::try_from(bytes.len()).unwrap();
+        let heap = u64::try_from(size_of::<Amendment>()).unwrap() + u64::try_from(bytes.len()).unwrap();
+        assert_eq!(ask.heap(&bounds).unwrap(), heap);
+        let total = u64::try_from(size_of::<Ask>()).unwrap() + heap;
         bounds.document_bytes = total;
         assert!(payload::fits(&ask, &bounds));
         bounds.document_bytes = total - 1;

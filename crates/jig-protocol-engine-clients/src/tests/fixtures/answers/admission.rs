@@ -40,7 +40,7 @@ pub fn admission_1() -> [(p::LimitKind, w::AdmissionLimit); 19] {
         (p::LimitKind::Policy, w::AdmissionLimit::Policy),
         (p::LimitKind::Resource, w::AdmissionLimit::Resource),
         (p::LimitKind::Service, w::AdmissionLimit::Service),
-        (p::LimitKind::Grace, w::AdmissionLimit::Spec),
+        (p::LimitKind::Grace, w::AdmissionLimit::Grace),
         (p::LimitKind::Goals, w::AdmissionLimit::ProjectLiveTasks),
     ]
 }
