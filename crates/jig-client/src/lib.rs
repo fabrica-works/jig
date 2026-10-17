@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 mod client;
+pub mod facts;
 mod limits;
 mod store;
 pub use client::{Client, Event, LinkView, Request};

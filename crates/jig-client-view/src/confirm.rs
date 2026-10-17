@@ -199,7 +199,7 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
             return;
         }
     }
-    let dangerous = act == ActKind::Cancel || act == ActKind::Reject || act == ActKind::DeleteNote;
+    let dangerous = jig_client::facts::dangerous(act);
     let choices = Choices {
         option: None,
         cannot: false,

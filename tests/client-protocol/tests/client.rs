@@ -554,41 +554,20 @@ fn a_task_query_watch_delivers_the_live_lines_its_keys_select() {
         Watchable::Jig(contract::Subject::Tasks { query: fixtures::task_query(PROJECT_NUMBER), window: 2 }),
     );
     assert!(story.run_until(|s| fixtures::task_lines(s, QUERY).is_some(), PROOF_WAIT));
-    assert_eq!(
-        fixtures::task_lines(&story, QUERY)
-            .expect("query story fixture and delivery")
-            .rows
-            .iter()
-            .map(|r| (r.chip.task, r.tracked))
-            .collect::<Vec<_>>(),
-        vec![(fixtures::FIRST_QUERY_TASK, Some(1))]
-    );
+    assert_eq!(fixtures::tracked_rows(&story, QUERY), vec![(fixtures::FIRST_QUERY_TASK, Some(1))]);
     story.send(
         QUERY_AMEND,
         Ask::Jig(Box::new(contract::Ask::Amend {
             project: PROJECT_NUMBER,
             task: fixtures::SECOND_QUERY_TASK,
             revision: None,
-            change: Box::new(contract::Amendment {
-                addressed: None,
-                spec: None,
-                wake: None,
-                dependencies: None,
-                authority: None,
-                instructions: None,
-                tracked: Some(contract::Tracking::Tracked { priority: 2 }),
-            }),
+            change: Box::new(fixtures::tracked_amendment(2)),
             reason: contract::Text::new(b"track".as_slice().into(), 32).expect("query story fixture and delivery"),
         })),
     );
     assert!(story.run_until(|s| fixtures::task_lines(s, QUERY).is_some_and(|tasks| tasks.rows.len() == 2), PROOF_WAIT));
     assert_eq!(
-        fixtures::task_lines(&story, QUERY)
-            .expect("query story fixture and delivery")
-            .rows
-            .iter()
-            .map(|r| (r.chip.task, r.tracked))
-            .collect::<Vec<_>>(),
+        fixtures::tracked_rows(&story, QUERY),
         vec![(fixtures::FIRST_QUERY_TASK, Some(1)), (fixtures::SECOND_QUERY_TASK, Some(2))]
     );
 }
@@ -666,4 +645,17 @@ fn a_query_naming_no_index_key_reads_no_ended_group() {
     assert_eq!(page.live.iter().map(|line| line.chip.task).collect::<Vec<_>>(), [task]);
     assert_eq!(page.ended, contract::EndedGroup::None);
     assert_eq!(page.live_after, None);
+}
+
+#[test]
+fn a_running_chat_reads_as_writing_from_the_engine_s_documents() {
+    use jig_client::facts::ChatStatus;
+    let mut story = Story::writing_chat(fixtures::SEED);
+    let task = story.running_task();
+    story.watch_chat_facts(task);
+    assert!(story.run_until(|s| s.chat_statuses(task) == Some((ChatStatus::Writing, ChatStatus::Writing)), PROOF_WAIT));
+    assert_eq!(story.chat_statuses(task), Some((ChatStatus::Writing, ChatStatus::Writing)));
+    let waiting = ChatStatus::WaitingForYou { kind: contract::WaitedFor::Question, entries: 1 };
+    assert!(story.run_until(|s| s.chat_statuses(task) == Some((waiting.clone(), waiting.clone())), PROOF_WAIT));
+    assert_eq!(story.chat_statuses(task), Some((waiting.clone(), waiting)));
 }

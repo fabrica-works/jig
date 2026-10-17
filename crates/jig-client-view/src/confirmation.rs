@@ -206,7 +206,9 @@ fn action(
         }
         ActKind::Cancel => {
             words.text(b, JigPhrase::WillCancel, &[]);
-            if let Some(Effect::Cancel(impact)) = effect(object, open.act) {
+            if let Some(offers) = crate::acts::offers(object)
+                && let Some(Effect::Cancel(impact)) = jig_client::facts::effect(offers.as_slice(), open.act)
+            {
                 impact_words(b, impact, words);
             }
             common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
@@ -220,7 +222,9 @@ fn action(
         }
         ActKind::Move => {
             words.text(b, JigPhrase::WillTakeOver, &[]);
-            if let Some(Effect::Move { reservation }) = effect(object, open.act) {
+            if let Some(offers) = crate::acts::offers(object)
+                && let Some(Effect::Move { reservation }) = jig_client::facts::effect(offers.as_slice(), open.act)
+            {
                 words.text(b, JigPhrase::TakeoverFunds, &[Hole::Amount(*reservation)]);
             }
             common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
@@ -336,7 +340,9 @@ fn held(object: &Object) -> bool {
     }
 }
 fn release_object(b: &mut Builder, client: &Borrowed<'_>, object: &Object, words: &Words, bindings: &mut JigBindings) {
-    if let Some(Effect::Release(effect)) = effect(object, ActKind::Release) {
+    if let Some(offers) = crate::acts::offers(object)
+        && let Some(Effect::Release(effect)) = jig_client::facts::effect(offers.as_slice(), ActKind::Release)
+    {
         match effect {
             ReleaseEffect::Judged => words.text(b, JigPhrase::ReleaseFresh, &[]),
             ReleaseEffect::RunAgain => words.text(b, JigPhrase::ResumeRelease, &[]),
@@ -567,9 +573,4 @@ pub fn missing_words(b: &mut Builder, missing: &Missing, words: &Words, text_lim
         Missing::Refused { why } => words.refusal(b, why, text_limit),
     }
     b.close();
-}
-
-fn effect(object: &Object, act: ActKind) -> Option<&Effect> {
-    let offer = crate::acts::offer(object, act)?;
-    offer.effect.as_ref()
 }

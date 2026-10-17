@@ -44,6 +44,10 @@ pub enum Failure {
 /// An opaque host call or one semantic engine tool in a script.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Call {
+    /// Ask the requester a question.
+    Question { target: u64, words: Box<[u8]> },
+    /// Delegate one agent task.
+    Delegate { words: Box<[u8]>, budget: u64 },
     /// Relay the declared host tool and input without interpreting either.
     Opaque { name: Box<[u8]>, tool: Box<[u8]>, input: Box<[u8]>, writes: bool },
     /// Propose a tracked goal as the accepting holder's own work.
@@ -55,6 +59,8 @@ pub enum Call {
 /// One action of an assigned run's script.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Script {
+    /// Report writing while this turn remains in progress.
+    Writing,
     /// Provisional text explicitly named by its next committed turn.
     Text { turn: u32, offset: u32, text: Box<[u8]> },
     /// Take a whole turn, within the independently supplied allowance.
@@ -102,6 +108,8 @@ pub enum End {
 /// Independent reports at the worker face; the world translates them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Up {
+    /// Best-effort writing observation from this hosting channel.
+    Writing { channel: u64, task: u64, attempt: u64 },
     /// Best-effort writing, never retained for contact replay.
     Text { channel: u64, task: u64, attempt: u64, turn: u32, offset: u32, text: Box<[u8]> },
     /// Begin a connection and list every retained slot.
@@ -403,6 +411,11 @@ impl Worker {
             run.until = None;
             let Some(action) = run.script.pop_front() else { continue };
             let emitted = match action {
+                Script::Writing => Some(Up::Writing {
+                    channel: self.channel,
+                    task: run.assignment.task,
+                    attempt: run.assignment.attempt,
+                }),
                 Script::Text { turn, offset, text } => Some(Up::Text {
                     channel: self.channel,
                     task: run.assignment.task,

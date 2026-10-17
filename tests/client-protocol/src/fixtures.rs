@@ -175,5 +175,5 @@ pub use create::{batch_config, create_tasks, proposed_tasks};
 mod queries;
 pub use queries::{
     FIRST_QUERY_TASK, SECOND_QUERY_TASK, person_batch_config, person_tasks, query_limits, task_lines, task_query,
-    tracked_tasks,
+    tracked_amendment, tracked_rows, tracked_tasks,
 };

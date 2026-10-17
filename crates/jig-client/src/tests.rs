@@ -1,3 +1,4 @@
+mod facts;
 mod fixtures;
 mod sign_in;
 mod store;

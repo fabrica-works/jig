@@ -17,14 +17,21 @@ use skein_lib::List;
 /// Returns the engine's admission, or not offered when its document has no such act.
 #[must_use]
 pub fn offered(object: &Object, act: ActKind) -> Admission {
-    match offer(object, act) {
-        Some(value) => value.admission.clone(),
+    let admission = match offers(object) {
+        Some(rows) => jig_client::facts::offer(rows.as_slice(), act),
+        None => None,
+    };
+    match admission {
+        Some(value) => value.clone(),
         None => Admission::Refused(Refusal::NotOffered),
     }
 }
 /// The engine's whole offer, including its consequence.
 #[must_use]
 pub fn offer(object: &Object, act: ActKind) -> Option<&Offered> {
+    offer_in(offers(object)?, act)
+}
+pub(crate) fn offers(object: &Object) -> Option<&List<Offered>> {
     let rows = match &object.body {
         Some(Body::Task(document)) => &document.acts,
         Some(Body::Proposal(document)) => &document.acts,
@@ -38,7 +45,7 @@ pub fn offer(object: &Object, act: ActKind) -> Option<&Offered> {
         Some(Body::Note { document, .. }) => &document.acts,
         Some(Body::Historical(_) | Body::Chip(_)) | None => return None,
     };
-    offer_in(rows, act)
+    Some(rows)
 }
 #[expect(clippy::manual_find, reason = "step code selects offers without closures")]
 fn offer_in(rows: &List<Offered>, act: ActKind) -> Option<&Offered> {

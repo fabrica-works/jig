@@ -267,13 +267,8 @@ pub fn answer(b: &mut Builder, object: &Object, words: &Words, text_limit: u32) 
 }
 
 fn admitted(rows: &List<Offered>, act: ActKind) -> bool {
-    for offer in rows {
-        if offer.act == act {
-            return match offer.admission {
-                Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => true,
-                Admission::Refused(_) => false,
-            };
-        }
+    match jig_client::facts::offer(rows.as_slice(), act) {
+        Some(Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. }) => true,
+        Some(Admission::Refused(_)) | None => false,
     }
-    false
 }

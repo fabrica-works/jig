@@ -327,3 +327,96 @@ impl Client {
         self.step(Event::Reply { exchange, message });
     }
 }
+
+pub fn facts_task() -> contract::Task {
+    let limits = jig_client_protocol_link::Limits::new(domain_limits(), 8).unwrap();
+    let mut parts = jig_client_test_records::task_record().into_parts();
+    parts.chip = jig_client_test_records::owner_waiting_chip_record();
+    let wire = w::Task::new(&w::CEILINGS, parts).unwrap();
+    jig_client_protocol_link::translate::documents::task(wire, &limits).unwrap()
+}
+pub fn me() -> contract::Me {
+    let limits = jig_client_protocol_link::Limits::new(domain_limits(), 8).unwrap();
+    let mut me =
+        jig_client_protocol_link::translate::documents::frame(jig_client_test_records::frame_record(), &limits)
+            .unwrap();
+    me.party.number = PARTY;
+    me.projects.clear();
+    let mut templates = List::with_capacity(2);
+    for number in [1, 2] {
+        templates
+            .push(contract::Template {
+                number,
+                name: contract::DocumentText {
+                    bytes: contract::Text::new(b"template".as_slice().into(), 32).unwrap(),
+                    cut: false,
+                },
+                executor: if number == 1 {
+                    contract::TemplateExecutor::Charter(1)
+                } else {
+                    contract::TemplateExecutor::Chosen
+                },
+                contract: contract::TaskContractDocument::Report { words: 32 },
+                shallower: 1,
+                budget: if number == 1 {
+                    contract::TemplateBudget::AsAllowed { cap: None }
+                } else {
+                    contract::TemplateBudget::Given
+                },
+                deadline: contract::TemplateDeadline::None,
+                tracked: None,
+                flags: contract::TaskFlags {
+                    conversation: number == 1,
+                    listed: number == 2,
+                    retention: contract::Retention::Kept,
+                },
+                label: 0,
+                grace: None,
+            })
+            .unwrap();
+    }
+    me.projects
+        .push(contract::MeProject {
+            project: PROJECT,
+            name: None,
+            role: contract::HeldRole::Owner,
+            pool: None,
+            templates,
+            creating: None,
+            chat_budget: 0,
+        })
+        .unwrap();
+    me
+}
+pub fn facts_chip(phase: contract::OwnerChipPhase, work: Option<contract::OwnerChipWork>) -> contract::Chip {
+    let mut chip = facts_task().chip;
+    let contract::ChipPhase::Owner { details, .. } = chip.details.as_mut() else { panic!("owner fixture") };
+    details.phase_since = PHASE_SINCE;
+    details.ended_at = Some(ENDED_AT);
+    details.retry = Some(RETRY_NOTICE);
+    details.observation = None;
+    if let Some(work) = work {
+        details.observation = Some(contract::OwnerChipObservation {
+            channel: Token::new(CHANNEL),
+            work,
+            since: OBSERVED_SINCE,
+            reported_at: OBSERVED_SINCE,
+            started: None,
+        });
+    }
+    let details = details.clone();
+    chip.details = Box::new(contract::ChipPhase::Owner { phase, details });
+    chip
+}
+pub const PHASE_SINCE: Wall = Wall::from_nanos(11);
+pub const OBSERVED_SINCE: Wall = Wall::from_nanos(13);
+pub const ENDED_AT: Wall = Wall::from_nanos(17);
+pub const RETRY_AT: Wall = Wall::from_nanos(19);
+pub const ATTEMPT: u64 = 23;
+pub const CHANNEL: u64 = 29;
+pub const OTHER_PARTY: u64 = 31;
+pub const OTHER_PROJECT: u32 = 2;
+pub const OWNER_ROLE: u32 = 0;
+pub const MEMBER_ROLE: u32 = 2;
+pub const RETRY_NOTICE: contract::RetryNotice =
+    contract::RetryNotice::OwnerFailed { class: contract::HoldFailure::Lost, count: 2, allowance: 3 };

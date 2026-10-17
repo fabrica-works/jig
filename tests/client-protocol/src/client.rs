@@ -1,4 +1,5 @@
 //! The application-held client against the real engine over native HTTP bytes.
+mod facts;
 mod operations;
 use crate::{engine::Engine, fixtures, net::Net};
 use jig_client::{self as client, Ask, Event, Handle, Key, Latest, Link, Outcome, Readable, Told, Watchable};

@@ -10,6 +10,8 @@ use jig_fake_workers::{self as workers, Call, Script, Worker};
 use jig_test_domain as root;
 use skein_lib::{Duration, Time};
 
+#[path = "peers/facts.rs"]
+mod facts;
 #[path = "peers/historical.rs"]
 mod historical;
 

@@ -33,6 +33,11 @@ pub fn header(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &
         b.close();
         return true;
     };
+    if doc.flags.conversation
+        && let Some(me) = client.frame().document
+    {
+        words.chat_status(b, &jig_client::facts::chat_status(&doc.chip, &doc.waits_on, doc.project, me), client.wall());
+    }
     words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(doc.project))]);
     if let Some(goal) = doc.goal {
         if goal == doc.chip.task {

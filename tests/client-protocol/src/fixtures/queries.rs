@@ -63,6 +63,28 @@ pub fn query_limits() -> jig_test_domain::Limits {
     super::journal(limits)
 }
 
+#[must_use]
+pub fn tracked_rows(story: &crate::client::Story, handle: Handle) -> Vec<(u64, Option<u32>)> {
+    task_lines(story, handle)
+        .expect("query story fixture and delivery")
+        .rows
+        .iter()
+        .map(|r| (r.chip.task, r.tracked))
+        .collect()
+}
+#[must_use]
+pub fn tracked_amendment(priority: u32) -> c::Amendment {
+    c::Amendment {
+        addressed: None,
+        spec: None,
+        wake: None,
+        dependencies: None,
+        authority: None,
+        instructions: None,
+        tracked: Some(c::Tracking::Tracked { priority }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

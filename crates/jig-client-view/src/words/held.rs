@@ -6,7 +6,7 @@ use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 impl Words {
     /// Admission reason facts, without invented amounts, actors, clocks or parts.
-    pub(super) fn hold_category(&self, b: &mut Builder, reason: HoldCategory) {
+    pub(crate) fn hold_category(&self, b: &mut Builder, reason: HoldCategory) {
         match reason {
             HoldCategory::Failures { class } => {
                 self.text(b, JigPhrase::TriesExhausted, &[]);
