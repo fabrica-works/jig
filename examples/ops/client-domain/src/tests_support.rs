@@ -9,8 +9,6 @@ pub enum JigOut {
     Open { watch: Token, subject: jig_client::contract::Subject },
     Continue { watch: Token, subject: jig_client::contract::Subject },
     Close { watch: Token },
-    Answered { asked: Token, answer: jig_client::contract::Answer },
-    Unknown { asked: Token },
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
@@ -30,6 +28,8 @@ pub struct Domain {
     root: d::Domain,
     later: Vec<Request>,
     watches: alloc::collections::BTreeMap<Token, u16>,
+    me: Option<Token>,
+    frame: Option<Box<jig_client::contract::Frame>>,
 }
 impl core::ops::Deref for Domain {
     type Target = d::Domain;
@@ -43,9 +43,28 @@ impl core::ops::DerefMut for Domain {
     }
 }
 pub fn new(limits: &d::Limits, seed: u64) -> Domain {
-    Domain { root: d::unlinked(limits, seed), later: Vec::new(), watches: alloc::collections::BTreeMap::new() }
+    Domain {
+        root: d::unlinked(limits, seed),
+        later: Vec::new(),
+        watches: alloc::collections::BTreeMap::new(),
+        me: None,
+        frame: None,
+    }
 }
 pub fn step(root: &mut Domain, env: &Env<d::Limits>, event: d::Event, out: &mut Queue<Request>) {
+    if let d::Event::Client {
+        event:
+            jig_client::Event::Up {
+                up:
+                    Up::Watched {
+                        event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Frame(frame)),
+                        ..
+                    },
+            },
+    } = &event
+    {
+        root.frame = Some(frame.clone());
+    }
     let events = callbacks(event);
     for event in events {
         let mut raw = Queue::with_capacity(d::max_out(&env.limits));
@@ -64,6 +83,16 @@ pub fn take(root: &mut Domain, env: &Env<d::Limits>, out: &mut Queue<Request>) {
 }
 fn collect(root: &mut Domain, raw: &mut Queue<d::Request>, out: &mut Queue<Request>) {
     while let Some(row) = raw.pop() {
+        if let d::Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down:
+                        Down::Open { watch, subject: jig_client::Watchable::Jig(jig_client::contract::Subject::Frame) },
+                },
+        } = &row
+        {
+            root.me = Some(*watch);
+        }
         let row = observed(row, &mut root.watches);
         match row {
             row @ (Request::Send { .. }
@@ -125,8 +154,6 @@ fn observed(row: d::Request, watches: &mut alloc::collections::BTreeMap<Token, u
         },
         d::Request::Save { record } => Request::Save { record },
         d::Request::Erase { key } => Request::Erase { key },
-        d::Request::Jig(d::JigOut::Answered { asked, answer }) => Request::Jig(JigOut::Answered { asked, answer }),
-        d::Request::Jig(d::JigOut::Unknown { asked }) => Request::Jig(JigOut::Unknown { asked }),
         d::Request::Infrastructure(value) => Request::Infrastructure(value),
         d::Request::Observability(value) => Request::Observability(value),
         d::Request::Show { address, replace } => Request::Show { address, replace },
@@ -276,4 +303,24 @@ pub fn client_limits() -> jig_client::Limits {
         },
         exchanges: 8,
     }
+}
+
+pub fn offline(root: &Domain) -> d::Event {
+    up(Up::WatchEnded { watch: root.me.expect("me open"), end: jig_client::contract::WatchEnd::Dropped })
+}
+pub fn reconnect(root: &mut Domain, env: &Env<d::Limits>, out: &mut Queue<Request>) {
+    let now = env.now.saturating_add(env.limits.client.domain.backoff.most);
+    let env = Env { now, wall: env.wall, limits: env.limits };
+    take(root, &env, out);
+    let watch = root.me.expect("me reopened");
+    let frame = root.frame.clone().expect("confirmed frame");
+    step(
+        root,
+        &env,
+        up(Up::Watched {
+            watch,
+            event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Frame(frame)),
+        }),
+        out,
+    );
 }

@@ -32,7 +32,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(infrastructure::worst_case(&limits.infrastructure)?)?;
     total = total.checked_add(crate::observability::worst_case(&limits.observability)?)?;
     total = total.checked_add(jig_client::worst_case(&limits.client)?)?;
-    // Synchronous frame hand-offs nest at most three child output queues.
+    // Named -> ShowPart/PartsLeft still nests first, jig, first: three child queues.
     let jig_out = jig_client_view::max_out(&limits.jig);
     let root_out = checked_max_out(limits)?;
     total = total.checked_add(Queue::<jig_client_view::Request>::worst_case(jig_out)?.checked_mul(3)?)?;

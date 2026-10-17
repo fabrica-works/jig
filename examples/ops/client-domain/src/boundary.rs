@@ -6,7 +6,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_client::contract::Ask as JigAsk;
-use skein_lib::{List, Token};
+use skein_lib::List;
 /// One keyed request, tagged with the child that owns its meaning.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
@@ -39,12 +39,6 @@ pub enum Event {
     Observability(crate::observability::Event),
     SignedOut,
 }
-/// An unkeyed jig shell obligation passed through the root.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum JigOut {
-    Answered { asked: Token, answer: jig_client::contract::Answer },
-    Unknown { asked: Token },
-}
 /// Bounded routing and child facts for the shell to observe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
@@ -58,7 +52,6 @@ pub enum Request {
     Save { record: Record },
     Erase { key: Key },
     Client { request: jig_client::Request },
-    Jig(JigOut),
     Infrastructure(infrastructure::Out),
     Observability(crate::observability::Out),
     Show { address: Address, replace: bool },

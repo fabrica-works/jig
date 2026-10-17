@@ -17,7 +17,6 @@ pub use documents::{Answer, Ask};
 pub use documents::{Document, Kind, ReadResult, Scope, Subject, WatchEnd, WatchEvent};
 use jig_client::Link;
 use jig_client::contract::{Part, Revision};
-use jig_client_view::frame::me::FrameShown;
 use skein_lib::{Env, Id, List, Map, Queue, RequestProgress, Slab, Time, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Address {
@@ -88,14 +87,11 @@ pub enum Event {
     Read { read: Token, result: ReadResult },
     Watch { watch: Token, event: WatchEvent },
     Ended { watch: Token, end: WatchEnd },
-    Link { link: Link },
-    Confirmed { party: Option<u64> },
-    FrameIs { asked: Token, frame: FrameShown },
     Restore { record: Record },
 }
 #[derive(Debug)]
 pub enum Request {
-    Frame { asked: Token },
+    Client { asked: jig_client::Event },
     Show { address: Address },
     Save { record: Record },
     Send { request: Token, scope: u64, ask: Ask },
@@ -181,6 +177,7 @@ pub struct Side {
     generation: u32,
     link: Link,
     party: Option<u64>,
+    me: bool,
     kept: Option<Record>,
     shown: u64,
 }
@@ -199,6 +196,7 @@ impl Side {
             generation: 0,
             link: Link::Starting,
             party: None,
+            me: false,
             kept: None,
             shown: 0,
         }
@@ -294,7 +292,6 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             side.generation = side.generation.checked_add(1).expect("page generation fits");
             prune(side, out);
             side.changed();
-            out.push(Request::Frame { asked: Token::new(0) });
             hold(side, env, address.subject(), out);
             save(side, out);
         }
@@ -330,23 +327,8 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
         Event::Answered { request, answer } => answered(side, env, request, answer, out),
         Event::Progress { request, progress } => progress_changed(side, env, request, progress, out),
         Event::Read { read, result } => read_result(side, env, read, result, out),
-        Event::Watch { watch, event } => watch_event(side, env, watch, event, out),
+        Event::Watch { watch, event } => watched(side, env, watch, event, out),
         Event::Ended { watch, end } => ended(side, env, Id::from_token(watch), end, out),
-        Event::Link { link } => {
-            side.link = link;
-            sync(side, env, out);
-            side.changed();
-        }
-        Event::Confirmed { party } => {
-            if side.party != party {
-                hide(side, out);
-            }
-            side.party = party;
-            sync(side, env, out);
-            save(side, out);
-            side.changed();
-        }
-        Event::FrameIs { asked: _, frame: _ } => {}
         Event::Restore { record } => match record {
             Record::Place { version, party, address } => {
                 if version == 1 && documents::subject_price(&address.clone().subject(), &env.limits).is_some() {
@@ -870,7 +852,7 @@ fn read_result(side: &mut Side, env: &Env<Limits>, read: Token, result: ReadResu
     }
 }
 
-fn watch_event(side: &mut Side, env: &Env<Limits>, watch: Token, event: WatchEvent, out: &mut Queue<Request>) {
+fn watched(side: &mut Side, env: &Env<Limits>, watch: Token, event: WatchEvent, out: &mut Queue<Request>) {
     let id = Id::from_token(watch);
     if side.watch_ids.get(&id).is_none() {
         return;
@@ -960,4 +942,44 @@ fn part_fits(part: &Part, segments: u32, text: u32) -> bool {
         | Part::Project { .. }
         | Part::Deployment { .. } => true,
     }
+}
+
+/// Read this side's party from its own client handle.
+pub(crate) fn me_told(
+    side: &mut Side,
+    env: &Env<Limits>,
+    client: &jig_client::Client,
+    told: &jig_client::Told,
+    out: &mut Queue<Request>,
+) -> bool {
+    let Some(update) =
+        crate::me::told(jig_ops_domain_connectors::Connector::Infrastructure, &mut side.me, client, told)
+    else {
+        return false;
+    };
+    if let Some(asked) = update.asked {
+        out.push(Request::Client { asked });
+    }
+    match update.change {
+        crate::me::Change::Link(link) => {
+            side.link = link;
+            if link == Link::SignedOut || link == Link::OutOfDate {
+                party(side, env, None, out);
+            }
+            sync(side, env, out);
+            side.changed();
+        }
+        crate::me::Change::Party(value) => party(side, env, value, out),
+        crate::me::Change::Unchanged => {}
+    }
+    true
+}
+fn party(side: &mut Side, env: &Env<Limits>, party: Option<u64>, out: &mut Queue<Request>) {
+    if side.party != party {
+        hide(side, out);
+    }
+    side.party = party;
+    sync(side, env, out);
+    save(side, out);
+    side.changed();
 }

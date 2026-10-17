@@ -11,7 +11,6 @@ use crate as support_domain;
 #[path = "tests_support.rs"]
 mod support;
 use crate::{Address, Answered, Ask, Event, Limits, infrastructure};
-use jig_client::Link;
 use jig_client::contract::{self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, WatchEvent};
 use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, Time, Token, Wall};
@@ -1127,9 +1126,12 @@ fn infrastructure_reopens_a_dropped_watch_after_the_link_goes_offline_and_live()
         &mut root,
         Event::Infrastructure(infrastructure::Event::Ended { watch: old, end: infrastructure::WatchEnd::Dropped }),
     );
-    drive(&mut root, Event::Infrastructure(infrastructure::Event::Link { link: Link::Offline }));
+    let offline = support::offline(&root);
+    drive(&mut root, offline);
     let id = root.infrastructure().page().unwrap();
-    let rows = drive(&mut root, Event::Infrastructure(infrastructure::Event::Link { link: Link::Live }));
+    let mut out = Queue::with_capacity(crate::max_out(&limits()));
+    support::reconnect(&mut root, &env(), &mut out);
+    let rows = out_iter(out);
     let watch = family_watch(&rows);
     assert_ne!(old, watch, "the retired watch epoch is not reused");
     let subject = root.infrastructure().object(id).unwrap().subject.clone();
@@ -1176,9 +1178,12 @@ fn observability_reopens_a_dropped_watch_after_the_link_goes_offline_and_live() 
         &mut root,
         Event::Observability(observability::Event::Ended { watch: old, end: observability::WatchEnd::Dropped }),
     );
-    drive(&mut root, Event::Observability(observability::Event::Link { link: Link::Offline }));
+    let offline = support::offline(&root);
+    drive(&mut root, offline);
     let id = root.observability().page().unwrap();
-    let rows = drive(&mut root, Event::Observability(observability::Event::Link { link: Link::Live }));
+    let mut out = Queue::with_capacity(crate::max_out(&limits()));
+    support::reconnect(&mut root, &env(), &mut out);
+    let rows = out_iter(out);
     let watch = rows
         .iter()
         .find_map(|row| match row {

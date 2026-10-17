@@ -2,7 +2,7 @@
 //! Replace: Ops connector sides, family addresses and application vocabulary.
 use crate::observability;
 use crate::{
-    Action, Address, Domain, Event, Fact, JigOut, Limits, Place, Request, infrastructure,
+    Action, Address, Domain, Event, Fact, Limits, Place, Request, infrastructure,
     store::{Key, Record},
 };
 use skein_lib::{Env, List, Queue};
@@ -178,19 +178,6 @@ pub(crate) fn route_jig(
                 infrastructure(root, env, infrastructure::Event::PartsLeft, out);
                 observability(root, env, observability::Event::PartsLeft, out);
             }
-            jig_client_view::Request::Link { .. } | jig_client_view::Request::Retention { .. } => {}
-            jig_client_view::Request::Confirmed { party } => {
-                infrastructure(root, env, infrastructure::Event::Confirmed { party }, out);
-                observability(root, env, observability::Event::Confirmed { party }, out);
-            }
-            jig_client_view::Request::FrameIs { asked, frame } => {
-                infrastructure(root, env, infrastructure::Event::FrameIs { asked, frame: frame.clone() }, out);
-                observability(root, env, observability::Event::FrameIs { asked, frame }, out);
-            }
-            jig_client_view::Request::Answered { asked, answer } => {
-                out.push(Request::Jig(JigOut::Answered { asked, answer }));
-            }
-            jig_client_view::Request::Unknown { asked } => out.push(Request::Jig(JigOut::Unknown { asked })),
         }
     }
 }
@@ -202,7 +189,7 @@ pub(crate) fn route_infrastructure(
 ) {
     for _ in 0..child.len() {
         match child.pop().expect("counted infrastructure output") {
-            infrastructure::Request::Frame { asked } => jig(root, env, jig_client_view::Event::Frame { asked }, out),
+            infrastructure::Request::Client { asked } => client(root, env, asked, out),
             infrastructure::Request::Show { address } => {
                 out.push(Request::Show { address: Address::Infrastructure(address), replace: false });
             }
@@ -241,7 +228,7 @@ pub(crate) fn route_observability(
 ) {
     for _ in 0..child.len() {
         match child.pop().expect("counted observability output") {
-            observability::Request::Frame { asked } => jig(root, env, jig_client_view::Event::Frame { asked }, out),
+            observability::Request::Client { asked } => client(root, env, asked, out),
             observability::Request::Show { address } => {
                 out.push(Request::Show { address: Address::Observability(address), replace: false });
             }
@@ -312,16 +299,9 @@ pub(crate) fn route_client(
 pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told, out: &mut Queue<Request>) {
     use jig_client::Told;
     let asker = match &told {
-        Told::Link { link } => {
-            let link = match link {
-                jig_client::Link::Live => jig_client::Link::Live,
-                jig_client::Link::Starting => jig_client::Link::Starting,
-                jig_client::Link::Offline | jig_client::Link::SignedOut | jig_client::Link::OutOfDate => {
-                    jig_client::Link::Offline
-                }
-            };
-            infrastructure(root, env, infrastructure::Event::Link { link }, out);
-            observability(root, env, observability::Event::Link { link }, out);
+        Told::Link { .. } => {
+            infrastructure_me(root, env, &told, out);
+            observability_me(root, env, &told, out);
             jig_client::Asker::JIG
         }
         Told::Dropped { .. } => jig_client::Asker::JIG,
@@ -337,14 +317,44 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
             route_jig(root, env, &mut child, out);
         }
         Some(jig_client_view::Owner::Application { number }) => match jig_ops_domain_connectors::connector(number) {
-            Some(jig_ops_domain_connectors::Connector::Infrastructure) => {
+            Some(jig_ops_domain_connectors::Connector::Infrastructure) if !infrastructure_me(root, env, &told, out) => {
                 crate::family::infrastructure::told(root, env, told, out);
             }
-            Some(jig_ops_domain_connectors::Connector::Observability) => {
+            Some(jig_ops_domain_connectors::Connector::Observability) if !observability_me(root, env, &told, out) => {
                 crate::family::observability::told(root, env, told, out);
             }
-            None => {}
+            Some(
+                jig_ops_domain_connectors::Connector::Infrastructure
+                | jig_ops_domain_connectors::Connector::Observability,
+            )
+            | None => {}
         },
         None => {}
     }
+}
+
+fn infrastructure_me(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
+    let mut child = Queue::with_capacity(infrastructure::max_out(&env.limits.infrastructure));
+    let consumed = infrastructure::me_told(
+        &mut root.infrastructure,
+        &Env { now: env.now, wall: env.wall, limits: env.limits.infrastructure },
+        &root.client,
+        told,
+        &mut child,
+    );
+    route_infrastructure(root, env, &mut child, out);
+    consumed
+}
+
+fn observability_me(root: &mut Domain, env: &Env<Limits>, told: &jig_client::Told, out: &mut Queue<Request>) -> bool {
+    let mut child = Queue::with_capacity(observability::max_out(&env.limits.observability));
+    let consumed = observability::me_told(
+        &mut root.observability,
+        &Env { now: env.now, wall: env.wall, limits: env.limits.observability },
+        &root.client,
+        told,
+        &mut child,
+    );
+    route_observability(root, env, &mut child, out);
+    consumed
 }

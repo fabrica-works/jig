@@ -1592,22 +1592,22 @@ fn native_effect_facts_have_distinct_proposal_and_state_labels() {
     let (jig_words, _, words) = phrasebooks();
     let tree_limits = Limits::of(&limits, &jig_words, &words, &words).unwrap().tree;
     let part = Part::OwnerEffect { connector: 2, proposal: u64::MAX };
-    let mut side = infrastructure::Side::new(&limits.infrastructure, 86);
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.infrastructure };
-    let mut out = Queue::with_capacity(infrastructure::max_out(&limits.infrastructure));
-    for event in [
-        infrastructure::Event::Link { link: jig_client::Link::Live },
-        infrastructure::Event::Confirmed { party: Some(1) },
-        infrastructure::Event::Show { part: part.clone(), scope: infrastructure::Scope::Project(0) },
-    ] {
-        infrastructure::step(&mut side, &env, event, &mut out);
-    }
-    let mut read = None;
-    while let Some(request) = out.pop() {
-        if let infrastructure::Request::Out(infrastructure::Out::Read { read: found, .. }) = request {
-            read = Some(found);
-        }
-    }
+    let mut root = ready();
+    let offline = support::offline(&root);
+    drive(&mut root, offline);
+    let mut out = Queue::with_capacity(root::max_out(&limits));
+    support::reconnect(&mut root, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, &mut out);
+    let rows = drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Show {
+            part: part.clone(),
+            scope: infrastructure::Scope::Project(0),
+        }),
+    );
+    let read = rows.iter().find_map(|request| match request {
+        Request::Infrastructure(infrastructure::Out::Read { read, .. }) => Some(*read),
+        _ => None,
+    });
     let document = infrastructure::Document::Native(Box::new(n::Document {
         subject: infrastructure::Subject {
             scope: infrastructure::Scope::Project(0),
@@ -1631,19 +1631,18 @@ fn native_effect_facts_have_distinct_proposal_and_state_labels() {
             },
         },
     }));
-    infrastructure::step(
-        &mut side,
-        &env,
-        infrastructure::Event::Read {
+    drive(
+        &mut root,
+        Event::Infrastructure(infrastructure::Event::Read {
             read: read.expect("raw effect subject read"),
             result: infrastructure::ReadResult::Value(Box::new(document.clone())),
-        },
-        &mut out,
+        }),
     );
+    let side = root.infrastructure();
     let mut builder = skein_ui::Builder::new(&tree_limits);
     builder.open(skein_ui::Role::Page);
     let mut bindings = crate::bindings::Bindings::new(tree_limits.bindings, limits.infrastructure.text, 2);
-    crate::infrastructure::part(&mut builder, &side, &part, &words, &jig_words, &mut bindings);
+    crate::infrastructure::part(&mut builder, side, &part, &words, &jig_words, &mut bindings);
     builder.close();
     let tree = builder.finish();
     let text: Vec<_> = tree.nodes().iter().flat_map(|node| node.text.iter()).map(|run| run.text.as_ref()).collect();
