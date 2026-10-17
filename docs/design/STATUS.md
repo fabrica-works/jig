@@ -227,5 +227,9 @@ smith, and builds what section 2's rows name it for.
 
 ## 4. Drafts
 
-None. `client-api.md` became the design on 2026-10-15 ("jig's client
-API", section 3).
+| Draft | About | Next |
+|---|---|---|
+| `providers.md` | what OpenAI's and Anthropic's terms allow an application to do with a person's subscription or API account, as read on 2026-10-17 | not adopted: the designs its section 4 names change by a design pass; its section 5 waits for the providers' answers |
+
+`client-api.md` became the design on 2026-10-15 ("jig's client API",
+section 3).
