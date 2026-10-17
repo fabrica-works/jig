@@ -281,12 +281,12 @@ pub(crate) fn party_event(up: parties::Up) -> core::Event {
             sign_in,
             project,
             key,
-            ask: parties::Ask::Say { task: parties::Task::Number(task), words, release },
+            ask: parties::Ask::Say { task: parties::Task::Number(task), words, release: None },
         } => core::Event::People(people::Event::Ask {
             reply_to: ReplyTo::new(Token::new(to)),
             sign_in,
             key,
-            ask: people::Ask::Say { project, task, words, release },
+            ask: people::Ask::Say { project, task, words, release: false },
         }),
         parties::Up::Request { ask, .. } => panic!("channel script requested {ask:?}"),
     }

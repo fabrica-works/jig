@@ -79,7 +79,8 @@ pub enum Ask {
     Say {
         task: Task,
         words: Box<[u8]>,
-        release: bool,
+        /// The hold revision to release alongside these words.
+        release: Option<u64>,
     },
     /// Cancel a task, allowing it a grace to finish.
     Cancel {

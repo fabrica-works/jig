@@ -225,6 +225,8 @@ fn position_snapshot(
     snapshot.tasks.insert(
         5,
         r::Task {
+            spec_revision: 0,
+            hold_revision: 0,
             tracked: false,
             number: 5,
             project: 1,

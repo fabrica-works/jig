@@ -159,6 +159,8 @@ pub fn task(value: &tasks::TaskRecord) -> r::Task {
         attempt: value.attempt,
         period: value.recurring.as_ref().map(|recurring| recurring.last_period),
         phase: phase(&value.phase),
+        spec_revision: value.revisions.spec,
+        hold_revision: value.revisions.hold,
         dependencies: value.dependencies.to_vec(),
         delegates: value.delegates.to_vec(),
         pools: if value.holds_taken && !matches!(value.phase, tasks::Phase::Ended(_)) {
@@ -320,7 +322,7 @@ impl Observer {
             applied_changes: BTreeSet::new(),
             forgetting: BTreeMap::new(),
             recorded: None,
-            intents: intents::Intents::default(),
+            intents: intents::Intents::configured(configuration),
         }
     }
 
@@ -552,6 +554,7 @@ impl Observer {
 
     /// Observe the application records the store has just received.
     pub fn submitted(&mut self, now: u64, store: &Store) {
+        self.intents.submitted(store);
         if let Some(pending) = store.pending.back() {
             let mut tasks = Vec::new();
             for write in &pending.writes {

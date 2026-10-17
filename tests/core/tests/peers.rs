@@ -112,7 +112,7 @@ fn three_workers_and_the_engines_own_slot_use_the_same_host_scripts() {
         .enumerate()
         .map(|(index, task)| Act::Request {
             key: [u8::try_from(index).expect("four tasks") + 10; 16],
-            ask: Ask::Say { task: Task::Number(task), words: Box::from(&b"finish"[..]), release: false },
+            ask: Ask::Say { task: Task::Number(task), words: Box::from(&b"finish"[..]), release: None },
         })
         .collect();
     acts(&mut world, 0, words);
@@ -204,6 +204,7 @@ fn a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt() {
     acts(&mut world, 2, Box::new([Act::Request { key: [7; 16], ask: Ask::Stop { task: Task::Last } }]));
     assert_eq!(world.cancellations.len(), 1);
     let task = world.peers.as_ref().expect("peers").parties[2].last_task.expect("started task");
+    let hold = jig_core_world::fixtures::live_row(&world, task).revisions.hold;
     world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     acts(
         &mut world,
@@ -211,7 +212,7 @@ fn a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt() {
         Box::new([
             Act::Request {
                 key: [8; 16],
-                ask: Ask::Say { task: Task::Last, words: Box::from(&b"continue"[..]), release: true },
+                ask: Ask::Say { task: Task::Last, words: Box::from(&b"continue"[..]), release: Some(hold) },
             },
             Act::Twice,
         ]),
@@ -225,13 +226,11 @@ fn a_person_stops_a_scripted_run_and_words_release_it_for_a_new_attempt() {
         !world.peers.as_ref().expect("peers").parties[2]
             .replies
             .iter()
-            .any(|(_, reply)| matches!(reply, parties::Reply::Said { .. }))
+            .any(|(_, reply)| matches!(reply, parties::Reply::Done))
     );
     world.release_commits();
     let peers = world.peers.as_ref().expect("peers");
-    assert!(peers.parties[2].replies.iter().any(
-        |(_, reply)| matches!(reply, parties::Reply::Said { task: number, released: true, .. } if *number == task)
-    ));
+    assert!(peers.parties[2].replies.iter().any(|(_, reply)| matches!(reply, parties::Reply::Done)));
     assert_eq!(peers.workers[0].seen.len(), 2);
     assert!(peers.workers[0].seen[1].attempt > peers.workers[0].seen[0].attempt);
     assert!(peers.quiescent(), "{:?}", world.trace);

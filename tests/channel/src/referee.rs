@@ -636,7 +636,7 @@ impl Referee {
                 ask: parties::Ask::Say {
                     task: parties::Task::Last,
                     words: b"Continue now".as_slice().into(),
-                    release: false,
+                    release: None,
                 },
             }]));
         }
@@ -650,7 +650,7 @@ impl Referee {
                 ask: parties::Ask::Say {
                     task: parties::Task::Last,
                     words: b"Continue now".as_slice().into(),
-                    release: false,
+                    release: None,
                 },
             }]));
         }
@@ -684,7 +684,7 @@ impl Referee {
                                 } else {
                                     b"From the person".as_slice().into()
                                 },
-                                release: false,
+                                release: None,
                             },
                         })
                         .collect(),

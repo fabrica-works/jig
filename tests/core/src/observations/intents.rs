@@ -1,10 +1,13 @@
 //! Explicit peer asks, deduplicated by their boundary identities.
 use super::{core, people, r, tasks};
+#[path = "named.rs"]
+mod named;
 use skein_lib::Token;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, Default)]
 pub struct Intents {
+    named: named::Names,
     parties: BTreeMap<(u64, [u8; 16]), bool>,
     replies: BTreeMap<Token, (u64, [u8; 16])>,
     calls: BTreeMap<core::CallKey, bool>,
@@ -12,6 +15,11 @@ pub struct Intents {
 }
 
 impl Intents {
+    #[must_use]
+    pub fn configured(configuration: &jig_test_domain::Config) -> Self {
+        Self { named: named::Names::configured(configuration), ..Self::default() }
+    }
+
     pub fn inbound_root(&mut self, store: &crate::Store, event: &mut jig_test_domain::Event) -> Vec<r::Observed> {
         use jig_test_domain::{Event, Record};
         if let Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask })) = event {
@@ -37,15 +45,23 @@ impl Intents {
         Vec::new()
     }
 
+    pub fn submitted(&mut self, store: &crate::Store) {
+        self.named.submitted(store);
+    }
+
     pub fn durable(&mut self, store: &crate::Store) -> Vec<r::Observed> {
-        store
-            .rows
-            .values()
-            .flat_map(|row| match row {
-                jig_test_domain::Record::Core(record) => self.record(record),
-                jig_test_domain::Record::Connector { .. } => Vec::new(),
-            })
-            .collect()
+        let mut observed = self.named.durable(store.applied);
+        observed.extend(
+            store
+                .rows
+                .values()
+                .flat_map(|row| match row {
+                    jig_test_domain::Record::Core(record) => self.record(record),
+                    jig_test_domain::Record::Connector { .. } => Vec::new(),
+                })
+                .collect::<Vec<_>>(),
+        );
+        observed
     }
 
     pub fn party(
@@ -55,19 +71,25 @@ impl Intents {
         key: [u8; 16],
         ask: &people::Ask,
     ) -> Vec<r::Observed> {
+        let mut observed = named::party(ask);
         if !matches!(ask, people::Ask::Propose { .. }) {
-            return Vec::new();
+            return observed;
         }
         self.replies.insert(Token::new(super::destination(reply)), (person, key));
         if let std::collections::btree_map::Entry::Vacant(entry) = self.parties.entry((person, key)) {
             entry.insert(true);
-            vec![r::Observed::ProposeAsked { proposer: r::Source::Person(person) }]
+            observed.push(r::Observed::ProposeAsked { proposer: r::Source::Person(person) });
+            observed
         } else {
             Vec::new()
         }
     }
 
     pub fn inbound(&mut self, event: &core::Event) -> Vec<r::Observed> {
+        let observed = named::run(event);
+        if !observed.is_empty() {
+            return observed;
+        }
         if let core::Event::NamedAction { key, action, .. } = event
             && matches!(
                 action,

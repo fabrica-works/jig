@@ -211,9 +211,7 @@ impl Peers {
                         priority,
                         deadline,
                     },
-                    parties::Ask::Say { task, words, release, .. } => {
-                        people::Ask::Say { project, task: task_number(task), words, release }
-                    }
+                    parties::Ask::Say { task, words, release, .. } => say(project, task_number(task), words, release),
                     parties::Ask::Cancel { task, grace } => people::Ask::Cancel {
                         project,
                         task: task_number(task),
@@ -780,4 +778,21 @@ pub fn journal(limits: &mut root::Limits) {
     let connectors = jig_test_connector::MAX_OUT * 2;
     limits.journal.writes = (room.writes + connectors).max(2000);
     limits.journal.held = ((room.held + connectors) * limits.journal.commits).max(2000);
+}
+
+// Words and a named release share one atomic party request.
+fn say(project: u32, task: u64, words: Box<[u8]>, release: Option<u64>) -> people::Ask {
+    match release {
+        Some(revision) => {
+            let mut operations = skein_lib::List::with_capacity(2);
+            operations
+                .push(people::Operation::Message { task, words, release: false })
+                .expect("two word and release operations");
+            operations
+                .push(people::Operation::Release { task, revision, again: None })
+                .expect("two word and release operations");
+            people::Ask::Compound { project, operations }
+        }
+        None => people::Ask::Say { project, task, words, release: false },
+    }
 }

@@ -8,7 +8,9 @@ mod compound;
 mod conversations;
 mod positions;
 mod proposals;
+mod revisions;
 pub use application::{ApplicationAnswer, ApplicationKey};
+pub use revisions::Revision;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -122,6 +124,10 @@ pub struct Task {
     /// Standing work resets descendant authority for each considered period.
     pub period: Option<u64>,
     pub phase: Phase,
+    /// Specification revision in the durable row.
+    pub spec_revision: u64,
+    /// Hold revision in the durable row.
+    pub hold_revision: u64,
     pub dependencies: Vec<u64>,
     pub delegates: Vec<u64>,
     pub pools: Vec<Name>,
@@ -267,6 +273,8 @@ pub struct Policy {
 #[expect(clippy::large_enum_variant, reason = "durable observations own the complete atomic snapshot")]
 #[derive(Clone, Debug)]
 pub enum Observed {
+    /// A decision names the specification or hold it saw.
+    Named { task: u64, revision: Revision },
     /// A party, run or terminal explicitly asked to propose (domain/testing.md, 6).
     ProposeAsked { proposer: Source },
     /// A refused ask leaves no credit for a later proposal.
@@ -357,6 +365,7 @@ pub struct Violation {
 #[derive(Clone, Debug)]
 pub struct Referee {
     proposals: proposals::Proposals,
+    revisions: revisions::Revisions,
     applications: application::Applications,
     compounds: BTreeMap<Vec<u64>, compound::Compound>,
     pub policy: Policy,
@@ -393,6 +402,7 @@ impl Referee {
     pub fn new(policy: Policy) -> Self {
         Self {
             proposals: proposals::Proposals::default(),
+            revisions: revisions::Revisions::default(),
             applications: application::Applications::default(),
             compounds: BTreeMap::new(),
             policy,
@@ -585,6 +595,7 @@ impl Referee {
             }
         }
         self.proposals.durable(&snapshot)?;
+        self.revisions.durable(&self.last, &snapshot)?;
         for (budget, spent, below, reserved) in &snapshot.balances {
             require(
                 spent
@@ -889,6 +900,7 @@ impl Referee {
     #[expect(clippy::too_many_lines, reason = "one total dispatch owns the referee's outside observations")]
     pub fn observe(&mut self, now: u64, observed: Observed) -> Result<(), Violation> {
         match observed {
+            Observed::Named { task, revision } => self.revisions.named(task, revision),
             Observed::ProposeAsked { proposer } => self.proposals.asked(proposer),
             Observed::ProposeRefused { proposer } => self.proposals.refused(proposer),
             Observed::ApplicationRequested { reply, key, connector, digest } => {

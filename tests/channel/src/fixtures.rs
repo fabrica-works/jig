@@ -414,7 +414,7 @@ pub(crate) fn party_script(script: &Script) -> Box<[jig_fake_parties::Act]> {
             ask: jig_fake_parties::Ask::Say {
                 task: jig_fake_parties::Task::Last,
                 words: b"From the person".as_slice().into(),
-                release: false,
+                release: None,
             },
         });
     }
