@@ -6,7 +6,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::{Act, End},
     windows::{Edge, Edges},
 };
@@ -57,7 +57,7 @@ fn edge(b: &mut Builder, words: &Words, bindings: &mut JigBindings, edge: &Edge,
     }
 }
 /// Show the page's excess rows and admission refusal after its sections.
-pub fn excess(b: &mut Builder, client: &Domain, words: &Words) {
+pub fn excess(b: &mut Builder, client: &Borrowed<'_>, words: &Words) {
     let text_limit = client.text_limit;
     match client.page() {
         crate::page::Page::Work { excess, refused, .. } => {
@@ -95,7 +95,7 @@ pub(crate) fn object_key(object: jig_client::contract::ObjectKey) -> skein_ui::K
 }
 
 /// Build the current jig page; an application's own page returns false.
-pub fn main(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+pub fn main(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) -> bool {
     use crate::{address::Address, page::Page};
     match client.page() {
         Page::Elsewhere => return false,
@@ -163,7 +163,7 @@ pub use crate::turns::conversation;
 /// When false, the root builds its application's page, then calls `after_page`.
 pub fn jig(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     nav: skein_ui::SlotRef,
     words: &Words,
     bindings: &mut JigBindings,
@@ -177,7 +177,7 @@ pub fn jig(
     built
 }
 /// Finish page composition with the one confirmation and visible notices.
-pub fn after_page(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn after_page(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     // A source can stop naming a card before its terminal facts arrive. The
     // owner retains it on this page until the pending answer or linger ends.
     let mut owed = false;
@@ -214,7 +214,7 @@ pub(crate) fn scratch(limits: &skein_ui::Limits) -> Option<u64> {
         .checked_add(skein_lib::List::<u8>::worst_case(limits.text_per_node)?)
 }
 
-pub(crate) fn mark_current(b: &mut Builder, client: &Domain, address: crate::address::Address) {
+pub(crate) fn mark_current(b: &mut Builder, client: &Borrowed<'_>, address: crate::address::Address) {
     match client.page() {
         crate::page::Page::Work { address: own, .. } => {
             if client.sections().len() > 1 && own == &address {

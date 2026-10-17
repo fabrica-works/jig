@@ -11,7 +11,7 @@
 //! | any | more | reading | opaque page cursor |
 //! | any | leave | empty context | parts leave through routing |
 use crate::{
-    Domain, Request,
+    Request, Ui,
     action::End,
     address::ProjectSection,
     objects::{Object, Source},
@@ -31,31 +31,22 @@ pub struct NoteFilter {
 }
 /// Only current project context; pending goal requests survive leaving the page.
 #[derive(Debug)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "independent source loss flags for three read windows and live continuation flags"
-)]
 pub struct ProjectPage {
     pub document: Option<Box<Project>>,
     /// Retained historical funding rows, independent of live project spend.
     pub owner_spend: Option<Box<contract::OwnerSpendPage>>,
     /// Whole owner facts, with no fabricated earlier document.
     pub owner: Option<Box<contract::OwnerProject>>,
-    pub goals: List<GoalLine>,
     /// The current read window, which may include both live and ended goals.
     pub ended: List<GoalLine>,
     /// Keyed display merge; the board's current row wins over a read row.
-    pub listed_goals: List<GoalLine>,
-    pub goals_more: bool,
     pub ended_cut: bool,
     pub ended_before: Option<Cursor>,
     pub ended_after: Option<Cursor>,
-    pub tasks: List<TaskLine>,
-    pub tasks_more: bool,
     pub task_filter: TaskFilter,
     pub notes: List<Id<Object>>,
     pub note_filter: Option<NoteFilter>,
-    /// Domain writes of the selected note scope and description.
+    /// Ui writes of the selected note scope and description.
     pub note_writes: u64,
     pub notes_cut: bool,
     pub notes_before: Option<Cursor>,
@@ -73,15 +64,10 @@ impl ProjectPage {
             document: None,
             owner_spend: None,
             owner: None,
-            goals: List::with_capacity(rows),
             ended: List::with_capacity(rows),
-            listed_goals: List::with_capacity(rows.checked_mul(2).expect("goal source rows fit")),
-            goals_more: false,
             ended_cut: false,
             ended_before: None,
             ended_after: None,
-            tasks: List::with_capacity(rows),
-            tasks_more: false,
             task_filter: TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false },
             notes: List::with_capacity(rows),
             note_filter: None,
@@ -101,15 +87,10 @@ impl ProjectPage {
         self.document = None;
         self.owner_spend = None;
         self.owner = None;
-        self.goals.clear();
         self.ended.clear();
-        self.listed_goals.clear();
-        self.goals_more = false;
         self.ended_cut = false;
         self.ended_before = None;
         self.ended_after = None;
-        self.tasks.clear();
-        self.tasks_more = false;
         self.task_filter = TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false };
         self.notes.clear();
         self.note_filter = None;
@@ -131,31 +112,28 @@ impl ProjectPage {
 }
 /// Number of the currently shown project, never inferred from another page.
 #[must_use]
-pub(crate) fn number(domain: &Domain) -> Option<u32> {
+pub(crate) fn number(domain: &Ui) -> Option<u32> {
     domain.shown_project()
 }
-fn open(domain: &mut Domain, subject: contract::Subject, out: &mut Queue<Request>) {
+fn open(domain: &mut Ui, subject: contract::Subject, out: &mut Queue<Request>) {
     super::routing::open_once(domain, subject, crate::page::shown::owner(domain), out);
 }
-pub(crate) fn ask(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
+pub(crate) fn ask(domain: &mut Ui, number: u16, what: Read, out: &mut Queue<Request>) {
     crate::page::shown::context_read(domain, &what);
-    if domain.reads.pending(&what) {
+    if domain.handles.pending(&what) {
         return;
     }
-    if domain
-        .reads
-        .ask(domain.generation, Source::Window { generation: domain.generation, number }, what, out)
-        .is_none()
-    {
+    if domain.handles.read(Source::Window { number }, what, out).is_none() {
         crate::page::routing::refuse(domain, contract::Limit::Reads);
     }
 }
 /// Replaces the project document and asks only this section's part references.
 pub(crate) fn document(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     mut document: Box<Project>,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     if number(domain) != Some(document.number) {
         return;
@@ -163,7 +141,7 @@ pub(crate) fn document(
     order_spend(&mut document.spend_lines);
     domain.project_page.owner = None;
     domain.project_page.document = Some(document);
-    goals::sync(domain);
+    goals::sync(domain, lent);
     let doc = domain.project_page.document.as_ref().expect("stored above");
     let mut parts_shown = List::with_capacity(env.limits.parts.saturating_add(1));
     for section in [
@@ -178,7 +156,7 @@ pub(crate) fn document(
         ProjectSection::Spend,
         ProjectSection::Recurring,
     ] {
-        if domain.shows(crate::page::Section::Project { project: doc.number, section }) {
+        if domain.shows(crate::page::Section::Project { project: doc.number, section }, lent) {
             for part in parts(doc, section, env.limits.parts.saturating_add(1)).into_boxed() {
                 if parts_shown.push(part).is_err() {
                     break;
@@ -218,7 +196,7 @@ fn append(out: &mut List<Part>, parts: &List<Part>) {
         }
     }
 }
-pub(crate) fn show(domain: &mut Domain, env: &Env<crate::Limits>, parts: List<Part>, out: &mut Queue<Request>) {
+pub(crate) fn show(domain: &mut Ui, env: &Env<crate::Limits>, parts: List<Part>, out: &mut Queue<Request>) {
     let mut count = 0_u32;
     for part in parts.into_boxed() {
         if count == env.limits.parts {
@@ -230,18 +208,17 @@ pub(crate) fn show(domain: &mut Domain, env: &Env<crate::Limits>, parts: List<Pa
             None => contract::PartScope::Deployment,
         };
         let scope = crate::application::owner_scope(&part, scope);
-        out.push(Request::ShowPart { part, generation: domain.generation, scope });
+        out.push(Request::ShowPart { part, scope });
         count = count.saturating_add(1);
     }
 }
 /// Replaces the live task watch so every filter is authoritative at its source.
-pub(crate) fn tasks(domain: &mut Domain, env: &Env<crate::Limits>, filter: TaskFilter, out: &mut Queue<Request>) {
+pub(crate) fn tasks(domain: &mut Ui, env: &Env<crate::Limits>, filter: TaskFilter, out: &mut Queue<Request>) {
     let Some(project) = number(domain) else {
         return;
     };
     let mut old = List::with_capacity(env.limits.watches);
-    for (id, ()) in &domain.watch_ids {
-        let watch = domain.watches.get(*id).expect("registered watch");
+    for (id, watch) in &domain.handles.watches {
         match watch.subject {
             contract::Subject::Tasks { .. } => {
                 if watch.owner == (crate::page::shown::owner(domain)) {
@@ -260,11 +237,9 @@ pub(crate) fn tasks(domain: &mut Domain, env: &Env<crate::Limits>, filter: TaskF
         }
     }
     for id in old.into_boxed() {
-        domain.close_one(id, out);
+        domain.release(id, out);
     }
-    domain.project_page.tasks_more = false;
     domain.project_page.task_filter = filter;
-    domain.project_page.tasks.clear();
     open(domain, contract::Subject::Tasks { project, filter, window: env.limits.rows }, out);
     domain.changed();
 }
@@ -282,7 +257,7 @@ pub const SPEND_WINDOW: u64 = 22;
 pub(crate) const SPEND_READ: u16 = 23;
 /// The project document read source.
 pub(crate) const PROJECT_READ: u16 = 0;
-pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue<Request>) {
+pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Request>) {
     let Some(project) = number(domain) else {
         return;
     };
@@ -336,46 +311,13 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(limits.document_bytes)
 }
 
-fn merge_goals(page: &mut ProjectPage) {
-    page.listed_goals.clear();
-    for rows in [&page.goals, &page.ended] {
-        for row in rows {
-            let mut known = false;
-            for current in &page.listed_goals {
-                if current.chip.task == row.chip.task {
-                    known = true;
-                    break;
-                }
-            }
-            if !known {
-                page.listed_goals.push(row.clone()).expect("two bounded goal sources fit");
-            }
-        }
-    }
-    goals::order(&mut page.listed_goals);
-}
-pub(crate) fn board(domain: &mut Domain, goals: contract::Goals) {
-    if number(domain) != Some(goals.project) {
-        return;
-    }
-    domain.project_page.goals_more = goals.more;
-    domain.project_page.goals.clear();
-    for row in goals.rows.into_boxed() {
-        if domain.project_page.goals.room() == 0 {
-            break;
-        }
-        domain.project_page.goals.push(row).expect("goal row fits");
-    }
-    goals::order(&mut domain.project_page.goals);
-    merge_goals(&mut domain.project_page);
-    domain.changed();
-}
 pub(crate) fn ended(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
     page: contract::GoalPage,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     domain.project_page.ended_cut = page.cut;
     domain.project_page.ended_before = page.before;
@@ -388,23 +330,12 @@ pub(crate) fn ended(
         domain.project_page.ended.push(row).expect("ended row fits");
     }
     goals::order(&mut domain.project_page.ended);
-    merge_goals(&mut domain.project_page);
     let mut keys = List::with_capacity(env.limits.rows);
     for goal in &domain.project_page.ended {
         keys.push(contract::ObjectKey::Task(goal.chip.task)).expect("keys fit row window");
     }
-    crate::page::routing::names(domain, env, source, keys, out);
+    crate::page::routing::names(domain, env, source, keys, out, lent);
     for goal in &domain.project_page.ended {
-        let mut watched = false;
-        for current in &domain.project_page.goals {
-            if current.chip.task == goal.chip.task {
-                watched = true;
-                break;
-            }
-        }
-        if watched {
-            continue;
-        }
         if !domain.objects.put(contract::ObjectKey::Task(goal.chip.task), crate::objects::Body::Chip(goal.chip.clone()))
         {
             break;
@@ -413,40 +344,24 @@ pub(crate) fn ended(
     domain.changed();
 }
 pub(crate) fn task_rows(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
     tasks: contract::Tasks,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     if number(domain) != Some(tasks.project) || tasks.filter != domain.project_page.task_filter {
         return;
     }
-    domain.project_page.tasks_more = tasks.more;
-    domain.project_page.tasks.clear();
-    for row in tasks.rows.into_boxed() {
-        if domain.project_page.tasks.room() == 0 {
-            break;
-        }
-        if matches_filter(&row, tasks.filter) {
-            domain.project_page.tasks.push(row).expect("task row fits");
-        }
-    }
-    order_tasks(&mut domain.project_page.tasks);
     let mut keys = List::with_capacity(env.limits.rows);
-    for task in &domain.project_page.tasks {
+    for task in &tasks.rows {
         keys.push(contract::ObjectKey::Task(task.chip.task)).expect("keys fit rows");
     }
-    crate::page::routing::names(domain, env, source, keys, out);
-    for task in &domain.project_page.tasks {
-        if !domain.objects.put(contract::ObjectKey::Task(task.chip.task), crate::objects::Body::Chip(task.chip.clone()))
-        {
-            break;
-        }
-    }
+    crate::page::routing::names(domain, env, source, keys, out, lent);
     domain.changed();
 }
-fn matches_filter(row: &TaskLine, filter: TaskFilter) -> bool {
+pub(crate) fn matches_filter(row: &TaskLine, filter: TaskFilter) -> bool {
     crate::page::conversations::live(row.chip.phase)
         && match filter.phase {
             Some(phase) => phase == row.chip.phase,
@@ -462,7 +377,7 @@ fn matches_filter(row: &TaskLine, filter: TaskFilter) -> bool {
         }
         && (!filter.asked_by_me || row.asked_by_me)
 }
-fn order_tasks(rows: &mut List<TaskLine>) {
+pub(crate) fn order_tasks(rows: &mut List<TaskLine>) {
     for first in 0..rows.len() {
         for second in first.checked_add(1).expect("row index fits")..rows.len() {
             let a = rows.get(first).expect("row exists");
@@ -475,7 +390,7 @@ fn order_tasks(rows: &mut List<TaskLine>) {
         }
     }
 }
-pub(crate) fn spend(domain: &mut Domain, page: contract::SpendPage) {
+pub(crate) fn spend(domain: &mut Ui, page: contract::SpendPage) {
     domain.project_page.spend_cut = page.cut;
     domain.project_page.spend_before = page.before;
     domain.project_page.spend_after = page.after;
@@ -505,33 +420,26 @@ fn order_spend(rows: &mut List<contract::TaskSpend>) {
 }
 
 pub(crate) fn live(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
-    goals: contract::Goals,
+    mut goals: contract::Goals,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
-    board(domain, goals);
+    goals::order(&mut goals.rows);
     let mut keys = List::with_capacity(env.limits.rows);
-    for row in &domain.project_page.goals {
+    for row in &goals.rows {
         match keys.push(contract::ObjectKey::Task(row.chip.task)) {
             Ok(()) => {}
             Err(_) => break,
         }
     }
-    crate::page::routing::names(domain, env, source, keys, out);
-    for row in &domain.project_page.goals {
-        let key = contract::ObjectKey::Task(row.chip.task);
-        let stored = domain.objects.put(key, crate::objects::Body::Chip(row.chip.clone()));
-        if !stored {
-            break;
-        }
-    }
-    domain.changed();
+    crate::page::routing::names(domain, env, source, keys, out, lent);
 }
 
 /// Install the complete historical source page in supplied order.
-pub(crate) fn owner_spend(domain: &mut Domain, page: Box<contract::OwnerSpendPage>) {
+pub(crate) fn owner_spend(domain: &mut Ui, page: Box<contract::OwnerSpendPage>) {
     domain.project_page.spend_cut = page.cut;
     domain.project_page.spend_before.clone_from(&page.before);
     domain.project_page.spend_after.clone_from(&page.after);
@@ -540,7 +448,7 @@ pub(crate) fn owner_spend(domain: &mut Domain, page: Box<contract::OwnerSpendPag
 }
 
 /// Receive only the original project's whole owner value; order stays supplied.
-pub(crate) fn owner_document(domain: &mut Domain, value: Box<contract::OwnerProject>) {
+pub(crate) fn owner_document(domain: &mut Ui, value: Box<contract::OwnerProject>) {
     if number(domain) != Some(value.number) {
         return;
     }

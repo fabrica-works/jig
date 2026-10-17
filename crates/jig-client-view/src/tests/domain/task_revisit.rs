@@ -1,18 +1,25 @@
 use super::{objects, spine::drive};
+use crate::tests::fixtures::{Ended, Fixture, ReadPage};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     address::{Address, Place, TaskSection},
     objects::Body,
     page::Page,
 };
 use jig_client::contract::*;
-use skein_lib::{List, Time, Token};
+use skein_lib::{List, Time};
 
-fn task_watch(domain: &mut Domain, task: u64) -> Token {
+fn task_watch(domain: &mut Fixture, task: u64) -> jig_client::Handle {
     let output = drive(domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(task)) });
     let mut token = None;
     for request in &output {
-        if let Request::Open { watch, subject: Subject::Task { task: found } } = request
+        if let Request::Client {
+            asked:
+                jig_client::Event::Watch {
+                    handle: watch,
+                    subject: jig_client::Watchable::Jig(Subject::Task { task: found }),
+                },
+        } = request
             && *found == task
         {
             assert!(token.replace(*watch).is_none());
@@ -20,19 +27,22 @@ fn task_watch(domain: &mut Domain, task: u64) -> Token {
     }
     token.unwrap()
 }
-fn terminal(domain: &mut Domain, watch: Token, end: WatchEnd) -> Box<[Request]> {
-    drive(domain, Time::ZERO, Event::Ended { watch, end })
+fn terminal(domain: &mut Fixture, watch: jig_client::Handle, end: WatchEnd) -> Box<[Request]> {
+    drive(domain, Time::ZERO, Ended { watch, end })
 }
-fn task_read(output: &[Request]) -> Token {
+fn task_read(output: &[Request]) -> jig_client::Handle {
     let mut token = None;
     for request in output {
-        if let Request::Read { read, what: Read::Task { task: 8 } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Task { task: 8 }) },
+        } = request
+        {
             assert!(token.replace(*read).is_none());
         }
     }
     token.unwrap()
 }
-fn work_address(domain: &Domain) -> &Address {
+fn work_address(domain: &Fixture) -> &Address {
     match domain.page() {
         Page::Work { address, .. } => address,
         Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
@@ -42,7 +52,7 @@ fn work_address(domain: &Domain) -> &Address {
 }
 fn no_reads(output: &[Request]) {
     for request in output {
-        if let Request::Read { .. } = request {
+        if let Request::Client { asked: jig_client::Event::Read { .. } } = request {
             panic!("unexpected read");
         }
     }
@@ -80,14 +90,14 @@ fn a_fresh_unknown_task_watch_reads_the_whole_retained_task_and_independent_resu
         drive(
             &mut domain,
             Time::ZERO,
-            Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(original.clone()))) },
+            ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(original.clone()))) },
         );
         let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
         assert_eq!(domain.task_page().header, Some(id));
         assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Historical(Box::new(original.clone()))));
         assert_eq!(work_address(&domain), &Address::task(8));
         assert!(terminal(&mut domain, watch, end).is_empty());
-        drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::None(ReadNone::Gone) });
+        drive(&mut domain, Time::ZERO, ReadPage { read, result: ReadResult::None(ReadNone::Gone) });
         assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Historical(Box::new(original))));
         assert_eq!(work_address(&domain), &Address::task(8));
     }
@@ -101,7 +111,7 @@ fn revisiting_an_already_retained_task_attaches_and_refreshes_its_new_page_heade
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(original.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(original.clone()))) },
     );
     let output = drive(
         &mut domain,
@@ -119,7 +129,7 @@ fn revisiting_an_already_retained_task_attaches_and_refreshes_its_new_page_heade
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(original.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(original.clone()))) },
     );
     assert_eq!(domain.task_page().header, Some(id));
     assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Historical(Box::new(original))));
@@ -131,7 +141,7 @@ fn an_unknown_task_becomes_missing_only_after_its_retained_read_refuses_the_obje
         let watch = task_watch(&mut domain, 8);
         let read = task_read(&terminal(&mut domain, watch, WatchEnd::Unknown));
         assert_eq!(work_address(&domain), &Address::task(8));
-        drive(&mut domain, Time::ZERO, Event::Read { read, result: ReadResult::None(none) });
+        drive(&mut domain, Time::ZERO, ReadPage { read, result: ReadResult::None(none) });
         assert_eq!(domain.page(), &Page::Missing);
     }
 }
@@ -161,7 +171,7 @@ fn a_retained_task_reply_abandoned_by_navigation_cannot_replace_the_new_page() {
         let watch = task_watch(&mut domain, 8);
         let read = task_read(&terminal(&mut domain, watch, WatchEnd::Unknown));
         task_watch(&mut domain, 9);
-        drive(&mut domain, Time::ZERO, Event::Read { read, result });
+        drive(&mut domain, Time::ZERO, ReadPage { read, result });
         assert_eq!(work_address(&domain), &Address::task(9));
         assert!(domain.objects().find(ObjectKey::Task(8)).is_none());
     }
@@ -171,7 +181,10 @@ fn an_unknown_non_task_page_watch_does_not_issue_a_retained_task_read() {
     let (mut domain, inbox) = objects::live();
     let output = terminal(&mut domain, inbox, WatchEnd::Unknown);
     for request in &output {
-        if let Request::Read { what: Read::Task { .. }, .. } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { read: jig_client::Readable::Jig(Read::Task { .. }), .. },
+        } = request
+        {
             panic!("unexpected retained Task read");
         }
     }

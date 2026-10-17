@@ -5,10 +5,11 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use crate::{Domain, action::Act};
+use crate::{Borrowed, action::Act};
 use jig_client::contract::{Executor, ObjectKey, Phase, Project};
-pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings) {
-    let filter = client.project_page().task_filter;
+pub(super) fn tasks(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words: &Words, bindings: &mut JigBindings) {
+    let project_page = client.project_page();
+    let filter = project_page.task_filter;
     crate::pages::work::control(
         b,
         words,
@@ -69,7 +70,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
         );
     }
     b.open(Role::List);
-    for row in &client.project_page().tasks {
+    for row in &project_page.tasks {
         b.open(Role::Item);
         b.key(crate::pages::object_key(ObjectKey::Task(row.chip.task)));
         cards::chip::chip(b, client, &row.chip, words, bindings);
@@ -92,7 +93,7 @@ pub(super) fn tasks(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
         b.close();
     }
     b.close();
-    if client.project_page().tasks_more {
+    if project_page.tasks_more {
         words.status(b, JigPhrase::MoreRows, &[]);
     }
 }

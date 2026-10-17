@@ -6,7 +6,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     action::End,
     page::inbox::{Filter, needs},
@@ -15,7 +15,7 @@ use jig_client::contract::{
     InboxDocument, InboxGroup, InboxReadGroup, InboxRow, OwnerInboxEntry, OwnerInboxObject, Proposer, Recipient,
 };
 /// The inbox's filters and counts while either group is shown.
-pub fn header(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+pub fn header(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) -> bool {
     let Some(project) = client.shown_inbox() else {
         return false;
     };
@@ -53,7 +53,7 @@ pub fn header(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Ji
 }
 pub(crate) fn group(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
     parent: InboxReadGroup,
@@ -88,7 +88,7 @@ pub(crate) fn group(
     b.close();
     true
 }
-pub(crate) fn status(b: &mut Builder, client: &Domain, words: &Words) {
+pub(crate) fn status(b: &mut Builder, client: &Borrowed<'_>, words: &Words) {
     let text_limit = client.text_limit;
     let page = client.inbox();
     if page.goal_context_pending {
@@ -101,7 +101,7 @@ pub(crate) fn status(b: &mut Builder, client: &Domain, words: &Words) {
         words.refusal(b, refusal, text_limit);
     }
 }
-fn window(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings, parent: InboxReadGroup) {
+fn window(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings, parent: InboxReadGroup) {
     let page = client.inbox();
     if let Some(kind) = page.filter.kind
         && InboxReadGroup::of(kind) != parent
@@ -162,8 +162,9 @@ fn filter(
 ) {
     crate::frame::control(b, words, bindings, Role::Button, phrase, holes, Act::FilterInbox { filter: value });
 }
-fn filters(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
-    let current = client.inbox().filter;
+fn filters(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
+    let inbox = client.inbox();
+    let current = inbox.filter;
     filter(b, words, bindings, JigPhrase::AllProjects, &[], Filter { project: None, ..current });
     if let Some(frame) = &client.frame().document {
         for project in &frame.projects {
@@ -195,7 +196,7 @@ fn filters(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBi
         filter(b, words, bindings, phrase, &[], Filter { kind: Some(kind), ..current });
     }
     filter(b, words, bindings, JigPhrase::AllGoals, &[], Filter { goal: None, ..current });
-    for entry in &client.inbox().rows {
+    for entry in &inbox.rows {
         if let Some(goal) = entry.goal() {
             filter(
                 b,
@@ -222,7 +223,7 @@ fn unread(entry: &jig_client::contract::InboxEntry, results_seen: u64) -> bool {
 
 fn supplied_entry(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
     entry: &jig_client::contract::InboxEntry,
@@ -253,7 +254,7 @@ fn owner_text(b: &mut Builder, words: &Words, phrase: crate::owner_inbox_words::
 }
 fn owner_entry(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
     entry: &OwnerInboxEntry,

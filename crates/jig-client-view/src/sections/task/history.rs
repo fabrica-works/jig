@@ -5,9 +5,9 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::{Domain, action::Act};
+use crate::{Borrowed, action::Act};
 use jig_client::contract::{HistoryChange, HistoryRow};
-pub(super) fn history(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn history(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     for (subtree, phrase) in [(false, JigPhrase::OwnHistory), (true, JigPhrase::SubtreeHistory)] {
         crate::pages::work::control(
             b,

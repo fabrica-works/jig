@@ -24,10 +24,19 @@ fn historical_six_reads_keep_original_client_query_and_token_until_whole_value_a
         let Incoming::Callback {
             client: actual,
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: original,
-                    result: client::ReadResult::Value(client::ReadValue::Historical(_)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: original,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::Historical(
+                                            _,
+                                        ))),
+                                },
+                        },
+                },
         } = read(&mut transport, to, &answer, &limits).expect("whole actual historical source")
         else {
             panic!("exact original callback")

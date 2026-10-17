@@ -1,4 +1,5 @@
 use super::*;
+use crate::tests::fixtures::AnsweredByEngine;
 #[test]
 fn note_cards_name_the_whole_stored_attempt_and_only_render_supplied_times() {
     for writer in [NoteAuthor::Party { party: u64::MAX }, NoteAuthor::Task { task: u64::MAX, attempt: u64::MAX }] {
@@ -19,7 +20,7 @@ fn note_cards_name_the_whole_stored_attempt_and_only_render_supplied_times() {
             let words = words();
             let mut bindings = JigBindings::new(256, CLIENT.text);
             let mut builder = Builder::new(&limits());
-            cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words, &mut bindings);
+            cards::card(&mut builder, &domain.view(), id, &cards::Place::Elsewhere, words, &mut bindings);
             let tree = builder.finish();
             assert!(contains(&tree, b"note body"));
             assert!(contains(&tree, b"Only part of this text was supplied"));
@@ -69,18 +70,18 @@ fn settled_note_answer(act: ActKind, cut: bool) {
     assert!(contains(&tree, b"Delete note"));
     let label = if act == ActKind::EditNote { b"Edit note".as_slice() } else { b"Delete note".as_slice() };
     let action = press(&tree, label, &mut bindings);
-    drive(&mut domain, Event::Act { act: action });
-    let outgoing = drive(&mut domain, Event::Act { act: Action::Confirm });
+    drive(&mut domain, Event::Act { action });
+    let outgoing = drive(&mut domain, Event::Act { action: Action::Confirm });
     let request = outgoing
         .iter()
         .find_map(|request| match request {
-            Request::Send { request, .. } => Some(*request),
+            Request::Client { asked: jig_client::Event::Send { key: request, .. } } => Some(*request),
             _ => None,
         })
         .unwrap();
     assert!(!contains(&render(&domain, id, words, &mut bindings), b"Note edited"));
     let answer = Answer::Done(Outcome::Owner(OwnerOutcome::NoteEdited { name: 77 }));
-    drive(&mut domain, Event::Answered { request, answer: answer.clone() });
+    drive(&mut domain, AnsweredByEngine { request, answer: answer.clone() });
     let facts = domain.objects().get(id).unwrap();
     assert_eq!(facts.answer.as_ref(), Some(&answer));
     match &facts.body {
@@ -91,7 +92,7 @@ fn settled_note_answer(act: ActKind, cut: bool) {
     envelope.nodes = crate::card_nodes(&CLIENT).unwrap();
     let mut builder = Builder::new(&envelope);
     bindings.begin();
-    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words, &mut bindings));
+    assert!(cards::card(&mut builder, &domain.view(), id, &cards::Place::Elsewhere, words, &mut bindings));
     let tree = builder.finish();
     assert!(
         tree.nodes().iter().any(|node| node.role == Role::Region && node.name.as_deref() == Some(b"stored note title"))

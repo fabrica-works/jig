@@ -2,31 +2,32 @@
 //! Reads use the page generation's activity source; stale terminals stay outside
 //! this module. The root only carries the resulting reads, names and parts.
 //! See client/domain/client.md, 10, and contract.md, 6 and 7.3.
-use crate::{Domain, Request, action::End, objects::Source, watches::Watch};
-use jig_client::contract::{ActivityPage, Executor, Limit, Read, RunText, Runtime, Subject, Task};
-use skein_lib::{Env, Id, Queue, Token};
+use crate::{Request, Ui, action::End, objects::Source};
+use jig_client::contract::{ActivityPage, Executor, Limit, Read, Runtime, Task};
+use skein_lib::{Env, Queue, Token};
 /// The activity window binding, independent of a watch's slab token.
 pub const ACTIVITY_WINDOW: u64 = 1;
 /// The activity read source.
 pub(crate) const ACTIVITY_READ: u16 = 1;
-fn ask(domain: &mut Domain, what: Option<Read>, out: &mut Queue<Request>) {
+fn ask(domain: &mut Ui, what: Option<Read>, out: &mut Queue<Request>) {
     let Some(what) = what else {
         return;
     };
-    if domain.reads.pending(&what) {
+    if domain.handles.pending(&what) {
         return;
     }
-    let source = Source::Window { generation: domain.generation, number: ACTIVITY_READ };
-    if domain.reads.ask(domain.generation, source, what, out).is_none() {
+    let source = Source::Window { number: ACTIVITY_READ };
+    if domain.handles.read(source, what, out).is_none() {
         domain.conversation.failed();
         crate::page::routing::refuse(domain, Limit::Reads);
     }
 }
 /// A task document moves only the activity belonging to the current conversation.
-pub(crate) fn document(domain: &mut Domain, task: &Task, out: &mut Queue<Request>) {
-    if !domain
-        .shows(crate::page::Section::Task { task: task.chip.task, section: crate::address::TaskSection::Activity })
-    {
+pub(crate) fn document(domain: &mut Ui, task: &Task, out: &mut Queue<Request>, lent: &jig_client::Client) {
+    if !domain.shows(
+        crate::page::Section::Task { task: task.chip.task, section: crate::address::TaskSection::Activity },
+        lent,
+    ) {
         return;
     }
     if domain.conversation.task != task.chip.task {
@@ -76,23 +77,29 @@ pub(crate) fn document(domain: &mut Domain, task: &Task, out: &mut Queue<Request
     finish(domain);
 }
 /// Takes an activity terminal and names its live cards and connector slots.
-pub(crate) fn page(domain: &mut Domain, env: &Env<crate::Limits>, page: ActivityPage, out: &mut Queue<Request>) {
+pub(crate) fn page(
+    domain: &mut Ui,
+    env: &Env<crate::Limits>,
+    page: ActivityPage,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     if domain.conversation.reading.is_none() {
         domain.conversation.reading = Some(super::Reading::Latest { known: domain.conversation.loaded });
     }
     let next = domain.conversation.accept(page);
-    working_set(domain, env, out);
+    working_set(domain, env, out, lent);
     ask(domain, next, out);
     finish(domain);
     domain.changed();
 }
-fn working_set(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
-    let keys = domain.conversation.names(env.limits.objects);
-    let source = Source::Window { generation: domain.generation, number: ACTIVITY_READ };
-    crate::page::routing::names(domain, env, source, keys, out);
+fn working_set(domain: &mut Ui, env: &Env<crate::Limits>, out: &mut Queue<Request>, lent: &jig_client::Client) {
+    let keys = domain.borrow(lent).conversation().names(env.limits.objects);
+    let source = Source::Window { number: ACTIVITY_READ };
+    crate::page::routing::names(domain, env, source, keys, out, lent);
     // Immutable turns still refer to mutable decisions. A new activity snapshot
     // refreshes those documents without deriving an outcome from the call text.
-    let keys = domain.conversation.names(env.limits.objects);
+    let keys = domain.borrow(lent).conversation().names(env.limits.objects);
     for key in &keys {
         match key {
             jig_client::contract::ObjectKey::Task(_) | jig_client::contract::ObjectKey::Result(_) => {
@@ -108,12 +115,12 @@ fn working_set(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Re
             continue;
         };
         let what = crate::objects::document_read(*key);
-        if !domain.reads.pending(&what) && domain.reads.ask(domain.generation, Source::Card(id), what, out).is_none() {
+        if !domain.handles.pending(&what) && domain.handles.read(Source::Card(id), what, out).is_none() {
             crate::page::routing::refuse(domain, Limit::Reads);
         }
     }
-    let parts = domain.conversation.parts(env.limits.parts);
-    crate::page::routing::parts(domain, env, parts.as_slice(), out);
+    let parts = domain.borrow(lent).conversation().parts(env.limits.parts);
+    crate::page::routing::parts(domain, env, parts.as_slice(), out, lent);
 }
 fn active_finished(stage: &jig_client::contract::RunStage) -> bool {
     match stage {
@@ -157,54 +164,31 @@ fn owner_finished(
         | jig_client::contract::OwnerChipPhase::Ended => true,
     }
 }
-fn finish(domain: &mut Domain) {
+fn finish(domain: &mut Ui) {
     if domain.conversation.run_finished && domain.conversation.loaded >= domain.conversation.committed {
         domain.conversation.end_run();
     }
 }
-/// Applies provisional text then acknowledges the retained turn's own cursor.
-pub(crate) fn stream(
-    domain: &mut Domain,
+/// The client's text changed; only names, parts and local folds change here.
+pub(crate) fn text(
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
-    watch: Id<Watch>,
-    value: RunText,
+    handle: jig_client::Handle,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
-    let Some(following) = domain.watches.get(watch) else {
+    if !domain.handles.watches.contains_key(&handle) {
         return;
-    };
-    match &following.subject {
-        Subject::Run { task, .. } => {
-            if *task != domain.conversation.task {
-                return;
-            }
-        }
-        Subject::Frame
-        | Subject::Task { .. }
-        | Subject::Tree { .. }
-        | Subject::Chips { .. }
-        | Subject::Inbox { .. }
-        | Subject::Tasks { .. }
-        | Subject::Goals { .. }
-        | Subject::Conversations
-        | Subject::Deployment => return,
     }
-    let accepted = domain.conversation.stream(value, env.limits.text);
-    if accepted {
-        working_set(domain, env, out);
-    } else {
-        crate::page::routing::refuse(domain, Limit::Objects);
-    }
-    let subject = Subject::Run {
-        task: domain.conversation.task,
-        turn: domain.conversation.current,
-        offset: domain.conversation.offset(),
-    };
-    out.push(Request::Continue { watch: watch.token(), subject });
+    let projected = domain.borrow(lent).conversation();
+    let live = projected.live;
+    let run = projected.current_run.cloned();
+    domain.conversation.prune_folds(live.as_slice(), run.as_ref());
+    working_set(domain, env, out, lent);
     domain.changed();
 }
 /// The person's scroll uses the supplied opaque cursor at the requested end.
-pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue<Request>) {
+pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Request>) {
     if window != Token::new(ACTIVITY_WINDOW) {
         return;
     }
@@ -216,53 +200,26 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
 }
 
 /// A fold changes page presentation without changing committed call facts.
-pub(crate) fn fold(domain: &mut Domain, name: super::CallName, open: bool) {
+pub(crate) fn fold(domain: &mut Ui, name: super::CallName, open: bool, lent: &jig_client::Client) {
     let fold = if open { super::Fold::Open } else { super::Fold::Folded };
-    if domain.conversation.set_fold(name, fold) {
+    let live = domain.borrow(lent).conversation().live;
+    if domain.conversation.set_fold(name, fold, live.as_slice()) {
         domain.changed();
     }
 }
 
 /// Raw provider identities never match a committed transcript call number.
-pub(crate) fn fold_current(domain: &mut Domain, identity: jig_client::contract::CallIdentity, open: bool) {
+pub(crate) fn fold_current(
+    domain: &mut Ui,
+    identity: jig_client::contract::CallIdentity,
+    open: bool,
+    lent: &jig_client::Client,
+) {
     let fold = if open { super::Fold::Open } else { super::Fold::Folded };
-    if domain.conversation.set_current_fold(identity, fold) {
+    let projected = domain.borrow(lent).conversation();
+    let live = projected.live;
+    let run = projected.current_run.cloned();
+    if domain.conversation.set_current_fold(identity, fold, live.as_slice(), run.as_ref()) {
         domain.changed();
     }
-}
-
-/// Whole owner run documents carry calls without requiring a text turn.
-/// The transport owns normal document acknowledgment; no stream cursor is invented.
-pub(crate) fn run_state(
-    domain: &mut Domain,
-    env: &Env<crate::Limits>,
-    watch: Id<Watch>,
-    value: jig_client::contract::RunState,
-    out: &mut Queue<Request>,
-) {
-    let Some(following) = domain.watches.get(watch) else {
-        return;
-    };
-    match &following.subject {
-        Subject::Run { task, .. } => {
-            if *task != domain.conversation.task || value.task != *task {
-                return;
-            }
-        }
-        Subject::Frame
-        | Subject::Task { .. }
-        | Subject::Tree { .. }
-        | Subject::Chips { .. }
-        | Subject::Inbox { .. }
-        | Subject::Tasks { .. }
-        | Subject::Goals { .. }
-        | Subject::Conversations
-        | Subject::Deployment => return,
-    }
-    if domain.conversation.run_state(value, env.limits.text) {
-        working_set(domain, env, out);
-    } else {
-        crate::page::routing::refuse(domain, Limit::Objects);
-    }
-    domain.changed();
 }

@@ -18,6 +18,7 @@ pub enum Answered {
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
+    SignIn,
     Jig(jig_client_view::action::Act),
     First(first::Act),
 }
@@ -38,7 +39,6 @@ pub enum JigOut {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
-    Jig(jig_client_view::facts::Fact),
     PartsFull,
     InvalidRecord,
     UnknownConnector,
@@ -51,7 +51,7 @@ pub enum Request {
     Jig(JigOut),
     First(first::Out),
     Show { address: Address, replace: bool },
-    SignIn { provider: u16, back: Address },
+    SignIn { provider: u16 },
     SignOut,
     Fact { fact: Fact },
 }

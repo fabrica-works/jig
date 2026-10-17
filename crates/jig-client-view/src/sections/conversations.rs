@@ -5,16 +5,17 @@ use crate::{JigBindings, Owner, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Key, Role, Run, State};
 
-use crate::{Domain, action::Act, fields::Purpose};
+use crate::{Borrowed, action::Act, fields::Purpose};
 use jig_client::contract::Runtime;
 /// Render committed chat facts, window edges and the projects' offered chat forms.
 pub(crate) fn section(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
     project: Option<u32>,
 ) -> bool {
+    let conversation_rows = client.conversation_rows();
     let text_limit = bindings.text_limit();
     if !client.shows(crate::page::Section::Conversations { project }) {
         return false;
@@ -22,7 +23,7 @@ pub(crate) fn section(
     crate::pages::work::section(b, words, JigPhrase::Conversations, crate::regions::JigRegion::Conversations);
     super::status(b, client, words, crate::page::Section::Conversations { project });
     b.open(Role::List);
-    for row in &client.conversation_rows().rows {
+    for row in &conversation_rows.rows {
         b.open(Role::Item);
         b.key(Key { owner: Owner::Jig.opaque(), kind: 20, a: row.chip.task, b: 0 });
         crate::frame::control(
@@ -79,14 +80,8 @@ pub(crate) fn section(
         b.close();
     }
     b.close();
-    crate::pages::cut(b, words, client.conversation_rows().cut);
-    crate::pages::edges(
-        b,
-        words,
-        bindings,
-        &client.conversation_rows().edges,
-        crate::page::conversations::CONVERSATIONS_WINDOW,
-    );
+    crate::pages::cut(b, words, conversation_rows.cut);
+    crate::pages::edges(b, words, bindings, &conversation_rows.edges, crate::page::conversations::CONVERSATIONS_WINDOW);
     let state = client.chats();
     if let Some(token) = state.starting {
         b.open(Role::Status);
@@ -104,7 +99,7 @@ pub(crate) fn section(
     b.close();
     true
 }
-fn forms(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn forms(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let mut field_built = false;
     if let Some(frame) = &client.frame().document {
         for offers in &frame.charters {
@@ -151,7 +146,13 @@ fn forms(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBind
         b.close();
     }
 }
-pub(crate) fn runtime(b: &mut Builder, client: &Domain, runtime: &Runtime, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn runtime(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    runtime: &Runtime,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     match runtime {
         Runtime::Active(value) => crate::runtime::active(b, value, words),
         Runtime::Waiting { dependencies, hold } => {

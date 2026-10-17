@@ -9,8 +9,8 @@ use crate::{
     family::{self, Document, Item, ItemState, Kind, Scope, Subject},
     first::{self, FamilyTerminal as T},
 };
+use jig_client::Link;
 use jig_client::contract::{Part, ProposalKey, Proposer, Revision};
-use jig_client_view::link::Link;
 use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 fn limits() -> first::Limits {
     first::Limits {
@@ -244,11 +244,7 @@ fn family_terminal_envelopes_fit_full_rows_and_object_capacity_and_signed_out_pa
         let rows = drive(
             &mut side,
             0,
-            first::Event::Show {
-                part: Part::Panel { connector: crate::FIRST, task: 6 },
-                generation: 9,
-                scope: Scope::Project(3),
-            },
+            first::Event::Show { part: Part::Panel { connector: crate::FIRST, task: 6 }, scope: Scope::Project(3) },
         );
         let second_watch = opened(&rows);
         drive(&mut side, 1, first::Event::Ended { watch, end });

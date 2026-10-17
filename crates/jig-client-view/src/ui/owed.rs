@@ -1,29 +1,23 @@
 //! Cards with nowhere else to show on the page (client/domain/view.md, 4.1).
-use crate::{
-    Domain,
-    address::TaskSection,
-    objects::{Card, Object},
-    page::Section,
-};
+use crate::{Ui, address::TaskSection, objects::Object, page::Section};
 use jig_client::contract::ObjectKey;
 use skein_lib::Id;
-impl Domain {
+impl Ui {
     /// Whether the page still owes this object's card.
     #[must_use]
-    pub fn owes(&self, id: Id<Object>) -> bool {
+    pub fn owes(&self, id: Id<Object>, lent: &jig_client::Client) -> bool {
         let Some(object) = self.objects().get(id) else {
             return false;
         };
-        if !object.shown {
+        if !object.shown
+            || (self.page == crate::page::Page::Elsewhere
+                && object.sources.contains(&crate::objects::Source::Window { number: crate::application::WINDOW }))
+        {
             return false;
         }
-        match object.card {
-            Card::Deciding { .. } | Card::Leaving { .. } | Card::Unknown { .. } => {}
-            Card::Open | Card::Refused { .. } => return false,
-        }
         if let Some(task) = self.shown_task()
-            && self.shows(Section::Task { task, section: TaskSection::Activity })
-            && self.conversation().shows(object.key)
+            && self.shows(Section::Task { task, section: TaskSection::Activity }, lent)
+            && self.borrow(lent).conversation().shows(object.key)
         {
             return false;
         }
@@ -33,7 +27,8 @@ impl Domain {
         let Some(task) = self.shown_task() else {
             return false;
         };
-        if !self.shows(Section::Task { task, section: TaskSection::Plan }) {
+        let plan = Section::Task { task, section: TaskSection::Plan };
+        if !self.sections().contains(&plan) {
             return false;
         }
         let key = match object.key {
@@ -45,7 +40,10 @@ impl Domain {
             | ObjectKey::Result(_)
             | ObjectKey::Note { .. } => return false,
         };
-        let Some(tree) = &self.task_page().plan.owner else {
+        if !self.shows(plan, lent) {
+            return true;
+        }
+        let Some(tree) = self.borrow(lent).task_page().plan.owner else {
             return false;
         };
         for row in &tree.rows {

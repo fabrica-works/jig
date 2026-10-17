@@ -36,7 +36,7 @@ pub fn limits() -> domain::Limits {
             save_delay: Duration::from_millis(10),
             intents: 2,
             fields: 4,
-            providers: 1,
+
             objects: 3,
             sources: 8,
             reads: 8,
@@ -153,11 +153,6 @@ impl App for Ops {
         let bounds = fixture_profile().0;
         let mut root = domain::unlinked(&limits, seed);
         domain::configure_arrangement(&mut root, view::arrangement()).expect("ops arrangement before start");
-        domain::provider(
-            &mut root,
-            jig_client_view::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },
-        )
-        .expect("provider fits");
         (root, view::View::new(&bounds, &limits, jig, obs, infra, 1))
     }
     fn start(address: Address, kept: Vec<Self::Record>, offset: i32) -> Event {
@@ -192,7 +187,7 @@ impl App for Ops {
             Request::Save { record } => Duty::Store(StoreWrite::Save(record)),
             Request::Erase { key } => Duty::Store(StoreWrite::Erase(key)),
             Request::Show { address, replace } => Duty::Show { address, replace },
-            Request::SignIn { provider, back } => Duty::SignIn { provider, back },
+            Request::SignIn { provider } => Duty::SignIn { provider },
             Request::SignOut | Request::Client { request: jig_client::Request::SignOut } => Duty::SignOut,
             Request::Client { .. } => Duty::Wire(request),
             Request::Observability(obs::Out::Read { .. } | obs::Out::Open { .. } | obs::Out::Close { .. })
@@ -285,7 +280,7 @@ impl App for Ops {
     }
     fn window_changed(event: &Event) -> bool {
         match event {
-            Event::Act { action: Action::Jig(act) } | Event::Jig(jig_client_view::Event::Act { act }) => {
+            Event::Act { action: Action::Jig(act) } | Event::Jig(jig_client_view::Event::Act { action: act }) => {
                 observe::jig_window_changed(act)
             }
             Event::Act {
@@ -427,22 +422,24 @@ fn client_received(up: &jig_client::Up) -> Vec<Receipt> {
             }]
         }
         Up::Watched { watch, event } => {
-            observe::jig_received(&jig_client_view::Event::Watch { watch: *watch, event: event.clone() })
+            observe::up_received(&jig_client::Up::Watched { watch: *watch, event: event.clone() })
         }
         Up::ReadDone { read, result: jig_client::Readout::Jig(result) } => {
-            observe::jig_received(&jig_client_view::Event::Read { read: *read, result: result.clone() })
+            observe::up_received(&jig_client::Up::ReadDone {
+                read: *read,
+                result: jig_client::Readout::Jig(result.clone()),
+            })
         }
         Up::FamilyDelivered { record, .. } if record.family == 2 => infrastructure_received(&record.bytes),
         Up::ReadDone { result: jig_client::Readout::Family { family: 2, record: Some(bytes) }, .. } => {
             infrastructure_read_received(bytes)
         }
+        Up::Served { .. } | Up::WatchEnded { .. } => observe::up_received(up),
         Up::SignedOut => vec![Receipt::Parked],
         Up::SignedIn
         | Up::NotKept { .. }
-        | Up::Served { .. }
         | Up::FamilyServed { .. }
         | Up::FamilyDelivered { .. }
-        | Up::WatchEnded { .. }
         | Up::ReadDone { .. } => vec![],
     }
 }
@@ -503,5 +500,21 @@ mod tests {
         };
         assert_eq!(*key, environment_key(1, 7));
         assert_eq!(*revisions, vec![(0, 5)]);
+    }
+    #[test]
+    fn native_link_receipts_keep_version_refusals_and_ended_sessions() {
+        let cases = [
+            (jig_client::Up::Served { served: false, versions: None }, "[OutOfDate]"),
+            (
+                jig_client::Up::WatchEnded {
+                    watch: skein_lib::Token::new(7),
+                    end: jig_client::contract::WatchEnd::SignedOut,
+                },
+                "[WatchEnded { watch: Token(7) }, Parked]",
+            ),
+        ];
+        for (up, expected) in cases {
+            assert_eq!(format!("{:?}", client_received(&up)), expected, "{up:?}");
+        }
     }
 }

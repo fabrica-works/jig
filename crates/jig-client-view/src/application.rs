@@ -2,18 +2,18 @@
 //! One window names them; their chips and deciding documents remain live through
 //! jig's watches and reads. No application value is held here (root.md, section 7).
 use crate::{
-    Domain, Request,
+    Request, Ui,
+    handles::Owner,
     objects::{Body, Source},
-    watches::Owner,
 };
 use jig_client::contract::{self, Delivery, ObjectKey, Part, Read, ReadResult, ReadValue, Subject};
 use skein_lib::{Env, List, Queue};
 pub(crate) const WINDOW: u16 = u16::MAX;
-fn source(domain: &Domain) -> Source {
-    Source::Window { generation: domain.generation, number: WINDOW }
+fn source(_domain: &Ui) -> Source {
+    Source::Window { number: WINDOW }
 }
-pub(crate) fn show(domain: &mut Domain, env: &Env<crate::Limits>, objects: List<ObjectKey>, out: &mut Queue<Request>) {
-    if domain.confirmed.is_none() || domain.link != crate::link::Link::Live {
+pub(crate) fn show(domain: &mut Ui, env: &Env<crate::Limits>, objects: List<ObjectKey>, out: &mut Queue<Request>) {
+    if domain.confirmed.is_none() || domain.link != jig_client::Link::Live {
         return;
     }
     let source = source(domain);
@@ -64,44 +64,54 @@ pub(crate) fn show(domain: &mut Domain, env: &Env<crate::Limits>, objects: List<
     }
     domain.changed();
 }
-fn open(domain: &mut Domain, subject: Subject, out: &mut Queue<Request>) {
-    if domain.open(subject, Owner::Application { generation: domain.generation }, out).is_none() {
+fn open(domain: &mut Ui, subject: Subject, out: &mut Queue<Request>) {
+    if domain.hold_watch(subject, Owner::Application, out).is_none() {
         crate::page::routing::refuse(domain, contract::Limit::Watches);
     }
 }
-fn close(domain: &mut Domain, out: &mut Queue<Request>) {
-    for (id, ()) in &domain.watch_ids {
-        let watch = domain.watches.get_mut(*id).expect("registered watch exists");
-        match watch.owner {
-            Owner::Application { .. } => crate::ui::close_watch(watch, *id, out),
-            Owner::Page { .. } | Owner::Sections { .. } | Owner::Frame => {}
+fn close(domain: &mut Ui, out: &mut Queue<Request>) {
+    for _ in 0..domain.handles.watches.len() {
+        let mut found = None;
+        for (handle, held) in &domain.handles.watches {
+            if held.owner == Owner::Application {
+                found = Some(*handle);
+                break;
+            }
         }
+        let Some(handle) = found else {
+            break;
+        };
+        domain.release(handle, out);
     }
 }
-pub(crate) fn left(domain: &mut Domain, out: &mut Queue<Request>) {
-    close(domain, out);
-    let missed = domain.objects.replace(source(domain), &[]);
-    assert!(missed == 0, "empty source cannot refuse");
-    domain.changed();
-}
-fn read(domain: &mut Domain, key: ObjectKey, out: &mut Queue<Request>) {
+fn read(domain: &mut Ui, key: ObjectKey, out: &mut Queue<Request>) {
     let what = crate::page::routing::document_read(key);
-    if !domain.reads.pending(&what) && domain.reads.ask(domain.generation, source(domain), what, out).is_none() {
+    if !domain.handles.pending(&what) && domain.handles.read(source(domain), what, out).is_none() {
         crate::page::routing::refuse(domain, contract::Limit::Reads);
     }
 }
-pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: Delivery, out: &mut Queue<Request>) {
+pub(crate) fn delivery(
+    domain: &mut Ui,
+    env: &Env<crate::Limits>,
+    delivery: Delivery,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     match delivery {
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
-            if domain.objects.named(key, source(domain)) && put(domain, env, key, Body::OwnerProposal(proposal), out) {
+            if domain.objects.named(key, source(domain))
+                && put(domain, env, key, Body::OwnerProposal(proposal), out, lent, false)
+            {
                 domain.changed();
             }
         }
         Delivery::Chips(chips) => {
             for chip in chips.into_boxed() {
                 let key = ObjectKey::Task(chip.task);
-                if domain.objects.named(key, source(domain)) && put(domain, env, key, Body::Chip(chip), out) {
+                if domain.objects.named(key, source(domain))
+                    && put(domain, env, key, Body::Chip(chip), out, lent, false)
+                {
                     domain.changed();
                 }
             }
@@ -132,11 +142,12 @@ pub(crate) fn delivery(domain: &mut Domain, env: &Env<crate::Limits>, delivery: 
     }
 }
 pub(crate) fn read_result(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     what: Read,
     result: ReadResult,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     let Some(key) = key(&what) else {
         return;
@@ -146,7 +157,7 @@ pub(crate) fn read_result(
     }
     match result {
         ReadResult::None(why) => match why {
-            contract::ReadNone::SignedOut => crate::ui::signed_out(domain, out),
+            contract::ReadNone::SignedOut => crate::ui::signed_out(domain, out, lent),
             contract::ReadNone::Unknown
             | contract::ReadNone::Gone
             | contract::ReadNone::Refused
@@ -158,16 +169,22 @@ pub(crate) fn read_result(
         },
         ReadResult::Value(value) => {
             let stored = match value {
-                ReadValue::Task(document) => put(domain, env, key, Body::Task(document), out),
-                ReadValue::Proposal(document) => put(domain, env, key, Body::Proposal(document), out),
-                ReadValue::Historical(document) => put(domain, env, key, Body::Historical(document), out),
-                ReadValue::OwnerProposal(document) => put(domain, env, key, Body::OwnerProposal(document), out),
-                ReadValue::Escalation(document) => put(domain, env, key, Body::Escalation(document), out),
-                ReadValue::OwnerEscalation(document) => put(domain, env, key, Body::OwnerEscalation(document), out),
-                ReadValue::Question(document) => put(domain, env, key, Body::Question(document), out),
-                ReadValue::PersonTask(document) => put(domain, env, key, Body::PersonTask(document), out),
-                ReadValue::OwnerPersonTask(document) => put(domain, env, key, Body::OwnerPersonTask(document), out),
-                ReadValue::Result(document) => put(domain, env, key, Body::Result(document), out),
+                ReadValue::Task(document) => put(domain, env, key, Body::Task(document), out, lent, true),
+                ReadValue::Proposal(document) => put(domain, env, key, Body::Proposal(document), out, lent, true),
+                ReadValue::Historical(document) => put(domain, env, key, Body::Historical(document), out, lent, true),
+                ReadValue::OwnerProposal(document) => {
+                    put(domain, env, key, Body::OwnerProposal(document), out, lent, true)
+                }
+                ReadValue::Escalation(document) => put(domain, env, key, Body::Escalation(document), out, lent, true),
+                ReadValue::OwnerEscalation(document) => {
+                    put(domain, env, key, Body::OwnerEscalation(document), out, lent, true)
+                }
+                ReadValue::Question(document) => put(domain, env, key, Body::Question(document), out, lent, true),
+                ReadValue::PersonTask(document) => put(domain, env, key, Body::PersonTask(document), out, lent, true),
+                ReadValue::OwnerPersonTask(document) => {
+                    put(domain, env, key, Body::OwnerPersonTask(document), out, lent, true)
+                }
+                ReadValue::Result(document) => put(domain, env, key, Body::Result(document), out, lent, true),
                 ReadValue::Frame(_)
                 | ReadValue::Ended(_)
                 | ReadValue::History(_)
@@ -216,11 +233,13 @@ fn key(what: &Read) -> Option<ObjectKey> {
 /// The caller marks its accepted body change; a refused body leaves prior facts intact.
 #[must_use]
 pub(crate) fn put(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     key: ObjectKey,
     body: Body,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+    retain: bool,
 ) -> bool {
     let parts = parts(&body, env.limits.parts);
     if parts.full {
@@ -246,19 +265,19 @@ pub(crate) fn put(
             | contract::ChipPhase::WaitingForWords { .. }
             | contract::ChipPhase::BackingOff { .. }
             | contract::ChipPhase::Person { .. }
-            | contract::ChipPhase::Ended { .. } => object_project(domain, key),
+            | contract::ChipPhase::Ended { .. } => object_project(domain, key, lent),
         },
         Body::Historical(_) | Body::Escalation(_) | Body::Question(_) | Body::PersonTask(_) | Body::Result(_) => {
-            object_project(domain, key)
+            object_project(domain, key, lent)
         }
     };
-    if domain.objects.put(key, body) {
+    if (!retain && domain.objects.find(key).is_some()) || (retain && domain.objects.put(key, body)) {
         for part in parts.values.into_boxed() {
             if let Some(project) = project {
                 let scope = owner_scope(&part, contract::PartScope::Project(project));
-                out.push(Request::ShowPart { part, generation: domain.generation, scope });
-            } else if let Some(scope) = scope(domain, &part) {
-                out.push(Request::ShowPart { part, generation: domain.generation, scope });
+                out.push(Request::ShowPart { part, scope });
+            } else if let Some(scope) = scope(domain, &part, lent) {
+                out.push(Request::ShowPart { part, scope });
             }
         }
 
@@ -461,8 +480,8 @@ fn append(parts: &mut Parts, values: &[Part]) {
     }
 }
 
-fn object_project(domain: &Domain, key: ObjectKey) -> Option<u32> {
-    domain.objects.get(domain.objects.find(key)?)?.project
+fn object_project(domain: &Ui, key: ObjectKey, lent: &jig_client::Client) -> Option<u32> {
+    domain.borrow(lent).objects().get(domain.objects.find(key)?)?.project
 }
 /// An outbox reference names its owner; other parts retain their enclosing document scope.
 pub(crate) fn owner_scope(part: &Part, enclosing: contract::PartScope) -> contract::PartScope {
@@ -481,7 +500,7 @@ pub(crate) fn owner_scope(part: &Part, enclosing: contract::PartScope) -> contra
     }
 }
 #[expect(clippy::manual_map, reason = "step code matches optional values explicitly")]
-pub(crate) fn scope(domain: &Domain, part: &Part) -> Option<contract::PartScope> {
+pub(crate) fn scope(domain: &Ui, part: &Part, lent: &jig_client::Client) -> Option<contract::PartScope> {
     match part {
         Part::Outbox { scope, .. } => Some(*scope),
         Part::Project { project, .. } => Some(contract::PartScope::Project(*project)),
@@ -489,9 +508,9 @@ pub(crate) fn scope(domain: &Domain, part: &Part) -> Option<contract::PartScope>
             Some(contract::PartScope::Deployment)
         }
         Part::Panel { task, .. } | Part::Result { task, .. } | Part::Hold { task, .. } => {
-            let project = match object_project(domain, ObjectKey::Task(*task)) {
+            let project = match object_project(domain, ObjectKey::Task(*task), lent) {
                 Some(project) => Some(project),
-                None => current_project(domain),
+                None => current_project(domain, lent),
             };
             match project {
                 Some(project) => Some(contract::PartScope::Project(project)),
@@ -499,27 +518,27 @@ pub(crate) fn scope(domain: &Domain, part: &Part) -> Option<contract::PartScope>
             }
         }
         Part::Effect { proposal, .. } => {
-            let project = match object_project(domain, ObjectKey::Proposal(*proposal)) {
+            let project = match object_project(domain, ObjectKey::Proposal(*proposal), lent) {
                 Some(project) => Some(project),
-                None => current_project(domain),
+                None => current_project(domain, lent),
             };
             match project {
                 Some(project) => Some(contract::PartScope::Project(project)),
                 None => None,
             }
         }
-        Part::OwnerEffect { .. } => match current_project(domain) {
+        Part::OwnerEffect { .. } => match current_project(domain, lent) {
             Some(project) => Some(contract::PartScope::Project(project)),
             None => None,
         },
     }
 }
-fn current_project(domain: &Domain) -> Option<u32> {
+fn current_project(domain: &Ui, lent: &jig_client::Client) -> Option<u32> {
     if let Some(project) = domain.shown_project() {
         return Some(project);
     }
     if let Some(task) = domain.shown_task() {
-        return object_project(domain, ObjectKey::Task(task));
+        return object_project(domain, ObjectKey::Task(task), lent);
     }
     domain.shown_inbox().or(domain.shown_conversations()).flatten()
 }

@@ -1,12 +1,12 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and checked language data")]
 use crate::owner_chip_words::{self as data, ChipPhrase, OwnerChipWords};
+use crate::tests::fixtures::Fixture;
 use crate::words::Words;
 use crate::{JigBindings, owner_chip as view};
 use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, PhraseLimits, Segment};
 use skein_ui::{Builder, Tree};
 
-use crate::Domain;
 use jig_client::contract::*;
 use skein_lib::{Duration, List, Token, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
@@ -99,7 +99,7 @@ fn words() -> &'static Words {
     })
 }
 fn build(value: &OwnerChipDetails, words: &Words) -> (Tree, JigBindings, view::ChipFragment) {
-    let client = Domain::new(&client_limits());
+    let client = Fixture::new(&client_limits());
     let f = view::required(value, &client_limits(), words).unwrap();
     let capacity = Limits {
         nodes: f.nodes,
@@ -117,7 +117,7 @@ fn build(value: &OwnerChipDetails, words: &Words) -> (Tree, JigBindings, view::C
     };
     let mut b = Builder::new(&capacity);
     let mut bindings = JigBindings::new(f.bindings, 256);
-    view::render(&mut b, value, &client, words, &mut bindings);
+    view::render(&mut b, value, &client.view(), words, &mut bindings);
     let tree = b.finish();
     assert!(tree.len() <= f.nodes);
     assert!(tree.nodes().iter().all(|node| crate::tests::text_bytes(node) <= f.text_per_node));
@@ -604,7 +604,7 @@ fn retry_activation_tree(retry: Option<RetryNotice>, words: &Words) -> Tree {
         scene_marks: 0,
         scene_bytes: 0,
     };
-    let client = Domain::new(&client_limits());
+    let client = Fixture::new(&client_limits());
     let chip = Chip {
         task: u64::MAX,
         title: doc(b"retry", false),
@@ -621,7 +621,7 @@ fn retry_activation_tree(retry: Option<RetryNotice>, words: &Words) -> Tree {
     };
     let mut b = Builder::new(&capacity);
     let mut bindings = JigBindings::new(f.bindings, 256);
-    crate::cards::chip::chip(&mut b, &client, &chip, words, &mut bindings);
+    crate::cards::chip::chip(&mut b, &client.view(), &chip, words, &mut bindings);
     let tree = b.finish();
     assert!(tree.len() <= f.nodes);
     assert!(tree.nodes().iter().all(|node| crate::tests::text_bytes(node) <= f.text_per_node));

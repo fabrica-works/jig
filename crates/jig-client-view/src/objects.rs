@@ -13,7 +13,7 @@
 //! | deciding | durable answer | refused or leaving | notice only if hidden |
 //! | leaving/looking | terminal document | leaving/ended | linger armed |
 //! | leaving | linger expires | gone | nothing |
-use crate::{intents::Progress, watches::Watch};
+use crate::intents::Progress;
 use alloc::boxed::Box;
 use jig_client::contract::{
     Chip, Ending, Escalation, ObjectKey, Outcome, PersonTask, Proposal, Question, Refusal, Result, Task,
@@ -27,12 +27,12 @@ pub mod question;
 pub mod result;
 
 /// One owner of an object's presence on the page.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Source {
     /// A watch that names this object.
-    Watch(Id<Watch>),
+    Watch(jig_client::Handle),
     /// A concrete window of one page generation.
-    Window { generation: u32, number: u16 },
+    Window { number: u16 },
     /// A disappearing card reads its terminal facts without naming itself.
     Card(Id<Object>),
 }
@@ -569,7 +569,7 @@ fn delivered_name(value: &jig_client::contract::Delivery, key: ObjectKey) -> Opt
     }
 }
 /// Protects disappearing cards before the source replacement prunes its names.
-pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &jig_client::contract::Delivery) {
+pub(crate) fn dropping(domain: &mut crate::Ui, watch: jig_client::Handle, value: &jig_client::contract::Delivery) {
     match value {
         jig_client::contract::Delivery::Conversations(_) => {
             if !domain.conversation_rows.edges.reaches(crate::action::End::Before) {
@@ -608,7 +608,7 @@ pub(crate) fn dropping(domain: &mut crate::Domain, watch: Id<Watch>, value: &jig
 /// A genuine ending can remove a source without a replacement delivery. Keep
 /// each shown waiting card until its own final read supplies the explanation
 /// (objects.md, 1–2; Q34).
-pub(crate) fn ending_source(domain: &mut crate::Domain, watch: Id<Watch>) {
+pub(crate) fn ending_source(domain: &mut crate::Ui, watch: jig_client::Handle) {
     let source = Source::Watch(watch);
     for (_, id) in &domain.objects.index {
         let object = domain.objects.slab.get_mut(*id).expect("indexed object exists");
@@ -637,7 +637,7 @@ pub(crate) fn document_read(key: ObjectKey) -> jig_client::contract::Read {
     }
 }
 /// Requests terminal facts for leaving cards, without inventing an ending.
-pub(crate) fn read_dropped(domain: &mut crate::Domain, out: &mut skein_lib::Queue<crate::Request>) {
+pub(crate) fn read_dropped(domain: &mut crate::Ui, out: &mut skein_lib::Queue<crate::Request>) {
     for (_, id) in &domain.objects.index {
         let object = domain.objects.slab.get(*id).expect("indexed object exists");
         let looking = match &object.card {
@@ -653,8 +653,8 @@ pub(crate) fn read_dropped(domain: &mut crate::Domain, out: &mut skein_lib::Queu
         };
         if looking {
             let what = document_read(object.key);
-            if !domain.reads.pending(&what) {
-                let read = domain.reads.ask(domain.generation, Source::Card(*id), what, out);
+            if !domain.handles.pending(&what) {
+                let read = domain.handles.read(Source::Card(*id), what, out);
                 if read.is_none() {
                     domain.objects.slab.get_mut(*id).expect("indexed object exists").card =
                         Card::Refused { refusal: Refusal::Limit { which: jig_client::contract::Limit::Reads } };
@@ -687,8 +687,8 @@ fn read_key(what: &jig_client::contract::Read) -> Option<ObjectKey> {
         | Read::Deployment => None,
     }
 }
-pub(crate) fn is_card_read(domain: &crate::Domain, token: Token) -> bool {
-    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+pub(crate) fn is_card_read(domain: &crate::Ui, token: Token, lent: &jig_client::Client) -> bool {
+    let Some(read) = domain.handles.reads.get(&crate::handles::handle(token)) else {
         return false;
     };
     match read.source {
@@ -700,7 +700,7 @@ pub(crate) fn is_card_read(domain: &crate::Domain, token: Token) -> bool {
             let Some(id) = domain.objects.find(key) else {
                 return false;
             };
-            match &domain.objects.get(id).expect("indexed object exists").card {
+            match &domain.borrow(lent).objects().get(id).expect("indexed object exists").card {
                 Card::Leaving { how: Left::Looking, .. } => true,
                 Card::Open
                 | Card::Deciding { .. }
@@ -721,30 +721,29 @@ pub(crate) fn is_card_read(domain: &crate::Domain, token: Token) -> bool {
 }
 /// Applies a card's terminal read without replacing the whole page on failure.
 pub(crate) fn read_card(
-    domain: &mut crate::Domain,
+    domain: &mut crate::Ui,
     env: &skein_lib::Env<crate::Limits>,
     token: Token,
     result: jig_client::contract::ReadResult,
     out: &mut skein_lib::Queue<crate::Request>,
+    lent: &jig_client::Client,
 ) {
     use jig_client::contract::{ReadNone, ReadResult};
     if let Some(value) = historical_read(&result) {
-        let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+        let Some(read) = domain.handles.reads.get(&crate::handles::handle(token)) else {
             return;
         };
         let Some(key) = read_key(&read.what) else {
             return;
         };
         if !value.matches(key) {
+            domain.handles.received(crate::handles::handle(token));
             return;
         }
     }
-    let Some(receipt) = domain.reads.terminal(token) else {
+    let Some(receipt) = domain.handles.received(crate::handles::handle(token)) else {
         return;
     };
-    if receipt.abandoned || receipt.generation != domain.generation {
-        return;
-    }
     let id = match receipt.source {
         Source::Card(id) => id,
         Source::Watch(_) | Source::Window { .. } => {
@@ -757,7 +756,7 @@ pub(crate) fn read_card(
             id
         }
     };
-    let Some(object) = domain.objects.get(id) else {
+    let Some(object) = domain.borrow(lent).objects().get(id) else {
         return;
     };
     let key = object.key;
@@ -780,7 +779,7 @@ pub(crate) fn read_card(
         ReadResult::Value(value) => read_body(key, value),
         ReadResult::None(why) => {
             match why {
-                ReadNone::SignedOut => crate::ui::signed_out(domain, out),
+                ReadNone::SignedOut => crate::ui::signed_out(domain, out, lent),
                 ReadNone::Unknown | ReadNone::Gone | ReadNone::Refused | ReadNone::Busy | ReadNone::Unreachable => {}
             }
             None
@@ -791,7 +790,7 @@ pub(crate) fn read_card(
         let stored = match body {
             Body::OwnerProposal(proposal) => {
                 if shown {
-                    crate::application::put(domain, env, key, Body::OwnerProposal(proposal), out)
+                    crate::application::put(domain, env, key, Body::OwnerProposal(proposal), out, lent, true)
                 } else {
                     domain.objects.put(key, Body::OwnerProposal(proposal))
                 }
@@ -812,11 +811,11 @@ pub(crate) fn read_card(
             return;
         }
     }
-    finish_read_card(domain, id, leaving, refreshed);
+    finish_read_card(domain, id, leaving, refreshed, lent);
 }
-fn finish_read_card(domain: &mut crate::Domain, id: Id<Object>, leaving: bool, refreshed: bool) {
+fn finish_read_card(domain: &mut crate::Ui, id: Id<Object>, leaving: bool, refreshed: bool, lent: &jig_client::Client) {
     if !leaving {
-        let ending = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
+        let ending = match domain.borrow(lent).objects().get(id).expect("terminal card exists").body.as_ref() {
             Some(body) => body.terminal(),
             None => None,
         };
@@ -839,7 +838,7 @@ fn finish_read_card(domain: &mut crate::Domain, id: Id<Object>, leaving: bool, r
         domain.changed();
         return;
     }
-    let pending = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
+    let pending = match domain.borrow(lent).objects().get(id).expect("terminal card exists").body.as_ref() {
         Some(body) => body.pending_historical(),
         None => false,
     };
@@ -849,7 +848,7 @@ fn finish_read_card(domain: &mut crate::Domain, id: Id<Object>, leaving: bool, r
         domain.changed();
         return;
     }
-    let how = match domain.objects.get(id).expect("terminal card exists").body.as_ref() {
+    let how = match domain.borrow(lent).objects().get(id).expect("terminal card exists").body.as_ref() {
         Some(body) => match body.terminal() {
             Some(ending) => ending,
             None => Left::Unknown,
@@ -1111,7 +1110,7 @@ pub(crate) fn contexts(value: &jig_client::contract::Delivery, capacity: u32) ->
     }
     rows
 }
-pub(crate) fn apply_contexts(domain: &mut crate::Domain, rows: List<Context>) {
+pub(crate) fn apply_contexts(domain: &mut crate::Ui, rows: List<Context>) {
     for row in rows.into_boxed() {
         if let Some(id) = domain.objects.find(row.object) {
             let object = domain.objects.get_mut(id).expect("indexed object exists");

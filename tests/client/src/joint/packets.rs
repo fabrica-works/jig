@@ -145,7 +145,7 @@ pub fn document(
     assert!(transport.delivered(watcher, Pace::Document), "validated owner route");
     Ok(Incoming::Callback {
         client,
-        event: Event::Jig(jig_client_view::Event::Watch { watch, event: client::WatchEvent::Delivered(delivery) }),
+        event: crate::test::up(jig_client::Up::Watched { watch, event: client::WatchEvent::Delivered(delivery) }),
     })
 }
 
@@ -166,7 +166,7 @@ pub fn stream(
     assert!(transport.delivered(watcher, Pace::Stream), "validated owner route");
     Ok(Incoming::Callback {
         client,
-        event: Event::Jig(jig_client_view::Event::Watch { watch, event: client::WatchEvent::Delivered(delivery) }),
+        event: crate::test::up(jig_client::Up::Watched { watch, event: client::WatchEvent::Delivered(delivery) }),
     })
 }
 
@@ -209,7 +209,7 @@ pub fn dropped(transport: &mut Transport, watcher: Token) -> Result<Incoming, In
 fn terminal(transport: &mut Transport, watcher: Token, end: client::WatchEnd) -> Result<Incoming, Invalid> {
     let route = transport.watch(watcher).ok_or(Invalid::MissingRoute)?.clone();
     let event = match route.subject {
-        Watched::Jig(_) => Event::Jig(jig_client_view::Event::Ended { watch: route.native, end }),
+        Watched::Jig(_) => crate::test::up(jig_client::Up::WatchEnded { watch: route.native, end }),
         Watched::Application { .. } => {
             let end = match end {
                 client::WatchEnd::Closed => family::WatchEnd::Closed,
@@ -359,11 +359,7 @@ pub fn people_reply(
             }
             Incoming::Callback {
                 client,
-                event: Event::Client {
-                    event: jig_client::Event::Up {
-                        up: jig_client::Up::Answer { attempt, envelope, answer, why: None },
-                    },
-                },
+                event: crate::test::up(jig_client::Up::Answer { attempt, envelope, answer, why: None }),
             }
         }
         Reply::Read { .. } | Reply::ApplicationRead { .. } => return Err(Invalid::OwnerRoute),
@@ -398,16 +394,12 @@ pub fn application_reply(
     transport.take_reply(to).expect("validated original reply route");
     Ok(Incoming::Callback {
         client,
-        event: Event::Client {
-            event: jig_client::Event::Up {
-                up: jig_client::Up::Answer {
-                    attempt,
-                    envelope: RequestEnvelope::Final,
-                    answer: Some(crate::test::family_answer(family::Answer::Connector(answer))),
-                    why: None,
-                },
-            },
-        },
+        event: crate::test::up(jig_client::Up::Answer {
+            attempt,
+            envelope: RequestEnvelope::Final,
+            answer: Some(crate::test::family_answer(family::Answer::Connector(answer))),
+            why: None,
+        }),
     })
 }
 
@@ -529,10 +521,16 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_client_view::Event::Watch {
-                    watch,
-                    event: client::WatchEvent::Delivered(client::Delivery::Task(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Watched {
+                                    watch,
+                                    event: client::WatchEvent::Delivered(client::Delivery::Task(value)),
+                                },
+                        },
+                },
         } = document(&mut transport, owner, &source, &limits).expect("whole original task")
         else {
             panic!("normal task callback")
@@ -579,10 +577,16 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_client_view::Event::Watch {
-                    watch,
-                    event: client::WatchEvent::Delivered(client::Delivery::OwnerTree(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Watched {
+                                    watch,
+                                    event: client::WatchEvent::Delivered(client::Delivery::OwnerTree(value)),
+                                },
+                        },
+                },
         } = document(&mut transport, original, &source, &limits).expect("admitted original tree flight")
         else {
             panic!("whole tree callback")
@@ -618,10 +622,16 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_client_view::Event::Watch {
-                    watch,
-                    event: client::WatchEvent::Delivered(client::Delivery::OwnerInbox(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Watched {
+                                    watch,
+                                    event: client::WatchEvent::Delivered(client::Delivery::OwnerInbox(value)),
+                                },
+                        },
+                },
         } = document(&mut transport, owner, &source, &limits).expect("original owner flight")
         else {
             panic!("owner inbox callback")
@@ -656,10 +666,16 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_client_view::Event::Watch {
-                    watch,
-                    event: client::WatchEvent::Delivered(client::Delivery::Conversations(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Watched {
+                                    watch,
+                                    event: client::WatchEvent::Delivered(client::Delivery::Conversations(value)),
+                                },
+                        },
+                },
         } = document(&mut transport, conversations, &source, &limits).expect("original whole list")
         else {
             panic!("original chats")
@@ -679,10 +695,16 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_client_view::Event::Watch {
-                    watch,
-                    event: client::WatchEvent::Delivered(client::Delivery::Goals(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Watched {
+                                    watch,
+                                    event: client::WatchEvent::Delivered(client::Delivery::Goals(value)),
+                                },
+                        },
+                },
         } = document(&mut transport, goals, &source, &limits).expect("original whole goals")
         else {
             panic!("original goals")
@@ -737,10 +759,16 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_client_view::Event::Watch {
-                    watch,
-                    event: client::WatchEvent::Delivered(client::Delivery::Tasks(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Watched {
+                                    watch,
+                                    event: client::WatchEvent::Delivered(client::Delivery::Tasks(value)),
+                                },
+                        },
+                },
         } = document(&mut transport, watcher, &source, &limits).expect("whole original Tasks")
         else {
             panic!("original Tasks route")
@@ -764,10 +792,16 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_client_view::Event::Watch {
-                    watch,
-                    event: client::WatchEvent::Delivered(client::Delivery::RunState(state)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Watched {
+                                    watch,
+                                    event: client::WatchEvent::Delivered(client::Delivery::RunState(state)),
+                                },
+                        },
+                },
         } = document(&mut transport, watcher, &run(31), &limits).expect("normal document")
         else {
             panic!("whole normal state under the original watch");
@@ -786,10 +820,16 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(1),
             event:
-                Event::Jig(jig_client_view::Event::Watch {
-                    watch,
-                    event: client::WatchEvent::Delivered(client::Delivery::Run(text)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::Watched {
+                                    watch,
+                                    event: client::WatchEvent::Delivered(client::Delivery::Run(text)),
+                                },
+                        },
+                },
         } = stream(&mut transport, watcher, &source, &limits).expect("independent stream")
         else {
             panic!("actual provisional stream");
@@ -850,7 +890,7 @@ mod tests {
             assert!(transport.delivered(watcher, Pace::Stream));
             let Incoming::Callback {
                 client: ClientId(0),
-                event: Event::Jig(jig_client_view::Event::Ended { watch, end }),
+                event: Event::Client { event: jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch, end } } },
             } = ended(&mut transport, watcher, why).expect("actual terminal")
             else {
                 panic!("original terminal");

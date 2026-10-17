@@ -6,7 +6,6 @@ pub(crate) fn show(
     root: &mut Domain,
     env: &Env<Limits>,
     part: Part,
-    generation: u32,
     scope: jig_client::contract::PartScope,
     out: &mut Queue<Request>,
 ) {
@@ -17,7 +16,6 @@ pub(crate) fn show(
             env,
             first::Event::Show {
                 part,
-                generation,
                 scope: match scope {
                     jig_client::contract::PartScope::Project(project) => crate::family::Scope::Project(project),
                     jig_client::contract::PartScope::Deployment => crate::family::Scope::Deployment,
@@ -26,7 +24,7 @@ pub(crate) fn show(
             out,
         ),
         Some(Connector::Second) => {
-            if !root.second.show(part, generation) {
+            if !root.second.show(part) {
                 out.push(Request::Fact { fact: Fact::PartsFull });
             }
         }

@@ -67,4 +67,23 @@ pub(crate) fn long_resource_path<const N: usize>() -> skein_lib::List<Box<[u8]>>
     }
     path
 }
-pub(crate) mod bridge;
+
+/// The application's part effects, preserving their exact fields.
+pub(crate) fn parts(output: &[crate::Request], capacity: u32) -> Box<[crate::Request]> {
+    let mut parts = skein_lib::List::with_capacity(capacity);
+    for request in output {
+        if let crate::Request::ShowPart { part, scope } = request {
+            parts.push(crate::Request::ShowPart { part: part.clone(), scope: *scope }).unwrap();
+        }
+    }
+    parts.into_boxed()
+}
+
+mod client;
+pub(crate) use client::{AnsweredByEngine, Ended, Fixture, Input, ReadPage, Reported, Served, Watched};
+
+pub(crate) fn one<T>(value: T) -> skein_lib::List<T> {
+    let mut list = skein_lib::List::with_capacity(1);
+    list.push(value).ok().unwrap();
+    list
+}

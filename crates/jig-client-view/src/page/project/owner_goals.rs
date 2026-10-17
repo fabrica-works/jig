@@ -1,9 +1,14 @@
 //! Goal admission from genuine whole Project offers; pages.md, 6.2.
 //! The engine's bounded offer and Frame facts remain independent source values.
-use crate::{Domain, page::project::goals::GoalForm};
+use crate::{Ui, page::project::goals::GoalForm};
 use jig_client::contract::{ActKind, Admission, Bounds, Funder, GoalExecutor};
 /// Preserve the original goal confirmation protocol without a fabricated Project.
-pub(crate) fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission, u64)> {
+pub(crate) fn prediction(
+    domain: &Ui,
+    form: GoalForm,
+    scope: u64,
+    lent: &jig_client::Client,
+) -> Option<(Admission, u64)> {
     let doc = domain.project_page.owner.as_ref()?;
     if doc.number != form.project {
         return None;
@@ -30,7 +35,7 @@ pub(crate) fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<
     }
     let mut pool = None;
     let mut listed = false;
-    if let Some(frame) = &domain.frame.document {
+    if let Some(frame) = &domain.frame(lent).document {
         for project in &frame.projects {
             if project.project == form.project
                 && let Some(ledger) = &project.pool

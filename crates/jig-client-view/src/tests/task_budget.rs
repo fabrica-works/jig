@@ -3,13 +3,19 @@ use crate::address::{Address, TaskSection};
 
 fn budget_page(row: Task) -> Tree {
     let (mut domain, out) = super::super::work_pages::entered(Address::Task { task: 8, section: TaskSection::Budget });
-    let watch = out
-        .iter()
-        .find_map(|request| match request {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|request| match request {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row)));
     let tree = super::super::pages::build(&domain, 3, words()).0;
     super::super::cards_access::check(&tree);

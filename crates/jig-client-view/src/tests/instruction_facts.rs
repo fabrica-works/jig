@@ -18,10 +18,12 @@ fn sources() -> [Option<DocumentText>; 6] {
 fn sent(out: &[Request]) -> &Amendment {
     out.iter()
         .find_map(|request| match request {
-            Request::Send { ask, .. } => match &**ask {
-                Ask::Amend { change, .. } => Some(change),
-                _ => None,
-            },
+            Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
+                match &**ask {
+                    Ask::Amend { change, .. } => Some(change),
+                    _ => None,
+                }
+            }
             _ => None,
         })
         .unwrap()
@@ -50,13 +52,19 @@ fn baseline(tree: &Tree, source: Option<&DocumentText>) {
 fn task_instruction_updates_distinguish_supplied_effective_empty_unknown_and_partial_text() {
     let (mut domain, out) =
         super::super::work_pages::entered(Address::Task { task: 8, section: TaskSection::Overview });
-    let watch = out
-        .iter()
-        .find_map(|request| match request {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|request| match request {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     for source in sources() {
         let mut row = task_doc(&[]);
         row.chip.executor = Executor::Agent { charter: 2 };
@@ -69,7 +77,8 @@ fn task_instruction_updates_distinguish_supplied_effective_empty_unknown_and_par
             assert!(!contains(&tree, b"supplied charter effective text"));
         }
         let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
-        let Body::Task(retained) = domain.objects().get(id).unwrap().body.as_ref().unwrap() else {
+        let projected = domain.objects().get(id).unwrap();
+        let Body::Task(retained) = projected.body.as_ref().unwrap() else {
             panic!("task");
         };
         assert_eq!(retained.instructions, source);
@@ -82,14 +91,14 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
         let mut row = task_doc(&[ActKind::Amend]);
         row.instructions = source.clone();
         let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
-        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Amend } });
+        drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, words(), &mut bindings);
         facts(&tree, source.as_ref());
         baseline(&tree, source.as_ref());
         assert!(domain.confirmation().unwrap().choices.change.is_none());
-        drive(&mut domain, Event::Act { act: input(&tree, b"New budget", b"25", &mut bindings) });
+        drive(&mut domain, Event::Act { action: input(&tree, b"New budget", b"25", &mut bindings) });
         let mut expected = Amendment {
             addressed: None,
             spec: None,
@@ -102,11 +111,12 @@ fn task_instruction_amendment_uses_only_complete_source_without_selecting_it() {
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
         let tree = dialog(&domain, words(), &mut bindings);
         baseline(&tree, source.as_ref());
-        drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
+        drive(&mut domain, Event::Act { action: input(&tree, b"New instructions", b"", &mut bindings) });
         expected.instructions = Some(text(b""));
-        let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+        let out = drive(&mut domain, Event::Act { action: Action::Confirm });
         assert_eq!(sent(&out), &expected);
-        let Body::Task(retained) = domain.objects().get(id).unwrap().body.as_ref().unwrap() else {
+        let projected = domain.objects().get(id).unwrap();
+        let Body::Task(retained) = projected.body.as_ref().unwrap() else {
             panic!("task");
         };
         assert_eq!(retained.instructions, source);
@@ -119,14 +129,14 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
         let mut row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
         row.steering.instructions = source.clone();
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
-        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, words(), &mut bindings);
         facts(&tree, source.as_ref());
         baseline(&tree, source.as_ref());
         assert!(domain.confirmation().unwrap().choices.change.is_none());
-        drive(&mut domain, Event::Act { act: input(&tree, b"New budget", b"25", &mut bindings) });
+        drive(&mut domain, Event::Act { action: input(&tree, b"New budget", b"25", &mut bindings) });
         let mut authority = row.steering.authority.whole().unwrap();
         authority.spend = 25;
         let mut expected = Amendment {
@@ -139,14 +149,16 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
         };
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
         let tree = dialog(&domain, words(), &mut bindings);
-        drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
+        drive(&mut domain, Event::Act { action: input(&tree, b"New instructions", b"", &mut bindings) });
         expected.instructions = Some(text(b""));
-        let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+        let out = drive(&mut domain, Event::Act { action: Action::Confirm });
         assert_eq!(sent(&out), &expected);
         let ask = out
             .iter()
             .find_map(|request| match request {
-                Request::Send { ask, .. } => Some(&**ask),
+                Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
+                    Some(&**ask)
+                }
                 _ => None,
             })
             .unwrap();
@@ -155,7 +167,8 @@ fn steering_instruction_unknown_context_and_loss_preserve_explicit_clear_and_rev
         };
         assert_eq!(*revision, Revision { value: 6 });
         assert_eq!(*release, Some(Revision { value: 4 }));
-        let Body::Escalation(retained) = domain.objects().get(id).unwrap().body.as_ref().unwrap() else {
+        let projected = domain.objects().get(id).unwrap();
+        let Body::Escalation(retained) = projected.body.as_ref().unwrap() else {
             panic!("escalation");
         };
         assert_eq!(retained.steering.person_revision, Some(Revision { value: 12 }));

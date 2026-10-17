@@ -4,13 +4,14 @@
     reason = "ordinary tests inspect checked sayings and public tree events"
 )]
 use super::cards::{CLIENT, contains, document, drive, start, words};
+use crate::tests::fixtures::{AnsweredByEngine, Fixture, Watched};
 use crate::words::Words;
 use crate::{JigBindings, owner_tree as view};
 use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act as ClientAct,
     address::{Address, Place, TaskSection},
 };
@@ -69,38 +70,50 @@ fn source() -> OwnerTree {
         next: Some(Cursor::new(copy_of(UTF8_TEXTS[0]), 128).unwrap()),
     }
 }
-fn domain(value: &OwnerTree) -> Domain {
+fn domain(value: &OwnerTree) -> Fixture {
     domain_and_watch(value).0
 }
-fn domain_and_watch(value: &OwnerTree) -> (Domain, skein_lib::Token) {
+fn domain_and_watch(value: &OwnerTree) -> (Fixture, jig_client::Handle) {
     let (mut d, frame) = start();
-    drive(&mut d, Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
     let asks = drive(&mut d, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
-    let task = asks
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let task =
+        asks.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let asks = drive(
         &mut d,
-        Event::Watch {
+        Watched {
             watch: task,
             event: WatchEvent::Delivered(Delivery::Task(Box::new(super::cards_objects::task_doc(&[])))),
         },
     );
-    let watch = asks
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Tree { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
-    drive(&mut d, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) });
+    let watch =
+        asks.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Tree { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
+    drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) });
     (d, watch)
 }
-fn build(value: &OwnerTree, d: &Domain, w: &Words, nodes: Option<u32>) -> Tree {
+fn build(value: &OwnerTree, d: &Fixture, w: &Words, nodes: Option<u32>) -> Tree {
     let f = view::required(value, &CLIENT, w).unwrap();
     let mut l = crate::limits::of_words(&CLIENT, w).unwrap();
     l.nodes = nodes.unwrap_or(f.nodes);
@@ -109,7 +122,7 @@ fn build(value: &OwnerTree, d: &Domain, w: &Words, nodes: Option<u32>) -> Tree {
     l.text_per_node = f.text_per_node;
     let mut builder = Builder::new(&l);
     let mut bindings = JigBindings::new(f.bindings, CLIENT.text);
-    view::render(&mut builder, value, &d.task_page().plan, d, w, &mut bindings);
+    view::render(&mut builder, value, &d.task_page().plan, &d.view(), w, &mut bindings);
     builder.finish()
 }
 #[test]
@@ -143,7 +156,7 @@ fn owner_tree_view_names_root_parent_depth_spend_loss_proposal_and_all_ten_count
         assert!(contains(&tree, expected), "missing {}", core::str::from_utf8(expected).unwrap());
     }
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
-    assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
+    assert_eq!(d.task_page().plan.owner, Some(&value));
 }
 #[test]
 fn owner_tree_view_preserves_all_link_metadata_without_fabricated_stored_chip_or_time() {
@@ -163,7 +176,7 @@ fn owner_tree_view_preserves_all_link_metadata_without_fabricated_stored_chip_or
         let d = domain(&value);
         let tree = build(&value, &d, w, None);
         assert!(contains(&tree, expected), "missing {}", core::str::from_utf8(expected).unwrap());
-        assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
+        assert_eq!(d.task_page().plan.owner, Some(&value));
     }
 }
 #[test]
@@ -244,7 +257,7 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
     let render = |cap: skein_ui::Limits| {
         let mut b = Builder::new(&cap);
         let mut bindings = JigBindings::new(f.bindings, CLIENT.text);
-        view::render(&mut b, &value, &d.task_page().plan, &d, &w, &mut bindings);
+        view::render(&mut b, &value, &d.task_page().plan, &d.view(), &w, &mut bindings);
         b.finish()
     };
     assert_eq!(render(cap).len(), exact);
@@ -271,7 +284,7 @@ fn owner_tree_local_filters_folds_cycles_and_empty_loss_continuations_remain_bou
         assert!(contains(&tree, if next.is_some() { b"More descendants remain" } else { b"no continuation" }));
         assert!(!contains(&tree, b"Some dependencies are outside this row"));
         assert!(contains(&tree, b"Held below: 19"));
-        assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
+        assert_eq!(d.task_page().plan.owner, Some(&value));
     }
 }
 
@@ -282,14 +295,20 @@ fn owner_tree_departure_keeps_a_separately_named_deciding_card_until_its_answer_
     let (mut d, tree_watch) = domain_and_watch(&value);
     let mut objects = List::with_capacity(1);
     objects.push(ObjectKey::Proposal(key)).unwrap();
-    let asks = drive(&mut d, Event::ShowObjects { objects });
-    let proposal_watch = asks
-        .iter()
-        .find_map(|ask| match ask {
-            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let asks = drive(&mut d, Event::Named { objects, sections: List::with_capacity(0) });
+    let proposal_watch =
+        asks.iter()
+            .find_map(|ask| match ask {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Inbox { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut acts = List::with_capacity(1);
     acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
     let proposal = OwnerProposal {
@@ -304,66 +323,43 @@ fn owner_tree_departure_keeps_a_separately_named_deciding_card_until_its_answer_
     };
     drive(
         &mut d,
-        Event::Watch {
-            watch: proposal_watch,
-            event: WatchEvent::Delivered(Delivery::OwnerProposal(Box::new(proposal))),
-        },
+        Watched { watch: proposal_watch, event: WatchEvent::Delivered(Delivery::OwnerProposal(Box::new(proposal))) },
     );
     let id = d.objects().find(ObjectKey::Proposal(key)).unwrap();
-    drive(&mut d, Event::Act { act: ClientAct::Intend { object: id.token(), act: ActKind::Accept } });
-    let sent = drive(&mut d, Event::Act { act: ClientAct::Confirm });
+    drive(&mut d, Event::Act { action: ClientAct::Intend { object: id.token(), act: ActKind::Accept } });
+    let sent = drive(&mut d, Event::Act { action: ClientAct::Confirm });
     let request = sent
         .iter()
         .find_map(|ask| match ask {
-            Request::Send { request, .. } => Some(*request),
+            Request::Client { asked: jig_client::Event::Send { key: request, .. } } => Some(*request),
             _ => None,
         })
         .unwrap();
-    let w = words();
-    let build_page = |domain: &Domain| {
-        let mut cap = crate::limits::of_words(&CLIENT, w).unwrap();
-        cap.nodes = cap.nodes.max(4096);
-        cap.text_bytes = cap.nodes.checked_mul(cap.text_per_node).unwrap();
-        let mut b = Builder::new(&cap);
-        let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-        b.open(Role::Page);
-        view::render(
-            &mut b,
-            domain.task_page().plan.owner.as_ref().unwrap(),
-            &domain.task_page().plan,
-            domain,
-            w,
-            &mut bindings,
-        );
-        crate::pages::after_page(&mut b, domain, w, &mut bindings);
-        b.close();
-        b.finish()
-    };
     let card_key = crate::pages::object_key(ObjectKey::Proposal(key));
-    let before = build_page(&d);
+    let before = deciding_tree_page(&d);
     assert_eq!(before.nodes().iter().filter(|node| node.key == Some(card_key)).count(), 1);
     let row = d.objects().find(ObjectKey::Task(9)).unwrap();
-    drive(&mut d, Event::Act { act: ClientAct::Fold { object: row.token(), open: false } });
+    drive(&mut d, Event::Act { action: ClientAct::Fold { object: row.token(), open: false } });
     assert_eq!(
-        build_page(&d).nodes().iter().filter(|node| node.key == Some(card_key)).count(),
+        deciding_tree_page(&d).nodes().iter().filter(|node| node.key == Some(card_key)).count(),
         0,
         "person fold stays hidden"
     );
-    drive(&mut d, Event::Act { act: ClientAct::Fold { object: row.token(), open: true } });
+    drive(&mut d, Event::Act { action: ClientAct::Fold { object: row.token(), open: true } });
     value.rows.get_mut(0).unwrap().proposals.clear();
     drive(
         &mut d,
-        Event::Watch { watch: tree_watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
+        Watched { watch: tree_watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
     );
     assert!(!d.objects().get(id).unwrap().sources.is_empty());
     assert!(d.task_page().plan.owner.as_ref().unwrap().rows.get(0).unwrap().proposals.is_empty());
-    let pending = build_page(&d);
+    let pending = deciding_tree_page(&d);
     assert_eq!(pending.nodes().iter().filter(|node| node.key == Some(card_key)).count(), 1);
     assert!(contains(&pending, b"Being decided"));
     assert!(contains(&pending, b"supplied pending reason"));
     drive(
         &mut d,
-        Event::Answered {
+        AnsweredByEngine {
             request,
             answer: Answer::Done(Outcome::Owner(OwnerOutcome::ProposalDecided {
                 proposal: key,
@@ -373,10 +369,90 @@ fn owner_tree_departure_keeps_a_separately_named_deciding_card_until_its_answer_
             })),
         },
     );
-    let answered = build_page(&d);
+    let answered = deciding_tree_page(&d);
     assert_eq!(answered.nodes().iter().filter(|node| node.key == Some(card_key)).count(), 1);
     assert!(contains(&answered, b"Accepted"));
     assert!(contains(&answered, b"supplied pending reason"));
 }
 
 const UTF8_TEXTS: [&[u8]; 1] = [b"~\0/"];
+
+fn deciding_tree_page(domain: &Fixture) -> Tree {
+    let w = words();
+    let mut cap = crate::limits::of_words(&CLIENT, w).unwrap();
+    cap.nodes = cap.nodes.max(4096);
+    cap.text_bytes = cap.nodes.checked_mul(cap.text_per_node).unwrap();
+    let mut b = Builder::new(&cap);
+    let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
+    b.open(Role::Page);
+    view::render(
+        &mut b,
+        domain.task_page().plan.owner.as_ref().unwrap(),
+        &domain.task_page().plan,
+        &domain.view(),
+        w,
+        &mut bindings,
+    );
+    crate::pages::after_page(&mut b, &domain.view(), w, &mut bindings);
+    b.close();
+    b.finish()
+}
+
+#[test]
+fn a_tree_keeps_a_waiting_card_held_by_another_source_after_its_row_leaves() {
+    let mut value = source();
+    let key = ObjectKey::Proposal(*value.rows.get(0).unwrap().proposals.get(0).unwrap());
+    let (mut domain, watch) = domain_and_watch(&value);
+    domain.ui.objects.name(key, crate::objects::Source::Window { number: 23 }).unwrap();
+    let card = crate::pages::object_key(key);
+    assert_eq!(deciding_tree_page(&domain).nodes().iter().filter(|node| node.key == Some(card)).count(), 1);
+    value.rows.get_mut(0).unwrap().proposals.clear();
+    drive(&mut domain, Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value))) });
+    assert_eq!(deciding_tree_page(&domain).nodes().iter().filter(|node| node.key == Some(card)).count(), 1);
+}
+
+#[test]
+fn a_waiting_tree_card_is_still_owed_when_the_task_stops_offering_its_plan() {
+    let value = source();
+    let key = ObjectKey::Proposal(*value.rows.get(0).unwrap().proposals.get(0).unwrap());
+    let (mut domain, _) = domain_and_watch(&value);
+    let task = domain
+        .ui
+        .handles
+        .watches
+        .iter()
+        .find_map(|(handle, held)| (held.subject == Subject::Task { task: 8 }).then_some(*handle))
+        .unwrap();
+    let mut finished = super::cards_objects::task_doc(&[]);
+    finished.delegates.clear();
+    finished.context = None;
+    drive(&mut domain, Watched { watch: task, event: WatchEvent::Delivered(Delivery::Task(Box::new(finished))) });
+    assert!(!domain.shows(crate::page::Section::Task { task: 8, section: TaskSection::Plan }));
+    let id = domain.objects().find(key).unwrap();
+    assert!(domain.owes(id));
+}
+
+#[test]
+fn a_task_end_keeps_its_other_documents_visible_while_the_final_header_is_read() {
+    let value = source();
+    let key = ObjectKey::Proposal(*value.rows.get(0).unwrap().proposals.get(0).unwrap());
+    let (mut domain, _) = domain_and_watch(&value);
+    let task = domain
+        .ui
+        .handles
+        .watches
+        .iter()
+        .find_map(|(handle, held)| (held.subject == Subject::Task { task: 8 }).then_some(*handle))
+        .unwrap();
+    drive(&mut domain, crate::tests::fixtures::Ended { watch: task, end: WatchEnd::SubjectEnded });
+    let w = words();
+    let cap = super::cards::limits();
+    let mut b = Builder::new(&cap);
+    let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
+    b.open(Role::Page);
+    crate::pages::main(&mut b, &domain.view(), w, &mut bindings);
+    crate::pages::after_page(&mut b, &domain.view(), w, &mut bindings);
+    b.close();
+    let tree = b.finish();
+    assert_eq!(tree.nodes().iter().filter(|node| node.key == Some(crate::pages::object_key(key))).count(), 1);
+}

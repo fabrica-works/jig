@@ -8,7 +8,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     confirm::{Confirmation, Missing},
     fields::Purpose,
@@ -18,13 +18,13 @@ use jig_client::contract::{ActKind, Hold, HoldReason, Impact, ObjectKey, OwnerCh
 
 pub mod amendment;
 /// Build the domain's one object or goal confirmation, or nothing when closed.
-pub fn confirmation(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn confirmation(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let text_limit = bindings.text_limit();
     if let Some(open) = client.confirmation() {
         begin(b, words, common::act_phrase(open.act));
         if let Some(object) = client.objects().get(open.object) {
-            context(b, client, object, words, bindings);
-            action(b, client, object, open, words, bindings);
+            context(b, client, &object, words, bindings);
+            action(b, client, &object, open, words, bindings);
         }
         if open.proposed.is_some() {
             words.text(b, JigPhrase::WillPropose, &[]);
@@ -100,7 +100,7 @@ fn end(b: &mut Builder, words: &Words, bindings: &mut JigBindings, dangerous: bo
     crate::frame::control(b, words, bindings, Role::Button, JigPhrase::Dismiss, &[], Act::Dismiss);
     b.close();
 }
-fn context(b: &mut Builder, client: &Domain, object: &Object, words: &Words, bindings: &mut JigBindings) {
+fn context(b: &mut Builder, client: &Borrowed<'_>, object: &Object, words: &Words, bindings: &mut JigBindings) {
     match &object.body {
         Some(Body::Historical(_)) => b.text(
             Run::Plain,
@@ -128,7 +128,7 @@ fn context(b: &mut Builder, client: &Domain, object: &Object, words: &Words, bin
 #[expect(clippy::too_many_lines, reason = "the closed act vocabulary has one exhaustive consequence table")]
 fn action(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: &Object,
     open: &Confirmation,
     words: &Words,
@@ -336,7 +336,7 @@ fn held(object: &Object) -> bool {
         | None => false,
     }
 }
-fn release_object(b: &mut Builder, client: &Domain, object: &Object, words: &Words, bindings: &mut JigBindings) {
+fn release_object(b: &mut Builder, client: &Borrowed<'_>, object: &Object, words: &Words, bindings: &mut JigBindings) {
     match &object.body {
         Some(Body::Task(doc)) => match &doc.hold {
             Some(TaskHold::Document(hold)) => release(b, client, hold, words, bindings),
@@ -429,7 +429,7 @@ pub fn impact_words(b: &mut Builder, impact: &Impact, words: &Words) {
     words.text(b, JigPhrase::PendingEffects, &[Hole::Number(u64::from(impact.effects_pending))]);
     words.text(b, JigPhrase::SettlingEffects, &[Hole::Number(u64::from(impact.effects_settling))]);
 }
-fn release(b: &mut Builder, client: &Domain, facts: &Hold, words: &Words, bindings: &mut JigBindings) {
+fn release(b: &mut Builder, client: &Borrowed<'_>, facts: &Hold, words: &Words, bindings: &mut JigBindings) {
     let closing = facts.before == jig_client::contract::Phase::Closing;
     if closing {
         words.text(b, JigPhrase::ContinueClosing, &[]);
@@ -491,7 +491,7 @@ fn release(b: &mut Builder, client: &Domain, facts: &Hold, words: &Words, bindin
 }
 fn delegates(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: &Object,
     open: &Confirmation,
     words: &Words,

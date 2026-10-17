@@ -8,7 +8,7 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
-use crate::{Domain, Limits, action::Act, page::task::Plan};
+use crate::{Borrowed, Limits, action::Act, ui::borrowed::task::PlanView};
 use jig_client::contract::{Chip, ObjectKey, OwnerPhaseCounts, OwnerTree, OwnerTreeRow, Proposer};
 use skein_lib::{Set, Stack};
 /// Finite complete subtree fragment and its temporary traversal storage.
@@ -137,7 +137,14 @@ fn fold(b: &mut Builder, parent: u64, counts: OwnerPhaseCounts, held: u32, words
     text(b, words, P::Held, &[Hole::Number(u64::from(held))]);
     b.close();
 }
-fn control(b: &mut Builder, client: &Domain, chip: &Chip, expanded: bool, words: &Words, bindings: &mut JigBindings) {
+fn control(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    chip: &Chip,
+    expanded: bool,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     if let Some(id) = client.objects().find(ObjectKey::Task(chip.task)) {
         crate::frame::control(
             b,
@@ -154,7 +161,7 @@ fn row(
     b: &mut Builder,
     value: &OwnerTreeRow,
     expanded: bool,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
@@ -215,8 +222,8 @@ fn row(
 pub fn render(
     b: &mut Builder,
     value: &OwnerTree,
-    plan: &Plan,
-    client: &Domain,
+    plan: &PlanView<'_>,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
@@ -295,7 +302,7 @@ pub fn render(
     text(b, words, P::Held, &[Hole::Number(u64::from(value.held_below))]);
     text(b, words, if value.next.is_some() { P::Next } else { P::End }, &[]);
 }
-fn hidden(row: &OwnerTreeRow, tree: &OwnerTree, plan: &Plan) -> bool {
+fn hidden(row: &OwnerTreeRow, tree: &OwnerTree, plan: &PlanView<'_>) -> bool {
     let mut parent = row.parent;
     for _ in 0..tree.rows.len() {
         let mut found = None;

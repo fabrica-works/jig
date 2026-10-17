@@ -36,6 +36,8 @@ pub struct Rules {
     parked: BTreeSet<ClientId>,
     ended_watches: BTreeSet<(ClientId, Token)>,
     out_of_date: BTreeSet<ClientId>,
+    sign_out_asked: BTreeSet<ClientId>,
+    sign_in_ended: BTreeSet<ClientId>,
     durable: BTreeSet<u64>,
     made: BTreeMap<RequestKey, u64>,
     requests: BTreeMap<RequestKey, Pending>,
@@ -64,6 +66,8 @@ impl Rules {
             parked: BTreeSet::new(),
             ended_watches: BTreeSet::new(),
             out_of_date: BTreeSet::new(),
+            sign_out_asked: BTreeSet::new(),
+            sign_in_ended: BTreeSet::new(),
             durable: BTreeSet::from([0]),
             made: BTreeMap::new(),
             requests: BTreeMap::new(),
@@ -81,6 +85,9 @@ impl Rules {
     }
     fn truth(&mut self, observed: Observed, judge: &mut JudgeOf) {
         match observed {
+            Observed::SignInEnded { client } => {
+                self.sign_in_ended.insert(client);
+            }
             Observed::Durable { commit, at } => {
                 judge.check(at <= judge.now(), "nothing shown done before durable: future write");
                 judge.check(self.durable.insert(commit), "durable commit reported once");
@@ -215,6 +222,7 @@ impl Rules {
             Receipt::Started => {
                 self.ended_watches.retain(|(owner, _)| *owner != client);
                 self.out_of_date.remove(&client);
+                self.sign_out_asked.remove(&client);
             }
             Receipt::OutOfDate => {
                 self.out_of_date.insert(client);
@@ -283,6 +291,12 @@ impl Rules {
                     }
                 }
                 Seen::Outline { .. } => judge.check(false, "the page's outline: a tree broke view.md 3.1"),
+                Seen::SignedOut => {
+                    let allowed = !self.sign_out_asked.contains(&client) || self.sign_in_ended.contains(&client);
+                    judge.check(allowed, "a sign-out told: the engine did not receive sign-out");
+                    self.sign_out_asked.remove(&client);
+                    self.sign_in_ended.remove(&client);
+                }
                 Seen::HiddenPage => {}
                 Seen::Link { live } => {
                     self.links.insert(client, live);
@@ -307,6 +321,9 @@ impl Expectations for Rules {
     type Stimulus = ();
     fn observe(&mut self, observation: Observation, judge: &mut JudgeOf) {
         match observation {
+            Observation::SignOutAsked { client } => {
+                self.sign_out_asked.insert(client);
+            }
             Observation::Client { client } => {
                 self.clients.insert(client);
                 if let Some(live) = self.reachable {

@@ -29,6 +29,8 @@ pub enum Seen {
     Words { task: u64, message: Option<u64>, words: Vec<u8> },
     /// A visible non-work page explains why the whole previous page is hidden.
     HiddenPage,
+    /// The sign-in page says that the former sign-in has ended.
+    SignedOut,
     /// The visible link status.
     Link { live: bool },
 }
@@ -62,6 +64,8 @@ pub enum Receipt {
 /// Durable truth reported by the engine boundary, drained once.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Observed {
+    /// The engine ended this client's sign-in.
+    SignInEnded { client: ClientId },
     /// A completed store commit and its clock.
     Durable { commit: u64, at: Time },
     /// One party's key answered at this durable commit.
@@ -80,6 +84,8 @@ pub enum Observed {
 /// One boundary observation made by the loop.
 #[derive(Clone, Debug)]
 pub enum Observation {
+    /// The shell is sending a person's sign-out to its front.
+    SignOutAsked { client: ClientId },
     /// Admit a tab/device to link expectations.
     Client { client: ClientId },
     /// A keyed send is leaving a client's shell.

@@ -3,13 +3,19 @@ use crate::address::{Address, TaskSection};
 
 pub(super) fn page(row: Task) -> (Tree, JigBindings) {
     let (mut domain, out) = super::super::work_pages::entered(Address::task(8));
-    let watch = out
-        .iter()
-        .find_map(|request| match request {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|request| match request {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     super::super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(row)));
     let built = super::super::pages::build(&domain, 3, words());
     super::super::cards_access::check(&built.0);

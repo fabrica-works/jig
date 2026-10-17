@@ -8,18 +8,16 @@ use super::{
     cards_objects::{loaded, question, render},
 };
 use crate::JigBindings;
+use crate::objects::{Object, question::facts};
 use crate::phrases::english;
 use crate::phrases::jig::{JigPhrase, shapes};
+use crate::tests::fixtures::Fixture;
 use crate::words::Words;
-use crate::{
-    Domain,
-    objects::{Object, question::facts},
-};
 use jig_client::contract::*;
 use skein_lib::{Id, List, Wall, bytes::copy_of};
 use skein_ui::phrases::{HoleKind, PhraseLimits, Phrasebook, Segment, WallFormat};
 use skein_ui::{Builder, Tree};
-fn fixture(from: Option<OwnerRequester>) -> (Domain, Id<Object>, Question) {
+fn fixture(from: Option<OwnerRequester>) -> (Fixture, Id<Object>, Question) {
     let mut value = question();
     value.from = from;
     value.words = text(UTF8_TEXTS[0]);
@@ -28,10 +26,10 @@ fn fixture(from: Option<OwnerRequester>) -> (Domain, Id<Object>, Question) {
         ObjectKey::Question { task: value.task.task, message: value.message },
         ReadValue::Question(Box::new(value.clone())),
     );
-    assert_eq!(facts(d.objects().get(id).unwrap()), Some(&value));
+    assert_eq!(facts(&d.objects().get(id).unwrap()), Some(&value));
     (d, id, value)
 }
-fn tree(d: &Domain, id: Id<Object>, w: &Words) -> Tree {
+fn tree(d: &Fixture, id: Id<Object>, w: &Words) -> Tree {
     render(d, id, w, &mut JigBindings::new(64, CLIENT.text))
 }
 fn selected() -> Words {
@@ -108,7 +106,7 @@ fn question_sender_cards_render_exact_closed_kinds_full_widths_and_no_claim_for_
                 .iter()
                 .any(|node| node.role == skein_ui::Role::Button && node.name.as_deref() == Some(b"Answer"))
         );
-        assert_eq!(facts(d.objects().get(id).unwrap()), Some(&value));
+        assert_eq!(facts(&d.objects().get(id).unwrap()), Some(&value));
     }
 }
 #[test]
@@ -131,7 +129,7 @@ fn question_sender_selected_language_keeps_reordered_numeric_holes_whole_words_a
                 assert!(contains(&shown, &run.text));
             }
         }
-        assert_eq!(facts(d.objects().get(id).unwrap()), Some(&value));
+        assert_eq!(facts(&d.objects().get(id).unwrap()), Some(&value));
     }
     let (d, id, _) = fixture(None);
     assert!(!contains(&tree(&d, id, &w), b"/source"));
@@ -168,7 +166,14 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
         limits.nodes = crate::question_nodes(&CLIENT).unwrap();
         let mut b = Builder::new(&limits);
         let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
-        assert!(crate::cards::question::question(&mut b, &d, id, &crate::cards::Place::Elsewhere, &w, &mut bindings));
+        assert!(crate::cards::question::question(
+            &mut b,
+            &d.view(),
+            id,
+            &crate::cards::Place::Elsewhere,
+            &w,
+            &mut bindings
+        ));
         let shown = b.finish();
         assert!(shown.len() <= limits.nodes);
         let mut total = 0_u64;
@@ -180,7 +185,7 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
         assert!(contains(&shown, b"4294967295 deployment/source"));
         assert!(contains(&shown, value.words.bytes()));
         assert!(contains(&shown, value.task.title.bytes.bytes()));
-        assert_eq!(facts(d.objects().get(id).unwrap()), Some(&value));
+        assert_eq!(facts(&d.objects().get(id).unwrap()), Some(&value));
         let mut older = value.clone();
         older.from = None;
         let (baseline, object) = loaded(

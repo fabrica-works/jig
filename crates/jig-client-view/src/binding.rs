@@ -164,8 +164,7 @@ impl JigBindings {
                         | crate::action::Act::FilterPlan { .. }
                         | crate::action::Act::HistoryScope { .. }
                         | crate::action::Act::OpenEnded { .. }
-                        | crate::action::Act::SignOut
-                        | crate::action::Act::SignIn { .. } => return None,
+                        | crate::action::Act::SignOut => return None,
                     },
                     JigMeaning::Field(_)
                     | JigMeaning::TaskNumber

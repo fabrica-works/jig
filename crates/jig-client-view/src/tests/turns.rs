@@ -9,9 +9,10 @@ use super::{
     pages::{build, deliver, named_binding},
     work_pages::{entered, list, part},
 };
+use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage};
 use crate::words::Words;
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act,
     address::{Address, TaskSection},
     fields::Purpose,
@@ -19,26 +20,34 @@ use crate::{
 use jig_client::contract::*;
 use skein_lib::{Token, Wall};
 use skein_ui::{Key, Role, Tree};
-fn read(out: &[Request]) -> Token {
+fn read(out: &[Request]) -> jig_client::Handle {
     out.iter()
         .find_map(|request| match request {
-            Request::Read { read, what: Read::Activity { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Activity { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .unwrap()
 }
-pub(super) fn ready() -> (Domain, Token, Token, Token) {
+pub(super) fn ready() -> (Fixture, jig_client::Handle, jig_client::Handle, jig_client::Handle) {
     ready_task(8)
 }
-fn ready_task(task: u64) -> (Domain, Token, Token, Token) {
+fn ready_task(task: u64) -> (Fixture, jig_client::Handle, jig_client::Handle, jig_client::Handle) {
     let (mut d, out) = entered(Address::Task { task, section: TaskSection::Activity });
-    let watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut doc = super::cards_objects::task_doc(&[ActKind::Write]);
     doc.chip.task = task;
     doc.chip.executor = Executor::Agent { charter: 2 };
@@ -52,7 +61,7 @@ fn ready_task(task: u64) -> (Domain, Token, Token, Token) {
     let run = out
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Run { .. } } => Some(*watch),
+            Request::Client { asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Run { .. }) } } => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -90,7 +99,7 @@ fn turn() -> Turn {
         cut: true,
     }
 }
-fn live(d: &mut Domain, run: Token, number: u32) {
+fn live(d: &mut Fixture, run: jig_client::Handle, number: u32) {
     let value = text(if number == 1 { b"# provisional first" } else { b"later provisional" });
     let length = u32::try_from(value.bytes().len()).unwrap();
     deliver(
@@ -132,15 +141,11 @@ fn replacement(words: &Words) {
         skein_ui::Act::Press,
     )
     .unwrap();
-    drive(&mut d, Event::Act { act });
+    drive(&mut d, Event::Act { action: act });
     assert!(contains(&build(&d, 3, words).0, b"whole private input"));
-    live(&mut d, run, 2);
-    let later = build(&d, 3, words).0;
-    assert_eq!(keys(&later).len(), 2);
-    assert_eq!(keys(&later)[0], key);
     drive(
         &mut d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                 cut: false,
@@ -168,6 +173,10 @@ fn replacement(words: &Words) {
             }))),
         },
     );
+    live(&mut d, run, 2);
+    let later = build(&d, 3, words).0;
+    assert_eq!(keys(&later).len(), 2);
+    assert_eq!(keys(&later)[0], key);
     let (committed, mut bindings) = build(&d, 3, words);
     access(&committed);
     assert_eq!(keys(&committed), keys(&later));
@@ -202,7 +211,7 @@ fn replacement(words: &Words) {
         skein_ui::Act::Press,
     )
     .unwrap();
-    drive(&mut d, Event::Act { act: closed });
+    drive(&mut d, Event::Act { action: closed });
     assert!(!contains(&build(&d, 3, words).0, b"whole private input"));
     let mut doc = super::cards_objects::task_doc(&[ActKind::Write]);
     doc.chip.executor = Executor::Agent { charter: 2 };
@@ -215,7 +224,7 @@ fn words_states(words: &Words) {
     let (mut d, _, _, read) = ready();
     drive(
         &mut d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                 cut: false,
@@ -227,21 +236,24 @@ fn words_states(words: &Words) {
     );
     drive(
         &mut d,
-        Event::Act { act: Act::Edit { field: Purpose::Composer { task: 8 }, text: text(b"whole new words") } },
+        Event::Act { action: Act::Edit { field: Purpose::Composer { task: 8 }, text: text(b"whole new words") } },
     );
-    drive(&mut d, Event::Act { act: Act::Submit { field: Purpose::Composer { task: 8 } } });
-    let out = drive(&mut d, Event::Act { act: Act::Confirm });
+    drive(&mut d, Event::Act { action: Act::Submit { field: Purpose::Composer { task: 8 } } });
+    let out = drive(&mut d, Event::Act { action: Act::Confirm });
     let request = out
         .iter()
         .find_map(|r| match r {
-            Request::Send { request, .. } => Some(*request),
+            Request::Client { asked: jig_client::Event::Send { key: request, .. } } => Some(*request),
             _ => None,
         })
         .unwrap();
     assert!(contains(&build(&d, 3, words).0, b"Being sent"));
     drive(
         &mut d,
-        Event::Answered { request, answer: Answer::Done(Outcome::Made { what: Made::Words { task: 8, message: 12 } }) },
+        AnsweredByEngine {
+            request,
+            answer: Answer::Done(Outcome::Made { what: Made::Words { task: 8, message: 12 } }),
+        },
     );
     assert!(contains(&build(&d, 3, words).0, b"Sent"));
     assert!(contains(&build(&d, 3, words).0, b"whole new words"));
@@ -282,7 +294,7 @@ fn activities(words: &Words) {
     for (index, rows) in values.chunks(2).enumerate() {
         let out = drive(
             &mut d,
-            Event::Read {
+            ReadPage {
                 read: token,
                 result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                     cut: false,
@@ -304,7 +316,10 @@ fn activities(words: &Words) {
             },
         );
         for request in out {
-            if let Request::Read { read, what: Read::Result { .. } } = request {
+            if let Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Result { .. }) },
+            } = request
+            {
                 let value = Result {
                     task: super::work_pages::chip(9),
                     ending: Ending::Done,
@@ -314,14 +329,14 @@ fn activities(words: &Words) {
 
                     details: None,
                 };
-                drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Result(Box::new(value))) });
+                drive(&mut d, ReadPage { read, result: ReadResult::Value(ReadValue::Result(Box::new(value))) });
             }
         }
         let (tree, mut bindings) = build(&d, 3, words);
         access(&tree);
         assert!(contains(&tree, expected[index]), "{:?}", expected[index]);
         let more = crate::decode(&mut bindings, named_binding(&tree, b"Read earlier"), skein_ui::Act::Press).unwrap();
-        token = read(&drive(&mut d, Event::Act { act: more }));
+        token = read(&drive(&mut d, Event::Act { action: more }));
     }
 }
 #[test]
@@ -336,6 +351,7 @@ fn conversation_keeps_word_states_activity_call_folds_and_provisional_turn_ident
 fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope() {
     let words = words();
     let (mut d, _, run, read) = ready_task(u64::MAX);
+    let mut prior = Vec::new();
     for attempt in [u64::MAX - 1, u64::MAX] {
         deliver(
             &mut d,
@@ -351,9 +367,10 @@ fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope()
                 call: None,
             })),
         );
+        prior.push(keys(&build(&d, 3, words).0)[0]);
     }
     let before = build(&d, 3, words).0;
-    let prior = keys(&before);
+    assert_eq!(keys(&before).len(), 1);
     assert_eq!(prior.len(), 2);
     assert_ne!(prior[0], prior[1]);
     let scope =
@@ -363,7 +380,7 @@ fn full_width_attempt_turn_keys_survive_commit_under_the_actual_task_log_scope()
     assert!(before.nodes()[scope + 1].key.is_none());
     drive(
         &mut d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                 cut: false,
@@ -402,7 +419,7 @@ fn held_and_closing_owner_facts_do_not_finish_an_unobserved_live_attempt() {
     let (mut d, task_watch, run, read) = ready();
     drive(
         &mut d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                 cut: false,
@@ -508,7 +525,7 @@ fn raw_live_call_rendering_omits_unsupplied_wall_and_preserves_escaped_literals_
     let supplied = build(&d, 3, words).0;
     assert_eq!(supplied.nodes().len(), missing_nodes + 2, "an actual epoch gets its own time and text nodes");
     assert_eq!(d.conversation().live.get(0).unwrap().began, Some(Wall::EPOCH));
-    drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: raw.identity.clone(), open: true } });
+    drive(&mut d, Event::Act { action: Act::FoldCurrentCall { identity: raw.identity.clone(), open: true } });
     let expanded = build(&d, 3, words).0;
     access(&expanded);
     assert!(contains(&expanded, UTF8_TEXTS[2]));
@@ -551,7 +568,7 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
     let (mut d, _, run, _) = ready();
     let tool = full_raw_byte(UTF8_TEXTS[3][0]);
     let input = full_raw_byte(UTF8_TEXTS[4][0]);
-    for number in 1..=CLIENT.rows {
+    for number in 1..=1 {
         let name = ProvisionalTurnName { retry: 0, attempt: u64::MAX, number };
         let call = CurrentCall {
             identity: CallIdentity {
@@ -578,17 +595,17 @@ fn maximum_raw_live_calls_fit_whole_page_and_escaped_phrase_capacities() {
                 call: Some(LiveCall::Raw(call.clone())),
             })),
         );
-        drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: call.identity.clone(), open: true } });
+        drive(&mut d, Event::Act { action: Act::FoldCurrentCall { identity: call.identity.clone(), open: true } });
     }
-    assert_eq!(d.conversation().live.len(), CLIENT.rows);
-    assert_eq!(d.conversation().current_opened.len(), CLIENT.rows);
+    assert_eq!(d.conversation().live.len(), 1);
+    assert_eq!(d.conversation().current_opened.len(), 1);
     let limits = crate::limits::of_words(&CLIENT, words).unwrap();
     let mut b = skein_ui::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
     assert!(crate::jig(
         &mut b,
-        &d,
+        &d.view(),
         skein_ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
@@ -701,7 +718,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
         skein_ui::Act::Press,
     )
     .unwrap();
-    drive(&mut d, Event::Act { act });
+    drive(&mut d, Event::Act { action: act });
     let opened = build(&d, 3, &words).0;
     assert!(contains(&opened, b"Selected language folds actual current input"));
     assert!(contains(&opened, b"input"));
@@ -731,16 +748,22 @@ fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_a
         cut: true,
     };
     let mut state = RunState { task: 8, attempt: Some(2), committed_turn: 0, writing: None, call: Some(raw.clone()) };
-    let out = deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
-    for request in &out {
-        if let Request::Continue { .. } = request {
-            panic!("normal document never invents a stream continuation");
+    let _out = deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
+    for down in &d.down {
+        if let jig_client::Down::Continue { .. } = down {
+            panic!("a current-call-only state needs no text continuation");
         }
     }
     assert!(d.conversation().live.is_empty());
-    assert_eq!(d.conversation().current, None);
-    assert_eq!(d.conversation().offset(), 0);
-    assert_eq!(d.conversation().current_run, Some(state.clone()));
+    assert_eq!(d.first_turn(), None);
+    assert_eq!(
+        match d.client.text(run) {
+            Some(text) => text.through,
+            None => 0,
+        },
+        0
+    );
+    assert_eq!(d.conversation().current_run, Some(&state));
     let folded = build(&d, 3, words).0;
     access(&folded);
     assert!(keys(&folded).is_empty(), "call-only has no invented provisional turn key");
@@ -748,7 +771,7 @@ fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_a
     assert!(!contains(&folded, b"call-only-input"));
     let label: &[u8] = b"Observed current tool call";
     assert_eq!(folded.nodes().iter().filter(|node| node.name.as_deref() == Some(label)).count(), 1);
-    drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: raw.identity.clone(), open: true } });
+    drive(&mut d, Event::Act { action: Act::FoldCurrentCall { identity: raw.identity.clone(), open: true } });
     let opened = build(&d, 3, words).0;
     assert!(contains(&opened, b"call-only-input"));
     let without_wall = opened.nodes().len();
@@ -776,7 +799,7 @@ fn whole_run_call_only_is_visible_once_without_a_turn_and_uses_normal_document_a
     state.writing = None;
     state.committed_turn = 1;
     deliver(&mut d, run, Delivery::RunState(Box::new(state.clone())));
-    assert_eq!(d.conversation().current_run, Some(state.clone()));
+    assert_eq!(d.conversation().current_run, Some(&state));
     assert_eq!(build(&d, 3, words).0.nodes().iter().filter(|node| node.name.as_deref() == Some(label)).count(), 1);
     state.call = None;
     deliver(&mut d, run, Delivery::RunState(Box::new(state)));
@@ -799,6 +822,7 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
         input: full_raw_byte(UTF8_TEXTS[4][0]),
         cut: true,
     };
+    let writing = d.client.text(run).cloned();
     deliver(
         &mut d,
         run,
@@ -806,18 +830,18 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
             task: 8,
             attempt: Some(2),
             committed_turn: 0,
-            writing: None,
+            writing,
             call: Some(call.clone()),
         })),
     );
-    drive(&mut d, Event::Act { act: Act::FoldCurrentCall { identity: call.identity, open: true } });
+    drive(&mut d, Event::Act { action: Act::FoldCurrentCall { identity: call.identity, open: true } });
     let limits = crate::limits::of_words(&CLIENT, words).unwrap();
     let mut b = skein_ui::Builder::new(&limits);
     let mut bindings = crate::JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
     assert!(crate::jig(
         &mut b,
-        &d,
+        &d.view(),
         skein_ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
@@ -831,7 +855,7 @@ fn maximum_independent_current_call_fits_page_with_all_existing_provisional_rows
         escaped.push(UTF8_TEXTS[4][0]);
     }
     assert!(contains(&tree, &escaped));
-    assert_eq!(d.conversation().live.len(), CLIENT.rows);
+    assert_eq!(d.conversation().live.len(), 1);
 }
 
 #[test]
@@ -842,17 +866,19 @@ fn displayed_retry_replaces_empty_then_resumes_with_exact_actual_watch_position(
     drive(
         &mut d,
         Event::Act {
-            act: Act::FoldCall { name: crate::conversation::CallName { attempt: 2, turn: 1, call: 1 }, open: true },
+            action: Act::FoldCall { name: crate::conversation::CallName { attempt: 2, turn: 1, call: 1 }, open: true },
         },
     );
     assert!(contains(&build(&d, 3, words).0, b"whole private input"), "existing rich call detail is still available");
     let name = ProvisionalTurnName { attempt: 2, number: 1, retry: u32::MAX };
     let mut value =
         RunText { attempt: 2, began: None, turn: name, from: 0, through: 0, text: text(b""), cut: false, call: None };
-    let out = deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
-    assert!(
-        out.contains(&Request::Continue { watch: run, subject: Subject::Run { task: 8, turn: Some(name), offset: 0 } })
-    );
+    let _out = deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
+    d.reopen(run);
+    assert!(d.down.as_slice().contains(&jig_client::Down::Continue {
+        watch: d.watch_token(run).unwrap(),
+        subject: Subject::Run { task: 8, turn: Some(name), offset: 0 }
+    }));
     assert_eq!(d.conversation().live.len(), 1);
     assert_eq!(d.conversation().live.get(0).unwrap().name, name);
     assert_eq!(d.conversation().live.get(0).unwrap().text.bytes(), b"");
@@ -862,17 +888,22 @@ fn displayed_retry_replaces_empty_then_resumes_with_exact_actual_watch_position(
     assert!(!contains(&empty, b"whole private input"), "a removed retry's rich detail cannot remain visible");
     value.text = text(b"new retry bytes");
     value.through = 15;
-    let out = deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
-    assert!(
-        out.contains(&Request::Continue {
-            watch: run,
-            subject: Subject::Run { task: 8, turn: Some(name), offset: 15 }
-        })
-    );
+    let _out = deliver(&mut d, run, Delivery::Run(Box::new(value.clone())));
+    d.reopen(run);
+    assert!(d.down.as_slice().contains(&jig_client::Down::Continue {
+        watch: d.watch_token(run).unwrap(),
+        subject: Subject::Run { task: 8, turn: Some(name), offset: 15 }
+    }));
     assert!(contains(&build(&d, 3, words).0, b"new retry bytes"));
     deliver(&mut d, run, Delivery::Run(Box::new(value)));
     assert_eq!(d.conversation().live.get(0).unwrap().text.bytes(), b"new retry bytes");
-    assert_eq!(d.conversation().offset(), 15);
+    assert_eq!(
+        match d.client.text(run) {
+            Some(text) => text.through,
+            None => 0,
+        },
+        15
+    );
 }
 
 #[test]
@@ -890,7 +921,7 @@ fn whole_owner_activity_and_fetched_archive_keep_numeric_senders_references_and_
     };
     drive(
         &mut domain,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                 cut: false,

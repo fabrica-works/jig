@@ -8,8 +8,9 @@ use super::{
     pages::{build, deliver},
     work_pages::{entered, list, project_doc, task},
 };
+use crate::tests::fixtures::{Fixture, ReadPage};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act,
     address::{Address, Place, ProjectSection, TaskSection},
 };
@@ -19,10 +20,12 @@ use skein_lib::{List, Token};
 fn cursor() -> Cursor {
     Cursor::new(Box::from(UTF8_TEXTS[0]), 1024).expect("bounded opaque cursor")
 }
-fn read(out: &[Request], kind: u8) -> Token {
+fn read(out: &[Request], kind: u8) -> jig_client::Handle {
     out.iter()
         .find_map(|request| match request {
-            Request::Read { read, what } => match (kind, what) {
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(what) },
+            } => match (kind, what) {
                 (0, Read::Ended { .. })
                 | (1, Read::History { .. })
                 | (2, Read::Activity { .. })
@@ -38,7 +41,7 @@ fn read(out: &[Request], kind: u8) -> Token {
         .unwrap()
 }
 
-fn ready(kind: u8) -> (Domain, Token) {
+fn ready(kind: u8) -> (Fixture, jig_client::Handle) {
     let (mut domain, mut out) = match kind {
         0 => task(TaskSection::Plan, Executor::Agent { charter: 2 }),
         1 => task(TaskSection::History, Executor::Agent { charter: 2 }),
@@ -59,7 +62,13 @@ fn ready(kind: u8) -> (Domain, Token) {
         let tree_watch = out
             .iter()
             .find_map(|request| match request {
-                Request::Open { watch, subject: Subject::Tree { .. } } => Some(*watch),
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Tree { .. }),
+                        },
+                } => Some(*watch),
                 _ => None,
             })
             .unwrap();
@@ -85,19 +94,22 @@ fn ready(kind: u8) -> (Domain, Token) {
                 held_below: 0,
             })),
         );
-        out.extend(drive(&mut domain, Event::Act { act: Act::OpenEnded { task: 9 } }));
+        out.extend(drive(&mut domain, Event::Act { action: Act::OpenEnded { task: 9 } }));
     }
     if kind >= 5 {
         let project = out
             .iter()
             .find_map(|request| match request {
-                Request::Read { read, what: Read::Project { .. } } => Some(*read),
+                Request::Client {
+                    asked:
+                        jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { .. }) },
+                } => Some(*read),
                 _ => None,
             })
             .unwrap();
         drive(
             &mut domain,
-            Event::Read { read: project, result: ReadResult::Value(ReadValue::Project(Box::new(project_doc()))) },
+            ReadPage { read: project, result: ReadResult::Value(ReadValue::Project(Box::new(project_doc()))) },
         );
     }
     let token = read(&out, kind);
@@ -121,7 +133,7 @@ fn value(kind: u8, cut: bool, after: Option<Cursor>) -> ReadValue {
         _ => panic!("eight page kinds"),
     }
 }
-fn held(domain: &Domain, kind: u8) -> bool {
+fn held(domain: &Fixture, kind: u8) -> bool {
     match kind {
         0 => domain.task_page().ended_cut,
         1 => domain.history_rows().cut,
@@ -134,7 +146,7 @@ fn held(domain: &Domain, kind: u8) -> bool {
         _ => panic!("eight page kinds"),
     }
 }
-fn continuation(domain: &Domain, kind: u8) -> Option<Cursor> {
+fn continuation(domain: &Fixture, kind: u8) -> Option<Cursor> {
     match kind {
         0 => domain.task_page().ended_after.clone(),
         1 => match &domain.history_rows().edges.after {
@@ -165,7 +177,7 @@ fn every_native_page_retains_source_loss_and_displays_it_independently_of_contin
         for (cut, after) in [(true, Some(cursor())), (true, None), (false, Some(cursor())), (false, None)] {
             let (mut domain, token) = ready(kind);
             let source = value(kind, cut, after.clone());
-            drive(&mut domain, Event::Read { read: token, result: ReadResult::Value(source) });
+            drive(&mut domain, ReadPage { read: token, result: ReadResult::Value(source) });
             assert_eq!(held(&domain, kind), cut, "native page kind {kind}");
             assert_eq!(continuation(&domain, kind), after, "opaque continuation for page kind {kind}");
             let tree = build(&domain, 3, words).0;
@@ -210,7 +222,7 @@ fn a_complete_conversation_page_preserves_independent_row_text_loss_and_opaque_c
     };
     drive(
         &mut domain,
-        Event::Read {
+        ReadPage {
             read: token,
             result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
                 cut: false,
@@ -235,17 +247,17 @@ fn sliding_a_read_window_keeps_supplied_page_loss_until_that_source_is_reset() {
         [(1, crate::page::task::HISTORY_WINDOW), (4, crate::page::conversations::CONVERSATIONS_WINDOW)]
     {
         let (mut domain, token) = ready(kind);
-        drive(&mut domain, Event::Read { read: token, result: ReadResult::Value(value(kind, true, Some(cursor()))) });
+        drive(&mut domain, ReadPage { read: token, result: ReadResult::Value(value(kind, true, Some(cursor()))) });
         let out = drive(
             &mut domain,
-            Event::Act { act: Act::More { window: Token::new(window), end: crate::action::End::After } },
+            Event::Act { action: Act::More { window: Token::new(window), end: crate::action::End::After } },
         );
         let token = read(&out, kind);
-        drive(&mut domain, Event::Read { read: token, result: ReadResult::Value(value(kind, false, None)) });
+        drive(&mut domain, ReadPage { read: token, result: ReadResult::Value(value(kind, false, None)) });
         assert!(held(&domain, kind), "a later page says nothing about the previous page's missing content");
         assert!(contains(&build(&domain, 3, words()).0, b"This page is incomplete"));
         if kind == 1 {
-            drive(&mut domain, Event::Act { act: Act::HistoryScope { subtree: true } });
+            drive(&mut domain, Event::Act { action: Act::HistoryScope { subtree: true } });
             assert!(!held(&domain, kind));
         }
     }
@@ -318,7 +330,7 @@ fn owner_conversation_rows_render_whole_text_loss_independent_cache_and_only_sup
         budget: super::cards_objects::task_doc(&[]).budget,
     };
     let page = ConversationPage { rows: list([row.clone()]), cut: false, before: None, after: Some(cursor()) };
-    drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Conversations(Box::new(page))) });
+    drive(&mut domain, ReadPage { read, result: ReadResult::Value(ReadValue::Conversations(Box::new(page))) });
     let selected = row_selected_words();
     let tree = build(&domain, 1, &selected).0;
     assert!(contains(&tree, UTF8_TEXTS[1]));
@@ -353,7 +365,7 @@ fn owner_goal_rows_render_every_distinct_stage_without_generic_ended_and_keep_pu
     };
     drive(
         &mut domain,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
                 rows: list([row.clone()]),

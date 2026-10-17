@@ -8,8 +8,9 @@ use super::{
     pages::{build, named_binding},
     work_pages::{entered, list, project_doc},
 };
+use crate::tests::fixtures::ReadPage;
 use crate::{
-    Event, Request,
+    Request,
     action::Act,
     address::{Address, ProjectSection},
 };
@@ -23,7 +24,10 @@ fn recurring_keeps_every_template_member_overlap_period_fact_and_last_batch_link
         let read = requests
             .iter()
             .find_map(|request| match request {
-                Request::Read { read, what: Read::Project { .. } } => Some(*read),
+                Request::Client {
+                    asked:
+                        jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { .. }) },
+                } => Some(*read),
                 _ => None,
             })
             .unwrap();
@@ -45,7 +49,7 @@ fn recurring_keeps_every_template_member_overlap_period_fact_and_last_batch_link
         final_task.contract = TaskContractDocument::Change { connector: u16::MAX, kind: u16::MAX, words: u32::MAX };
         final_task.funder = Funder::Period { project: u32::MAX, period: 71 };
         final_task.cut = true;
-        drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(document))) });
+        drive(&mut domain, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(document))) });
         let (tree, mut bindings) = build(&domain, 3, words);
         assert!(contains(&tree, b"Daily work"));
         assert!(contains(&tree, b"Then follow up"));
@@ -79,7 +83,9 @@ fn recurring_with_no_template_members_or_retained_batch_invents_no_task_or_pendi
     let read = requests
         .iter()
         .find_map(|request| match request {
-            Request::Read { read, what: Read::Project { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
@@ -91,7 +97,7 @@ fn recurring_with_no_template_members_or_retained_batch_invents_no_task_or_pendi
     row.began = None;
     row.next = None;
     row.cut = false;
-    drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(document))) });
+    drive(&mut domain, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(document))) });
     let (tree, _) = build(&domain, 3, words);
     assert!(!contains(&tree, b"Daily work"));
     assert!(!contains(&tree, b"Then follow up"));

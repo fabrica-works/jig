@@ -61,7 +61,7 @@ pub enum Duty<A: App> {
     Store(StoreWrite<A::Record, A::Key>),
     Wire(A::Request),
     Show { address: A::Address, replace: bool },
-    SignIn { provider: u16, back: A::Address },
+    SignIn { provider: u16 },
     SignOut,
     Fact,
 }

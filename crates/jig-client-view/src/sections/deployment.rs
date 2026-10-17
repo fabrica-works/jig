@@ -5,21 +5,22 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::Domain;
+use crate::Borrowed;
 /// Show the admitted deployment document and its connector-owned parts.
-pub(crate) fn section(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+pub(crate) fn section(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) -> bool {
+    let deployment_page = client.deployment_page();
     let text_limit = bindings.text_limit();
     if !client.shows(crate::page::Section::Deployment) {
         return false;
     }
     crate::pages::work::section(b, words, JigPhrase::Deployment, crate::regions::JigRegion::Deployment);
     super::status(b, client, words, crate::page::Section::Deployment);
-    if let Some(doc) = &client.deployment_page().owner {
+    if let Some(doc) = &deployment_page.owner {
         crate::owner_deployment::render(b, client, doc, words, bindings);
         b.close();
         return true;
     }
-    let Some(doc) = &client.deployment_page().document else {
+    let Some(doc) = &deployment_page.document else {
         words.status(b, JigPhrase::LoadingObject, &[]);
         b.close();
         return true;

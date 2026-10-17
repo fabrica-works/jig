@@ -18,7 +18,7 @@ pub struct Filter {
     pub goal: Option<u64>,
 }
 /// One read group's bounded window and independent continuation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct InboxWindow {
     pub cut: bool,
     pub rows: List<InboxRow>,
@@ -83,8 +83,8 @@ impl InboxWindow {
 /// A watched row wins; each source is bounded by one document's row limit.
 #[derive(Debug)]
 pub struct Inbox {
+    pub state: State,
     pub rows: List<InboxRow>,
-    pub filter: Filter,
     /// Whole latest source; exact owner aggregates never become four counters.
     pub document: Option<InboxDocument>,
     /// A selected live goal has no supplied context for at least one row.
@@ -94,6 +94,11 @@ pub struct Inbox {
     pub live: List<InboxRow>,
     /// The shared live watch has rows beyond its window; read cursors remain independent.
     pub live_more: bool,
+}
+/// Page-owned read windows and choices. Live source documents stay with the client.
+#[derive(Clone, Debug)]
+pub struct State {
+    pub filter: Filter,
     pub needs_window: InboxWindow,
     pub updates_window: InboxWindow,
     pub refusal: Option<jig_client::contract::Refusal>,
@@ -102,19 +107,21 @@ pub struct Inbox {
     /// The committed read position; pending mark-seen requests do not advance it.
     pub results_seen: u64,
 }
-impl Inbox {
-    /// Allocates the page's bounded context window.
-    #[must_use]
-    pub fn new(rows: u32) -> Self {
+impl core::ops::Deref for Inbox {
+    type Target = State;
+    fn deref(&self) -> &State {
+        &self.state
+    }
+}
+impl core::ops::DerefMut for Inbox {
+    fn deref_mut(&mut self) -> &mut State {
+        &mut self.state
+    }
+}
+impl State {
+    pub(crate) fn new(rows: u32) -> Self {
         Self {
-            rows: List::with_capacity(rows.checked_mul(4).expect("inbox source rows fit")),
             filter: Filter { project: None, kind: None, goal: None },
-            document: None,
-            goal_context_pending: false,
-            needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
-            updates: Count { value: 0, limited: false },
-            live: List::with_capacity(rows.checked_mul(2).expect("two live groups fit")),
-            live_more: false,
             needs_window: InboxWindow::new(rows),
             updates_window: InboxWindow::new(rows),
             refusal: None,
@@ -123,35 +130,20 @@ impl Inbox {
             results_seen: 0,
         }
     }
-    /// A filtered row belongs here only while its shared object still waits.
-    #[must_use]
-    pub fn includes(&self, entry: &InboxRow) -> bool {
-        let membership = match entry {
-            InboxRow::Entry(value) => self.filter.goal.is_none() || self.filter.goal == value.goal,
-            InboxRow::Owner(value) => owner_membership(value, self.filter.goal, self.document.as_ref()) == Some(true),
-        };
-        (self.filter.project.is_none() || self.filter.project == entry.project())
-            && (self.filter.kind.is_none() || self.filter.kind == Some(entry.group()))
-            && membership
+    pub(crate) fn snapshot(&self) -> Inbox {
+        let mut projected = Inbox::new(self.needs_window.rows.capacity());
+        projected.state = self.clone();
+        projected.merge();
+        projected
     }
-    /// Leaving a page discards every source and its pending cursor.
     pub(crate) fn clear(&mut self) {
-        self.live.clear();
-        self.document = None;
-        self.goal_context_pending = false;
-        self.live_more = false;
         self.needs_window.clear();
         self.updates_window.clear();
-        self.rows.clear();
     }
-    /// Changing filters retains the current live source and starts each query anew.
     pub(crate) fn filter(&mut self, filter: Filter) {
         self.filter = filter;
-        self.needs_window.clear();
-        self.updates_window.clear();
-        self.merge();
+        self.clear();
     }
-    /// Read window for exactly one parent group.
     #[must_use]
     pub const fn window(&self, group: InboxReadGroup) -> &InboxWindow {
         match group {
@@ -159,10 +151,72 @@ impl Inbox {
             InboxReadGroup::Updates => &self.updates_window,
         }
     }
-    pub(crate) const fn window_mut(&mut self, group: InboxReadGroup) -> &mut InboxWindow {
+    pub(crate) fn window_mut(&mut self, group: InboxReadGroup) -> &mut InboxWindow {
         match group {
             InboxReadGroup::Needs => &mut self.needs_window,
             InboxReadGroup::Updates => &mut self.updates_window,
+        }
+    }
+    pub(crate) fn page(&mut self, group: InboxReadGroup, page: InboxPage) {
+        let mut projected = self.snapshot();
+        projected.page(group, page);
+        *self = projected.state;
+    }
+    pub(crate) fn owner_page(&mut self, group: InboxReadGroup, query: Read, page: OwnerInboxPage) {
+        let mut projected = self.snapshot();
+        projected.owner_page(group, query, page);
+        *self = projected.state;
+    }
+}
+
+impl Inbox {
+    pub(crate) fn into_state(self) -> State {
+        self.state
+    }
+    /// Allocates the page's bounded context window.
+    #[must_use]
+    pub fn new(rows: u32) -> Self {
+        Self {
+            state: State::new(rows),
+            rows: List::with_capacity(rows.checked_mul(4).expect("inbox source rows fit")),
+            document: None,
+            goal_context_pending: false,
+            needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+            updates: Count { value: 0, limited: false },
+            live: List::with_capacity(rows.checked_mul(2).expect("two live groups fit")),
+            live_more: false,
+        }
+    }
+    /// Rebuild this entry's projection after changing its local filter.
+    pub fn filter(&mut self, filter: Filter) {
+        self.state.filter(filter);
+        self.merge();
+    }
+    /// A filtered row belongs here only while its shared object still waits.
+    #[must_use]
+    pub fn includes(&self, entry: &InboxRow) -> bool {
+        let membership = match entry {
+            InboxRow::Entry(value) => self.state.filter.goal.is_none() || self.state.filter.goal == value.goal,
+            InboxRow::Owner(value) => {
+                owner_membership(value, self.state.filter.goal, self.document.as_ref()) == Some(true)
+            }
+        };
+        (self.state.filter.project.is_none() || self.state.filter.project == entry.project())
+            && (self.state.filter.kind.is_none() || self.state.filter.kind == Some(entry.group()))
+            && membership
+    }
+    /// Read window for exactly one parent group.
+    #[must_use]
+    pub const fn window(&self, group: InboxReadGroup) -> &InboxWindow {
+        match group {
+            InboxReadGroup::Needs => &self.state.needs_window,
+            InboxReadGroup::Updates => &self.state.updates_window,
+        }
+    }
+    pub(crate) const fn window_mut(&mut self, group: InboxReadGroup) -> &mut InboxWindow {
+        match group {
+            InboxReadGroup::Needs => &mut self.state.needs_window,
+            InboxReadGroup::Updates => &mut self.state.updates_window,
         }
     }
     /// The whole live watch replaces its own source, preserving read windows.
@@ -172,8 +226,8 @@ impl Inbox {
             self.live.push(InboxRow::Entry(Box::new(entry))).expect("whole live source fits");
         }
         self.live_more = more;
-        self.needs_window.past(&self.live, self.filter.goal, self.document.as_ref());
-        self.updates_window.past(&self.live, self.filter.goal, self.document.as_ref());
+        self.state.needs_window.past(&self.live, self.state.filter.goal, self.document.as_ref());
+        self.state.updates_window.past(&self.live, self.state.filter.goal, self.document.as_ref());
         self.merge();
     }
     /// A read terminal moves only its group's rows and cursor.
@@ -189,15 +243,19 @@ impl Inbox {
         window.after = page.after;
         window.more = window.after.is_some();
         match group {
-            InboxReadGroup::Needs => self.needs_window.past(&self.live, self.filter.goal, self.document.as_ref()),
-            InboxReadGroup::Updates => self.updates_window.past(&self.live, self.filter.goal, self.document.as_ref()),
+            InboxReadGroup::Needs => {
+                self.state.needs_window.past(&self.live, self.state.filter.goal, self.document.as_ref());
+            }
+            InboxReadGroup::Updates => {
+                self.state.updates_window.past(&self.live, self.state.filter.goal, self.document.as_ref());
+            }
         }
         self.merge();
     }
     /// Whole exact owner delivery; both allocated groups remain in the envelope.
     pub(crate) fn owner(&mut self, value: Box<OwnerInbox>) {
-        self.results_seen = value.results_seen;
-        self.marked_results = self.marked_results.max(value.results_seen);
+        self.state.results_seen = value.results_seen;
+        self.state.marked_results = self.state.marked_results.max(value.results_seen);
         self.live_more = value.next.is_some();
         self.live.clear();
         for entries in [&value.needs, &value.updates] {
@@ -206,8 +264,8 @@ impl Inbox {
             }
         }
         self.document = Some(InboxDocument::Owner(value));
-        self.needs_window.past(&self.live, self.filter.goal, self.document.as_ref());
-        self.updates_window.past(&self.live, self.filter.goal, self.document.as_ref());
+        self.state.needs_window.past(&self.live, self.state.filter.goal, self.document.as_ref());
+        self.state.updates_window.past(&self.live, self.state.filter.goal, self.document.as_ref());
         self.merge();
     }
     /// The source selected these rows using the original query; no guessed goal
@@ -225,8 +283,12 @@ impl Inbox {
         window.more = window.after.is_some();
         window.query = Some(query);
         match group {
-            InboxReadGroup::Needs => self.needs_window.past(&self.live, self.filter.goal, self.document.as_ref()),
-            InboxReadGroup::Updates => self.updates_window.past(&self.live, self.filter.goal, self.document.as_ref()),
+            InboxReadGroup::Needs => {
+                self.state.needs_window.past(&self.live, self.state.filter.goal, self.document.as_ref());
+            }
+            InboxReadGroup::Updates => {
+                self.state.updates_window.past(&self.live, self.state.filter.goal, self.document.as_ref());
+            }
         }
         self.merge();
     }
@@ -237,7 +299,7 @@ impl Inbox {
             match entry {
                 InboxRow::Owner(value) => {
                     self.goal_context_pending |=
-                        owner_membership(value, self.filter.goal, self.document.as_ref()).is_none();
+                        owner_membership(value, self.state.filter.goal, self.document.as_ref()).is_none();
                 }
                 InboxRow::Entry(_) => {}
             }
@@ -245,11 +307,11 @@ impl Inbox {
                 self.rows.push(entry.clone()).expect("bounded live groups fit");
             }
         }
-        for window in [&self.needs_window, &self.updates_window] {
+        for window in [&self.state.needs_window, &self.state.updates_window] {
             for entry in &window.rows {
                 let included = match entry {
                     InboxRow::Entry(_) => self.includes(entry),
-                    InboxRow::Owner(_) => query_filter(window.query.as_ref()) == Some(self.filter),
+                    InboxRow::Owner(_) => query_filter(window.query.as_ref()) == Some(self.state.filter),
                 };
                 if !included {
                     continue;

@@ -1,12 +1,12 @@
 //! Standalone lifecycle milestones (client/domain/objects.md, 11; view.md, 7).
-//! Domain is borrowed only by existing admitted result follow-up fragments.
+//! Ui is borrowed only by existing admitted result follow-up fragments.
 use crate::JigBindings;
 use crate::owner_milestone_words::MilestonePhrase as P;
 use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::{Domain, Limits};
+use crate::{Borrowed, Limits};
 use jig_client::contract::{ClosingStage, OwnerChipEnding, OwnerMilestoneLine, OwnerMilestonePhase, RunStage};
 
 /// Checked storage for one whole milestone and its nested result/source fragments.
@@ -106,7 +106,13 @@ fn closing(b: &mut Builder, stage: ClosingStage, words: &Words) {
     }
 }
 /// Render only supplied milestone facts, borrowing existing result follow-ups.
-pub fn render(b: &mut Builder, value: &OwnerMilestoneLine, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn render(
+    b: &mut Builder,
+    value: &OwnerMilestoneLine,
+    client: &Borrowed<'_>,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     b.open(Role::Region);
     let caption = words.book.say(words.language, P::Milestone.id(), &[]).expect("checked milestone region name");
     b.name(&caption.text);

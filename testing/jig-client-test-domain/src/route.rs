@@ -5,15 +5,13 @@ use crate::{
     store::{Key, Record},
 };
 use skein_lib::{Env, List, Queue};
-pub(crate) fn jig_env(env: &Env<Limits>) -> Env<jig_client_view::Limits> {
-    Env { now: env.now, wall: env.wall, limits: env.limits.jig }
-}
+
 fn first_env(env: &Env<Limits>) -> Env<first::Limits> {
     Env { now: env.now, wall: env.wall, limits: env.limits.first }
 }
 pub(crate) fn jig(root: &mut Domain, env: &Env<Limits>, event: jig_client_view::Event, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
-    jig_client_view::step(&mut root.jig, &jig_env(env), event, &mut child);
+    root.jig.step(env.now, env.wall, &root.client, event, &mut child);
     route_jig(root, env, &mut child, out);
 }
 pub(crate) fn first(root: &mut Domain, env: &Env<Limits>, event: first::Event, out: &mut Queue<Request>) {
@@ -23,7 +21,7 @@ pub(crate) fn first(root: &mut Domain, env: &Env<Limits>, event: first::Event, o
 }
 pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Start { address, kept, offset } => {
+        Event::Start { address, kept, offset: _ } => {
             let mut jig_kept = List::with_capacity(env.limits.jig.records);
             let mut bytes = List::with_capacity(env.limits.client.domain.requests.requests);
             let mut records = List::with_capacity(env.limits.client.domain.requests.requests);
@@ -48,10 +46,15 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
                 Address::First(_) => jig_client_view::address::Address::Inbox { project: None },
             };
             let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
-            jig_client_view::step(
-                &mut root.jig,
-                &jig_env(env),
-                jig_client_view::Event::Start { address: jig_address, kept: jig_kept, offset },
+            root.jig.step(
+                env.now,
+                env.wall,
+                &root.client,
+                jig_client_view::Event::Start {
+                    place: jig_client_view::address::Place::Jig(jig_address),
+                    records: jig_kept,
+                    seed: root.salt,
+                },
                 &mut child,
             );
             let event = if root.unlinked {
@@ -69,13 +72,14 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
         }
         Event::Went { place } => went(root, env, place, out),
         Event::Act { action } => match action {
-            Action::Jig(act) => jig(root, env, jig_client_view::Event::Act { act }, out),
+            Action::SignIn => out.push(Request::SignIn { provider: 1 }),
+            Action::Jig(act) => jig(root, env, jig_client_view::Event::Act { action: act }, out),
             Action::First(act) => first(root, env, first::Event::Act { act }, out),
         },
         Event::Client { event } => client(root, env, event, out),
         Event::Jig(event) => jig(root, env, event, out),
         Event::First(event) => first(root, env, event, out),
-        Event::SignedOut => jig(root, env, jig_client_view::Event::SignedOut, out),
+        Event::SignedOut => client(root, env, jig_client::Event::Up { up: jig_client::Up::SignedOut }, out),
     }
 }
 fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Request>) {
@@ -85,7 +89,7 @@ fn went(root: &mut Domain, env: &Env<Limits>, place: Place, out: &mut Queue<Requ
             jig(root, env, jig_client_view::Event::Went { place: jig_client_view::address::Place::Jig(address) }, out);
         }
         Place::Address(Address::First(address)) => {
-            jig(root, env, jig_client_view::Event::Went { place: jig_client_view::address::Place::Elsewhere }, out);
+            jig(root, env, jig_client_view::Event::Left, out);
             first(root, env, first::Event::Went { address }, out);
         }
         Place::Missing => {
@@ -102,39 +106,33 @@ pub(crate) fn route_jig(
 ) {
     for _ in 0..child.len() {
         let request = child.pop().expect("counted jig output");
-        if let Some(event) = jig_client_view::bridge::asked(&request, root.salt, env.limits.jig.watches) {
-            client(root, env, event, out);
-            if let jig_client_view::Request::Close { watch } = request {
-                let mut closed = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
-                jig_client_view::bridge::closed(&mut root.jig, &jig_env(env), watch, &mut closed);
-                route_jig(root, env, &mut closed, out);
-            }
-            continue;
-        }
         match request {
-            jig_client_view::Request::Send { .. }
-            | jig_client_view::Request::Read { .. }
-            | jig_client_view::Request::Open { .. }
-            | jig_client_view::Request::Close { .. }
-            | jig_client_view::Request::SignOut => unreachable!("the bridge takes client work"),
-            jig_client_view::Request::Show { address, replace } => {
-                out.push(Request::Show { address: Address::Jig(address), replace });
+            jig_client_view::Request::Client { asked } => client(root, env, asked, out),
+            jig_client_view::Request::Show { place, how } => match place {
+                jig_client_view::address::Place::Jig(address) => out.push(Request::Show {
+                    address: Address::Jig(address),
+                    replace: how == jig_client_view::How::Replace,
+                }),
+                jig_client_view::address::Place::Elsewhere | jig_client_view::address::Place::Missing => {}
+            },
+            jig_client_view::Request::Save { records } => {
+                for record in records.into_boxed() {
+                    out.push(Request::Save { record: Record::Jig(record) });
+                }
             }
-            jig_client_view::Request::Save { record } => out.push(Request::Save { record: Record::Jig(record) }),
-            jig_client_view::Request::Erase { key } => out.push(Request::Erase { key: Key::Jig(key) }),
-            jig_client_view::Request::SignIn { provider, back } => {
-                out.push(Request::SignIn { provider, back: Address::Jig(back) });
+            jig_client_view::Request::Erase { records } => {
+                for key in records.into_boxed() {
+                    out.push(Request::Erase { key: Key::Jig(key) });
+                }
             }
-            jig_client_view::Request::ShowPart { part, generation, scope } => {
-                crate::parts::show(root, env, part, generation, scope, out);
+            jig_client_view::Request::ShowPart { part, scope } => {
+                crate::parts::show(root, env, part, scope, out);
             }
-            jig_client_view::Request::PartsLeft { generation } => {
-                first(root, env, first::Event::PartsLeft { generation }, out);
-                root.second.left(generation);
+            jig_client_view::Request::PartsLeft => {
+                first(root, env, first::Event::PartsLeft, out);
+                root.second.left();
             }
-            jig_client_view::Request::Continue { .. }
-            | jig_client_view::Request::Link { .. }
-            | jig_client_view::Request::Retention { .. } => {}
+            jig_client_view::Request::Link { .. } | jig_client_view::Request::Retention { .. } => {}
             jig_client_view::Request::Confirmed { party } => {
                 first(root, env, first::Event::Confirmed { party }, out);
                 root.second.confirmed(party);
@@ -146,7 +144,6 @@ pub(crate) fn route_jig(
                 out.push(Request::Jig(JigOut::Answered { asked, answer }));
             }
             jig_client_view::Request::Unknown { asked } => out.push(Request::Jig(JigOut::Unknown { asked })),
-            jig_client_view::Request::Fact { fact } => out.push(Request::Fact { fact: Fact::Jig(fact) }),
         }
     }
 }
@@ -167,16 +164,12 @@ pub(crate) fn route_first(
                 crate::family::client::send(root, env, request, &ask, out);
             }
             first::Request::Out(first::Out::Fact { fact: first::Fact::SignedOut }) => {
-                jig(root, env, jig_client_view::Event::SignedOut, out);
+                client(root, env, jig_client::Event::Up { up: jig_client::Up::SignedOut }, out);
             }
             first::Request::Out(value) => crate::family::client::asked(root, env, value, out),
-            first::Request::ShowObjects { objects } => {
-                jig(root, env, jig_client_view::Event::ShowObjects { objects }, out);
+            first::Request::Named { objects, sections } => {
+                jig(root, env, jig_client_view::Event::Named { objects, sections }, out);
             }
-            first::Request::ShowSections { sections } => {
-                jig(root, env, jig_client_view::Event::ShowSections { sections }, out);
-            }
-            first::Request::ObjectsLeft => jig(root, env, jig_client_view::Event::ObjectsLeft, out),
         }
     }
 }
@@ -223,10 +216,10 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
     let asker = match &told {
         Told::Link { link } => {
             let link = match link {
-                jig_client::Link::Live => jig_client_view::link::Link::Live,
-                jig_client::Link::Starting => jig_client_view::link::Link::Starting,
+                jig_client::Link::Live => jig_client::Link::Live,
+                jig_client::Link::Starting => jig_client::Link::Starting,
                 jig_client::Link::Offline | jig_client::Link::SignedOut | jig_client::Link::OutOfDate => {
-                    jig_client_view::link::Link::Offline
+                    jig_client::Link::Offline
                 }
             };
             first(root, env, first::Event::Link { link }, out);
@@ -242,7 +235,7 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: jig_client::Told,
     match jig_client_view::Owner::of_asker(asker) {
         Some(jig_client_view::Owner::Jig) => {
             let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
-            jig_client_view::bridge::told(&mut root.jig, &jig_env(env), &root.client, told, root.salt, &mut child);
+            root.jig.step(env.now, env.wall, &root.client, jig_client_view::Event::Client { told }, &mut child);
             route_jig(root, env, &mut child, out);
         }
         Some(jig_client_view::Owner::Application { number }) => match crate::Connector::of(number) {

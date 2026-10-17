@@ -5,31 +5,31 @@ use crate::{JigBindings, JigMeaning, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
-use crate::{Domain, action::Act, page::project::NoteFilter};
+use crate::{Borrowed, action::Act, page::project::NoteFilter};
 use alloc::boxed::Box;
 use jig_client::contract::{NoteScope, Part};
-pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn notes(b: &mut Builder, client: &Borrowed<'_>, project: u32, words: &Words, bindings: &mut JigBindings) {
+    let project_page = client.project_page();
     b.open(Role::Search);
     b.region(crate::regions::JigRegion::NotesSearch.region());
     b.name(&words.say(JigPhrase::NoteSearch, &[]));
-    let filter = client
-        .project_page()
+    let filter = project_page
         .note_filter
         .clone()
         .unwrap_or(NoteFilter { scope: NoteScope::Project(project), description: None });
     b.open(Role::TextField);
     b.name(&words.say(JigPhrase::NoteSearch, &[]));
     if let Some(description) = &filter.description {
-        b.value(description.bytes(), client.project_page().note_writes);
+        b.value(description.bytes(), project_page.note_writes);
     } else {
-        b.value(&[], client.project_page().note_writes);
+        b.value(&[], project_page.note_writes);
     }
     b.bind(bindings.insert(JigMeaning::NoteSearch { filter: filter.clone() }));
     b.close();
     for scope in [NoteScope::Deployment, NoteScope::Project(project)] {
         scope_choice(b, words, bindings, &filter, scope);
     }
-    if let Some(doc) = &client.project_page().document {
+    if let Some(doc) = &project_page.document {
         for part in &doc.resources {
             match part {
                 Part::Resource { connector, path } => {
@@ -56,22 +56,22 @@ pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Word
             }
         }
     }
-    for goal in &client.project_page().goals {
+    for goal in &project_page.goals {
         scope_choice(b, words, bindings, &filter, NoteScope::Goal { project, goal: goal.chip.task });
     }
     b.close();
     b.open(Role::List);
-    for note in &client.project_page().notes {
+    for note in &project_page.notes {
         cards::card(b, client, *note, &cards::Place::Elsewhere, words, bindings);
     }
     b.close();
-    crate::pages::cut(b, words, client.project_page().notes_cut);
+    crate::pages::cut(b, words, project_page.notes_cut);
     crate::pages::work::cursors(
         b,
         words,
         bindings,
-        client.project_page().notes_before.as_ref(),
-        client.project_page().notes_after.as_ref(),
+        project_page.notes_before.as_ref(),
+        project_page.notes_after.as_ref(),
         crate::page::project::NOTES_WINDOW,
     );
 }

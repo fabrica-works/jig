@@ -12,7 +12,7 @@
 //! | refused otherwise | refused with facts | none |
 //! | retention expired | unknown, inspect address | notice if hidden |
 use crate::{
-    Domain, Request,
+    Request, Ui,
     objects::{Card, Object, Source},
 };
 use jig_client::contract::{ActKind, Answer, Limit, ObjectKey, Refusal};
@@ -47,46 +47,53 @@ pub fn recovery(object: &Object) -> Recovery {
     recovery
 }
 /// Reads the current object, joining a read already in flight and preserving its refusal.
-pub fn look_again(domain: &mut Domain, id: Id<Object>, out: &mut Queue<Request>) {
-    let Some(object) = domain.objects.get(id) else {
+pub fn look_again(domain: &mut Ui, id: Id<Object>, out: &mut Queue<Request>, lent: &jig_client::Client) {
+    let Some(object) = domain.borrow(lent).objects().get(id) else {
         return;
     };
-    if !object.shown || !recovery(object).look_again {
+    if !object.shown || !recovery(&object).look_again {
         return;
     }
     let what = super::document_read(object.key);
-    if domain.reads.pending(&what) {
+    if domain.handles.pending(&what) {
         return;
     }
-    if domain.reads.ask(domain.generation, Source::Card(id), what, out).is_none() {
+    if domain.handles.read(Source::Card(id), what, out).is_none() {
         crate::notices::kept::show(domain, crate::notices::kept::Kind::Refused(Limit::Reads));
     }
     domain.changed();
 }
-pub(crate) fn answered(domain: &mut Domain, key: ObjectKey, act: ActKind, answer: Answer, out: &mut Queue<Request>) {
+pub(crate) fn answered(
+    domain: &mut Ui,
+    key: ObjectKey,
+    act: ActKind,
+    answer: Answer,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     let Some(id) = domain.objects.find(key) else {
         crate::notices::kept::show(domain, crate::notices::kept::Kind::Answer { object: key, answer });
         return;
     };
-    if !domain.objects.get(id).expect("named card exists").shown {
+    if !domain.borrow(lent).objects().get(id).expect("named card exists").shown {
         crate::notices::kept::show(domain, crate::notices::kept::Kind::Answer { object: key, answer: answer.clone() });
     }
     domain.objects.get_mut(id).expect("named card exists").answer = Some(answer.clone());
     match answer {
         Answer::Refused(refusal) => {
             domain.objects.get_mut(id).expect("named card exists").card = Card::Refused { refusal };
-            if recovery(domain.objects.get(id).expect("named card exists")).look_again {
-                look_again(domain, id, out);
+            if recovery(&domain.borrow(lent).objects().get(id).expect("named card exists")).look_again {
+                look_again(domain, id, out, lent);
             }
         }
         Answer::Done(outcome) => {
             if stops_waiting(key, act, &outcome) {
-                let left = domain.leave_answer(id, outcome);
-                assert!(left, "answered card exists");
+                let removed = domain.leave_answer(id, outcome);
+                assert!(removed, "answered card exists");
             } else {
                 domain.objects.get_mut(id).expect("named card exists").card = Card::Open;
                 if act == ActKind::Take || act == ActKind::HandBack {
-                    current_facts(domain, id, out);
+                    current_facts(domain, id, out, lent);
                 }
             }
         }
@@ -94,15 +101,15 @@ pub(crate) fn answered(domain: &mut Domain, key: ObjectKey, act: ActKind, answer
     domain.objects.prune();
     domain.changed();
 }
-fn current_facts(domain: &mut Domain, id: Id<Object>, out: &mut Queue<Request>) {
-    let object = domain.objects.get(id).expect("answered card exists");
+fn current_facts(domain: &mut Ui, id: Id<Object>, out: &mut Queue<Request>, lent: &jig_client::Client) {
+    let object = domain.borrow(lent).objects().get(id).expect("answered card exists");
     if !object.shown {
         return;
     }
     let what = super::document_read(object.key);
     // A read started before the durable answer may still describe the old offers.
-    domain.reads.abandon_matching(domain.generation, &what);
-    if domain.reads.ask(domain.generation, Source::Card(id), what, out).is_none() {
+    domain.handles.forget_read(&what, out);
+    if domain.handles.read(Source::Card(id), what, out).is_none() {
         crate::notices::kept::show(domain, crate::notices::kept::Kind::Refused(Limit::Reads));
     }
 }
@@ -115,12 +122,12 @@ fn stops_waiting(key: ObjectKey, act: ActKind, outcome: &jig_client::contract::O
     }
     super::stops_waiting(key, outcome)
 }
-pub(crate) fn unknown(domain: &mut Domain, key: ObjectKey, act: ActKind) {
+pub(crate) fn unknown(domain: &mut Ui, key: ObjectKey, act: ActKind, lent: &jig_client::Client) {
     let Some(id) = domain.objects.find(key) else {
         crate::notices::kept::show(domain, crate::notices::kept::Kind::Unknown { object: key, act });
         return;
     };
-    if !domain.objects.get(id).expect("named card exists").shown {
+    if !domain.borrow(lent).objects().get(id).expect("named card exists").shown {
         crate::notices::kept::show(domain, crate::notices::kept::Kind::Unknown { object: key, act });
     }
     let object = domain.objects.get_mut(id).expect("named card exists");

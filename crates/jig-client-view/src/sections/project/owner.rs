@@ -7,7 +7,7 @@ use crate::{JigBindings, JigMeaning, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::{Domain, Limits, action::Act, page::project::owner_form};
+use crate::{Borrowed, Limits, action::Act, page::project::owner_form};
 use alloc::boxed::Box;
 use jig_client::contract::{
     Ask, OwnerProject, OwnerProjectPolicy, OwnerProjectResourceRole, PartyKind, PolicyEdit, PolicyEditRole, PolicyGuard,
@@ -317,7 +317,7 @@ fn effect(b: &mut Builder, connector: u16, kind: u16, words: &Words) {
     words.text(b, JigPhrase::PolicyEffect, &[Hole::Number(u64::from(connector)), Hole::Number(u64::from(kind))]);
 }
 /// Render all source facts in order, with connector resource slots left raw.
-pub fn render(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn render(b: &mut Builder, value: &OwnerProject, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     region(b, words, P::Project, &[Hole::Number(u64::from(value.number))]);
     crate::pages::work::section(
         b,
@@ -362,7 +362,7 @@ fn configured_ledgers(b: &mut Builder, value: &OwnerProject, words: &Words) {
     }
     b.close();
 }
-fn resources(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn resources(b: &mut Builder, value: &OwnerProject, _client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::List);
     for resource in &value.resources {
         b.open(Role::Item);
@@ -383,11 +383,17 @@ fn resources(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Wo
     }
     b.close();
 }
-fn policy_section(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn policy_section(
+    b: &mut Builder,
+    value: &OwnerProject,
+    _client: &Borrowed<'_>,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     let text_limit = bindings.text_limit();
     policy(b, &value.policy, words, text_limit);
 }
-fn members(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Words, _bindings: &mut JigBindings) {
+fn members(b: &mut Builder, value: &OwnerProject, _client: &Borrowed<'_>, words: &Words, _bindings: &mut JigBindings) {
     b.open(Role::List);
     for member in &value.members {
         b.open(Role::Item);
@@ -413,7 +419,7 @@ fn members(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Word
     }
     b.close();
 }
-fn ledgers(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Words, _bindings: &mut JigBindings) {
+fn ledgers(b: &mut Builder, value: &OwnerProject, _client: &Borrowed<'_>, words: &Words, _bindings: &mut JigBindings) {
     match &value.current_period {
         Some(ledger) => crate::owner_budget::ledger(b, ledger, words),
         None => text(b, words, P::PeriodAbsent, &[]),
@@ -422,7 +428,7 @@ fn ledgers(b: &mut Builder, value: &OwnerProject, _client: &Domain, words: &Word
         crate::owner_budget::ledger(b, ledger, words);
     }
 }
-fn spend(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn spend(b: &mut Builder, value: &OwnerProject, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::List);
     for spend in &value.spend {
         b.open(Role::Item);
@@ -438,7 +444,7 @@ fn spend(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, 
     }
     b.close();
 }
-fn recurring(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn recurring(b: &mut Builder, value: &OwnerProject, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     for row in &value.recurring {
         whole_recurring(b, client, row, words, bindings);
     }
@@ -446,7 +452,7 @@ fn recurring(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Wor
 // A new whole owner row uses its supplied numeric identity even with an empty title.
 fn whole_recurring(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     row: &jig_client::contract::Recurring,
     words: &Words,
     bindings: &mut JigBindings,
@@ -507,11 +513,12 @@ pub(super) fn section(
     b: &mut Builder,
     value: &OwnerProject,
     selected: crate::address::ProjectSection,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
     use crate::address::ProjectSection;
+    let project_page = client.project_page();
     match selected {
         ProjectSection::Settings => {
             render(b, value, client, words, bindings);
@@ -532,7 +539,7 @@ pub(super) fn section(
         ProjectSection::Recurring => recurring(b, value, client, words, bindings),
         ProjectSection::Overview => {
             super::inbox_cards(b, client, words, bindings);
-            for goal in &client.project_page().goals {
+            for goal in &project_page.goals {
                 super::goals::line(b, client, goal, words, bindings);
             }
             ledgers(b, value, client, words, bindings);
@@ -540,27 +547,27 @@ pub(super) fn section(
         ProjectSection::Goals => {
             words.text(b, JigPhrase::PriorityMeaning, &[]);
             b.open(Role::List);
-            for goal in &client.project_page().listed_goals {
+            for goal in &project_page.listed_goals {
                 super::goals::line(b, client, goal, words, bindings);
             }
             b.close();
-            if client.project_page().goals_more {
+            if project_page.goals_more {
                 words.status(b, JigPhrase::MoreRows, &[]);
             }
-            crate::pages::cut(b, words, client.project_page().ended_cut);
+            crate::pages::cut(b, words, project_page.ended_cut);
             crate::pages::work::cursors(
                 b,
                 words,
                 bindings,
-                client.project_page().ended_before.as_ref(),
-                client.project_page().ended_after.as_ref(),
+                project_page.ended_before.as_ref(),
+                project_page.ended_after.as_ref(),
                 crate::page::project::GOALS_WINDOW,
             );
             super::owner_goals::form(b, client, value, words, bindings);
         }
         ProjectSection::Tasks => {
             b.open(Role::List);
-            for row in &client.project_page().tasks {
+            for row in &project_page.tasks {
                 b.open(Role::Item);
                 cards::chip::chip(b, client, &row.chip, words, bindings);
                 crate::owner_result::requester(b, row.requester, words);
@@ -568,7 +575,7 @@ pub(super) fn section(
                 b.close();
             }
             b.close();
-            if client.project_page().tasks_more {
+            if project_page.tasks_more {
                 words.status(b, JigPhrase::MoreRows, &[]);
             }
         }
@@ -757,7 +764,13 @@ fn service_request(ask: &Ask) -> Option<(&jig_client::contract::Text, jig_client
     }
 }
 /// Show only complete supplied policy replacements, never absent mappings.
-pub(super) fn forms(b: &mut Builder, value: &OwnerProject, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn forms(
+    b: &mut Builder,
+    value: &OwnerProject,
+    client: &Borrowed<'_>,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     let state = &client.project_page().settings;
     policy_fields(b, value, state, words, bindings);
     policy_lists(b, value, state, words, bindings);
@@ -969,7 +982,13 @@ fn holding_forms(
         }
     }
 }
-fn review_form(b: &mut Builder, client: &Domain, state: &owner_form::Form, words: &Words, bindings: &mut JigBindings) {
+fn review_form(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    state: &owner_form::Form,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     let text_limit = bindings.text_limit();
     if let Some(ask) = &state.review {
         region(b, words, P::Review, &[]);

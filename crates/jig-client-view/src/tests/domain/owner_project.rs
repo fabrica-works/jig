@@ -6,8 +6,9 @@
     reason = "ordinary proofs inspect original read tokens and whole keyed requests"
 )]
 use super::spine::{LIMITS, delivered, drive, frame, start};
+use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage, Reported};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act,
     address::{Address, Place, ProjectSection},
     intents::Progress,
@@ -29,7 +30,7 @@ fn pattern() -> OwnerPattern {
         last: OwnerPatternEnd::Open(copy_of(&[254, 0])),
     }
 }
-fn source(number: u32) -> OwnerProject {
+pub(super) fn source(number: u32) -> OwnerProject {
     let authority = OwnerAuthorityDocument::complete(OwnerAuthority {
         tools: u64::MAX,
         grants: list(2, [OwnerGrant { connector: u16::MAX, kind: u16::MAX, pattern: pattern() }]),
@@ -88,23 +89,25 @@ fn source(number: u32) -> OwnerProject {
         cut: false,
     }
 }
-fn read(out: &[Request]) -> Token {
+fn read(out: &[Request]) -> jig_client::Handle {
     out.iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Project { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .expect("original project read")
 }
-fn enter(domain: &mut Domain, number: u32) -> Box<[Request]> {
+fn enter(domain: &mut Fixture, number: u32) -> Box<[Request]> {
     drive(
         domain,
         Time::ZERO,
         Event::Went { place: Place::Jig(Address::Project { project: number, section: ProjectSection::Settings }) },
     )
 }
-fn live(number: u32) -> (Domain, Token) {
-    let mut domain = Domain::new(&LIMITS);
+fn live(number: u32) -> (Fixture, jig_client::Handle) {
+    let mut domain = Fixture::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
     value.projects = list(2, [super::pages::project(number, false)]);
@@ -112,7 +115,7 @@ fn live(number: u32) -> (Domain, Token) {
     let entered = enter(&mut domain, number);
     assert!(
         !entered.iter().any(|r| match r {
-            Request::Open { .. } => true,
+            Request::Client { asked: jig_client::Event::Watch { .. } } => true,
             _ => false,
         }),
         "settings does not acquire a Project watch"
@@ -120,11 +123,11 @@ fn live(number: u32) -> (Domain, Token) {
     let token = read(&entered);
     (domain, token)
 }
-fn install(domain: &mut Domain, token: Token, value: OwnerProject) {
+fn install(domain: &mut Fixture, token: jig_client::Handle, value: OwnerProject) {
     drive(
         domain,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value))) },
     );
 }
 #[test]
@@ -136,22 +139,24 @@ fn owner_project_original_read_checks_full_identity_before_terminal_and_ignores_
         wrong.number = if number == 0 { u32::MAX } else { 0 };
         install(&mut domain, token, wrong);
         assert!(domain.project_page().owner.is_none());
+        assert!(domain.handles.reads.get(&token).is_none());
+        let token = domain.read_again(token);
         install(&mut domain, token, value.clone());
         assert_eq!(domain.project_page().owner.as_deref(), Some(&value));
         assert!(domain.project_page().document.is_none());
         let mut duplicate = value.clone();
         duplicate.policy.period_spend = 0;
-        install(&mut domain, token, duplicate.clone());
+        install_late(&mut domain, token, duplicate.clone());
         assert_eq!(domain.project_page().owner.as_deref(), Some(&value));
         drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
         let next = read(&enter(&mut domain, number));
-        install(&mut domain, token, duplicate);
+        install_late(&mut domain, token, duplicate);
         assert!(domain.project_page().owner.is_none());
         install(&mut domain, next, value.clone());
         assert_eq!(domain.project_page().owner.as_deref(), Some(&value));
-        drive(&mut domain, Time::ZERO, Event::SignedOut);
+        drive(&mut domain, Time::ZERO, jig_client::Up::SignedOut);
         assert!(domain.project_page().owner.is_none());
-        install(&mut domain, next, value);
+        install_late(&mut domain, next, value);
         assert!(domain.project_page().owner.is_none());
     }
 }
@@ -176,16 +181,20 @@ fn owner_project_whole_role_review_keeps_raw_flags_authority_and_other_edited_ch
         role.period_spend = 0;
         role.requests = 0x8041;
     }
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: owner_form::action(chosen.clone()) }).is_empty());
     assert_eq!(domain.project_page().settings.before.as_deref(), Some(&before));
     assert_eq!(owner_form::draft(&domain.project_page().settings, &before), chosen);
-    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
-    let Request::Send { request, scope, ask } = &out[0] else { panic!("one keyed form request") };
-    assert_eq!(*scope, 7);
+    let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
+    let Request::Client { asked: jig_client::Event::Send { key: request, request: jig_client::Ask::Jig(ask) } } =
+        &out[0]
+    else {
+        panic!("one keyed form request")
+    };
+    assert_eq!(domain.intents().get(skein_lib::Id::from_token(domain.intent(*request))).unwrap().scope, 7);
     assert_eq!(**ask, chosen);
     let request = *request;
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
-    drive(&mut domain, Time::ZERO, Event::Answered { request, answer: Answer::Done(Outcome::Changed) });
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
+    drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: Answer::Done(Outcome::Changed) });
     assert!(domain.project_page().settings.pending.is_none());
     assert_eq!(domain.project_page().owner.as_deref(), Some(&value));
 }
@@ -213,8 +222,8 @@ fn owner_project_policy_scalar_and_complete_lists_are_offered_without_inferred_p
     ));
     let (mut domain, token) = live(0);
     install(&mut domain, token, value);
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(absent) }).is_empty());
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: owner_form::action(absent) }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
 }
 #[test]
 fn owner_project_configured_pool_review_keeps_zero_target_distinct_and_refuses_changed_period_or_cut_absence() {
@@ -246,12 +255,14 @@ fn owner_project_configured_pool_review_keeps_zero_target_distinct_and_refuses_c
     assert_eq!(owner_form::baseline(&value, &chosen), Some(before.clone()));
     let (mut domain, token) = live(0);
     install(&mut domain, token, value.clone());
-    drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) });
+    drive(&mut domain, Time::ZERO, Event::Act { action: owner_form::action(chosen.clone()) });
     assert_eq!(domain.project_page().settings.pool_period, Some(0));
     assert_eq!(domain.project_page().settings.before.as_deref(), Some(&before));
-    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert!(match &sent[..] {
-        [Request::Send { ask, .. }] if ask.as_ref() == &chosen => true,
+        [Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } }]
+            if ask.as_ref() == &chosen =>
+            true,
         _ => false,
     });
     let absent = Ask::SetPool { project: 0, party: 0, budget: 113 };
@@ -259,9 +270,9 @@ fn owner_project_configured_pool_review_keeps_zero_target_distinct_and_refuses_c
     assert_eq!(owner_form::baseline(&value, &absent), None);
     let (mut domain, token) = live(0);
     install(&mut domain, token, value.clone());
-    drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(absent.clone()) });
+    drive(&mut domain, Time::ZERO, Event::Act { action: owner_form::action(absent.clone()) });
     domain.project_page.owner.as_mut().unwrap().configured_period = u64::MAX;
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
     value.configured_pools_cut = true;
     assert!(!owner_form::supported(&value, &absent));
     assert_eq!(value.pools.get(0).unwrap().numbers.budget, 11);
@@ -285,11 +296,13 @@ fn owner_project_permission_review_preserves_full_width_order_and_distinguishes_
     assert_eq!(owner_form::baseline(&value, &chosen), Some(before.clone()));
     let (mut domain, token) = live(value.number);
     install(&mut domain, token, value.clone());
-    drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) });
+    drive(&mut domain, Time::ZERO, Event::Act { action: owner_form::action(chosen.clone()) });
     assert_eq!(domain.project_page().settings.before.as_deref(), Some(&before));
-    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert!(match &sent[..] {
-        [Request::Send { ask, .. }] if ask.as_ref() == &chosen => true,
+        [Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } }]
+            if ask.as_ref() == &chosen =>
+            true,
         _ => false,
     });
     value.policy.permissions = Some(List::with_capacity(2));
@@ -314,20 +327,22 @@ fn owner_project_service_requires_explicit_role_before_name_without_emitting_an_
         drive(
             &mut domain,
             Time::ZERO,
-            Event::Act { act: Act::ProjectServiceRole { role: HeldRole::Policy { role: 17 } } }
+            Event::Act { action: Act::ProjectServiceRole { role: HeldRole::Policy { role: 17 } } }
         )
         .is_empty()
     );
     assert!(domain.project_page().settings.service_role.is_none());
     let role = HeldRole::Policy { role: u32::MAX };
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::ProjectServiceRole { role } }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::ProjectServiceRole { role } }).is_empty());
     assert_eq!(domain.project_page().settings.service_role, Some(role));
     assert!(domain.project_page().settings.review.is_none());
     let chosen = Ask::MakeService { project: 0, name: Text::new(copy_of(b""), LIMITS.text).unwrap(), role };
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(chosen.clone()) }).is_empty());
-    let sent = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: owner_form::action(chosen.clone()) }).is_empty());
+    let sent = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert!(match &sent[..] {
-        [Request::Send { ask, .. }] if ask.as_ref() == &chosen => true,
+        [Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } }]
+            if ask.as_ref() == &chosen =>
+            true,
         _ => false,
     });
 }
@@ -338,18 +353,18 @@ fn owner_project_settings_unknown_retires_only_matching_pending_and_late_answer_
     let value = source(0);
     install(&mut domain, token, value.clone());
     let ask = Ask::ChangePolicy { project: 0, edit: PolicyEdit::ProjectSpend { period_spend: 19 } };
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: owner_form::action(ask) }).is_empty());
-    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: owner_form::action(ask) }).is_empty());
+    let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     let request = out
         .iter()
         .find_map(|row| match row {
-            Request::Send { request, .. } => Some(*request),
+            Request::Client { asked: jig_client::Event::Send { key: request, .. } } => Some(*request),
             _ => None,
         })
         .unwrap();
     owner_form::unknown(&mut domain, Token::new(u64::MAX));
-    assert_eq!(domain.project_page().settings.pending, Some(request));
-    assert!(drive(&mut domain, Time::ZERO, Event::Progress { request, progress: Progress::Unknown }).is_empty());
+    assert_eq!(domain.project_page().settings.pending, Some(domain.intent(request)));
+    assert!(drive(&mut domain, Time::ZERO, Reported { request, progress: Progress::Unknown }).is_empty());
     assert!(domain.project_page().settings.pending.is_none());
     let notices: Vec<_> =
         domain.notices().ids().into_iter().map(|(id, ())| domain.notices().get(*id).unwrap().kind.clone()).collect();
@@ -358,13 +373,21 @@ fn owner_project_settings_unknown_retires_only_matching_pending_and_late_answer_
             purpose: crate::page::IntentPurpose::ProjectSettings
         })
     );
-    assert!(drive(&mut domain, Time::ZERO, Event::Progress { request, progress: Progress::Unknown }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Reported { request, progress: Progress::Unknown }).is_empty());
     assert!(
-        drive(&mut domain, Time::ZERO, Event::Answered { request, answer: Answer::Done(Outcome::Changed) }).is_empty()
+        drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: Answer::Done(Outcome::Changed) }).is_empty()
     );
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
     let after: Vec<_> =
         domain.notices().ids().into_iter().map(|(id, ())| domain.notices().get(*id).unwrap().kind.clone()).collect();
     assert_eq!(after, notices);
     assert_eq!(domain.project_page().owner.as_deref(), Some(&value));
+}
+
+fn install_late(domain: &mut Fixture, read: jig_client::Handle, value: OwnerProject) {
+    drive(
+        domain,
+        Time::ZERO,
+        ReadPage { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value))) }.late(),
+    );
 }

@@ -1,14 +1,14 @@
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
+use crate::tests::fixtures::{Fixture, ReadPage, Watched};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::End,
     address::{Address, Place, TaskSection},
     objects::{Card, Objects, Source},
-    reads::Reads,
     windows::*,
 };
 use jig_client::contract::*;
-use skein_lib::{List, Queue, Time, Token, Wall};
+use skein_lib::{List, Time, Token, Wall};
 
 fn rows<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     let mut rows = List::with_capacity(3);
@@ -74,26 +74,40 @@ fn history(position: u64) -> HistoryRow {
 
 #[test]
 fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() {
-    let mut domain = Domain::new(&LIMITS);
+    let mut domain = Fixture::new(&LIMITS);
     let frame_watch = start(&mut domain, List::with_capacity(0));
-    let inbox = open_token(&delivered(&mut domain, Time::ZERO, frame_watch, frame(7)));
-    let source = Source::Window { generation: 0, number: 0 };
+    let initial = delivered(&mut domain, Time::ZERO, frame_watch, frame(7));
+    let inbox = open_token(&initial);
+    super::pages::finish_initial_inbox_reads(&mut domain, &initial);
+    let source = Source::Window { number: 0 };
     let pending = domain.objects.name(ObjectKey::Task(5), source).unwrap();
     domain.objects.get_mut(pending).unwrap().card =
         Card::Deciding { request: Some(Token::new(99)), progress: crate::intents::Progress::InFlight };
     let address = Address::Task { task: 8, section: TaskSection::Activity };
     let moved = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(address) });
     assert_eq!(moved.len(), 5);
-    assert_eq!(moved[0], Request::Close { watch: inbox });
-    assert_eq!(moved[1], Request::PartsLeft { generation: 0 });
-    let Request::Open { watch: task_watch, subject: Subject::Task { task: 8 }, .. } = moved[2] else {
+    assert_eq!(moved[0], Request::Client { asked: jig_client::Event::Unwatch { handle: inbox } });
+    assert_eq!(moved[1], Request::PartsLeft);
+    let Request::Client {
+        asked:
+            jig_client::Event::Watch {
+                handle: task_watch,
+                subject: jig_client::Watchable::Jig(Subject::Task { task: 8 }),
+                ..
+            },
+    } = moved[2]
+    else {
         panic!("task first");
     };
-    assert_eq!(moved[3], Request::Show { address, replace: true });
+    assert_eq!(moved[3], Request::Show { place: Place::Jig(address), how: crate::How::Replace });
     assert_eq!(
         moved[4],
         Request::Save {
-            record: crate::store::Record::Place { version: crate::store::STORE_VERSION, party: 7, address }
+            records: crate::tests::fixtures::one(crate::store::Record::Place {
+                version: crate::store::STORE_VERSION,
+                party: 7,
+                address
+            })
         }
     );
     let mut document = super::confirmation::task();
@@ -101,26 +115,37 @@ fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() 
     let activity_requests = drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+        Watched { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
     );
-    let Request::Open { subject: Subject::Run { task: 8, .. }, .. } = activity_requests[0] else {
+    let Request::Client {
+        asked: jig_client::Event::Watch { subject: jig_client::Watchable::Jig(Subject::Run { task: 8, .. }), .. },
+    } = activity_requests[0]
+    else {
         panic!("agent run after its document");
     };
-    let Request::Read { read, what: Read::Activity { task: 8, before: None } } = activity_requests[1] else {
+    let Request::Client {
+        asked:
+            jig_client::Event::Read {
+                handle: read,
+                read: jig_client::Readable::Jig(Read::Activity { task: 8, before: None }),
+            },
+    } = activity_requests[1]
+    else {
         panic!("activity read after its document");
     };
-    assert_eq!(domain.objects.find(ObjectKey::Task(5)), Some(pending));
-    assert!(domain.objects.get(pending).unwrap().sources.is_empty());
+    assert_eq!(domain.objects().find(ObjectKey::Task(5)), Some(pending));
+    assert!(domain.objects().get(pending).unwrap().sources.is_empty());
     let gone = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
-    assert_eq!(gone.len(), 3);
-    assert_eq!(gone[2], Request::PartsLeft { generation: 1 });
+    assert_eq!(gone.len(), 4);
+    assert_eq!(gone[2], Request::Client { asked: jig_client::Event::Unwatch { handle: read } });
+    assert_eq!(gone[3], Request::PartsLeft);
     let shown = domain.shown();
     let page = ActivityPage { cut: false, rows: rows([activity(9)]), before: None, after: None };
     assert!(
         drive(
             &mut domain,
             Time::ZERO,
-            Event::Read { read, result: ReadResult::Value(ReadValue::Activity(Box::new(page))) }
+            ReadPage { read, result: ReadResult::Value(ReadValue::Activity(Box::new(page))) }
         )
         .is_empty()
     );
@@ -132,15 +157,15 @@ fn navigation_closes_abandons_leaves_and_opens_in_order_keeping_pending_cards() 
 #[test]
 fn source_replacement_keeps_shared_names_and_admits_in_order() {
     let mut objects = Objects::new(2, 2);
-    let a = Source::Window { generation: 1, number: 1 };
-    let b = Source::Window { generation: 1, number: 2 };
+    let a = Source::Window { number: 1 };
+    let b = Source::Window { number: 2 };
     let first = ObjectKey::Task(1);
     let second = ObjectKey::Task(2);
     let third = ObjectKey::Task(3);
     assert_eq!(objects.replace(a, &[first, second, third]), 1);
     let id = objects.find(first).unwrap();
     assert_eq!(objects.replace(b, &[first]), 0);
-    let c = Source::Window { generation: 1, number: 3 };
+    let c = Source::Window { number: 3 };
     assert_eq!(objects.replace(c, &[first]), 1);
     assert!(!objects.named(first, c));
     assert_eq!(objects.replace(a, &[second]), 0);
@@ -157,24 +182,8 @@ fn source_replacement_keeps_shared_names_and_admits_in_order() {
 }
 
 #[test]
-fn full_reads_refuse_and_keep_the_abandoned_terminal_obligation() {
-    let mut reads = Reads::new(1);
-    let source = Source::Window { generation: 0, number: 1 };
-    let mut out = Queue::with_capacity(8);
-    let first = reads.ask(0, source, Read::Deployment, &mut out).unwrap();
-    reads.abandon(0);
-    assert!(reads.ask(1, source, Read::Frame, &mut out).is_none());
-    assert_eq!(out.pop(), Some(Request::Read { read: first.token(), what: Read::Deployment }));
-    assert_eq!(out.pop(), Some(Request::Fact { fact: crate::facts::Fact::Refused { which: Limit::Reads } }));
-    assert!(reads.terminal(first.token()).unwrap().abandoned);
-    assert!(reads.terminal(first.token()).is_none());
-    reads.reclaim();
-    assert!(reads.ask(1, source, Read::Frame, &mut out).is_some());
-}
-
-#[test]
 fn deployment_parts_are_shown_with_the_page_generation() {
-    let mut domain = Domain::new(&LIMITS);
+    let mut domain = Fixture::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     delivered(&mut domain, Time::ZERO, f, frame(7));
     let moved = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
@@ -191,9 +200,9 @@ fn deployment_parts_are_shown_with_the_page_generation() {
     let out = drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Deployment(Box::new(deployment))) },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Deployment(Box::new(deployment))) },
     );
-    assert_eq!(out.as_ref(), &[Request::ShowPart { part, generation: 1, scope: PartScope::Deployment }]);
+    assert_eq!(out.as_ref(), &[Request::ShowPart { part, scope: PartScope::Deployment }]);
 }
 
 fn object_window_slides_from_both_ends_and_gates_live_rows() {
@@ -287,7 +296,7 @@ fn every_concrete_window_slides_from_both_ends_and_gates_live_rows() {
 #[test]
 fn outbox_parts_keep_their_owner_scope_in_pages_and_retained_application_objects() {
     for owner in [PartScope::Project(41), PartScope::Deployment] {
-        let mut domain = Domain::new(&LIMITS);
+        let mut domain = Fixture::new(&LIMITS);
         let f = start(&mut domain, List::with_capacity(0));
         delivered(&mut domain, Time::ZERO, f, frame(7));
         let part = Part::Outbox { connector: 2, scope: owner, entry: u64::MAX };
@@ -304,23 +313,30 @@ fn outbox_parts_keep_their_owner_scope_in_pages_and_retained_application_objects
         let out = drive(
             &mut domain,
             Time::ZERO,
-            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Deployment(Box::new(deployment))) },
+            Watched { watch, event: WatchEvent::Delivered(Delivery::Deployment(Box::new(deployment))) },
         );
-        assert_eq!(out.as_ref(), &[Request::ShowPart { part: part.clone(), generation: 1, scope: owner }]);
+        assert_eq!(out.as_ref(), &[Request::ShowPart { part: part.clone(), scope: owner }]);
         drive(
             &mut domain,
             Time::ZERO,
             Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Overview }) },
         );
-        assert_eq!(crate::application::scope(&domain, &part), Some(owner));
+        assert_eq!(crate::application::scope(&domain.ui, &part, &domain.client), Some(owner));
         let task = super::confirmation::task();
         assert_eq!(crate::application::owner_scope(&part, PartScope::Project(task.project)), owner);
         // The same supplied scope survives a jig object retained on an application page.
         drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
-        let shown = drive(&mut domain, Time::ZERO, Event::ShowObjects { objects: rows([ObjectKey::Task(8)]) });
+        let shown = drive(
+            &mut domain,
+            Time::ZERO,
+            Event::Named { sections: List::with_capacity(0), objects: rows([ObjectKey::Task(8)]) },
+        );
         let mut task_read = None;
         for request in &shown {
-            if let Request::Read { read, what: Read::Task { task: 8 } } = request {
+            if let Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Task { task: 8 }) },
+            } = request
+            {
                 task_read = Some(*read);
             }
         }
@@ -330,8 +346,8 @@ fn outbox_parts_keep_their_owner_scope_in_pages_and_retained_application_objects
         let shown = drive(
             &mut domain,
             Time::ZERO,
-            Event::Read { read, result: ReadResult::Value(ReadValue::Task(Box::new(task))) },
+            ReadPage { read, result: ReadResult::Value(ReadValue::Task(Box::new(task))) },
         );
-        assert!(shown.contains(&Request::ShowPart { part, generation: 3, scope: owner }));
+        assert!(shown.contains(&Request::ShowPart { part, scope: owner }));
     }
 }

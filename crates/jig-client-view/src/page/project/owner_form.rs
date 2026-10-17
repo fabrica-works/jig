@@ -1,6 +1,6 @@
 //! Whole supplied settings baselines and one keyed edit; pages.md, 6.5.
 //! This form never computes policy. Only explicit offered requests are eligible.
-use crate::{Domain, Request, action::Act, intents::Origin, page::IntentPurpose};
+use crate::{Request, Ui, action::Act, intents::Origin, page::IntentPurpose};
 use alloc::boxed::Box;
 use jig_client::contract::{ActKind, Admission, Ask, OwnerProject, PolicyEdit, Refusal};
 use skein_lib::{Queue, Token};
@@ -57,7 +57,7 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
     false
 }
 /// An explicit role choice has no implicit service name or request.
-pub(crate) fn service_role(domain: &mut Domain, role: jig_client::contract::HeldRole) {
+pub(crate) fn service_role(domain: &mut Ui, role: jig_client::contract::HeldRole) {
     if domain.blocked || domain.project_page.settings.pending.is_some() {
         return;
     }
@@ -217,7 +217,7 @@ pub fn draft(state: &Form, before: &Ask) -> Ask {
     before.clone()
 }
 #[expect(clippy::manual_map, reason = "step code matches Option without closures")]
-pub(crate) fn review(domain: &mut Domain, ask: Box<Ask>) {
+pub(crate) fn review(domain: &mut Ui, ask: Box<Ask>) {
     if domain.blocked || domain.project_page.settings.pending.is_some() {
         return;
     }
@@ -263,7 +263,7 @@ pub(crate) fn review(domain: &mut Domain, ask: Box<Ask>) {
     domain.changed();
 }
 #[expect(clippy::manual_map, reason = "step code matches Option without closures")]
-pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
+pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>) {
     if domain.blocked || domain.project_page.settings.pending.is_some() {
         return;
     }
@@ -309,14 +309,14 @@ pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
         domain.changed();
         return;
     }
-    let origin = Origin::Page { generation: domain.generation, purpose: IntentPurpose::ProjectSettings };
+    let origin = Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::ProjectSettings };
     domain.project_page.settings.pending = match domain.intents.ask(scope, origin, ask, out) {
         Some(id) => Some(id.token()),
         None => None,
     };
     domain.changed();
 }
-pub(crate) fn answered(domain: &mut Domain, request: Token, answer: jig_client::contract::Answer) {
+pub(crate) fn answered(domain: &mut Ui, request: Token, answer: jig_client::contract::Answer) {
     if domain.project_page.settings.pending == Some(request) {
         domain.project_page.settings.pending = None;
         crate::notices::kept::show(domain, crate::notices::kept::Kind::PageAnswer { answer });
@@ -324,7 +324,7 @@ pub(crate) fn answered(domain: &mut Domain, request: Token, answer: jig_client::
     }
 }
 /// Retire only the matching pending settings request after retention becomes unknown.
-pub(crate) fn unknown(domain: &mut Domain, request: Token) {
+pub(crate) fn unknown(domain: &mut Ui, request: Token) {
     if domain.project_page.settings.pending == Some(request) {
         domain.project_page.settings.pending = None;
     }

@@ -11,12 +11,13 @@ use super::{
     work_pages::{entered, list, part},
 };
 use crate::JigBindings;
+use crate::tests::fixtures::{Fixture, ReadPage};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     address::{Address, Place, TaskSection},
 };
 use jig_client::contract::*;
-use skein_lib::{Token, Wall};
+use skein_lib::Wall;
 use skein_ui::{Builder, Role, Tree};
 fn key(proposer: Proposer) -> ProposalKey {
     ProposalKey { proposer, number: 1 }
@@ -32,15 +33,21 @@ fn task(keys: &[ProposalKey], activity: u64) -> Task {
     doc.activity = activity;
     doc
 }
-fn opened(keys: &[ProposalKey]) -> (Domain, Token, Vec<Request>) {
+fn opened(keys: &[ProposalKey]) -> (Fixture, jig_client::Handle, Vec<Request>) {
     let (mut d, out) = entered(Address::Task { task: 8, section: TaskSection::Activity });
-    let watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let out = deliver(&mut d, watch, Delivery::Task(Box::new(task(keys, 11))));
     (d, watch, out)
 }
@@ -60,26 +67,23 @@ fn proposal(key: ProposalKey) -> Proposal {
         ending: None,
     }
 }
-fn token(out: &[Request], key: ProposalKey) -> Token {
+fn token(out: &[Request], key: ProposalKey) -> jig_client::Handle {
     out.iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Proposal { proposal } } if *proposal == key => Some(*read),
+            Request::Client { asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Proposal { proposal }) } } if *proposal == key => Some(*read),
             _ => None,
         })
         .unwrap()
 }
-fn receive(d: &mut Domain, out: &[Request], value: Proposal) {
-    drive(
-        d,
-        Event::Read { read: token(out, value.key), result: ReadResult::Value(ReadValue::Proposal(Box::new(value))) },
-    );
+fn receive(d: &mut Fixture, out: &[Request], value: Proposal) {
+    drive(d, ReadPage { read: token(out, value.key), result: ReadResult::Value(ReadValue::Proposal(Box::new(value))) });
 }
-fn build(d: &Domain) -> Tree {
+fn build(d: &Fixture) -> Tree {
     let tree = build_tree(d);
     super::cards_access::check(&tree);
     tree
 }
-fn build_tree(d: &Domain) -> Tree {
+fn build_tree(d: &Fixture) -> Tree {
     let w = words();
     let nodes = crate::task_nodes(&CLIENT, 0)
         .unwrap()
@@ -98,8 +102,8 @@ fn build_tree(d: &Domain) -> Tree {
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(nodes, CLIENT.text);
     b.open(Role::Page);
-    crate::pages::main(&mut b, d, w, &mut bindings);
-    crate::pages::after_page(&mut b, d, w, &mut bindings);
+    crate::pages::main(&mut b, &d.view(), w, &mut bindings);
+    crate::pages::after_page(&mut b, &d.view(), w, &mut bindings);
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= nodes);
@@ -168,7 +172,13 @@ fn task_proposals_share_exact_cards_with_committed_and_live_calls_without_confla
             let run = out
                 .iter()
                 .find_map(|r| match r {
-                    Request::Open { watch, subject: Subject::Run { .. } } => Some(*watch),
+                    Request::Client {
+                        asked:
+                            jig_client::Event::Watch {
+                                handle: watch,
+                                subject: jig_client::Watchable::Jig(Subject::Run { .. }),
+                            },
+                    } => Some(*watch),
                     _ => None,
                 })
                 .unwrap();
@@ -191,16 +201,22 @@ fn task_proposals_share_exact_cards_with_committed_and_live_calls_without_confla
                 })),
             );
         } else {
-            let read = out
-                .iter()
-                .find_map(|r| match r {
-                    Request::Read { read, what: Read::Activity { .. } } => Some(*read),
-                    _ => None,
-                })
-                .unwrap();
+            let read =
+                out.iter()
+                    .find_map(|r| match r {
+                        Request::Client {
+                            asked:
+                                jig_client::Event::Read {
+                                    handle: read,
+                                    read: jig_client::Readable::Jig(Read::Activity { .. }),
+                                },
+                        } => Some(*read),
+                        _ => None,
+                    })
+                    .unwrap();
             drive(
                 &mut d,
-                Event::Read {
+                ReadPage {
                     read,
                     result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                         cut: false,
@@ -262,7 +278,7 @@ fn a_task_activity_renders_the_native_whole_pending_proposal_with_its_supplied_f
     };
     drive(
         &mut d,
-        Event::Read { read: token(&out, k), result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(native))) },
+        ReadPage { read: token(&out, k), result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(native))) },
     );
     let tree = build(&d);
     assert_eq!(cards(&tree, k), 1);
@@ -273,35 +289,49 @@ fn a_task_activity_renders_the_native_whole_pending_proposal_with_its_supplied_f
     assert!(contains(&tree, b"Accept"));
 }
 
-fn leaving_plan(with_chat: bool) -> (Domain, ProposalKey) {
+fn leaving_plan(with_chat: bool) -> (Fixture, ProposalKey) {
     let k = key(Proposer::Task(8));
     let (mut d, opened) = super::work_pages::entered_arranged(
         Address::Task { task: 8, section: TaskSection::Plan },
         crate::page::Arrangement { task: list([TaskSection::Activity]), project: list([]) },
     );
-    let watch = opened
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        opened
+            .iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let out = deliver(&mut d, watch, Delivery::Task(Box::new(task(&[k], 11))));
     receive(&mut d, &out, proposal(k));
     if with_chat {
         committed_proposal(&mut d, &out, k);
     }
     let id = d.objects().find(ObjectKey::Proposal(k)).unwrap();
-    drive(&mut d, Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::Accept } });
-    drive(&mut d, Event::Act { act: crate::action::Act::Confirm });
-    let tree = opened
-        .iter()
-        .chain(out.iter())
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Tree { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    drive(&mut d, Event::Act { action: crate::action::Act::Intend { object: id.token(), act: ActKind::Accept } });
+    drive(&mut d, Event::Act { action: crate::action::Act::Confirm });
+    let tree =
+        opened
+            .iter()
+            .chain(out.iter())
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Tree { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     deliver(
         &mut d,
         tree,
@@ -315,17 +345,19 @@ fn leaving_plan(with_chat: bool) -> (Domain, ProposalKey) {
     );
     (d, k)
 }
-fn committed_proposal(d: &mut Domain, out: &[Request], k: ProposalKey) {
+fn committed_proposal(d: &mut Fixture, out: &[Request], k: ProposalKey) {
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Activity { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Activity { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
     drive(
         d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                 cut: false,

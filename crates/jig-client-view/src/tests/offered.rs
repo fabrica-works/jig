@@ -79,7 +79,7 @@ fn every_closed_offer_control_and_whole_refusal_fits_the_public_card_tree_with_t
         let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
         let mut builder = Builder::new(&limits);
         builder.open(Role::Page);
-        cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, w, &mut bindings);
+        cards::card(&mut builder, &domain.view(), id, &cards::Place::Elsewhere, w, &mut bindings);
         builder.close();
         let tree = builder.finish();
         super::cards_access::check(&tree);

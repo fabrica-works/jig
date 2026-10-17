@@ -4,9 +4,10 @@
 mod held;
 mod lacking;
 mod refusals;
+use crate::intents::Progress;
 use crate::phrases::jig::JigPhrase;
-use crate::{intents::Progress, link::Link};
 use alloc::boxed::Box;
+use jig_client::Link;
 use jig_client::contract::{Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome, ProposalKey, Proposer};
 use skein_lib::{Duration, Wall, bytes::copy_of};
 use skein_ui::phrases::{Hole, Phrasebook};
@@ -57,6 +58,8 @@ impl Words {
             Link::Starting => JigPhrase::Starting,
             Link::Live => JigPhrase::Live,
             Link::Offline => JigPhrase::Offline,
+            Link::SignedOut => JigPhrase::SignedOut,
+            Link::OutOfDate => JigPhrase::UpdateClient,
         };
         self.status(b, phrase, &[]);
     }

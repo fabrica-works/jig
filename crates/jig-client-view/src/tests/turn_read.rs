@@ -4,7 +4,7 @@ use super::{
     turns::ready,
     work_pages::list,
 };
-use crate::Event;
+use crate::tests::fixtures::ReadPage;
 use jig_client::contract::*;
 use skein_lib::Wall;
 
@@ -31,7 +31,7 @@ fn an_unreadable_turn_card_says_why() {
         let (mut domain, _, _, read) = ready();
         drive(
             &mut domain,
-            Event::Read { read, result: ReadResult::Value(ReadValue::Activity(Box::new(unread_page(why)))) },
+            ReadPage { read, result: ReadResult::Value(ReadValue::Activity(Box::new(unread_page(why)))) },
         );
         let tree = build(&domain, 3, words()).0;
         assert!(contains(&tree, saying));

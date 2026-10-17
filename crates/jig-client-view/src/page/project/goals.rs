@@ -10,7 +10,7 @@
 //! | pending | refused | editable | refusal facts |
 //! | pending | made/proposed | editable | clear matching words; navigate/notice |
 use crate::{
-    Domain, Request,
+    Request, Ui,
     address::{Address, Place},
     fields::Purpose,
     intents::Origin,
@@ -39,7 +39,7 @@ pub struct GoalConfirmation {
     pub proposed: bool,
     pub to: Option<Recipient>,
     pub scope: u64,
-    pub generation: u32,
+    pub handle: Option<jig_client::Handle>,
 }
 /// Snapshot belongs to its request even if the page or field changes.
 #[derive(Debug)]
@@ -52,7 +52,7 @@ pub struct Submission {
 /// Pending form and its durable result survive page context replacement.
 #[derive(Debug)]
 pub struct FormState {
-    /// Domain writes of the typed form, independent of list deliveries.
+    /// Ui writes of the typed form, independent of list deliveries.
     pub writes: u64,
     pub form: Option<GoalForm>,
     pub confirmation: Option<GoalConfirmation>,
@@ -65,7 +65,7 @@ impl FormState {
         Self { writes: 0, form: None, confirmation: None, pending: None, refusal: None, answer: None }
     }
 }
-pub(crate) fn configure(domain: &mut Domain, form: GoalForm) {
+pub(crate) fn configure(domain: &mut Ui, form: GoalForm) {
     if super::number(domain) != Some(form.project) {
         return;
     }
@@ -76,7 +76,7 @@ pub(crate) fn configure(domain: &mut Domain, form: GoalForm) {
     domain.changed();
 }
 /// Closes object confirmation before opening the page's one confirmation.
-pub(crate) fn open(domain: &mut Domain) {
+pub(crate) fn open(domain: &mut Ui, lent: &jig_client::Client) {
     crate::confirm::close(domain);
     if domain.blocked || domain.project_page.form.pending.is_some() {
         return;
@@ -97,7 +97,7 @@ pub(crate) fn open(domain: &mut Domain) {
         return;
     }
     let words = field.text.clone();
-    let Some((prediction, pool_left)) = prediction(domain, form, scope) else {
+    let Some((prediction, pool_left)) = prediction(domain, form, scope, lent) else {
         return;
     };
     let to = match prediction {
@@ -117,17 +117,17 @@ pub(crate) fn open(domain: &mut Domain) {
         proposed: to.is_some(),
         to,
         scope,
-        generation: domain.generation,
+        handle: domain.page_handle(),
     });
     domain.changed();
 }
-fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission, u64)> {
+fn prediction(domain: &Ui, form: GoalForm, scope: u64, lent: &jig_client::Client) -> Option<(Admission, u64)> {
     if domain.project_page.owner.is_some() {
-        return super::owner_goals::prediction(domain, form, scope);
+        return super::owner_goals::prediction(domain, form, scope, lent);
     }
     let mut offered = false;
     let mut pool = None;
-    if let Some(frame) = &domain.frame.document {
+    if let Some(frame) = &domain.frame(lent).document {
         for project in &frame.projects {
             if project.project == form.project
                 && let Some(ledger) = &project.pool
@@ -179,11 +179,11 @@ fn prediction(domain: &Domain, form: GoalForm, scope: u64) -> Option<(Admission,
     Some((jig_client::contract::admission::goal(&admission, form.executor, form.budget, form.deadline), pool?))
 }
 /// Refresh an unsent draft when the supplied project facts move.
-pub(crate) fn sync(domain: &mut Domain) {
+pub(crate) fn sync(domain: &mut Ui, lent: &jig_client::Client) {
     let Some(open) = &domain.project_page.form.confirmation else {
         return;
     };
-    let Some((prediction, pool_left)) = prediction(domain, open.form, open.scope) else {
+    let Some((prediction, pool_left)) = prediction(domain, open.form, open.scope, lent) else {
         return;
     };
     let to = match prediction {
@@ -206,15 +206,15 @@ pub(crate) fn sync(domain: &mut Domain) {
     }
 }
 /// Sending consumes the confirmation, so a second press can only join pending.
-pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
-    sync(domain);
+pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client::Client) {
+    sync(domain, lent);
     if domain.blocked || domain.project_page.form.pending.is_some() {
         return;
     }
     let Some(open) = domain.project_page.form.confirmation.take() else {
         return;
     };
-    if open.scope != domain.confirmed.unwrap_or(0) || open.generation != domain.generation {
+    if open.scope != domain.confirmed.unwrap_or(0) || open.handle != domain.page_handle() {
         return;
     }
     let ask = Ask::SetGoal {
@@ -227,7 +227,7 @@ pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
     };
     match domain.intents.ask(
         open.scope,
-        Origin::Page { generation: domain.generation, purpose: IntentPurpose::SetGoal },
+        Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::SetGoal },
         Box::new(ask),
         out,
     ) {
@@ -243,12 +243,13 @@ pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
     domain.changed();
 }
 pub(crate) fn answered(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     request: Token,
-    generation: u32,
+    handle: Option<jig_client::Handle>,
     answer: Answer,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     let same = match &domain.project_page.form.pending {
         Some(pending) => pending.request == request,
@@ -260,7 +261,7 @@ pub(crate) fn answered(
     let pending = domain.project_page.form.pending.take().expect("matching pending form");
     match answer {
         Answer::Refused(why) => {
-            if generation == domain.generation && domain.confirmed == Some(pending.scope) {
+            if handle == domain.page_handle() && domain.confirmed == Some(pending.scope) {
                 domain.project_page.form.refusal = Some(why);
             } else {
                 crate::notices::kept::show(
@@ -285,8 +286,8 @@ pub(crate) fn answered(
             domain.project_page.form.answer = Some(outcome.clone());
             match crate::outcome::route(&outcome) {
                 crate::outcome::Route::Goal { task } => {
-                    if generation == domain.generation && domain.confirmed == Some(pending.scope) {
-                        crate::page::routing::navigate(domain, env, Place::Jig(Address::task(task)), false, out);
+                    if handle == domain.page_handle() && domain.confirmed == Some(pending.scope) {
+                        crate::page::routing::navigate(domain, env, Place::Jig(Address::task(task)), false, out, lent);
                     } else {
                         crate::notices::kept::show(
                             domain,
@@ -308,7 +309,7 @@ pub(crate) fn answered(
     }
     domain.changed();
 }
-pub(crate) fn unknown(domain: &mut Domain, request: Token) {
+pub(crate) fn unknown(domain: &mut Ui, request: Token) {
     if let Some(pending) = &domain.project_page.form.pending
         && pending.request == request
     {

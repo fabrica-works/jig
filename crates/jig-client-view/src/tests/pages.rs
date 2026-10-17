@@ -6,15 +6,16 @@
 )]
 use super::cards::{CLIENT, contains, document, drive, start, text, words};
 use crate::JigBindings;
+use crate::tests::fixtures::{AnsweredByEngine, Ended, Fixture, ReadPage, Served, Watched};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     address::{Address, Place},
     page::Page,
 };
 use jig_client::contract::*;
 use skein_lib::{List, Token};
 use skein_ui::{Builder, Role, Tree};
-pub(super) fn build(d: &Domain, kind: u8, words: &crate::words::Words) -> (Tree, JigBindings) {
+pub(super) fn build(d: &Fixture, kind: u8, words: &crate::words::Words) -> (Tree, JigBindings) {
     let mut limits = super::cards::limits();
     limits.nodes = 2000;
     limits.depth = 32;
@@ -25,17 +26,17 @@ pub(super) fn build(d: &Domain, kind: u8, words: &crate::words::Words) -> (Tree,
     b.open(Role::Page);
     match kind {
         0 | 1 | 3 => {
-            crate::pages::main(&mut b, d, words, &mut bindings);
+            crate::pages::main(&mut b, &d.view(), words, &mut bindings);
         }
         _ => {
-            crate::pages::not_the_work(&mut b, d, words, &mut bindings);
+            crate::pages::not_the_work(&mut b, &d.view(), words, &mut bindings);
         }
     }
     b.close();
     (b.finish(), bindings)
 }
-pub(super) fn deliver(d: &mut Domain, token: Token, document: Delivery) -> Vec<Request> {
-    drive(d, Event::Watch { watch: token, event: WatchEvent::Delivered(document) })
+pub(super) fn deliver(d: &mut Fixture, token: jig_client::Handle, document: Delivery) -> Vec<Request> {
+    drive(d, Watched { watch: token, event: WatchEvent::Delivered(document) })
 }
 pub(super) fn named_binding(tree: &Tree, name: &[u8]) -> Token {
     tree.nodes().iter().find(|n| n.name.as_deref() == Some(name) && n.binding.is_some()).unwrap().binding.unwrap().token
@@ -46,29 +47,15 @@ pub(super) fn special_pages(words: &crate::words::Words) {
     deliver(&mut d, f, Delivery::Frame(Box::new(document())));
     drive(&mut d, Event::Went { place: Place::Missing });
     assert!(contains(&build(&d, 2, words).0, b"Page missing"));
-    drive(&mut d, Event::SignedOut);
+    drive(&mut d, jig_client::Up::SignedOut);
     assert_eq!(d.page(), &Page::SigningIn);
-    let mut d = Domain::new(&CLIENT);
-    d.provider(crate::signin::Provider { number: 3, name: text(b"Organization") }).unwrap();
-    drive(
-        &mut d,
-        Event::Start {
-            address: Address::Inbox { project: None },
-            kept: List::with_capacity(0),
-            offset: crate::boundary::Offset { minutes: 0 },
-        },
-    );
-    drive(&mut d, Event::SignedOut);
-    let (tree, mut bindings) = build(&d, 2, words);
-    assert_eq!(
-        crate::decode(&mut bindings, named_binding(&tree, b"Sign in with Organization"), skein_ui::Act::Press),
-        Some(crate::action::Act::SignIn { provider: 3 })
-    );
+    let (tree, _) = build(&d, 2, words);
+    assert!(tree.nodes().iter().any(|node| node.slot == Some(crate::signin::SLOT)));
     let (mut d, f) = start();
-    drive(&mut d, Event::Hello { served: false });
+    drive(&mut d, Served { served: false });
     assert!(deliver(&mut d, f, Delivery::Frame(Box::new(document()))).is_empty());
     assert!(contains(&build(&d, 2, words).0, b"update or reload"));
-    let mut d = Domain::new(&CLIENT);
+    let mut d = Fixture::new(&CLIENT);
     let mut kept = List::with_capacity(1);
     kept.push(crate::store::Record::Draft {
         version: crate::store::STORE_VERSION,
@@ -78,18 +65,14 @@ pub(super) fn special_pages(words: &crate::words::Words) {
         touched: 1,
     })
     .unwrap();
-    let out = drive(
-        &mut d,
-        Event::Start {
-            address: Address::Inbox { project: None },
-            kept,
-            offset: crate::boundary::Offset { minutes: 0 },
-        },
-    );
+    let out =
+        drive(&mut d, Event::Start { seed: 8, place: Place::Jig(Address::Inbox { project: None }), records: kept });
     let f = out
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Frame } => Some(*watch),
+            Request::Client {
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+            } => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -102,13 +85,19 @@ pub(super) fn special_pages(words: &crate::words::Words) {
 fn inbox_edges(words: &crate::words::Words) {
     let (mut d, f) = start();
     let out = deliver(&mut d, f, Delivery::Frame(Box::new(document())));
-    let page = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let page =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Inbox { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut entries = List::with_capacity(2);
     for n in 1..=2 {
         entries
@@ -139,10 +128,13 @@ fn inbox_edges(words: &crate::words::Words) {
         })),
     );
     for request in &out {
-        if let Request::Read { read, what: Read::Inbox { .. } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Inbox { .. }) },
+        } = request
+        {
             drive(
                 &mut d,
-                Event::Read {
+                ReadPage {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                         cut: false,
@@ -181,13 +173,19 @@ fn inbox_edges(words: &crate::words::Words) {
 fn inbox_committed_read_position(words: &crate::words::Words) {
     let (mut d, f) = start();
     let out = deliver(&mut d, f, Delivery::Frame(Box::new(document())));
-    let page = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let page =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Inbox { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut rows = List::with_capacity(1);
     rows.push(InboxEntry {
         reply: None,
@@ -212,24 +210,30 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
     };
     deliver(&mut d, page, Delivery::Inbox(Box::new(value.clone())));
     assert!(contains(&build(&d, 0, words).0, b"New"));
-    drive(&mut d, Event::Act { act: crate::action::Act::OpenUpdates });
+    drive(&mut d, Event::Act { action: crate::action::Act::OpenUpdates });
     assert!(contains(&build(&d, 0, words).0, b"New"));
     let mut committed = value;
     committed.results_seen = 4;
     deliver(&mut d, page, Delivery::Inbox(Box::new(committed)));
     assert!(!contains(&build(&d, 0, words).0, b"New"));
     let filter = crate::page::inbox::Filter { project: None, kind: None, goal: None };
-    drive(&mut d, Event::Act { act: crate::action::Act::FilterInbox { filter } });
+    drive(&mut d, Event::Act { action: crate::action::Act::FilterInbox { filter } });
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Inbox { group: InboxReadGroup::Updates, .. } } => Some(*read),
+            Request::Client {
+                asked:
+                    jig_client::Event::Read {
+                        handle: read,
+                        read: jig_client::Readable::Jig(Read::Inbox { group: InboxReadGroup::Updates, .. }),
+                    },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
     drive(
         &mut d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                 cut: false,
@@ -243,14 +247,21 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
     assert!(contains(&tree, b"Read earlier"));
     assert!(contains(&tree, b"Read later"));
     let act = crate::decode(&mut bindings, named_binding(&tree, b"Read earlier"), skein_ui::Act::Press).unwrap();
-    let out = drive(&mut d, Event::Act { act });
-    assert!(out.iter().any(|r| match r {
-        Request::Read { what: Read::Inbox { after: Some(cursor), .. }, .. } => cursor.value.bytes() == b"earlier",
-        _ => false,
-    }));
+    let out = drive(&mut d, Event::Act { action: act });
+    assert!(
+        out.iter().any(|r| match r {
+            Request::Client {
+                asked:
+                    jig_client::Event::Read {
+                        read: jig_client::Readable::Jig(Read::Inbox { after: Some(cursor), .. }), ..
+                    },
+            } => cursor.value.bytes() == b"earlier",
+            _ => false,
+        })
+    );
 }
 
-fn conversations_domain() -> Domain {
+fn conversations_domain() -> Fixture {
     let (mut d, f) = start();
     let mut frame = document();
     frame.charters.get_mut(0).unwrap().chats = List::with_capacity(1);
@@ -282,18 +293,18 @@ fn conversations_form(words: &crate::words::Words) {
         skein_ui::Act::Input { value: b"Hello".to_vec().into_boxed_slice() },
     )
     .unwrap();
-    drive(&mut d, Event::Act { act: edit });
-    let out = drive(&mut d, Event::Act { act: crate::action::Act::StartChat { project: 4 } });
+    drive(&mut d, Event::Act { action: edit });
+    let out = drive(&mut d, Event::Act { action: crate::action::Act::StartChat { project: 4 } });
     let request = out
         .iter()
         .find_map(|r| match r {
-            Request::Send { request, .. } => Some(*request),
+            Request::Client { asked: jig_client::Event::Send { key: request, .. } } => Some(*request),
             _ => None,
         })
         .unwrap();
     let waiting = build(&d, 1, words).0;
     assert!(waiting.nodes().iter().any(|n| n.states.as_slice().contains(&skein_ui::State::Busy)));
-    drive(&mut d, Event::Answered { request, answer: Answer::Refused(Refusal::NotOffered) });
+    drive(&mut d, AnsweredByEngine { request, answer: Answer::Refused(Refusal::NotOffered) });
     assert!(contains(&build(&d, 1, words).0, b"This act is not offered"));
     assert!(
         tree.nodes()
@@ -303,50 +314,20 @@ fn conversations_form(words: &crate::words::Words) {
     );
 }
 fn conversation_states(words: &crate::words::Words) {
-    let cases = [
-        (Runtime::Idle, b"Waiting for news".as_slice()),
-        (Runtime::Starting, b"Starting".as_slice()),
-        (Runtime::Running { attempt: 1, since: skein_lib::Wall::EPOCH, tool: None }, b"Writing".as_slice()),
-        (
-            Runtime::Running { attempt: 1, since: skein_lib::Wall::EPOCH, tool: Some(text(b"inspect")) },
-            b"Using tool inspect".as_slice(),
-        ),
-        (Runtime::WaitingForWords { attempt: 1, since: skein_lib::Wall::EPOCH }, b"Waiting for your words".as_slice()),
-        (
-            Runtime::BackingOff {
-                at: skein_lib::Wall::EPOCH,
-                attempt: 1,
-                tries: 2,
-                class: FailureClass::Temporary,
-                reason: text(b"later"),
-            },
-            b"Retrying at".as_slice(),
-        ),
-        (
-            Runtime::Closing(Closing {
-                delegates: 1,
-                stage: None,
-                ending: None,
-                connectors: Some({
-                    let mut rows = List::with_capacity(2);
-                    rows.push(1).unwrap();
-                    rows.push(2).unwrap();
-                    rows
-                }),
-            }),
-            b"Closing: 1 delegates".as_slice(),
-        ),
-        (Runtime::Held { was: None }, b"Held".as_slice()),
-        (Runtime::Ended, b"Ended".as_slice()),
-    ];
-    for (runtime, expected) in cases {
+    for (runtime, expected) in conversation_cases() {
         let (mut d, f) = start();
         deliver(&mut d, f, Delivery::Frame(Box::new(document())));
         let out = drive(&mut d, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
         let token = out
             .iter()
             .find_map(|r| match r {
-                Request::Read { read, what: Read::Conversations { .. } } => Some(*read),
+                Request::Client {
+                    asked:
+                        jig_client::Event::Read {
+                            handle: read,
+                            read: jig_client::Readable::Jig(Read::Conversations { .. }),
+                        },
+                } => Some(*read),
                 _ => None,
             })
             .unwrap();
@@ -380,7 +361,7 @@ fn conversation_states(words: &crate::words::Words) {
         }
         drive(
             &mut d,
-            Event::Read {
+            ReadPage {
                 read: token,
                 result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
                     cut: false,
@@ -420,10 +401,13 @@ fn inbox_group_controls_decode_independent_windows() {
     let (mut d, frame) = start();
     let out = deliver(&mut d, frame, Delivery::Frame(Box::new(document())));
     for request in &out {
-        if let Request::Read { read, what: Read::Inbox { group, .. } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Inbox { group, .. }) },
+        } = request
+        {
             drive(
                 &mut d,
-                Event::Read {
+                ReadPage {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                         cut: false,
@@ -465,21 +449,26 @@ fn inbox_group_controls_decode_independent_windows() {
             }
         ]
     );
-    let more = drive(&mut d, Event::Act { act: acts[1].clone() });
-    let reads: Vec<_> = more
-        .iter()
-        .filter_map(|request| match request {
-            Request::Read { what: Read::Inbox { group, after, .. }, .. } => Some((*group, after.clone().unwrap())),
-            _ => None,
-        })
-        .collect();
+    let more = drive(&mut d, Event::Act { action: acts[1].clone() });
+    let reads: Vec<_> =
+        more.iter()
+            .filter_map(|request| match request {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Read {
+                            read: jig_client::Readable::Jig(Read::Inbox { group, after, .. }), ..
+                        },
+                } => Some((*group, after.clone().unwrap())),
+                _ => None,
+            })
+            .collect();
     assert_eq!(reads.len(), 1);
     assert_eq!(reads[0].0, InboxReadGroup::Updates);
     assert_eq!(reads[0].1.value.bytes(), b"updates");
     assert_eq!(d.inbox().needs_window.after.as_ref().unwrap().value.bytes(), b"needs");
 }
 
-fn whole_page(d: &Domain) -> Tree {
+fn whole_page(d: &Fixture) -> Tree {
     let mut limits = super::cards::limits();
     limits.nodes = 2000;
     limits.text_bytes = 200_000;
@@ -489,7 +478,7 @@ fn whole_page(d: &Domain) -> Tree {
     b.open(Role::Page);
     assert!(crate::jig(
         &mut b,
-        d,
+        &d.view(),
         skein_ui::SlotRef { owner: (crate::Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words(),
         &mut bindings
@@ -515,27 +504,34 @@ fn each_of_jigs_pages_keeps_the_outline() {
     for (label, place) in rows {
         let out = drive(&mut d, Event::Went { place });
         for request in out {
-            if let Request::Open { watch, subject: Subject::Task { .. } } = request {
+            if let Request::Client {
+                asked:
+                    jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Task { .. }) },
+            } = request
+            {
                 deliver(&mut d, watch, Delivery::Task(Box::new(super::cards_objects::task_doc(&[]))));
             }
         }
         assert_eq!(skein_ui::outline::check(&whole_page(&d)), None, "{label}");
     }
-    drive(&mut d, Event::SignedOut);
+    drive(&mut d, jig_client::Up::SignedOut);
     assert_eq!(skein_ui::outline::check(&whole_page(&d)), None, "signing in");
 }
 
-fn domain_with_an_owed_card() -> Domain {
+fn domain_with_an_owed_card() -> Fixture {
     let (mut d, watch) = start();
     deliver(&mut d, watch, Delivery::Frame(Box::new(document())));
     let mut objects = List::with_capacity(1);
     objects.push(ObjectKey::Task(8)).unwrap();
-    let out = drive(&mut d, Event::ShowObjects { objects });
+    let out = drive(&mut d, Event::Named { objects, sections: List::with_capacity(0) });
     for request in out {
-        if let Request::Read { read, what: Read::Task { .. } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Task { .. }) },
+        } = request
+        {
             drive(
                 &mut d,
-                Event::Read {
+                ReadPage {
                     read,
                     result: ReadResult::Value(ReadValue::Task(Box::new(super::cards_objects::task_doc(&[
                         ActKind::Cancel,
@@ -545,13 +541,13 @@ fn domain_with_an_owed_card() -> Domain {
         }
     }
     let id = d.objects().find(ObjectKey::Task(8)).unwrap();
-    drive(&mut d, Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::Cancel } });
+    drive(&mut d, Event::Act { action: crate::action::Act::Intend { object: id.token(), act: ActKind::Cancel } });
     assert_eq!(
         d.objects().get(id).unwrap().card,
         crate::objects::Card::Deciding { request: None, progress: crate::intents::Progress::Confirming }
     );
-    drive(&mut d, Event::Act { act: crate::action::Act::Confirm });
-    drive(&mut d, Event::ObjectsLeft);
+    drive(&mut d, Event::Act { action: crate::action::Act::Confirm });
+    drive(&mut d, Event::Named { objects: List::with_capacity(0), sections: List::with_capacity(0) });
     d
 }
 
@@ -575,10 +571,10 @@ fn the_inbox_header_shows_with_either_group() {
         let mut b = Builder::new(&super::cards::limits());
         let mut bindings = JigBindings::new(64, CLIENT.text);
         b.open(Role::Page);
-        assert!(crate::sections::inbox::header(&mut b, &d, words(), &mut bindings));
+        assert!(crate::sections::inbox::header(&mut b, &d.view(), words(), &mut bindings));
         assert!(crate::sections::section(
             &mut b,
-            &d,
+            &d.view(),
             words(),
             &mut bindings,
             crate::page::Section::Inbox { group, project: None }
@@ -595,7 +591,7 @@ fn the_inbox_header_shows_with_either_group() {
     let (other, _) = super::work_pages::entered(Address::Conversations { project: None });
     let mut b = Builder::new(&super::cards::limits());
     let mut bindings = JigBindings::new(64, CLIENT.text);
-    assert!(!crate::sections::inbox::header(&mut b, &other, words(), &mut bindings));
+    assert!(!crate::sections::inbox::header(&mut b, &other.view(), words(), &mut bindings));
     assert_eq!(b.finish().len(), 0);
 }
 #[test]
@@ -641,20 +637,59 @@ fn a_missing_section_says_so_in_its_own_region() {
     let section = crate::page::Section::Task { task: 8, section: crate::address::TaskSection::Plan };
     let mut sections = List::with_capacity(1);
     sections.push(section).unwrap();
-    let opened = drive(&mut domain, Event::ShowSections { sections });
+    let opened = drive(&mut domain, Event::Named { objects: List::with_capacity(0), sections });
     let watch = opened
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, .. } => Some(*watch),
+            Request::Client { asked: jig_client::Event::Watch { handle: watch, .. } } => Some(*watch),
             _ => None,
         })
         .unwrap();
-    drive(&mut domain, Event::Ended { watch, end: WatchEnd::NotAllowed });
+    drive(&mut domain, Ended { watch, end: WatchEnd::NotAllowed });
     let mut builder = Builder::new(&super::cards::limits());
     let mut bindings = JigBindings::new(256, CLIENT.text);
-    assert!(crate::sections::section(&mut builder, &domain, words(), &mut bindings, section));
+    assert!(crate::sections::section(&mut builder, &domain.view(), words(), &mut bindings, section));
     let tree = builder.finish();
     assert_eq!(tree.nodes()[0].region, Some(crate::regions::JigRegion::TaskPlan.region()));
     assert_eq!(tree.nodes()[0].size, tree.len());
     assert!(contains(&tree, b"Page missing"));
+}
+
+fn conversation_cases() -> [(Runtime, &'static [u8]); 9] {
+    [
+        (Runtime::Idle, b"Waiting for news".as_slice()),
+        (Runtime::Starting, b"Starting".as_slice()),
+        (Runtime::Running { attempt: 1, since: skein_lib::Wall::EPOCH, tool: None }, b"Writing".as_slice()),
+        (
+            Runtime::Running { attempt: 1, since: skein_lib::Wall::EPOCH, tool: Some(text(b"inspect")) },
+            b"Using tool inspect".as_slice(),
+        ),
+        (Runtime::WaitingForWords { attempt: 1, since: skein_lib::Wall::EPOCH }, b"Waiting for your words".as_slice()),
+        (
+            Runtime::BackingOff {
+                at: skein_lib::Wall::EPOCH,
+                attempt: 1,
+                tries: 2,
+                class: FailureClass::Temporary,
+                reason: text(b"later"),
+            },
+            b"Retrying at".as_slice(),
+        ),
+        (
+            Runtime::Closing(Closing {
+                delegates: 1,
+                stage: None,
+                ending: None,
+                connectors: Some({
+                    let mut rows = List::with_capacity(2);
+                    rows.push(1).unwrap();
+                    rows.push(2).unwrap();
+                    rows
+                }),
+            }),
+            b"Closing: 1 delegates".as_slice(),
+        ),
+        (Runtime::Held { was: None }, b"Held".as_slice()),
+        (Runtime::Ended, b"Ended".as_slice()),
+    ]
 }

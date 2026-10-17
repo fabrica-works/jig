@@ -59,10 +59,14 @@ fn load(root: &mut Domain, proposal: OwnerProposal) -> Vec<Request> {
         .unwrap();
     drive(
         root,
-        Event::Jig(jig_client_view::Event::Read {
-            read,
-            result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(proposal))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::ReadDone {
+                    read,
+                    result: jig_client::Readout::Jig(ReadResult::Value(ReadValue::OwnerProposal(Box::new(proposal)))),
+                },
+            },
+        },
     )
 }
 fn part() -> OwnerPart {

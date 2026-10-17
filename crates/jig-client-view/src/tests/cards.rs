@@ -7,18 +7,18 @@
 
 use crate::phrases::english;
 use crate::phrases::jig::{JigPhrase, shapes};
+use crate::tests::fixtures::{Fixture, Watched};
 use crate::words::Words;
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act as Action,
     address::Address,
-    boundary::Offset,
     intents::Progress,
     objects::{Card, Left, Source},
 };
 use crate::{JigBindings, JigMeaning, Owner, decode};
 use jig_client::contract::*;
-use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
+use skein_lib::{Duration, List, Queue, Time, Token, Wall};
 use skein_ui::Act;
 use skein_ui::phrases::{Hole, PhraseLimits, Phrasebook};
 use skein_ui::{Builder, Role, SlotRef, Tree};
@@ -31,7 +31,7 @@ pub(crate) const CLIENT: crate::Limits = crate::Limits {
     save_delay: Duration::from_secs(1),
     intents: 2,
     fields: 8,
-    providers: 2,
+
     objects: 3,
     sources: 8,
     reads: 8,
@@ -77,42 +77,8 @@ pub(super) fn words() -> &'static Words {
 pub(super) fn text(bytes: &[u8]) -> Text {
     Text::new(bytes.into(), CLIENT.text).unwrap()
 }
-pub(super) fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
-    let mut q = Queue::with_capacity(crate::max_out(&CLIENT));
-    let starting = match &event {
-        Event::Start { .. } => true,
-        Event::Hello { .. }
-        | Event::Kept { .. }
-        | Event::KeptGone { .. }
-        | Event::Went { .. }
-        | Event::Act { .. }
-        | Event::Ask { .. }
-        | Event::Progress { .. }
-        | Event::Answered { .. }
-        | Event::Read { .. }
-        | Event::Watch { .. }
-        | Event::Ended { .. }
-        | Event::ShowObjects { .. }
-        | Event::ShowSections { .. }
-        | Event::ObjectsLeft
-        | Event::SignOutLost
-        | Event::SignedOut
-        | Event::Frame { .. } => false,
-    };
-    crate::step(d, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT }, event, &mut q);
-    if starting {
-        crate::step(
-            d,
-            &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: CLIENT },
-            Event::Hello { served: true },
-            &mut q,
-        );
-    }
-    let mut out = Vec::new();
-    while let Some(r) = q.pop() {
-        out.push(r);
-    }
-    out
+pub(super) fn drive(d: &mut Fixture, event: impl crate::tests::fixtures::Input) -> Vec<Request> {
+    d.drive(Time::ZERO, event).into_vec()
 }
 pub(super) fn document() -> Frame {
     let mut projects = List::with_capacity(2);
@@ -162,24 +128,24 @@ pub(super) fn document() -> Frame {
         deployment_role: Some(HeldRole::Policy { role: 1 }),
     }
 }
-pub(super) fn start() -> (Domain, Token) {
+pub(super) fn start() -> (Fixture, jig_client::Handle) {
     start_arranged(crate::page::Arrangement::none())
 }
-pub(super) fn start_arranged(arrangement: crate::page::Arrangement) -> (Domain, Token) {
-    let mut d = Domain::new(&CLIENT);
+pub(super) fn start_arranged(arrangement: crate::page::Arrangement) -> (Fixture, jig_client::Handle) {
+    let mut d = Fixture::new(&CLIENT);
     d.configure_arrangement(arrangement).unwrap();
     let out = drive(
         &mut d,
         Event::Start {
-            address: Address::Inbox { project: None },
-            kept: List::with_capacity(0),
-            offset: Offset { minutes: 60 },
+            seed: 8,
+            place: crate::address::Place::Jig(Address::Inbox { project: None }),
+            records: List::with_capacity(0),
         },
     );
     let token = out
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, .. } => Some(*watch),
+            Request::Client { asked: jig_client::Event::Watch { handle: watch, .. } } => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -198,18 +164,18 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
     let mut bindings = JigBindings::new(64, CLIENT.text);
     for expected in [b"Connecting".as_slice(), b"Live", b"Offline"] {
         if expected == b"Live" {
-            drive(&mut d, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+            drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
         }
         if expected == b"Offline" {
-            d.set_link(crate::link::Link::Offline, &mut Queue::with_capacity(crate::max_out(&CLIENT)));
+            d.set_link(jig_client::Link::Offline, &mut Queue::with_capacity(crate::max_out(&CLIENT)));
         }
         bindings.begin();
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
-        crate::frame::banner(&mut b, &d, words, &mut bindings);
+        crate::frame::banner(&mut b, &d.view(), words, &mut bindings);
         crate::frame::navigation(
             &mut b,
-            &d,
+            &d.view(),
             SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
             words,
             &mut bindings,
@@ -233,8 +199,8 @@ fn frame_builds_statuses_counts_navigation_and_number_submission_in_every_link_s
 
 fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_by_place() {
     let (mut d, frame_watch) = start();
-    let source = Source::Window { generation: 0, number: 1 };
-    // The public object collection is read-only in Domain; build states through its shared entry point.
+    let source = Source::Window { number: 1 };
+    // The public object collection is read-only in Fixture; build states through its shared entry point.
     let mut objects = crate::objects::Objects::new(2, 8);
     let id = objects.name(ObjectKey::Task(7), source).unwrap();
     let words = words();
@@ -292,21 +258,25 @@ fn shared_card_frame_says_each_progress_refusal_and_departure_with_context_only_
     // Refused by the domain after its handle has left; a retained tree token still decodes the handle.
     let binding = bindings.insert(JigMeaning::Action(Action::LookAgain { object: id.token() }));
     let action = decode(&mut bindings, binding.token, Act::Press).unwrap();
-    drive(&mut d, Event::Act { act: action });
+    drive(&mut d, Event::Act { action });
 }
 
-fn card_context(d: &mut Domain, frame_watch: Token, words: &Words, bindings: &mut JigBindings) {
-    let out = drive(
-        d,
-        Event::Watch { watch: frame_watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
-    );
-    let inbox_watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+fn card_context(d: &mut Fixture, frame_watch: jig_client::Handle, words: &Words, bindings: &mut JigBindings) {
+    let out =
+        drive(d, Watched { watch: frame_watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    let inbox_watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Inbox { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut entries = List::with_capacity(1);
     entries
         .push(InboxEntry {
@@ -324,7 +294,7 @@ fn card_context(d: &mut Domain, frame_watch: Token, words: &Words, bindings: &mu
         .unwrap();
     drive(
         d,
-        Event::Watch {
+        Watched {
             watch: inbox_watch,
             event: WatchEvent::Delivered(Delivery::Inbox(Box::new(Inbox {
                 entries,
@@ -355,7 +325,7 @@ fn card_context(d: &mut Domain, frame_watch: Token, words: &Words, bindings: &mu
     ] {
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
-        assert!(crate::cards::open(&mut b, d, shared, &place, b"Question", words, bindings));
+        assert!(crate::cards::open(&mut b, &d.view(), shared, &place, b"Question", words, bindings));
         crate::cards::close(&mut b);
         b.close();
         let tree = b.finish();
@@ -395,7 +365,6 @@ fn every_binding_kind_decodes_and_old_tokens_are_retired() {
         Action::Fold { object, open: true },
         Action::Filter { group: InboxGroup::Questions, project: None },
         Action::More { window: object, end: crate::action::End::Before },
-        Action::SignIn { provider: 1 },
     ];
     for action in actions {
         let token = bindings.insert(JigMeaning::Action(action.clone())).token;

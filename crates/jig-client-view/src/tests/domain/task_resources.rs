@@ -2,6 +2,7 @@ use super::{
     objects,
     spine::{drive, open_token},
 };
+use crate::tests::fixtures::{ReadPage, Watched};
 use crate::{
     Event, Request,
     address::{Address, Place, TaskSection},
@@ -40,10 +41,10 @@ fn whole_owner_task_resources_survive_reads_without_invented_scope_while_referen
         let output = drive(
             &mut domain,
             Time::ZERO,
-            Event::Read { read, result: ReadResult::Value(ReadValue::Task(Box::new(row))) },
+            ReadPage { read, result: ReadResult::Value(ReadValue::Task(Box::new(row))) },
         );
-        let id = domain.objects.find(ObjectKey::Task(8)).unwrap();
-        assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Task(Box::new(exact.clone()))));
+        let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
+        assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Task(Box::new(exact.clone()))));
         assert!(output.is_empty(), "object reads retain facts without selecting application parts");
         let opened = drive(
             &mut domain,
@@ -54,13 +55,10 @@ fn whole_owner_task_resources_survive_reads_without_invented_scope_while_referen
         let output = drive(
             &mut domain,
             Time::ZERO,
-            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(exact))) },
+            Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(exact))) },
         );
         if include_reference {
-            assert_eq!(
-                output.as_ref(),
-                &[Request::ShowPart { part: reference.clone(), generation: 1, scope: PartScope::Project(1) }]
-            );
+            assert_eq!(output.as_ref(), &[Request::ShowPart { part: reference.clone(), scope: PartScope::Project(1) }]);
         } else {
             assert!(output.is_empty());
         }

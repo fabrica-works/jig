@@ -6,7 +6,8 @@
 )]
 use super::cards::{CLIENT, contains, shared_words as words, text};
 use crate::JigBindings;
-use crate::{Domain, Request, address::Address};
+use crate::tests::fixtures::Fixture;
+use crate::{Request, address::Address};
 use jig_client::contract::*;
 use skein_lib::List;
 use skein_ui::{Builder, Tree};
@@ -28,11 +29,11 @@ fn chip(phase: OwnerChipPhase, details: OwnerChipDetails) -> Chip {
     }
 }
 fn brief(value: &Chip) -> Tree {
-    let client = Domain::new(&CLIENT);
+    let client = Fixture::new(&CLIENT);
     let limits = crate::limits::of_words(&CLIENT, words()).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
-    crate::cards::chip::chip(&mut b, &client, value, words(), &mut bindings);
+    crate::cards::chip::chip(&mut b, &client.view(), value, words(), &mut bindings);
     let tree = b.finish();
     assert!(tree.len() <= crate::chip_nodes(&CLIENT).unwrap());
     tree
@@ -102,13 +103,19 @@ fn task_overview_expands_whole_metadata_but_nested_verdict_chips_stay_brief() {
     let mut doc = super::cards_objects::task_doc(&[]);
     doc.chip = chip(OwnerChipPhase::Ended, details);
     let (mut client, out) = super::page_capacity::entered(Address::task(8));
-    let watch = out
-        .iter()
-        .find_map(|request| match request {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|request| match request {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     super::pages::deliver(&mut client, watch, Delivery::Task(Box::new(doc)));
     let tree = super::page_capacity::render(&client, words());
     assert!(contains(&tree, b"whole outer result"));

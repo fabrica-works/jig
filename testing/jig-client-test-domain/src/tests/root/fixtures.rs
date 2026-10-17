@@ -16,7 +16,7 @@ const JIG: jig_client_view::Limits = jig_client_view::Limits {
     save_delay: Duration::from_secs(1),
     intents: 2,
     fields: 4,
-    providers: 2,
+
     objects: 2,
     sources: 8,
     reads: 4,
@@ -121,12 +121,7 @@ pub(super) fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
             }
         }
         Event::First(first::Event::Ended { watch, end }) => jig_client::Up::WatchEnded { watch, end: family_end(end) },
-        Event::Jig(jig_client_view::Event::Watch { watch, event }) => jig_client::Up::Watched { watch, event },
-        Event::Jig(jig_client_view::Event::Ended { watch, end }) => jig_client::Up::WatchEnded { watch, end },
-        Event::Jig(jig_client_view::Event::Read { read, result }) => {
-            jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) }
-        }
-        Event::Jig(jig_client_view::Event::Hello { served }) => jig_client::Up::Served { served, versions: None },
+
         Event::SignedOut => jig_client::Up::SignedOut,
         event => return root_step(root, event),
     };

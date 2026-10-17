@@ -9,13 +9,14 @@
 //! Native Deployment view proofs; no source translation or connector completion is inferred.
 use super::cards::{CLIENT, contains, document, drive, shared_words, start};
 use crate::owner_deployment_words::DeploymentPhrase as P;
+use crate::tests::fixtures::{Fixture, Watched};
 use crate::words::Words;
 use crate::{JigBindings, owner_deployment as view};
 use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     address::{Address, Place},
 };
 use jig_client::contract::*;
@@ -79,7 +80,7 @@ fn task(action: OwnerTaskCapacityAction, cause: OwnerTaskCapacityCause) -> Owner
         at: Wall::from_nanos(u64::MAX),
     }
 }
-fn domain(value: OwnerDeployment) -> Domain {
+fn domain(value: OwnerDeployment) -> Fixture {
     let (mut client, frame) = start();
     let mut authoritative = document();
     authoritative.deployment_role = Some(HeldRole::Policy { role: 4 });
@@ -87,34 +88,31 @@ fn domain(value: OwnerDeployment) -> Domain {
     authoritative.cut = true;
     drive(
         &mut client,
-        Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(authoritative))) },
+        Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(authoritative))) },
     );
     let out = drive(&mut client, Event::Went { place: Place::Jig(Address::Deployment) });
     let watch = out
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Deployment } => Some(*watch),
+            Request::Client { asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Deployment) } } => Some(*watch),
             _ => None,
         })
         .unwrap();
-    drive(
-        &mut client,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerDeployment(Box::new(value))) },
-    );
+    drive(&mut client, Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerDeployment(Box::new(value))) });
     client
 }
-fn build(client: &Domain, w: &Words, limits: skein_ui::Limits) -> Tree {
+fn build(client: &Fixture, w: &Words, limits: skein_ui::Limits) -> Tree {
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
-    view::render(&mut b, client, client.deployment_page().owner.as_deref().unwrap(), w, &mut bindings);
+    view::render(&mut b, &client.view(), client.deployment_page().owner.unwrap(), w, &mut bindings);
     b.finish()
 }
 fn round_trip(value: OwnerDeployment) -> Tree {
     let untouched = value.clone();
     let client = domain(value);
-    assert_eq!(client.deployment_page().owner.as_deref(), Some(&untouched));
+    assert_eq!(client.deployment_page().owner, Some(&untouched));
     let w = shared_words();
-    let bounds = view::required(client.deployment_page().owner.as_deref().unwrap(), &CLIENT, w).unwrap();
+    let bounds = view::required(client.deployment_page().owner.unwrap(), &CLIENT, w).unwrap();
     let tree = build(&client, w, bounds);
     assert!(tree.len() <= bounds.nodes);
     assert!(
@@ -306,7 +304,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
         offset_minutes: 0,
     };
     let client = domain(empty());
-    let maximum = view::required(client.deployment_page().owner.as_deref().unwrap(), &CLIENT, &words).unwrap();
+    let maximum = view::required(client.deployment_page().owner.unwrap(), &CLIENT, &words).unwrap();
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
@@ -453,7 +451,7 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
     oversized.hosts = List::with_capacity(CLIENT.rows + 1);
     assert!(view::required(&oversized, &CLIENT, w).is_none());
     assert!(view::max_nodes(&crate::Limits { rows: u32::MAX, ..CLIENT }).is_none());
-    assert_eq!(client.deployment_page().owner.as_deref(), Some(&untouched));
+    assert_eq!(client.deployment_page().owner, Some(&untouched));
 }
 fn genuine_owner_chip_fixture(number: u64) -> Chip {
     let part = OwnerPart {

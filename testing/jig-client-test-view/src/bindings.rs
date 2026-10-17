@@ -6,6 +6,7 @@ use skein_lib::{List, Token};
 use skein_ui::{Act, Binding};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Meaning {
+    SignIn,
     Action(first::Act),
     Parameters { object: Token, revision: Revision },
     Object(ObjectKey),
@@ -45,7 +46,7 @@ impl Bindings {
             if entry.token == token {
                 return match &entry.meaning {
                     Meaning::Object(key) => Some(*key),
-                    Meaning::Action(_) | Meaning::Parameters { .. } | Meaning::Section(_) => None,
+                    Meaning::SignIn | Meaning::Action(_) | Meaning::Parameters { .. } | Meaning::Section(_) => None,
                 };
             }
         }
@@ -57,11 +58,20 @@ impl Bindings {
             if entry.token == token {
                 return match &entry.meaning {
                     Meaning::Section(section) => Some(*section),
-                    Meaning::Action(_) | Meaning::Parameters { .. } | Meaning::Object(_) => None,
+                    Meaning::SignIn | Meaning::Action(_) | Meaning::Parameters { .. } | Meaning::Object(_) => None,
                 };
             }
         }
         None
+    }
+    #[must_use]
+    pub fn sign_in(&self, token: Token) -> bool {
+        for entry in &self.entries {
+            if entry.token == token && entry.meaning == Meaning::SignIn {
+                return true;
+            }
+        }
+        false
     }
 }
 #[must_use]
@@ -86,7 +96,7 @@ pub fn decode(bindings: &Bindings, token: Token, act: Act) -> Option<first::Act>
                     }
                     Act::Press | Act::Submit | Act::Toggle | Act::Drawing { .. } => None,
                 },
-                Meaning::Object(_) | Meaning::Section(_) => None,
+                Meaning::SignIn | Meaning::Object(_) | Meaning::Section(_) => None,
             };
         }
     }

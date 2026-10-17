@@ -1,6 +1,7 @@
 use super::spine::{LIMITS, delivered, drive, frame, start};
+use crate::tests::fixtures::{Fixture, ReadPage};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::{Act, End},
     address::{Address, Place, TaskSection},
     windows::{Edge, Edges, HistoryWindow},
@@ -69,9 +70,12 @@ fn mixed_history_window_retains_revision_position_and_line_identity_in_source_or
     assert_eq!(window.rows.as_slice(), &[semantic, line(0, 0)]);
     assert!(window.edges.reaches(End::Before));
 }
-fn history_read(requests: &[Request]) -> Token {
+fn history_read(requests: &[Request]) -> jig_client::Handle {
     for request in requests {
-        if let Request::Read { read, what: Read::History { .. } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::History { .. }) },
+        } = request
+        {
             return *read;
         }
     }
@@ -87,7 +91,7 @@ fn page(cut: bool, after: Option<Cursor>) -> ReadValue {
 }
 #[test]
 fn owner_history_original_scope_cursors_and_page_loss_survive_continuation_and_reset() {
-    let mut domain = Domain::new(&LIMITS);
+    let mut domain = Fixture::new(&LIMITS);
     let watch = start(&mut domain, List::with_capacity(0));
     let initial = delivered(&mut domain, Time::ZERO, watch, frame(7));
     super::pages::finish_initial_inbox_reads(&mut domain, &initial);
@@ -97,37 +101,38 @@ fn owner_history_original_scope_cursors_and_page_loss_survive_continuation_and_r
         Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::History }) },
     ));
     let subtree =
-        history_read(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::HistoryScope { subtree: true } }));
-    drive(&mut domain, Time::ZERO, Event::Read { read: original, result: ReadResult::Value(page(true, None)) });
+        history_read(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::HistoryScope { subtree: true } }));
+    drive(&mut domain, Time::ZERO, ReadPage { read: original, result: ReadResult::Value(page(true, None)) });
     assert!(domain.history_rows().rows.is_empty());
     assert!(!domain.history_rows().cut);
     let cursor = Cursor::new(Box::from(b"whole supplied cursor".as_slice()), 1024).expect("bounded opaque cursor");
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read: subtree, result: ReadResult::Value(page(true, Some(cursor.clone()))) },
+        ReadPage { read: subtree, result: ReadResult::Value(page(true, Some(cursor.clone()))) },
     );
     assert_eq!(domain.history_rows().rows.as_slice(), &[change(u64::MAX, 0), milestone(u64::MAX, 0)]);
     assert!(domain.history_rows().cut);
     let more = drive(
         &mut domain,
         Time::ZERO,
-        Event::Act { act: Act::More { window: Token::new(crate::page::task::HISTORY_WINDOW), end: End::After } },
+        Event::Act { action: Act::More { window: Token::new(crate::page::task::HISTORY_WINDOW), end: End::After } },
     );
     let continued = history_read(&more);
     let mut matching_reads = 0_u32;
     for request in &more {
-        if let Request::Read { what, .. } = request
+        if let Request::Client { asked: jig_client::Event::Read { read: jig_client::Readable::Jig(what), .. } } =
+            request
             && *what == (Read::History { task: 8, subtree: true, after: Some(cursor.clone()) })
         {
             matching_reads += 1;
         }
     }
     assert_eq!(matching_reads, 1);
-    drive(&mut domain, Time::ZERO, Event::Read { read: continued, result: ReadResult::Value(page(false, None)) });
+    drive(&mut domain, Time::ZERO, ReadPage { read: continued, result: ReadResult::Value(page(false, None)) });
     assert!(domain.history_rows().cut);
     assert_eq!(domain.history_rows().rows.len(), 2);
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::HistoryScope { subtree: false } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::HistoryScope { subtree: false } });
     assert!(domain.history_rows().rows.is_empty());
     assert!(!domain.history_rows().cut);
 }

@@ -3,7 +3,7 @@ use crate::{JigBindings, phrases::jig::JigPhrase, words::Words};
 use skein_ui::Builder;
 
 use crate::{
-    Domain,
+    Borrowed,
     fields::Purpose,
     objects::{Object, question::facts},
 };
@@ -12,7 +12,7 @@ use skein_lib::Id;
 /// Build the shared question; its answer field belongs to its open confirmation.
 pub fn question(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &super::Place,
     words: &Words,
@@ -22,7 +22,7 @@ pub fn question(
     let Some(fact) = client.objects().get(object) else {
         return false;
     };
-    let Some(document) = facts(fact) else {
+    let Some(document) = facts(&fact) else {
         return false;
     };
     let title = words.say(JigPhrase::Question, &[]);
@@ -46,7 +46,7 @@ pub fn question(
     if let Some(ending) = &document.ending {
         words.ending(b, ending);
     }
-    super::common::answer(b, fact, words, text_limit);
+    super::common::answer(b, &fact, words, text_limit);
     super::common::acts(b, &fact.card, &document.acts, object, words, bindings);
     super::close(b);
     true

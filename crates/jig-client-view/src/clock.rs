@@ -1,6 +1,6 @@
 //! Wall time is for the view; deadlines are monotonic. A minute's tick is
 //! armed only while a work page shows wall times; client/domain/client.md, 13.
-use crate::{Domain, objects::Body, page::Page, ui::Timer};
+use crate::{Ui, objects::Body, page::Page, ui::Timer};
 use skein_lib::Duration;
 /// Whether page policy shows times, and whether its one tick is armed.
 #[derive(Debug)]
@@ -8,7 +8,7 @@ pub(crate) struct State {
     pub page_times: bool,
     pub armed: bool,
 }
-fn showing(domain: &Domain) -> bool {
+fn showing(domain: &Ui) -> bool {
     match domain.page {
         Page::Work { .. } => {}
         Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
@@ -44,7 +44,7 @@ fn showing(domain: &Domain) -> bool {
     }
     false
 }
-pub(crate) fn sync(domain: &mut Domain) {
+pub(crate) fn sync(domain: &mut Ui) {
     if showing(domain) {
         if !domain.clock.armed {
             domain
@@ -58,7 +58,7 @@ pub(crate) fn sync(domain: &mut Domain) {
         domain.clock.armed = false;
     }
 }
-pub(crate) fn minute(domain: &mut Domain) {
+pub(crate) fn minute(domain: &mut Ui) {
     domain.clock.armed = false;
     if showing(domain) {
         domain.changed();

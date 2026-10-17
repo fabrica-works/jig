@@ -4,6 +4,7 @@ use jig_client_view::address::{Address as JigAddress, TaskSection};
 use jig_client_world::{Until, harness::App};
 use jig_ops_client_domain::{Address, observability as obs};
 use jig_ops_world::client::{Ops, stories};
+use jig_ops_world::joint::fixture::{press, see};
 use skein_fake_person::{Find, Step};
 use skein_lib::Duration;
 use skein_ui::Role;
@@ -24,12 +25,6 @@ fn scripted_client_starts_within_the_shell_heap_envelope() {
     drop(state);
 }
 
-fn see(words: &[u8]) -> Step<Address> {
-    Step::See { find: Find::text(words), within: WITHIN }
-}
-fn press(words: &[u8]) -> Step<Address> {
-    Step::Press { find: Find::named(Role::Button, words) }
-}
 #[test]
 fn p_accepts_a_restart_from_the_incidents_page() {
     accept_restart(501);
@@ -49,8 +44,8 @@ fn p_accepts_the_restart_in_its_leads_plan_on_the_incidents_page() {
         vec![
             see(b"R restart checkout"),
             see(b"Restart checkout in production"),
-            press(b"Accept"),
-            press(b"Confirm"),
+            press(Role::Button, b"Accept"),
+            press(Role::Button, b"Confirm"),
             see(b"Accepted"),
         ],
     );
@@ -68,8 +63,8 @@ fn p_accepts_the_restart_from_the_incidents_page_at_the_text_shell() {
         vec![
             see(b"R restart checkout"),
             see(b"Restart checkout in production"),
-            press(b"Accept"),
-            press(b"Confirm"),
+            press(Role::Button, b"Accept"),
+            press(Role::Button, b"Confirm"),
             see(b"Accepted"),
         ],
     );
@@ -100,8 +95,8 @@ fn accept_restart(seed: u64) {
             Step::Go { address: Address::Jig(JigAddress::Task { task: 9, section: TaskSection::Plan }) },
             see(b"R restart checkout"),
             see(b"Restart checkout in production"),
-            press(b"Accept"),
-            press(b"Confirm"),
+            press(Role::Button, b"Accept"),
+            press(Role::Button, b"Confirm"),
             see(b"Accepted"),
             Step::Go { address: Address::Jig(JigAddress::Task { task: 10, section: TaskSection::Panels }) },
             see(b"Restart service"),
@@ -145,12 +140,12 @@ fn q_asks_for_an_environment_in_a_chat_and_accepts_what_it_costs() {
                     find: Find::named(Role::TextArea, b"First words"),
                     words: b"staging for one week".as_slice().into(),
                 },
-                press(b"Start a conversation"),
+                press(Role::Button, b"Start a conversation"),
                 see(b"Q staging chat"),
                 see(b"Provision staging for one week"),
                 see(b"40"),
-                press(b"Accept"),
-                press(b"Confirm"),
+                press(Role::Button, b"Accept"),
+                press(Role::Button, b"Confirm"),
                 see(b"Accepted"),
             ],
         );
@@ -167,7 +162,7 @@ fn q_asks_for_an_environment_in_a_chat_and_accepts_what_it_costs() {
                     find: Find::named(Role::TextField, b"New end (seconds since epoch)"),
                     words: b"900".as_slice().into(),
                 },
-                press(b"Move end"),
+                press(Role::Button, b"Move end"),
                 see(b"End moved"),
             ],
         );

@@ -6,7 +6,7 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::Domain;
+use crate::Borrowed;
 use jig_client::contract::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, Proposer, ResultDetails};
 
 fn text(b: &mut Builder, words: &Words, phrase: ResultPhrase, holes: &[Hole]) {
@@ -22,7 +22,13 @@ pub(crate) fn requester(b: &mut Builder, value: OwnerRequester, words: &Words) {
         }
     }
 }
-pub(crate) fn link(b: &mut Builder, client: &Domain, value: &OwnerTaskLink, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn link(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    value: &OwnerTaskLink,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     match value {
         OwnerTaskLink::Live(chip) => {
             text(b, words, ResultPhrase::Live, &[]);
@@ -49,7 +55,13 @@ pub(crate) fn link(b: &mut Builder, client: &Domain, value: &OwnerTaskLink, word
     }
 }
 /// Render only supplied metadata. Raw connector references retain their owner meaning.
-pub fn render(b: &mut Builder, client: &Domain, value: &ResultDetails, words: &Words, bindings: &mut JigBindings) {
+pub fn render(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    value: &ResultDetails,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     b.open(Role::Region);
     let saying = words.book.say(words.language, ResultPhrase::Details.id(), &[]).expect("result heading checked");
     b.name(&saying.text);

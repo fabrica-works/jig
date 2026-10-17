@@ -6,26 +6,20 @@
 )]
 //! Public subtree deliveries preserve source facts across page lifecycles.
 use super::spine::{LIMITS, delivered, frame, start};
+use crate::tests::fixtures::{Ended, Fixture, Watched};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act,
     address::{Address, Place, TaskSection},
     page::task::PlanFilter,
 };
 use jig_client::contract::*;
-use skein_lib::{Env, List, Queue, Time, Token, Wall};
+use skein_lib::{List, Time, Wall};
 fn limits() -> crate::Limits {
     crate::Limits { objects: 8, reads: 8, ..LIMITS }
 }
-fn drive(d: &mut Domain, event: Event) -> Vec<Request> {
-    let l = limits();
-    let mut q = Queue::with_capacity(crate::max_out(&l));
-    crate::step(d, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: l }, event, &mut q);
-    let mut out = Vec::new();
-    while let Some(value) = q.pop() {
-        out.push(value);
-    }
-    out
+fn drive(d: &mut Fixture, event: impl crate::tests::fixtures::Input) -> Vec<Request> {
+    d.drive(Time::ZERO, event).into_vec()
 }
 fn chip(n: u64, phase: Phase) -> Chip {
     let mut c = super::confirmation::task().chip;
@@ -86,26 +80,38 @@ fn plan_task() -> Task {
     doc.context.as_mut().unwrap().impact.tasks.waiting = 1;
     doc
 }
-fn opened(root: u64) -> (Domain, Token) {
-    let mut d = Domain::new(&limits());
+fn opened(root: u64) -> (Fixture, jig_client::Handle) {
+    let mut d = Fixture::new(&limits());
     let f = start(&mut d, List::with_capacity(0));
     delivered(&mut d, Time::ZERO, f, frame(7));
     let asks =
         drive(&mut d, Event::Went { place: Place::Jig(Address::Task { task: root, section: TaskSection::Plan }) });
-    let task = asks
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { task } } if *task == root => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let task =
+        asks.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { task }),
+                        },
+                } if *task == root => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut doc = plan_task();
     doc.chip.task = root;
-    let asks = drive(&mut d, Event::Watch { watch: task, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc))) });
+    let asks = drive(&mut d, Watched { watch: task, event: WatchEvent::Delivered(Delivery::Task(Box::new(doc))) });
     let tree = asks
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Tree { task, .. } } if *task == root => Some(*watch),
+            Request::Client {
+                asked:
+                    jig_client::Event::Watch {
+                        handle: watch,
+                        subject: jig_client::Watchable::Jig(Subject::Tree { task, .. }),
+                    },
+            } if *task == root => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -115,9 +121,9 @@ fn opened(root: u64) -> (Domain, Token) {
 fn owner_tree_root_descendants_proposals_parent_depth_spend_cuts_and_two_independent_folds_are_retained_whole() {
     let (mut d, watch) = opened(0);
     let value = tree(0);
-    drive(&mut d, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) });
+    drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) });
     let plan = &d.task_page().plan;
-    assert_eq!(plan.owner.as_deref(), Some(&value));
+    assert_eq!(plan.owner, Some(&value));
     assert!(plan.nodes.is_empty());
     assert_eq!(plan.owner.as_ref().unwrap().rows.len(), 1);
     assert_eq!(plan.owner.as_ref().unwrap().rows.capacity(), 2);
@@ -143,81 +149,82 @@ fn owner_tree_filter_and_fold_actions_preserve_hidden_source_counts_and_optional
     ] {
         value.rows.get_mut(0).unwrap().dependencies.clear();
         value.rows.get_mut(0).unwrap().dependencies.push(link).unwrap();
-        drive(
-            &mut d,
-            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
-        );
+        drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) });
         for filter in [PlanFilter::Held, PlanFilter::Live, PlanFilter::All] {
-            drive(&mut d, Event::Act { act: Act::FilterPlan { filter } });
-            assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
+            drive(&mut d, Event::Act { action: Act::FilterPlan { filter } });
+            assert_eq!(d.task_page().plan.owner, Some(&value));
         }
         let id = d.objects().find(ObjectKey::Task(u64::MAX)).unwrap();
-        drive(&mut d, Event::Act { act: Act::Fold { object: id.token(), open: false } });
+        drive(&mut d, Event::Act { action: Act::Fold { object: id.token(), open: false } });
         assert!(!d.task_page().plan.owner_expanded(&value.rows.get(0).unwrap().chip));
-        assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
-        drive(&mut d, Event::Act { act: Act::Fold { object: id.token(), open: true } });
+        assert_eq!(d.task_page().plan.owner, Some(&value));
+        drive(&mut d, Event::Act { action: Act::Fold { object: id.token(), open: true } });
     }
 }
 #[test]
 fn owner_tree_departed_same_task_watch_and_clear_are_fenced_and_older_replacement_clears_owner_state() {
     let (mut d, old) = opened(8);
     let value = tree(8);
-    drive(
-        &mut d,
-        Event::Watch { watch: old, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
-    );
+    drive(&mut d, Watched { watch: old, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) });
     let closed = drive(&mut d, Event::Went { place: Place::Elsewhere });
     assert!(d.task_page().plan.owner.is_none());
     for request in closed {
-        if let Request::Close { watch } = request {
-            drive(&mut d, Event::Ended { watch, end: WatchEnd::Closed });
+        if let Request::Client { asked: jig_client::Event::Unwatch { handle: watch } } = request {
+            drive(&mut d, Ended { watch, end: WatchEnd::Closed });
         }
     }
     crate::reclaim(&mut d);
-    drive(
-        &mut d,
-        Event::Watch { watch: old, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
-    );
+    drive(&mut d, Watched { watch: old, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) });
     assert!(d.task_page().plan.owner.is_none());
     let asks = drive(&mut d, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
-    let task = asks
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
-    let asks = drive(
-        &mut d,
-        Event::Watch { watch: task, event: WatchEvent::Delivered(Delivery::Task(Box::new(plan_task()))) },
-    );
-    let current = asks
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Tree { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let task =
+        asks.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
+    let asks =
+        drive(&mut d, Watched { watch: task, event: WatchEvent::Delivered(Delivery::Task(Box::new(plan_task()))) });
+    let current =
+        asks.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Tree { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     drive(
         &mut d,
-        Event::Watch { watch: current, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
+        Watched { watch: current, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
     );
-    drive(&mut d, Event::Watch { watch: old, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(tree(0)))) });
-    assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
+    drive(&mut d, Watched { watch: old, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(tree(0)))) });
+    assert_eq!(d.task_page().plan.owner, Some(&value));
     let older = Tree {
         task: 8,
         nodes: List::with_capacity(0),
         folded: PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 },
         held_below: 13,
     };
-    drive(&mut d, Event::Watch { watch: current, event: WatchEvent::Delivered(Delivery::Tree(Box::new(older))) });
+    drive(&mut d, Watched { watch: current, event: WatchEvent::Delivered(Delivery::Tree(Box::new(older))) });
     assert!(d.task_page().plan.owner.is_none());
     assert_eq!(d.task_page().plan.held_below, 13);
     drive(
         &mut d,
-        Event::Watch { watch: current, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
+        Watched { watch: current, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(value.clone()))) },
     );
-    assert_eq!(d.task_page().plan.owner.as_deref(), Some(&value));
+    assert_eq!(d.task_page().plan.owner, Some(&value));
 }
 
 const UTF8_TEXT: &[u8] = b"~\0/";

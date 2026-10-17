@@ -22,7 +22,17 @@ pub(super) fn read(captured: &mut Option<Captured>, source: &reads::Answer, inco
     let Some(captured) = captured else { return };
     let Incoming::Callback {
         client,
-        event: Event::Jig(jig_client_view::Event::Read { result: client::ReadResult::Value(native), .. }),
+        event:
+            Event::Client {
+                event:
+                    jig_client::Event::Up {
+                        up:
+                            jig_client::Up::ReadDone {
+                                result: jig_client::Readout::Jig(client::ReadResult::Value(native)),
+                                ..
+                            },
+                    },
+            },
     } = incoming
     else {
         return;

@@ -5,7 +5,7 @@ use crate::{JigBindings, JigMeaning, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
-use crate::{Domain, action::Act, fields::Purpose};
+use crate::{Borrowed, action::Act, fields::Purpose};
 use jig_client::contract::{ActKind, Admission, Bounds, Funder, GoalExecutor, OwnerProject};
 
 /// The goal renderer traverses bounded choices and recipients; both have independent row bounds.
@@ -37,7 +37,13 @@ pub(super) fn offer_fits(value: &Admission, limits: &crate::Limits) -> Option<()
     }
 }
 
-pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn form(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    doc: &OwnerProject,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     let text_limit = bindings.text_limit();
     b.open(Role::Form);
     b.region(crate::regions::JigRegion::NewGoal.region());
@@ -119,7 +125,7 @@ pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: 
 
 fn choices(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     doc: &OwnerProject,
     admission: &Admission,
     left: u64,
@@ -168,7 +174,7 @@ fn choices(
 
 fn inputs(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     project: u32,
     admission: &Admission,
     pool_left: u64,

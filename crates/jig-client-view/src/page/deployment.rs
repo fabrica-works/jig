@@ -1,7 +1,7 @@
 //! Deployment facts and connector part references, only for its admitted page.
 //! Hosts, accounts and capacity are whole owner documents. No connector value is
 //! kept. See client/domain/pages.md, 7, and client/domain/root.md, 6.
-use crate::{Domain, Request};
+use crate::{Request, Ui};
 use alloc::boxed::Box;
 use jig_client::contract::{Deployment, OwnerDeployment, Part};
 use skein_lib::{Env, List, Queue};
@@ -17,8 +17,14 @@ impl DeploymentPage {
         Self { document: None, owner: None }
     }
 }
-pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, doc: Box<Deployment>, out: &mut Queue<Request>) {
-    if !domain.shows(crate::page::Section::Deployment) {
+pub(crate) fn document(
+    domain: &mut Ui,
+    env: &Env<crate::Limits>,
+    doc: Box<Deployment>,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
+    if !domain.shows(crate::page::Section::Deployment, lent) {
         return;
     }
     let mut parts = List::<Part>::with_capacity(env.limits.parts.saturating_add(1));
@@ -41,12 +47,13 @@ pub const fn worst_case(limits: &crate::Limits) -> Option<u64> {
 
 /// Keep the whole owner value only for the admitted current deployment page.
 pub(crate) fn owner_document(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     doc: Box<OwnerDeployment>,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
-    if !domain.shows(crate::page::Section::Deployment) {
+    if !domain.shows(crate::page::Section::Deployment, lent) {
         return;
     }
     let mut parts = List::with_capacity(env.limits.parts.saturating_add(1));
@@ -58,6 +65,32 @@ pub(crate) fn owner_document(
     }
     domain.deployment_page.document = None;
     domain.deployment_page.owner = Some(doc);
+    crate::page::project::show(domain, env, parts, out);
+    domain.changed();
+}
+
+/// Show the watched deployment's references without retaining its document.
+pub(crate) fn watched(
+    domain: &mut Ui,
+    env: &Env<crate::Limits>,
+    out: &mut Queue<Request>,
+    client: &jig_client::Client,
+) {
+    let projected = domain.borrow(client).deployment_page();
+    let mut parts = List::with_capacity(env.limits.parts.saturating_add(1));
+    if let Some(owner) = projected.owner {
+        for connector in &owner.connectors {
+            if parts.push(Part::Deployment { connector: *connector }).is_err() {
+                break;
+            }
+        }
+    } else if let Some(doc) = projected.document {
+        for part in &doc.parts {
+            if parts.push(part.clone()).is_err() {
+                break;
+            }
+        }
+    }
     crate::page::project::show(domain, env, parts, out);
     domain.changed();
 }

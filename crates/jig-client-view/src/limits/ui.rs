@@ -1,10 +1,8 @@
 //! Container capacities and byte bounds owned by the client.
 //! Every retained container is sized from these at new; jig 21–23 add their
 //! own entities. See client/domain/client.md, 14.
-use crate::{store::Record, ui::Timer, watches::Watch};
-use core::mem::size_of;
-use jig_client::contract::{Charter, Frame, ProjectRole};
-use skein_lib::{Deadlines, Duration, Id, List, Map, Slab};
+use crate::{store::Record, ui::Timer};
+use skein_lib::{Deadlines, Duration, List, Map};
 
 /// Configured capacities, payload bounds and durations for the client spine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -16,7 +14,7 @@ pub struct Limits {
     pub save_delay: Duration,
     pub intents: u32,
     pub fields: u32,
-    pub providers: u32,
+
     pub objects: u32,
     pub sources: u32,
     pub reads: u32,
@@ -45,7 +43,7 @@ pub struct Limits {
     pub updates_count: u32,
 }
 
-/// The heap held by the implemented spine, including frame and record payloads.
+/// The heap held by the implemented spine, including page reads and record payloads.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     limits.watches.checked_add(limits.reads)?;
@@ -68,7 +66,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.sources == 0 || limits.conversation_words < limits.intents {
         return None;
     }
-    let mut total = Slab::<Watch>::worst_case(limits.watches)?;
+    let mut total = Map::<jig_client::Handle, crate::handles::Watched>::worst_case(limits.watches)?;
     total = total.checked_add(List::<jig_client::contract::ObjectKey>::worst_case(tree_names(limits)?)?)?;
     total = total.checked_add(List::<crate::page::Section>::worst_case(crate::page::MOST_SECTIONS)?)?;
     total = total.checked_add(List::<crate::page::SectionStatus>::worst_case(crate::page::MOST_SECTIONS)?)?;
@@ -88,25 +86,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(Map::<u64, u32>::worst_case(limits.kept)?)?;
     total = total.checked_add(crate::confirm::worst_case(limits)?)?;
     total = total.checked_add(List::<crate::objects::Context>::worst_case(limits.rows.checked_mul(2)?)?)?;
-    total = total.checked_add(crate::signin::worst_case(limits)?)?;
     total = total.checked_add(crate::objects::worst_case(limits)?)?;
-    total = total.checked_add(Slab::<crate::reads::Reading>::worst_case(limits.reads)?)?;
-    total = total.checked_add(Map::<Id<crate::reads::Reading>, ()>::worst_case(limits.reads)?)?;
+    total = total.checked_add(Map::<jig_client::Handle, crate::handles::Reading>::worst_case(limits.reads)?)?;
     total = total.checked_add(u64::from(limits.reads).checked_mul(limits.document_bytes)?)?;
     total = total.checked_add(crate::windows::worst_case(limits)?)?;
-    total = total.checked_add(Map::<Id<Watch>, ()>::worst_case(limits.watches)?)?;
     total = total.checked_add(Deadlines::<Timer>::worst_case(timer_capacity)?)?;
     total = total.checked_add(List::<Record>::worst_case(limits.records)?.checked_mul(2)?)?;
     total = total.checked_add(u64::from(limits.records).checked_mul(u64::from(limits.text))?)?;
-    total = total.checked_add(u64::try_from(size_of::<Frame>()).ok()?)?;
-    total = total.checked_add(u64::from(limits.text).checked_mul(2)?)?;
-    total = total.checked_add(List::<ProjectRole>::worst_case(limits.projects)?)?;
-    total = total.checked_add(List::<jig_client::contract::OfferedCharters>::worst_case(limits.projects)?)?;
-    let charters = List::<Charter>::worst_case(limits.charters)?
-        .checked_add(u64::from(limits.charters).checked_mul(u64::from(limits.text))?)?
-        .checked_mul(2)?;
-    let project = charters.checked_add(u64::from(limits.text))?;
-    total = total.checked_add(u64::from(limits.projects).checked_mul(project)?)?;
     // Chips subjects own at most one configured task-number list each.
     total.checked_add(u64::from(limits.watches).checked_mul(List::<u64>::worst_case(limits.rows)?)?)
 }

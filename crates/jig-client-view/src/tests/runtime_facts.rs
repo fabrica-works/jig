@@ -10,8 +10,9 @@ use super::{
     work_pages::{entered, list},
 };
 use crate::JigBindings;
+use crate::tests::fixtures::Fixture;
 use crate::{
-    Domain, Request,
+    Request,
     address::{Address, TaskSection},
 };
 use jig_client::contract::*;
@@ -28,15 +29,21 @@ fn active(stage: RunStage) -> ActiveRun {
         observation: None,
     }
 }
-fn ready(runtime: Runtime, details: ChipPhase, phase: Phase) -> Domain {
+fn ready(runtime: Runtime, details: ChipPhase, phase: Phase) -> Fixture {
     let (mut d, out) = entered(Address::Task { task: 8, section: TaskSection::Activity });
-    let watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut task = task_doc(&[]);
     task.chip.executor = Executor::Agent { charter: 2 };
     task.chip.phase = phase;
@@ -230,7 +237,7 @@ fn full_runtime_tools_and_held_closing_fit_the_declared_tree_envelope() {
         let mut b = Builder::new(&limits());
         let mut bindings = JigBindings::new(64, CLIENT.text);
         b.open(Role::Page);
-        crate::cards::chip::chip(&mut b, &d, &chip, words(), &mut bindings);
+        crate::cards::chip::chip(&mut b, &d.view(), &chip, words(), &mut bindings);
         b.close();
         let tree = b.finish();
         assert!(tree.len() <= crate::chip_nodes(&CLIENT).unwrap() + 1);

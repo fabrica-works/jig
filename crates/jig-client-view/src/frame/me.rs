@@ -1,10 +1,11 @@
 //! The shared frame, last delivered facts and selected address.
 //! The frame confirms party and retention, and answers siblings within a step.
 //! See client/domain/client.md, 3 and 8.
-use crate::{address::Address, link::Link};
+use crate::address::Address;
+use jig_client::Link;
 use jig_client::contract::Frame;
 /// A sibling hand off of who is signed in and where.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FrameShown {
     pub party: Option<u64>,
     pub address: Option<Address>,
@@ -12,12 +13,12 @@ pub struct FrameShown {
 }
 
 /// The current committed frame document.
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct FrameState {
-    pub document: Option<Frame>,
+#[derive(Debug, PartialEq, Eq)]
+pub struct FrameState<'a> {
+    pub document: Option<&'a Frame>,
 }
 
-impl FrameState {
+impl FrameState<'_> {
     /// The authenticated party from the latest frame, never from kept work.
     #[must_use]
     pub fn party(&self) -> Option<u64> {
@@ -69,7 +70,7 @@ fn name_fits(name: Option<&jig_client::contract::DocumentText>, text: u32) -> bo
 }
 
 /// Facts on every page's frame, with exact needs and bounded unread updates.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Summary {
     pub party: Option<u64>,
     pub needs: u64,
@@ -80,7 +81,7 @@ pub struct Summary {
     pub link: Link,
     pub behind: bool,
 }
-impl FrameState {
+impl FrameState<'_> {
     /// Derives display facts from the committed frame; never guesses unread counts.
     #[must_use]
     pub fn summary(&self, address: Address, link: Link, behind: bool, limit: u32) -> Summary {

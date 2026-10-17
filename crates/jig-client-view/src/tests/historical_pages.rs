@@ -4,13 +4,13 @@
 )]
 use super::cards::CLIENT;
 use crate::historical_pages_words::{self as sayings, HistoricalPhrase as P};
+use crate::tests::fixtures::{Fixture, ReadPage, Watched};
 use crate::words::Words;
 use crate::{JigBindings, historical_pages as view};
 use skein_ui::Limits;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Tree};
 
-use crate::Domain;
 use jig_client::contract::*;
 use skein_lib::{List, Wall, bytes::copy_of};
 fn doc(bytes: &[u8], cut: bool) -> DocumentText {
@@ -86,7 +86,7 @@ fn ended_tree(page: &OwnerEndedPage, w: &Words, cap: Option<Limits>) -> Tree {
     let cap = cap.unwrap_or(limits(f));
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    view::ended_render(&mut b, &Domain::new(&CLIENT), page, w, &mut bindings);
+    view::ended_render(&mut b, &Fixture::new(&CLIENT).view(), page, w, &mut bindings);
     b.finish()
 }
 fn spend_tree(page: &OwnerSpendPage, w: &Words, cap: Option<Limits>) -> Tree {
@@ -380,33 +380,42 @@ fn historical_public_plan_keeps_owner_tree_early_return_and_companion_ended_read
         address::{Address, Place, TaskSection},
     };
     let (mut client, frame) = start();
-    drive(
-        &mut client,
-        Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
-    );
+    drive(&mut client, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
     let out =
         drive(&mut client, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
-    let task = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let task =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let out = drive(
         &mut client,
-        Event::Watch {
+        Watched {
             watch: task,
             event: WatchEvent::Delivered(Delivery::Task(Box::new(super::cards_objects::task_doc(&[])))),
         },
     );
-    let watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Tree { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Tree { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let tree = OwnerTree {
         root: super::cards_objects::task_doc(&[]).chip,
         rows: List::with_capacity(CLIENT.rows),
@@ -414,33 +423,36 @@ fn historical_public_plan_keeps_owner_tree_early_return_and_companion_ended_read
         held_below: 0,
         next: None,
     };
-    drive(
-        &mut client,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(tree.clone()))) },
-    );
-    let out = drive(&mut client, Event::Act { act: Act::OpenEnded { task: 8 } });
+    drive(&mut client, Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerTree(Box::new(tree.clone()))) });
+    let out = drive(&mut client, Event::Act { action: Act::OpenEnded { task: 8 } });
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Ended { task: 8, after: None } } => Some(*read),
+            Request::Client {
+                asked:
+                    jig_client::Event::Read {
+                        handle: read,
+                        read: jig_client::Readable::Jig(Read::Ended { task: 8, after: None }),
+                    },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
     let page = ended(OwnerChipEnding::Failed(doc(b"companion actual cause", true)), None);
-    drive(&mut client, Event::Read { read, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page.clone()))) });
+    drive(&mut client, ReadPage { read, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page.clone()))) });
     let w = words();
     let cap = crate::limits::of_words(&CLIENT, &w).unwrap();
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    crate::pages::main(&mut b, &client, &w, &mut bindings);
+    crate::pages::main(&mut b, &client.view(), &w, &mut bindings);
     let rendered = b.finish();
     assert!(has(&rendered, b"companion actual cause"));
     caption(&rendered, &w, P::EndedDelegates, &[]);
-    assert_eq!(client.task_page().plan.owner.as_deref(), Some(&tree));
+    assert_eq!(client.task_page().plan.owner, Some(&tree));
     assert_eq!(client.task_page().owner_ended.as_deref(), Some(&page));
-    drive(&mut client, Event::Act { act: Act::OpenEnded { task: 8 } });
+    drive(&mut client, Event::Act { action: Act::OpenEnded { task: 8 } });
     assert!(client.task_page().owner_ended.is_none());
-    assert_eq!(client.task_page().plan.owner.as_deref(), Some(&tree));
+    assert_eq!(client.task_page().plan.owner, Some(&tree));
     assert!(!client.task_page().ended_cut);
     assert!(client.task_page().ended_before.is_none() && client.task_page().ended_after.is_none());
 }

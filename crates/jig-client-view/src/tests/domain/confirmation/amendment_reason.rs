@@ -1,13 +1,14 @@
 //! A supplied amendment reason is independent of the six selected changes.
 use super::*;
+use crate::tests::fixtures::{AnsweredByEngine, Fixture};
 
-fn opened(act: ActKind) -> (Domain, Id<Object>) {
+fn opened(act: ActKind) -> (Fixture, Id<Object>) {
     let (mut domain, _) = live();
     let mut row = task();
     row.acts = offered(act, Admission::Allowed);
     let id = install(&mut domain, Body::Task(Box::new(row)));
     intend(&mut domain, id, act);
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     (domain, id)
 }
 
@@ -18,29 +19,29 @@ fn amendment_requires_person_reason_presence_and_accepts_explicit_empty() {
         edit(&mut full, field, b"");
     }
     let refused =
-        drive(&mut full, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
-    assert!(refused.as_ref().contains(&Request::Fact { fact: crate::facts::Fact::Refused { which: Limit::Fields } }));
+        drive(&mut full, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } });
+    assert!(refused.is_empty());
+    let crate::page::Page::Work { refused, .. } = full.page() else { panic!("work page") };
+    assert_eq!(*refused, Some(Limit::Fields));
     assert_eq!(full.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
     assert!(full.fields().get(Purpose::Reason).is_none());
     let (mut domain, id) = opened(ActKind::Amend);
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Words { field: Purpose::Reason }));
-    assert!(acts::ask(domain.objects().get(id).unwrap(), domain.confirmation().unwrap(), domain.fields()).is_none());
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    assert!(acts::ask(&domain.objects().get(id).unwrap(), domain.confirmation().unwrap(), domain.fields()).is_none());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
     edit(&mut domain, Purpose::Instructions, b"unrelated");
     let too_long = Text::new(Box::from(UTF8_TEXTS[0]), 33).unwrap();
     let refused =
-        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: too_long } });
-    assert!(
-        refused
-            .as_ref()
-            .contains(&Request::Fact { fact: crate::facts::Fact::Refused { which: Limit::Words { limit: 32 } } })
-    );
+        drive(&mut domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: too_long } });
+    assert!(refused.is_empty());
+    let crate::page::Page::Work { refused, .. } = domain.page() else { panic!("work page") };
+    assert_eq!(*refused, Some(Limit::Words { limit: 32 }));
     assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
     assert!(domain.fields().get(Purpose::Reason).is_none());
     edit(&mut domain, Purpose::Reason, b"");
     assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Supplied);
     assert!(domain.confirmation().unwrap().missing.is_none());
-    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert_eq!(
         sent(&out),
         &Ask::Amend {
@@ -52,27 +53,27 @@ fn amendment_requires_person_reason_presence_and_accepts_explicit_empty() {
             reason: text(b"")
         }
     );
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
 }
 
 #[test]
 fn amendment_reason_receipt_resets_without_losing_domain_clear_write_counts() {
     let (mut domain, id) = opened(ActKind::Amend);
     edit(&mut domain, Purpose::Reason, b"previous reason");
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Dismiss });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dismiss });
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().text.bytes(), b"");
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().writes, 1);
     intend(&mut domain, id, ActKind::Amend);
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Words { field: Purpose::Reason }));
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
     edit(&mut domain, Purpose::Reason, b"");
     assert!(domain.confirmation().unwrap().missing.is_none());
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Dismiss });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dismiss });
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().writes, 2);
     intend(&mut domain, id, ActKind::Amend);
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Missing);
 }
 
@@ -83,7 +84,7 @@ fn amendment_release_keeps_opaque_reason_delta_and_independent_revisions_in_one_
     edit(&mut domain, Purpose::Reason, bytes);
     let selected = domain.confirmation().unwrap().choices.change.clone().unwrap();
     assert_eq!(selected, change());
-    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert_eq!(
         sent(&out),
         &Ask::Amend {
@@ -103,17 +104,19 @@ fn amendment_release_keeps_opaque_reason_delta_and_independent_revisions_in_one_
 fn a_late_amendment_answer_preserves_another_forms_supplied_reason_until_page_switch() {
     let (mut domain, _) = opened(ActKind::Amend);
     edit(&mut domain, Purpose::Reason, b"old reason");
-    let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
-    let Request::Send { request, .. } = out[0] else { panic!("one amendment send") };
+    let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
+    let Request::Client { asked: jig_client::Event::Send { key: request, .. } } = out[0] else {
+        panic!("one amendment send")
+    };
     let mut other = task();
     other.chip.task = 9;
     other.acts = offered(ActKind::Amend, Admission::Allowed);
     let id = install(&mut domain, Body::Task(Box::new(other)));
     intend(&mut domain, id, ActKind::Amend);
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     edit(&mut domain, Purpose::Reason, b"new reason");
     let writes = domain.fields().get(Purpose::Reason).unwrap().writes;
-    drive(&mut domain, Time::ZERO, Event::Answered { request, answer: Answer::Refused(Refusal::NotOffered) });
+    drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: Answer::Refused(Refusal::NotOffered) });
     assert_eq!(domain.confirmation().unwrap().object, id);
     assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Supplied);
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().text.bytes(), b"new reason");
@@ -121,7 +124,7 @@ fn a_late_amendment_answer_preserves_another_forms_supplied_reason_until_page_sw
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Act { act: Act::Go { address: crate::address::Address::Inbox { project: None } } },
+        Event::Act { action: Act::Go { address: crate::address::Address::Inbox { project: None } } },
     );
     assert!(domain.confirmation().is_none());
     assert!(domain.fields().get(Purpose::Reason).unwrap().text.bytes().is_empty());

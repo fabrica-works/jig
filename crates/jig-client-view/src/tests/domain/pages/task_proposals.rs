@@ -1,9 +1,9 @@
 //! The Task document supplies proposal identities independently of transcript calls.
 use super::*;
 use crate::objects::{Body, Card, Left};
-use skein_lib::Token;
+use crate::tests::fixtures::{Ended, Fixture, ReadPage, Watched};
 
-fn opened() -> (Domain, Token) {
+fn opened() -> (Fixture, jig_client::Handle) {
     let (mut domain, _) = super::super::objects::live();
     let out = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::task(8)) });
     (domain, open_token(&out))
@@ -18,13 +18,16 @@ fn task(keys: &[ProposalKey], activity: u64) -> Task {
     }
     task
 }
-fn deliver(domain: &mut Domain, watch: Token, value: Task) -> Box<[Request]> {
-    drive(domain, Time::ZERO, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(value))) })
+fn deliver(domain: &mut Fixture, watch: jig_client::Handle, value: Task) -> Box<[Request]> {
+    drive(domain, Time::ZERO, Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(value))) })
 }
-fn proposal_read(out: &[Request], key: ProposalKey) -> Token {
+fn proposal_read(out: &[Request], key: ProposalKey) -> jig_client::Handle {
     let mut found = None;
     for row in out {
-        if let Request::Read { read, what: Read::Proposal { proposal } } = row
+        if let Request::Client {
+            asked:
+                jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Proposal { proposal }) },
+        } = row
             && *proposal == key
         {
             assert!(found.replace(*read).is_none(), "one read per supplied proposal");
@@ -38,8 +41,8 @@ fn proposal(key: ProposalKey) -> Proposal {
     value.proposer = key.proposer;
     value
 }
-fn receive(domain: &mut Domain, read: Token, value: Proposal) {
-    drive(domain, Time::ZERO, Event::Read { read, result: ReadResult::Value(ReadValue::Proposal(Box::new(value))) });
+fn receive(domain: &mut Fixture, read: jig_client::Handle, value: Proposal) {
+    drive(domain, Time::ZERO, ReadPage { read, result: ReadResult::Value(ReadValue::Proposal(Box::new(value))) });
 }
 #[test]
 fn task_watch_names_literal_proposals_once_and_refreshes_whole_shared_cards_when_activity_moves() {
@@ -106,14 +109,14 @@ fn a_genuine_watch_ending_keeps_a_shown_waiting_proposal_until_its_supplied_with
         receive(&mut domain, proposal_read(&output, key), proposal(key));
         let id = domain.objects().find(ObjectKey::Proposal(key)).unwrap();
         assert!(domain.objects().get(id).unwrap().shown);
-        let output = drive(&mut domain, Time::ZERO, Event::Ended { watch, end });
+        let output = drive(&mut domain, Time::ZERO, Ended { watch, end });
         let read = proposal_read(&output, key);
         assert_eq!(domain.objects().find(ObjectKey::Proposal(key)), Some(id));
         assert!(domain.objects().get(id).unwrap().sources.is_empty());
         let Card::Leaving { how: Left::Looking, .. } = domain.objects().get(id).unwrap().card else {
             panic!("genuine source ending retains the shown proposal for its final read");
         };
-        assert!(drive(&mut domain, Time::ZERO, Event::Ended { watch, end }).is_empty());
+        assert!(drive(&mut domain, Time::ZERO, Ended { watch, end }).is_empty());
         let supplied = OwnerHistorical {
             key: ObjectKey::Proposal(key),
             value: OwnerHistoricalValue::Proposal(OwnerProposalHistory {
@@ -129,7 +132,7 @@ fn a_genuine_watch_ending_keeps_a_shown_waiting_proposal_until_its_supplied_with
         drive(
             &mut domain,
             Time::ZERO,
-            Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
+            ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
         );
         assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Historical(Box::new(supplied.clone()))));
         let Card::Leaving { how: Left::Historical { .. }, .. } = domain.objects().get(id).unwrap().card else {
@@ -137,16 +140,19 @@ fn a_genuine_watch_ending_keeps_a_shown_waiting_proposal_until_its_supplied_with
         };
         drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
         assert!(!domain.objects().get(id).unwrap().shown);
-        assert!(drive(&mut domain, Time::ZERO, Event::Ended { watch, end }).is_empty());
+        assert!(drive(&mut domain, Time::ZERO, Ended { watch, end }).is_empty());
     }
     let key = ProposalKey { proposer: Proposer::Task(8), number: 1 };
     let (mut domain, watch) = opened();
     let output = deliver(&mut domain, watch, task(&[key], 11));
     receive(&mut domain, proposal_read(&output, key), proposal(key));
-    let output = drive(&mut domain, Time::ZERO, Event::Ended { watch, end: WatchEnd::NotAllowed });
+    let output = drive(&mut domain, Time::ZERO, Ended { watch, end: WatchEnd::NotAllowed });
     assert!(domain.objects().find(ObjectKey::Proposal(key)).is_none());
     for request in &output {
-        if let Request::Read { what: Read::Proposal { .. }, .. } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { read: jig_client::Readable::Jig(Read::Proposal { .. }), .. },
+        } = request
+        {
             panic!("privacy retirement must not read the hidden proposal");
         }
     }

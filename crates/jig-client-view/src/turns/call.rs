@@ -6,14 +6,14 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     conversation::{CallName, Fold},
 };
 use jig_client::contract::{Call, CurrentCall, LiveCall, TurnName};
 pub(super) fn call(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     turn: TurnName,
     call: &Call,
     words: &Words,
@@ -70,7 +70,7 @@ pub(super) fn call(
 
 pub(super) fn live(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     turn: TurnName,
     value: &LiveCall,
     words: &Words,
@@ -81,7 +81,13 @@ pub(super) fn live(
         LiveCall::Raw(value) => raw(b, client, value, words, bindings),
     }
 }
-pub(super) fn raw(b: &mut Builder, client: &Domain, call: &CurrentCall, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn raw(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    call: &CurrentCall,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     let open = client.conversation().current_fold(&call.identity) == Fold::Open;
     b.open(Role::Region);
     let region = words

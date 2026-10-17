@@ -2,6 +2,7 @@ use super::{
     objects::{self, live, read_token, watched},
     spine::drive,
 };
+use crate::tests::fixtures::ReadPage;
 use crate::{
     Event,
     action::Act,
@@ -40,31 +41,31 @@ fn historical_normal_reads_keep_whole_terminal_facts_and_linger_once_without_cur
     let key = supplied.key;
     let first = watched(&mut domain, page, &[key]);
     let read = read_token(&first);
-    let id = domain.objects.find(key).unwrap();
+    let id = domain.objects().find(key).unwrap();
     let output = drive(
         &mut domain,
         Time::from_nanos(30),
-        Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
     );
     assert!(output.is_empty());
     let original = Card::Leaving {
         how: Left::Historical { facts: Box::new(supplied.clone()) },
         until: Time::from_nanos(5_000_000_030),
     };
-    assert_eq!(domain.objects.get(id).unwrap().card, original);
-    assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Historical(Box::new(supplied))));
+    assert_eq!(domain.objects().get(id).unwrap().card, original);
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Historical(Box::new(supplied))));
     assert!(
         drive(
             &mut domain,
             Time::from_nanos(40),
-            Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Answer } }
+            Event::Act { action: Act::Intend { object: id.token(), act: ActKind::Answer } }
         )
         .is_empty()
     );
     assert!(domain.confirmation().is_none());
-    assert_eq!(domain.objects.get(id).unwrap().card, original);
-    drive(&mut domain, Time::from_nanos(50), Event::Read { read, result: ReadResult::None(ReadNone::Gone) });
-    assert_eq!(domain.objects.get(id).unwrap().card, original);
+    assert_eq!(domain.objects().get(id).unwrap().card, original);
+    drive(&mut domain, Time::from_nanos(50), ReadPage { read, result: ReadResult::None(ReadNone::Gone) });
+    assert_eq!(domain.objects().get(id).unwrap().card, original);
 }
 #[test]
 fn historical_wrong_nested_message_leaves_original_receipt_and_existing_body_available_for_the_matching_read() {
@@ -80,17 +81,18 @@ fn historical_wrong_nested_message_leaves_original_receipt_and_existing_body_ava
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(wrong))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(wrong))) },
     );
-    let id = domain.objects.find(key).unwrap();
-    assert!(domain.objects.get(id).unwrap().body.is_none());
-    assert!(domain.reads.slab.get(skein_lib::Id::from_token(read)).is_some());
+    let id = domain.objects().find(key).unwrap();
+    assert!(domain.objects().get(id).unwrap().body.is_none());
+    assert!(domain.handles.reads.get(&read).is_none());
+    let read = domain.read_again(read);
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
     );
-    assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Historical(Box::new(supplied))));
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Historical(Box::new(supplied))));
 }
 #[test]
 fn historical_pending_sourced_facts_stay_open_and_source_less_facts_prune_without_unknown_or_new_linger() {
@@ -106,13 +108,13 @@ fn historical_pending_sourced_facts_stay_open_and_source_less_facts_prune_withou
         drive(
             &mut domain,
             Time::ZERO,
-            Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
+            ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
         );
         if drop {
-            assert!(domain.objects.find(key).is_none());
+            assert!(domain.objects().find(key).is_none());
         } else {
-            let id = domain.objects.find(key).unwrap();
-            let fact = domain.objects.get(id).unwrap();
+            let id = domain.objects().find(key).unwrap();
+            let fact = domain.objects().get(id).unwrap();
             assert_eq!(fact.card, Card::Open);
             assert_eq!(fact.body, Some(Body::Historical(Box::new(supplied))));
             assert!(!fact.sources.is_empty());
@@ -130,12 +132,12 @@ fn historical_disappearing_terminal_keeps_each_source_and_ignores_later_compact_
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
     );
-    let id = domain.objects.find(key).unwrap();
+    let id = domain.objects().find(key).unwrap();
     assert!(domain.objects.put(key, Body::Question(Box::new(objects::question()))));
     assert_eq!(
-        domain.objects.get(id).unwrap().card,
+        domain.objects().get(id).unwrap().card,
         Card::Leaving { how: Left::Historical { facts: Box::new(supplied) }, until: Time::from_nanos(5_000_000_000) }
     );
 }
@@ -146,29 +148,29 @@ fn historical_pending_request_and_answered_card_fences_survive_terminal_read_and
     let key = supplied.key;
     let first = watched(&mut domain, page, &[key]);
     let read = read_token(&first);
-    let id = domain.objects.find(key).unwrap();
+    let id = domain.objects().find(key).unwrap();
     let card = Card::Deciding { request: Some(skein_lib::Token::new(999)), progress: crate::intents::Progress::Parked };
     domain.objects.get_mut(id).unwrap().card = card.clone();
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
     );
-    assert_eq!(domain.objects.get(id).unwrap().card, card);
-    assert!(domain.objects.get(id).unwrap().body.is_none());
+    assert_eq!(domain.objects().get(id).unwrap().card, card);
+    assert!(domain.objects().get(id).unwrap().body.is_none());
     let mut wrong = supplied.clone();
     wrong.key = ObjectKey::Question { task: 8, message: 2 };
     assert!(!domain.objects.put(key, Body::Historical(Box::new(wrong))));
-    assert_eq!(domain.objects.get(id).unwrap().card, card);
+    assert_eq!(domain.objects().get(id).unwrap().card, card);
     // A genuine body refresh is allowed, but never substitutes for a keyed answer.
     assert!(domain.objects.put(key, Body::Historical(Box::new(supplied))));
-    assert_eq!(domain.objects.get(id).unwrap().card, card);
-    assert!(domain.objects.named(key, Source::Watch(skein_lib::Id::from_token(page))));
+    assert_eq!(domain.objects().get(id).unwrap().card, card);
+    assert!(domain.objects().named(key, Source::Watch(page)));
     // The already durable answered-card fixture is an independent fence.
     let (mut answered, answered_page) = live();
     let first = watched(&mut answered, answered_page, &[key]);
     let read = read_token(&first);
-    let id = answered.objects.find(key).unwrap();
+    let id = answered.objects().find(key).unwrap();
     let answer = Answer::Done(Outcome::Changed);
     let card =
         Card::Leaving { how: Left::Answered { outcome: Outcome::Changed }, until: Time::from_nanos(5_000_000_000) };
@@ -177,11 +179,11 @@ fn historical_pending_request_and_answered_card_fences_survive_terminal_read_and
     drive(
         &mut answered,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::Historical(Box::new(question(true)))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::Historical(Box::new(question(true)))) },
     );
-    assert_eq!(answered.objects.get(id).unwrap().card, card);
-    assert_eq!(answered.objects.get(id).unwrap().answer, Some(answer));
-    assert!(answered.objects.get(id).unwrap().body.is_none());
+    assert_eq!(answered.objects().get(id).unwrap().card, card);
+    assert_eq!(answered.objects().get(id).unwrap().answer, Some(answer));
+    assert!(answered.objects().get(id).unwrap().body.is_none());
 }
 
 const UTF8_TEXT: &[u8] = b"~\0";

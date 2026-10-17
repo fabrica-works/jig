@@ -1,21 +1,21 @@
 //! The subjects named by the current page's sections (client/domain/client.md, 5.1).
 use crate::{
-    Domain,
+    Ui,
     address::{Address, ProjectSection, TaskSection},
     objects::Body,
     page::Section,
 };
-impl Domain {
+impl Ui {
     /// Whether this page includes the section.
     #[must_use]
-    pub fn shows(&self, section: Section) -> bool {
+    pub fn shows(&self, section: Section, lent: &jig_client::Client) -> bool {
         if !self.sections().contains(&section) {
             return false;
         }
         match section {
             Section::Task { task, section } => {
                 if let Some(id) = self.objects.find(jig_client::contract::ObjectKey::Task(task)) {
-                    match &self.objects.get(id).expect("named task exists").body {
+                    match &self.borrow(lent).objects().get(id).expect("named task exists").body {
                         Some(Body::Task(task)) => return super::task::offered(&super::task::offers(task), section),
                         Some(
                             Body::Historical(_)
@@ -91,7 +91,7 @@ impl Domain {
 }
 
 /// Builds each address's union in the sections' display order, with Settings whole.
-pub(crate) fn arrange(domain: &mut Domain) {
+pub(crate) fn arrange(domain: &mut Ui) {
     match domain.address {
         Address::Task { task, section: own } => {
             domain.sections.clear();
@@ -145,25 +145,26 @@ pub(crate) fn arrange(domain: &mut Domain) {
     }
 }
 
-pub(crate) fn owner(domain: &Domain) -> crate::watches::Owner {
+pub(crate) fn owner(domain: &Ui) -> crate::handles::Owner {
     match domain.page {
-        super::Page::Elsewhere => crate::watches::Owner::Sections { generation: domain.generation },
+        super::Page::Elsewhere => crate::handles::Owner::Sections,
         super::Page::Starting
         | super::Page::Work { .. }
         | super::Page::SigningIn
         | super::Page::Missing
         | super::Page::OutOfDate
-        | super::Page::SomeoneElse => crate::watches::Owner::Page { generation: domain.generation },
+        | super::Page::SomeoneElse => crate::handles::Owner::Page,
     }
 }
 
 pub(crate) fn show(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &skein_lib::Env<crate::Limits>,
     sections: skein_lib::List<Section>,
     out: &mut skein_lib::Queue<crate::Request>,
+    lent: &jig_client::Client,
 ) {
-    if domain.page != super::Page::Elsewhere || domain.confirmed.is_none() || domain.link != crate::link::Link::Live {
+    if domain.page != super::Page::Elsewhere || domain.confirmed.is_none() || domain.link != jig_client::Link::Live {
         return;
     }
     let overlong = sections.len() > super::MOST_SECTIONS;
@@ -223,12 +224,14 @@ pub(crate) fn show(
         super::routing::refuse(domain, jig_client::contract::Limit::Objects);
     }
     let owner = owner(domain);
-    for (id, ()) in &domain.watch_ids {
-        let watch = domain.watches.get(*id).expect("registered watch exists");
+    let mut leaving = skein_lib::List::with_capacity(domain.limits.watches);
+    for (handle, watch) in &domain.handles.watches {
         if watch.owner == owner && !needed(domain, &watch.subject) {
-            let watch = domain.watches.get_mut(*id).expect("registered watch exists");
-            crate::ui::close_watch(watch, *id, out);
+            leaving.push(*handle).expect("held handles fit");
         }
+    }
+    for handle in leaving.into_boxed() {
+        domain.release(handle, out);
     }
     for index in 0..domain.sections.len() {
         let section = *domain.sections.get(index).expect("section index exists");
@@ -242,13 +245,13 @@ pub(crate) fn show(
         if let Some(task) = domain.shown_task() {
             context_subject(domain, &jig_client::contract::Subject::Task { task });
         }
-        super::task::document(domain, env, out);
+        super::task::document(domain, env, out, lent);
         domain.section_context = u32::MAX;
         domain.changed();
     }
 }
 
-pub(crate) fn needed(domain: &Domain, subject: &jig_client::contract::Subject) -> bool {
+pub(crate) fn needed(domain: &Ui, subject: &jig_client::contract::Subject) -> bool {
     for section in domain.sections() {
         if uses(*section, subject) {
             return true;
@@ -256,7 +259,7 @@ pub(crate) fn needed(domain: &Domain, subject: &jig_client::contract::Subject) -
     }
     false
 }
-fn uses(section: Section, subject: &jig_client::contract::Subject) -> bool {
+pub(crate) fn uses(section: Section, subject: &jig_client::contract::Subject) -> bool {
     use jig_client::contract::Subject;
     match subject {
         Subject::Frame => false,
@@ -305,10 +308,10 @@ pub struct SectionStatus {
     pub refused: Option<jig_client::contract::Limit>,
     pub missing: bool,
 }
-impl Domain {
+impl Ui {
     #[must_use]
-    pub fn section_status(&self, section: Section) -> Option<SectionStatus> {
-        if self.page != super::Page::Elsewhere || !self.shows(section) {
+    pub fn section_status(&self, section: Section, lent: &jig_client::Client) -> Option<SectionStatus> {
+        if self.page != super::Page::Elsewhere || !self.shows(section, lent) {
             return None;
         }
         let mut found = None;
@@ -318,17 +321,12 @@ impl Domain {
             }
         }
         let index = found?;
-        let mut status = *self.section_statuses.as_slice().get(index)?;
-        for (id, ()) in &self.watch_ids {
-            let watch = self.watches.get(*id).expect("registered watch exists");
-            if watch.owner == owner(self) && uses(section, &watch.subject) && watch.behind {
-                status.behind = true;
-            }
-        }
+        let status = *self.section_statuses.as_slice().get(index)?;
+        // The current client states are read when the section is built.
         Some(status)
     }
 }
-pub(crate) fn context_subject(domain: &mut Domain, subject: &jig_client::contract::Subject) {
+pub(crate) fn context_subject(domain: &mut Ui, subject: &jig_client::contract::Subject) {
     domain.section_context = 0;
     for (index, section) in domain.sections.as_slice().iter().enumerate() {
         if uses(*section, subject) {
@@ -337,7 +335,7 @@ pub(crate) fn context_subject(domain: &mut Domain, subject: &jig_client::contrac
         }
     }
 }
-fn context_section(domain: &mut Domain, section: Section) {
+fn context_section(domain: &mut Ui, section: Section) {
     domain.section_context = 0;
     for (index, value) in domain.sections.as_slice().iter().enumerate() {
         if *value == section {
@@ -347,7 +345,7 @@ fn context_section(domain: &mut Domain, section: Section) {
     }
 }
 pub(crate) fn status(
-    domain: &mut Domain,
+    domain: &mut Ui,
     refused: Option<jig_client::contract::Limit>,
     excess: Option<u32>,
     missing: bool,
@@ -366,7 +364,7 @@ pub(crate) fn status(
     }
 }
 
-pub(crate) fn context_read(domain: &mut Domain, what: &jig_client::contract::Read) {
+pub(crate) fn context_read(domain: &mut Ui, what: &jig_client::contract::Read) {
     use jig_client::contract::{Read, Subject};
     let section = match what {
         Read::Task { task } => {

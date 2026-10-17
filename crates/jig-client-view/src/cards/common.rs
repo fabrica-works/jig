@@ -6,7 +6,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, SlotRef};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     fields::Purpose,
     objects::{Card, Object},
@@ -221,7 +221,7 @@ pub fn trail(b: &mut Builder, rows: &List<Passed>, words: &Words, text_limit: u3
 /// Render a form field with its domain write count; the shell preserves typing.
 pub fn field(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     purpose: Purpose,
     phrase: JigPhrase,
     words: &Words,
@@ -239,7 +239,7 @@ pub fn field(
 }
 /// Required fields and choices are visible once this object's confirmation is open.
 #[must_use]
-pub fn answering(client: &Domain, object: Id<Object>) -> bool {
+pub fn answering(client: &Borrowed<'_>, object: Id<Object>) -> bool {
     match client.confirmation() {
         Some(open) => open.object == object && open.act == ActKind::Answer,
         None => false,

@@ -73,8 +73,6 @@ pub enum Act {
     OpenEnded { task: u64 },
     /// End this sign-in from the frame; never offered to a service.
     SignOut,
-    /// Choose a sign in provider.
-    SignIn { provider: u16 },
 }
 
 /// The end of a window requested by a person.

@@ -87,7 +87,7 @@ pub enum Page {
     /// Waiting for the frame's first delivery.
     Starting,
     /// A jig page, with its generation and freshness.
-    Work { address: Address, generation: u32, behind: bool, excess: u32, refused: Option<Limit> },
+    Work { address: Address, behind: bool, excess: u32, refused: Option<Limit> },
     /// A page owned by another child of the root.
     Elsewhere,
     /// The sign in has ended.

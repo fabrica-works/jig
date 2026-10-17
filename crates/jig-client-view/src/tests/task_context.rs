@@ -26,7 +26,14 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
             let (mut domain, out) = super::super::work_pages::entered(Address::Task { task: 8, section });
             let mut task_watch = None;
             for request in &out {
-                if let Request::Open { watch, subject: Subject::Task { task: 8 } } = request {
+                if let Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { task: 8 }),
+                        },
+                } = request
+                {
                     assert!(task_watch.replace(*watch).is_none());
                 }
             }
@@ -58,7 +65,7 @@ fn task_context_view_preserves_supplied_runtime_spend_slots_and_impact_without_c
             }
         }
         let (mut domain, id, _) = loaded_with_watch(ObjectKey::Task(8), ReadValue::Task(Box::new(row.clone())));
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Cancel } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Cancel } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, words(), &mut bindings);
         let caption = words().say(JigPhrase::TasksRunning, &[Hole::Number(u64::from(u32::MAX))]);

@@ -5,12 +5,12 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary public proofs inspect complete accessible trees, raw slots and decoded actions"
 )]
+use crate::tests::fixtures::{Fixture, ReadPage, Served, Watched};
 use crate::words::Words;
 use crate::{JigBindings, owner_project as view};
 use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Role, Tree};
 
-use crate::Domain;
 use jig_client::contract::*;
 use skein_lib::{
     Duration, List, Wall,
@@ -296,8 +296,8 @@ fn build(value: &OwnerProject, w: &Words) -> (Tree, JigBindings) {
     let f = view::required(value, &limits(), w).expect("whole finite admission");
     let mut b = Builder::new(&capacity(f));
     let mut bindings = JigBindings::new(f.bindings, 32);
-    let d = Domain::new(&limits());
-    view::render(&mut b, value, &d, w, &mut bindings);
+    let d = Fixture::new(&limits());
+    view::render(&mut b, value, &d.view(), w, &mut bindings);
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(tree.len() <= f.nodes);
@@ -479,19 +479,8 @@ fn owner_project_public_required_envelope_checks_last_nested_capacity_and_both_l
     assert!(view::required(&changed, &small, w).is_none());
     assert_eq!(value, before);
 }
-fn native_drive(domain: &mut Domain, event: crate::Event) -> Vec<crate::Request> {
-    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&limits()));
-    crate::step(
-        domain,
-        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits: limits() },
-        event,
-        &mut out,
-    );
-    let mut result = Vec::new();
-    while let Some(value) = out.pop() {
-        result.push(value);
-    }
-    result
+fn native_drive(domain: &mut Fixture, event: impl crate::tests::fixtures::Input) -> Vec<crate::Request> {
+    domain.drive(skein_lib::Time::ZERO, event).into_vec()
 }
 #[test]
 fn owner_project_real_page_decodes_whole_role_edits_preserves_prior_channels_and_reviews_before_after_once() {
@@ -504,34 +493,43 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         action::Act,
         address::{Address, ProjectSection},
     };
-    let mut d = Domain::new(&limits());
+    let mut d = Fixture::new(&limits());
     let opened = native_drive(
         &mut d,
         Event::Start {
-            address: Address::Project { project: 4, section: ProjectSection::Settings },
-            kept: List::with_capacity(0),
-            offset: crate::boundary::Offset { minutes: 0 },
+            seed: 8,
+            place: crate::address::Place::Jig(Address::Project { project: 4, section: ProjectSection::Settings }),
+            records: List::with_capacity(0),
         },
     );
-    native_drive(&mut d, Event::Hello { served: true });
+    native_drive(&mut d, Served { served: true });
     let f = opened
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Frame } => Some(*watch),
+            Request::Client {
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+            } => Some(*watch),
             _ => None,
         })
         .unwrap();
     let ready = native_drive(
         &mut d,
-        Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+        Watched { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
     );
-    let read = ready
-        .iter()
-        .find_map(|r| match r {
-            Request::Read { read, what: Read::Project { project: 4 } } => Some(*read),
-            _ => None,
-        })
-        .unwrap();
+    let read =
+        ready
+            .iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Read {
+                            handle: read,
+                            read: jig_client::Readable::Jig(Read::Project { project: 4 }),
+                        },
+                } => Some(*read),
+                _ => None,
+            })
+            .unwrap();
     let mut value = source();
     value.number = 4;
     value.cut = false;
@@ -541,17 +539,17 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
     value.acts.push(Offered { act: ActKind::ChangePolicy, admission: Admission::Allowed }).unwrap();
     native_drive(
         &mut d,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value.clone()))) },
     );
     let w = words(false);
     let f = view::worst_case(&limits(), w).unwrap();
     let mut bounds = capacity(f);
     bounds.nodes = bounds.nodes.checked_add(32).unwrap();
     bounds.text_bytes = bounds.text_bytes.checked_add(bounds.text_per_node.checked_mul(32).unwrap()).unwrap();
-    let page = |d: &Domain| {
+    let page = |d: &Fixture| {
         let mut b = Builder::new(&bounds);
         let mut bindings = JigBindings::new(f.bindings, 32);
-        crate::pages::main(&mut b, d, w, &mut bindings);
+        crate::pages::main(&mut b, &d.view(), w, &mut bindings);
         let tree = b.finish();
         super::cards_access::check(&tree);
         (tree, bindings)
@@ -571,7 +569,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .unwrap()
         .token;
     let act = crate::decode(&mut bindings, textbox, skein_ui::Act::Input { value: copy_of(b"32833") }).unwrap();
-    assert!(native_drive(&mut d, Event::Act { act }).is_empty());
+    assert!(native_drive(&mut d, Event::Act { action: act }).is_empty());
     let (tree, mut bindings) = page(&d);
     let field = tree
         .nodes()
@@ -582,7 +580,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .unwrap()
         .token;
     let act = crate::decode(&mut bindings, field, skein_ui::Act::Input { value: copy_of(b"129") }).unwrap();
-    native_drive(&mut d, Event::Act { act });
+    native_drive(&mut d, Event::Act { action: act });
     let (tree, mut bindings) = page(&d);
     assert!(has(&tree, b"Before"));
     assert!(has(&tree, b"After"));
@@ -598,11 +596,13 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
         .token;
     let act = crate::decode(&mut bindings, confirm, skein_ui::Act::Press).unwrap();
     assert_eq!(act, Act::Confirm);
-    let sent = native_drive(&mut d, Event::Act { act });
+    let sent = native_drive(&mut d, Event::Act { action: act });
     let asks: Vec<_> = sent
         .iter()
         .filter_map(|r| match r {
-            Request::Send { ask, .. } => Some(ask.as_ref()),
+            Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
+                Some(ask.as_ref())
+            }
             _ => None,
         })
         .collect();
@@ -613,7 +613,7 @@ fn check_owner_project_real_page_decodes_whole_role_edits_preserves_prior_channe
     assert_eq!(role.decides, 129);
     assert_eq!(role.authority, value.policy.roles.get(0).unwrap().authority.authority);
     assert_eq!(role.period_spend, u64::MAX);
-    assert!(native_drive(&mut d, Event::Act { act: Act::Confirm }).is_empty());
+    assert!(native_drive(&mut d, Event::Act { action: Act::Confirm }).is_empty());
 }
 #[test]
 fn owner_project_public_baselines_preserve_optional_permissions_configured_targets_and_empty_recurring_titles() {
@@ -665,7 +665,7 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     let render = |bound: skein_ui::Limits| {
         let mut b = Builder::new(&bound);
         let mut bindings = JigBindings::new(f.bindings, 32);
-        view::render(&mut b, &value, &Domain::new(&limits()), w, &mut bindings);
+        view::render(&mut b, &value, &Fixture::new(&limits()).view(), w, &mut bindings);
         b.finish()
     };
     let exact = render(bound);
@@ -679,46 +679,47 @@ fn owner_project_public_whole_tree_accepts_exact_observed_nodes_and_text_and_ref
     assert!(std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| render(short))).is_err());
     assert_eq!(value.resources.capacity(), 4);
 }
-fn native_owner(value: OwnerProject) -> Domain {
+fn native_owner(value: OwnerProject) -> Fixture {
     native_owner_at(value, crate::address::ProjectSection::Settings)
 }
-fn native_owner_at(value: OwnerProject, section: crate::address::ProjectSection) -> Domain {
+fn native_owner_at(value: OwnerProject, section: crate::address::ProjectSection) -> Fixture {
     use crate::{Event, Request, address::Address};
-    let mut domain = Domain::new(&limits());
+    let mut domain = Fixture::new(&limits());
     let out = native_drive(
         &mut domain,
         Event::Start {
-            address: Address::Project { project: value.number, section },
-            kept: List::with_capacity(0),
-            offset: crate::boundary::Offset { minutes: 0 },
+            seed: 8,
+            place: crate::address::Place::Jig(Address::Project { project: value.number, section }),
+            records: List::with_capacity(0),
         },
     );
-    native_drive(&mut domain, Event::Hello { served: true });
+    native_drive(&mut domain, Served { served: true });
     let watch = out
         .iter()
         .find_map(|request| match request {
-            Request::Open { watch, subject: Subject::Frame } => Some(*watch),
+            Request::Client {
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+            } => Some(*watch),
             _ => None,
         })
         .unwrap();
     let out = native_drive(
         &mut domain,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
     );
     let read = out
         .iter()
         .find_map(|request| match request {
-            Request::Read { read, what: Read::Project { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
-    native_drive(
-        &mut domain,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value))) },
-    );
+    native_drive(&mut domain, ReadPage { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value))) });
     domain
 }
-fn owner_page(domain: &Domain) -> (Tree, JigBindings) {
+fn owner_page(domain: &Fixture) -> (Tree, JigBindings) {
     let w = words(false);
     let f = view::worst_case(&limits(), w).unwrap();
     let mut bound = capacity(f);
@@ -726,7 +727,7 @@ fn owner_page(domain: &Domain) -> (Tree, JigBindings) {
     bound.text_bytes = bound.text_bytes.checked_add(32_u32.checked_mul(bound.text_per_node).unwrap()).unwrap();
     let mut b = Builder::new(&bound);
     let mut bindings = JigBindings::new(f.bindings, 32);
-    crate::pages::main(&mut b, domain, w, &mut bindings);
+    crate::pages::main(&mut b, &domain.view(), w, &mut bindings);
     let tree = b.finish();
     super::cards_access::check(&tree);
     (tree, bindings)
@@ -762,7 +763,7 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
             })
         })
         .unwrap();
-    assert!(native_drive(&mut domain, Event::Act { act: selected }).is_empty());
+    assert!(native_drive(&mut domain, Event::Act { action: selected }).is_empty());
     let (tree, mut bindings) = owner_page(&domain);
     let name = tree
         .nodes()
@@ -778,10 +779,10 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
             true,
         _ => false,
     });
-    native_drive(&mut domain, Event::Act { act });
-    let sent = native_drive(&mut domain, Event::Act { act: Act::Confirm });
+    native_drive(&mut domain, Event::Act { action: act });
+    let sent = native_drive(&mut domain, Event::Act { action: Act::Confirm });
     assert!(match &sent[..] {
-        [Request::Send { ask, .. }]
+        [Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } }]
             if match ask.as_ref() {
                 Ask::MakeService { project: 4, role: HeldRole::Policy { role: u32::MAX }, name }
                     if name.bytes().is_empty() =>
@@ -819,12 +820,12 @@ fn owner_project_public_service_and_pool_inputs_decode_explicit_values_and_prese
         .unwrap();
     assert!(pool.0.value.is_none());
     assert!(has(&tree, b"No pool exists for this configured target"));
-    native_drive(&mut domain, Event::Act { act: pool.1 });
+    native_drive(&mut domain, Event::Act { action: pool.1 });
     assert!(domain.project_page().settings.before.is_none());
     assert_eq!(domain.project_page().settings.pool_period, Some(0));
-    let sent = native_drive(&mut domain, Event::Act { act: Act::Confirm });
+    let sent = native_drive(&mut domain, Event::Act { action: Act::Confirm });
     assert!(match &sent[..] {
-        [Request::Send { ask, .. }]
+        [Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } }]
             if match ask.as_ref() {
                 Ask::SetPool { project: 4, party: 0, budget: u64::MAX } => true,
                 _ => false,
@@ -906,7 +907,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         .expect("supplied procedure choice");
     assert_eq!(choice.project, 4);
     assert_eq!(choice.budget, 17);
-    assert!(native_drive(&mut domain, Event::Act { act: Act::GoalForm { form: choice } }).is_empty());
+    assert!(native_drive(&mut domain, Event::Act { action: Act::GoalForm { form: choice } }).is_empty());
     let (tree, mut bindings) = owner_page(&domain);
     let words_field = tree.nodes().iter().find(|node| node.role == Role::TextArea).unwrap().binding.unwrap().token;
     let act =
@@ -915,7 +916,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         Act::Edit { field: Purpose::NewGoal, text } if text.bytes() == UTF8_TEXTS[0] => true,
         _ => false,
     });
-    native_drive(&mut domain, Event::Act { act });
+    native_drive(&mut domain, Event::Act { action: act });
     for (field, amount) in [
         (crate::sections::project::goals::Field::Budget, b"23".as_slice()),
         (crate::sections::project::goals::Field::Priority, b"4294967295".as_slice()),
@@ -931,7 +932,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
             })
             .find(|act| act == &edited)
             .unwrap();
-        assert!(native_drive(&mut domain, Event::Act { act: decoded }).is_empty());
+        assert!(native_drive(&mut domain, Event::Act { action: decoded }).is_empty());
     }
     let (tree, mut bindings) = owner_page(&domain);
     let submit = tree
@@ -943,8 +944,9 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
             _ => false,
         })
         .unwrap();
-    assert!(native_drive(&mut domain, Event::Act { act: submit }).is_empty());
-    let review = domain.project_page().form.confirmation.as_ref().unwrap();
+    assert!(native_drive(&mut domain, Event::Act { action: submit }).is_empty());
+    let projected = domain.project_page();
+    let review = projected.form.confirmation.as_ref().unwrap();
     assert_eq!(review.form.executor, executor);
     assert_eq!(review.form.budget, 23);
     assert_eq!(review.form.priority, u32::MAX);
@@ -953,11 +955,13 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     assert_eq!(review.pool_left, 17);
     assert!(review.proposed);
     assert_eq!(review.to.as_ref(), Some(&recipient));
-    let sent = native_drive(&mut domain, Event::Act { act: Act::Confirm });
+    let sent = native_drive(&mut domain, Event::Act { action: Act::Confirm });
     let asks: Vec<_> = sent
         .iter()
         .filter_map(|row| match row {
-            Request::Send { ask, .. } => Some(ask.as_ref()),
+            Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
+                Some(ask.as_ref())
+            }
             _ => None,
         })
         .collect();
@@ -972,7 +976,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
             deadline: None
         }]
     );
-    assert!(native_drive(&mut domain, Event::Act { act: Act::Confirm }).is_empty());
+    assert!(native_drive(&mut domain, Event::Act { action: Act::Confirm }).is_empty());
     assert_eq!(domain.project_page().owner.as_deref(), Some(&value));
 }
 
@@ -1053,7 +1057,7 @@ fn historical_old_spend(before: &Cursor, after: &Cursor) -> SpendPage {
         cut: true,
     }
 }
-fn native_historical_project() -> (Domain, OwnerSpendPage) {
+fn native_historical_project() -> (Fixture, OwnerSpendPage) {
     use crate::{
         Event, Request,
         action::{Act, End},
@@ -1061,90 +1065,91 @@ fn native_historical_project() -> (Domain, OwnerSpendPage) {
     };
     let mut value = source();
     value.number = 4;
-    let mut domain = Domain::new(&limits());
+    let mut domain = Fixture::new(&limits());
     let start = native_drive(
         &mut domain,
         Event::Start {
-            address: Address::Project { project: 4, section: ProjectSection::Spend },
-            kept: List::with_capacity(0),
-            offset: crate::boundary::Offset { minutes: 0 },
+            seed: 8,
+            place: crate::address::Place::Jig(Address::Project { project: 4, section: ProjectSection::Spend }),
+            records: List::with_capacity(0),
         },
     );
-    native_drive(&mut domain, Event::Hello { served: true });
+    native_drive(&mut domain, Served { served: true });
     let watch = start
         .iter()
         .find_map(|request| match request {
-            Request::Open { watch, subject: Subject::Frame } => Some(*watch),
+            Request::Client {
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+            } => Some(*watch),
             _ => None,
         })
         .unwrap();
     let ready = native_drive(
         &mut domain,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
     );
+    let read =
+        ready
+            .iter()
+            .find_map(|request| match request {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Read {
+                            handle: read,
+                            read: jig_client::Readable::Jig(Read::Project { project: 4 }),
+                        },
+                } => Some(*read),
+                _ => None,
+            })
+            .unwrap();
+    native_drive(&mut domain, ReadPage { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value))) });
     let read = ready
         .iter()
         .find_map(|request| match request {
-            Request::Read { read, what: Read::Project { project: 4 } } => Some(*read),
-            _ => None,
-        })
-        .unwrap();
-    native_drive(
-        &mut domain,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProject(Box::new(value))) },
-    );
-    let read = ready
-        .iter()
-        .find_map(|request| match request {
-            Request::Read { read, what: Read::Spend { project: 4, after: None } } => Some(*read),
+            Request::Client {
+                asked:
+                    jig_client::Event::Read {
+                        handle: read,
+                        read: jig_client::Readable::Jig(Read::Spend { project: 4, after: None }),
+                    },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
     let before = Cursor::new(copy_of(UTF8_TEXTS[1]), 32).unwrap();
     let after = Cursor::new(copy_of(UTF8_TEXTS[2]), 32).unwrap();
     let old = historical_old_spend(&before, &after);
-    native_drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::Spend(Box::new(old))) });
+    native_drive(&mut domain, ReadPage { read, result: ReadResult::Value(ReadValue::Spend(Box::new(old))) });
     let requests = native_drive(
         &mut domain,
         Event::Act {
-            act: Act::More { window: skein_lib::Token::new(crate::page::project::SPEND_WINDOW), end: End::After },
+            action: Act::More { window: skein_lib::Token::new(crate::page::project::SPEND_WINDOW), end: End::After },
         },
     );
     let read = requests
         .iter()
         .find_map(|request| match request {
-            Request::Read { read, what: Read::Spend { project: 4, after: Some(cursor) } } if cursor == &after => {
-                Some(*read)
-            }
+            Request::Client {
+                asked:
+                    jig_client::Event::Read {
+                        handle: read,
+                        read: jig_client::Readable::Jig(Read::Spend { project: 4, after: Some(cursor) }),
+                    },
+            } if cursor == &after => Some(*read),
             _ => None,
         })
         .unwrap();
-    let page = OwnerSpendPage {
-        rows: list(
-            4,
-            [OwnerFundingRecord {
-                period: Some(OwnerPeriodTimes { began: Wall::EPOCH, next: Some(Wall::from_nanos(u64::MAX)) }),
-                funder: Funder::Period { project: 4, period: 777 },
-                parent: None,
-                numbers: OwnerNumbers { budget: 977, spent: 979, spent_below: 981, reserved: 983 },
-                made: 985,
-                closed: true,
-            }],
-        ),
-        before: Some(before),
-        after: Some(after),
-        cut: true,
-    };
+    let page = historical_spend_page(before, after);
     native_drive(
         &mut domain,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
     );
     (domain, page)
 }
-fn historical_project_tree(domain: &Domain, w: &Words, bound: skein_ui::Limits) -> (Tree, JigBindings) {
+fn historical_project_tree(domain: &Fixture, w: &Words, bound: skein_ui::Limits) -> (Tree, JigBindings) {
     let mut b = Builder::new(&bound);
     let mut bindings = JigBindings::new(bound.bindings, 32);
-    crate::pages::main(&mut b, domain, w, &mut bindings);
+    crate::pages::main(&mut b, &domain.view(), w, &mut bindings);
     (b.finish(), bindings)
 }
 fn historical_project_bound(w: &Words) -> skein_ui::Limits {
@@ -1194,9 +1199,15 @@ fn owner_project_genuine_spend_keeps_live_historical_and_earlier_period_facts_wi
         ]
     );
     for (act, expected) in edges.into_iter().zip([page.before.clone().unwrap(), page.after.clone().unwrap()]) {
-        let requests = native_drive(&mut domain, Event::Act { act });
+        let requests = native_drive(&mut domain, Event::Act { action: act });
         assert!(requests.iter().any(|request| match request {
-            Request::Read { what: Read::Spend { project: 4, after: Some(cursor) }, .. } => cursor == &expected,
+            Request::Client {
+                asked:
+                    jig_client::Event::Read {
+                        read: jig_client::Readable::Jig(Read::Spend { project: 4, after: Some(cursor) }),
+                        ..
+                    },
+            } => cursor == &expected,
             _ => false,
         }));
     }
@@ -1242,4 +1253,23 @@ pub(super) fn settings_tree() -> Tree {
     let mut value = source();
     value.number = 4;
     owner_page(&native_owner(value)).0
+}
+
+fn historical_spend_page(before: Cursor, after: Cursor) -> OwnerSpendPage {
+    OwnerSpendPage {
+        rows: list(
+            4,
+            [OwnerFundingRecord {
+                period: Some(OwnerPeriodTimes { began: Wall::EPOCH, next: Some(Wall::from_nanos(u64::MAX)) }),
+                funder: Funder::Period { project: 4, period: 777 },
+                parent: None,
+                numbers: OwnerNumbers { budget: 977, spent: 979, spent_below: 981, reserved: 983 },
+                made: 985,
+                closed: true,
+            }],
+        ),
+        before: Some(before),
+        after: Some(after),
+        cut: true,
+    }
 }

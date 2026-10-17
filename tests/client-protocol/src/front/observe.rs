@@ -131,13 +131,16 @@ pub fn receipts(fact: &Received) -> Vec<Receipt> {
         Received::Delivery(c::Delivery::Frame(value)) => {
             return vec![Receipt::Party { party: value.party.number, watch: None }];
         }
-        Received::Delivery(value) => Event::Jig(jig_client_view::Event::Watch {
-            watch: Token::new(0),
-            event: c::WatchEvent::Delivered(value.clone()),
-        }),
-        Received::Read(result) => {
-            Event::Jig(jig_client_view::Event::Read { read: Token::new(0), result: result.clone() })
-        }
+        Received::Delivery(value) => Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch: Token::new(0), event: c::WatchEvent::Delivered(value.clone()) },
+            },
+        },
+        Received::Read(result) => Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::ReadDone { read: Token::new(0), result: jig_client::Readout::Jig(result.clone()) },
+            },
+        },
         Received::SignedIn { .. } | Received::Sent { .. } => return Vec::new(),
     };
     jig_client_world::observe::received(&event)

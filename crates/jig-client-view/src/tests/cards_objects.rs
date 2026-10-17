@@ -6,11 +6,12 @@
     reason = "ordinary tests inspect trees and script public domain requests"
 )]
 use super::cards::{CLIENT, contains, document, drive, limits, start, text, words};
+use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage, Watched};
 use crate::{JigBindings, cards, decode};
 use skein_ui::Act;
 use skein_ui::{Builder, Role, State, Tree};
 
-use crate::{Domain, Event, Request, action::Act as Action, fields::Purpose, objects::Object};
+use crate::{Event, Request, action::Act as Action, fields::Purpose, objects::Object};
 use jig_client::contract::*;
 use skein_lib::{Duration, Id, List, Wall};
 
@@ -128,22 +129,26 @@ fn result() -> Result {
         details: None,
     }
 }
-fn loaded_with_watch(key: ObjectKey, value: ReadValue) -> (Domain, Id<Object>, skein_lib::Token) {
+fn loaded_with_watch(key: ObjectKey, value: ReadValue) -> (Fixture, Id<Object>, jig_client::Handle) {
     let (mut d, frame) = start();
+    let out =
+        drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    let inbox =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Inbox { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let out = drive(
         &mut d,
-        Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
-    );
-    let inbox = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
-    let out = drive(
-        &mut d,
-        Event::Watch {
+        Watched {
             watch: inbox,
             event: WatchEvent::Delivered(Delivery::Inbox(Box::new(Inbox {
                 entries: list([InboxEntry {
@@ -169,23 +174,23 @@ fn loaded_with_watch(key: ObjectKey, value: ReadValue) -> (Domain, Id<Object>, s
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, .. } => Some(*read),
+            Request::Client { asked: jig_client::Event::Read { handle: read, .. } } => Some(*read),
             _ => None,
         })
         .unwrap();
-    drive(&mut d, Event::Read { read, result: ReadResult::Value(value) });
+    drive(&mut d, ReadPage { read, result: ReadResult::Value(value) });
     let id = d.objects().find(key).unwrap();
     (d, id, inbox)
 }
-pub(super) fn loaded(key: ObjectKey, value: ReadValue) -> (Domain, Id<Object>) {
+pub(super) fn loaded(key: ObjectKey, value: ReadValue) -> (Fixture, Id<Object>) {
     let (d, id, _) = loaded_with_watch(key, value);
     (d, id)
 }
-pub(super) fn render(d: &Domain, id: Id<Object>, words: &crate::words::Words, bindings: &mut JigBindings) -> Tree {
+pub(super) fn render(d: &Fixture, id: Id<Object>, words: &crate::words::Words, bindings: &mut JigBindings) -> Tree {
     bindings.begin();
     let mut b = Builder::new(&limits());
     b.open(Role::Page);
-    cards::card(&mut b, d, id, &cards::Place::Elsewhere, words, bindings);
+    cards::card(&mut b, &d.view(), id, &cards::Place::Elsewhere, words, bindings);
     b.close();
     let tree = b.finish();
     super::cards_access::check(&tree);
@@ -204,7 +209,7 @@ pub(super) fn render(d: &Domain, id: Id<Object>, words: &crate::words::Words, bi
     tree
 }
 fn render_with_confirmation(
-    d: &Domain,
+    d: &Fixture,
     id: Id<Object>,
     words: &crate::words::Words,
     bindings: &mut JigBindings,
@@ -221,8 +226,8 @@ fn render_with_confirmation(
     cap.text_bytes = bound.checked_mul(cap.text_per_node).unwrap();
     let mut b = Builder::new(&cap);
     b.open(Role::Page);
-    cards::card(&mut b, d, id, &cards::Place::Elsewhere, words, bindings);
-    crate::confirmation::confirmation(&mut b, d, words, bindings);
+    cards::card(&mut b, &d.view(), id, &cards::Place::Elsewhere, words, bindings);
+    crate::confirmation::confirmation(&mut b, &d.view(), words, bindings);
     b.close();
     let tree = b.finish();
     super::cards_access::check(&tree);
@@ -270,7 +275,7 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
         assert!(contains(&tree, b"Your pool has 12 left; this needs 40"));
         assert!(!tree.nodes().iter().any(|n| n.role == Role::Button && n.name.as_deref() == Some(b"Pass up")));
         let action = press(&tree, label, &mut bindings);
-        drive(&mut d, Event::Act { act: action });
+        drive(&mut d, Event::Act { action });
         let tree = render_with_confirmation(&d, id, words, &mut bindings);
         assert!(contains(&tree, whole));
         assert!(contains(&tree, b"review the confirmation"));
@@ -285,14 +290,14 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
                 .token;
             let edit =
                 decode(&mut bindings, field, Act::Input { value: Box::from(b"complete answer".as_slice()) }).unwrap();
-            drive(&mut d, Event::Act { act: edit });
+            drive(&mut d, Event::Act { action: edit });
             assert_eq!(d.fields().get(Purpose::Answer).unwrap().text.bytes(), b"complete answer");
         }
-        let out = drive(&mut d, Event::Act { act: Action::Confirm });
+        let out = drive(&mut d, Event::Act { action: Action::Confirm });
         let request = out
             .iter()
             .find_map(|r| match r {
-                Request::Send { request, .. } => Some(*request),
+                Request::Client { asked: jig_client::Event::Send { key: request, .. } } => Some(*request),
                 _ => None,
             })
             .unwrap();
@@ -301,7 +306,7 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
         assert!(contains(&tree, whole));
         drive(
             &mut d,
-            Event::Answered {
+            AnsweredByEngine {
                 request,
                 answer: Answer::Refused(Refusal::Moved { now: Revision { value: 19 }, what: Moved::PersonTask }),
             },
@@ -310,21 +315,21 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
         assert!(contains(&tree, b"19"));
         assert!(contains(&tree, whole));
         let action = press(&tree, label, &mut bindings);
-        drive(&mut d, Event::Act { act: action });
+        drive(&mut d, Event::Act { action });
         if label == b"Answer" {
-            drive(&mut d, Event::Act { act: Action::Edit { field: Purpose::Answer, text: text(b"answer") } });
+            drive(&mut d, Event::Act { action: Action::Edit { field: Purpose::Answer, text: text(b"answer") } });
         }
-        let out = drive(&mut d, Event::Act { act: Action::Confirm });
+        let out = drive(&mut d, Event::Act { action: Action::Confirm });
         let request = out
             .iter()
             .find_map(|r| match r {
-                Request::Send { request, .. } => Some(*request),
+                Request::Client { asked: jig_client::Event::Send { key: request, .. } } => Some(*request),
                 _ => None,
             })
             .unwrap();
         drive(
             &mut d,
-            Event::Answered {
+            AnsweredByEngine {
                 request,
                 answer: Answer::Done(Outcome::DecidedFirst {
                     by: super::cards::party(),
@@ -369,7 +374,7 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words
             assert!(option.binding.is_none());
         }
         let action = press(&before, b"Answer", &mut bindings);
-        drive(&mut d, Event::Act { act: action });
+        drive(&mut d, Event::Act { action });
         let tree = render_with_confirmation(&d, id, words, &mut bindings);
         assert!(contains(&tree, b"whole report"));
         assert!(contains(&tree, b"Becomes news for its requester after 4 min"));
@@ -381,7 +386,7 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words
             if node.role == Role::Choice {
                 let act = decode(&mut bindings, node.binding.unwrap().token, Act::Press).unwrap();
                 assert_eq!(act, Action::Choose { option: 3 });
-                drive(&mut d, Event::Act { act });
+                drive(&mut d, Event::Act { action: act });
             }
         }
         assert!(contains(&tree, b"Cannot do it"));
@@ -390,13 +395,13 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words
     let mut bindings = JigBindings::new(64, CLIENT.text);
     let tree = render(&result_domain, id, words, &mut bindings);
     assert!(contains(&tree, b"whole failure"));
-    drive(&mut result_domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::PassUp } });
+    drive(&mut result_domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::PassUp } });
     let tree = render(&result_domain, id, words, &mut bindings);
     assert!(contains(&tree, b"Your pool has 12 left; this needs 40"));
     assert!(contains(&tree, b"whole report"));
     let out = drive(
         &mut result_domain,
-        Event::Watch {
+        Watched {
             watch,
             event: WatchEvent::Delivered(Delivery::Inbox(Box::new(Inbox {
                 entries: list([]),
@@ -411,11 +416,11 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, .. } => Some(*read),
+            Request::Client { asked: jig_client::Event::Read { handle: read, .. } } => Some(*read),
             _ => None,
         })
         .unwrap();
-    drive(&mut result_domain, Event::Read { read, result: ReadResult::Value(ReadValue::Result(Box::new(result()))) });
+    drive(&mut result_domain, ReadPage { read, result: ReadResult::Value(ReadValue::Result(Box::new(result()))) });
     let tree = render(&result_domain, id, words, &mut bindings);
     assert!(tree.nodes().iter().any(|n| n.role == Role::Status && n.name.as_deref() == Some(b"Leaving")));
     assert!(contains(&tree, b"whole failure"));
@@ -465,7 +470,7 @@ fn result_value_payloads(words: &crate::words::Words, part: &Part) {
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        cards::result::value_nodes(&mut b, &d, &value, words, &mut bindings);
+        cards::result::value_nodes(&mut b, &d.view(), &value, words, &mut bindings);
         b.close();
         assert!(contains(&b.finish(), whole));
     }
@@ -614,7 +619,7 @@ fn all_chip_phases(words: &crate::words::Words) {
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        cards::chip::chip(&mut b, &d, &value, words, &mut bindings);
+        cards::chip::chip(&mut b, &d.view(), &value, words, &mut bindings);
         b.close();
         let tree = b.finish();
         super::cards_access::check(&tree);
@@ -635,17 +640,21 @@ fn all_chip_phases(words: &crate::words::Words) {
 
 fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     let (mut d, frame) = start();
-    let out = drive(
-        &mut d,
-        Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
-    );
-    let inbox = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let out =
+        drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    let inbox =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Inbox { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut dependency = chip();
     dependency.task = 9;
     dependency.title = DocumentText::complete(text(b"Live dependency"));
@@ -671,7 +680,7 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     };
     drive(
         &mut d,
-        Event::Watch {
+        Watched {
             watch: inbox,
             event: WatchEvent::Delivered(Delivery::Inbox(Box::new(Inbox {
                 entries: list([InboxEntry {
@@ -719,7 +728,7 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     let mut b = Builder::new(&limits());
     b.open(Role::Page);
     bindings.begin();
-    cards::chip::chip(&mut b, &d, &root, words, &mut bindings);
+    cards::chip::chip(&mut b, &d.view(), &root, words, &mut bindings);
     b.close();
     let tree = b.finish();
     super::cards_access::check(&tree);
@@ -792,11 +801,11 @@ fn escalation_doc(reason: HoldReason, acts: &[ActKind]) -> Escalation {
         ending: None,
     }
 }
-fn dialog(d: &Domain, words: &crate::words::Words, bindings: &mut JigBindings) -> Tree {
+fn dialog(d: &Fixture, words: &crate::words::Words, bindings: &mut JigBindings) -> Tree {
     bindings.begin();
     let mut b = Builder::new(&limits());
     b.open(Role::Page);
-    crate::confirmation::confirmation(&mut b, d, words, bindings);
+    crate::confirmation::confirmation(&mut b, &d.view(), words, bindings);
     b.close();
     let tree = b.finish();
     super::cards_access::check(&tree);
@@ -952,7 +961,7 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
     ] {
         let task = task_doc(&[act]);
         let (mut d, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(task)));
-        drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act } });
+        drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act } });
         let tree = dialog(&d, words, bindings);
         assert!(contains(&tree, &words.say(cards::common::act_phrase(act), &[])));
         if act == ActKind::Cancel {
@@ -962,20 +971,20 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
                 && n.styles.as_slice().contains(&crate::JigStyle::Danger.token())
                 && n.states.as_slice().contains(&State::Disabled)));
             let edit = input(&tree, b"Your reason", b"stop it", bindings);
-            drive(&mut d, Event::Act { act: edit });
+            drive(&mut d, Event::Act { action: edit });
             let tree = dialog(&d, words, bindings);
             assert_eq!(press(&tree, b"Confirm", bindings), Action::Confirm);
         }
         if act == ActKind::Close {
             let choose = press(&tree, b"Take over delegate 8, reserving 13", bindings);
-            drive(&mut d, Event::Act { act: choose });
+            drive(&mut d, Event::Act { action: choose });
             assert_eq!(d.confirmation().unwrap().choices.disposals.as_slice(), &[Disposal::TakeOver { task: 8 }]);
             let tree = dialog(&d, words, bindings);
             assert_eq!(press(&tree, b"Confirm", bindings), Action::Confirm);
         }
         if act == ActKind::Prioritise {
             let change = input(&tree, b"New goal priority", b"3", bindings);
-            drive(&mut d, Event::Act { act: change });
+            drive(&mut d, Event::Act { action: change });
             assert_eq!(d.confirmation().unwrap().choices.priority, Some(3));
         }
     }
@@ -983,7 +992,7 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
         let mut p = proposal(ProposalAction::Batch { tasks: list([]), own: true });
         p.acts = list([Offered { act, admission: Admission::Proposed { to: Recipient::Task(2) } }]);
         let (mut d, id) = loaded(ObjectKey::Proposal(p.key), ReadValue::Proposal(Box::new(p)));
-        drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act } });
+        drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act } });
         let tree = dialog(&d, words, bindings);
         assert!(contains(&tree, b"will be proposed"));
         assert!(contains(&tree, b"Waiting for task 2"));
@@ -994,11 +1003,11 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
     }
     let p = person(PersonContract::Words);
     let (mut d, id) = loaded(ObjectKey::PersonTask(8), ReadValue::PersonTask(Box::new(p)));
-    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Answer } });
+    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Answer } });
     let tree = dialog(&d, words, bindings);
     assert!(tree.nodes().iter().any(|n| n.role == Role::TextArea && n.name.as_deref() == Some(b"Your answer")));
     let choose = press(&tree, b"Cannot do it", bindings);
-    drive(&mut d, Event::Act { act: choose });
+    drive(&mut d, Event::Act { action: choose });
     assert!(d.confirmation().unwrap().choices.cannot);
     for act in [ActKind::EditNote, ActKind::DeleteNote] {
         let note = Note {
@@ -1014,7 +1023,7 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
             cut: false,
         };
         let (mut d, id) = note_loaded(note);
-        drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act } });
+        drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act } });
         let tree = dialog(&d, words, bindings);
         assert!(contains(&tree, b"note title"));
         if act == ActKind::EditNote {
@@ -1029,7 +1038,7 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
     let mut doc = document();
     doc.charters.get_mut(0).unwrap().goals =
         list([Charter { number: 1, name: Some(DocumentText::complete(text(b"lead"))) }]);
-    drive(&mut d, Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(doc))) });
+    drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(doc))) });
     let out = drive(
         &mut d,
         Event::Went { place: Place::Jig(Address::Project { project: 4, section: ProjectSection::Goals }) },
@@ -1037,7 +1046,9 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Project { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
@@ -1067,12 +1078,12 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
             admission: Admission::Proposed { to: Recipient::Role { project: 4, role: 2 } },
         }]),
     };
-    drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(project))) });
-    drive(&mut d, Event::Act { act: Action::Edit { field: Purpose::NewGoal, text: text(b"whole new goal") } });
+    drive(&mut d, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(project))) });
+    drive(&mut d, Event::Act { action: Action::Edit { field: Purpose::NewGoal, text: text(b"whole new goal") } });
     drive(
         &mut d,
         Event::Act {
-            act: Action::GoalForm {
+            action: Action::GoalForm {
                 form: crate::page::project::goals::GoalForm {
                     project: 4,
                     executor: GoalExecutor::Charter(1),
@@ -1083,7 +1094,7 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
             },
         },
     );
-    drive(&mut d, Event::Act { act: Action::Submit { field: Purpose::NewGoal } });
+    drive(&mut d, Event::Act { action: Action::Submit { field: Purpose::NewGoal } });
     let tree = dialog(&d, words, bindings);
     assert!(contains(&tree, b"whole new goal"));
     assert!(contains(&tree, b"Your pool has 20 left; this needs 21"));
@@ -1094,8 +1105,8 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
 fn notice_scenarios(words: &crate::words::Words) {
     use crate::notices::kept::Kind;
     for kind in [
-        Kind::Link(crate::link::Link::Offline),
-        Kind::Link(crate::link::Link::Live),
+        Kind::Link(jig_client::Link::Offline),
+        Kind::Link(jig_client::Link::Live),
         Kind::Answer { object: ObjectKey::Task(8), answer: Answer::Done(Outcome::Changed) },
         Kind::PageAnswer {
             answer: Answer::Refused(Refusal::Authority {
@@ -1119,20 +1130,20 @@ fn notice_scenarios(words: &crate::words::Words) {
     crate::notices::kept::show(&mut d, Kind::Refused(Limit::Objects));
     let mut b = Builder::new(&limits());
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
-    crate::notices::notices(&mut b, &d, words, &mut bindings);
+    crate::notices::notices(&mut b, &d.view(), words, &mut bindings);
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(contains(&tree, b"Working set limit"));
     let dismiss = press(&tree, b"Dismiss", &mut bindings);
-    drive(&mut d, Event::Act { act: dismiss });
+    drive(&mut d, Event::Act { action: dismiss });
     assert!(d.notices().ids().is_empty());
 }
 
-fn note_loaded(note: Note) -> (Domain, Id<Object>) {
+fn note_loaded(note: Note) -> (Fixture, Id<Object>) {
     use crate::address::{Address, Place, ProjectSection};
     let number = note.number;
     let (mut d, frame) = start();
-    drive(&mut d, Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
+    drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) });
     let out = drive(
         &mut d,
         Event::Went { place: Place::Jig(Address::Project { project: 4, section: ProjectSection::Notes }) },
@@ -1140,13 +1151,15 @@ fn note_loaded(note: Note) -> (Domain, Id<Object>) {
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Notes { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Notes { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
     drive(
         &mut d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
                 cut: false,
@@ -1185,7 +1198,7 @@ fn escalation_row_scenario(
                 && n.name.as_deref() == Some(&words.say(cards::common::act_phrase(*act), &[])))
         );
     }
-    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: acts[0] } });
+    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: acts[0] } });
     let tree = dialog(&d, words, bindings);
     assert!(tree.nodes().iter().any(|n| n.role == Role::Dialog && n.name.is_some()));
     if match row.hold.reason {
@@ -1194,16 +1207,17 @@ fn escalation_row_scenario(
     } {
         assert!(contains(&tree, b"engine will do as you choose"));
         let choose = press(&tree, b"Release without making the effect again; tell its executor so", bindings);
-        drive(&mut d, Event::Act { act: choose });
+        drive(&mut d, Event::Act { action: choose });
         assert_eq!(d.confirmation().unwrap().choices.again, Some(false));
         let tree = dialog(&d, words, bindings);
         let send = press(&tree, b"Confirm", bindings);
-        let out = drive(&mut d, Event::Act { act: send });
+        let out = drive(&mut d, Event::Act { action: send });
         assert!(out.iter().any(|r| match r {
-            Request::Send { ask, .. } => match **ask {
-                Ask::Release { again: Some(false), .. } => true,
-                _ => false,
-            },
+            Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } =>
+                match **ask {
+                    Ask::Release { again: Some(false), .. } => true,
+                    _ => false,
+                },
             _ => false,
         }));
     }
@@ -1223,18 +1237,18 @@ fn escalation_row_scenario(
             .written;
         assert_eq!(written, initial_writes);
         let change = input(&tree, b"New budget", b"25", bindings);
-        drive(&mut d, Event::Act { act: change });
+        drive(&mut d, Event::Act { action: change });
         assert_eq!(d.confirmation().unwrap().choices.change.as_ref().unwrap().authority.as_ref().unwrap().spend, 25);
         let tree = dialog(&d, words, bindings);
         let change = input(&tree, b"New instructions", b"try another way", bindings);
-        drive(&mut d, Event::Act { act: change });
+        drive(&mut d, Event::Act { action: change });
         let open = d.confirmation().unwrap();
         assert_eq!(open.choices.change.as_ref().unwrap().instructions.as_ref().unwrap().bytes(), b"try another way");
         assert_eq!(open.choices.change.as_ref().unwrap().authority.as_ref().unwrap().spend, 25);
         assert_eq!(open.revision, Some(Revision { value: 6 }));
         let tree = dialog(&d, words, bindings);
         let change = input(&tree, b"Address to role number in this project", b"7", bindings);
-        drive(&mut d, Event::Act { act: change });
+        drive(&mut d, Event::Act { action: change });
         assert_eq!(
             d.confirmation().unwrap().choices.change.as_ref().unwrap().addressed,
             Some(AddressChange { revision: Revision { value: 12 }, address: PersonAddress::Role(7) })
@@ -1242,9 +1256,9 @@ fn escalation_row_scenario(
     }
     if expected == b"spent 10" {
         let initial_writes = d.confirmation().unwrap().writes;
-        drive(&mut d, Event::Act { act: Action::Dismiss });
-        drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
-        drive(&mut d, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut d, Event::Act { action: Action::Dismiss });
+        drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut d, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         assert!(d.confirmation().unwrap().writes > initial_writes);
         let tree = dialog(&d, words, bindings);
         let value = tree
@@ -1263,18 +1277,18 @@ fn escalation_row_scenario(
 fn changed_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings) {
     let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::Release]);
     let (mut d, id, _watch) = loaded_with_watch(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
-    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Release } });
-    let out = drive(&mut d, Event::Act { act: Action::Confirm });
+    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Release } });
+    let out = drive(&mut d, Event::Act { action: Action::Confirm });
     let request = out
         .iter()
         .find_map(|r| match r {
-            Request::Send { request, .. } => Some(*request),
+            Request::Client { asked: jig_client::Event::Send { key: request, .. } } => Some(*request),
             _ => None,
         })
         .unwrap();
     let out = drive(
         &mut d,
-        Event::Answered {
+        AnsweredByEngine {
             request,
             answer: Answer::Refused(Refusal::Moved { now: Revision { value: 5 }, what: Moved::Hold { reason: None } }),
         },
@@ -1284,12 +1298,12 @@ fn changed_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindin
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, .. } => Some(*read),
+            Request::Client { asked: jig_client::Event::Read { handle: read, .. } } => Some(*read),
             _ => None,
         })
         .unwrap();
-    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Release } });
-    drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Escalation(Box::new(moved))) });
+    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Release } });
+    drive(&mut d, ReadPage { read, result: ReadResult::Value(ReadValue::Escalation(Box::new(moved))) });
     let tree = dialog(&d, words, bindings);
     assert!(contains(&tree, b"revision this action names changed"));
     assert!(!tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Confirm") && n.binding.is_some()));
@@ -1354,7 +1368,7 @@ fn person_chip_preserves_absent_readiness(words: &crate::words::Words) {
         let mut b = Builder::new(&limits());
         let mut bindings = JigBindings::new(16, CLIENT.text);
         b.open(Role::Page);
-        cards::chip::chip(&mut b, &d, &value, words, &mut bindings);
+        cards::chip::chip(&mut b, &d.view(), &value, words, &mut bindings);
         b.close();
         let tree = b.finish();
         assert_eq!(contains(&tree, b"Since"), since.is_some());
@@ -1396,7 +1410,7 @@ fn approved_and_failed_results_show_only_their_supplied_owner_payloads() {
         let mut builder = Builder::new(&limits());
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        cards::result::value_nodes(&mut builder, &domain, &value, words, &mut bindings);
+        cards::result::value_nodes(&mut builder, &domain.view(), &value, words, &mut bindings);
         builder.close();
         let tree = builder.finish();
         assert!(contains(&tree, &[0, 255, 1]));
@@ -1412,7 +1426,7 @@ fn approved_and_failed_results_show_only_their_supplied_owner_payloads() {
     let mut bindings = JigBindings::new(64, CLIENT.text);
     cards::result::value_nodes(
         &mut builder,
-        &domain,
+        &domain.view(),
         &ResultValue::Failure(DocumentText::complete(text(b"cannot complete"))),
         words,
         &mut bindings,
@@ -1442,8 +1456,8 @@ fn whole_specification_words_edit_preserves_parameters_and_input_identities() {
     row.spec.specification.inputs = list([u64::MAX, 0]);
     let expected = row.spec.whole().unwrap();
     let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
-    drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
-    drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+    drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Amend } });
+    drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     let words = words();
     let mut bindings = JigBindings::new(256, CLIENT.text);
     let tree = dialog(&domain, words, &mut bindings);
@@ -1451,12 +1465,14 @@ fn whole_specification_words_edit_preserves_parameters_and_input_identities() {
     assert!(contains(&tree, b"Parameter 4294967295 has value 18446744073709551615"));
     assert!(contains(&tree, b"Parameter 9 names connector 65535 resource 18446744073709551615"));
     assert!(contains(&tree, b"Input task 18446744073709551615"));
-    drive(&mut domain, Event::Act { act: input(&tree, b"New specification", b"replacement", &mut bindings) });
-    let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+    drive(&mut domain, Event::Act { action: input(&tree, b"New specification", b"replacement", &mut bindings) });
+    let out = drive(&mut domain, Event::Act { action: Action::Confirm });
     let sent = out
         .iter()
         .find_map(|request| match request {
-            Request::Send { ask, .. } => Some(&**ask),
+            Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
+                Some(&**ask)
+            }
             _ => None,
         })
         .expect("whole amendment sent");
@@ -1490,12 +1506,12 @@ fn cut_specification_is_shown_and_cannot_be_reconstructed_by_the_words_editor() 
     );
     builder.close();
     assert!(contains(&builder.finish(), b"The specification is incomplete"));
-    drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
-    drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+    drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Amend } });
+    drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     let mut bindings = JigBindings::new(256, CLIENT.text);
     let tree = dialog(&domain, words, &mut bindings);
     assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
-    assert!(drive(&mut domain, Event::Act { act: Action::Confirm }).is_empty());
+    assert!(drive(&mut domain, Event::Act { action: Action::Confirm }).is_empty());
 }
 
 #[test]
@@ -1560,24 +1576,28 @@ fn specification_documents_keep_independent_text_and_list_loss_and_block_whole_e
         assert!(contains(&tree, UTF8_TEXTS[0]));
         assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
         let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
-        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Amend } });
+        drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let mut bindings = JigBindings::new(256, CLIENT.text);
         let tree = dialog(&domain, words, &mut bindings);
         if mask != 0 {
             assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New specification")));
-            assert!(drive(&mut domain, Event::Act { act: Action::Confirm }).is_empty());
+            assert!(drive(&mut domain, Event::Act { action: Action::Confirm }).is_empty());
         } else {
-            drive(&mut domain, Event::Act { act: input(&tree, b"New specification", b"replacement", &mut bindings) });
-            let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+            drive(
+                &mut domain,
+                Event::Act { action: input(&tree, b"New specification", b"replacement", &mut bindings) },
+            );
+            let out = drive(&mut domain, Event::Act { action: Action::Confirm });
             assert!(out.iter().any(|request| match request {
-                Request::Send { ask, .. } => match &**ask {
-                    Ask::Amend { change, .. } =>
-                        change.spec.as_ref().is_some_and(|spec| spec.words.bytes() == b"replacement"
-                            && spec.inputs == list([u64::MAX])
-                            && spec.parameters == list([Parameter::Bytes { name: 8, value: text(UTF8_TEXTS[0]) }])),
-                    _ => false,
-                },
+                Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } =>
+                    match &**ask {
+                        Ask::Amend { change, .. } =>
+                            change.spec.as_ref().is_some_and(|spec| spec.words.bytes() == b"replacement"
+                                && spec.inputs == list([u64::MAX])
+                                && spec.parameters == list([Parameter::Bytes { name: 8, value: text(UTF8_TEXTS[0]) }])),
+                        _ => false,
+                    },
                 _ => false,
             }));
         }
@@ -1605,22 +1625,22 @@ fn note_documents_keep_each_text_loss_and_reference_loss_without_reconstructing_
             let words = words();
             let mut bindings = JigBindings::new(256, CLIENT.text);
             let mut builder = Builder::new(&limits());
-            cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words, &mut bindings);
+            cards::card(&mut builder, &domain.view(), id, &cards::Place::Elsewhere, words, &mut bindings);
             let tree = builder.finish();
             assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
             assert_eq!(contains(&tree, b"This note has more references"), mask & 4 != 0);
-            drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act } });
+            drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act } });
             let tree = dialog(&domain, words, &mut bindings);
-            let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+            let out = drive(&mut domain, Event::Act { action: Action::Confirm });
             if act == ActKind::EditNote && mask != 0 {
                 assert!(tree.nodes().iter().all(|node| node.value.is_none()));
                 assert!(out.iter().all(|request| match request {
-                    Request::Send { .. } => false,
+                    Request::Client { asked: jig_client::Event::Send { .. } } => false,
                     _ => true,
                 }));
             } else {
                 assert!(out.iter().any(|request| match request {
-                    Request::Send { .. } => true,
+                    Request::Client { asked: jig_client::Event::Send { .. } } => true,
                     _ => false,
                 }));
             }
@@ -1651,13 +1671,16 @@ fn equal_number_proposal_makers_keep_distinct_card_keys_words_and_decoding() {
         assert_eq!(crate::pages::object_key(key), expected);
         shown.push(expected);
         let action = press(&tree, b"Accept", &mut bindings);
-        drive(&mut d, Event::Act { act: action });
+        drive(&mut d, Event::Act { action });
         let tree = dialog(&d, words, &mut bindings);
         assert!(contains(&tree, label));
         let action = press(&tree, b"Confirm", &mut bindings);
-        let sent = drive(&mut d, Event::Act { act: action });
+        let sent = drive(&mut d, Event::Act { action });
         assert_eq!(sent.len(), 1);
-        let Request::Send { ask, .. } = &sent[0] else { panic!("one typed proposal request") };
+        let Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } = &sent[0]
+        else {
+            panic!("one typed proposal request")
+        };
         assert_eq!(
             ask.as_ref(),
             &Ask::DecideProposal {
@@ -1733,28 +1756,29 @@ fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_del
             cut: true,
         };
         let (mut domain, id) = note_loaded(note);
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act } });
         let tree = dialog(&domain, words, &mut bindings);
-        let outgoing = drive(&mut domain, Event::Act { act: Action::Confirm });
+        let outgoing = drive(&mut domain, Event::Act { action: Action::Confirm });
         if act == ActKind::EditNote {
             assert!(contains(&tree, b"This note has more references"));
             assert!(tree.nodes().iter().all(|node| node.value.is_none()));
             assert!(domain.confirmation().unwrap().missing.is_some());
             assert!(outgoing.iter().all(|request| match request {
-                Request::Send { .. } => false,
+                Request::Client { asked: jig_client::Event::Send { .. } } => false,
                 _ => true,
             }));
         } else {
             assert!(outgoing.iter().any(|request| match request {
-                Request::Send { ask, .. } => match &**ask {
-                    Ask::DeleteNote {
-                        note: 77,
-                        scope: NoteScope::Goal { project: 1, goal: 900 },
-                        revision: Revision { value: 123 },
-                        ..
-                    } => true,
-                    _ => false,
-                },
+                Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } =>
+                    match &**ask {
+                        Ask::DeleteNote {
+                            note: 77,
+                            scope: NoteScope::Goal { project: 1, goal: 900 },
+                            revision: Revision { value: 123 },
+                            ..
+                        } => true,
+                        _ => false,
+                    },
                 _ => false,
             }));
         }
@@ -1795,7 +1819,7 @@ fn result_documents_keep_each_words_loss_fact_and_the_exact_change_kind_and_owne
             let mut builder = Builder::new(&crate::limits::of_words(&CLIENT, words).unwrap());
             builder.open(Role::Page);
             let mut bindings = JigBindings::new(64, CLIENT.text);
-            cards::result::value_nodes(&mut builder, &domain, &value, words, &mut bindings);
+            cards::result::value_nodes(&mut builder, &domain.view(), &value, words, &mut bindings);
             builder.close();
             let tree = builder.finish();
             assert!(contains(&tree, b"supplied words"));
@@ -1836,7 +1860,7 @@ fn result_cards_distinguish_an_absent_completion_wall_from_epoch_and_render_supp
         let mut builder = Builder::new(&envelope);
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
-        cards::result::facts(&mut builder, &domain, &value, words, &mut bindings);
+        cards::result::facts(&mut builder, &domain.view(), &value, words, &mut bindings);
         builder.close();
         let tree = builder.finish();
         assert_eq!(contains(&tree, b"Completion time not supplied"), at.is_none());
@@ -1872,7 +1896,7 @@ fn exact_owner_verdict_renders_payload_and_stored_followups_without_inventing_ch
         let mut builder = Builder::new(&envelope);
         builder.open(Role::Page);
         let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
-        cards::result::facts(&mut builder, &domain, &value, words, &mut bindings);
+        cards::result::facts(&mut builder, &domain.view(), &value, words, &mut bindings);
         builder.close();
         let tree = builder.finish();
         assert!(contains(&tree, b"Verdict 4294967295"));

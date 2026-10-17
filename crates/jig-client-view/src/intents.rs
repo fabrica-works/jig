@@ -27,16 +27,16 @@ pub struct ByValue {
     pub ask: Box<Ask>,
 }
 
-use crate::{boundary::Request, facts::Fact};
+use crate::boundary::Request;
 use jig_client::contract::{ActKind, Answer, Limit, ObjectKey};
 use skein_lib::{Id, Map, Queue, Slab};
 /// The owner to which one terminal is applied.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Origin {
     /// An object's act; a second press joins by object and act.
     Card { object: ObjectKey, act: ActKind },
     /// A page's request, with the generation that originated it.
-    Page { generation: u32, purpose: crate::page::IntentPurpose },
+    Page { handle: Option<jig_client::Handle>, purpose: crate::page::IntentPurpose },
     /// A caller's by-value ask; its token receives the one answer.
     Program { asked: Token },
 }
@@ -63,6 +63,7 @@ pub struct Receipt {
 /// Pending intents, with retired facts available until reclaim.
 #[derive(Debug)]
 pub struct Intents {
+    pub(crate) seed: u64,
     slab: Slab<Intent>,
     ids: Map<Id<Intent>, ()>,
 }
@@ -70,7 +71,7 @@ impl Intents {
     /// Allocates the configured pending obligations.
     #[must_use]
     pub fn new(capacity: u32) -> Self {
-        Self { slab: Slab::with_capacity(capacity), ids: Map::with_capacity(capacity) }
+        Self { seed: 0, slab: Slab::with_capacity(capacity), ids: Map::with_capacity(capacity) }
     }
     /// Reads an intent, including a terminal awaiting reclaim.
     #[must_use]
@@ -107,13 +108,15 @@ impl Intents {
                 let old = self.ids.insert(id, ()).expect("registry fits its paired slab");
                 assert!(old.is_none(), "new intent is not registered");
                 let ask = self.slab.get(id).expect("inserted intent exists").ask.clone();
-                out.push(Request::Send { request: id.token(), scope, ask });
+                out.push(Request::Client {
+                    asked: jig_client::Event::Send {
+                        key: jig_client::Key { asker: jig_client::Asker::JIG, number: id.token().raw() ^ self.seed },
+                        request: jig_client::Ask::Jig(ask),
+                    },
+                });
                 Some(id)
             }
-            Err(_) => {
-                out.push(Request::Fact { fact: Fact::Refused { which: Limit::Requests } });
-                None
-            }
+            Err(_) => None,
         }
     }
     /// Records only the root table's report of a pending request.
@@ -166,11 +169,12 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
 /// A card policy's one send, joined by object and act. Jig 21 calls this after
 /// validating its confirmation and completes the durable card transition.
 pub fn send_card(
-    domain: &mut crate::Domain,
+    domain: &mut crate::Ui,
     object: ObjectKey,
     act: ActKind,
     ask: Box<Ask>,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) -> Option<Token> {
     let scope = domain.confirmed?;
     let object_id = domain.objects.find(object)?;
@@ -179,13 +183,13 @@ pub fn send_card(
     if !joined && let Some(which) = crate::conversation::sending::admission(domain, scope, &ask) {
         domain.objects.get_mut(object_id).expect("named card exists").card =
             crate::objects::Card::Refused { refusal: jig_client::contract::Refusal::Limit { which } };
-        out.push(Request::Fact { fact: Fact::Refused { which } });
+
         domain.changed();
         return None;
     }
     match domain.intents.ask(scope, origin, ask, out) {
         Some(id) => {
-            crate::conversation::sending::pending(domain, id);
+            crate::conversation::sending::pending(domain, id, lent);
             if act == ActKind::Write && !joined {
                 let task = match object {
                     ObjectKey::Task(task) => Some(task),
@@ -220,7 +224,7 @@ pub fn send_card(
         }
     }
 }
-pub(crate) fn by_value(domain: &mut crate::Domain, value: ByValue, out: &mut Queue<Request>) {
+pub(crate) fn by_value(domain: &mut crate::Ui, value: ByValue, out: &mut Queue<Request>, lent: &jig_client::Client) {
     if domain.blocked {
         out.push(Request::Answered {
             asked: value.asked,
@@ -239,16 +243,22 @@ pub(crate) fn by_value(domain: &mut crate::Domain, value: ByValue, out: &mut Que
         return;
     }
     match domain.intents.ask(value.scope, origin, value.ask, out) {
-        Some(id) => crate::conversation::sending::pending(domain, id),
+        Some(id) => crate::conversation::sending::pending(domain, id, lent),
         None => out.push(Request::Answered {
             asked: value.asked,
             answer: Answer::Refused(jig_client::contract::Refusal::Limit { which: Limit::Requests }),
         }),
     }
 }
-pub(crate) fn progress(domain: &mut crate::Domain, request: Token, progress: Progress, out: &mut Queue<Request>) {
+pub(crate) fn progress(
+    domain: &mut crate::Ui,
+    request: Token,
+    progress: Progress,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     if progress == Progress::Unknown {
-        unknown(domain, request, out);
+        unknown(domain, request, out, lent);
         return;
     }
     let Some(origin) = domain.intents.progress(request, progress) else {
@@ -267,11 +277,12 @@ pub(crate) fn progress(domain: &mut crate::Domain, request: Token, progress: Pro
     }
 }
 pub(crate) fn answered(
-    domain: &mut crate::Domain,
+    domain: &mut crate::Ui,
     env: &skein_lib::Env<crate::Limits>,
     request: Token,
     answer: Answer,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     let Some(receipt) = domain.intents.terminal(request, answer) else {
         return;
@@ -279,8 +290,8 @@ pub(crate) fn answered(
     crate::conversation::sending::answered(domain, request, &receipt.answer);
     match receipt.origin {
         Origin::Program { asked } => out.push(Request::Answered { asked, answer: receipt.answer }),
-        Origin::Page { generation, purpose } => {
-            crate::page::conversations::answered(domain, env, request, generation, purpose, receipt.answer, out);
+        Origin::Page { handle, purpose } => {
+            crate::page::conversations::answered(domain, env, (request, handle), purpose, receipt.answer, out, lent);
         }
         Origin::Card { object, act } => {
             if act == ActKind::Write {
@@ -302,17 +313,17 @@ pub(crate) fn answered(
                     | ObjectKey::Note { .. } => {}
                 }
             }
-            crate::objects::answer::answered(domain, object, act, receipt.answer, out);
+            crate::objects::answer::answered(domain, object, act, receipt.answer, out, lent);
         }
     }
 }
-fn unknown(domain: &mut crate::Domain, request: Token, out: &mut Queue<Request>) {
+fn unknown(domain: &mut crate::Ui, request: Token, out: &mut Queue<Request>, lent: &jig_client::Client) {
     let Some(origin) = domain.intents.unknown(request) else {
         return;
     };
     domain.conversation.words.refused(request);
     match origin {
-        Origin::Card { object, act } => crate::objects::answer::unknown(domain, object, act),
+        Origin::Card { object, act } => crate::objects::answer::unknown(domain, object, act, lent),
         Origin::Program { asked } => out.push(Request::Unknown { asked }),
         Origin::Page { purpose, .. } => {
             if domain.chats.starting == Some(request) {

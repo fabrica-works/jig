@@ -1,9 +1,10 @@
 use super::{
     objects::{chip, escalation, live, owner_authority, person, proposal, text},
-    spine::{LIMITS, drive},
+    spine::drive,
 };
+use crate::tests::fixtures::{Fixture, ReadPage};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act,
     acts,
     confirm::Missing,
@@ -11,21 +12,21 @@ use crate::{
     objects::{Body, Card, Object, Source},
 };
 use jig_client::contract::*;
-use skein_lib::{Id, List, Queue, Time, Wall};
+use skein_lib::{Id, List, Time, Wall};
 fn offered(act: ActKind, admission: Admission) -> List<Offered> {
     let mut rows = List::with_capacity(1);
     rows.push(Offered { act, admission }).unwrap();
     rows
 }
-fn install(domain: &mut Domain, body: Body) -> Id<Object> {
+fn install(domain: &mut Fixture, body: Body) -> Id<Object> {
     let key = body.key();
-    let id = domain.objects.name(key, Source::Window { generation: 0, number: 4 }).unwrap();
+    let id = domain.objects.name(key, Source::Window { number: 4 }).unwrap();
     assert!(domain.objects.put(key, body));
     domain.objects.get_mut(id).unwrap().project = Some(1);
     id
 }
-fn intend(domain: &mut Domain, id: Id<Object>, act: ActKind) -> Box<[Request]> {
-    drive(domain, Time::ZERO, Event::Act { act: Act::Intend { object: id.token(), act } })
+fn intend(domain: &mut Fixture, id: Id<Object>, act: ActKind) -> Box<[Request]> {
+    drive(domain, Time::ZERO, Event::Act { action: Act::Intend { object: id.token(), act } })
 }
 pub(super) fn change() -> Amendment {
     Amendment {
@@ -104,18 +105,17 @@ pub(super) fn task() -> Task {
     }
 }
 fn sent(rows: &[Request]) -> &Ask {
-    let Request::Send { ask, .. } = &rows[0] else {
+    let Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } = &rows[0] else {
         panic!("one request");
     };
     assert_eq!(rows.len(), 1);
     ask
 }
-fn edit(domain: &mut Domain, field: Purpose, bytes: &[u8]) {
-    assert!(drive(domain, Time::ZERO, Event::Act { act: Act::Edit { field, text: text(bytes) } }).is_empty());
+fn edit(domain: &mut Fixture, field: Purpose, bytes: &[u8]) {
+    assert!(drive(domain, Time::ZERO, Event::Act { action: Act::Edit { field, text: text(bytes) } }).is_empty());
 }
-pub(super) fn reread(domain: &mut Domain, body: Body, what: Read) {
-    let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
-    let read = domain.reads.ask(0, Source::Window { generation: 0, number: 4 }, what, &mut out).unwrap();
+pub(super) fn reread(domain: &mut Fixture, body: Body, what: Read) {
+    let read = domain.request_read(Source::Window { number: 4 }, what).unwrap();
     let value = match body {
         Body::Escalation(document) => ReadValue::Escalation(document),
         Body::OwnerEscalation(document) => ReadValue::OwnerEscalation(document),
@@ -130,7 +130,7 @@ pub(super) fn reread(domain: &mut Domain, body: Body, what: Read) {
         | Body::Chip(_)
         | Body::Note { .. } => unreachable!(),
     };
-    drive(domain, Time::ZERO, Event::Read { read: read.token(), result: ReadResult::Value(value) });
+    drive(domain, Time::ZERO, ReadPage { read, result: ReadResult::Value(value) });
 }
 
 #[test]
@@ -168,7 +168,7 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
         let id = install(&mut domain, body);
         assert!(intend(&mut domain, id, act).is_empty());
         assert_eq!(
-            domain.objects.get(id).unwrap().card,
+            domain.objects().get(id).unwrap().card,
             Card::Deciding { request: None, progress: crate::intents::Progress::Confirming }
         );
         match case {
@@ -176,15 +176,15 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
                 drive(
                     &mut domain,
                     Time::ZERO,
-                    Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } },
+                    Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } },
                 );
-                drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+                drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
             }
             2 => edit(&mut domain, Purpose::Answer, b"the answer"),
             0 | 3 | 4 => {}
             _ => unreachable!(),
         }
-        let rows = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+        let rows = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
         let expected = match case {
             0 => Ask::Release { project: 1, task: 8, revision: Revision { value: 3 }, again: None },
             1 => Ask::Amend {
@@ -206,7 +206,7 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
             _ => unreachable!(),
         };
         assert_eq!(sent(&rows), &expected);
-        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
         assert!(domain.confirmation().is_none());
         if case == 2 {
             assert!(domain.fields().get(Purpose::Answer).unwrap().text.bytes().is_empty());
@@ -259,7 +259,7 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
     );
     for act in [ActKind::EditNote, ActKind::DeleteNote] {
         let (mut domain, _) = live();
-        let id = domain.objects.note(1, Source::Window { generation: 0, number: 4 }, note.clone()).unwrap();
+        let id = domain.objects.note(1, Source::Window { number: 4 }, note.clone()).unwrap();
         assert!(intend(&mut domain, id, act).is_empty());
         assert_eq!(domain.confirmation().unwrap().revision, Some(Revision { value: 11 }));
         let expected = if act == ActKind::EditNote {
@@ -282,7 +282,7 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
                 revision: Revision { value: 11 },
             }
         };
-        assert_eq!(sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })), &expected);
+        assert_eq!(sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })), &expected);
         assert!(domain.confirmation().is_none());
         if act == ActKind::EditNote {
             assert!(domain.fields().get(Purpose::NoteDescription).unwrap().text.bytes().is_empty());
@@ -302,17 +302,17 @@ fn a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_w
     reread(&mut domain, Body::Escalation(Box::new(row)), Read::Escalation { task: 8 });
     assert!(domain.confirmation().unwrap().changed);
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Changed { now: Some(Revision { value: 8 }) }));
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Dismiss });
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dismiss });
     domain.objects.clear();
     domain.objects.reclaim();
-    domain.reads.reclaim();
+
     let mut row = task();
     row.acts = offered(ActKind::Amend, Admission::Proposed { to: Recipient::Party(9) });
     let id = install(&mut domain, Body::Task(Box::new(row.clone())));
     intend(&mut domain, id, ActKind::Amend);
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     row.budget.numbers.spent = 5;
     reread(&mut domain, Body::Task(Box::new(row)), Read::Task { task: 8 });
     let open = domain.confirmation().unwrap();
@@ -320,7 +320,7 @@ fn a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_w
     assert_eq!(open.proposed, Some(Recipient::Party(9)));
     assert!(open.missing.is_none());
     assert_eq!(
-        sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
+        sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })),
         &Ask::Amend {
             reason: text(b""),
             project: 1,
@@ -340,12 +340,12 @@ fn only_engine_offers_open_and_new_confirmations_or_dismissals_clear_the_old_fie
     let id = install(&mut domain, Body::Proposal(Box::new(row.clone())));
     assert!(intend(&mut domain, id, ActKind::Accept).is_empty());
     assert!(domain.confirmation().is_none());
-    assert_eq!(domain.objects.get(id).unwrap().card, Card::Refused { refusal: Refusal::NotOffered });
+    assert_eq!(domain.objects().get(id).unwrap().card, Card::Refused { refusal: Refusal::NotOffered });
     intend(&mut domain, id, ActKind::Reject);
     assert!(domain.confirmation().unwrap().dangerous);
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Words { field: Purpose::Reason }));
     edit(&mut domain, Purpose::Reason, b"reason");
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Dismiss });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dismiss });
     assert!(domain.fields().get(Purpose::Reason).unwrap().text.bytes().is_empty());
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().writes, 1);
     intend(&mut domain, id, ActKind::Reject);
@@ -405,13 +405,13 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
         after.grants = List::with_capacity(1);
         after.grants.push(grant).unwrap();
         draft.authority = Some(after);
-        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
-        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+        drive(&mut domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(draft.clone()) } });
         assert!(domain.confirmation().unwrap().missing.is_none());
         assert_eq!(domain.confirmation().unwrap().proposed, None);
         draft.authority.as_mut().unwrap().spend = 16;
-        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
-        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+        drive(&mut domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(draft.clone()) } });
         assert_eq!(domain.confirmation().unwrap().proposed, Some(Recipient::Party(9)));
         row.acts = offered(
             act,
@@ -436,13 +436,13 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
             domain.confirmation().unwrap().missing,
             Some(Missing::Refused { why: Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) } })
         );
-        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
         draft.authority = None;
-        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
-        drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+        drive(&mut domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(draft.clone()) } });
         assert_eq!(domain.confirmation().unwrap().proposed, None);
         assert_eq!(
-            sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
+            sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })),
             &Ask::Amend {
                 reason: text(b""),
                 project: 1,
@@ -558,12 +558,12 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
     let mut after = row.authority.whole().unwrap();
     after.spend = 16;
     draft.authority = Some(after);
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(draft.clone()) } });
     assert_eq!(domain.confirmation().unwrap().proposed, Some(recipient));
     assert!(domain.confirmation().unwrap().missing.is_none());
     assert_eq!(
-        sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
+        sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })),
         &Ask::Amend {
             reason: text(b""),
             project: 1,
@@ -592,8 +592,8 @@ fn person_verdict_choices_preserve_full_codes_and_refuse_missing_machine_fields(
         row.acts = offered(ActKind::Answer, Admission::Allowed);
         let id = install(&mut domain, Body::PersonTask(Box::new(row)));
         assert!(intend(&mut domain, id, ActKind::Answer).is_empty());
-        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Choose { option: u32::MAX } }).is_empty());
-        let rows = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Choose { option: u32::MAX } }).is_empty());
+        let rows = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
         if required {
             assert!(rows.is_empty(), "machine field choice cannot send an incomplete answer");
             assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Choice));
@@ -638,7 +638,7 @@ fn approval_confirmation_keeps_the_whole_state_and_actual_optional_explanation()
             edit(&mut domain, Purpose::Reason, reason);
         }
         assert_eq!(
-            sent(&drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm })),
+            sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })),
             &Ask::AnswerPerson {
                 project: 1,
                 task: 8,
@@ -699,16 +699,20 @@ fn bounded_authority_drafts_use_literal_pattern_order_and_complete_source_facts(
             after.spend = spend;
             let mut draft = change();
             draft.authority = Some(after);
-            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
-            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } },
+            );
+            drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(draft.clone()) } });
             let refused = cuts & 1 != 0 || spend > 10 && cuts & 6 != 0;
             if refused {
                 assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Refused { why: Refusal::NotOffered }));
-                assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+                assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
             } else {
                 assert!(domain.confirmation().unwrap().missing.is_none());
                 assert_eq!(domain.confirmation().unwrap().proposed, None);
-                let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+                let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
                 assert_eq!(
                     sent(&out),
                     &Ask::Amend {
@@ -771,12 +775,16 @@ fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserve
             intend(&mut domain, id, ActKind::Amend);
             let mut draft = change();
             draft.authority = Some(after);
-            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"") } });
-            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(draft.clone()) } });
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } },
+            );
+            drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(draft.clone()) } });
             let confirmation = domain.confirmation().unwrap();
             assert!(confirmation.missing.is_none());
             assert_eq!(confirmation.proposed, if relation == 1 { None } else { Some(Recipient::Party(9)) });
-            let out = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+            let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
             assert_eq!(
                 sent(&out),
                 &Ask::Amend {

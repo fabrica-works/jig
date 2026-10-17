@@ -1,6 +1,6 @@
 use super::spine::{LIMITS, delivered, frame, start};
+use crate::tests::fixtures::Fixture;
 use crate::{
-    Domain,
     address::Address,
     page::navigation::{Destination, Navigation},
 };
@@ -33,10 +33,10 @@ fn frame_delivery_keeps_exact_roles_absent_pools_and_independent_owner_counts() 
         source.results_seen = u64::MAX;
         source.cut = true;
         source.deployment_role = None;
-        let mut domain = Domain::new(&LIMITS);
+        let mut domain = Fixture::new(&LIMITS);
         let watch = start(&mut domain, List::with_capacity(0));
         delivered(&mut domain, Time::ZERO, watch, source.clone());
-        assert_eq!(domain.frame().document.as_ref(), Some(&source));
+        assert_eq!(domain.frame().document, Some(&source));
         let summary = domain.frame_summary();
         assert_eq!(summary.needs, u64::from(u32::MAX) * 4);
         assert_eq!(summary.needs_total, 3);

@@ -1,7 +1,8 @@
 //! Native proposal page reads and watches register only supplied connector parts.
 use super::*;
 use crate::objects::{Body, Card};
-use skein_lib::{Env, Queue, Token, Wall};
+use crate::tests::fixtures::{Fixture, ReadPage, Watched};
+use skein_lib::Wall;
 
 fn proposal(proposer: Proposer, effect: u64) -> OwnerProposal {
     let mut acts = List::with_capacity(1);
@@ -24,7 +25,7 @@ fn proposal(proposer: Proposer, effect: u64) -> OwnerProposal {
         acts,
     }
 }
-fn named(domain: &mut Domain, watch: Token, key: ProposalKey) -> Token {
+fn named(domain: &mut Fixture, watch: jig_client::Handle, key: ProposalKey) -> jig_client::Handle {
     let mut entries = List::with_capacity(1);
     let mut row = entry(8, InboxGroup::Proposals, 0);
     row.object = ObjectKey::Proposal(key);
@@ -32,7 +33,10 @@ fn named(domain: &mut Domain, watch: Token, key: ProposalKey) -> Token {
     let output = inbox_delivery(domain, watch, entries);
     let mut found = None;
     for request in &output {
-        if let Request::Read { read, what: Read::Proposal { proposal } } = request
+        if let Request::Client {
+            asked:
+                jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Proposal { proposal }) },
+        } = request
             && *proposal == key
         {
             assert!(found.replace(*read).is_none());
@@ -40,26 +44,17 @@ fn named(domain: &mut Domain, watch: Token, key: ProposalKey) -> Token {
     }
     found.unwrap()
 }
-fn parts(output: &[Request]) -> Box<[Request]> {
-    let mut result = List::with_capacity(LIMITS.parts);
-    for request in output {
-        if let Request::ShowPart { .. } = request {
-            result.push(request.clone()).unwrap();
-        }
-    }
-    result.into_boxed()
-}
-fn exact(domain: &Domain, value: &OwnerProposal) {
+
+fn exact(domain: &Fixture, value: &OwnerProposal) {
     let id = domain.objects().find(ObjectKey::Proposal(value.key)).unwrap();
     let object = domain.objects().get(id).unwrap();
     assert_eq!(object.body, Some(Body::OwnerProposal(Box::new(value.clone()))));
     assert_eq!(object.project, Some(value.project));
     assert_eq!(object.card, Card::Open);
 }
-fn supplied(generation: u32, effect: u64) -> Request {
+fn supplied(_generation: u32, effect: u64) -> Request {
     Request::ShowPart {
         part: Part::OwnerEffect { connector: u16::MAX, proposal: effect },
-        generation,
         scope: PartScope::Project(41),
     }
 }
@@ -70,26 +65,25 @@ fn native_proposal_page_reads_and_watches_keep_whole_facts_scope_and_identity_wi
         let (mut domain, watch) = live_inbox();
         let original = proposal(proposer, u64::MAX);
         let read = named(&mut domain, watch, original.key);
-        let event =
-            Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(original.clone()))) };
+        let event = ReadPage { read, result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(original.clone()))) };
         let output = drive(&mut domain, Time::ZERO, event.clone());
-        assert_eq!(parts(&output).as_ref(), &[supplied(0, u64::MAX)]);
+        assert_eq!(crate::tests::fixtures::parts(&output, LIMITS.parts).as_ref(), &[supplied(0, u64::MAX)]);
         exact(&domain, &original);
         let id = domain.objects().find(ObjectKey::Proposal(original.key)).unwrap();
         let mut changed = proposal(proposer, 0);
         changed.reason = DocumentText::complete(text(b"new supplied facts"));
         changed.as_holder = true;
         let delivery =
-            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerProposal(Box::new(changed.clone()))) };
+            Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerProposal(Box::new(changed.clone()))) };
         let output = drive(&mut domain, Time::ZERO, delivery.clone());
-        assert_eq!(parts(&output).as_ref(), &[supplied(0, 0)]);
+        assert_eq!(crate::tests::fixtures::parts(&output, LIMITS.parts).as_ref(), &[supplied(0, 0)]);
         assert_eq!(domain.objects().find(ObjectKey::Proposal(changed.key)), Some(id));
         exact(&domain, &changed);
         assert!(drive(&mut domain, Time::ZERO, event.clone()).is_empty());
         exact(&domain, &changed);
         let left = drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
-        assert!(left.contains(&Request::PartsLeft { generation: 0 }));
-        assert!(left.contains(&Request::Close { watch }));
+        assert!(left.contains(&Request::PartsLeft));
+        assert!(left.contains(&Request::Client { asked: jig_client::Event::Unwatch { handle: watch } }));
         assert!(domain.objects().find(ObjectKey::Proposal(original.key)).is_none());
         assert!(drive(&mut domain, Time::ZERO, delivery).is_empty());
         assert!(drive(&mut domain, Time::ZERO, event).is_empty());
@@ -106,19 +100,24 @@ fn native_proposal_page_reads_and_watches_refuse_part_capacity_while_preserving_
         let Page::Work { refused: None, .. } = domain.page() else {
             panic!("the named Inbox starts without a capacity refusal");
         };
-        let event = if watch_delivery {
-            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerProposal(Box::new(value.clone()))) }
+        domain.ui.limits.parts = 0;
+        let output = if watch_delivery {
+            drive(
+                &mut domain,
+                Time::ZERO,
+                Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerProposal(Box::new(value.clone()))) },
+            )
         } else {
-            Event::Read { read, result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(value.clone()))) }
+            drive(
+                &mut domain,
+                Time::ZERO,
+                ReadPage { read, result: ReadResult::Value(ReadValue::OwnerProposal(Box::new(value.clone()))) },
+            )
         };
-        let limits = crate::Limits { parts: 0, ..LIMITS };
-        let mut output = Queue::with_capacity(crate::max_out(&limits));
-        crate::step(&mut domain, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event, &mut output);
-        while let Some(request) = output.pop() {
-            if let Request::ShowPart { .. } = request {
-                panic!("full part capacity cannot emit a connector part");
-            }
-        }
+        assert!(
+            crate::tests::fixtures::parts(&output, LIMITS.parts).is_empty(),
+            "full part capacity cannot emit a connector part"
+        );
         exact(&domain, &value);
         let Page::Work { address, refused, .. } = domain.page() else {
             panic!("a refused connector part keeps the Inbox page");

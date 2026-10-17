@@ -72,12 +72,11 @@ pub fn part(
     b: &mut Builder,
     side: &first::Side,
     part: &Part,
-    generation: u32,
     words: &Words,
     jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
 ) {
-    if !side.contains(part, generation) {
+    if !side.contains(part) {
         words.status(b, Word::Unshowable, &[]);
         return;
     }

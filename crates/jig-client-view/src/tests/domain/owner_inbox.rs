@@ -6,12 +6,13 @@
 )]
 //! Exact owner Inbox proofs independent of existing supplied fixture projections.
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
+use crate::tests::fixtures::{Fixture, ReadPage, Watched};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     page::inbox::{Filter, Inbox as PageInbox},
 };
 use jig_client::contract::*;
-use skein_lib::{List, Time, Token, Wall};
+use skein_lib::{List, Time, Wall};
 fn list<T>(values: impl IntoIterator<Item = T>) -> List<T> {
     let values: Vec<_> = values.into_iter().collect();
     let mut result = List::with_capacity(u32::try_from(values.len()).unwrap());
@@ -143,8 +144,8 @@ fn owner_inbox_whole_groups_aggregate_counts_live_winner_and_unknown_time_source
         assert_eq!(**got, source);
     }
 }
-fn begin() -> (Domain, Token, Box<[Request]>) {
-    let mut domain = Domain::new(&LIMITS);
+fn begin() -> (Fixture, jig_client::Handle, Box<[Request]>) {
+    let mut domain = Fixture::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let out = delivered(&mut domain, Time::ZERO, f, frame(7));
     (domain, open_token(&out), out)
@@ -154,11 +155,11 @@ fn owner_inbox_read_group_original_goal_query_cut_and_opaque_cursor_are_preserve
     let (mut domain, _, out) = begin();
     super::pages::finish_initial_inbox_reads(&mut domain, &out);
     let filter = Filter { project: Some(1), kind: Some(InboxGroup::Questions), goal: Some(77) };
-    let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::FilterInbox { filter } });
+    let out = drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::FilterInbox { filter } });
     let (read, query) = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: what @ Read::Inbox { .. } } => Some((*read, what.clone())),
+            Request::Client { asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(what @ Read::Inbox { .. }) } } => Some((*read, what.clone())),
             _ => None,
         })
         .unwrap();
@@ -176,10 +177,11 @@ fn owner_inbox_read_group_original_goal_query_cut_and_opaque_cursor_are_preserve
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerInbox(Box::new(wrong))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::OwnerInbox(Box::new(wrong))) },
     );
-    assert_eq!(domain.inbox().needs_window.reading, Some(read));
+    assert_eq!(domain.inbox().needs_window.reading, None);
     assert!(domain.inbox().needs_window.rows.is_empty());
+    let read = domain.read_again(read);
     let context = list([OwnerInboxSelection { cursor: row.cursor, goals: list([3, 77]) }]);
     let page = OwnerInboxPage {
         selection: Some(context.clone()),
@@ -188,11 +190,7 @@ fn owner_inbox_read_group_original_goal_query_cut_and_opaque_cursor_are_preserve
         before: None,
         after: Some(cursor.clone()),
     };
-    drive(
-        &mut domain,
-        Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerInbox(Box::new(page))) },
-    );
+    drive(&mut domain, Time::ZERO, ReadPage { read, result: ReadResult::Value(ReadValue::OwnerInbox(Box::new(page))) });
     assert_eq!(domain.inbox().rows.get(0), Some(&InboxRow::Owner(Box::new(original))));
     assert_eq!(domain.inbox().needs_window.query, Some(query));
     assert_eq!(domain.inbox().needs_window.selection, Some(context));
@@ -250,16 +248,18 @@ fn owner_inbox_reply_keeps_preview_unread_runtime_options_and_activity_distinct_
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerInbox(Box::new(value))) },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerInbox(Box::new(value))) },
     );
     let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
-    let reply = domain.objects().get(id).unwrap().reply.as_ref().unwrap();
+    let projected = domain.objects().get(id).unwrap();
+    let reply = projected.reply.as_ref().unwrap();
     assert_eq!(reply.first_unread, 5);
     assert_eq!(reply.first_words, line.first_words);
     assert_eq!(domain.inbox().rows.get(0), Some(&InboxRow::Owner(Box::new(row))));
-    let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::OpenChat { task: 8 } });
+    let out = drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::OpenChat { task: 8 } });
     assert!(out.iter().any(|r| match r {
-        Request::Send { ask, .. } => **ask == Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 9 } },
+        Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } =>
+            **ask == Ask::MarkSeen { seen: Seen::Replies { chat: 8, through: 9 } },
         _ => false,
     }));
 }
@@ -268,18 +268,18 @@ fn owner_inbox_superseded_query_terminal_retires_without_replacing_the_new_filte
     let (mut domain, _, out) = begin();
     super::pages::finish_initial_inbox_reads(&mut domain, &out);
     let old = Filter { project: Some(1), kind: Some(InboxGroup::Questions), goal: Some(77) };
-    let out = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::FilterInbox { filter: old } });
+    let out = drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::FilterInbox { filter: old } });
     let (token, query) = out
         .iter()
         .find_map(|request| match request {
-            Request::Read { read, what: what @ Read::Inbox { .. } } => Some((*read, what.clone())),
+            Request::Client { asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(what @ Read::Inbox { .. }) } } => Some((*read, what.clone())),
             _ => None,
         })
         .unwrap();
     let new = Filter { goal: Some(88), ..old };
-    drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::FilterInbox { filter: new } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::FilterInbox { filter: new } });
     let current = domain.inbox().needs_window.reading.unwrap();
-    assert_ne!(token, current);
+    assert_ne!(token, crate::handles::handle(current));
     let page = OwnerInboxPage {
         selection: None,
         cut: true,
@@ -290,9 +290,9 @@ fn owner_inbox_superseded_query_terminal_retires_without_replacing_the_new_filte
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerInbox(Box::new(page))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerInbox(Box::new(page))) },
     );
-    assert!(!domain.reads.pending(&query));
+    assert!(!domain.handles.pending(&query));
     assert_eq!(domain.inbox().filter, new);
     assert_eq!(domain.inbox().needs_window.reading, Some(current));
     assert!(domain.inbox().needs_window.rows.is_empty());

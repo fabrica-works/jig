@@ -3,7 +3,6 @@
 use super::{Document, Ops, OpsScript, Subject};
 use jig_client_domain::contract::*;
 use jig_client_scripted_engine::{self as engine, ApplicationScope, Envelope, Up};
-use jig_client_view::{self as client};
 use jig_client_world::{harness::*, observe};
 use jig_ops_client_domain::{self as domain, Event, Request, infrastructure as infra, observability as obs};
 use jig_ops_domain_connectors::{Connector, number};
@@ -144,7 +143,9 @@ fn family_subject(record: &jig_client::Family) -> (Channel, Subject) {
 }
 fn watch(channel: Channel, local: Token, event: WatchEvent) -> Event {
     match channel {
-        Channel::Jig => Event::Jig(client::Event::Watch { watch: local, event }),
+        Channel::Jig => {
+            Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched { watch: local, event } } }
+        }
         Channel::Observability => Event::Observability(obs::Event::Watch {
             watch: local,
             event: match event {
@@ -165,7 +166,9 @@ fn watch(channel: Channel, local: Token, event: WatchEvent) -> Event {
 }
 fn end(channel: Channel, local: Token, why: WatchEnd) -> Event {
     match channel {
-        Channel::Jig => Event::Jig(client::Event::Ended { watch: local, end: why }),
+        Channel::Jig => {
+            Event::Client { event: jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch: local, end: why } } }
+        }
         Channel::Observability => Event::Observability(obs::Event::Ended {
             watch: local,
             end: match why {
@@ -290,7 +293,16 @@ impl Front<Ops> for Scripted {
         self.recover(now, wall);
         let mut delivered: Vec<_> = std::mem::take(&mut self.hellos)
             .into_iter()
-            .map(|client| (client, Event::Jig(client::Event::Hello { served: self.engine.versions().contains(8) })))
+            .map(|client| {
+                (
+                    client,
+                    Event::Client {
+                        event: jig_client::Event::Up {
+                            up: jig_client::Up::Served { served: self.engine.versions().contains(8), versions: None },
+                        },
+                    },
+                )
+            })
             .collect();
         delivered.append(&mut self.shell);
         for up in self.engine.poll(now) {
@@ -335,7 +347,11 @@ impl Front<Ops> for Scripted {
                         })
                     }),
                 ),
-                Up::Read { terminal, .. } => Event::Jig(client::Event::Read { read: local, result: terminal }),
+                Up::Read { terminal, .. } => Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::ReadDone { read: local, result: jig_client::Readout::Jig(terminal) },
+                    },
+                },
                 Up::Watch { event, .. } => watch(route.channel, local, event),
                 Up::App { document, .. } => match document {
                     Document::Observability(doc) => Event::Observability(obs::Event::Watch {
@@ -347,41 +363,7 @@ impl Front<Ops> for Scripted {
                         event: infra::WatchEvent::Delivered(Box::new(doc)),
                     }),
                 },
-                Up::ApplicationRead { terminal, .. } => match (route.channel, terminal) {
-                    (Channel::Observability, Ok(Document::Observability(doc))) => {
-                        Event::Observability(obs::Event::Read {
-                            read: local,
-                            result: obs::ReadResult::Value(Box::new(doc)),
-                        })
-                    }
-                    (Channel::Infrastructure, Ok(Document::Infrastructure(doc))) => {
-                        Event::Infrastructure(infra::Event::Read {
-                            read: local,
-                            result: infra::ReadResult::Value(Box::new(doc)),
-                        })
-                    }
-                    (Channel::Observability, Err(reason)) => Event::Observability(obs::Event::Read {
-                        read: local,
-                        result: match reason {
-                            ReadNone::SignedOut => obs::ReadResult::SignedOut,
-                            ReadNone::Busy | ReadNone::Unreachable => obs::ReadResult::Busy,
-                            ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone => obs::ReadResult::Unknown,
-                        },
-                    }),
-                    (Channel::Infrastructure, Err(reason)) => Event::Infrastructure(infra::Event::Read {
-                        read: local,
-                        result: match reason {
-                            ReadNone::SignedOut => infra::ReadResult::SignedOut,
-                            ReadNone::Busy | ReadNone::Unreachable => infra::ReadResult::Busy,
-                            ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone => infra::ReadResult::Unknown,
-                        },
-                    }),
-                    (Channel::Jig, _)
-                    | (Channel::Observability, Ok(Document::Infrastructure(_)))
-                    | (Channel::Infrastructure, Ok(Document::Observability(_))) => {
-                        panic!("application payload owner mismatch")
-                    }
-                },
+                Up::ApplicationRead { terminal, .. } => application_read(route.channel, local, terminal),
                 Up::Ended { why, .. } => end(route.channel, local, why),
             };
             delivered.push((route.client, event));
@@ -433,7 +415,13 @@ impl Front<Ops> for Scripted {
                 engine::Fault::Lose { attempt }
             }
             FrontFault::SignedOut => {
-                engine::Fault::SignOut { sign_in: *self.parties.values().next().expect("bound client") }
+                let sign_in = *self.parties.values().next().expect("bound client");
+                for (&client, &party) in &self.parties {
+                    if party == sign_in {
+                        self.observed.push(Observed::SignInEnded { client });
+                    }
+                }
+                engine::Fault::SignOut { sign_in }
             }
             FrontFault::Versions => {
                 self.hellos.extend(self.parties.keys().copied());
@@ -485,10 +473,15 @@ impl Front<Ops> for Scripted {
     }
     fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
         if self.recovery.is_some_and(|at| now < at) {
-            self.shell.push((client, Event::Jig(jig_client_view::Event::SignOutLost)));
+            self.shell.push((client, Event::Client { event: jig_client::Event::SignOutLost }));
             return;
         }
         let sign_in = self.parties[&client];
+        for (&client, &party) in &self.parties {
+            if party == sign_in {
+                self.observed.push(Observed::SignInEnded { client });
+            }
+        }
         self.engine.act(now, wall, engine::Change::SignedOut { sign_in }).expect("sign out fits");
         self.shell.push((client, Event::SignedOut));
     }
@@ -635,6 +628,38 @@ impl Scripted {
             | Read::Project { .. }
             | Read::Notes { .. }
             | Read::Deployment => self.last_object,
+        }
+    }
+}
+
+fn application_read(channel: Channel, local: Token, terminal: std::result::Result<Document, ReadNone>) -> Event {
+    match (channel, terminal) {
+        (Channel::Observability, Ok(Document::Observability(doc))) => {
+            Event::Observability(obs::Event::Read { read: local, result: obs::ReadResult::Value(Box::new(doc)) })
+        }
+        (Channel::Infrastructure, Ok(Document::Infrastructure(doc))) => {
+            Event::Infrastructure(infra::Event::Read { read: local, result: infra::ReadResult::Value(Box::new(doc)) })
+        }
+        (Channel::Observability, Err(reason)) => Event::Observability(obs::Event::Read {
+            read: local,
+            result: match reason {
+                ReadNone::SignedOut => obs::ReadResult::SignedOut,
+                ReadNone::Busy | ReadNone::Unreachable => obs::ReadResult::Busy,
+                ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone => obs::ReadResult::Unknown,
+            },
+        }),
+        (Channel::Infrastructure, Err(reason)) => Event::Infrastructure(infra::Event::Read {
+            read: local,
+            result: match reason {
+                ReadNone::SignedOut => infra::ReadResult::SignedOut,
+                ReadNone::Busy | ReadNone::Unreachable => infra::ReadResult::Busy,
+                ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone => infra::ReadResult::Unknown,
+            },
+        }),
+        (Channel::Jig, _)
+        | (Channel::Observability, Ok(Document::Infrastructure(_)))
+        | (Channel::Infrastructure, Ok(Document::Observability(_))) => {
+            panic!("application payload owner mismatch")
         }
     }
 }

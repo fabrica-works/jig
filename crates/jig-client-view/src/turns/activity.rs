@@ -5,9 +5,17 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Run};
 
-use crate::Domain;
+use crate::Borrowed;
 use jig_client::contract::{Activity, RunBeginning, RunEnding};
-pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn activity(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    value: &Activity,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    let conversation = client.conversation();
+    let objects = client.objects();
     match value {
         Activity::Owner { source, decoded } => {
             crate::owner_activity::render(b, source, words);
@@ -23,13 +31,13 @@ pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words
                 super::turn::turn(b, client, archive.name, &archive.turn, words, bindings);
             }
             if let Some((message, _)) = value.word_message() {
-                super::word_state(b, client.conversation().words.state(message), words);
+                super::word_state(b, conversation.words.state(message), words);
             }
         }
         Activity::Words { by, message, words: value } => {
             super::party(b, by, words);
             b.text(Run::Plain, value.bytes());
-            super::word_state(b, client.conversation().words.state(*message), words);
+            super::word_state(b, conversation.words.state(*message), words);
         }
         Activity::Turn { name, turn } => super::turn::turn(b, client, *name, turn, words, bindings),
         Activity::RunBegan { attempt, how, why } => {
@@ -56,7 +64,7 @@ pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words
             words.amount(b, *spent);
         }
         Activity::Result { result } => {
-            if let Some(id) = client.objects().find(jig_client::contract::ObjectKey::Result(result.task.task)) {
+            if let Some(id) = objects.find(jig_client::contract::ObjectKey::Result(result.task.task)) {
                 cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
             } else {
                 cards::result::facts(b, client, result, words, bindings);
@@ -72,7 +80,7 @@ pub(super) fn activity(b: &mut Builder, client: &Domain, value: &Activity, words
         Activity::Decision { object, by, how } => {
             words.actor(b, *by);
             words.decision(b, how);
-            if let Some(id) = client.objects().find(*object) {
+            if let Some(id) = objects.find(*object) {
                 cards::card(b, client, id, &cards::Place::Conversation, words, bindings);
             }
         }

@@ -32,10 +32,19 @@ fn project_read_retains_original_project_client_and_token_until_whole_native_adm
     let Incoming::Callback {
         client: actual_client,
         event:
-            Event::Jig(jig_client_view::Event::Read {
-                read: actual,
-                result: client::ReadResult::Value(client::ReadValue::OwnerProject(value)),
-            }),
+            Event::Client {
+                event:
+                    jig_client::Event::Up {
+                        up:
+                            jig_client::Up::ReadDone {
+                                read: actual,
+                                result:
+                                    jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::OwnerProject(
+                                        value,
+                                    ))),
+                            },
+                    },
+            },
     } = read(&mut transport, to, &whole, &limits).expect("complete original project read")
     else {
         panic!("whole native project callback")

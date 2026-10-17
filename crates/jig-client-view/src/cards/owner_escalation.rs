@@ -7,7 +7,7 @@ use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
 use crate::{
-    Domain,
+    Borrowed,
     objects::{Body, Object},
 };
 use skein_lib::Id;
@@ -15,7 +15,7 @@ use skein_lib::Id;
 /// Build a held task’s escalation without reconstructing another owner’s context.
 pub fn card(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &super::Place,
     words: &Words,
@@ -54,7 +54,7 @@ pub fn card(
     }
     crate::sections::task::overview(b, client, &document.task, words, bindings);
     crate::sections::task::budget(b, &document.task, words, bindings);
-    super::common::answer(b, facts, words, text_limit);
+    super::common::answer(b, &facts, words, text_limit);
     super::common::acts(b, &facts.card, &document.acts, object, words, bindings);
     super::close(b);
     true

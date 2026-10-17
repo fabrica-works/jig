@@ -1,11 +1,12 @@
 //! Short-lived outcomes with no card, on monotonic deadlines.
 //! Notices never decide whether a request was made. The root table's answer
 //! remains its one durable answer. See client/domain/client.md, 13.
-use crate::{Domain, link::Link, ui::Timer};
+use crate::{Ui, ui::Timer};
+use jig_client::Link;
 use jig_client::contract::{Answer, Limit, ObjectKey};
 use skein_lib::{Duration, Id, Map, Slab, Time, Token};
 /// Facts the view phrases as a short-lived notice.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
     /// A sign-out exchange did not reach the engine.
     SignOutLost,
@@ -87,7 +88,7 @@ impl Notices {
     }
 }
 /// Shows one bounded notice, replacing the oldest at the visible limit.
-pub fn show(domain: &mut Domain, kind: Kind) {
+pub fn show(domain: &mut Ui, kind: Kind) {
     if domain.notices.ids.capacity() == 0 {
         return;
     }
@@ -108,14 +109,14 @@ pub fn show(domain: &mut Domain, kind: Kind) {
     }
 }
 /// Dismisses or expires a visible notice once.
-pub fn dismiss(domain: &mut Domain, token: Token) {
+pub fn dismiss(domain: &mut Ui, token: Token) {
     let id = Id::from_token(token);
     if domain.notices.remove(id) {
         domain.timers.cancel(Timer::Notice(id));
         domain.changed();
     }
 }
-pub(crate) fn clear_sign_out_lost(domain: &mut Domain) {
+pub(crate) fn clear_sign_out_lost(domain: &mut Ui) {
     for _ in 0..domain.notices.ids.len() {
         let mut lost = None;
         for (id, ()) in domain.notices.ids() {
@@ -129,7 +130,7 @@ pub(crate) fn clear_sign_out_lost(domain: &mut Domain) {
         }
     }
 }
-pub(crate) fn dismiss_first(domain: &mut Domain) {
+pub(crate) fn dismiss_first(domain: &mut Ui) {
     if let Some(id) = domain.notices.oldest() {
         dismiss(domain, id.token());
     }

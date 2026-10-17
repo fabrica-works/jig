@@ -1,4 +1,5 @@
 use super::{objects, spine::drive};
+use crate::tests::fixtures::{ReadPage, Watched};
 use crate::{
     Event, Request,
     address::{Address, Place, TaskSection},
@@ -20,12 +21,12 @@ fn whole_task_context_absence_and_supplied_empty_are_distinct_in_original_reads(
         let output = drive(
             &mut domain,
             Time::ZERO,
-            Event::Read { read, result: ReadResult::Value(ReadValue::Task(Box::new(row))) },
+            ReadPage { read, result: ReadResult::Value(ReadValue::Task(Box::new(row))) },
         );
-        let id = domain.objects.find(ObjectKey::Task(8)).unwrap();
-        assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Task(Box::new(original))));
+        let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
+        assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Task(Box::new(original))));
         assert!(output.is_empty());
-        let Some(Body::Task(retained)) = &domain.objects.get(id).unwrap().body else {
+        let Some(Body::Task(retained)) = &domain.objects().get(id).unwrap().body else {
             panic!("whole task body");
         };
         assert_eq!(retained.context, context);
@@ -48,7 +49,14 @@ fn supplied_task_context_routes_only_its_whole_parts_and_impact_without_recreati
         );
         let mut task_watch = None;
         for request in &opened {
-            if let Request::Open { watch, subject: Subject::Task { task: 8 } } = request {
+            if let Request::Client {
+                asked:
+                    jig_client::Event::Watch {
+                        handle: watch,
+                        subject: jig_client::Watchable::Jig(Subject::Task { task: 8 }),
+                    },
+            } = request
+            {
                 assert!(task_watch.replace(*watch).is_none());
             }
         }
@@ -69,7 +77,7 @@ fn supplied_task_context_routes_only_its_whole_parts_and_impact_without_recreati
         let output = drive(
             &mut domain,
             Time::ZERO,
-            Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row))) },
+            Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row))) },
         );
         let mut parts = 0;
         for request in &output {
@@ -79,8 +87,8 @@ fn supplied_task_context_routes_only_its_whole_parts_and_impact_without_recreati
             }
         }
         assert_eq!(parts, u32::from(present));
-        let id = domain.objects.find(ObjectKey::Task(8)).unwrap();
-        assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Task(Box::new(exact))));
+        let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
+        assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Task(Box::new(exact))));
     }
 }
 
@@ -93,24 +101,33 @@ fn finished(phase: Option<OwnerChipPhase>, prior: Option<OwnerPriorPhase>) -> bo
     );
     let mut task_watch = None;
     for request in &opened {
-        if let Request::Open { watch, subject: Subject::Task { task: 8 } } = request {
+        if let Request::Client {
+            asked:
+                jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Task { task: 8 }) },
+        } = request
+        {
             assert!(task_watch.replace(*watch).is_none());
         }
     }
     let watch = task_watch.unwrap();
-    assert!(domain.conversation.stream(
-        RunText {
-            attempt: 1,
-            began: None,
-            turn: ProvisionalTurnName { retry: 0, attempt: 1, number: 1 },
-            from: 0,
-            through: 3,
-            text: objects::text(b"one"),
-            cut: false,
-            call: None,
+    let run = domain.request_watch(Subject::Run { task: 8, turn: None, offset: 0 }).unwrap();
+    drive(
+        &mut domain,
+        Time::ZERO,
+        Watched {
+            watch: run,
+            event: WatchEvent::Delivered(Delivery::Run(Box::new(RunText {
+                attempt: 1,
+                began: None,
+                turn: ProvisionalTurnName { retry: 0, attempt: 1, number: 1 },
+                from: 0,
+                through: 3,
+                text: objects::text(b"one"),
+                cut: false,
+                call: None,
+            }))),
         },
-        32
-    ));
+    );
     let mut row = super::confirmation::task();
     row.context = None;
     row.chip.executor = Executor::Agent { charter: 1 };
@@ -134,8 +151,8 @@ fn finished(phase: Option<OwnerChipPhase>, prior: Option<OwnerPriorPhase>) -> bo
         row.chip.phase = phase.compact();
         row.chip.details = Box::new(ChipPhase::Owner { phase, details: Box::new(details) });
     }
-    drive(&mut domain, Time::ZERO, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row))) });
-    assert_eq!(domain.conversation.live.is_empty(), domain.conversation.run_finished);
+    drive(&mut domain, Time::ZERO, Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(row))) });
+    assert_eq!(domain.conversation().live.is_empty(), domain.conversation.run_finished);
     domain.conversation.run_finished
 }
 

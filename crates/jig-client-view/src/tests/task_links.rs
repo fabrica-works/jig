@@ -24,7 +24,13 @@ fn task_pages_keep_owner_requesters_and_live_retained_stored_links_without_filli
             let watch = out
                 .iter()
                 .find_map(|request| match request {
-                    Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
+                    Request::Client {
+                        asked:
+                            jig_client::Event::Watch {
+                                handle: watch,
+                                subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                            },
+                    } => Some(*watch),
                     _ => None,
                 })
                 .unwrap();
@@ -79,7 +85,7 @@ fn aggregate_task_loss_prevents_partial_dependency_replacement_and_complete_link
             OwnerTaskLink::Retained { chip: chip(), at: None },
         ]);
         let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Amend } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, words, &mut bindings);
@@ -96,7 +102,7 @@ fn aggregate_task_loss_prevents_partial_dependency_replacement_and_complete_link
         if cut {
             assert!(selected.is_empty(), "aggregate loss cannot supply a whole dependency replacement");
             let changed = input(&tree, b"New instructions", b"", &mut bindings);
-            drive(&mut domain, Event::Act { act: changed });
+            drive(&mut domain, Event::Act { action: changed });
             assert_eq!(domain.confirmation().unwrap().choices.change.as_ref().unwrap().instructions, Some(text(b"")));
         } else {
             assert_eq!(selected, vec![list([8]), list([u64::MAX])]);

@@ -7,7 +7,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     confirm::Confirmation,
     objects::{Body, Object},
@@ -100,7 +100,7 @@ pub fn deadline(value: &[u8]) -> Option<skein_lib::Wall> {
 /// Show all before facts and form fields; each input preserves the other selected changes.
 pub fn form(
     b: &mut Builder,
-    _client: &Domain,
+    _client: &Borrowed<'_>,
     object: &Object,
     open: &Confirmation,
     words: &Words,

@@ -3,13 +3,13 @@
     reason = "ordinary tests inspect standalone trees and mutate checked language data"
 )]
 use crate::owner_result_words::{self as result_words, ResultPhrase};
+use crate::tests::fixtures::Fixture;
 use crate::words::Words;
 use crate::{JigBindings, owner_result as view};
 use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, Language, PhraseLimits, Phrasebook, Segment, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use crate::Domain;
 use jig_client::contract::{
     Chip, ChipPhase, Executor, OwnerExecutor, OwnerPart, OwnerPartKey, OwnerPartKind, OwnerRequester, OwnerTaskLink,
     OwnerTaskStatus, PersonAddress, Phase, ProposalKey, Proposer, ResultDetails, TaskContractDocument, Text,
@@ -67,11 +67,11 @@ fn details() -> ResultDetails {
     }
 }
 fn build(value: &ResultDetails, words: &Words) -> Tree {
-    let client = Domain::new(&client_limits());
+    let client = Fixture::new(&client_limits());
     let limits = view::limits(&client_limits(), words).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, 128);
-    view::render(&mut b, &client, value, words, &mut bindings);
+    view::render(&mut b, &client.view(), value, words, &mut bindings);
     b.finish()
 }
 fn has(tree: &Tree, text: &[u8]) -> bool {
@@ -216,7 +216,7 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
         Some(Invalid::Holes { id: ResultPhrase::RequesterTask.id() })
     );
     let value = details();
-    let client = Domain::new(&client_limits());
+    let client = Fixture::new(&client_limits());
     let mut capacity = view::limits(&client_limits(), &words).unwrap();
     assert_eq!(tree.len(), 9, "one region and eight independent metadata leaves");
     capacity.nodes = 9;
@@ -225,14 +225,14 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
     capacity.text_bytes = 112;
     let mut b = Builder::new(&capacity);
     let mut bindings = JigBindings::new(capacity.bindings, 128);
-    view::render(&mut b, &client, &value, &words, &mut bindings);
+    view::render(&mut b, &client.view(), &value, &words, &mut bindings);
     assert_eq!(b.finish().len(), 9, "minimal nodes, depth and selected saying bytes fit");
     capacity.nodes = capacity.nodes.checked_sub(1).unwrap();
     assert!(
         std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
             let mut b = Builder::new(&capacity);
             let mut bindings = JigBindings::new(capacity.bindings, 128);
-            view::render(&mut b, &client, &value, &words, &mut bindings);
+            view::render(&mut b, &client.view(), &value, &words, &mut bindings);
         }))
         .is_err(),
         "one fewer node refuses before a partial tree is retained"
@@ -247,7 +247,7 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
             std::panic::catch_unwind(core::panic::AssertUnwindSafe(|| {
                 let mut b = Builder::new(&below);
                 let mut bindings = JigBindings::new(below.bindings, 128);
-                view::render(&mut b, &client, &value, &words, &mut bindings);
+                view::render(&mut b, &client.view(), &value, &words, &mut bindings);
             }))
             .is_err(),
             "one below a checked storage dimension refuses"

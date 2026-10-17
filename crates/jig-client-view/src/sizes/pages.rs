@@ -289,10 +289,10 @@ fn deployment_in(l: &Limits, chip: u32, slot_nodes: u32) -> Option<u32> {
         .checked_add(70)?;
     synthetic.max(crate::owner_deployment::max_nodes(l)?.checked_add(3)?).checked_add(slot_nodes)
 }
-/// Starting, providers, missing, out of date and someone else's work.
+/// Starting, signing in, missing, out of date and someone else's work.
 #[must_use]
-pub fn not_the_work_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
-    l.providers.checked_mul(2)?.checked_add(25)?.checked_add(slot_nodes)
+pub fn not_the_work_nodes(_l: &Limits, slot_nodes: u32) -> Option<u32> {
+    25_u32.checked_add(slot_nodes)
 }
 /// The largest jig page with every window and text at its bound.
 #[must_use]

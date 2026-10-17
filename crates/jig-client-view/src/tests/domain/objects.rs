@@ -1,11 +1,12 @@
 use super::spine::{LIMITS, delivered, drain, drive, env, frame, open_token, start};
+use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage, Watched};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     intents::{Progress, send_card},
     objects::{self, Card, Left, Source},
 };
 use jig_client::contract::*;
-use skein_lib::{List, Queue, Time, Token, Wall};
+use skein_lib::{List, Queue, Time, Wall};
 pub(super) fn text(bytes: &[u8]) -> Text {
     Text::new(Box::from(bytes), 32).unwrap()
 }
@@ -223,20 +224,20 @@ fn inbox(keys: &[ObjectKey]) -> Delivery {
         more: false,
     }))
 }
-pub(super) fn live() -> (Domain, Token) {
-    let mut domain = Domain::new(&LIMITS);
+pub(super) fn live() -> (Fixture, jig_client::Handle) {
+    let mut domain = Fixture::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let out = delivered(&mut domain, Time::ZERO, f, frame(7));
     let page = open_token(&out);
     super::pages::finish_initial_inbox_reads(&mut domain, &out);
     (domain, page)
 }
-pub(super) fn watched(domain: &mut Domain, page: Token, keys: &[ObjectKey]) -> Box<[Request]> {
-    drive(domain, Time::ZERO, Event::Watch { watch: page, event: WatchEvent::Delivered(inbox(keys)) })
+pub(super) fn watched(domain: &mut Fixture, page: jig_client::Handle, keys: &[ObjectKey]) -> Box<[Request]> {
+    drive(domain, Time::ZERO, Watched { watch: page, event: WatchEvent::Delivered(inbox(keys)) })
 }
-pub(super) fn read_token(rows: &[Request]) -> Token {
+pub(super) fn read_token(rows: &[Request]) -> jig_client::Handle {
     for row in rows {
-        if let Request::Read { read, .. } = row {
+        if let Request::Client { asked: jig_client::Event::Read { handle: read, .. } } = row {
             return *read;
         }
     }
@@ -256,27 +257,27 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
     for (key, value) in cases {
         domain.objects.clear();
         domain.objects.reclaim();
-        domain.reads.reclaim();
+
         let requests = watched(&mut domain, page, &[key]);
         drive(
             &mut domain,
             Time::ZERO,
-            Event::Read { read: read_token(&requests), result: ReadResult::Value(value.clone()) },
+            ReadPage { read: read_token(&requests), result: ReadResult::Value(value.clone()) },
         );
-        let id = domain.objects.find(key).unwrap();
-        let object = domain.objects.get(id).unwrap();
+        let id = domain.objects().find(key).unwrap();
+        let object = domain.objects().get(id).unwrap();
         match value {
-            ReadValue::Proposal(document) => assert_eq!(objects::proposal::facts(object), Some(document.as_ref())),
+            ReadValue::Proposal(document) => assert_eq!(objects::proposal::facts(&object), Some(document.as_ref())),
             ReadValue::Escalation(document) => {
-                assert_eq!(objects::escalation::facts(object), Some(document.as_ref()));
-                assert_eq!(objects::escalation::revision(object), Some(Revision { value: 3 }));
+                assert_eq!(objects::escalation::facts(&object), Some(document.as_ref()));
+                assert_eq!(objects::escalation::revision(&object), Some(Revision { value: 3 }));
             }
-            ReadValue::Question(document) => assert_eq!(objects::question::facts(object), Some(document.as_ref())),
+            ReadValue::Question(document) => assert_eq!(objects::question::facts(&object), Some(document.as_ref())),
             ReadValue::PersonTask(document) => {
-                assert_eq!(objects::person_task::facts(object), Some(document.as_ref()));
-                assert_eq!(objects::person_task::revision(object), Some(Revision { value: 4 }));
+                assert_eq!(objects::person_task::facts(&object), Some(document.as_ref()));
+                assert_eq!(objects::person_task::revision(&object), Some(Revision { value: 4 }));
             }
-            ReadValue::Result(document) => assert_eq!(objects::result::facts(object), Some(document.as_ref())),
+            ReadValue::Result(document) => assert_eq!(objects::result::facts(&object), Some(document.as_ref())),
             ReadValue::OwnerProject(_)
             | ReadValue::Historical(_)
             | ReadValue::OwnerProposal(_)
@@ -318,11 +319,12 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
         last_reply: 7,
         changed: Some(Wall::EPOCH),
     };
-    let id = domain.objects.reply(Source::Window { generation: 0, number: 1 }, line).unwrap();
-    let reply = domain.objects.get(id).unwrap().reply.as_ref().unwrap();
+    let id = domain.objects.reply(Source::Window { number: 1 }, line).unwrap();
+    let projected = domain.objects().get(id).unwrap();
+    let reply = projected.reply.as_ref().unwrap();
     assert_eq!(reply.first_words.bytes(), b"first words");
     assert_eq!(reply.first_unread, 6);
-    assert!(domain.objects.name(ObjectKey::Task(10), Source::Window { generation: 0, number: 1 }).is_none());
+    assert!(domain.objects.name(ObjectKey::Task(10), Source::Window { number: 1 }).is_none());
 }
 
 #[test]
@@ -333,38 +335,39 @@ fn a_deciding_card_survives_a_drop_until_its_durable_answer_then_lingers() {
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read: read_token(&reads), result: ReadResult::Value(ReadValue::Proposal(Box::new(proposal()))) },
+        ReadPage { read: read_token(&reads), result: ReadResult::Value(ReadValue::Proposal(Box::new(proposal()))) },
     );
     let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
     let request = send_card(
-        &mut domain,
+        &mut domain.ui,
         key,
         ActKind::Accept,
         Box::new(Ask::DecideProposal { project: 1, proposal: proposal().key, decision: Decision::Accepted }),
         &mut out,
+        &domain.client,
     )
     .unwrap();
     assert_eq!(drain(out).len(), 1);
-    let id = domain.objects.find(key).unwrap();
+    let id = domain.objects().find(key).unwrap();
     assert!(watched(&mut domain, page, &[]).is_empty());
     assert_eq!(
-        domain.objects.get(id).unwrap().card,
+        domain.objects().get(id).unwrap().card,
         Card::Deciding { request: Some(request), progress: Progress::InFlight }
     );
     assert!(domain.notices().ids().is_empty());
     let outcome = Outcome::DecidedFirst { by: super::spine::party(9), how: Decision::Accepted, at: Wall::EPOCH };
-    drive(&mut domain, Time::from_nanos(20), Event::Answered { request, answer: Answer::Done(outcome.clone()) });
+    drive(&mut domain, Time::from_nanos(20), AnsweredByEngine { request, answer: Answer::Done(outcome.clone()) });
     assert_eq!(
-        domain.objects.get(id).unwrap().card,
+        domain.objects().get(id).unwrap().card,
         Card::Leaving { how: Left::Answered { outcome }, until: Time::from_nanos(5_000_000_020) }
     );
     assert!(domain.notices().ids().is_empty(), "a card still on this page owns its outcome");
     // Fire the unrelated heartbeat before the linger.
     let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
     for _ in 0_u8..4 {
-        crate::fire(&mut domain, &env(Time::from_nanos(5_000_000_020)), &mut out);
+        crate::fire(&mut domain.ui, &env(Time::from_nanos(5_000_000_020)), &mut out, &domain.client);
     }
-    assert!(domain.objects.find(key).is_none());
+    assert!(domain.objects().find(key).is_none());
 }
 
 #[test]
@@ -378,9 +381,8 @@ fn a_drop_reads_how_the_card_ended_and_a_preexisting_read_can_supply_the_termina
             drive(
                 &mut domain,
                 Time::ZERO,
-                Event::Read { read: initial, result: ReadResult::Value(ReadValue::Question(Box::new(question()))) },
+                ReadPage { read: initial, result: ReadResult::Value(ReadValue::Question(Box::new(question()))) },
             );
-            domain.reads.reclaim();
         }
         let dropped = watched(&mut domain, page, &[]);
         let terminal = if read_before_drop {
@@ -389,8 +391,8 @@ fn a_drop_reads_how_the_card_ended_and_a_preexisting_read_can_supply_the_termina
         } else {
             read_token(&dropped)
         };
-        let id = domain.objects.find(key).unwrap();
-        let Card::Leaving { how, .. } = &domain.objects.get(id).unwrap().card else {
+        let id = domain.objects().find(key).unwrap();
+        let Card::Leaving { how, .. } = &domain.objects().get(id).unwrap().card else {
             panic!("terminal read keeps card leaving");
         };
         assert_eq!(*how, Left::Looking);
@@ -405,14 +407,14 @@ fn a_drop_reads_how_the_card_ended_and_a_preexisting_read_can_supply_the_termina
         drive(
             &mut domain,
             Time::from_nanos(30),
-            Event::Read { read: terminal, result: ReadResult::Value(ReadValue::Question(Box::new(ended))) },
+            ReadPage { read: terminal, result: ReadResult::Value(ReadValue::Question(Box::new(ended))) },
         );
         assert_eq!(
-            domain.objects.get(id).unwrap().card,
+            domain.objects().get(id).unwrap().card,
             Card::Leaving { how: Left::Ended { how: ending }, until: Time::from_nanos(5_000_000_030) }
         );
         assert_ne!(domain.page(), &crate::page::Page::Missing);
-        assert_eq!(domain.objects.get(id).unwrap().sources.len(), 0);
+        assert_eq!(domain.objects().get(id).unwrap().sources.len(), 0);
     }
 }
 
@@ -435,25 +437,29 @@ fn equal_number_task_and_party_proposals_keep_separate_requests_and_terminal_car
         row.acts = List::with_capacity(1);
         row.acts.push(Offered { act: ActKind::Accept, admission: Admission::Allowed }).unwrap();
         let key = ObjectKey::Proposal(row.key);
-        let id = domain.objects.name(key, Source::Window { generation: 0, number: 4 }).unwrap();
+        let id = domain.objects.name(key, Source::Window { number: 4 }).unwrap();
         assert!(domain.objects.put(key, objects::Body::Proposal(Box::new(row.clone()))));
         domain.objects.get_mut(id).unwrap().project = Some(row.project);
         assert!(
             drive(
                 &mut domain,
                 Time::ZERO,
-                Event::Act { act: crate::action::Act::Intend { object: id.token(), act: ActKind::Accept } }
+                Event::Act { action: crate::action::Act::Intend { object: id.token(), act: ActKind::Accept } }
             )
             .is_empty()
         );
-        let sent = drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm });
+        let sent = drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::Confirm });
         assert_eq!(sent.len(), 1);
-        let Request::Send { request, ask, .. } = &sent[0] else { panic!("one keyed decision") };
+        let Request::Client { asked: jig_client::Event::Send { key: request, request: jig_client::Ask::Jig(ask), .. } } =
+            &sent[0]
+        else {
+            panic!("one keyed decision")
+        };
         assert_eq!(
             ask.as_ref(),
             &Ask::DecideProposal { project: row.project, proposal: row.key, decision: Decision::Accepted }
         );
-        assert!(drive(&mut domain, Time::ZERO, Event::Act { act: crate::action::Act::Confirm }).is_empty());
+        assert!(drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::Confirm }).is_empty());
         pending.push((key, id, *request)).unwrap();
     }
     assert_ne!(pending.get(0).unwrap().0, pending.get(1).unwrap().0);
@@ -462,38 +468,38 @@ fn equal_number_task_and_party_proposals_keep_separate_requests_and_terminal_car
     let outcome = Outcome::Decided { by: Actor::Party(7), how: Decision::Accepted, at: Wall::EPOCH };
     let answer = Answer::Done(outcome.clone());
     assert!(
-        drive(&mut domain, Time::ZERO, Event::Answered { request: pending.get(0).unwrap().2, answer: answer.clone() })
+        drive(&mut domain, Time::ZERO, AnsweredByEngine { request: pending.get(0).unwrap().2, answer: answer.clone() })
             .is_empty()
     );
     assert_eq!(
-        domain.objects.get(pending.get(0).unwrap().1).unwrap().card,
+        domain.objects().get(pending.get(0).unwrap().1).unwrap().card,
         Card::Leaving { how: Left::Answered { outcome: outcome.clone() }, until: Time::from_nanos(5_000_000_000) }
     );
     assert_eq!(
-        domain.objects.get(pending.get(1).unwrap().1).unwrap().card,
-        Card::Deciding { request: Some(pending.get(1).unwrap().2), progress: Progress::InFlight }
+        domain.objects().get(pending.get(1).unwrap().1).unwrap().card,
+        Card::Deciding { request: Some(domain.intent(pending.get(1).unwrap().2)), progress: Progress::InFlight }
     );
-    assert_eq!(domain.objects.get(pending.get(0).unwrap().1).unwrap().answer, Some(answer.clone()));
+    assert_eq!(domain.objects().get(pending.get(0).unwrap().1).unwrap().answer, Some(answer.clone()));
     assert!(
         drive(
             &mut domain,
             Time::ZERO,
-            Event::Answered { request: pending.get(0).unwrap().2, answer: Answer::Refused(Refusal::KeyConflict) }
+            AnsweredByEngine { request: pending.get(0).unwrap().2, answer: Answer::Refused(Refusal::KeyConflict) }
         )
         .is_empty()
     );
-    assert_eq!(domain.objects.get(pending.get(0).unwrap().1).unwrap().answer, Some(answer.clone()));
+    assert_eq!(domain.objects().get(pending.get(0).unwrap().1).unwrap().answer, Some(answer.clone()));
     assert!(
-        drive(&mut domain, Time::ZERO, Event::Answered { request: pending.get(1).unwrap().2, answer: answer.clone() })
+        drive(&mut domain, Time::ZERO, AnsweredByEngine { request: pending.get(1).unwrap().2, answer: answer.clone() })
             .is_empty()
     );
-    assert_eq!(domain.objects.get(pending.get(1).unwrap().1).unwrap().answer, Some(answer));
+    assert_eq!(domain.objects().get(pending.get(1).unwrap().1).unwrap().answer, Some(answer));
     assert_eq!(
-        domain.objects.get(pending.get(1).unwrap().1).unwrap().card,
+        domain.objects().get(pending.get(1).unwrap().1).unwrap().card,
         Card::Leaving { how: Left::Answered { outcome }, until: Time::from_nanos(5_000_000_000) }
     );
     for (key, id, _) in &pending {
-        assert_eq!(domain.objects.find(*key), Some(*id));
+        assert_eq!(domain.objects().find(*key), Some(*id));
     }
 }
 

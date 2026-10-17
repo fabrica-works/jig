@@ -98,11 +98,6 @@ pub fn client(seed: u64) -> (client::Domain, view::View) {
     let profile = profile();
     let mut domain = client::new(&limits, seed);
     client::configure_arrangement(&mut domain, view::arrangement()).expect("ops arrangement before start");
-    client::provider(
-        &mut domain,
-        jig_client_view::signin::Provider { number: 1, name: jig_client_world::stories::text(b"Ops") },
-    )
-    .expect("actual provider display");
     let mut view =
         view::View::new(&profile.bounds, &limits, profile.jig.clone(), profile.obs.clone(), profile.infra.clone(), 1);
     view.native_environments();
@@ -243,7 +238,7 @@ impl jig_client_world::harness::App for Client {
             Duty::Store(value) => Duty::Store(value),
             Duty::Wire(value) => Duty::Wire(value),
             Duty::Show { address, replace } => Duty::Show { address, replace },
-            Duty::SignIn { provider, back } => Duty::SignIn { provider, back },
+            Duty::SignIn { provider } => Duty::SignIn { provider },
             Duty::SignOut => Duty::SignOut,
             Duty::Fact => Duty::Fact,
         }
@@ -282,4 +277,43 @@ impl jig_client_world::harness::App for Client {
     fn window_changed(event: &Self::Event) -> bool {
         Ops::window_changed(event)
     }
+}
+
+#[must_use]
+pub fn see(words: &[u8]) -> skein_fake_person::Step<client::Address> {
+    skein_fake_person::Step::See {
+        find: skein_fake_person::Find::text(words),
+        within: skein_lib::Duration::from_secs(3),
+    }
+}
+
+#[must_use]
+pub fn press(role: skein_ui::Role, words: &[u8]) -> skein_fake_person::Step<client::Address> {
+    skein_fake_person::Step::Press { find: skein_fake_person::Find::named(role, words) }
+}
+
+#[must_use]
+pub fn incident_lead(engine: &jig_conformance::Harness<super::engine::OpsApplication>) -> u64 {
+    let mut rows = engine.store.rows.values();
+    rows.find_map(|row| match row {
+        jig_ops_domain::Record::Observability(jig_ops_domain_observability::Record::Incident(incident))
+            if incident.project == 1 && incident.number == 12 =>
+        {
+            incident.lead
+        }
+        root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => None,
+    })
+    .expect("incident 12 has its retained lead")
+}
+
+#[must_use]
+pub fn remediation(engine: &jig_conformance::Harness<super::engine::OpsApplication>, lead: u64) -> u64 {
+    let mut rows = engine.store.rows.values();
+    rows.find_map(|row| match row {
+        jig_ops_domain::Record::Core(jig_domain_core::Record::Tasks(
+            jig_domain_tasks::Stored::Live(task) | jig_domain_tasks::Stored::Ended(task),
+        )) if task.requester == jig_domain_tasks::Party::Task(lead) => Some(task.number),
+        root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => None,
+    })
+    .expect("the lead has its remediation delegate")
 }

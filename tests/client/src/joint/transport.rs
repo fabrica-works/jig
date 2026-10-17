@@ -124,8 +124,8 @@ impl Transport {
     }
 
     #[must_use]
-    pub fn hello(&self) -> jig_client_view::Event {
-        jig_client_view::Event::Hello { served: jig_client_protocol_link::serves(self.versions) }
+    pub fn hello(&self) -> jig_client::Up {
+        jig_client::Up::Served { served: jig_client_protocol_link::serves(self.versions), versions: None }
     }
 
     /// The configured Jig range, independent of a delivered Frame.
@@ -373,38 +373,17 @@ pub fn contract_request(down: jig_client::Down) -> Result<jig_client_test_domain
 /// Translate only original transport callbacks; shell handoffs stay with their caller.
 #[must_use]
 pub fn contract_event(event: &jig_client_test_domain::Event) -> Option<jig_client::Up> {
-    use jig_client::{Readout, Up};
+    use jig_client::Up;
     use jig_client_test_domain::Event;
-    use jig_client_view::Event as Jig;
     match event {
-        Event::Jig(Jig::Watch { watch, event }) => Some(Up::Watched { watch: *watch, event: event.clone() }),
-        Event::Jig(Jig::Ended { watch, end }) => Some(Up::WatchEnded { watch: *watch, end: *end }),
-        Event::Jig(Jig::Read { read, result }) => {
-            Some(Up::ReadDone { read: *read, result: Readout::Jig(result.clone()) })
-        }
         Event::Client { event: jig_client::Event::Up { up } } => Some(up.clone()),
-        Event::SignedOut | Event::Jig(Jig::SignedOut) => Some(Up::SignedOut),
+        Event::SignedOut => Some(Up::SignedOut),
         Event::Client { .. }
         | Event::Start { .. }
         | Event::Went { .. }
         | Event::Act { .. }
         | Event::First(_)
-        | Event::Jig(
-            Jig::Start { .. }
-            | Jig::Hello { .. }
-            | Jig::Kept { .. }
-            | Jig::KeptGone { .. }
-            | Jig::Went { .. }
-            | Jig::Act { .. }
-            | Jig::Ask { .. }
-            | Jig::Progress { .. }
-            | Jig::Answered { .. }
-            | Jig::ShowObjects { .. }
-            | Jig::ShowSections { .. }
-            | Jig::ObjectsLeft
-            | Jig::SignOutLost
-            | Jig::Frame { .. },
-        ) => None,
+        | Event::Jig(_) => None,
     }
 }
 
@@ -597,7 +576,7 @@ mod tests {
         let mut front = Transport::new(versions);
         let supplied = identity(&[255, b'/', 0]);
         front.bind(ClientId(0), u64::MAX, supplied.clone());
-        assert_eq!(front.hello(), jig_client_view::Event::Hello { served: false });
+        assert_eq!(front.hello(), jig_client::Up::Served { served: false, versions: None });
         assert_eq!(front.sign_in(ClientId(0)), None);
         let Event::SignIn { reply_to, identity: actual } = front.start_sign_in(ClientId(0)) else {
             panic!("authentic sign-in input")

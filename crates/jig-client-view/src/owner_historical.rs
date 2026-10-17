@@ -7,7 +7,7 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::{Domain, Limits};
+use crate::{Borrowed, Limits};
 use alloc::boxed::Box;
 use jig_client::contract::{
     Chip, ChipPhase, OwnerEscalationDecision, OwnerGoalHolding, OwnerHistorical, OwnerHistoricalValue,
@@ -133,7 +133,7 @@ fn proposal_decision(b: &mut Builder, value: &OwnerProposalDecision, words: &Wor
         None => label(b, words, P::CreatedAbsent),
     }
 }
-fn task(b: &mut Builder, client: &Domain, value: &Task, words: &Words, bindings: &mut JigBindings) {
+fn task(b: &mut Builder, client: &Borrowed<'_>, value: &Task, words: &Words, bindings: &mut JigBindings) {
     number(b, words, P::Project, u64::from(value.project));
     crate::cards::chip::chip(b, client, &value.chip, words, bindings);
     crate::sections::task::overview(b, client, value, words, bindings);
@@ -153,7 +153,13 @@ fn outer(b: &mut Builder, value: &OwnerHistorical, words: &Words) {
     }
 }
 /// Render each genuine source separately. No current card controls are added.
-pub fn render(b: &mut Builder, client: &Domain, value: &OwnerHistorical, words: &Words, bindings: &mut JigBindings) {
+pub fn render(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    value: &OwnerHistorical,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     region(b, words, P::Historical);
     outer(b, value, words);
     match &value.value {
@@ -248,7 +254,7 @@ pub fn render(b: &mut Builder, client: &Domain, value: &OwnerHistorical, words: 
 /// Rich departure facts take precedence over later compact/body refreshes.
 pub(crate) fn card(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<crate::objects::Object>,
     place: &crate::cards::Place,
     words: &Words,

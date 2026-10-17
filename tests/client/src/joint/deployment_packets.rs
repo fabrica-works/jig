@@ -25,10 +25,19 @@ fn deployment_read_keeps_original_query_client_and_token_until_whole_owner_admis
     let Incoming::Callback {
         client: actual_client,
         event:
-            Event::Jig(jig_client_view::Event::Read {
-                read: actual,
-                result: client::ReadResult::Value(client::ReadValue::OwnerDeployment(value)),
-            }),
+            Event::Client {
+                event:
+                    jig_client::Event::Up {
+                        up:
+                            jig_client::Up::ReadDone {
+                                read: actual,
+                                result:
+                                    jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::OwnerDeployment(
+                                        value,
+                                    ))),
+                            },
+                    },
+            },
     } = read(&mut transport, to, &answer, &limits).expect("whole original read")
     else {
         panic!("whole owner deployment")
@@ -64,10 +73,16 @@ fn deployment_watch_keeps_original_subject_and_ack_until_whole_delivery_admissio
     let Incoming::Callback {
         client: actual_client,
         event:
-            Event::Jig(jig_client_view::Event::Watch {
-                watch,
-                event: client::WatchEvent::Delivered(client::Delivery::OwnerDeployment(value)),
-            }),
+            Event::Client {
+                event:
+                    jig_client::Event::Up {
+                        up:
+                            jig_client::Up::Watched {
+                                watch,
+                                event: client::WatchEvent::Delivered(client::Delivery::OwnerDeployment(value)),
+                            },
+                    },
+            },
     } = super::super::packets::document(&mut transport, watcher, &document, &limits).expect("whole original delivery")
     else {
         panic!("whole owner deployment delivery")

@@ -11,7 +11,7 @@
 //! | pending | refused | refused | nothing |
 //! | pending | made chat | ready | navigate to chat activity |
 use crate::{
-    Domain, Request,
+    Request, Ui,
     action::End,
     address::{Address, Place, TaskSection},
     fields::Purpose,
@@ -34,14 +34,21 @@ pub struct State {
     pub scope: Option<u64>,
     pub words: Option<Text>,
     pub more: bool,
+    pub show_live: bool,
 }
 impl State {
     pub(crate) const fn new() -> Self {
-        Self { starting: None, refusal: None, project: None, scope: None, words: None, more: false }
+        Self { starting: None, refusal: None, project: None, scope: None, words: None, more: false, show_live: false }
     }
 }
 /// Starts a chat with only a project and the first words; a second press joins.
-pub fn start(domain: &mut Domain, _env: &Env<crate::Limits>, project: u32, out: &mut Queue<Request>) {
+pub fn start(
+    domain: &mut Ui,
+    _env: &Env<crate::Limits>,
+    project: u32,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     if domain.blocked || domain.chats.starting.is_some() {
         return;
     }
@@ -49,7 +56,7 @@ pub fn start(domain: &mut Domain, _env: &Env<crate::Limits>, project: u32, out: 
         return;
     };
     let mut offered = false;
-    if let Some(frame) = &domain.frame.document {
+    if let Some(frame) = &domain.frame(lent).document {
         for role in &frame.charters {
             if role.project == project && !role.chats.is_empty() {
                 offered = true;
@@ -71,7 +78,7 @@ pub fn start(domain: &mut Domain, _env: &Env<crate::Limits>, project: u32, out: 
     let ask = Box::new(Ask::StartChat { project, words: words.clone() });
     match domain.intents.ask(
         scope,
-        Origin::Page { generation: domain.generation, purpose: IntentPurpose::StartChat },
+        Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::StartChat },
         ask,
         out,
     ) {
@@ -87,11 +94,17 @@ pub fn start(domain: &mut Domain, _env: &Env<crate::Limits>, project: u32, out: 
     domain.changed();
 }
 /// Starts from a card, naming the thing by its committed title in the first words.
-pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out: &mut Queue<Request>) {
+pub fn about(
+    domain: &mut Ui,
+    env: &Env<crate::Limits>,
+    key: ObjectKey,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     let Some(id) = domain.objects.find(key) else {
         return;
     };
-    let Some(object) = domain.objects.get(id) else {
+    let Some(object) = domain.borrow(lent).objects().get(id) else {
         return;
     };
     let (project, title) = match &object.body {
@@ -110,7 +123,7 @@ pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out:
     };
     let mut project = project.or(object.project);
     if project.is_none() {
-        for entry in &domain.inbox.rows {
+        for entry in &domain.borrow(lent).inbox().rows {
             if entry.card_key() == key {
                 project = entry.project();
                 break;
@@ -124,22 +137,25 @@ pub fn about(domain: &mut Domain, env: &Env<crate::Limits>, key: ObjectKey, out:
         return;
     };
     match domain.write_field(Purpose::NewChat, title) {
-        Ok(()) => start(domain, env, project, out),
+        Ok(()) => start(domain, env, project, out, lent),
         Err(which) => crate::page::routing::refuse(domain, which),
     }
 }
 pub(crate) fn answered(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
-    request: Token,
-    generation: u32,
+    request_and_handle: (Token, Option<jig_client::Handle>),
     purpose: IntentPurpose,
     answer: Answer,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
+    let (request, handle) = request_and_handle;
     match purpose {
         IntentPurpose::ProjectSettings => crate::page::project::owner_form::answered(domain, request, answer),
-        IntentPurpose::SetGoal => crate::page::project::goals::answered(domain, env, request, generation, answer, out),
+        IntentPurpose::SetGoal => {
+            crate::page::project::goals::answered(domain, env, request, handle, answer, out, lent);
+        }
         IntentPurpose::Seen(_) => {
             match answer {
                 Answer::Done(_) => {}
@@ -176,8 +192,8 @@ pub(crate) fn answered(
                             }
                         }
                         let address = Address::Task { task, section: TaskSection::Activity };
-                        if generation == domain.generation && domain.chats.scope == domain.confirmed {
-                            crate::page::routing::navigate(domain, env, Place::Jig(address), false, out);
+                        if handle == domain.page_handle() && domain.chats.scope == domain.confirmed {
+                            crate::page::routing::navigate(domain, env, Place::Jig(address), false, out, lent);
                         } else {
                             crate::notices::kept::show(
                                 domain,
@@ -204,7 +220,7 @@ pub(crate) fn answered(
         }
     }
 }
-fn seen(domain: &mut Domain, value: Seen, out: &mut Queue<Request>) -> bool {
+fn seen(domain: &mut Ui, value: Seen, out: &mut Queue<Request>) -> bool {
     let Some(scope) = domain.confirmed else {
         return false;
     };
@@ -212,28 +228,28 @@ fn seen(domain: &mut Domain, value: Seen, out: &mut Queue<Request>) -> bool {
         .intents
         .ask(
             scope,
-            Origin::Page { generation: domain.generation, purpose: IntentPurpose::Seen(value) },
+            Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::Seen(value) },
             Box::new(Ask::MarkSeen { seen: value }),
             out,
         )
         .is_some()
 }
-pub(crate) fn open_updates(domain: &mut Domain, out: &mut Queue<Request>) {
+pub(crate) fn open_updates(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client::Client) {
     let Some(project) = domain.shown_inbox() else {
         return;
     };
-    if !domain.shows(crate::page::Section::Inbox { group: InboxReadGroup::Updates, project }) {
+    if !domain.shows(crate::page::Section::Inbox { group: InboxReadGroup::Updates, project }, lent) {
         return;
     }
     domain.inbox.opening_updates = true;
-    mark_results(domain, out);
+    mark_results(domain, out, lent);
 }
-pub(crate) fn mark_results(domain: &mut Domain, out: &mut Queue<Request>) {
+pub(crate) fn mark_results(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client::Client) {
     if !domain.inbox.opening_updates {
         return;
     }
     let mut through = domain.inbox.marked_results;
-    for entry in &domain.inbox.rows {
+    for entry in &domain.borrow(lent).inbox().rows {
         if let Some(position) = entry.result_position() {
             through = through.max(position);
         }
@@ -243,9 +259,15 @@ pub(crate) fn mark_results(domain: &mut Domain, out: &mut Queue<Request>) {
         domain.inbox.opening_updates = false;
     }
 }
-pub(crate) fn open_chat(domain: &mut Domain, env: &Env<crate::Limits>, task: u64, out: &mut Queue<Request>) {
+pub(crate) fn open_chat(
+    domain: &mut Ui,
+    env: &Env<crate::Limits>,
+    task: u64,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     let mut through = None;
-    for entry in &domain.inbox.rows {
+    for entry in &domain.borrow(lent).inbox().rows {
         if entry.group() == InboxGroup::Replies
             && entry.card_key() == ObjectKey::Task(task)
             && let Some(line) = entry.reply()
@@ -256,7 +278,7 @@ pub(crate) fn open_chat(domain: &mut Domain, env: &Env<crate::Limits>, task: u64
             through = Some(line.last_reply);
         }
     }
-    for row in &domain.conversation_rows.rows {
+    for row in &domain.borrow(lent).conversation_rows().rows {
         if row.chip.task == task && row.last_reply > row.seen {
             through = Some(through.unwrap_or(0).max(row.last_reply));
         }
@@ -273,9 +295,10 @@ pub(crate) fn open_chat(domain: &mut Domain, env: &Env<crate::Limits>, task: u64
         Place::Jig(Address::Task { task, section: TaskSection::Activity }),
         false,
         out,
+        lent,
     );
 }
-pub(crate) fn filter_inbox(domain: &mut Domain, filter: Filter, out: &mut Queue<Request>) {
+pub(crate) fn filter_inbox(domain: &mut Ui, filter: Filter, out: &mut Queue<Request>) {
     if domain.shown_inbox().is_none() {
         return;
     }
@@ -288,12 +311,12 @@ pub(crate) fn filter_inbox(domain: &mut Domain, filter: Filter, out: &mut Queue<
     start_inbox(domain, out);
     domain.changed();
 }
-pub(crate) fn start_inbox(domain: &mut Domain, out: &mut Queue<Request>) {
+pub(crate) fn start_inbox(domain: &mut Ui, out: &mut Queue<Request>) {
     for group in [InboxReadGroup::Needs, InboxReadGroup::Updates] {
         start_group(domain, group, out);
     }
 }
-pub(crate) fn start_group(domain: &mut Domain, group: InboxReadGroup, out: &mut Queue<Request>) {
+pub(crate) fn start_group(domain: &mut Ui, group: InboxReadGroup, out: &mut Queue<Request>) {
     let filter = domain.inbox.filter;
     if let Some(kind) = filter.kind
         && InboxReadGroup::of(kind) != group
@@ -320,20 +343,19 @@ pub(crate) const fn inbox_group(number: u16) -> Option<InboxReadGroup> {
         _ => None,
     }
 }
-fn ask_read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
-    for (id, ()) in &domain.reads.ids {
-        let reading = domain.reads.slab.get(*id).expect("registered read exists");
-        if reading.what == what && reading.generation == domain.generation && !reading.abandoned {
+fn ask_read(domain: &mut Ui, number: u16, what: Read, out: &mut Queue<Request>) {
+    for (id, reading) in &domain.handles.reads {
+        if reading.what == what {
             if let Some(group) = inbox_group(number) {
-                domain.inbox.window_mut(group).reading = Some(id.token());
+                domain.inbox.window_mut(group).reading = Some(Token::new(id.number));
             }
             return;
         }
     }
-    match domain.reads.ask(domain.generation, Source::Window { generation: domain.generation, number }, what, out) {
+    match domain.handles.read(Source::Window { number }, what, out) {
         Some(id) => {
             if let Some(group) = inbox_group(number) {
-                domain.inbox.window_mut(group).reading = Some(id.token());
+                domain.inbox.window_mut(group).reading = Some(Token::new(id.number));
             }
         }
         None => crate::page::routing::refuse(domain, Limit::Reads),
@@ -369,7 +391,7 @@ pub(crate) const fn read_end(source: Source) -> End {
         Source::Window { .. } | Source::Watch(_) | Source::Card(_) => End::After,
     }
 }
-pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue<Request>) {
+pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Request>, lent: &jig_client::Client) {
     if window == Token::new(INBOX_WINDOW) || window == Token::new(INBOX_UPDATES_WINDOW) {
         let group = if window == Token::new(INBOX_WINDOW) { InboxReadGroup::Needs } else { InboxReadGroup::Updates };
         let filter = domain.inbox.filter;
@@ -392,9 +414,10 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
             );
         }
     } else if window == Token::new(CONVERSATIONS_WINDOW) {
+        let displayed = domain.borrow(lent).conversation_rows();
         let edge = match end {
-            End::Before => &domain.conversation_rows.edges.before,
-            End::After => &domain.conversation_rows.edges.after,
+            End::Before => &displayed.edges.before,
+            End::After => &displayed.edges.after,
         };
         match edge {
             Edge::More(cursor) => {
@@ -403,7 +426,7 @@ pub(crate) fn more(domain: &mut Domain, window: Token, end: End, out: &mut Queue
                 }
                 let number = match end {
                     End::Before => CONVERSATIONS_BEFORE_READ,
-                    End::After => match &domain.conversation_rows.owner_after {
+                    End::After => match &displayed.owner_after {
                         Some(owner) if owner == cursor => REPLAY_READ,
                         Some(_) | None => CONVERSATIONS_READ,
                     },
@@ -476,19 +499,34 @@ fn later(b: Option<skein_lib::Wall>, a: Option<skein_lib::Wall>) -> bool {
 /// Receives the whole live snapshot only at its reached end, preserving read
 /// rows and recording the exact supplied continuation independently of more.
 pub(crate) fn delivered(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
     conversations: contract::Conversations,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     domain.chats.more = conversations.more;
-    if domain.conversation_rows.edges.reaches(End::Before) {
-        domain.conversation_rows.owner_after = Some(conversations.after.clone());
+    domain.chats.show_live = domain.conversation_rows.edges.reaches(End::Before);
+    let mut projected = domain.conversation_rows.clone();
+    if project_live(&mut projected, conversations) > 0 {
+        super::routing::refuse(domain, Limit::Objects);
+    }
+    domain.conversation_rows.edges = projected.edges;
+    domain.conversation_rows.owner_after = projected.owner_after;
+    crate::page::replies::conversations(domain, env, source, out, lent);
+    domain.changed();
+}
+pub(crate) fn project_live(
+    window: &mut crate::windows::ConversationWindow,
+    conversations: contract::Conversations,
+) -> u32 {
+    if window.edges.reaches(End::Before) {
+        window.owner_after = Some(conversations.after.clone());
         // A current live snapshot replaces live rows, while retained past rows
         // still belong to the read window. An overlapping watch row wins whole.
-        let capacity = domain.conversation_rows.rows.capacity();
-        let old = core::mem::replace(&mut domain.conversation_rows.rows, List::with_capacity(capacity));
+        let capacity = window.rows.capacity();
+        let old = core::mem::replace(&mut window.rows, List::with_capacity(capacity));
         for row in old.into_boxed() {
             let mut named = false;
             for current in &conversations.rows {
@@ -498,21 +536,57 @@ pub(crate) fn delivered(
                 }
             }
             if !live(row.chip.phase) && !named {
-                domain.conversation_rows.rows.push(row).expect("retained rows fit their window");
+                window.rows.push(row).expect("retained rows fit their window");
             }
         }
-        let after = domain.conversation_rows.edges.after.clone();
+        let after = window.edges.after.clone();
         let mut rows = conversations.rows;
         order(&mut rows);
         let edges = Edges { before: Edge::End, after: Edge::More(conversations.after) };
-        let dropped = domain.conversation_rows.slide(rows, edges, End::Before);
+        let dropped = window.slide(rows, edges, End::Before);
         if dropped == 0 {
-            domain.conversation_rows.edges.after = after;
+            window.edges.after = after;
         }
         if dropped > 0 {
-            super::routing::refuse(domain, Limit::Objects);
+            return dropped;
         }
-        crate::page::replies::conversations(domain, env, source, out);
     }
-    domain.changed();
+    0
+}
+
+/// Merge the visible layout, retaining only facts supplied by reads in the page.
+pub(crate) fn read_page(domain: &mut Ui, source: Source, page: contract::ConversationPage, lent: &jig_client::Client) {
+    let old = domain.conversation_rows.clone();
+    let incoming = page.rows.clone();
+    let mut displayed = domain.borrow(lent).conversation_rows();
+    displayed.cut |= page.cut;
+    let edges = super::routing::page_edges(page.before, page.after);
+    let mut rows = page.rows;
+    order(&mut rows);
+    if is_replay(source) {
+        displayed.replay(rows, edges);
+    } else {
+        displayed.slide(rows, edges, read_end(source));
+    }
+    let mut retained = List::with_capacity(displayed.rows.capacity());
+    for row in &displayed.rows {
+        let mut read = None;
+        for values in [&old.rows, &incoming] {
+            for value in values {
+                if value.chip.task == row.chip.task {
+                    read = Some(value);
+                    break;
+                }
+            }
+            if read.is_some() {
+                break;
+            }
+        }
+        if let Some(read) = read {
+            retained.push(read.clone()).expect("read rows fit the visible layout");
+        }
+    }
+    displayed.rows = retained;
+    order(&mut displayed.rows);
+    domain.conversation_rows = displayed;
 }

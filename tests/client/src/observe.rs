@@ -166,24 +166,7 @@ fn family(doc: &family::Document) -> Receipt {
 #[must_use]
 pub fn received(event: &Event) -> Vec<Receipt> {
     match event {
-        Event::Client {
-            event: jig_client::Event::Up { up: jig_client::Up::Answer { attempt, envelope, answer, why: None } },
-        } => {
-            let words = match answer {
-                Some(jig_client::Answered::Jig(Answer::Done(
-                    Outcome::Made { what: Made::Words { task, message } }
-                    | Outcome::Owner(
-                        OwnerOutcome::Said { task, message, .. } | OwnerOutcome::QuestionAnswered { task, message, .. },
-                    ),
-                ))) => Some((*task, *message)),
-                Some(jig_client::Answered::Jig(_) | jig_client::Answered::Family(_)) | None => None,
-            };
-            if *envelope == RequestEnvelope::SignedOut {
-                vec![Receipt::Parked]
-            } else {
-                vec![Receipt::Answer { attempt: *attempt, final_answer: *envelope == RequestEnvelope::Final, words }]
-            }
-        }
+        Event::Client { event: jig_client::Event::Up { up } } => up_received(up),
         Event::Start { .. } => vec![Receipt::Started],
         Event::Jig(event) => jig_received(event),
         Event::First(
@@ -203,43 +186,60 @@ pub fn received(event: &Event) -> Vec<Receipt> {
 pub fn jig_received(event: &jig_client_view::Event) -> Vec<Receipt> {
     match event {
         jig_client_view::Event::Start { .. } => vec![Receipt::Started],
-        jig_client_view::Event::Hello { served } => {
-            if *served {
-                vec![]
+        jig_client_view::Event::Client { .. }
+        | jig_client_view::Event::Kept { .. }
+        | jig_client_view::Event::KeptGone { .. }
+        | jig_client_view::Event::Went { .. }
+        | jig_client_view::Event::Left
+        | jig_client_view::Event::Act { .. }
+        | jig_client_view::Event::Ask { .. }
+        | jig_client_view::Event::Named { .. }
+        | jig_client_view::Event::Frame { .. } => vec![],
+    }
+}
+/// Observe native transport deliveries independently of the root and UI.
+#[must_use]
+pub fn up_received(up: &jig_client::Up) -> Vec<Receipt> {
+    use jig_client::{Readout, Up};
+    match up {
+        Up::Answer { attempt, envelope, answer, why: None } => {
+            let words = match answer {
+                Some(jig_client::Answered::Jig(Answer::Done(
+                    Outcome::Made { what: Made::Words { task, message } }
+                    | Outcome::Owner(
+                        OwnerOutcome::Said { task, message, .. } | OwnerOutcome::QuestionAnswered { task, message, .. },
+                    ),
+                ))) => Some((*task, *message)),
+                Some(jig_client::Answered::Jig(_) | jig_client::Answered::Family(_)) | None => None,
+            };
+            if *envelope == RequestEnvelope::SignedOut {
+                vec![Receipt::Parked]
             } else {
-                vec![Receipt::OutOfDate]
+                vec![Receipt::Answer { attempt: *attempt, final_answer: *envelope == RequestEnvelope::Final, words }]
             }
         }
-        jig_client_view::Event::Read { result: ReadResult::Value(value), .. } => read(value),
-        jig_client_view::Event::Watch { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => {
-            vec![task(value)]
-        }
-        jig_client_view::Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(value)) } => {
-            frame(value, Some(*watch))
-        }
-        jig_client_view::Event::Ended { watch, end } => {
+        Up::Served { served: false, .. } => vec![Receipt::OutOfDate],
+        Up::ReadDone { result: Readout::Jig(ReadResult::Value(value)), .. } => read(value),
+        Up::Watched { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => vec![task(value)],
+        Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(value)) } => frame(value, Some(*watch)),
+        Up::WatchEnded { watch, end } => {
             let mut receipts = vec![Receipt::WatchEnded { watch: *watch }];
             if *end == WatchEnd::SignedOut {
                 receipts.push(Receipt::Parked);
             }
             receipts
         }
-        jig_client_view::Event::SignedOut
-        | jig_client_view::Event::Read { result: ReadResult::None(ReadNone::SignedOut), .. } => vec![Receipt::Parked],
-        jig_client_view::Event::SignOutLost
-        | jig_client_view::Event::Kept { .. }
-        | jig_client_view::Event::KeptGone { .. }
-        | jig_client_view::Event::Went { .. }
-        | jig_client_view::Event::Act { .. }
-        | jig_client_view::Event::Ask { .. }
-        | jig_client_view::Event::Progress { .. }
-        | jig_client_view::Event::Answered { .. }
-        | jig_client_view::Event::Read { .. }
-        | jig_client_view::Event::Watch { .. }
-        | jig_client_view::Event::ShowObjects { .. }
-        | jig_client_view::Event::ShowSections { .. }
-        | jig_client_view::Event::ObjectsLeft
-        | jig_client_view::Event::Frame { .. } => vec![],
+        Up::SignedOut | Up::ReadDone { result: Readout::Jig(ReadResult::None(ReadNone::SignedOut)), .. } => {
+            vec![Receipt::Parked]
+        }
+        Up::SignedIn
+        | Up::NotKept { .. }
+        | Up::Served { served: true, .. }
+        | Up::FamilyServed { .. }
+        | Up::FamilyDelivered { .. }
+        | Up::ReadDone { .. }
+        | Up::Watched { .. }
+        | Up::Answer { .. } => vec![],
     }
 }
 
@@ -348,6 +348,13 @@ fn visible(tree: &Tree, include_test_family: bool) -> Vec<Seen> {
     }) {
         seen.push(Seen::HiddenPage);
     }
+    if tree.nodes().iter().any(|node| {
+        node.role == Role::Heading { level: 1 }
+            && TreeFace::subtree(tree, node.id)
+                .is_some_and(|mut face| matches!(face.find(&Find::text(b"Sign in")), Found::Node(_)))
+    }) {
+        seen.push(Seen::SignedOut);
+    }
     if let Some(live) = frame_link(tree) {
         seen.push(Seen::Link { live });
     }
@@ -413,10 +420,12 @@ mod link_tests;
 #[must_use]
 pub fn window_changed(event: &Event) -> bool {
     let act = match event {
-        Event::Act { action: domain::Action::Jig(act) } | Event::Jig(jig_client_view::Event::Act { act }) => act,
+        Event::Act { action: domain::Action::Jig(act) } | Event::Jig(jig_client_view::Event::Act { action: act }) => {
+            act
+        }
         Event::Start { .. }
         | Event::Went { .. }
-        | Event::Act { action: domain::Action::First(_) }
+        | Event::Act { action: domain::Action::SignIn | domain::Action::First(_) }
         | Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Answer { .. } } }
         | Event::Jig(_)
         | Event::First(_)

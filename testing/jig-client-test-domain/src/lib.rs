@@ -19,7 +19,7 @@ pub mod second;
 pub mod store;
 pub use address::{Address, Place};
 pub use boundary::{Action, Answered, Ask, Event, Fact, JigOut, Request};
-pub use domain::{Domain, configure_arrangement, fire, new, next_deadline, provider, shown, step, take, unlinked};
+pub use domain::{Domain, configure_arrangement, fire, new, next_deadline, shown, step, take, unlinked};
 pub use limits::{Limits, max_out, worst_case};
 pub use owner::{Connector, FIRST, SECOND};
 #[cfg(test)]

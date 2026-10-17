@@ -9,11 +9,12 @@ use super::{
     pages::deliver,
     work_pages::{chip, list, part, project_doc},
 };
+use crate::tests::fixtures::{Fixture, ReadPage};
 use crate::{JigBindings, Owner, words::Words};
 use skein_ui::{Builder, Role, SlotRef, Tree};
 
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act,
     address::{Address, Place, ProjectSection, TaskSection},
 };
@@ -80,7 +81,7 @@ fn authority() -> Authority {
         ]),
     }
 }
-pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
+pub(super) fn entered(address: Address) -> (Fixture, Vec<Request>) {
     let (mut d, watch) = start();
     let mut frame = document();
     let mut project = frame.projects.get(0).unwrap().clone();
@@ -111,14 +112,14 @@ pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
     let out = drive(&mut d, Event::Went { place: Place::Jig(address) });
     (d, out)
 }
-pub(super) fn render(d: &Domain, words: &Words) -> Tree {
+pub(super) fn render(d: &Fixture, words: &Words) -> Tree {
     let limits = crate::limits::of_words(&CLIENT, words).unwrap();
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
     assert!(crate::jig(
         &mut b,
-        d,
+        &d.view(),
         SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
@@ -174,7 +175,13 @@ fn task_pages(words: &Words) {
         let watch = out
             .iter()
             .find_map(|r| match r {
-                Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
                 _ => None,
             })
             .unwrap();
@@ -209,9 +216,21 @@ fn task_pages(words: &Words) {
         sources.extend(out);
         for request in sources {
             match request {
-                Request::Open { watch, subject: Subject::Tree { .. } } => fill_tree(&mut d, watch),
-                Request::Read { read, what: Read::Activity { .. } } => fill_activity(&mut d, read),
-                Request::Read { read, what: Read::History { .. } } => fill_history(&mut d, read),
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Tree { .. }),
+                        },
+                } => fill_tree(&mut d, watch),
+                Request::Client {
+                    asked:
+                        jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Activity { .. }) },
+                } => fill_activity(&mut d, read),
+                Request::Client {
+                    asked:
+                        jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::History { .. }) },
+                } => fill_history(&mut d, read),
                 _ => {}
             }
         }
@@ -224,99 +243,7 @@ fn task_pages(words: &Words) {
         }
     }
 }
-fn project_pages(words: &Words) {
-    for section in [
-        ProjectSection::Overview,
-        ProjectSection::Goals,
-        ProjectSection::Tasks,
-        ProjectSection::Notes,
-        ProjectSection::Settings,
-        ProjectSection::Resources,
-        ProjectSection::Policy,
-        ProjectSection::Roles,
-        ProjectSection::Spend,
-        ProjectSection::Recurring,
-    ] {
-        let (mut d, out) = entered(Address::Project { project: 4, section });
-        let mut doc = project_doc();
-        doc.name = full();
-        if section == ProjectSection::Goals {
-            goal_offers(&mut doc);
-        }
-        doc.resources = parts();
-        doc.parts = parts();
-        doc.policy.ceiling = authority();
-        doc.policy.roles = list([
-            RolePolicy { number: 1, authority: authority(), allotment: u64::MAX, decisions: list([1, 2]) },
-            RolePolicy { number: 2, authority: authority(), allotment: u64::MAX, decisions: list([1, 2]) },
-        ]);
-        doc.policy.requirements = parts();
-        doc.policy.deciders = list([Decider { kind: 1, role: 1 }, Decider { kind: 2, role: 2 }]);
-        doc.roles = list([
-            Holding { party: 1, role: HeldRole::Policy { role: 1 } },
-            Holding { party: 2, role: HeldRole::Policy { role: 2 } },
-        ]);
-        doc.services = list([
-            Party { number: 1, kind: PartyKind::Service, name: full() },
-            Party { number: 2, kind: PartyKind::Service, name: full() },
-        ]);
-        let recurring = Recurring {
-            chip: full_chip(7),
-            key: u32::MAX,
-            batch: list([super::proposed_task::full_template(1), super::proposed_task::full_template(2)]),
-            budget: u64::MAX,
-            overlap: RecurringOverlap::Wait,
-            last_period: u64::MAX,
-            pending_period: Some(u64::MAX),
-            last_batch: list([8, 9]),
-            cut: true,
-            current_period: u64::MAX,
-            began: Some(Wall::from_nanos(u64::MAX)),
-            next: Some(Wall::from_nanos(u64::MAX)),
-        };
-        doc.recurring = list([recurring.clone(), Recurring { key: 2, ..recurring }]);
-        doc.pools = list([*doc.pools.get(0).unwrap(), *doc.pools.get(0).unwrap()]);
-        doc.spend_lines = list([
-            TaskSpend { chip: full_chip(8), spent: u64::MAX },
-            TaskSpend { chip: full_chip(9), spent: u64::MAX },
-        ]);
-        for request in out {
-            match request {
-                Request::Read { read, what: Read::Project { .. } } => {
-                    drive(
-                        &mut d,
-                        Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc.clone()))) },
-                    );
-                }
-                Request::Open { watch, subject: Subject::Goals { .. } } => fill_goals(&mut d, watch, &doc),
-                Request::Read { read, what: Read::Goals { .. } } => fill_ended_goals(&mut d, read, &doc),
-                Request::Open { watch, subject: Subject::Inbox { .. } } => fill_inbox(&mut d, watch),
-                Request::Open { watch, subject: Subject::Tasks { filter, .. } } => fill_tasks(&mut d, watch, filter),
-                Request::Read { read, what: Read::Notes { .. } } => fill_notes(&mut d, read),
-                Request::Read { read, what: Read::Spend { .. } } => fill_spend(&mut d, read, &doc),
-                _ => {}
-            }
-        }
-        if section == ProjectSection::Goals {
-            drive(
-                &mut d,
-                Event::Act {
-                    act: Act::GoalForm {
-                        form: crate::page::project::goals::GoalForm {
-                            project: 4,
-                            executor: GoalExecutor::Charter(1),
-                            budget: u64::MAX,
-                            deadline: Some(Wall::from_nanos(u64::MAX)),
-                            priority: u32::MAX,
-                        },
-                    },
-                },
-            );
-            drive(&mut d, Event::Act { act: Act::Edit { field: crate::fields::Purpose::NewGoal, text: full() } });
-        }
-        render(&d, words);
-    }
-}
+
 fn goal_offers(doc: &mut Project) {
     doc.acts = list([Offered {
         act: ActKind::SetGoal,
@@ -348,7 +275,7 @@ fn deployment(words: &Words) {
     let watch = out
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Deployment } => Some(*watch),
+            Request::Client { asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Deployment) } } => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -387,13 +314,19 @@ fn deployment(words: &Words) {
 }
 fn conversations(words: &Words) {
     let (mut d, out) = entered(Address::Conversations { project: None });
-    let watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Conversations } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Conversations),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let line = |number| ConversationLine {
         cached_replies: u32::MAX,
         runtime: Some(Runtime::Waiting { dependencies: list([8, 9]), hold: Some(part()) }),
@@ -420,13 +353,19 @@ fn conversations(words: &Words) {
 }
 fn inbox(words: &Words) {
     let (mut d, out) = entered(Address::Inbox { project: None });
-    let watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Inbox { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let entry = |number| InboxEntry {
         object: ObjectKey::Task(number),
         group: InboxGroup::PersonTasks,
@@ -452,7 +391,10 @@ fn inbox(words: &Words) {
         })),
     );
     for request in &out {
-        if let Request::Read { read, what: Read::Inbox { group, .. } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Inbox { group, .. }) },
+        } = request
+        {
             let mut first = entry(if *group == InboxReadGroup::Needs { 10 } else { 12 });
             let mut second = entry(if *group == InboxReadGroup::Needs { 11 } else { 13 });
             if *group == InboxReadGroup::Updates {
@@ -461,7 +403,7 @@ fn inbox(words: &Words) {
             }
             drive(
                 &mut d,
-                Event::Read {
+                ReadPage {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                         cut: false,
@@ -477,19 +419,9 @@ fn inbox(words: &Words) {
     render(&d, words);
 }
 fn not_the_work(words: &Words) {
-    let mut d = Domain::new(&CLIENT);
-    for number in [1, 2] {
-        d.provider(crate::signin::Provider { number, name: full() }).unwrap();
-    }
-    drive(
-        &mut d,
-        Event::Start {
-            address: Address::Inbox { project: None },
-            kept: list([]),
-            offset: crate::boundary::Offset { minutes: 0 },
-        },
-    );
-    drive(&mut d, Event::SignedOut);
+    let mut d = Fixture::new(&CLIENT);
+    drive(&mut d, Event::Start { seed: 8, place: Place::Jig(Address::Inbox { project: None }), records: list([]) });
+    drive(&mut d, jig_client::Up::SignedOut);
     render(&d, words);
     let (d, _) = start();
     render(&d, words);
@@ -551,7 +483,7 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
     b.open(Role::Page);
     assert!(!crate::jig(
         &mut b,
-        &d,
+        &d.view(),
         SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings
@@ -561,7 +493,7 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
     b.text(skein_ui::Run::Plain, b"Application page");
     b.close();
     b.close();
-    crate::after_page(&mut b, &d, words, &mut bindings);
+    crate::after_page(&mut b, &d.view(), words, &mut bindings);
     b.close();
     let slots = b.slots(0);
     assert_eq!(slots.len(), 1);
@@ -587,7 +519,7 @@ fn capacity_composes_siblings_fragments_and_application_pages_with_checked_overf
     );
 }
 
-fn fill_tree(d: &mut Domain, watch: Token) {
+fn fill_tree(d: &mut Fixture, watch: jig_client::Handle) {
     let node = |number, parent| TreeNode {
         chip: full_chip(number),
         parent,
@@ -620,10 +552,10 @@ fn fill_tree(d: &mut Domain, watch: Token) {
         })),
     );
 }
-fn fill_activity(d: &mut Domain, read: Token) {
+fn fill_activity(d: &mut Fixture, read: jig_client::Handle) {
     drive(
         d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Activity(Box::new(ActivityPage {
                 cut: false,
@@ -653,7 +585,7 @@ fn fill_activity(d: &mut Domain, read: Token) {
             drive(
                 d,
                 Event::Act {
-                    act: Act::FoldCall {
+                    action: Act::FoldCall {
                         name: crate::conversation::CallName { attempt: 1, turn: number, call },
                         open: true,
                     },
@@ -662,10 +594,10 @@ fn fill_activity(d: &mut Domain, read: Token) {
         }
     }
 }
-fn fill_history(d: &mut Domain, read: Token) {
+fn fill_history(d: &mut Fixture, read: jig_client::Handle) {
     drive(
         d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::History(Box::new(HistoryPage {
                 cut: false,
@@ -692,7 +624,7 @@ fn fill_history(d: &mut Domain, read: Token) {
     );
 }
 
-fn fill_goals(d: &mut Domain, watch: Token, _doc: &Project) {
+fn fill_goals(d: &mut Fixture, watch: jig_client::Handle, _doc: &Project) {
     let goal = |number| GoalLine {
         changed: Some(Wall::EPOCH),
         chip: full_chip(number),
@@ -714,7 +646,7 @@ fn fill_goals(d: &mut Domain, watch: Token, _doc: &Project) {
     };
     deliver(d, watch, Delivery::Goals(Box::new(Goals { project: 4, rows: list([goal(8), goal(9)]), more: true })));
 }
-fn fill_ended_goals(d: &mut Domain, read: Token, _doc: &Project) {
+fn fill_ended_goals(d: &mut Fixture, read: jig_client::Handle, _doc: &Project) {
     let goal = |number| GoalLine {
         changed: Some(Wall::EPOCH),
         chip: full_chip(number),
@@ -736,7 +668,7 @@ fn fill_ended_goals(d: &mut Domain, read: Token, _doc: &Project) {
     };
     drive(
         d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
                 cut: false,
@@ -747,7 +679,7 @@ fn fill_ended_goals(d: &mut Domain, read: Token, _doc: &Project) {
         },
     );
 }
-fn fill_inbox(d: &mut Domain, watch: Token) {
+fn fill_inbox(d: &mut Fixture, watch: jig_client::Handle) {
     let entry = |number| InboxEntry {
         object: ObjectKey::Task(number),
         group: InboxGroup::PersonTasks,
@@ -773,7 +705,7 @@ fn fill_inbox(d: &mut Domain, watch: Token) {
         })),
     );
 }
-fn fill_tasks(d: &mut Domain, watch: Token, filter: TaskFilter) {
+fn fill_tasks(d: &mut Fixture, watch: jig_client::Handle, filter: TaskFilter) {
     let row = |number| TaskLine {
         asked_by_me: true,
         chip: full_chip(number),
@@ -787,7 +719,7 @@ fn fill_tasks(d: &mut Domain, watch: Token, filter: TaskFilter) {
         Delivery::Tasks(Box::new(Tasks { project: 4, filter, rows: list([row(8), row(9)]), more: true })),
     );
 }
-fn fill_notes(d: &mut Domain, read: Token) {
+fn fill_notes(d: &mut Fixture, read: jig_client::Handle) {
     let note = |number| Note {
         number,
         revision: Revision { value: 7 },
@@ -805,7 +737,7 @@ fn fill_notes(d: &mut Domain, read: Token) {
     };
     drive(
         d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
                 cut: false,
@@ -816,12 +748,12 @@ fn fill_notes(d: &mut Domain, read: Token) {
         },
     );
 }
-fn fill_spend(d: &mut Domain, read: Token, doc: &Project) {
+fn fill_spend(d: &mut Fixture, read: jig_client::Handle, doc: &Project) {
     let period =
         SpendPeriod { period: u64::MAX, budget: doc.spend, pools: doc.pools.clone(), tasks: doc.spend_lines.clone() };
     drive(
         d,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Spend(Box::new(SpendPage {
                 cut: false,
@@ -860,7 +792,7 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
     assert_eq!(crate::task_nodes(&CLIENT, 0), Some(1_171_879));
     assert_eq!(crate::project_nodes(&CLIENT, 0), Some(508_525));
     assert_eq!(crate::deployment_nodes(&CLIENT, 0), Some(2729));
-    assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(29));
+    assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(25));
     assert_eq!(crate::page_nodes(&CLIENT, 0), Some(1_171_879));
 }
 
@@ -893,32 +825,35 @@ fn no_arrangement_keeps_each_page_bound() {
     assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_171_888));
 }
 
-fn most_owed_cards() -> Domain {
+fn most_owed_cards() -> Fixture {
     let (mut d, watch) = start();
     deliver(&mut d, watch, Delivery::Frame(Box::new(document())));
     let objects = list((1..=CLIENT.objects).map(|n| ObjectKey::Task(u64::from(n))));
-    let out = drive(&mut d, Event::ShowObjects { objects });
+    let out = drive(&mut d, Event::Named { objects, sections: List::with_capacity(0) });
     for request in out {
-        if let Request::Read { read, what: Read::Task { task } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Task { task }) },
+        } = request
+        {
             let mut doc = super::cards_objects::task_doc(&[ActKind::Cancel]);
             doc.chip.task = task;
-            drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Task(Box::new(doc))) });
+            drive(&mut d, ReadPage { read, result: ReadResult::Value(ReadValue::Task(Box::new(doc))) });
         }
     }
     for number in 1..=CLIENT.objects {
         let id = d.objects().find(ObjectKey::Task(u64::from(number))).unwrap();
-        drive(&mut d, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Cancel } });
+        drive(&mut d, Event::Act { action: Act::Intend { object: id.token(), act: ActKind::Cancel } });
         drive(
             &mut d,
             Event::Act {
-                act: Act::Edit { field: crate::fields::Purpose::Reason, text: super::cards::text(b"cancel") },
+                action: Act::Edit { field: crate::fields::Purpose::Reason, text: super::cards::text(b"cancel") },
             },
         );
         if number < CLIENT.objects {
-            drive(&mut d, Event::Act { act: Act::Confirm });
+            drive(&mut d, Event::Act { action: Act::Confirm });
         }
     }
-    drive(&mut d, Event::ObjectsLeft);
+    drive(&mut d, Event::Named { objects: List::with_capacity(0), sections: List::with_capacity(0) });
     d
 }
 #[test]
@@ -932,7 +867,10 @@ fn the_most_owed_cards_fit_the_pages_bound() {
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
-    crate::pages::after_page(&mut b, &d, words(), &mut bindings);
+    crate::pages::after_page(&mut b, &d.view(), words(), &mut bindings);
     b.close();
     assert!(b.finish().len() <= limits.nodes);
 }
+
+mod project;
+use project::project_pages;

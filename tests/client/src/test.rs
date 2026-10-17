@@ -26,7 +26,7 @@ pub fn limits() -> jig_client_test_domain::Limits {
             save_delay: Duration::from_millis(10),
             intents: 2,
             fields: 4,
-            providers: 2,
+
             objects: 3,
             sources: 8,
             reads: 8,
@@ -163,11 +163,7 @@ fn from_fixture(
     linked: bool,
 ) -> (domain::Domain, view::View<'static>) {
     let (words, family) = fixture.books;
-    let mut root = if linked { domain::new(limits, seed) } else { domain::unlinked(limits, seed) };
-    domain::provider(&mut root, jig_client_view::signin::Provider { number: 1, name: crate::stories::text(b"Test") })
-        .expect("provider fits");
-    domain::provider(&mut root, jig_client_view::signin::Provider { number: 2, name: crate::stories::text(b"Other") })
-        .expect("second provider fits");
+    let root = if linked { domain::new(limits, seed) } else { domain::unlinked(limits, seed) };
     (root, view::View::new(&fixture.bounds, limits, words, family, first::Address { project: 1, item: 1 }))
 }
 /// The same fixture with the application's byte transport attached.
@@ -221,7 +217,7 @@ impl App for Test {
         Event::Went { place: domain::Place::Address(address) }
     }
     fn step(root: &mut Self::Root, env: &Env<Self::Limits>, event: Event, out: &mut Queue<Request>) {
-        if matches!(&event, Event::Jig(jig_client_view::Event::Hello { .. })) {
+        if matches!(&event, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { .. } } }) {
             for family in [domain::FIRST, domain::SECOND] {
                 domain::step(
                     root,
@@ -268,7 +264,7 @@ impl App for Test {
             Request::Client { request: jig_client::Request::SignOut } | Request::SignOut => Duty::SignOut,
             Request::Client { .. } => Duty::Wire(request),
             Request::Show { address, replace } => Duty::Show { address, replace },
-            Request::SignIn { provider, back } => Duty::SignIn { provider, back },
+            Request::SignIn { provider } => Duty::SignIn { provider },
             Request::Jig(JigOut::Answered { .. } | JigOut::Unknown { .. })
             | Request::First(_)
             | Request::Fact { .. } => Duty::Fact,
@@ -402,14 +398,23 @@ pub fn family_answer(answer: domain::family::Answer) -> jig_client::Answered {
 }
 fn client_event(event: Event) -> Event {
     let up = match event {
-        Event::Jig(jig_client_view::Event::Hello { served }) => jig_client::Up::Served { served, versions: None },
-        Event::Jig(jig_client_view::Event::Watch { watch, event }) => jig_client::Up::Watched { watch, event },
-        Event::Jig(jig_client_view::Event::Ended { watch, end }) => jig_client::Up::WatchEnded { watch, end },
-        Event::Jig(jig_client_view::Event::Read { read, result }) => {
-            jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) }
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served, versions: None } } } => {
+            jig_client::Up::Served { served, versions: None }
         }
-        Event::SignedOut | Event::Jig(jig_client_view::Event::SignedOut) => jig_client::Up::SignedOut,
-        Event::Jig(jig_client_view::Event::SignOutLost) => {
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event } } } => {
+            jig_client::Up::Watched { watch, event }
+        }
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::WatchEnded { watch, end } } } => {
+            jig_client::Up::WatchEnded { watch, end }
+        }
+        Event::Client {
+            event:
+                jig_client::Event::Up { up: jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) } },
+        } => jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) },
+        Event::SignedOut | Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedOut } } => {
+            jig_client::Up::SignedOut
+        }
+        Event::Client { event: jig_client::Event::SignOutLost } => {
             return Event::Client { event: jig_client::Event::SignOutLost };
         }
         Event::First(first::Event::Read { read, result }) => jig_client::Up::ReadDone {
@@ -466,3 +471,6 @@ fn client_event(event: Event) -> Event {
     };
     Event::Client { event: jig_client::Event::Up { up } }
 }
+
+mod native;
+pub(crate) use native::up;

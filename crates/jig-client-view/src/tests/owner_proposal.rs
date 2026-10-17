@@ -3,12 +3,12 @@
     clippy::wildcard_enum_match_arm,
     reason = "ordinary proofs query checked source trees and select public action requests"
 )]
+use crate::tests::fixtures::Fixture;
 use crate::words::Words;
 use crate::{JigBindings, owner_proposal as view};
 use skein_ui::phrases::{Hole, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use crate::Domain;
 use jig_client::contract::*;
 use skein_lib::{
     List, Wall,
@@ -164,8 +164,8 @@ fn build(value: &OwnerProposal, w: &Words) -> (Tree, JigBindings) {
     let f = view::required(value, &limits(), w).unwrap();
     let mut b = Builder::new(&capacity(f));
     let mut bindings = JigBindings::new(f.bindings, 256);
-    let client = Domain::new(&limits());
-    view::render(&mut b, &client, value, w, &mut bindings);
+    let client = Fixture::new(&limits());
+    view::render(&mut b, &client.view(), value, w, &mut bindings);
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(tree.len() <= f.nodes);
@@ -418,7 +418,7 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
     let _refusal = std::panic::catch_unwind(|| {
         let mut b = Builder::new(&short);
         let mut bindings = JigBindings::new(f.bindings, 256);
-        view::render(&mut b, &Domain::new(&limits()), &v, &w, &mut bindings);
+        view::render(&mut b, &Fixture::new(&limits()).view(), &v, &w, &mut bindings);
         b.finish()
     })
     .unwrap_err();
@@ -477,7 +477,7 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
         ] {
             let mut b = Builder::new(&skein_ui::Limits { nodes: f.nodes + 100, ..capacity(f) });
             let mut bindings = JigBindings::new(f.bindings, 256);
-            assert!(crate::cards::card(&mut b, &client, id, &place, &w, &mut bindings));
+            assert!(crate::cards::card(&mut b, &client.view(), id, &place, &w, &mut bindings));
             let tree = b.finish();
             super::cards_access::check(&tree);
             assert!(has(&tree, b"Proposed release"));
@@ -488,19 +488,22 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
             } else {
                 expected = Some(key);
             }
-            assert_eq!(crate::objects::proposal::owner_facts(client.objects().get(id).unwrap()), Some(&v));
+            assert_eq!(crate::objects::proposal::owner_facts(&client.objects().get(id).unwrap()), Some(&v));
         }
         maker_keys.push(expected.unwrap()).unwrap();
-        super::cards::drive(&mut client, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Accept } });
+        super::cards::drive(
+            &mut client,
+            Event::Act { action: Act::Intend { object: id.token(), act: ActKind::Accept } },
+        );
         assert_eq!(client.confirmation().unwrap().revision, None);
         let mut b = Builder::new(&skein_ui::Limits { nodes: f.nodes + 100, ..capacity(f) });
         let mut bindings = JigBindings::new(f.bindings, 256);
-        crate::confirmation::confirmation(&mut b, &client, &w, &mut bindings);
+        crate::confirmation::confirmation(&mut b, &client.view(), &w, &mut bindings);
         let tree = b.finish();
         super::cards_access::check(&tree);
         assert!(has(&tree, b"Proposed release"));
         assert!(has(&tree, b"Release hold not supplied"));
-        super::cards::drive(&mut client, Event::Act { act: Act::Dismiss });
+        super::cards::drive(&mut client, Event::Act { action: Act::Dismiss });
         assert!(client.confirmation().is_none());
     }
     assert_ne!(maker_keys.get(0).unwrap(), maker_keys.get(1).unwrap());
@@ -541,7 +544,7 @@ fn whole_linked_owner_carrier(w: &Words) {
         ObjectKey::Proposal(linked.key),
         ReadValue::OwnerProposal(Box::new(linked.clone())),
     );
-    assert_eq!(crate::objects::proposal::owner_facts(linked_client.objects().get(linked_id).unwrap()), Some(&linked),);
+    assert_eq!(crate::objects::proposal::owner_facts(&linked_client.objects().get(linked_id).unwrap()), Some(&linked),);
 }
 
 const UTF8_TEXTS: [&[u8]; 1] = [&[b'~'; 32]];

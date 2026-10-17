@@ -1,5 +1,6 @@
 //! Conversation read/watch agreement through the public boundary.
 use super::*;
+use crate::tests::fixtures::{Ended, Fixture, ReadPage, Served, Watched};
 use crate::{
     action::{Act, End},
     objects::Source,
@@ -14,12 +15,12 @@ fn rows(values: &[ConversationLine]) -> List<ConversationLine> {
     }
     result
 }
-fn watch_rows(domain: &mut Domain, watch: Token, values: &[ConversationLine]) -> Box<[Request]> {
+fn watch_rows(domain: &mut Fixture, watch: jig_client::Handle, values: &[ConversationLine]) -> Box<[Request]> {
     watch_owner(domain, watch, values, true, cursor(b"fixture-watch-after"))
 }
 fn watch_owner(
-    domain: &mut Domain,
-    watch: Token,
+    domain: &mut Fixture,
+    watch: jig_client::Handle,
     values: &[ConversationLine],
     more: bool,
     after: Cursor,
@@ -27,7 +28,7 @@ fn watch_owner(
     drive(
         domain,
         Time::ZERO,
-        Event::Watch {
+        Watched {
             watch,
             event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
                 rows: rows(values),
@@ -38,8 +39,8 @@ fn watch_owner(
     )
 }
 fn read_rows(
-    domain: &mut Domain,
-    read: Token,
+    domain: &mut Fixture,
+    read: jig_client::Handle,
     values: &[ConversationLine],
     before: Option<Cursor>,
     after: Option<Cursor>,
@@ -48,7 +49,7 @@ fn read_rows(
     drive(
         domain,
         Time::ZERO,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
                 rows: rows(values),
@@ -62,8 +63,8 @@ fn read_rows(
 fn cursor(value: &[u8]) -> Cursor {
     Cursor::new(Box::from(value), 1024).expect("bounded opaque cursor")
 }
-fn reply(domain: &Domain, task: u64) -> &crate::objects::result::Reply {
-    domain.objects().get(domain.objects().find(ObjectKey::Task(task)).unwrap()).unwrap().reply.as_ref().unwrap()
+fn reply(domain: &Fixture, task: u64) -> crate::objects::result::Reply {
+    domain.objects().get(domain.objects().find(ObjectKey::Task(task)).unwrap()).unwrap().reply.unwrap()
 }
 #[test]
 fn live_watch_growth_keeps_a_continuation_to_known_dropped_past() {
@@ -80,7 +81,7 @@ fn live_watch_growth_keeps_a_continuation_to_known_dropped_past() {
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Watch {
+        Watched {
             watch,
             event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
                 rows: rows(&[ten.clone(), eight.clone()]),
@@ -131,7 +132,7 @@ fn a_stale_read_preserves_one_current_conversation_and_its_reply() {
     assert_eq!(reply(&domain, 8).first_words, DocumentText { bytes: text(UTF8_TEXTS[1]), cut: true });
     let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
     assert_eq!(domain.objects().get(id).unwrap().sources.len(), 1);
-    assert!(domain.objects().get(id).unwrap().sources.contains(&Source::Watch(skein_lib::Id::from_token(watch))));
+    assert!(domain.objects().get(id).unwrap().sources.contains(&Source::Watch(watch)));
 }
 
 #[test]
@@ -167,12 +168,12 @@ fn overlap_is_deduplicated_before_both_bounded_slides() {
     );
     assert_eq!(window.rows.as_slice(), &[eight]);
 }
-fn more(domain: &mut Domain, end: End, value: &Cursor) -> Token {
+fn more(domain: &mut Fixture, end: End, value: &Cursor) -> jig_client::Handle {
     domain.reclaim();
     let out = drive(
         domain,
         Time::ZERO,
-        Event::Act { act: Act::More { window: Token::new(crate::page::conversations::CONVERSATIONS_WINDOW), end } },
+        Event::Act { action: Act::More { window: Token::new(crate::page::conversations::CONVERSATIONS_WINDOW), end } },
     );
     read_named(&out, &Read::Conversations { after: Some(value.clone()) })
 }
@@ -311,40 +312,33 @@ fn a_full_live_window_keeps_both_winners_when_a_read_disagrees_on_every_key() {
 }
 
 const THREE: crate::Limits = crate::Limits { rows: 3, objects: 3, reads: 8, ..LIMITS };
-fn step_three(domain: &mut Domain, event: Event) -> Box<[Request]> {
-    let env = skein_lib::Env { now: Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: THREE };
-    let mut out = skein_lib::Queue::with_capacity(crate::max_out(&THREE));
-    crate::step(domain, &env, event, &mut out);
-    let mut requests = List::with_capacity(crate::max_out(&THREE));
-    while let Some(request) = out.pop() {
-        requests.push(request).unwrap();
-    }
-    requests.into_boxed()
+fn step_three(domain: &mut Fixture, event: impl crate::tests::fixtures::Input) -> Box<[Request]> {
+    domain.drive(Time::ZERO, event)
 }
-fn three() -> (Domain, Token, Token) {
-    let mut domain = Domain::new(&THREE);
+fn three() -> (Fixture, jig_client::Handle, jig_client::Handle) {
+    let mut domain = Fixture::new(&THREE);
     let begin = step_three(
         &mut domain,
         Event::Start {
-            address: Address::Conversations { project: None },
-            kept: List::with_capacity(0),
-            offset: crate::boundary::Offset { minutes: 60 },
+            seed: 8,
+            place: Place::Jig(Address::Conversations { project: None }),
+            records: List::with_capacity(0),
         },
     );
     let frame_watch = open_token(&begin);
-    step_three(&mut domain, Event::Hello { served: true });
+    step_three(&mut domain, Served { served: true });
     let entered = step_three(
         &mut domain,
-        Event::Watch { watch: frame_watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },
+        Watched { watch: frame_watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame(7)))) },
     );
     let watch = open_token(&entered);
     let read = read_named(&entered, &Read::Conversations { after: None });
     (domain, watch, read)
 }
-fn watch_three(domain: &mut Domain, watch: Token, values: &[ConversationLine], after: &Cursor) {
+fn watch_three(domain: &mut Fixture, watch: jig_client::Handle, values: &[ConversationLine], after: &Cursor) {
     step_three(
         domain,
-        Event::Watch {
+        Watched {
             watch,
             event: WatchEvent::Delivered(Delivery::Conversations(Box::new(Conversations {
                 rows: rows(values),
@@ -355,15 +349,15 @@ fn watch_three(domain: &mut Domain, watch: Token, values: &[ConversationLine], a
     );
 }
 fn page_three(
-    domain: &mut Domain,
-    read: Token,
+    domain: &mut Fixture,
+    read: jig_client::Handle,
     values: &[ConversationLine],
     before: Option<Cursor>,
     after: Option<Cursor>,
 ) {
     step_three(
         domain,
-        Event::Read {
+        ReadPage {
             read,
             result: ReadResult::Value(ReadValue::Conversations(Box::new(ConversationPage {
                 rows: rows(values),
@@ -374,11 +368,11 @@ fn page_three(
         },
     );
 }
-fn more_three(domain: &mut Domain, end: End, cursor: &Cursor) -> Token {
+fn more_three(domain: &mut Fixture, end: End, cursor: &Cursor) -> jig_client::Handle {
     domain.reclaim();
     let out = step_three(
         domain,
-        Event::Act { act: Act::More { window: Token::new(crate::page::conversations::CONVERSATIONS_WINDOW), end } },
+        Event::Act { action: Act::More { window: Token::new(crate::page::conversations::CONVERSATIONS_WINDOW), end } },
     );
     read_named(&out, &Read::Conversations { after: Some(cursor.clone()) })
 }
@@ -489,19 +483,20 @@ fn an_owner_replay_joins_once_and_full_admission_keeps_the_current_cursor() {
         &mut domain,
         Time::ZERO,
         Event::Act {
-            act: Act::More { window: Token::new(crate::page::conversations::CONVERSATIONS_WINDOW), end: End::After },
+            action: Act::More { window: Token::new(crate::page::conversations::CONVERSATIONS_WINDOW), end: End::After },
         },
     );
     for request in &joined {
-        if let Request::Read { what, .. } = request {
+        if let Request::Client { asked: jig_client::Event::Read { read: jig_client::Readable::Jig(what), .. } } =
+            request
+        {
             assert_ne!(*what, Read::Conversations { after: Some(restart.clone()) });
         }
     }
     assert_eq!(domain.conversation_rows().edges.after, Edge::More(restart));
-    assert_ne!(first, Token::new(0));
+    assert_ne!(first, crate::handles::handle(Token::new(0)));
 
-    // Earlier page reads still owe terminals after navigation. Two displayed
-    // object reads fill the remaining slots; the new owner cursor stays whole.
+    // Outstanding reads on this page fill admission; the new owner cursor stays whole.
     let (mut domain, old_watch, old_read) = live_conversation_page();
     let history = drive(
         &mut domain,
@@ -509,7 +504,7 @@ fn an_owner_replay_joins_once_and_full_admission_keeps_the_current_cursor() {
         Event::Went { place: Place::Jig(Address::Task { task: 42, section: TaskSection::History }) },
     );
     let history_read = read_named(&history, &Read::History { task: 42, subtree: false, after: None });
-    drive(&mut domain, Time::ZERO, Event::Ended { watch: old_watch, end: WatchEnd::Closed });
+    drive(&mut domain, Time::ZERO, Ended { watch: old_watch, end: WatchEnd::Closed });
     domain.reclaim();
     let entered =
         drive(&mut domain, Time::ZERO, Event::Went { place: Place::Jig(Address::Conversations { project: None }) });
@@ -528,15 +523,23 @@ fn an_owner_replay_joins_once_and_full_admission_keeps_the_current_cursor() {
         false,
         next.clone(),
     );
+    for number in 0..LIMITS.reads {
+        let _read = domain.request_read(
+            Source::Window { number: 100 + u16::try_from(number).unwrap() },
+            Read::Task { task: 100 + u64::from(number) },
+        );
+    }
     let out = drive(
         &mut domain,
         Time::ZERO,
         Event::Act {
-            act: Act::More { window: Token::new(crate::page::conversations::CONVERSATIONS_WINDOW), end: End::After },
+            action: Act::More { window: Token::new(crate::page::conversations::CONVERSATIONS_WINDOW), end: End::After },
         },
     );
     for request in &out {
-        if let Request::Read { what, .. } = request {
+        if let Request::Client { asked: jig_client::Event::Read { read: jig_client::Readable::Jig(what), .. } } =
+            request
+        {
             assert_ne!(*what, Read::Conversations { after: Some(next.clone()) });
         }
     }

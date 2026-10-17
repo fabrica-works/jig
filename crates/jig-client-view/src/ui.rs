@@ -14,18 +14,20 @@
 use crate::{
     action::Act,
     address::{Address, Place},
-    boundary::{Event, Offset, Request},
-    facts::Fact,
+    boundary::{Event, Refused, Request},
     frame::me::{FrameShown, FrameState},
+    handles::Owner,
     limits::ui::Limits,
-    link::Link,
     page::{Arrangement, Page, Section},
     store::Record,
-    watches::{Following, Owner, Watch},
 };
-use jig_client::contract::{Delivery, Frame, Limit, Subject, WatchEnd, WatchEvent};
-use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Slab, Time, Token, Wall};
+use jig_client::Link;
+use jig_client::contract::{Delivery, Frame, Limit, Subject};
+use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Time, Token, Wall};
 
+pub mod borrowed;
+pub(crate) mod client;
+pub use borrowed::Borrowed;
 mod owed;
 
 /// View deadlines: one per notice, linger and saved record, plus a tick.
@@ -43,7 +45,9 @@ pub enum Timer {
 
 /// Jig's client state, owned once by the application client root.
 #[derive(Debug)]
-pub struct Domain {
+pub struct Ui {
+    pub(crate) limits: Limits,
+    pub(crate) seed: u64,
     pub(crate) started: bool,
     pub(crate) drafts: crate::drafts::Drafts,
     pub(crate) confirming: Option<crate::confirm::Confirmation>,
@@ -58,15 +62,13 @@ pub struct Domain {
     pub(crate) fields: crate::fields::Fields,
     pub(crate) signin: crate::signin::SignIn,
     pub(crate) blocked: bool,
-    pub(crate) versions: Option<bool>,
-    pub(crate) frame: FrameState,
     pub(crate) link: Link,
     pub(crate) page: Page,
     pub(crate) sections: List<Section>,
     pub(crate) section_statuses: List<crate::page::SectionStatus>,
     pub(crate) section_context: u32,
     pub(crate) arrangement: Arrangement,
-    pub(crate) inbox: crate::page::inbox::Inbox,
+    pub(crate) inbox: crate::page::inbox::State,
     pub(crate) project_page: crate::page::project::ProjectPage,
     pub(crate) deployment_page: crate::page::deployment::DeploymentPage,
     pub(crate) task_page: crate::page::task::TaskPage,
@@ -74,31 +76,68 @@ pub struct Domain {
     pub(crate) navigation: crate::page::navigation::Navigation,
     pub(crate) updates_count: u32,
     pub(crate) address: Address,
-    pub(crate) generation: u32,
-    pub(crate) offset: Offset,
     pub(crate) wall: Wall,
     pub(crate) shown: u64,
     pub(crate) kept: List<Record>,
     pub(crate) kept_requests: Map<u64, u32>,
-    pub(crate) watches: Slab<Watch>,
-    pub(crate) watch_ids: Map<Id<Watch>, ()>,
-    pub(crate) frame_watch: Option<Id<Watch>>,
+    pub(crate) handles: crate::handles::Handles,
+    pub(crate) frame_watch: Option<jig_client::Handle>,
     pub(crate) timers: Deadlines<Timer>,
     pub(crate) objects: crate::objects::Objects,
-    pub(crate) reads: crate::reads::Reads,
     pub(crate) object_rows: crate::windows::ObjectWindow,
     pub(crate) conversation_rows: crate::windows::ConversationWindow,
     pub(crate) conversation: crate::conversation::Conversation,
     pub(crate) history_rows: crate::windows::HistoryWindow,
 }
-impl Domain {
+impl Ui {
+    /// Steps the presentation with the client its root lends for this entry.
+    pub fn step(&mut self, now: Time, wall: Wall, client: &jig_client::Client, event: Event, out: &mut Queue<Request>) {
+        let env = Env { now, wall, limits: self.limits };
+        self.now = now;
+        self.wall = wall;
+        match event {
+            Event::Client { told } if self.started => client::told(self, &env, client, told, self.seed, out),
+            Event::Client { .. } => {}
+            event @ Event::Start { .. } => {
+                step(self, &env, event, out, client);
+                client::told(self, &env, client, jig_client::Told::Link { link: client.link().state }, self.seed, out);
+            }
+            event @ (Event::Went { .. }
+            | Event::Left
+            | Event::Act { .. }
+            | Event::Named { .. }
+            | Event::Frame { .. }
+            | Event::Ask { .. }
+            | Event::Kept { .. }
+            | Event::KeptGone { .. }) => step(self, &env, event, out, client),
+        }
+        settle(self, &env, out, client);
+    }
+    /// Fires one presentation deadline using the client's current state.
+    pub fn fire(&mut self, now: Time, wall: Wall, client: &jig_client::Client, out: &mut Queue<Request>) {
+        let env = Env { now, wall, limits: self.limits };
+        fire(self, &env, out, client);
+        settle(self, &env, out, client);
+    }
     /// Allocates bounded state from limits.
-    #[must_use]
-    pub fn new(limits: &Limits) -> Self {
+    pub fn new(
+        limits: &Limits,
+        navigation: crate::page::navigation::Navigation,
+        home: Address,
+        arrangement: Arrangement,
+    ) -> Result<Self, Refused> {
+        if !valid_navigation(&navigation, limits.navigation_entries) {
+            return Err(Refused::Navigation);
+        }
+        if !arrangement.valid() {
+            return Err(Refused::Arrangement);
+        }
         assert!(crate::limits::ui::worst_case(limits).is_some(), "client limits are valid");
         let mut conversation = crate::conversation::Conversation::new(0, limits.rows);
         conversation.words = crate::conversation::KeptWords::new(limits.conversation_words);
-        Self {
+        Ok(Self {
+            limits: *limits,
+            seed: 0,
             started: false,
             drafts: crate::drafts::Drafts::new(limits.drafts),
             confirming: None,
@@ -111,41 +150,35 @@ impl Domain {
             text_limit: limits.text,
             intents: crate::intents::Intents::new(limits.intents),
             fields: crate::fields::Fields::new(limits.fields, limits.text),
-            signin: crate::signin::SignIn::new(limits.providers),
+            signin: crate::signin::SignIn::new(),
             blocked: false,
-            versions: None,
-            frame: FrameState { document: None },
             link: Link::Starting,
             page: Page::Starting,
             sections: List::with_capacity(crate::page::MOST_SECTIONS),
             section_statuses: List::with_capacity(crate::page::MOST_SECTIONS),
             section_context: u32::MAX,
-            arrangement: Arrangement::none(),
-            inbox: crate::page::inbox::Inbox::new(limits.rows),
+            arrangement,
+            inbox: crate::page::inbox::State::new(limits.rows),
             project_page: crate::page::project::ProjectPage::new(limits.rows),
             deployment_page: crate::page::deployment::DeploymentPage::new(),
             task_page: crate::page::task::TaskPage::new(limits.rows, limits.objects),
             chats: crate::page::conversations::State::new(),
-            navigation: crate::page::navigation::Navigation::new(limits.navigation_entries),
+            navigation,
             updates_count: limits.updates_count,
-            address: Address::Inbox { project: None },
-            generation: 0,
-            offset: Offset { minutes: 0 },
+            address: home,
             wall: Wall::EPOCH,
             shown: 0,
             kept: List::with_capacity(limits.records),
             kept_requests: Map::with_capacity(limits.kept),
-            watches: Slab::with_capacity(limits.watches),
-            watch_ids: Map::with_capacity(limits.watches),
+            handles: crate::handles::Handles::new(limits.watches, limits.reads),
             frame_watch: None,
             timers: Deadlines::with_capacity(crate::limits::ui::timers(limits).expect("timer capacity is validated")),
             objects: crate::objects::Objects::new(limits.objects, limits.sources),
-            reads: crate::reads::Reads::new(limits.reads),
             object_rows: crate::windows::ObjectWindow::new(limits.rows),
             conversation_rows: crate::windows::ConversationWindow::new(limits.rows),
             conversation,
             history_rows: crate::windows::HistoryWindow::new(limits.rows),
-        }
+        })
     }
     /// The page's sections in their display order (client/domain/client.md, 5.1).
     #[must_use]
@@ -160,7 +193,7 @@ impl Domain {
         &mut self,
         navigation: crate::page::navigation::Navigation,
     ) -> Result<(), crate::page::navigation::Navigation> {
-        if self.started || navigation.entries.capacity() > self.navigation.entries.capacity() {
+        if self.started || !valid_navigation(&navigation, self.limits.navigation_entries) {
             return Err(navigation);
         }
         self.navigation = navigation;
@@ -181,7 +214,7 @@ impl Domain {
     }
     /// Inbox context, filters and historical cursors for its shared cards.
     #[must_use]
-    pub const fn inbox(&self) -> &crate::page::inbox::Inbox {
+    pub const fn inbox(&self) -> &crate::page::inbox::State {
         &self.inbox
     }
     /// Current project facts, board, notes and the goal form.
@@ -211,12 +244,13 @@ impl Domain {
     }
     /// Counts and current identity shown on every page, including application pages.
     #[must_use]
-    pub fn frame_summary(&self) -> crate::frame::me::Summary {
-        let mut summary = self.frame.summary(self.address, self.link, self.page_behind_value(), self.updates_count);
+    pub fn frame_summary(&self, lent: &jig_client::Client) -> crate::frame::me::Summary {
+        let mut summary =
+            self.frame(lent).summary(self.address, self.link, self.page_behind_value(), self.updates_count);
         match self.address {
             Address::Task { task, .. } => {
                 if let Some(id) = self.objects.find(jig_client::contract::ObjectKey::Task(task))
-                    && let Some(object) = self.objects.get(id)
+                    && let Some(object) = self.borrow(lent).objects().get(id)
                 {
                     match &object.body {
                         Some(crate::objects::Body::Task(task)) => summary.project = Some(task.project),
@@ -251,20 +285,6 @@ impl Domain {
             | Page::OutOfDate
             | Page::SomeoneElse => false,
         }
-    }
-    /// Installs one provider before start, refusing duplicates and oversized names.
-    pub fn provider(&mut self, provider: crate::signin::Provider) -> Result<(), crate::signin::Provider> {
-        if self.started
-            || u64::try_from(provider.name.bytes().len()).expect("name length fits u64") > u64::from(self.text_limit)
-        {
-            return Err(provider);
-        }
-        for kept in &self.signin.providers {
-            if kept.number == provider.number {
-                return Err(provider);
-            }
-        }
-        self.signin.providers.push(provider)
     }
     /// Visible notices and their monotonic ends.
     #[must_use]
@@ -303,11 +323,6 @@ impl Domain {
     pub const fn confirmation(&self) -> Option<&crate::confirm::Confirmation> {
         self.confirming.as_ref()
     }
-    /// Provider names for the sign-in page.
-    #[must_use]
-    pub const fn signin(&self) -> &crate::signin::SignIn {
-        &self.signin
-    }
     /// Pending intents and any terminal awaiting reclaim.
     #[must_use]
     pub const fn intents(&self) -> &crate::intents::Intents {
@@ -340,8 +355,26 @@ impl Domain {
     }
     /// What the frame most recently said, without interpreting authority.
     #[must_use]
-    pub const fn frame(&self) -> &FrameState {
-        &self.frame
+    pub fn frame<'a>(&self, client: &'a jig_client::Client) -> FrameState<'a> {
+        match client.link().state {
+            Link::SignedOut | Link::OutOfDate => return FrameState { document: None },
+            Link::Starting | Link::Live | Link::Offline => {}
+        }
+        let document = match self.frame_watch {
+            Some(handle) => match client.document(handle) {
+                Some(document) => match document.latest {
+                    Some(jig_client::Latest::Jig(Delivery::Frame(frame)))
+                        if crate::frame::me::fits(frame, &self.limits) =>
+                    {
+                        Some(frame.as_ref())
+                    }
+                    Some(jig_client::Latest::Jig(_) | jig_client::Latest::Family(_)) | None => None,
+                },
+                None => None,
+            },
+            None => None,
+        };
+        FrameState { document }
     }
     /// The one page the view builds.
     #[must_use]
@@ -363,10 +396,9 @@ impl Domain {
     pub const fn wall(&self) -> Wall {
         self.wall
     }
-    /// The current page generation, including application pages.
-    #[must_use]
-    pub const fn generation(&self) -> u32 {
-        self.generation
+    /// The first native handle named by this page, retained until it leaves.
+    pub(crate) fn page_handle(&self) -> Option<jig_client::Handle> {
+        self.handles.anchor
     }
     /// The page's objects held once by key.
     #[must_use]
@@ -398,11 +430,6 @@ impl Domain {
     pub const fn history_rows(&self) -> &crate::windows::HistoryWindow {
         &self.history_rows
     }
-    /// The person's configured display time offset.
-    #[must_use]
-    pub const fn offset(&self) -> Offset {
-        self.offset
-    }
     /// The next timer the application's loop should fire.
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
@@ -410,39 +437,7 @@ impl Domain {
     }
     /// Reclaims entities only after their terminals arrived.
     pub fn reclaim(&mut self) {
-        for _ in 0..self.watch_ids.len() {
-            let mut finished = None;
-            for (id, ()) in &self.watch_ids {
-                let watch = self.watches.get(*id).expect("registered watch exists");
-                match watch.state {
-                    Following::Closed => {
-                        finished = Some(*id);
-                        break;
-                    }
-                    Following::Opening | Following::Live | Following::Closing => {}
-                }
-            }
-            match finished {
-                Some(id) => {
-                    let removed = self.watch_ids.remove(&id);
-                    assert!(removed.is_some(), "closed watch was registered");
-                    self.watches.retire(id);
-                    if self.frame_watch == Some(id) {
-                        self.frame_watch = None;
-                    }
-                    let count = self.objects.len();
-                    let excess = self.objects.replace(crate::objects::Source::Watch(id), &[]);
-                    assert!(excess == 0, "empty source replacement never refuses");
-                    if self.objects.len() != count {
-                        self.changed();
-                    }
-                }
-                None => break,
-            }
-        }
-        self.watches.reclaim();
         self.objects.reclaim();
-        self.reads.reclaim();
         self.intents.reclaim();
         self.notices.reclaim();
         crate::clock::sync(self);
@@ -455,117 +450,62 @@ impl Domain {
             let previous = self.link;
             self.link = link;
             match previous {
-                Link::Starting => {}
+                Link::Starting | Link::SignedOut | Link::OutOfDate => {}
                 Link::Live | Link::Offline => crate::notices::kept::show(self, crate::notices::kept::Kind::Link(link)),
             }
             self.changed();
             out.push(Request::Link { link });
         }
     }
-    pub(crate) fn open(&mut self, subject: Subject, owner: Owner, out: &mut Queue<Request>) -> Option<Id<Watch>> {
-        let watch = Watch { subject, owner, state: Following::Opening, behind: false };
-        match self.watches.insert(watch) {
-            Ok(id) => {
-                let previous = self.watch_ids.insert(id, ()).expect("the registry has the slab capacity");
-                assert!(previous.is_none(), "a newly issued watch is not already registered");
-                let subject = self.watches.get(id).expect("inserted watch exists").subject.clone();
-                out.push(Request::Open { watch: id.token(), subject });
-                Some(id)
-            }
-            Err(_) => {
-                out.push(Request::Fact { fact: Fact::Refused { which: Limit::Watches } });
-                None
-            }
+    pub(crate) fn hold_watch(
+        &mut self,
+        subject: Subject,
+        owner: Owner,
+        out: &mut Queue<Request>,
+    ) -> Option<jig_client::Handle> {
+        let handle = self.handles.watch(subject, owner, out);
+        if handle.is_none() {
+            crate::page::routing::refuse(self, Limit::Watches);
         }
+        handle
     }
-    fn retire(&mut self, id: Id<Watch>) {
-        match self.watches.get_mut(id) {
-            Some(watch) => {
-                match watch.state {
-                    Following::Closed => return,
-                    Following::Opening | Following::Live | Following::Closing => {}
-                }
-                watch.state = Following::Closed;
-            }
-            None => return,
+    pub(crate) fn release(&mut self, handle: jig_client::Handle, out: &mut Queue<Request>) {
+        if self.handles.watches.remove(&handle).is_none() {
+            return;
         }
-        let removed = self.watch_ids.remove(&id);
-        assert!(removed.is_some(), "retired watch was registered");
-        self.watches.retire(id);
+        out.push(Request::Client { asked: jig_client::Event::Unwatch { handle } });
+        self.unname(handle);
+    }
+    fn unname(&mut self, handle: jig_client::Handle) {
         let count = self.objects.len();
-        let excess = self.objects.replace(crate::objects::Source::Watch(id), &[]);
+        let excess = self.objects.replace(crate::objects::Source::Watch(handle), &[]);
         assert!(excess == 0, "empty source replacement never refuses");
         if self.objects.len() != count {
             self.changed();
         }
-        if self.frame_watch == Some(id) {
+        if self.frame_watch == Some(handle) {
             self.frame_watch = None;
         }
     }
-    pub(crate) fn close_one(&mut self, id: Id<Watch>, out: &mut Queue<Request>) {
-        if let Some(watch) = self.watches.get_mut(id) {
-            close_watch(watch, id, out);
-        }
-    }
-    pub(crate) fn close_page(&mut self, out: &mut Queue<Request>) {
-        for (id, ()) in &self.watch_ids {
-            let watch = self.watches.get_mut(*id).expect("registered watch exists");
-            match watch.owner {
-                Owner::Frame => {}
-                Owner::Page { .. } | Owner::Application { .. } | Owner::Sections { .. } => {
-                    close_watch(watch, *id, out);
+    pub(crate) fn leave_handles(&mut self, all: bool, out: &mut Queue<Request>) {
+        self.handles.anchor = None;
+        for _ in 0..self.handles.watches.len() {
+            let mut found = None;
+            for (handle, held) in &self.handles.watches {
+                if all || held.owner != Owner::Frame {
+                    found = Some(*handle);
+                    break;
                 }
             }
+            let Some(handle) = found else {
+                break;
+            };
+            self.release(handle, out);
         }
     }
-    pub(crate) fn close_all(&mut self, out: &mut Queue<Request>) {
-        for (id, ()) in &self.watch_ids {
-            let watch = self.watches.get_mut(*id).expect("registered watch exists");
-            close_watch(watch, *id, out);
-        }
+    pub(crate) fn show_work(&mut self, env: &Env<Limits>, out: &mut Queue<Request>, lent: &jig_client::Client) {
+        crate::page::routing::enter(self, env, out, lent);
     }
-    fn page_behind(&mut self) {
-        let mut behind = false;
-        for (id, ()) in &self.watch_ids {
-            let watch = self.watches.get(*id).expect("registered watch exists");
-            match watch.owner {
-                Owner::Frame | Owner::Application { .. } | Owner::Sections { .. } => {}
-                Owner::Page { generation } => {
-                    if generation == self.generation && watch.behind {
-                        behind = true;
-                    }
-                }
-            }
-        }
-        match &mut self.page {
-            Page::Work { behind: current, .. } => {
-                if *current != behind {
-                    *current = behind;
-                    self.changed();
-                }
-            }
-            Page::Starting
-            | Page::Elsewhere
-            | Page::SigningIn
-            | Page::Missing
-            | Page::OutOfDate
-            | Page::SomeoneElse => {}
-        }
-    }
-    pub(crate) fn show_work(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) {
-        crate::page::routing::enter(self, env, out);
-    }
-}
-
-pub(crate) fn close_watch(watch: &mut Watch, id: Id<Watch>, out: &mut Queue<Request>) {
-    watch.state = match watch.state {
-        Following::Opening | Following::Live => {
-            out.push(Request::Close { watch: id.token() });
-            Following::Closing
-        }
-        Following::Closed => Following::Closed,
-        Following::Closing => Following::Closing,
-    };
 }
 
 /// The maximum effects emitted by any one entry, with all watches closing.
@@ -581,24 +521,20 @@ pub fn max_out(limits: &Limits) -> u32 {
 }
 
 /// Routes one event, accepting no input until Start.
-pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
+pub fn step(domain: &mut Ui, env: &Env<Limits>, event: Event, out: &mut Queue<Request>, lent: &jig_client::Client) {
     if !domain.started {
         match event {
-            Event::Start { address, kept, offset } => start(domain, env, address, kept, offset, out),
-            Event::Hello { .. }
+            Event::Start { records, place, seed } => {
+                domain.seed = seed;
+                domain.intents.seed = seed;
+                start(domain, env, place, records, out);
+            }
+            Event::Client { .. }
+            | Event::Left
             | Event::Went { .. }
             | Event::Act { .. }
             | Event::Ask { .. }
-            | Event::Progress { .. }
-            | Event::Answered { .. }
-            | Event::Read { .. }
-            | Event::Watch { .. }
-            | Event::Ended { .. }
-            | Event::SignOutLost
-            | Event::SignedOut
-            | Event::ShowObjects { .. }
-            | Event::ShowSections { .. }
-            | Event::ObjectsLeft
+            | Event::Named { .. }
             | Event::Frame { .. }
             | Event::Kept { .. }
             | Event::KeptGone { .. } => {}
@@ -608,21 +544,19 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
     domain.now = env.now;
     domain.wall = env.wall;
     match event {
-        Event::Hello { served } => crate::versions::hello(domain, env, served, out),
-        Event::Frame { asked } => frame_answer(domain, asked, out),
-        Event::Watch { watch, event } => watch_event(domain, env, Id::from_token(watch), event, out),
-        Event::Ended { watch, end } => watch_end(domain, Id::from_token(watch), end, out),
+        Event::Client { .. } => unreachable!("client tells enter through Ui::step"),
+        Event::Frame { asked } => frame_answer(domain, asked, out, lent),
         Event::Went { place } => {
             crate::confirm::close(domain);
-            crate::page::routing::navigate(domain, env, place, true, out);
+            crate::page::routing::navigate(domain, env, place, true, out, lent);
         }
-        Event::Act { act } => act_event(domain, env, act, out),
+        Event::Act { action } => act_event(domain, env, action, out, lent),
         Event::Start { .. } => {}
         Event::Kept { scope, requests } => {
             if requests != 0 && domain.kept_requests.insert(scope, requests).is_err() {
-                out.push(Request::Fact { fact: Fact::Refused { which: Limit::Requests } });
+                crate::page::routing::refuse(domain, Limit::Requests);
             }
-            refresh_kept_page(domain, env, out);
+            refresh_kept_page(domain, env, out, lent);
         }
         Event::KeptGone { scope } => {
             if let Some(requests) = domain.kept_requests.get(&scope).copied() {
@@ -634,45 +568,36 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                         .insert(scope, requests.checked_sub(1).expect("counted request remains"))
                         .expect("existing scope retains its capacity");
                 }
-                refresh_kept_page(domain, env, out);
+                refresh_kept_page(domain, env, out, lent);
             }
         }
-        Event::Ask { ask } => crate::intents::by_value(domain, ask, out),
-        Event::Progress { request, progress } => crate::intents::progress(domain, request, progress, out),
-        Event::Answered { request, answer } => crate::intents::answered(domain, env, request, answer, out),
-        Event::SignOutLost => crate::signin::sign_out_lost(domain),
-        Event::SignedOut => signed_out(domain, out),
-        Event::ShowSections { sections } => crate::page::shown::show(domain, env, sections, out),
-        Event::ShowObjects { objects } => crate::application::show(domain, env, objects, out),
-        Event::ObjectsLeft => crate::application::left(domain, out),
-        Event::Read { read, result } => {
-            if crate::objects::historical_read(&result).is_some() || crate::objects::is_card_read(domain, read) {
-                crate::objects::read_card(domain, env, read, result, out);
-            } else {
-                crate::page::routing::read_result(domain, env, read, result, out);
-            }
+        Event::Ask { ask } => crate::intents::by_value(domain, ask, out, lent),
+        Event::Named { objects, sections } => {
+            crate::page::shown::show(domain, env, sections, out, lent);
+            crate::application::show(domain, env, objects, out);
         }
+        Event::Left => crate::page::routing::navigate(domain, env, Place::Elsewhere, false, out, lent),
     }
+}
+fn settle(domain: &mut Ui, env: &Env<Limits>, out: &mut Queue<Request>, lent: &jig_client::Client) {
     domain.section_context = u32::MAX;
     crate::drafts::sync(domain, out);
-    crate::confirm::sync(domain);
-    crate::signin::returned(domain, out);
-    crate::conversation::sending::restore(domain);
-    crate::conversation::chips::sync(domain, env, out);
+    crate::confirm::sync(domain, lent);
+    crate::conversation::sending::restore(domain, lent);
+    crate::conversation::chips::sync(domain, env, out, lent);
     crate::clock::sync(domain);
 }
-fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<Request>) {
+fn act_event(domain: &mut Ui, env: &Env<Limits>, act: Act, out: &mut Queue<Request>, lent: &jig_client::Client) {
     match act {
         Act::ProjectSettings { ask } => crate::page::project::owner_form::review(domain, ask),
         Act::ProjectServiceRole { role } => crate::page::project::owner_form::service_role(domain, role),
         Act::Go { address } => {
             crate::confirm::close(domain);
-            crate::page::routing::navigate(domain, env, Place::Jig(address), false, out);
+            crate::page::routing::navigate(domain, env, Place::Jig(address), false, out, lent);
         }
         Act::Edit { field: crate::fields::Purpose::Composer { task }, text } => {
             if let Err(which) = crate::drafts::edit(domain, task, text, out) {
                 crate::page::routing::refuse(domain, which);
-                out.push(Request::Fact { fact: Fact::Refused { which } });
             }
         }
         Act::Edit { field, text } => match domain.fields.edit(field, text) {
@@ -682,57 +607,57 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
             }
             Err(which) => {
                 crate::page::routing::refuse(domain, which);
-                out.push(Request::Fact { fact: Fact::Refused { which } });
             }
         },
         Act::Dismiss => dismiss_act(domain),
         Act::SignOut => crate::signin::sign_out(domain, out),
-        Act::SignIn { provider } => crate::signin::choose(domain, provider, out),
-        Act::StartChat { project } => crate::page::conversations::start(domain, env, project, out),
-        Act::OpenChat { task } => crate::page::conversations::open_chat(domain, env, task, out),
-        Act::OpenUpdates => crate::page::conversations::open_updates(domain, out),
+        Act::StartChat { project } => crate::page::conversations::start(domain, env, project, out, lent),
+        Act::OpenChat { task } => crate::page::conversations::open_chat(domain, env, task, out, lent),
+        Act::OpenUpdates => crate::page::conversations::open_updates(domain, out, lent),
         Act::FilterInbox { filter } => crate::page::conversations::filter_inbox(domain, filter, out),
         Act::Filter { group, project } => crate::page::conversations::filter_inbox(
             domain,
             crate::page::inbox::Filter { project, kind: Some(group), goal: None },
             out,
         ),
-        Act::FoldCall { name, open } => crate::conversation::routing::fold(domain, name, open),
-        Act::FoldCurrentCall { identity, open } => crate::conversation::routing::fold_current(domain, identity, open),
+        Act::FoldCall { name, open } => crate::conversation::routing::fold(domain, name, open, lent),
+        Act::FoldCurrentCall { identity, open } => {
+            crate::conversation::routing::fold_current(domain, identity, open, lent);
+        }
         Act::More { window, end } => {
             crate::conversation::routing::more(domain, window, end, out);
-            crate::page::conversations::more(domain, window, end, out);
+            crate::page::conversations::more(domain, window, end, out, lent);
             crate::page::task::more(domain, window, end, out);
             crate::page::project::more(domain, window, end, out);
         }
         Act::GoalForm { form } => crate::page::project::goals::configure(domain, form),
         Act::FilterTasks { filter } => crate::page::project::tasks(domain, env, filter, out),
         Act::FilterNotes { filter } => crate::page::project::notes::filter(domain, filter, out),
-        Act::Submit { field: crate::fields::Purpose::NewGoal } => crate::page::project::goals::open(domain),
+        Act::Submit { field: crate::fields::Purpose::NewGoal } => crate::page::project::goals::open(domain, lent),
         Act::FilterPlan { filter } => crate::page::task::filter(domain, filter),
         Act::HistoryScope { subtree } => crate::page::task::history(domain, subtree, out),
-        Act::OpenEnded { task } => crate::page::task::open_ended(domain, task, out),
+        Act::OpenEnded { task } => crate::page::task::open_ended(domain, task, out, lent),
         Act::Submit { field: crate::fields::Purpose::NewChat } => {
             let project = domain.shown_conversations().or(domain.shown_inbox()).unwrap_or(domain.shown_project());
             if let Some(project) = project {
-                crate::page::conversations::start(domain, env, project, out);
+                crate::page::conversations::start(domain, env, project, out, lent);
             }
         }
         Act::Submit { field: crate::fields::Purpose::Composer { task } } => {
             if let Some(id) = domain.objects.find(jig_client::contract::ObjectKey::Task(task)) {
-                crate::confirm::open(domain, env, id, jig_client::contract::ActKind::Write);
+                crate::confirm::open(domain, env, id, jig_client::contract::ActKind::Write, lent);
             }
         }
         Act::WriteRelease { release } => crate::confirm::write_release(domain, release),
         Act::Priority { priority } => crate::confirm::priority(domain, priority),
         Act::ChatAbout { object } => {
-            if let Some(object) = domain.objects.get(Id::from_token(object)) {
+            if let Some(object) = domain.borrow(lent).objects().get(Id::from_token(object)) {
                 let key = object.key;
                 crate::confirm::close(domain);
-                crate::page::conversations::about(domain, env, key, out);
+                crate::page::conversations::about(domain, env, key, out, lent);
             }
         }
-        Act::Intend { object, act } => crate::confirm::open(domain, env, Id::from_token(object), act),
+        Act::Intend { object, act } => crate::confirm::open(domain, env, Id::from_token(object), act, lent),
         Act::Choose { option } => crate::confirm::choose(domain, option),
         Act::CannotDo => crate::confirm::cannot(domain),
         Act::Again { again } => crate::confirm::again(domain, again),
@@ -742,33 +667,29 @@ fn act_event(domain: &mut Domain, env: &Env<Limits>, act: Act, out: &mut Queue<R
             if domain.project_page.settings.review.is_some() {
                 crate::page::project::owner_form::send(domain, out);
             } else {
-                confirm_act(domain, out);
+                confirm_act(domain, out, lent);
             }
         }
-        Act::LookAgain { object } => crate::objects::answer::look_again(domain, Id::from_token(object), out),
-        Act::Fold { object, open } => crate::page::task::fold(domain, object, open),
+        Act::LookAgain { object } => crate::objects::answer::look_again(domain, Id::from_token(object), out, lent),
+        Act::Fold { object, open } => crate::page::task::fold(domain, object, open, lent),
         Act::Submit { .. } => {}
     }
 }
-fn start(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    address: Address,
-    kept: List<Record>,
-    offset: Offset,
-    out: &mut Queue<Request>,
-) {
+fn start(domain: &mut Ui, env: &Env<Limits>, place: Place, records: List<Record>, out: &mut Queue<Request>) {
     domain.started = true;
     domain.now = env.now;
     domain.wall = env.wall;
-    domain.address = address;
-    domain.offset = offset;
-    crate::store::restore(domain, env.limits.text, kept, out);
-    domain.frame_watch = domain.open(Subject::Frame, Owner::Frame, out);
+    match place {
+        Place::Jig(address) => domain.address = address,
+        Place::Elsewhere => domain.signin.application = true,
+        Place::Missing => domain.page = Page::Missing,
+    }
+    crate::store::restore(domain, env.limits.text, records, out);
+    domain.frame_watch = domain.hold_watch(Subject::Frame, Owner::Frame, out);
     domain.changed();
 }
 // Restored table scopes are facts; the client owns the warning and its end.
-pub(crate) fn foreign_kept_requests(domain: &Domain, party: u64) -> bool {
+pub(crate) fn foreign_kept_requests(domain: &Ui, party: u64) -> bool {
     for (scope, requests) in &domain.kept_requests {
         if *scope != party && *requests != 0 {
             return true;
@@ -776,8 +697,8 @@ pub(crate) fn foreign_kept_requests(domain: &Domain, party: u64) -> bool {
     }
     false
 }
-fn refresh_kept_page(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
-    let Some(party) = domain.frame.party() else {
+fn refresh_kept_page(domain: &mut Ui, env: &Env<Limits>, out: &mut Queue<Request>, lent: &jig_client::Client) {
+    let Some(party) = domain.frame(lent).party() else {
         return;
     };
     if domain.blocked || domain.confirmed.is_none() {
@@ -785,16 +706,16 @@ fn refresh_kept_page(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Req
     }
     if foreign_kept_requests(domain, party) {
         if domain.page != Page::SomeoneElse {
-            domain.close_page(out);
+            domain.leave_handles(false, out);
             domain.page = Page::SomeoneElse;
             domain.changed();
         }
     } else if domain.page == Page::SomeoneElse {
-        domain.show_work(env, out);
+        domain.show_work(env, out, lent);
     }
 }
-fn frame_answer(domain: &Domain, asked: Token, out: &mut Queue<Request>) {
-    let party = domain.frame.party();
+fn frame_answer(domain: &Ui, asked: Token, out: &mut Queue<Request>, lent: &jig_client::Client) {
+    let party = domain.frame(lent).party();
     let address = match domain.page {
         Page::Work { address, .. } => Some(address),
         Page::Starting | Page::Elsewhere | Page::SigningIn | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {
@@ -804,124 +725,75 @@ fn frame_answer(domain: &Domain, asked: Token, out: &mut Queue<Request>) {
     out.push(Request::FrameIs { asked, frame: FrameShown { party, address, link: domain.link } });
 }
 
-fn accepts(state: Following) -> bool {
-    match state {
-        Following::Opening | Following::Live => true,
-        Following::Closing | Following::Closed => false,
-    }
-}
-fn watch_event(domain: &mut Domain, env: &Env<Limits>, id: Id<Watch>, event: WatchEvent, out: &mut Queue<Request>) {
-    let Some(watch) = domain.watches.get_mut(id) else {
+pub(crate) fn changed_handle(
+    domain: &mut Ui,
+    env: &Env<Limits>,
+    client: &jig_client::Client,
+    handle: jig_client::Handle,
+    out: &mut Queue<Request>,
+) {
+    let Some(held) = domain.handles.watches.get(&handle) else {
         return;
     };
-    if domain.blocked || !accepts(watch.state) {
+    if domain.blocked {
         return;
     }
-    let owner = watch.owner;
-    let subject = watch.subject.clone();
-    match event {
-        WatchEvent::Opened | WatchEvent::Alive => {}
-        WatchEvent::Behind => {
-            watch.behind = true;
-            domain.page_behind();
-        }
-        WatchEvent::Delivered(delivery) => {
-            match &delivery {
-                Delivery::OwnerDeployment(_) => {
-                    if watch.subject != Subject::Deployment {
-                        return;
-                    }
-                }
-                Delivery::OwnerTree(value) => match &watch.subject {
-                    Subject::Tree { task, .. } => {
-                        if *task != value.root.task {
-                            return;
-                        }
-                    }
-                    Subject::Frame
-                    | Subject::Task { .. }
-                    | Subject::Chips { .. }
-                    | Subject::Inbox { .. }
-                    | Subject::Goals { .. }
-                    | Subject::Tasks { .. }
-                    | Subject::Conversations
-                    | Subject::Run { .. }
-                    | Subject::Deployment => return,
-                },
-                Delivery::OwnerProject(_) => return,
-                Delivery::Frame(_)
-                | Delivery::Task(_)
-                | Delivery::OwnerProposal(_)
-                | Delivery::Tree(_)
-                | Delivery::Chips(_)
-                | Delivery::Inbox(_)
-                | Delivery::OwnerInbox(_)
-                | Delivery::Goals(_)
-                | Delivery::Tasks(_)
-                | Delivery::Conversations(_)
-                | Delivery::Run(_)
-                | Delivery::RunState(_)
-                | Delivery::Deployment(_) => {}
-            }
-            watch.state = Following::Live;
-            watch.behind = false;
-            match owner {
-                Owner::Application { generation } => {
-                    if generation == domain.generation {
-                        crate::application::delivery(domain, env, delivery, out);
-                    }
-                }
-                Owner::Frame => match delivery {
-                    Delivery::Frame(frame) => frame_delivery(domain, env, *frame, out),
-                    Delivery::Task(_)
-                    | Delivery::OwnerProject(_)
-                    | Delivery::OwnerProposal(_)
-                    | Delivery::Tree(_)
-                    | Delivery::OwnerTree(_)
-                    | Delivery::Chips(_)
-                    | Delivery::Inbox(_)
-                    | Delivery::OwnerInbox(_)
-                    | Delivery::Tasks(_)
-                    | Delivery::Goals(_)
-                    | Delivery::Conversations(_)
-                    | Delivery::Run(_)
-                    | Delivery::RunState(_)
-                    | Delivery::Deployment(_)
-                    | Delivery::OwnerDeployment(_) => {}
-                },
-                Owner::Page { generation } | Owner::Sections { generation } => {
-                    if generation == domain.generation {
-                        crate::page::shown::context_subject(domain, &subject);
-                        let contexts = crate::objects::contexts(
-                            &delivery,
-                            env.limits.rows.checked_mul(2).expect("two whole Inbox groups fit"),
-                        );
-                        crate::objects::dropping(domain, id, &delivery);
-                        crate::page::routing::delivery(domain, env, id, delivery, out);
-                        crate::objects::apply_contexts(domain, contexts);
-                        crate::objects::read_dropped(domain, out);
-                    }
+    let owner = held.owner;
+    let subject = held.subject.clone();
+    let Some(document) = client.document(handle) else {
+        return;
+    };
+    if document.state == jig_client::State::Live {
+        let Some(jig_client::Latest::Jig(delivery)) = document.latest else {
+            return;
+        };
+        match owner {
+            Owner::Frame => {
+                if let Delivery::Frame(frame) = delivery {
+                    frame_delivery(domain, env, *frame.clone(), out, client);
                 }
             }
-            domain.page_behind();
+            Owner::Application => crate::application::delivery(domain, env, delivery.clone(), out, client),
+            Owner::Page | Owner::Sections => {
+                crate::page::shown::context_subject(domain, &subject);
+                let contexts =
+                    crate::objects::contexts(delivery, env.limits.rows.checked_mul(2).expect("two inbox groups fit"));
+                crate::objects::dropping(domain, handle, delivery);
+                crate::page::routing::delivery(domain, env, handle, delivery.clone(), out, client);
+                crate::objects::apply_contexts(domain, contexts);
+                crate::objects::read_dropped(domain, out);
+            }
         }
     }
+    let mut behind = false;
+    for (handle, held) in &domain.handles.watches {
+        if held.owner == Owner::Page
+            && let Some(doc) = client.document(*handle)
+        {
+            behind |= doc.state == jig_client::State::Behind;
+        }
+    }
+    if let Page::Work { behind: value, .. } = &mut domain.page {
+        *value = behind;
+    }
+    domain.changed();
 }
-pub(crate) fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Frame, out: &mut Queue<Request>) {
+pub(crate) fn frame_delivery(
+    domain: &mut Ui,
+    env: &Env<Limits>,
+    frame: Frame,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     if !crate::frame::me::fits(&frame, &env.limits) {
-        out.push(Request::Fact { fact: Fact::Refused { which: Limit::Objects } });
-        return;
-    }
-    if domain.versions.is_none() {
-        domain.frame.document = Some(frame);
-        domain.changed();
+        crate::page::routing::refuse(domain, Limit::Objects);
         return;
     }
     domain.signin.service = match frame.party.kind {
         jig_client::contract::PartyKind::Service => true,
         jig_client::contract::PartyKind::Person => false,
     };
-    let first = domain.frame.document.is_none();
+    let first = domain.confirmed.is_none();
     let party = frame.party.number;
     let mut mismatch = false;
     for record in &domain.kept {
@@ -932,10 +804,9 @@ pub(crate) fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Fram
             mismatch = true;
         }
     }
-    let previous = domain.frame.party();
+    let previous = domain.confirmed;
     let previously_confirmed = domain.confirmed;
     let retention = frame.retention;
-    domain.frame.document = Some(frame);
     domain.confirmed = if mismatch { None } else { Some(party) };
     domain.changed();
     if first || previous != Some(party) || mismatch || previously_confirmed != domain.confirmed {
@@ -943,172 +814,90 @@ pub(crate) fn frame_delivery(domain: &mut Domain, env: &Env<Limits>, frame: Fram
         out.push(Request::Confirmed { party: confirmed });
     }
     out.push(Request::Retention { retention });
-    domain.set_link(Link::Live, out);
     if mismatch || foreign_kept_requests(domain, party) {
-        domain.close_page(out);
+        domain.leave_handles(false, out);
         domain.page = Page::SomeoneElse;
         domain.changed();
     } else {
         match domain.page {
-            Page::Starting | Page::SomeoneElse | Page::SigningIn => domain.show_work(env, out),
+            Page::Starting | Page::SomeoneElse | Page::SigningIn => {
+                if domain.signin.application {
+                    domain.page = Page::Elsewhere;
+                    domain.changed();
+                } else {
+                    domain.show_work(env, out, lent);
+                }
+            }
             Page::Work { .. } | Page::Elsewhere | Page::Missing | Page::OutOfDate => {}
         }
     }
 }
-fn watch_end(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Queue<Request>) {
-    let Some(watch) = domain.watches.get(id) else {
+pub(crate) fn ended_handle(
+    domain: &mut Ui,
+    handle: jig_client::Handle,
+    why: jig_client::Why,
+    out: &mut Queue<Request>,
+) {
+    let Some(held) = domain.handles.watches.remove(&handle) else {
         return;
     };
-    match &watch.subject {
-        Subject::Run { task, .. } => {
-            if *task == domain.conversation.task {
-                domain.conversation.interrupted();
-            }
-        }
-        Subject::Frame
-        | Subject::Task { .. }
-        | Subject::Tree { .. }
-        | Subject::Chips { .. }
-        | Subject::Inbox { .. }
-        | Subject::Tasks { .. }
-        | Subject::Goals { .. }
-        | Subject::Conversations
-        | Subject::Deployment => {}
+    crate::page::shown::context_subject(domain, &held.subject);
+    if why == jig_client::Why::Limit {
+        crate::page::routing::refuse(domain, Limit::Watches);
     }
-    match watch.state {
-        Following::Closed => return,
-        Following::Closing => {
-            domain.retire(id);
-            crate::signin::returned(domain, out);
-            return;
-        }
-        Following::Opening | Following::Live => {}
-    }
-    match end {
-        WatchEnd::Dropped | WatchEnd::Busy | WatchEnd::Stopping | WatchEnd::Closed => domain.retire(id),
-        WatchEnd::Unknown | WatchEnd::NotAllowed | WatchEnd::SubjectEnded => {
-            terminal_watch(domain, id, end, out);
-        }
-        WatchEnd::SignedOut => {
-            domain.retire(id);
-            signed_out(domain, out);
-        }
-    }
-    crate::signin::returned(domain, out);
-}
-fn terminal_watch(domain: &mut Domain, id: Id<Watch>, end: WatchEnd, out: &mut Queue<Request>) {
-    let Some(watch) = domain.watches.get(id) else {
-        return;
-    };
-    let owner = watch.owner;
-    let subject = watch.subject.clone();
-    let task_subject = match &watch.subject {
-        Subject::Task { .. } => true,
-        Subject::Frame
-        | Subject::Tree { .. }
-        | Subject::Chips { .. }
-        | Subject::Inbox { .. }
-        | Subject::Tasks { .. }
-        | Subject::Goals { .. }
-        | Subject::Conversations
-        | Subject::Run { .. }
-        | Subject::Deployment => false,
-    };
-    let final_task = match (&watch.subject, owner) {
-        (Subject::Task { task }, Owner::Page { generation } | Owner::Sections { generation }) => {
-            Some((*task, generation))
-        }
-        (Subject::Task { .. }, Owner::Frame | Owner::Application { .. })
-        | (
-            Subject::Frame
-            | Subject::Tree { .. }
-            | Subject::Chips { .. }
-            | Subject::Inbox { .. }
-            | Subject::Tasks { .. }
-            | Subject::Goals { .. }
-            | Subject::Conversations
-            | Subject::Run { .. }
-            | Subject::Deployment,
-            _,
-        ) => None,
-    };
-    // A live watch cannot distinguish an ended task from an absent one. The
-    // retained read supplies that distinction (client/domain/client.md, 7).
-    if (end == WatchEnd::SubjectEnded || end == WatchEnd::Unknown)
-        && let Some((task, generation)) = final_task
-        && generation == domain.generation
+    let final_task = why == jig_client::Why::SubjectEnded || why == jig_client::Why::Unknown;
+    if final_task
+        && (held.owner == Owner::Page || held.owner == Owner::Sections)
+        && let Subject::Task { task } = held.subject
     {
-        read_final_task(domain, id, task, generation, out);
-    }
-    let preserve = match owner {
-        Owner::Page { generation } | Owner::Application { generation } | Owner::Sections { generation } => {
-            generation == domain.generation && (end == WatchEnd::SubjectEnded || end == WatchEnd::Unknown)
+        let key = jig_client::contract::ObjectKey::Task(task);
+        let source = crate::objects::Source::Window { number: FINAL_TASK_READ };
+        if let Some(id) = domain.objects.find(key) {
+            domain
+                .objects
+                .get_mut(id)
+                .expect("named task exists")
+                .sources
+                .remove(&crate::objects::Source::Watch(handle));
         }
-        Owner::Frame => false,
-    };
-    if preserve {
-        crate::objects::ending_source(domain, id);
+        if let Some(id) = domain.objects.name(key, source) {
+            domain.task_page.header = Some(id);
+            let what = jig_client::contract::Read::Task { task };
+            if !domain.handles.pending(&what) && domain.handles.read(source, what, out).is_none() {
+                crate::page::routing::refuse(domain, Limit::Reads);
+            }
+        } else {
+            crate::page::routing::refuse(domain, Limit::Objects);
+        }
     }
-    if end == WatchEnd::NotAllowed && owner == (Owner::Sections { generation: domain.generation }) {
-        crate::page::shown::context_subject(domain, &subject);
+    if final_task && held.owner != Owner::Frame {
+        crate::objects::ending_source(domain, handle);
+    }
+    if why == jig_client::Why::NotAllowed && held.owner == Owner::Sections {
         crate::page::shown::status(domain, None, None, true);
     }
-    domain.retire(id);
-    if preserve {
+    domain.unname(handle);
+    if final_task {
         crate::objects::read_dropped(domain, out);
     }
-    match owner {
-        Owner::Frame => domain.set_link(Link::Offline, out),
-        Owner::Application { .. } | Owner::Sections { .. } => {}
-        Owner::Page { generation } => {
-            if generation == domain.generation && task_subject && domain.shown_task().is_some() {
-                match end {
-                    WatchEnd::NotAllowed => {
-                        domain.page = Page::Missing;
-                        domain.changed();
-                    }
-                    WatchEnd::Unknown
-                    | WatchEnd::SubjectEnded
-                    | WatchEnd::Closed
-                    | WatchEnd::Dropped
-                    | WatchEnd::Busy
-                    | WatchEnd::Stopping
-                    | WatchEnd::SignedOut => {}
-                }
-            }
-        }
+    if why == jig_client::Why::NotAllowed
+        && held.owner == Owner::Page
+        && let Subject::Task { .. } = held.subject
+    {
+        domain.page = Page::Missing;
     }
-}
-/// The final task document read source after its watch ends.
-pub(crate) const FINAL_TASK_READ: u16 = 24;
-// A watch terminal ends its obligation, while its final task remains readable.
-fn read_final_task(domain: &mut Domain, watch: Id<Watch>, task: u64, generation: u32, out: &mut Queue<Request>) {
-    let key = jig_client::contract::ObjectKey::Task(task);
-    let what = jig_client::contract::Read::Task { task };
-    let source = crate::objects::Source::Window { generation, number: FINAL_TASK_READ };
-    // Transfer this source's slot, including at a one-source limit.
-    if let Some(id) = domain.objects.find(key) {
-        domain.objects.get_mut(id).expect("named task exists").sources.remove(&crate::objects::Source::Watch(watch));
-    }
-    let Some(id) = domain.objects.name(key, source) else {
-        crate::page::routing::refuse(domain, Limit::Objects);
-        return;
-    };
-    // A fresh address has no live delivery to attach its page header.
-    domain.task_page.header = Some(id);
     domain.changed();
-    if !domain.reads.pending(&what) && domain.reads.ask(generation, source, what, out).is_none() {
-        crate::page::routing::refuse(domain, Limit::Reads);
-    }
 }
-pub(crate) fn signed_out(domain: &mut Domain, out: &mut Queue<Request>) {
-    crate::signin::signed_out(domain, out);
+/// Read window for the task's final document after its watch ends.
+pub(crate) const FINAL_TASK_READ: u16 = 24;
+pub(crate) fn signed_out(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client::Client) {
+    crate::signin::signed_out(domain, out, lent);
     if !domain.blocked {
         domain.project_page.clear();
     }
 }
 /// Fires at most one expired deadline, respecting watch terminal obligations.
-pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
+pub fn fire(domain: &mut Ui, env: &Env<Limits>, out: &mut Queue<Request>, lent: &jig_client::Client) {
     domain.now = env.now;
     domain.wall = env.wall;
     let Some(timer) = domain.timers.expire(env.now) else {
@@ -1119,7 +908,7 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         Timer::Notice(id) => crate::notices::kept::dismiss(domain, id.token()),
         Timer::Save(key) => crate::store::fire_save(domain, key, out),
         Timer::Linger(id) => {
-            if let Some(object) = domain.objects.get(id) {
+            if let Some(object) = domain.borrow(lent).objects().get(id) {
                 match object.card {
                     crate::objects::Card::Leaving { until, .. } => {
                         if until <= env.now {
@@ -1140,22 +929,22 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 }
 /// The next deadline of the client, for roots using free entry points.
 #[must_use]
-pub fn next_deadline(domain: &Domain) -> Option<Time> {
+pub fn next_deadline(domain: &Ui) -> Option<Time> {
     domain.next_deadline()
 }
 /// Frees retired slots at the loop's reclaim point.
-pub fn reclaim(domain: &mut Domain) {
+pub fn reclaim(domain: &mut Ui) {
     domain.reclaim();
 }
 
-fn confirm_act(domain: &mut Domain, out: &mut Queue<Request>) {
+fn confirm_act(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client::Client) {
     if domain.project_page.form.confirmation.is_some() {
-        crate::page::project::goals::send(domain, out);
+        crate::page::project::goals::send(domain, out, lent);
     } else {
-        crate::confirm::send(domain, out);
+        crate::confirm::send(domain, out, lent);
     }
 }
-fn dismiss_act(domain: &mut Domain) {
+fn dismiss_act(domain: &mut Ui) {
     if domain.project_page.settings.review.take().is_some() {
         domain.project_page.settings.before = None;
         domain.project_page.settings.pool_period = None;
@@ -1169,4 +958,18 @@ fn dismiss_act(domain: &mut Domain) {
     } else {
         crate::notices::kept::dismiss_first(domain);
     }
+}
+
+fn valid_navigation(navigation: &crate::page::navigation::Navigation, capacity: u32) -> bool {
+    if navigation.entries.capacity() > capacity {
+        return false;
+    }
+    for (index, entry) in navigation.entries.as_slice().iter().enumerate() {
+        if let Some(prefix) = navigation.entries.as_slice().get(..index)
+            && prefix.contains(entry)
+        {
+            return false;
+        }
+    }
+    true
 }

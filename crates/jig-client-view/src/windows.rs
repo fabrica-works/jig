@@ -127,7 +127,7 @@ fn move_objectwindow(rows: List<ObjectKey>, start: u32, count: u32, out: &mut Li
 }
 
 /// Conversations in the party list.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ConversationWindow {
     /// A retained read reported page loss; independent from its row edges.
     pub cut: bool,

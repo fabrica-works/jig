@@ -6,7 +6,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     fields::Purpose,
     objects::{Object, person_task::facts},
@@ -16,7 +16,7 @@ use skein_lib::{Id, List};
 /// Build the person-task card, addressed and taken from committed facts.
 pub fn person_task(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &super::Place,
     words: &Words,
@@ -26,7 +26,7 @@ pub fn person_task(
     let Some(fact) = client.objects().get(object) else {
         return false;
     };
-    let Some(document) = facts(fact) else {
+    let Some(document) = facts(&fact) else {
         return false;
     };
     let title = words.say(JigPhrase::PersonTask, &[]);
@@ -60,7 +60,7 @@ pub fn person_task(
     if let Some(ending) = &document.ending {
         words.ending(b, ending);
     }
-    super::common::answer(b, fact, words, text_limit);
+    super::common::answer(b, &fact, words, text_limit);
     super::common::acts(b, &fact.card, &document.acts, object, words, bindings);
     super::close(b);
     true
@@ -68,7 +68,7 @@ pub fn person_task(
 /// Show the contract's named state or options without a second answer form.
 pub fn contract(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     contract: &PersonContract,
     words: &Words,
     bindings: &mut JigBindings,
@@ -78,7 +78,7 @@ pub fn contract(
 /// Build the sole editable form in the object's Answer confirmation.
 pub fn form(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     contract: &PersonContract,
     words: &Words,
@@ -89,7 +89,7 @@ pub fn form(
 }
 fn render_contract(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     contract: &PersonContract,
     answering: bool,
     words: &Words,
@@ -114,7 +114,7 @@ fn render_contract(
 }
 fn options(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     options: &List<OptionLine>,
     answering: bool,
     words: &Words,

@@ -5,7 +5,7 @@ use crate::{JigBindings, JigMeaning, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
-use crate::{Domain, action::Act, fields::Purpose, page::project::goals::GoalForm};
+use crate::{Borrowed, action::Act, fields::Purpose, page::project::goals::GoalForm};
 use jig_client::contract::{ActKind, Admission, Bounds, GoalExecutor, GoalLine, ObjectKey, Project};
 /// The one typed form property changed by an input's complete value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,28 +30,29 @@ pub fn edit(form: GoalForm, field: Field, value: &[u8]) -> Option<Act> {
     }
     Some(Act::GoalForm { form })
 }
-pub(super) fn goals(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn goals(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words: &Words, bindings: &mut JigBindings) {
+    let project_page = client.project_page();
     words.text(b, JigPhrase::PriorityMeaning, &[]);
     b.open(Role::List);
-    for goal in &client.project_page().listed_goals {
+    for goal in &project_page.listed_goals {
         line(b, client, goal, words, bindings);
     }
     b.close();
-    if client.project_page().goals_more {
+    if project_page.goals_more {
         words.status(b, JigPhrase::MoreRows, &[]);
     }
-    crate::pages::cut(b, words, client.project_page().ended_cut);
+    crate::pages::cut(b, words, project_page.ended_cut);
     crate::pages::work::cursors(
         b,
         words,
         bindings,
-        client.project_page().ended_before.as_ref(),
-        client.project_page().ended_after.as_ref(),
+        project_page.ended_before.as_ref(),
+        project_page.ended_after.as_ref(),
         crate::page::project::GOALS_WINDOW,
     );
     form(b, client, doc, words, bindings);
 }
-fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings) {
+fn form(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words: &Words, bindings: &mut JigBindings) {
     let text_limit = bindings.text_limit();
     b.open(Role::Form);
     b.region(crate::regions::JigRegion::NewGoal.region());
@@ -124,7 +125,7 @@ fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings
 /// Bounds supply the whole choice list; Frame supplies only actual charter names.
 fn choices(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     doc: &Project,
     words: &Words,
     bindings: &mut JigBindings,
@@ -177,7 +178,7 @@ fn choices(
 }
 pub(super) fn choice(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
     project: u32,
@@ -226,7 +227,14 @@ pub(super) fn choice(
         GoalExecutor::Procedure { .. } => {}
     }
 }
-fn inputs(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings, pool_left: u64) {
+fn inputs(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    doc: &Project,
+    words: &Words,
+    bindings: &mut JigBindings,
+    pool_left: u64,
+) {
     let text_limit = bindings.text_limit();
     let state = &client.project_page().form;
     if let Some(form) = state.form {
@@ -298,7 +306,7 @@ fn inputs(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindin
         );
     }
 }
-pub(super) fn line(b: &mut Builder, client: &Domain, goal: &GoalLine, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn line(b: &mut Builder, client: &Borrowed<'_>, goal: &GoalLine, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Item);
     b.key(crate::pages::object_key(ObjectKey::Task(goal.chip.task)));
     cards::chip::chip(b, client, &goal.chip, words, bindings);

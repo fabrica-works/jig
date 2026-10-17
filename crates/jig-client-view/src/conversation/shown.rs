@@ -7,7 +7,7 @@ use jig_client::contract::{Activity, ArchivedTurn, Block, LiveCall, ObjectKey, T
 impl Conversation {
     /// Whether a shown conversation line or live call shows this object (view.md, 4.1).
     #[must_use]
-    pub fn shows(&self, key: ObjectKey) -> bool {
+    pub fn shows(&self, key: ObjectKey, live: &[crate::conversation::LiveTurn]) -> bool {
         for line in &self.lines.rows {
             match &line.event {
                 Activity::Turn { turn: TurnRead::Decoded(turn), .. }
@@ -35,7 +35,7 @@ impl Conversation {
                 | Activity::News { .. } => {}
             }
         }
-        for live in &self.live {
+        for live in live {
             match &live.call {
                 Some(LiveCall::Decoded(call)) => {
                     if call.objects.as_slice().contains(&key) {

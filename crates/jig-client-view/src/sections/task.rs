@@ -2,11 +2,12 @@
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
 use crate::{JigBindings, cards};
+use alloc::boxed::Box;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     address::{Address, TaskSection},
     objects::Body,
@@ -15,7 +16,7 @@ use jig_client::contract::{Executor, ObjectKey, Task};
 mod history;
 mod plan;
 /// The task's shared card and context, while any of its sections shows.
-pub fn header(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+pub fn header(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) -> bool {
     let Some(number) = shown(client) else {
         return false;
     };
@@ -57,7 +58,7 @@ pub fn header(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Ji
     b.close();
     true
 }
-fn shown(client: &Domain) -> Option<u64> {
+fn shown(client: &Borrowed<'_>) -> Option<u64> {
     for section in client.sections() {
         if client.shows(*section) {
             match section {
@@ -71,10 +72,11 @@ fn shown(client: &Domain) -> Option<u64> {
     }
     None
 }
-fn document(client: &Domain, number: u64) -> Option<&Task> {
-    let id = client.objects().find(ObjectKey::Task(number))?;
-    match &client.objects().get(id)?.body {
-        Some(Body::Task(doc)) => Some(doc),
+fn document(client: &Borrowed<'_>, number: u64) -> Option<Box<Task>> {
+    let objects = client.objects();
+    let id = objects.find(ObjectKey::Task(number))?;
+    match &objects.get(id)?.body {
+        Some(Body::Task(doc)) => Some(doc.clone()),
         Some(
             Body::Historical(_)
             | Body::Chip(_)
@@ -92,14 +94,14 @@ fn document(client: &Domain, number: u64) -> Option<&Task> {
     }
 }
 /// Every offered section, linked to its address with the current address marked.
-pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+pub fn tabs(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) -> bool {
     let Some(number) = shown(client) else {
         return false;
     };
     let Some(doc) = document(client, number) else {
         return false;
     };
-    let sections = crate::page::task::offers(doc);
+    let sections = crate::page::task::offers(&doc);
     b.open(Role::Tabs);
     b.region(crate::regions::JigRegion::TaskTabs.region());
     b.name(&words.say(JigPhrase::TaskPage, &[Hole::Number(number)]));
@@ -125,14 +127,14 @@ pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     b.close();
     true
 }
-pub(crate) fn all_shown(client: &Domain) -> bool {
+pub(crate) fn all_shown(client: &Borrowed<'_>) -> bool {
     let Some(number) = shown(client) else {
         return false;
     };
     let Some(doc) = document(client, number) else {
         return false;
     };
-    for section in &crate::page::task::offers(doc).offered {
+    for section in &crate::page::task::offers(&doc).offered {
         if !client.shows(crate::page::Section::Task { task: number, section: *section }) {
             return false;
         }
@@ -141,7 +143,7 @@ pub(crate) fn all_shown(client: &Domain) -> bool {
 }
 pub(crate) fn section(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
     task: u64,
@@ -153,14 +155,19 @@ pub(crate) fn section(
     crate::pages::work::section(b, words, section_phrase(section), region(section));
     crate::pages::mark_current(b, client, Address::Task { task, section });
     super::status(b, client, words, crate::page::Section::Task { task, section });
-    if let Some(doc) = document(client, task) {
-        match section {
-            TaskSection::Overview => overview(b, client, doc, words, bindings),
-            TaskSection::Activity => activity(b, client, doc, words, bindings),
-            TaskSection::Plan => plan::plan(b, client, words, bindings),
-            TaskSection::History => history::history(b, client, words, bindings),
-            TaskSection::Budget => budget(b, doc, words, bindings),
-            TaskSection::Panels => slots(b, doc, section, words, bindings),
+    match section {
+        TaskSection::Plan => plan::plan(b, client, words, bindings),
+        TaskSection::History => history::history(b, client, words, bindings),
+        TaskSection::Overview | TaskSection::Activity | TaskSection::Budget | TaskSection::Panels => {
+            if let Some(doc) = document(client, task) {
+                match section {
+                    TaskSection::Overview => overview(b, client, &doc, words, bindings),
+                    TaskSection::Activity => activity(b, client, &doc, words, bindings),
+                    TaskSection::Budget => budget(b, &doc, words, bindings),
+                    TaskSection::Panels => slots(b, &doc, section, words, bindings),
+                    TaskSection::Plan | TaskSection::History => unreachable!("independent section"),
+                }
+            }
         }
     }
     b.close();
@@ -218,7 +225,8 @@ fn slots(b: &mut Builder, doc: &Task, section: TaskSection, words: &Words, bindi
         TaskSection::Activity | TaskSection::Plan | TaskSection::History | TaskSection::Budget => {}
     }
 }
-pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn overview(b: &mut Builder, client: &Borrowed<'_>, doc: &Task, words: &Words, bindings: &mut JigBindings) {
+    let objects = client.objects();
     if let jig_client::contract::ChipPhase::Owner { details, .. } = doc.chip.details.as_ref() {
         crate::owner_chip::render(b, details, client, words, bindings);
     }
@@ -240,7 +248,7 @@ pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Wor
     }
     for link in &doc.inputs {
         task_link(b, client, link, words, bindings);
-        if let Some(id) = client.objects().find(ObjectKey::Result(link.number()))
+        if let Some(id) = objects.find(ObjectKey::Result(link.number()))
             && !client.owes(id)
         {
             cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
@@ -270,7 +278,7 @@ pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Wor
     match doc.chip.executor {
         Executor::Agent { charter } => words.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(charter))]),
         Executor::Party { .. } | Executor::Role { .. } => {
-            if let Some(id) = client.objects().find(ObjectKey::PersonTask(doc.chip.task))
+            if let Some(id) = objects.find(ObjectKey::PersonTask(doc.chip.task))
                 && !client.owes(id)
             {
                 cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
@@ -281,7 +289,7 @@ pub(crate) fn overview(b: &mut Builder, client: &Domain, doc: &Task, words: &Wor
 }
 fn task_link(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     link: &jig_client::contract::OwnerTaskLink,
     words: &Words,
     bindings: &mut JigBindings,
@@ -300,8 +308,9 @@ fn task_link(
         ),
     }
 }
-fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, bindings: &mut JigBindings) {
+fn activity(b: &mut Builder, client: &Borrowed<'_>, doc: &Task, words: &Words, bindings: &mut JigBindings) {
     use jig_client::contract::ChipPhase;
+    let objects = client.objects();
     match doc.chip.executor {
         Executor::Agent { .. } => {
             match doc.chip.details.as_ref() {
@@ -329,7 +338,7 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
             crate::turns::conversation(b, client, words, bindings);
             for proposal in &client.task_page().proposals {
                 let key = ObjectKey::Proposal(*proposal);
-                if let Some(id) = client.objects().find(key)
+                if let Some(id) = objects.find(key)
                     && !client.conversation().shows(key)
                     && !client.owes(id)
                 {
@@ -339,7 +348,7 @@ fn activity(b: &mut Builder, client: &Domain, doc: &Task, words: &Words, binding
         }
         Executor::Procedure { .. } => slots(b, doc, TaskSection::Activity, words, bindings),
         Executor::Party { .. } | Executor::Role { .. } => {
-            if let Some(id) = client.objects().find(ObjectKey::PersonTask(doc.chip.task))
+            if let Some(id) = objects.find(ObjectKey::PersonTask(doc.chip.task))
                 && !client.owes(id)
             {
                 cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);

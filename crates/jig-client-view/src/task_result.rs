@@ -2,10 +2,16 @@
 use crate::{JigBindings, words::Words};
 use skein_ui::Builder;
 
-use crate::Domain;
+use crate::Borrowed;
 use jig_client::contract::TaskResult;
 
-pub(crate) fn render(b: &mut Builder, client: &Domain, value: &TaskResult, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn render(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    value: &TaskResult,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     match value {
         TaskResult::Document(document) => crate::cards::result::facts(b, client, document, words, bindings),
         TaskResult::Ending(ending) => crate::owner_chip::ending(b, ending, client, words, bindings),

@@ -1,9 +1,9 @@
 use super::spine::{LIMITS, drain, frame, open_token};
+use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage, Watched};
 use crate::{
-    Domain, Event, Limits, Request,
+    Event, Limits, Request,
     action::Act,
     address::{Address, Place},
-    boundary::Offset,
     fields::Purpose,
     intents::{ByValue, send_card},
     notices::kept::{self, Kind},
@@ -15,45 +15,26 @@ use skein_lib::{Duration, Env, List, Queue, Time, Token, Wall};
 fn limits() -> Limits {
     Limits { ..LIMITS }
 }
-fn drive(domain: &mut Domain, limits: &Limits, now: Time, event: Event) -> Box<[Request]> {
+fn drive(
+    domain: &mut Fixture,
+    limits: &Limits,
+    now: Time,
+    event: impl crate::tests::fixtures::Input,
+) -> Box<[Request]> {
+    domain.ui.limits = *limits;
+    domain.drive(now, event)
+}
+fn tick(domain: &mut Fixture, limits: &Limits, now: Time) -> Box<[Request]> {
     let mut out = Queue::with_capacity(crate::max_out(limits));
-    let starting = match &event {
-        Event::Start { .. } => true,
-        Event::Hello { .. }
-        | Event::Kept { .. }
-        | Event::KeptGone { .. }
-        | Event::Went { .. }
-        | Event::Act { .. }
-        | Event::Ask { .. }
-        | Event::Progress { .. }
-        | Event::Answered { .. }
-        | Event::Read { .. }
-        | Event::Watch { .. }
-        | Event::Ended { .. }
-        | Event::ShowObjects { .. }
-        | Event::ShowSections { .. }
-        | Event::ObjectsLeft
-        | Event::SignOutLost
-        | Event::SignedOut
-        | Event::Frame { .. } => false,
-    };
-    crate::step(domain, &Env { now, wall: Wall::EPOCH, limits: *limits }, event, &mut out);
-    if starting {
-        crate::step(domain, &Env { now, wall: Wall::EPOCH, limits: *limits }, Event::Hello { served: true }, &mut out);
-    }
+    crate::fire(&mut domain.ui, &Env { now, wall: Wall::EPOCH, limits: *limits }, &mut out, &domain.client);
     drain(out)
 }
-fn tick(domain: &mut Domain, limits: &Limits, now: Time) -> Box<[Request]> {
-    let mut out = Queue::with_capacity(crate::max_out(limits));
-    crate::fire(domain, &Env { now, wall: Wall::EPOCH, limits: *limits }, &mut out);
-    drain(out)
-}
-fn start(domain: &mut Domain, limits: &Limits, kept: List<Record>) -> (Token, Token) {
+fn start(domain: &mut Fixture, limits: &Limits, kept: List<Record>) -> (jig_client::Handle, jig_client::Handle) {
     let f = open_token(&drive(
         domain,
         limits,
         Time::ZERO,
-        Event::Start { address: Address::Inbox { project: None }, kept, offset: Offset { minutes: 0 } },
+        Event::Start { seed: 8, place: Place::Jig(Address::Inbox { project: None }), records: kept },
     ));
     let mut source = frame(7);
     source.party.login = DocumentText::complete(text(b"L"));
@@ -61,16 +42,19 @@ fn start(domain: &mut Domain, limits: &Limits, kept: List<Record>) -> (Token, To
         domain,
         limits,
         Time::ZERO,
-        Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(source))) },
+        Watched { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(source))) },
     );
     let page = open_token(&initial);
     for request in &initial {
-        if let Request::Read { read, what: Read::Inbox { .. } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Inbox { .. }) },
+        } = request
+        {
             drive(
                 domain,
                 limits,
                 Time::ZERO,
-                Event::Read {
+                ReadPage {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                         cut: false,
@@ -92,7 +76,7 @@ fn text(bytes: &[u8]) -> Text {
 #[test]
 fn a_minute_counts_a_change_only_while_the_page_shows_wall_times() {
     let limits = limits();
-    let mut domain = Domain::new(&limits);
+    let mut domain = Fixture::new(&limits);
     start(&mut domain, &limits, List::with_capacity(0));
     assert_eq!(domain.next_deadline(), None);
     domain.timed_page(true);
@@ -116,22 +100,29 @@ fn a_minute_counts_a_change_only_while_the_page_shows_wall_times() {
 #[test]
 fn hidden_answers_have_notices_and_lingers_and_coalesced_saves_end_on_deadlines() {
     let limits = limits();
-    let mut domain = Domain::new(&limits);
+    let mut domain = Fixture::new(&limits);
     start(&mut domain, &limits, List::with_capacity(0));
     let key = ObjectKey::Task(8);
-    domain.objects.name(key, Source::Window { generation: 0, number: 1 }).unwrap();
+    domain.objects.name(key, Source::Window { number: 1 }).unwrap();
     let mut out = Queue::with_capacity(crate::max_out(&limits));
-    let request =
-        send_card(&mut domain, key, ActKind::Stop, Box::new(Ask::Stop { project: 1, task: 8 }), &mut out).unwrap();
+    let request = send_card(
+        &mut domain.ui,
+        key,
+        ActKind::Stop,
+        Box::new(Ask::Stop { project: 1, task: 8 }),
+        &mut out,
+        &domain.client,
+    )
+    .unwrap();
     drive(&mut domain, &limits, Time::ZERO, Event::Went { place: Place::Elsewhere });
-    drive(&mut domain, &limits, Time::ZERO, Event::Answered { request, answer: Answer::Refused(Refusal::NotOffered) });
+    drive(&mut domain, &limits, Time::ZERO, AnsweredByEngine { request, answer: Answer::Refused(Refusal::NotOffered) });
     let notice = *domain.notices().ids().first().unwrap().0;
     let Kind::Answer { object, .. } = &domain.notices().get(notice).unwrap().kind else {
         panic!("hidden card outcome");
     };
     assert_eq!(*object, key);
     assert_eq!(domain.notices().get(notice).unwrap().until, Time::from_nanos(Duration::from_secs(5).as_nanos()));
-    let id = domain.objects.name(ObjectKey::Task(9), Source::Window { generation: 1, number: 1 }).unwrap();
+    let id = domain.objects.name(ObjectKey::Task(9), Source::Window { number: 1 }).unwrap();
     assert!(domain.leave(id, Ending::Cancelled { by: Actor::Party(7), reason: Some(text(b"done")), at: None }));
     out = Queue::with_capacity(crate::max_out(&limits));
     assert!(store::coalesce(
@@ -146,12 +137,12 @@ fn hidden_answers_have_notices_and_lingers_and_coalesced_saves_end_on_deadlines(
     assert!(tick(&mut domain, &limits, Time::from_nanos(1_499_999_999)).is_empty());
     assert_eq!(
         tick(&mut domain, &limits, Time::from_nanos(1_500_000_000)).as_ref(),
-        &[Request::Save { record: newest }]
+        &[Request::Save { records: crate::tests::fixtures::one(newest) }]
     );
     tick(&mut domain, &limits, Time::from_nanos(5_000_000_000));
     tick(&mut domain, &limits, Time::from_nanos(5_000_000_000));
     assert!(domain.notices().ids().is_empty());
-    assert!(domain.objects.find(ObjectKey::Task(9)).is_none());
+    assert!(domain.objects().find(ObjectKey::Task(9)).is_none());
 }
 
 #[test]
@@ -163,7 +154,7 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
         reads: 1,
         intents: 1,
         fields: 1,
-        providers: 1,
+
         notices: 1,
         records: 1,
         projects: 1,
@@ -174,13 +165,11 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
         ..limits()
     };
     check_worst_case(limits);
-    let mut domain = Domain::new(&limits);
-    domain.provider(crate::signin::Provider { number: 1, name: text(b"P") }).unwrap();
+    let mut domain = Fixture::new(&limits);
     let mut kept = List::with_capacity(1);
     kept.push(Record::Draft { version: STORE_VERSION, party: 7, task: 8, words: text(b"kept"), touched: 1 }).unwrap();
     let (f, page) = start(&mut domain, &limits, kept);
-    let mut out = Queue::with_capacity(crate::max_out(&limits));
-    domain.reads.ask(0, Source::Window { generation: 0, number: 1 }, Read::Deployment, &mut out).unwrap();
+    domain.request_read(Source::Window { number: 1 }, Read::Deployment).unwrap();
     let mut entries = List::with_capacity(2);
     for task in 1..=2 {
         entries
@@ -210,9 +199,9 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
         &mut domain,
         &limits,
         Time::ZERO,
-        Event::Watch { watch: page, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox))) },
+        Watched { watch: page, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox))) },
     );
-    assert_eq!(effects.len(), 2);
+    assert_eq!(effects.len(), 0);
     let crate::page::Page::Work { excess: 1, refused: Some(Limit::Objects), .. } = domain.page() else {
         panic!("full kept the first and counted the rest");
     };
@@ -220,22 +209,22 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
     assert_eq!(drive(&mut domain, &limits, Time::ZERO, Event::Ask { ask: ask.clone() }).len(), 1);
     let mut other = ask;
     other.asked = Token::new(51);
-    assert_eq!(drive(&mut domain, &limits, Time::ZERO, Event::Ask { ask: other }).len(), 2);
+    assert_eq!(drive(&mut domain, &limits, Time::ZERO, Event::Ask { ask: other }).len(), 1);
     drive(
         &mut domain,
         &limits,
         Time::ZERO,
-        Event::Act { act: Act::Edit { field: Purpose::NewChat, text: text(b"one") } },
+        Event::Act { action: Act::Edit { field: Purpose::NewChat, text: text(b"one") } },
     );
     assert_eq!(
         drive(
             &mut domain,
             &limits,
             Time::ZERO,
-            Event::Act { act: Act::Edit { field: Purpose::Reason, text: text(b"two") } }
+            Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"two") } }
         )
         .len(),
-        1
+        0
     );
     kept::show(&mut domain, Kind::Refused(Limit::Requests));
     kept::show(&mut domain, Kind::Refused(Limit::Fields));
@@ -247,10 +236,10 @@ fn checked_worst_case_and_full_containers_keep_steps_within_max_out() {
             &mut domain,
             &limits,
             Time::ZERO,
-            Event::Watch { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(oversized))) }
+            Watched { watch: f, event: WatchEvent::Delivered(Delivery::Frame(Box::new(oversized))) }
         )
         .len(),
-        1
+        0
     );
     let effects = drive(&mut domain, &limits, Time::ZERO, Event::Went { place: Place::Jig(Address::Deployment) });
     assert!(u64::try_from(effects.len()).unwrap() <= u64::from(crate::max_out(&limits)));

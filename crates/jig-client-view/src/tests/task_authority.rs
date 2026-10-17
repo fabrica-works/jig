@@ -36,8 +36,8 @@ fn task_authority_forms_preserve_all_permissions_and_selected_delta_without_reco
         row.authority.cut = cut;
         let before = row.clone();
         let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
-        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Amend } });
+        drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, words, &mut bindings);
@@ -53,11 +53,11 @@ fn task_authority_forms_preserve_all_permissions_and_selected_delta_without_reco
             !cut
         );
         let action = input(&tree, b"New instructions", b"", &mut bindings);
-        drive(&mut domain, Event::Act { act: action });
+        drive(&mut domain, Event::Act { action });
         let tree = dialog(&domain, words, &mut bindings);
         if !cut {
             let action = input(&tree, b"New budget", b"25", &mut bindings);
-            drive(&mut domain, Event::Act { act: action });
+            drive(&mut domain, Event::Act { action });
         }
         let selected = domain.confirmation().unwrap().choices.change.as_ref().unwrap();
         assert_eq!(selected.instructions, Some(text(b"")));
@@ -76,14 +76,16 @@ fn task_authority_forms_preserve_all_permissions_and_selected_delta_without_reco
             );
         }
         let expected = selected.clone();
-        let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+        let out = drive(&mut domain, Event::Act { action: Action::Confirm });
         let sent: Vec<_> = out
             .iter()
             .filter_map(|request| match request {
-                Request::Send { ask, .. } => match &**ask {
-                    Ask::Amend { change, .. } => Some(change),
-                    _ => None,
-                },
+                Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
+                    match &**ask {
+                        Ask::Amend { change, .. } => Some(change),
+                        _ => None,
+                    }
+                }
                 _ => None,
             })
             .collect();
@@ -108,7 +110,13 @@ fn task_budget_section_renders_exact_bitmap_delegation_and_literal_authority_los
             let watch = out
                 .iter()
                 .find_map(|request| match request {
-                    Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
+                    Request::Client {
+                        asked:
+                            jig_client::Event::Watch {
+                                handle: watch,
+                                subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                            },
+                    } => Some(*watch),
                     _ => None,
                 })
                 .unwrap();

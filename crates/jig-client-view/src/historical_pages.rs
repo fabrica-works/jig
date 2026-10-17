@@ -8,7 +8,7 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::{Domain, Limits};
+use crate::{Borrowed, Limits};
 use alloc::boxed::Box;
 use jig_client::contract::{Chip, ChipPhase, Cursor, Funder, OwnerChipEnding, OwnerEndedPage, OwnerSpendPage};
 
@@ -146,7 +146,7 @@ fn wall(b: &mut Builder, words: &Words, phrase: P, at: skein_lib::Wall) {
 /// Display admitted rows as a companion to either existing Plan rendering path.
 pub fn ended_render(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     page: &OwnerEndedPage,
     words: &Words,
     bindings: &mut JigBindings,

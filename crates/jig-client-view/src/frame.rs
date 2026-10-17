@@ -9,10 +9,10 @@ use crate::{JigBindings, JigMeaning};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, SlotRef, State};
 
-use crate::{Domain, action::Act, address::Address, page::navigation::Destination};
+use crate::{Borrowed, action::Act, address::Address, page::navigation::Destination};
 
 /// The connection's state, on every page.
-pub fn link(b: &mut Builder, client: &Domain, words: &Words, _bindings: &mut JigBindings) {
+pub fn link(b: &mut Builder, client: &Borrowed<'_>, words: &Words, _bindings: &mut JigBindings) {
     let summary = client.frame_summary();
     part(b, words, JigRegion::Link, JigPhrase::LinkPart);
     words.link(b, summary.link);
@@ -22,7 +22,7 @@ pub fn link(b: &mut Builder, client: &Domain, words: &Words, _bindings: &mut Jig
     b.close();
 }
 /// What needs the signed-in party and their unread updates.
-pub fn needs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn needs(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let summary = client.frame_summary();
     part(b, words, JigRegion::Needs, JigPhrase::NeedsPart);
     match &client.frame().document {
@@ -53,12 +53,15 @@ pub fn needs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
     b.close();
 }
 /// Who is signed in, and their sign-out control.
-pub fn party(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn party(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     part(b, words, JigRegion::Party, JigPhrase::PartyPart);
     match &client.frame().document {
         Some(frame) => {
             crate::frame_facts::identity(b, words, &frame.party);
             if frame.party.kind == jig_client::contract::PartyKind::Person {
+                if client.client.link().sign_out_lost {
+                    words.status(b, JigPhrase::SignOutLost, &[]);
+                }
                 control(b, words, bindings, Role::Button, JigPhrase::SignOut, &[], Act::SignOut);
             }
         }
@@ -67,7 +70,7 @@ pub fn party(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut Jig
     b.close();
 }
 /// The party's project memberships.
-pub fn projects(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn projects(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     part(b, words, JigRegion::Projects, JigPhrase::ProjectsPart);
     if let Some(frame) = &client.frame().document {
         for project in &frame.projects {
@@ -77,7 +80,7 @@ pub fn projects(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut 
     b.close();
 }
 /// Going directly to a task by number.
-pub fn go_to_task(b: &mut Builder, _client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn go_to_task(b: &mut Builder, _client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     part(b, words, JigRegion::GoToTask, JigPhrase::GoToTaskPart);
     b.open(Role::TextField);
     b.name(&words.say(JigPhrase::TaskNumber, &[]));
@@ -87,12 +90,12 @@ pub fn go_to_task(b: &mut Builder, _client: &Domain, words: &Words, bindings: &m
     b.close();
 }
 /// Jig's navigation, followed by the application's slot.
-pub fn navigation(b: &mut Builder, client: &Domain, nav: SlotRef, words: &Words, bindings: &mut JigBindings) {
+pub fn navigation(b: &mut Builder, client: &Borrowed<'_>, nav: SlotRef, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Navigation);
     b.region(JigRegion::Navigation.region());
     b.name(&words.say(JigPhrase::Navigation, &[]));
     for entry in &client.navigation().entries {
-        if client.navigation().offered(*entry, client.frame().document.as_ref()) {
+        if client.navigation().offered(*entry, client.frame().document) {
             match entry {
                 Destination::Jig(address) => {
                     let phrase = match address {
@@ -128,7 +131,7 @@ pub fn navigation(b: &mut Builder, client: &Domain, nav: SlotRef, words: &Words,
     b.close();
 }
 /// Jig's banner, with its five parts in their stable order.
-pub fn banner(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn banner(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Banner);
     b.name(&words.say(JigPhrase::Frame, &[]));
     link(b, client, words, bindings);

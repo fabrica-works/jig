@@ -29,11 +29,12 @@ impl Session {
     pub fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
         self.stopping().expect("whole original stopped routes");
         if self.offline() {
-            self.callbacks.push((client, Event::Jig(jig_client_view::Event::SignOutLost)));
+            self.callbacks.push((client, Event::Client { event: jig_client::Event::SignOutLost }));
             return;
         }
         let Some(sign_in) = self.driver.transport.sign_in(client) else { return };
         let reply_to = self.driver.transport.reply_to(Reply::SignOut { client, sign_in });
+        self.lifecycle.push(crate::harness::Observed::SignInEnded { client });
         self.source(now, wall, root::Event::Core(core::Event::People(people::Event::SignOut { reply_to, sign_in })));
     }
 }

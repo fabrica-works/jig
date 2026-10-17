@@ -7,7 +7,7 @@ use crate::words::{Words, name};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use crate::{Domain, action::Act, address::Address, objects::Body};
+use crate::{Borrowed, action::Act, address::Address, objects::Body};
 use jig_client::contract::{Chip, ChipPhase, FailureClass};
 
 /// The task's named link and copied title, with its executor kind in words.
@@ -41,7 +41,7 @@ pub fn head(b: &mut Builder, chip: &Chip, words: &Words, bindings: &mut JigBindi
     }
 }
 /// Build all kept dependency chips with a bounded work list, never recursive traversal.
-pub fn chip(b: &mut Builder, client: &Domain, chip: &Chip, words: &Words, bindings: &mut JigBindings) {
+pub fn chip(b: &mut Builder, client: &Borrowed<'_>, chip: &Chip, words: &Words, bindings: &mut JigBindings) {
     let count = client.objects().len();
     let mut pending = skein_lib::Queue::with_capacity(count);
     let mut seen = skein_lib::Set::with_capacity(count.checked_add(1).expect("one external root chip fits"));
@@ -52,15 +52,16 @@ pub fn chip(b: &mut Builder, client: &Domain, chip: &Chip, words: &Words, bindin
             break;
         };
         if let Some(chip) = kept(client, task) {
-            region(b, client, chip, words, bindings, &mut pending, &mut seen);
+            region(b, client, &chip, words, bindings, &mut pending, &mut seen);
         }
     }
 }
-fn kept(client: &Domain, task: u64) -> Option<&Chip> {
-    let object = client.objects().get(client.objects().find(jig_client::contract::ObjectKey::Task(task))?)?;
+fn kept(client: &Borrowed<'_>, task: u64) -> Option<Chip> {
+    let objects = client.objects();
+    let object = objects.get(objects.find(jig_client::contract::ObjectKey::Task(task))?)?;
     match &object.body {
-        Some(Body::Chip(chip)) => Some(chip),
-        Some(Body::Task(task)) => Some(&task.chip),
+        Some(Body::Chip(chip)) => Some(chip.clone()),
+        Some(Body::Task(task)) => Some(task.chip.clone()),
         Some(
             Body::Historical(_)
             | Body::Proposal(_)
@@ -78,7 +79,7 @@ fn kept(client: &Domain, task: u64) -> Option<&Chip> {
 }
 fn region(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     chip: &Chip,
     words: &Words,
     bindings: &mut JigBindings,
@@ -105,7 +106,7 @@ pub fn failure(b: &mut Builder, class: FailureClass, words: &Words) {
 /// Detailed task runtime, with application phase explanations left as parts.
 pub fn details(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     phase: &ChipPhase,
     words: &Words,
     bindings: &mut JigBindings,
@@ -210,7 +211,7 @@ pub fn wake(b: &mut Builder, wake: &jig_client::contract::WakePolicy, words: &Wo
 
 fn dependencies_list(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     dependencies: &skein_lib::List<u64>,
     words: &Words,
     bindings: &mut JigBindings,

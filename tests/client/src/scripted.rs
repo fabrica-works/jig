@@ -155,7 +155,13 @@ impl Scripted {
         std::mem::take(&mut self.hellos)
             .into_iter()
             .map(|client| {
-                (client, Event::Jig(jig_client_view::Event::Hello { served: self.engine.versions().contains(8) }))
+                (
+                    client,
+                    crate::test::up(jig_client::Up::Served {
+                        served: self.engine.versions().contains(8),
+                        versions: None,
+                    }),
+                )
             })
             .collect()
     }
@@ -231,10 +237,7 @@ impl Scripted {
                     .expect("recovered sign in fits");
                 for (client, owner) in &self.parties {
                     if *owner == party {
-                        self.shell.push((
-                            *client,
-                            Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } },
-                        ));
+                        self.shell.push((*client, crate::test::up(jig_client::Up::SignedIn)));
                     }
                 }
             }
@@ -280,11 +283,9 @@ impl Front<Test> for Scripted {
     fn bind(&mut self, client: ClientId, party: u64) {
         self.parties.insert(client, party);
     }
-    fn starting(&mut self, _client: ClientId) -> Vec<Event> {
-        vec![
-            Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } },
-            Event::Jig(jig_client_view::Event::Hello { served: self.engine.versions().contains(8) }),
-        ]
+    fn starting(&mut self, client: ClientId) -> Vec<Event> {
+        self.hellos.insert(client);
+        vec![crate::test::up(jig_client::Up::SignedIn)]
     }
     fn wire(&mut self, client: ClientId, now: Time, wall: Wall, request: Request) {
         let party = self.parties[&client];
@@ -450,7 +451,13 @@ impl Front<Test> for Scripted {
                 engine::Fault::Lose { attempt }
             }
             FrontFault::SignedOut => {
-                engine::Fault::SignOut { sign_in: *self.parties.values().next().expect("client bound") }
+                let sign_in = *self.parties.values().next().expect("client bound");
+                for (&client, &party) in &self.parties {
+                    if party == sign_in {
+                        self.link.push(Observed::SignInEnded { client });
+                    }
+                }
+                engine::Fault::SignOut { sign_in }
             }
             FrontFault::Versions => {
                 self.hellos.extend(self.parties.keys().copied());
@@ -476,9 +483,9 @@ impl Front<Test> for Scripted {
     }
     fn received(&mut self, client: ClientId, event: &Event) {
         let selected = match event {
-            Event::Jig(jig_client_view::Event::Watch { watch, event: WatchEvent::Delivered(_) }) => {
-                Some((*watch, false))
-            }
+            Event::Client {
+                event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(_) } },
+            } => Some((*watch, false)),
             Event::First(first::Event::Watch { watch, event: family::WatchEvent::Delivered(_) }) => {
                 Some((*watch, true))
             }
@@ -498,11 +505,16 @@ impl Front<Test> for Scripted {
     }
     fn sign_out(&mut self, client: ClientId, now: Time, wall: Wall) {
         if std::mem::take(&mut self.lose_sign_out) || self.recovery.is_some_and(|at| now < at) {
-            self.shell.push((client, Event::Jig(jig_client_view::Event::SignOutLost)));
+            self.shell.push((client, Event::Client { event: jig_client::Event::SignOutLost }));
             return;
         }
         let sign_in = self.parties[&client];
         self.engine.act(now, wall, engine::Change::SignedOut { sign_in }).expect("sign out fits");
+        for (&client, &party) in &self.parties {
+            if party == sign_in {
+                self.link.push(Observed::SignInEnded { client });
+            }
+        }
         self.shell.push((client, Event::SignedOut));
     }
     fn sign_in(&mut self, client: ClientId, now: Time, wall: Wall) {
@@ -514,7 +526,7 @@ impl Front<Test> for Scripted {
             return;
         }
         self.engine.act(now, wall, engine::Change::SignIn { sign_in: party, party }).expect("sign in fits");
-        self.shell.push((client, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::SignedIn } }));
+        self.shell.push((client, crate::test::up(jig_client::Up::SignedIn)));
     }
 }
 
@@ -615,6 +627,18 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
 }
 
 impl Scripted {
+    fn sign_out_receipt(&mut self, client: ClientId, up: &Up<Family>) {
+        if matches!(
+            up,
+            Up::Answer { envelope: Envelope::SignedOut, .. }
+                | Up::ApplicationAnswer { envelope: Envelope::SignedOut, .. }
+                | Up::Read { terminal: ReadResult::None(ReadNone::SignedOut), .. }
+                | Up::ApplicationRead { terminal: Err(ReadNone::SignedOut), .. }
+                | Up::Ended { why: WatchEnd::SignedOut, .. }
+        ) {
+            self.shell.push((client, crate::test::up(jig_client::Up::SignedOut)));
+        }
+    }
     fn callback(&mut self, up: Up<Family>) -> Option<(ClientId, Event)> {
         let token = match &up {
             Up::Answer { attempt, .. } | Up::ApplicationAnswer { attempt, .. } => *attempt,
@@ -643,22 +667,19 @@ impl Scripted {
         let (client, local) = match route {
             Route::Jig(c, t) | Route::First(c, t) => (c, t),
         };
+        self.sign_out_receipt(client, &up);
         let event = match up {
-            Up::Answer { attempt: _, envelope: e, answer } => Event::Client {
-                event: jig_client::Event::Up {
-                    up: jig_client::Up::Answer {
-                        attempt: local,
-                        envelope: envelope(e),
-                        answer: answer.map(jig_client::Answered::Jig),
-                        why: None,
-                    },
-                },
-            },
+            Up::Answer { attempt: _, envelope: e, answer } => crate::test::up(jig_client::Up::Answer {
+                attempt: local,
+                envelope: envelope(e),
+                answer: answer.map(jig_client::Answered::Jig),
+                why: None,
+            }),
             Up::Read { token: _, terminal } => {
-                Event::Jig(jig_client_view::Event::Read { read: local, result: terminal })
+                crate::test::up(jig_client::Up::ReadDone { read: local, result: jig_client::Readout::Jig(terminal) })
             }
             Up::Watch { token: _, event } => match route {
-                Route::Jig(_, _) => Event::Jig(jig_client_view::Event::Watch { watch: local, event }),
+                Route::Jig(_, _) => crate::test::up(jig_client::Up::Watched { watch: local, event }),
                 Route::First(_, _) => Event::First(first::Event::Watch {
                     watch: local,
                     event: match event {
@@ -670,18 +691,13 @@ impl Scripted {
                     },
                 }),
             },
-            Up::ApplicationAnswer { attempt: _, envelope: e, answer } => Event::Client {
-                event: jig_client::Event::Up {
-                    up: jig_client::Up::Answer {
-                        attempt: local,
-                        envelope: envelope(e),
-                        answer: answer.map(|a| {
-                            crate::test::family_answer(a.expect("test family fixture requires a typed outcome"))
-                        }),
-                        why: None,
-                    },
-                },
-            },
+            Up::ApplicationAnswer { attempt: _, envelope: e, answer } => crate::test::up(jig_client::Up::Answer {
+                attempt: local,
+                envelope: envelope(e),
+                answer: answer
+                    .map(|a| crate::test::family_answer(a.expect("test family fixture requires a typed outcome"))),
+                why: None,
+            }),
             Up::ApplicationRead { token: _, terminal } => Event::First(first::Event::Read {
                 read: local,
                 result: match terminal {
@@ -695,7 +711,7 @@ impl Scripted {
                 Event::First(first::Event::Watch { watch: local, event: family::WatchEvent::Delivered(document) })
             }
             Up::Ended { token: _, why } => match route {
-                Route::Jig(_, _) => Event::Jig(jig_client_view::Event::Ended { watch: local, end: why }),
+                Route::Jig(_, _) => crate::test::up(jig_client::Up::WatchEnded { watch: local, end: why }),
                 Route::First(_, _) => Event::First(first::Event::Ended {
                     watch: local,
                     end: match why {

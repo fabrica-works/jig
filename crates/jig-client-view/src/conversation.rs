@@ -68,7 +68,6 @@ pub struct LiveTurn {
 }
 /// Committed lines and page state for one task conversation.
 #[derive(Debug)]
-#[expect(clippy::struct_excessive_bools, reason = "independent retained page-loss and existing run/watch flags")]
 pub struct Conversation {
     /// Loss reported by retained activity pages, independent of turn and text loss.
     pub page_cut: bool,
@@ -85,24 +84,14 @@ pub struct Conversation {
     pub opened: Map<CallName, ()>,
     /// Opaque current-call folds are equality-only and independent of transcript numbers.
     pub current_opened: List<CallIdentity>,
-    /// Whole run document, independent of retained provisional and committed turns.
-    pub current_run: Option<RunState>,
-    /// Earlier provisional turns survive deliveries of a later turn.
-    pub live: List<LiveTurn>,
-    /// The name and offset to request on the run watch.
-    pub current: Option<ProvisionalTurnName>,
-    /// The current watch cursor survives replacement by a committed turn.
-    pub stream_offset: u32,
     /// The latest committed turn read, fencing stale stream deliveries.
     pub committed_turn: Option<TurnName>,
-    /// An interrupted connection replaces its provisional text on recovery.
-    pub replacing: bool,
     /// The task ended its run; unread committed activity is taken before cleanup.
     pub run_finished: bool,
     /// Pending snapshots and durable words retained until the agent read them.
     pub words: KeptWords,
     /// One live chips source for tasks named by calls in this window.
-    pub chips_watch: Option<skein_lib::Id<crate::watches::Watch>>,
+    pub chips_watch: Option<jig_client::Handle>,
     /// Task membership shared by all displayed engine calls.
     pub chips: List<u64>,
     /// Membership is waiting for the old watch terminal or available watch room.
@@ -122,12 +111,7 @@ impl Conversation {
             fresh: TurnWindow::new(rows),
             opened: Map::with_capacity(rows),
             current_opened: List::with_capacity(rows),
-            current_run: None,
-            live: List::with_capacity(rows),
-            current: None,
-            stream_offset: 0,
             committed_turn: None,
-            replacing: false,
             run_finished: false,
             words: KeptWords::new(rows),
             chips_watch: None,
@@ -254,7 +238,6 @@ impl Conversation {
                 }
             }
         }
-        self.prune_folds();
         self.moved(self.committed)
     }
     /// Allows a failed or refused read to be retried without inventing a page.
@@ -262,176 +245,9 @@ impl Conversation {
         self.reading = None;
         self.fresh.rows.clear();
     }
-    /// Apply the owner's whole current run without inventing a provisional name.
-    /// Owner committed progress never hides text before its activity is read.
-    pub fn run_state(&mut self, value: RunState, text_limit: u32) -> bool {
-        if value.task != self.task {
-            return false;
-        }
-        if value.attempt.is_none() && (value.writing.is_some() || value.call.is_some()) {
-            return false;
-        }
-        if let Some(held) = &self.current_run
-            && let Some(previous) = held.attempt
-            && let Some(incoming) = value.attempt
-            && incoming < previous
-        {
-            return true;
-        }
-        if let Some(writing) = &value.writing {
-            if value.attempt != Some(writing.attempt) {
-                return false;
-            }
-            if !self.stream(writing.clone(), text_limit) {
-                return false;
-            }
-        }
-        if value.attempt.is_none() {
-            self.end_run();
-        }
-        self.current_run = Some(value);
-        self.prune_folds();
-        true
-    }
-    /// Appends one valid offset delivery, retaining other provisional turn names.
-    /// A gap needs an explicit cut; overlap and duplicate text are absorbed once.
-    pub fn stream(&mut self, value: RunText, text_limit: u32) -> bool {
-        if value.attempt != value.turn.attempt
-            || value.through.checked_sub(value.from) != u32::try_from(value.text.bytes().len()).ok()
-        {
-            return false;
-        }
-        if let Some(run) = &self.current_run
-            && let Some(attempt) = run.attempt
-            && value.attempt < attempt
-        {
-            return true;
-        }
-        if let Some(committed) = self.committed_turn
-            && !later(value.turn.turn(), committed)
-        {
-            return true;
-        }
-        if let Some(current) = self.current
-            && current.turn() == value.turn.turn()
-            && value.turn.retry < current.retry
-        {
-            return true;
-        }
-        if self.replacing {
-            self.reopened(value.turn);
-        }
-        let mut index = None;
-        for at in 0..self.live.len() {
-            let held = self.live.get(at).expect("live row exists").name;
-            if held.turn() == value.turn.turn() {
-                if value.turn.retry < held.retry {
-                    return true;
-                }
-                index = Some(at);
-                break;
-            }
-        }
-        let name = value.turn;
-        let through = value.through;
-        match index {
-            Some(at) => {
-                let live = self.live.get_mut(at).expect("live row exists");
-                if value.turn.retry > live.name.retry {
-                    *live = live_turn(value, text_limit);
-                } else if value.cut && value.through >= live.offset {
-                    live.text = tail(&[], value.text.bytes(), text_limit);
-                    live.offset = value.through;
-                    live.began = value.began;
-                    live.call = value.call;
-                    live.cut = true;
-                } else {
-                    if value.through <= live.offset {
-                        if value.through == live.offset {
-                            live.began = value.began;
-                            live.call = value.call;
-                        }
-                        self.prune_folds();
-                        return true;
-                    }
-                    if value.from > live.offset && !value.cut {
-                        return false;
-                    }
-                    let skip = live.offset.saturating_sub(value.from);
-                    let skip = usize::try_from(skip).expect("offset fits usize");
-                    let Some(text) = value.text.bytes().get(skip..) else {
-                        return false;
-                    };
-                    let old = if value.from > live.offset { &[] } else { live.text.bytes() };
-                    let combined = old.len().saturating_add(text.len());
-                    live.text = tail(old, text, text_limit);
-                    live.offset = value.through;
-                    live.cut =
-                        live.cut || value.cut || combined > usize::try_from(text_limit).expect("text bound fits usize");
-                    live.began = value.began;
-                    live.call = value.call;
-                }
-            }
-            None => {
-                if self.live.len() == self.live.capacity() {
-                    return false;
-                }
-                let live = live_turn(value, text_limit);
-                self.live.push(live).expect("live turn room checked");
-            }
-        }
-        self.followed(name, through);
-        self.prune_folds();
-        true
-    }
-    fn reopened(&mut self, name: ProvisionalTurnName) {
-        let mut kept = List::with_capacity(self.live.capacity());
-        let old = core::mem::replace(&mut self.live, List::with_capacity(0));
-        for held in old.into_boxed() {
-            if held.name.turn() != name.turn() {
-                kept.push(held).expect("replacement preserves bounded earlier turns");
-            }
-        }
-        self.live = kept;
-        if let Some(current) = self.current
-            && current.turn() == name.turn()
-        {
-            self.current = None;
-            self.stream_offset = 0;
-        }
-        self.replacing = false;
-    }
-    fn followed(&mut self, name: ProvisionalTurnName, through: u32) {
-        match self.current {
-            Some(current) => {
-                if name >= current {
-                    self.current = Some(name);
-                    self.stream_offset = through;
-                }
-            }
-            None => {
-                self.current = Some(name);
-                self.stream_offset = through;
-            }
-        }
-    }
-    /// Keeps text during a brief offline interval, replacing it on the next delivery.
-    pub fn interrupted(&mut self) {
-        self.replacing = true;
-    }
-    /// Drops provisional text that a completed run never committed.
+    /// Ends the provisional presentation after its committed activity has been read.
     pub fn end_run(&mut self) {
-        self.live.clear();
-        self.current_run = None;
-        self.current = None;
-        self.stream_offset = 0;
-        self.replacing = false;
-        self.prune_folds();
-    }
-    /// The stream cursor follows the current name, never another turn's offset.
-    #[must_use]
-    pub const fn offset(&self) -> u32 {
-        self.stream_offset
+        self.prune_folds(&[], None);
     }
     fn committed(&mut self, name: TurnName) {
         match self.committed_turn {
@@ -442,18 +258,10 @@ impl Conversation {
             }
             None => self.committed_turn = Some(name),
         }
-        let mut kept = List::with_capacity(self.live.capacity());
-        let live = core::mem::replace(&mut self.live, List::with_capacity(0));
-        for turn in live.into_boxed() {
-            if turn.name.turn() != name {
-                kept.push(turn).expect("removal keeps bounded live turns");
-            }
-        }
-        self.live = kept;
     }
     /// Connector-owned parts carried by calls, results or news, requested by the root.
     #[must_use]
-    pub fn parts(&self, capacity: u32) -> List<Part> {
+    pub fn parts(&self, capacity: u32, live: &[LiveTurn]) -> List<Part> {
         let mut parts = List::with_capacity(capacity);
         for line in &self.lines.rows {
             match &line.event {
@@ -503,7 +311,7 @@ impl Conversation {
                 | Activity::Decision { .. } => {}
             }
         }
-        for live in &self.live {
+        for live in live {
             if let Some(call) = &live.call {
                 match call {
                     LiveCall::Decoded(call) => {
@@ -522,11 +330,11 @@ impl Conversation {
     pub fn fold(&self, name: CallName) -> Fold {
         if self.opened.contains_key(&name) { Fold::Open } else { Fold::Folded }
     }
-    fn displayed_call(&self, name: CallName) -> bool {
+    fn displayed_call(&self, name: CallName, live: &[LiveTurn]) -> bool {
         if has_call(&self.lines.rows, name) {
             return true;
         }
-        for live in &self.live {
+        for live in live {
             if live.name.attempt == name.attempt
                 && live.name.number == name.turn
                 && let Some(LiveCall::Decoded(call)) = &live.call
@@ -538,8 +346,8 @@ impl Conversation {
         false
     }
     /// Opens or closes one displayed call, refusing unknown calls or full fold room.
-    pub fn set_fold(&mut self, name: CallName, fold: Fold) -> bool {
-        if !self.displayed_call(name) {
+    pub fn set_fold(&mut self, name: CallName, fold: Fold, live: &[LiveTurn]) -> bool {
+        if !self.displayed_call(name, live) {
             return false;
         }
         match fold {
@@ -565,14 +373,14 @@ impl Conversation {
     pub fn current_fold(&self, identity: &CallIdentity) -> Fold {
         if self.current_opened.as_slice().contains(identity) { Fold::Open } else { Fold::Folded }
     }
-    fn displayed_current_call(&self, identity: &CallIdentity) -> bool {
-        if let Some(run) = &self.current_run {
+    fn displayed_current_call(identity: &CallIdentity, live: &[LiveTurn], current_run: Option<&RunState>) -> bool {
+        if let Some(run) = current_run {
             return match &run.call {
                 Some(call) => &call.identity == identity,
                 None => false,
             };
         }
-        for live in &self.live {
+        for live in live {
             if let Some(LiveCall::Raw(call)) = &live.call
                 && &call.identity == identity
             {
@@ -582,11 +390,16 @@ impl Conversation {
         false
     }
     /// Opening an unknown identity or exceeding the bounded fold table is refused.
-    pub fn set_current_fold(&mut self, identity: CallIdentity, fold: Fold) -> bool {
-        if !self.displayed_current_call(&identity) {
+    pub fn set_current_fold(
+        &mut self,
+        identity: CallIdentity,
+        fold: Fold,
+        live: &[LiveTurn],
+        current_run: Option<&RunState>,
+    ) -> bool {
+        if !Self::displayed_current_call(&identity, live, current_run) {
             return false;
         }
-        self.prune_folds();
         match fold {
             Fold::Open => {
                 if self.current_opened.as_slice().contains(&identity) {
@@ -612,10 +425,10 @@ impl Conversation {
             }
         }
     }
-    fn prune_folds(&mut self) {
+    pub(crate) fn prune_folds(&mut self, live: &[LiveTurn], current_run: Option<&RunState>) {
         let mut gone = List::with_capacity(self.opened.capacity());
         for (name, ()) in &self.opened {
-            if !self.displayed_call(*name) {
+            if !self.displayed_call(*name, live) {
                 gone.push(*name).expect("removed folds fit fold capacity");
             }
         }
@@ -624,7 +437,7 @@ impl Conversation {
         }
         let mut kept = List::with_capacity(self.current_opened.capacity());
         for identity in &self.current_opened {
-            if self.displayed_current_call(identity) {
+            if Self::displayed_current_call(identity, live, current_run) {
                 kept.push(identity.clone()).expect("remaining current folds fit");
             }
         }
@@ -632,7 +445,7 @@ impl Conversation {
     }
     /// Names cards produced by calls and heard results, deduplicated by object key.
     #[must_use]
-    pub fn names(&self, capacity: u32) -> List<ObjectKey> {
+    pub fn names(&self, capacity: u32, live: &[LiveTurn]) -> List<ObjectKey> {
         let mut names = List::with_capacity(capacity);
         for line in &self.lines.rows {
             match &line.event {
@@ -662,7 +475,7 @@ impl Conversation {
                 | Activity::News { .. } => {}
             }
         }
-        for live in &self.live {
+        for live in live {
             if let Some(call) = &live.call {
                 match call {
                     LiveCall::Decoded(call) => {
@@ -678,7 +491,7 @@ impl Conversation {
     }
     /// Replaces this window's working-set source without duplicating shared cards.
     pub fn name_objects(&self, objects: &mut Objects, source: Source, capacity: u32) -> u32 {
-        let names = self.names(capacity);
+        let names = self.names(capacity, &[]);
         objects.replace(source, names.as_slice())
     }
 }
@@ -740,14 +553,10 @@ fn has_call(rows: &List<ActivityLine>, name: CallName) -> bool {
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     words::worst_case(limits)?
-        .checked_add(List::<LiveTurn>::worst_case(limits.rows)?)?
-        .checked_mul(2)?
-        .checked_add(
-            u64::from(limits.rows)
-                .checked_mul(u64::from(limits.text).checked_add(limits.document_bytes)?)?
-                .checked_mul(2)?,
-        )?
-        .checked_add(u64::from(limits.text).checked_mul(2)?)?
+        // The borrowed projection clones at most the client's one provisional turn.
+        .checked_add(List::<LiveTurn>::worst_case(1)?)?
+        .checked_add(limits.document_bytes)?
+        .checked_add(u64::from(limits.text))?
         .checked_add(Map::<CallName, ()>::worst_case(limits.rows)?)?
         .checked_add(List::<CallName>::worst_case(limits.rows)?)?
         .checked_add(List::<CallIdentity>::worst_case(limits.rows)?.checked_mul(2)?)?
@@ -758,7 +567,7 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(u64::from(limits.rows).checked_mul(limits.document_bytes)?.checked_mul(4)?)
 }
 
-fn live_turn(value: RunText, limit: u32) -> LiveTurn {
+pub(crate) fn live_turn(value: RunText, limit: u32) -> LiveTurn {
     let cut = value.cut || value.from > 0 || !value.text.fits(limit);
     LiveTurn {
         name: value.turn,
@@ -770,7 +579,7 @@ fn live_turn(value: RunText, limit: u32) -> LiveTurn {
     }
 }
 
-fn later(name: TurnName, other: TurnName) -> bool {
+pub(crate) fn later(name: TurnName, other: TurnName) -> bool {
     name.attempt > other.attempt || (name.attempt == other.attempt && name.number > other.number)
 }
 fn tail(old: &[u8], incoming: &[u8], limit: u32) -> Text {

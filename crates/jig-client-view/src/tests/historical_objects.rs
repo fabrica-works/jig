@@ -5,11 +5,11 @@
     reason = "ordinary public fragment proofs inspect full supplied sources and tree bindings"
 )]
 use super::cards::{CLIENT, contains, text, words};
+use crate::tests::fixtures::{Fixture, ReadPage, Served, Watched};
 use crate::{JigBindings, owner_historical as view};
 use skein_ui::Limits;
 use skein_ui::{Builder, Role, Tree};
 
-use crate::Domain;
 use jig_client::contract::*;
 use skein_lib::{List, Wall};
 fn task() -> Task {
@@ -121,10 +121,10 @@ fn limits(f: view::HistoricalFragment) -> Limits {
 fn build(value: &OwnerHistorical, words: &crate::words::Words) -> (Tree, JigBindings) {
     let f = view::required(value, &CLIENT, words).unwrap();
     let l = limits(f);
-    let domain = Domain::new(&CLIENT);
+    let domain = Fixture::new(&CLIENT);
     let mut b = Builder::new(&l);
     let mut bindings = JigBindings::new(f.bindings, CLIENT.text);
-    view::render(&mut b, &domain, value, words, &mut bindings);
+    view::render(&mut b, &domain.view(), value, words, &mut bindings);
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(tree.len() <= f.nodes);
@@ -300,7 +300,7 @@ fn historical_passive_card_retains_named_whole_departure_and_does_not_bind_curre
     l.text_bytes = l.text_bytes.checked_add(64_u32.checked_mul(l.text_per_node).unwrap()).unwrap();
     let mut b = Builder::new(&l);
     let mut bindings = JigBindings::new(l.bindings, CLIENT.text);
-    assert!(crate::cards::card(&mut b, &d, id, &crate::cards::Place::Elsewhere, words(), &mut bindings));
+    assert!(crate::cards::card(&mut b, &d.view(), id, &crate::cards::Place::Elsewhere, words(), &mut bindings));
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(contains(&tree, b"Historical question"));
@@ -313,40 +313,14 @@ fn historical_passive_card_retains_named_whole_departure_and_does_not_bind_curre
     };
     assert_eq!(facts.as_ref(), &value);
 }
-fn step(domain: &mut Domain, l: &crate::Limits, event: crate::Event) -> Vec<crate::Request> {
-    let mut out = skein_lib::Queue::with_capacity(crate::max_out(l));
-    crate::step(domain, &skein_lib::Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits: *l }, event, &mut out);
-    let mut rows = Vec::new();
-    while let Some(value) = out.pop() {
-        rows.push(value);
-    }
-    rows
+fn step(domain: &mut Fixture, l: &crate::Limits, event: impl crate::tests::fixtures::Input) -> Vec<crate::Request> {
+    domain.ui.limits = *l;
+    domain.drive(skein_lib::Time::ZERO, event).into_vec()
 }
 fn presence(mask: u8) {
     use crate::{Event, Request};
     let l = crate::Limits { objects: 4, reads: 8, ..CLIENT };
-    let mut domain = Domain::new(&l);
-    let first = step(
-        &mut domain,
-        &l,
-        Event::Start {
-            address: crate::address::Address::Inbox { project: None },
-            kept: List::with_capacity(0),
-            offset: crate::boundary::Offset { minutes: 0 },
-        },
-    );
-    let watch = first
-        .iter()
-        .find_map(
-            |request| if let Request::Open { watch, subject: Subject::Frame } = request { Some(*watch) } else { None },
-        )
-        .unwrap();
-    step(&mut domain, &l, Event::Hello { served: true });
-    step(
-        &mut domain,
-        &l,
-        Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
-    );
+    let mut domain = presence_domain(&l);
     let proposal_key = ProposalKey { proposer: Proposer::Task(9), number: 7 };
     let mut keys = List::with_capacity(4);
     keys.push(ObjectKey::Task(8)).unwrap();
@@ -359,10 +333,14 @@ fn presence(mask: u8) {
     if mask & 4 != 0 {
         keys.push(ObjectKey::Proposal(proposal_key)).unwrap();
     }
-    let reads = step(&mut domain, &l, Event::ShowObjects { objects: keys });
+    let reads = step(&mut domain, &l, Event::Named { sections: List::with_capacity(0), objects: keys });
     let mut task_read = None;
     for request in reads {
-        let Request::Read { read, what } = request else { continue };
+        let Request::Client { asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(what) } } =
+            request
+        else {
+            continue;
+        };
         let value = match what {
             Read::Task { task: 8 } => {
                 task_read = Some(read);
@@ -417,12 +395,11 @@ fn presence(mask: u8) {
             }
             _ => continue,
         };
-        step(&mut domain, &l, Event::Read { read, result: ReadResult::Value(value) });
+        step(&mut domain, &l, ReadPage { read, result: ReadResult::Value(value) });
     }
     presence_finish(&mut domain, &l, task_read.unwrap(), mask);
 }
-fn presence_finish(domain: &mut Domain, l: &crate::Limits, task_read: skein_lib::Token, mask: u8) {
-    use crate::Event;
+fn presence_finish(domain: &mut Fixture, l: &crate::Limits, task_read: jig_client::Handle, mask: u8) {
     let mut doc = task();
     doc.inputs = List::with_capacity(l.rows);
     for _ in 0..l.rows {
@@ -435,7 +412,7 @@ fn presence_finish(domain: &mut Domain, l: &crate::Limits, task_read: skein_lib:
     step(
         domain,
         l,
-        Event::Read { read: task_read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
+        ReadPage { read: task_read, result: ReadResult::Value(ReadValue::Historical(Box::new(supplied.clone()))) },
     );
     let id = domain.objects().find(supplied.key).unwrap();
     let words = words();
@@ -445,7 +422,7 @@ fn presence_finish(domain: &mut Domain, l: &crate::Limits, task_read: skein_lib:
     cap.text_bytes = cap.text_bytes.checked_add(64_u32.checked_mul(cap.text_per_node).unwrap()).unwrap();
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, l.text);
-    assert!(crate::cards::card(&mut b, domain, id, &crate::cards::Place::Elsewhere, words, &mut bindings));
+    assert!(crate::cards::card(&mut b, &domain.view(), id, &crate::cards::Place::Elsewhere, words, &mut bindings));
     let tree = b.finish();
     super::cards_access::check(&tree);
     assert!(tree.len() <= f.nodes.checked_add(64).unwrap());
@@ -542,3 +519,37 @@ fn historical_selected_language_uses_checked_native_captions_and_preserves_opaqu
 }
 
 const UTF8_TEXTS: [&[u8]; 2] = [b"~\0", &[b'~'; 129]];
+
+fn presence_domain(l: &crate::Limits) -> Fixture {
+    use crate::{Event, Request};
+    let mut domain = Fixture::new(l);
+    let first = step(
+        &mut domain,
+        l,
+        Event::Start {
+            seed: 8,
+            place: crate::address::Place::Jig(crate::address::Address::Inbox { project: None }),
+            records: List::with_capacity(0),
+        },
+    );
+    let watch = first
+        .iter()
+        .find_map(|request| {
+            if let Request::Client {
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+            } = request
+            {
+                Some(*watch)
+            } else {
+                None
+            }
+        })
+        .unwrap();
+    step(&mut domain, l, Served { served: true });
+    step(
+        &mut domain,
+        l,
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(super::cards::document()))) },
+    );
+    domain
+}

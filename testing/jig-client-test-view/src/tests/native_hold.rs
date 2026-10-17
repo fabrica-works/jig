@@ -36,7 +36,10 @@ pub(super) fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_client_view::Event::Hello { served: true }));
+    drive(
+        &mut root,
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } } },
+    );
     drive(
         &mut root,
         Event::Client {
@@ -47,26 +50,30 @@ pub(super) fn ready() -> Domain {
     );
     drive(
         &mut root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
-                party: FrameParty {
-                    number: 7,
-                    kind: PartyKind::Person,
-                    login: DocumentText::complete(text(b"login")),
-                    name: DocumentText::complete(text(b"Pat")),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
+                        party: FrameParty {
+                            number: 7,
+                            kind: PartyKind::Person,
+                            login: DocumentText::complete(text(b"login")),
+                            name: DocumentText::complete(text(b"Pat")),
+                        },
+                        projects: List::with_capacity(0),
+                        needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+                        needs_total: 0,
+                        results_seen: 0,
+                        charters: List::with_capacity(0),
+                        cut: false,
+                        updates: Count { value: 0, limited: false },
+                        retention: Duration::from_secs(1000),
+                        deployment_role: None,
+                    }))),
                 },
-                projects: List::with_capacity(0),
-                needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
-                needs_total: 0,
-                results_seen: 0,
-                charters: List::with_capacity(0),
-                cut: false,
-                updates: Count { value: 0, limited: false },
-                retention: Duration::from_secs(1000),
-                deployment_role: None,
-            }))),
-        }),
+            },
+        },
     );
     root
 }
@@ -143,10 +150,11 @@ fn load(root: &mut Domain, task: Task) -> Vec<Request> {
         .unwrap();
     drive(
         root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Task(Box::new(task))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) },
+            },
+        },
     )
 }
 pub(super) fn view() -> View<'static> {
@@ -222,7 +230,8 @@ fn a_supplied_native_hold_slot_reads_and_renders_its_actual_scoped_account() {
     }
     assert!(view.tree().nodes().iter().any(|node| node.key == Some(crate::family_key(&subject))));
     assert!(patches(&mut view, &root).is_empty());
-    let retained = root.jig().objects().get(root.jig().objects().find(ObjectKey::Task(9)).unwrap()).unwrap();
+    let retained =
+        root.jig().borrow(root.client()).objects().get(root.jig().objects().find(ObjectKey::Task(9)).unwrap()).unwrap();
     let jig_client_view::objects::Body::Task(retained) = retained.body.as_ref().unwrap() else { panic!("whole task") };
     assert_eq!(retained.as_ref(), &original);
     let left = drive(

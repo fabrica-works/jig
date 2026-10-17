@@ -7,7 +7,7 @@ use crate::{JigBindings, Owner};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Key, Role, Run};
 
-use crate::{Domain, Limits};
+use crate::{Borrowed, Limits};
 use hello::hello;
 use jig_client::contract::{
     AdmissionLimit, Chip, ChipPhase, Funder, OwnerAccountPlace, OwnerAccountState, OwnerAccountUnread,
@@ -136,7 +136,7 @@ fn placement(b: &mut Builder, words: &Words, value: OwnerRunLocation) {
         }
     }
 }
-fn run(b: &mut Builder, client: &Domain, words: &Words, value: &OwnerHostRun, bindings: &mut JigBindings) {
+fn run(b: &mut Builder, client: &Borrowed<'_>, words: &Words, value: &OwnerHostRun, bindings: &mut JigBindings) {
     region(
         b,
         words,
@@ -467,7 +467,13 @@ fn admission(b: &mut Builder, words: &Words, value: AdmissionLimit) {
     };
     text(b, words, phrase, &[]);
 }
-fn render_hosts(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: &Words, bindings: &mut JigBindings) {
+fn render_hosts(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    value: &OwnerDeployment,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     list(b, words, P::Hosts);
     for host in &value.hosts {
         region(
@@ -501,7 +507,7 @@ fn render_hosts(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words
 }
 fn render_accounts(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     value: &OwnerDeployment,
     words: &Words,
     bindings: &mut JigBindings,
@@ -547,7 +553,13 @@ fn render_accounts(
     b.close();
 }
 /// Render every supplied deployment scalar and ordered row without decoding keys or deriving authority.
-pub fn render(b: &mut Builder, client: &Domain, value: &OwnerDeployment, words: &Words, bindings: &mut JigBindings) {
+pub fn render(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    value: &OwnerDeployment,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     region(b, words, P::Deployment, &[], None);
     field_number(b, words, P::StoreBytes, value.store.bytes);
     field_number(b, words, P::StoreMark, value.store.mark);

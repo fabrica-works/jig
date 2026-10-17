@@ -1,4 +1,5 @@
 use super::*;
+use crate::tests::fixtures::{Fixture, ReadPage, Served, Watched};
 
 fn escalation() -> OwnerEscalation {
     let mut task = task_doc(&[ActKind::Stop]);
@@ -66,7 +67,7 @@ fn maximum_card_envelope() {
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(bound, CLIENT.text);
     builder.open(Role::Page);
-    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words(), &mut bindings));
+    assert!(cards::card(&mut builder, &domain.view(), id, &cards::Place::Elsewhere, words(), &mut bindings));
     builder.close();
     let tree = builder.finish();
     super::super::cards_access::check(&tree);
@@ -110,7 +111,7 @@ fn owner_escalation_amendment_inputs_keep_whole_source_baselines_and_selected_de
         }
         let original = row.clone();
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::OwnerEscalation(Box::new(row)));
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, words(), &mut bindings);
         assert!(contains(&tree, b"whole task specification"));
@@ -132,7 +133,7 @@ fn owner_escalation_amendment_inputs_keep_whole_source_baselines_and_selected_de
             assert_eq!(change.spec, None);
             assert_eq!(change.wake, None);
             assert_eq!(change.dependencies, None);
-            drive(&mut domain, Event::Act { act: Action::Change { change } });
+            drive(&mut domain, Event::Act { action: Action::Change { change } });
             assert_eq!(domain.confirmation().unwrap().revision, Some(original.task.spec_revision));
             assert_eq!(domain.confirmation().unwrap().release_revision, Some(Revision { value: u64::MAX }));
         }
@@ -148,7 +149,7 @@ fn build_closed_offers(row: &OwnerEscalation, allocation: skein_ui::Limits, w: &
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
     builder.open(Role::Page);
-    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, w, &mut bindings));
+    assert!(cards::card(&mut builder, &domain.view(), id, &cards::Place::Elsewhere, w, &mut bindings));
     builder.close();
     builder.finish()
 }
@@ -223,19 +224,9 @@ fn check_exact_storage(row: &OwnerEscalation, allocation: skein_ui::Limits, tree
     }
 }
 
-fn presence_step(domain: &mut Domain, l: crate::Limits, event: Event) -> Vec<Request> {
-    let mut queue = skein_lib::Queue::with_capacity(crate::max_out(&l));
-    crate::step(
-        domain,
-        &skein_lib::Env { now: skein_lib::Time::ZERO, wall: Wall::EPOCH, limits: l },
-        event,
-        &mut queue,
-    );
-    let mut requests = Vec::new();
-    while let Some(request) = queue.pop() {
-        requests.push(request);
-    }
-    requests
+fn presence_step(domain: &mut Fixture, l: crate::Limits, event: impl crate::tests::fixtures::Input) -> Vec<Request> {
+    domain.ui.limits = l;
+    domain.drive(skein_lib::Time::ZERO, event).into_vec()
 }
 
 fn presence_result(key: ProposalKey) -> Result {
@@ -283,34 +274,42 @@ fn presence_person(result: &Result, owner: bool) -> ReadValue {
     }))
 }
 
-fn presence_domain(l: crate::Limits, documents: &[(ObjectKey, Option<ReadValue>)]) -> Domain {
-    let mut domain = Domain::new(&l);
+fn presence_domain(l: crate::Limits, documents: &[(ObjectKey, Option<ReadValue>)]) -> Fixture {
+    let mut domain = Fixture::new(&l);
     let mut requests = presence_step(
         &mut domain,
         l,
         Event::Start {
-            address: crate::address::Address::Inbox { project: None },
-            kept: List::with_capacity(0),
-            offset: crate::boundary::Offset { minutes: 60 },
+            seed: 8,
+            place: crate::address::Place::Jig(crate::address::Address::Inbox { project: None }),
+            records: List::with_capacity(0),
         },
     );
-    requests.extend(presence_step(&mut domain, l, Event::Hello { served: true }));
+    requests.extend(presence_step(&mut domain, l, Served { served: true }));
     let frame = requests
         .into_iter()
         .find_map(|request| match request {
-            Request::Open { watch, subject: Subject::Frame } => Some(watch),
+            Request::Client {
+                asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+            } => Some(watch),
             _ => None,
         })
         .unwrap();
     presence_step(
         &mut domain,
         l,
-        Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
+        Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
     );
-    let requests =
-        presence_step(&mut domain, l, Event::ShowObjects { objects: list(documents.iter().map(|(key, _)| *key)) });
+    let requests = presence_step(
+        &mut domain,
+        l,
+        Event::Named { sections: List::with_capacity(0), objects: list(documents.iter().map(|(key, _)| *key)) },
+    );
     for request in requests {
-        if let Request::Read { read, what } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(what) },
+        } = request
+        {
             let key = match what {
                 Read::Escalation { task } => ObjectKey::Escalation(task),
                 Read::Result { task } => ObjectKey::Result(task),
@@ -321,7 +320,7 @@ fn presence_domain(l: crate::Limits, documents: &[(ObjectKey, Option<ReadValue>)
             };
             let value = documents.iter().find(|(named, _)| *named == key).unwrap().1.clone();
             if let Some(value) = value {
-                presence_step(&mut domain, l, Event::Read { read, result: ReadResult::Value(value) });
+                presence_step(&mut domain, l, ReadPage { read, result: ReadResult::Value(value) });
             }
         }
     }
@@ -376,7 +375,7 @@ fn check_presence_case(present: [bool; 3], loaded: bool, owner: bool) {
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(allocation.bindings, l.text);
     builder.open(Role::Page);
-    assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, words(), &mut bindings));
+    assert!(cards::card(&mut builder, &domain.view(), id, &cards::Place::Elsewhere, words(), &mut bindings));
     builder.close();
     let tree = builder.finish();
     super::super::cards_access::check(&tree);
@@ -505,7 +504,7 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
         let mut builder = Builder::new(&allocation);
         let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
         builder.open(Role::Page);
-        assert!(cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, w, &mut bindings));
+        assert!(cards::card(&mut builder, &domain.view(), id, &cards::Place::Elsewhere, w, &mut bindings));
         builder.close();
         let tree = builder.finish();
         super::super::cards_access::check(&tree);
@@ -562,7 +561,7 @@ fn owner_escalation_closed_outer_controls_and_whole_refusals_fit_finite_view_and
     let mut builder = Builder::new(&allocation);
     let mut bindings = JigBindings::new(allocation.bindings, CLIENT.text);
     builder.open(Role::Page);
-    assert!(!cards::card(&mut builder, &domain, id, &cards::Place::Elsewhere, w, &mut bindings));
+    assert!(!cards::card(&mut builder, &domain.view(), id, &cards::Place::Elsewhere, w, &mut bindings));
     builder.close();
     assert_eq!(builder.finish().len(), 1);
     assert_eq!(domain.objects().get(id).unwrap().body, Some(crate::objects::Body::OwnerEscalation(Box::new(original))));

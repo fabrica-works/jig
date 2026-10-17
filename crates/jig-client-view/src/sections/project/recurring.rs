@@ -5,10 +5,16 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use crate::{Domain, action::Act, address::Address};
+use crate::{Borrowed, action::Act, address::Address};
 use jig_client::contract::{Recurring, RecurringOverlap};
 
-pub(super) fn recurring(b: &mut Builder, client: &Domain, row: &Recurring, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn recurring(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    row: &Recurring,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     b.open(Role::Region);
     b.name(row.chip.title.bytes());
     cards::chip::chip(b, client, &row.chip, words, bindings);

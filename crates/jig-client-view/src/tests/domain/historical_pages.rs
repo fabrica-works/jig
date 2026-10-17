@@ -2,8 +2,9 @@ use super::{
     objects,
     spine::{LIMITS, delivered, drive, frame, start},
 };
+use crate::tests::fixtures::{Fixture, ReadPage, Watched};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::{Act, End},
     address::{Address, Place, ProjectSection, TaskSection},
 };
@@ -55,14 +56,14 @@ fn funding(project: u32) -> OwnerSpendPage {
         cut: true,
     }
 }
-fn begin() -> Domain {
-    let mut d = Domain::new(&LIMITS);
+fn begin() -> Fixture {
+    let mut d = Fixture::new(&LIMITS);
     let token = start(&mut d, List::with_capacity(0));
     let out = delivered(&mut d, Time::ZERO, token, frame(7));
     super::pages::finish_initial_inbox_reads(&mut d, &out);
     d
 }
-fn ended_read() -> (Domain, Token) {
+fn ended_read() -> (Fixture, jig_client::Handle) {
     let mut d = begin();
     let out = drive(
         &mut d,
@@ -71,7 +72,11 @@ fn ended_read() -> (Domain, Token) {
     );
     let mut watch = None;
     for request in &out {
-        if let Request::Open { watch: value, subject: Subject::Task { task: 8 } } = request {
+        if let Request::Client {
+            asked:
+                jig_client::Event::Watch { handle: value, subject: jig_client::Watchable::Jig(Subject::Task { task: 8 }) },
+        } = request
+        {
             watch = Some(*value);
             break;
         }
@@ -82,10 +87,17 @@ fn ended_read() -> (Domain, Token) {
     task.delegates = rows([LiveDelegate { chip: objects::chip(9), takeover_budget: 0 }]);
     task.chip.details = Box::new(ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH });
     let out =
-        drive(&mut d, Time::ZERO, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) });
+        drive(&mut d, Time::ZERO, Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) });
     let mut token = None;
     for request in &out {
-        if let Request::Read { read, what: Read::Ended { task: 8, after: None } } = request {
+        if let Request::Client {
+            asked:
+                jig_client::Event::Read {
+                    handle: read,
+                    read: jig_client::Readable::Jig(Read::Ended { task: 8, after: None }),
+                },
+        } = request
+        {
             token = Some(*read);
             break;
         }
@@ -93,7 +105,7 @@ fn ended_read() -> (Domain, Token) {
     let token = token.unwrap();
     (d, token)
 }
-fn spend_read() -> (Domain, Token, Token) {
+fn spend_read() -> (Fixture, jig_client::Handle, jig_client::Handle) {
     let mut d = begin();
     let out = drive(
         &mut d,
@@ -102,7 +114,14 @@ fn spend_read() -> (Domain, Token, Token) {
     );
     let mut spend = None;
     for request in &out {
-        if let Request::Read { read, what: Read::Spend { project: 1, after: None } } = request {
+        if let Request::Client {
+            asked:
+                jig_client::Event::Read {
+                    handle: read,
+                    read: jig_client::Readable::Jig(Read::Spend { project: 1, after: None }),
+                },
+        } = request
+        {
             spend = Some(*read);
             break;
         }
@@ -110,7 +129,11 @@ fn spend_read() -> (Domain, Token, Token) {
     let spend = spend.unwrap();
     let mut project = None;
     for request in &out {
-        if let Request::Read { read, what: Read::Project { project: 1 } } = request {
+        if let Request::Client {
+            asked:
+                jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { project: 1 }) },
+        } = request
+        {
             project = Some(*read);
             break;
         }
@@ -126,7 +149,7 @@ fn historical_owner_original_read_callbacks_keep_complete_rows_cuts_and_two_opaq
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page))) },
     );
     assert_eq!(d.task_page().owner_ended.as_deref(), Some(&original));
     assert_eq!(d.task_page().owner_ended.as_ref().unwrap().rows.capacity(), 2);
@@ -140,7 +163,7 @@ fn historical_owner_original_read_callbacks_keep_complete_rows_cuts_and_two_opaq
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page))) },
     );
     assert_eq!(d.project_page().owner_spend.as_deref(), Some(&original));
     assert!(d.project_page().spend.is_empty());
@@ -149,12 +172,12 @@ fn historical_owner_original_read_callbacks_keep_complete_rows_cuts_and_two_opaq
 }
 #[test]
 fn historical_owner_wrong_original_query_foreign_funder_and_stale_terminal_cannot_replace_pages() {
-    let (mut d, token, wrong) = spend_read();
+    let (mut d, mut token, wrong) = spend_read();
     let page = funding(1);
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: wrong, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
+        ReadPage { read: wrong, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
     );
     assert!(d.project_page().owner_spend.is_none());
     for wrong_page in [
@@ -167,24 +190,26 @@ fn historical_owner_wrong_original_query_foreign_funder_and_stale_terminal_canno
         drive(
             &mut d,
             Time::ZERO,
-            Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(wrong_page))) },
+            ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(wrong_page))) },
         );
         assert!(d.project_page().owner_spend.is_none());
+        assert!(d.handles.reads.get(&token).is_none());
+        token = d.read_again(token);
     }
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
     );
     assert_eq!(d.project_page().owner_spend.as_deref(), Some(&page));
-    drive(&mut d, Time::ZERO, Event::Read { read: token, result: ReadResult::None(ReadNone::Gone) });
+    drive(&mut d, Time::ZERO, ReadPage { read: token, result: ReadResult::None(ReadNone::Gone) }.late());
     assert_eq!(d.project_page().owner_spend.as_deref(), Some(&page));
     let (mut d, token) = ended_read();
     drive(&mut d, Time::ZERO, Event::Went { place: Place::Elsewhere });
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(ended(true)))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(ended(true)))) }.late(),
     );
     assert!(d.task_page().owner_ended.is_none());
     assert!(d.task_page().ended_task.is_none());
@@ -196,18 +221,19 @@ fn historical_owner_more_keeps_original_window_tokens_and_each_supplied_opaque_c
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page.clone()))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page.clone()))) },
     );
     for (end, edge) in [(End::Before, page.before), (End::After, page.after)] {
         let out = drive(
             &mut d,
             Time::ZERO,
-            Event::Act { act: Act::More { window: Token::new(crate::page::task::ENDED_WINDOW), end } },
+            Event::Act { action: Act::More { window: Token::new(crate::page::task::ENDED_WINDOW), end } },
         );
         let expected = Read::Ended { task: 8, after: edge };
         let mut found = false;
         for request in &out {
-            if let Request::Read { what, .. } = request
+            if let Request::Client { asked: jig_client::Event::Read { read: jig_client::Readable::Jig(what), .. } } =
+                request
                 && *what == expected
             {
                 found = true;
@@ -221,18 +247,19 @@ fn historical_owner_more_keeps_original_window_tokens_and_each_supplied_opaque_c
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
     );
     for (end, edge) in [(End::Before, page.before), (End::After, page.after)] {
         let out = drive(
             &mut d,
             Time::ZERO,
-            Event::Act { act: Act::More { window: Token::new(crate::page::project::SPEND_WINDOW), end } },
+            Event::Act { action: Act::More { window: Token::new(crate::page::project::SPEND_WINDOW), end } },
         );
         let expected = Read::Spend { project: 1, after: edge };
         let mut found = false;
         for request in &out {
-            if let Request::Read { what, .. } = request
+            if let Request::Client { asked: jig_client::Event::Read { read: jig_client::Readable::Jig(what), .. } } =
+                request
                 && *what == expected
             {
                 found = true;
@@ -249,16 +276,19 @@ fn historical_owner_fresh_whole_page_clears_obsolete_page_loss_without_changing_
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page.clone()))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(page.clone()))) },
     );
     let out = drive(
         &mut d,
         Time::ZERO,
-        Event::Act { act: Act::More { window: Token::new(crate::page::task::ENDED_WINDOW), end: End::After } },
+        Event::Act { action: Act::More { window: Token::new(crate::page::task::ENDED_WINDOW), end: End::After } },
     );
     let mut token = None;
     for request in &out {
-        if let Request::Read { read, what: Read::Ended { .. } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Ended { .. }) },
+        } = request
+        {
             token = Some(*read);
             break;
         }
@@ -271,7 +301,7 @@ fn historical_owner_fresh_whole_page_clears_obsolete_page_loss_without_changing_
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(fresh.clone()))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(fresh.clone()))) },
     );
     assert_eq!(d.task_page().owner_ended.as_deref(), Some(&fresh));
     assert!(!d.task_page().ended_cut);
@@ -288,7 +318,7 @@ fn historical_owner_old_result_backed_ended_pages_stay_on_their_original_object_
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read {
+        ReadPage {
             read: token,
             result: ReadResult::Value(ReadValue::Ended(Box::new(ObjectPage {
                 rows: rows([result.clone()]),
@@ -310,7 +340,7 @@ fn historical_owner_wrong_query_and_reserved_capacity_refusals_preserve_the_orig
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: project, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(ended(true)))) },
+        ReadPage { read: project, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(ended(true)))) },
     );
     assert!(d.task_page().owner_ended.is_none());
     let mut over = funding(1);
@@ -318,22 +348,26 @@ fn historical_owner_wrong_query_and_reserved_capacity_refusals_preserve_the_orig
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: spend, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(over))) },
+        ReadPage { read: spend, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(over))) },
     );
     assert!(d.project_page().owner_spend.is_none());
+    assert!(d.handles.reads.get(&spend).is_none());
+    let spend = d.read_again(spend);
     let mut over = funding(1);
     over.after = Some(Cursor::new(skein_lib::bytes::copy_of(&[0; 33]), 33).unwrap());
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: spend, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(over))) },
+        ReadPage { read: spend, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(over))) },
     );
     assert!(d.project_page().owner_spend.is_none());
+    assert!(d.handles.reads.get(&spend).is_none());
+    let spend = d.read_again(spend);
     let actual = funding(1);
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: spend, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(actual.clone()))) },
+        ReadPage { read: spend, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(actual.clone()))) },
     );
     assert_eq!(d.project_page().owner_spend.as_deref(), Some(&actual));
     let (mut d, token) = ended_read();
@@ -342,14 +376,16 @@ fn historical_owner_wrong_query_and_reserved_capacity_refusals_preserve_the_orig
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(over))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(over))) },
     );
     assert!(d.task_page().owner_ended.is_none());
+    assert!(d.handles.reads.get(&token).is_none());
+    let token = d.read_again(token);
     let actual = ended(false);
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(actual.clone()))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerEnded(Box::new(actual.clone()))) },
     );
     assert_eq!(d.task_page().owner_ended.as_deref(), Some(&actual));
 }
@@ -360,16 +396,19 @@ fn historical_owner_fresh_funding_page_resets_loss_and_navigation_clears_only_it
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page.clone()))) },
     );
     let out = drive(
         &mut d,
         Time::ZERO,
-        Event::Act { act: Act::More { window: Token::new(crate::page::project::SPEND_WINDOW), end: End::After } },
+        Event::Act { action: Act::More { window: Token::new(crate::page::project::SPEND_WINDOW), end: End::After } },
     );
     let mut token = None;
     for request in &out {
-        if let Request::Read { read, what: Read::Spend { .. } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Spend { .. }) },
+        } = request
+        {
             token = Some(*read);
             break;
         }
@@ -382,7 +421,7 @@ fn historical_owner_fresh_funding_page_resets_loss_and_navigation_clears_only_it
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(fresh.clone()))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(fresh.clone()))) },
     );
     assert_eq!(d.project_page().owner_spend.as_deref(), Some(&fresh));
     assert!(!d.project_page().spend_cut);
@@ -393,7 +432,7 @@ fn historical_owner_fresh_funding_page_resets_loss_and_navigation_clears_only_it
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page))) },
+        ReadPage { read: token, result: ReadResult::Value(ReadValue::OwnerSpend(Box::new(page))) },
     );
     assert!(d.project_page().owner_spend.is_none());
 }
@@ -410,7 +449,7 @@ fn historical_owner_old_spend_period_budget_pool_and_task_envelope_stays_indepen
     drive(
         &mut d,
         Time::ZERO,
-        Event::Read {
+        ReadPage {
             read: token,
             result: ReadResult::Value(ReadValue::Spend(Box::new(SpendPage {
                 rows: rows([period.clone()]),

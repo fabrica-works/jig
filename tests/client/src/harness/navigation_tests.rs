@@ -30,7 +30,7 @@ impl Front<Test> for Receipts {
     fn fault(&mut self, _now: Time, _fault: FrontFault) {}
     fn reload(&mut self, _client: ClientId, _now: Time) {}
     fn received(&mut self, client: ClientId, event: &Event) {
-        if matches!(event, Event::Jig(jig_client_view::Event::Hello { .. })) {
+        if matches!(event, Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { .. } } }) {
             self.hello += 1;
         }
         if let Event::Went { place: Place::Address(address) } = event {
@@ -206,7 +206,9 @@ fn a_new_navigation_does_not_discard_a_current_epoch_engine_callback() {
         super::Due {
             client,
             epoch: 0,
-            event: Event::Jig(jig_client_view::Event::Hello { served: true }),
+            event: Event::Client {
+                event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } },
+            },
             navigation: None,
         },
     );

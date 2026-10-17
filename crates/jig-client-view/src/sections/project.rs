@@ -6,7 +6,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     address::{Address, ProjectSection},
 };
@@ -18,7 +18,8 @@ mod owner_goals;
 mod recurring;
 mod tasks;
 /// The project's shared identity while any of its sections is shown.
-pub fn header(b: &mut Builder, client: &Domain, words: &Words, _bindings: &mut JigBindings) -> bool {
+pub fn header(b: &mut Builder, client: &Borrowed<'_>, words: &Words, _bindings: &mut JigBindings) -> bool {
+    let project_page = client.project_page();
     let Some(number) = client.shown_project() else {
         return false;
     };
@@ -26,25 +27,26 @@ pub fn header(b: &mut Builder, client: &Domain, words: &Words, _bindings: &mut J
     b.region(crate::regions::JigRegion::ProjectHeader.region());
     b.name(&words.say(JigPhrase::ProjectPage, &[]));
     words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(number))]);
-    if let Some(doc) = &client.project_page().document {
+    if let Some(doc) = &project_page.document {
         b.text(Run::Plain, doc.name.bytes());
-    } else if client.project_page().owner.is_none() {
+    } else if project_page.owner.is_none() {
         words.status(b, JigPhrase::LoadingObject, &[]);
     }
     b.close();
     true
 }
 /// Every section linked to its address, with the address's own marked current.
-pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+pub fn tabs(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) -> bool {
+    let project_page = client.project_page();
     let Some(number) = client.shown_project() else {
         return false;
     };
-    if client.project_page().document.is_none() && client.project_page().owner.is_none() {
+    if project_page.document.is_none() && project_page.owner.is_none() {
         return false;
     }
     b.open(Role::Tabs);
     b.region(crate::regions::JigRegion::ProjectTabs.region());
-    match &client.project_page().document {
+    match &project_page.document {
         Some(doc) => b.name(doc.name.bytes()),
         None => b.name(&words.say(JigPhrase::ContextProject, &[Hole::Number(u64::from(number))])),
     }
@@ -75,7 +77,7 @@ pub fn tabs(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigB
     b.close();
     true
 }
-pub(crate) fn all_shown(client: &Domain) -> bool {
+pub(crate) fn all_shown(client: &Borrowed<'_>) -> bool {
     let Some(project) = client.shown_project() else {
         return false;
     };
@@ -102,24 +104,25 @@ pub(crate) fn all_shown(client: &Domain) -> bool {
 }
 pub(crate) fn section(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
     project: u32,
     selected: ProjectSection,
 ) -> bool {
+    let project_page = client.project_page();
     if !client.shows(crate::page::Section::Project { project, section: selected }) {
         return false;
     }
     crate::pages::work::section(b, words, phrase(selected), region(selected));
     crate::pages::mark_current(b, client, Address::Project { project, section: selected });
     super::status(b, client, words, crate::page::Section::Project { project, section: selected });
-    if let Some(doc) = &client.project_page().owner {
+    if let Some(doc) = &project_page.owner {
         owner::section(b, doc, selected, client, words, bindings);
         b.close();
         return true;
     }
-    let Some(doc) = &client.project_page().document else {
+    let Some(doc) = &project_page.document else {
         b.close();
         return true;
     };
@@ -127,7 +130,7 @@ pub(crate) fn section(
     match selected {
         ProjectSection::Overview => {
             inbox_cards(b, client, words, bindings);
-            for goal in &client.project_page().goals {
+            for goal in &project_page.goals {
                 goals::line(b, client, goal, words, bindings);
             }
             crate::pages::work::budget(b, &doc.spend, words);
@@ -191,12 +194,13 @@ fn slots(b: &mut Builder, doc: &Project, section: ProjectSection, words: &Words,
 }
 fn settings(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     doc: &Project,
     section: ProjectSection,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
+    let project_page = client.project_page();
     match section {
         ProjectSection::Policy => {
             cards::common::authority(b, &doc.policy.ceiling, words, bindings);
@@ -228,20 +232,20 @@ fn settings(
         ProjectSection::Spend => {
             period(b, doc.period, &doc.spend, &doc.pools, words);
             task_spend(b, client, &doc.spend_lines, words, bindings);
-            if let Some(page) = &client.project_page().owner_spend {
+            if let Some(page) = &project_page.owner_spend {
                 crate::historical_pages::spend_render(b, page, words);
             }
-            for past in &client.project_page().spend {
+            for past in &project_page.spend {
                 period(b, past.period, &past.budget, &past.pools, words);
                 task_spend(b, client, &past.tasks, words, bindings);
             }
-            crate::pages::cut(b, words, client.project_page().spend_cut);
+            crate::pages::cut(b, words, project_page.spend_cut);
             crate::pages::work::cursors(
                 b,
                 words,
                 bindings,
-                client.project_page().spend_before.as_ref(),
-                client.project_page().spend_after.as_ref(),
+                project_page.spend_before.as_ref(),
+                project_page.spend_after.as_ref(),
                 crate::page::project::SPEND_WINDOW,
             );
         }
@@ -274,7 +278,7 @@ fn period(
 }
 fn task_spend(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     tasks: &skein_lib::List<jig_client::contract::TaskSpend>,
     words: &Words,
     bindings: &mut JigBindings,
@@ -290,7 +294,7 @@ fn task_spend(
     }
 }
 
-fn inbox_cards(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn inbox_cards(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     for entry in &client.inbox().rows {
         if let Some(id) = client.objects().find(entry.card_key())
             && !client.owes(id)
@@ -313,7 +317,7 @@ fn inbox_cards(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
 }
 
 /// Retained funding and earlier period rows preserve the original spend window.
-fn historical_spend(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn historical_spend(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let page = client.project_page();
     if let Some(spend) = &page.owner_spend {
         crate::historical_pages::spend_render(b, spend, words);

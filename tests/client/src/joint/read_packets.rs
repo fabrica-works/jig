@@ -6,6 +6,7 @@ use super::{
     wire,
 };
 use jig_client_domain::contract as client;
+#[cfg(test)]
 use jig_client_test_domain::Event;
 use jig_client_view::Limits;
 use jig_domain_core::{documents, reads};
@@ -127,7 +128,10 @@ pub fn read_with_codec(
         }
     };
     transport.take_reply(to).expect("validated original read route");
-    Ok(Incoming::Callback { client, event: Event::Jig(jig_client_view::Event::Read { read, result }) })
+    Ok(Incoming::Callback {
+        client,
+        event: crate::test::up(jig_client::Up::ReadDone { read, result: jig_client::Readout::Jig(result) }),
+    })
 }
 
 fn escalation(
@@ -219,10 +223,19 @@ mod tests {
         assert!(transport.reply(to).is_some());
         let Incoming::Callback {
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: actual,
-                    result: client::ReadResult::Value(client::ReadValue::OwnerProposal(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: actual,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(
+                                            client::ReadValue::OwnerProposal(value),
+                                        )),
+                                },
+                        },
+                },
             ..
         } = read(&mut transport, to, &whole, &limits).expect("exact original pending proposal")
         else {
@@ -261,10 +274,19 @@ mod tests {
         assert!(transport.reply(to).is_some());
         let Incoming::Callback {
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: actual,
-                    result: client::ReadResult::Value(client::ReadValue::OwnerPersonTask(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: actual,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(
+                                            client::ReadValue::OwnerPersonTask(value),
+                                        )),
+                                },
+                        },
+                },
             ..
         } = read(&mut transport, to, &whole, &limits).expect("exact original person work")
         else {
@@ -299,10 +321,17 @@ mod tests {
         assert!(transport.reply(to).is_some());
         let Incoming::Callback {
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: actual,
-                    result: client::ReadResult::Value(client::ReadValue::Task(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: actual,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::Task(value))),
+                                },
+                        },
+                },
             ..
         } = read(&mut transport, to, &whole, &limits).expect("whole original task")
         else {
@@ -338,10 +367,19 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: actual,
-                    result: client::ReadResult::Value(client::ReadValue::Question(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: actual,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::Question(
+                                            value,
+                                        ))),
+                                },
+                        },
+                },
         } = read(&mut transport, to, &source, &limits).expect("original whole question")
         else {
             panic!("question callback")
@@ -403,10 +441,19 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: actual,
-                    result: client::ReadResult::Value(client::ReadValue::OwnerInbox(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: actual,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::OwnerInbox(
+                                            value,
+                                        ))),
+                                },
+                        },
+                },
         } = read(&mut transport, to, &source, &limits).expect("complete original owner answer")
         else {
             panic!("original owner read")
@@ -458,10 +505,19 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: actual,
-                    result: client::ReadResult::Value(client::ReadValue::Result(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: actual,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::Result(
+                                            value,
+                                        ))),
+                                },
+                        },
+                },
         } = read(&mut transport, to, &source, &limits).expect("whole actual Result")
         else {
             panic!("original Result callback")
@@ -490,7 +546,13 @@ mod tests {
                 .into_token();
             let Incoming::Callback {
                 client: ClientId(0),
-                event: Event::Jig(jig_client_view::Event::Read { read: actual, result }),
+                event:
+                    Event::Client {
+                        event:
+                            jig_client::Event::Up {
+                                up: jig_client::Up::ReadDone { read: actual, result: jig_client::Readout::Jig(result) },
+                            },
+                    },
             } = read(&mut transport, to, &reads::Answer::None(why), &crate::test::limits().jig)
                 .expect("actual terminal")
             else {
@@ -531,10 +593,19 @@ mod tests {
         assert!(transport.reply(to).is_some());
         let Incoming::Callback {
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: actual,
-                    result: client::ReadResult::Value(client::ReadValue::Activity(page)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: actual,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::Activity(
+                                            page,
+                                        ))),
+                                },
+                        },
+                },
             ..
         } = read(&mut transport, to, &answer, &Limits { rows: 3, ..limits }).expect("whole reserved collection")
         else {
@@ -596,10 +667,17 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: original,
-                    result: client::ReadResult::Value(client::ReadValue::Notes(value)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: original,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::Notes(value))),
+                                },
+                        },
+                },
         } = read(&mut transport, to, &reads::Answer::Page(Box::new(page.clone())), &limits)
             .expect("whole original Notes query")
         else {
@@ -665,10 +743,19 @@ mod tests {
         let Incoming::Callback {
             client: ClientId(0),
             event:
-                Event::Jig(jig_client_view::Event::Read {
-                    read: actual,
-                    result: client::ReadResult::Value(client::ReadValue::History(page)),
-                }),
+                Event::Client {
+                    event:
+                        jig_client::Event::Up {
+                            up:
+                                jig_client::Up::ReadDone {
+                                    read: actual,
+                                    result:
+                                        jig_client::Readout::Jig(client::ReadResult::Value(client::ReadValue::History(
+                                            page,
+                                        ))),
+                                },
+                        },
+                },
         } = read(&mut transport, to, &source, &limits).expect("whole original mixed terminal")
         else {
             panic!("original history route")

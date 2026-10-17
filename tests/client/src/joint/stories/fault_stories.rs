@@ -360,7 +360,7 @@ fn a_watch_ended_as_the_engine_stops_reaches_the_client_as_stopping() {
     let mut callbacks = world.front().session.poll(now, wall).expect("stopping watch terminals");
     callbacks.extend(world.front().session.poll(now, wall).expect("pending watch terminal"));
     assert!(callbacks.iter().any(|(owner, event)| matches!(event,
-        jig_client_test_domain::Event::Jig(jig_client_view::Event::Ended {
+        jig_client_test_domain::Event::Client { event: jig_client::Event::Up { up: jig_client::Up::WatchEnded {
             end: jig_client_domain::contract::WatchEnd::Stopping, ..
-        }) if *owner == client)));
+        } } } if *owner == client)));
 }

@@ -1,28 +1,29 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary whole page proofs inspect supplied tree facts")]
 use super::{cards, owner_history as fixture};
+use crate::tests::fixtures::{Fixture, ReadPage, Served, Watched};
 use crate::{JigBindings, Owner, words::Words};
 use skein_ui::{Builder, Key, Role, Tree};
 
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     address::{Address, TaskSection},
-    boundary::Offset,
 };
 use jig_client::contract::*;
-use skein_lib::{Env, List, Queue, Time, Token, Wall};
-fn drive(domain: &mut Domain, event: Event) -> List<Request> {
-    let limits = fixture::client_limits();
-    let mut out = Queue::with_capacity(crate::max_out(&limits));
-    crate::step(domain, &Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, event, &mut out);
-    let mut values = List::with_capacity(crate::max_out(&limits));
-    while let Some(request) = out.pop() {
-        values.push(request).unwrap();
+use skein_lib::{List, Time, Wall};
+fn drive(domain: &mut Fixture, event: impl crate::tests::fixtures::Input) -> List<Request> {
+    let requests = domain.drive(Time::ZERO, event);
+    let mut out = List::with_capacity(u32::try_from(requests.len()).unwrap());
+    for request in requests {
+        out.push(request).unwrap();
     }
-    values
+    out
 }
-fn history_read(values: &[Request]) -> Token {
+fn history_read(values: &[Request]) -> jig_client::Handle {
     for value in values {
-        if let Request::Read { read, what: Read::History { .. } } = value {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::History { .. }) },
+        } = value
+        {
             return *read;
         }
     }
@@ -75,28 +76,40 @@ fn history_page() -> HistoryPage {
         after: Some(Cursor::new(Box::from(b"opaque".as_slice()), 1024).expect("bounded opaque cursor")),
     }
 }
-fn populated() -> Domain {
-    let mut domain = Domain::new(&fixture::client_limits());
+fn populated() -> Fixture {
+    let mut domain = Fixture::new(&fixture::client_limits());
     let out = drive(
         &mut domain,
         Event::Start {
-            address: Address::Task { task: 8, section: TaskSection::History },
-            kept: List::with_capacity(0),
-            offset: Offset { minutes: 0 },
+            seed: 8,
+            place: crate::address::Place::Jig(Address::Task { task: 8, section: TaskSection::History }),
+            records: List::with_capacity(0),
         },
     );
-    let Request::Open { watch, subject: Subject::Frame } = out.as_slice()[0] else { panic!("explicit frame watch") };
-    drive(&mut domain, Event::Hello { served: true });
+    let Request::Client {
+        asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Frame) },
+    } = out.as_slice()[0]
+    else {
+        panic!("explicit frame watch")
+    };
+    drive(&mut domain, Served { served: true });
     let mut frame = cards::document();
     frame.party.login = DocumentText::complete(cards::text(b"login"));
-    let opened =
-        drive(&mut domain, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) });
+    let opened = drive(&mut domain, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) });
     let _original_read = history_read(opened.as_slice());
     let task_watch = opened
         .as_slice()
         .iter()
         .find_map(|request| {
-            if let Request::Open { watch, subject: Subject::Task { task: 8 }, .. } = request {
+            if let Request::Client {
+                asked:
+                    jig_client::Event::Watch {
+                        handle: watch,
+                        subject: jig_client::Watchable::Jig(Subject::Task { task: 8 }),
+                        ..
+                    },
+            } = request
+            {
                 Some(*watch)
             } else {
                 None
@@ -105,23 +118,20 @@ fn populated() -> Domain {
         .expect("actual task header watch");
     let mut task = super::cards_objects::task_doc(&[]);
     task.instructions = Some(DocumentText::complete(cards::text(b"now")));
-    drive(
-        &mut domain,
-        Event::Watch { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) },
-    );
+    drive(&mut domain, Watched { watch: task_watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(task))) });
     let read = history_read(
-        drive(&mut domain, Event::Act { act: crate::action::Act::HistoryScope { subtree: true } }).as_slice(),
+        drive(&mut domain, Event::Act { action: crate::action::Act::HistoryScope { subtree: true } }).as_slice(),
     );
-    drive(&mut domain, Event::Read { read, result: ReadResult::Value(ReadValue::History(Box::new(history_page()))) });
+    drive(&mut domain, ReadPage { read, result: ReadResult::Value(ReadValue::History(Box::new(history_page()))) });
     domain
 }
-fn build(domain: &Domain, words: &Words) -> (Tree, JigBindings) {
+fn build(domain: &Fixture, words: &Words) -> (Tree, JigBindings) {
     let client = fixture::client_limits();
     let limits = crate::limits::of_words(&client, words).unwrap();
     let mut bindings = JigBindings::new(limits.bindings, client.text);
     let mut b = Builder::new(&limits);
     b.open(Role::Page);
-    crate::pages::main(&mut b, domain, words, &mut bindings);
+    crate::pages::main(&mut b, &domain.view(), words, &mut bindings);
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= limits.nodes);

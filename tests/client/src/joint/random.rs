@@ -180,7 +180,7 @@ fn lost_words(world: &mut World<Test, Joint>, client: crate::ClientId, seed: u64
     );
     let boundary = world.now().saturating_add(slack);
     let pending = world.run(Until::Time(boundary));
-    assert!(matches!(pending.verdict, Verdict::Open { .. }));
+    assert!(matches!(pending.verdict, Verdict::Open { .. }), "pending words seed {seed}: {pending:?}");
     assert_eq!(
         world.front().session.driver.world.reached_cut,
         Some(jig_core_world::effects::Cut::Submitted(submitted))

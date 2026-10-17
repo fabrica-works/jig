@@ -2,10 +2,8 @@ use super::{
     objects,
     spine::{LIMITS, drive, env},
 };
-use crate::{
-    Event,
-    objects::{Body, Card, Left},
-};
+use crate::objects::{Body, Card, Left};
+use crate::tests::fixtures::ReadPage;
 use jig_client::contract::*;
 use skein_lib::{Queue, Time, Wall};
 
@@ -34,9 +32,8 @@ fn terminal_task_reads_keep_whole_owner_endings_through_linger_without_result_do
                 drive(
                     &mut domain,
                     Time::ZERO,
-                    Event::Read { read: initial, result: ReadResult::Value(ReadValue::Task(Box::new(task.clone()))) },
+                    ReadPage { read: initial, result: ReadResult::Value(ReadValue::Task(Box::new(task.clone()))) },
                 );
-                domain.reads.reclaim();
             }
             let dropped = objects::watched(&mut domain, page, &[]);
             let terminal = if read_before_drop {
@@ -51,11 +48,11 @@ fn terminal_task_reads_keep_whole_owner_endings_through_linger_without_result_do
             let output = drive(
                 &mut domain,
                 at,
-                Event::Read { read: terminal, result: ReadResult::Value(ReadValue::Task(Box::new(task))) },
+                ReadPage { read: terminal, result: ReadResult::Value(ReadValue::Task(Box::new(task))) },
             );
             assert!(output.is_empty());
-            let id = domain.objects.find(key).unwrap();
-            let object = domain.objects.get(id).unwrap();
+            let id = domain.objects().find(key).unwrap();
+            let object = domain.objects().get(id).unwrap();
             assert_eq!(
                 object.card,
                 Card::Leaving {
@@ -66,10 +63,10 @@ fn terminal_task_reads_keep_whole_owner_endings_through_linger_without_result_do
             assert_eq!(object.body, Some(Body::Task(Box::new(exact))));
             assert_eq!(object.sources.len(), 0);
             let duplicate =
-                drive(&mut domain, at, Event::Read { read: terminal, result: ReadResult::None(ReadNone::Gone) });
+                drive(&mut domain, at, ReadPage { read: terminal, result: ReadResult::None(ReadNone::Gone) });
             assert!(duplicate.is_empty());
             assert_eq!(
-                domain.objects.get(id).unwrap().card,
+                domain.objects().get(id).unwrap().card,
                 Card::Leaving {
                     how: Left::OwnerEnded { how: Box::new(ending.clone()) },
                     until: Time::from_nanos(5_000_000_030),
@@ -77,9 +74,9 @@ fn terminal_task_reads_keep_whole_owner_endings_through_linger_without_result_do
             );
             let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
             for _ in 0_u8..4 {
-                crate::fire(&mut domain, &env(Time::from_nanos(5_000_000_030)), &mut out);
+                crate::fire(&mut domain.ui, &env(Time::from_nanos(5_000_000_030)), &mut out, &domain.client);
             }
-            assert!(domain.objects.find(key).is_none());
+            assert!(domain.objects().find(key).is_none());
         }
     }
 }

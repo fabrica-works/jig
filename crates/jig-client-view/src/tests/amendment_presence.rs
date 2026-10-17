@@ -1,6 +1,7 @@
 //! Selected amendments are independent of displayed source facts (client.md, 9).
 use super::*;
 use crate::objects::Body;
+use crate::tests::fixtures::Fixture;
 
 fn empty() -> Amendment {
     Amendment { addressed: None, spec: None, instructions: None, wake: None, dependencies: None, authority: None }
@@ -8,18 +9,20 @@ fn empty() -> Amendment {
 fn sent(out: &[Request]) -> &Amendment {
     out.iter()
         .find_map(|request| match request {
-            Request::Send { ask, .. } => match &**ask {
-                Ask::Amend { change, .. } => Some(change),
-                _ => None,
-            },
+            Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
+                match &**ask {
+                    Ask::Amend { change, .. } => Some(change),
+                    _ => None,
+                }
+            }
             _ => None,
         })
         .expect("the selected amendment is sent")
 }
-fn open(row: Task) -> (Domain, Id<Object>) {
+fn open(row: Task) -> (Fixture, Id<Object>) {
     let (mut domain, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
-    drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Amend } });
-    drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+    drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Amend } });
+    drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     (domain, id)
 }
 
@@ -77,9 +80,9 @@ fn amendment_single_field_inputs_select_only_whole_property_and_explicit_empty_i
         assert!(!contains(&tree, b"Address to task number"), "only actual person and role destinations are offered");
         assert!(domain.confirmation().unwrap().choices.change.is_none());
         let action = input(&tree, label, value, &mut bindings);
-        drive(&mut domain, Event::Act { act: action });
+        drive(&mut domain, Event::Act { action });
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&selected));
-        let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+        let out = drive(&mut domain, Event::Act { action: Action::Confirm });
         assert_eq!(sent(&out), &selected);
         if let Some(spec) = &sent(&out).spec {
             assert_eq!(spec.parameters.capacity(), 2);
@@ -102,7 +105,7 @@ fn amendment_dependency_and_wake_controls_preserve_only_prior_selected_changes()
     let words = words();
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
     let tree = dialog(&domain, words, &mut bindings);
-    drive(&mut domain, Event::Act { act: press(&tree, b"Drop dependency 8", &mut bindings) });
+    drive(&mut domain, Event::Act { action: press(&tree, b"Drop dependency 8", &mut bindings) });
     let mut expected = Amendment { dependencies: Some(list([])), ..empty() };
     assert_eq!(
         domain.confirmation().unwrap().choices.change.as_ref().unwrap().dependencies.as_ref().unwrap().capacity(),
@@ -110,20 +113,20 @@ fn amendment_dependency_and_wake_controls_preserve_only_prior_selected_changes()
     );
     assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
     let tree = dialog(&domain, words, &mut bindings);
-    drive(&mut domain, Event::Act { act: press(&tree, b"Wakes on inbox messages", &mut bindings) });
+    drive(&mut domain, Event::Act { action: press(&tree, b"Wakes on inbox messages", &mut bindings) });
     let mut wake = initial_wake;
     wake.words = WakeRule::Never;
     expected.wake = Some(wake);
     assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
     let tree = dialog(&domain, words, &mut bindings);
-    drive(&mut domain, Event::Act { act: press(&tree, b"Wakes on a delegate result", &mut bindings) });
+    drive(&mut domain, Event::Act { action: press(&tree, b"Wakes on a delegate result", &mut bindings) });
     wake.results = ResultsWake::Never;
     expected.wake = Some(wake);
     let tree = dialog(&domain, words, &mut bindings);
     assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Drop dependency 8")));
-    drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
+    drive(&mut domain, Event::Act { action: input(&tree, b"New instructions", b"", &mut bindings) });
     expected.instructions = Some(text(b""));
-    let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+    let out = drive(&mut domain, Event::Act { action: Action::Confirm });
     assert_eq!(sent(&out), &expected);
 }
 
@@ -145,8 +148,8 @@ fn amendment_loss_in_specification_does_not_select_or_block_independent_fields()
         assert!(contains(&tree, b"whole task specification"));
         assert!(contains(&tree, UTF8_TEXTS[0]));
         assert_eq!(contains(&tree, b"Only part of this text was supplied"), mask & 3 != 0);
-        drive(&mut domain, Event::Act { act: input(&tree, b"New instructions", b"", &mut bindings) });
-        let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+        drive(&mut domain, Event::Act { action: input(&tree, b"New instructions", b"", &mut bindings) });
+        let out = drive(&mut domain, Event::Act { action: Action::Confirm });
         assert_eq!(sent(&out), &Amendment { instructions: Some(text(b"")), ..empty() });
     }
 }
@@ -155,8 +158,8 @@ fn amendment_loss_in_specification_does_not_select_or_block_independent_fields()
 fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_revisions() {
     let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
     let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
-    drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
-    drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+    drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+    drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
     let words = words();
     let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
     for (label, value) in [
@@ -165,7 +168,7 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
         (b"New instructions", b""),
     ] {
         let tree = dialog(&domain, words, &mut bindings);
-        drive(&mut domain, Event::Act { act: input(&tree, label, value, &mut bindings) });
+        drive(&mut domain, Event::Act { action: input(&tree, label, value, &mut bindings) });
     }
     let mut authority = row.steering.authority.whole().unwrap();
     authority.spend = 25;
@@ -175,17 +178,20 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
     assert_eq!(open.choices.change.as_ref(), Some(&expected));
     assert_eq!(open.revision, Some(Revision { value: 6 }));
     assert_eq!(open.release_revision, Some(Revision { value: 4 }));
-    let Body::Escalation(retained) = domain.objects().get(id).unwrap().body.as_ref().unwrap() else {
+    let projected = domain.objects().get(id).unwrap();
+    let Body::Escalation(retained) = projected.body.as_ref().unwrap() else {
         panic!("retained escalation");
     };
     assert_eq!(retained.steering.person_revision, Some(Revision { value: 12 }));
     assert_eq!(retained.steering.instructions.as_ref().unwrap().bytes(), b"held instructions");
-    let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+    let out = drive(&mut domain, Event::Act { action: Action::Confirm });
     assert_eq!(sent(&out), &expected);
     let ask = out
         .iter()
         .find_map(|request| match request {
-            Request::Send { ask, .. } => Some(&**ask),
+            Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
+                Some(&**ask)
+            }
             _ => None,
         })
         .expect("sent amendment request");
@@ -204,14 +210,14 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
     ] {
         let row = escalation_doc(HoldReason::Budget { spent: 10, limit: 10 }, &[ActKind::AmendRelease]);
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row.clone())));
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
-        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let words = words();
         let mut bindings = JigBindings::new(limits().bindings, CLIENT.text);
         let tree = dialog(&domain, words, &mut bindings);
         drive(
             &mut domain,
-            Event::Act { act: input(&tree, b"New specification", b"selected whole words", &mut bindings) },
+            Event::Act { action: input(&tree, b"New specification", b"selected whole words", &mut bindings) },
         );
         let tree = dialog(&domain, words, &mut bindings);
         assert!(contains(&tree, b"Person-task revision 12"));
@@ -221,7 +227,7 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
             assert_eq!(decode(&mut bindings, token, Act::Input { value: Box::from(b"4294967296".as_slice()) }), None);
             assert!(domain.confirmation().unwrap().choices.change.as_ref().unwrap().addressed.is_none());
         }
-        drive(&mut domain, Event::Act { act: input(&tree, label, bytes, &mut bindings) });
+        drive(&mut domain, Event::Act { action: input(&tree, label, bytes, &mut bindings) });
         let mut specification = row.steering.spec.whole().unwrap();
         specification.words = text(b"selected whole words");
         let expected = Amendment {
@@ -230,12 +236,14 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
             ..empty()
         };
         assert_eq!(domain.confirmation().unwrap().choices.change.as_ref(), Some(&expected));
-        let out = drive(&mut domain, Event::Act { act: Action::Confirm });
+        let out = drive(&mut domain, Event::Act { action: Action::Confirm });
         assert_eq!(sent(&out), &expected);
         let ask = out
             .iter()
             .find_map(|request| match request {
-                Request::Send { ask, .. } => Some(&**ask),
+                Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
+                    Some(&**ask)
+                }
                 _ => None,
             })
             .unwrap();
@@ -260,8 +268,8 @@ fn address_controls_require_actual_person_revision_and_keep_task_recipients_outs
         row.steering.person_revision = revision;
         row.steering.addressed = recipient;
         let (mut domain, id) = loaded(ObjectKey::Escalation(8), ReadValue::Escalation(Box::new(row)));
-        drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
-        drive(&mut domain, Event::Act { act: Action::Edit { field: Purpose::Reason, text: text(b"") } });
+        drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+        drive(&mut domain, Event::Act { action: Action::Edit { field: Purpose::Reason, text: text(b"") } });
         let tree = dialog(&domain, words(), &mut JigBindings::new(limits().bindings, CLIENT.text));
         assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"Address to party number")));
         assert!(

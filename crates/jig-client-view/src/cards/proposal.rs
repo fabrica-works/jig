@@ -6,7 +6,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
 use crate::{
-    Domain,
+    Borrowed,
     objects::{Object, proposal::facts},
 };
 use jig_client::contract::{Amendment, ProposalAction, ProposedTask};
@@ -14,7 +14,7 @@ use skein_lib::Id;
 /// Build the one proposal card at any place, using the document's acts only.
 pub fn proposal(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &super::Place,
     words: &Words,
@@ -24,7 +24,7 @@ pub fn proposal(
     let Some(object_facts) = client.objects().get(object) else {
         return false;
     };
-    let Some(document) = facts(object_facts) else {
+    let Some(document) = facts(&object_facts) else {
         return false;
     };
     let title = words.say(JigPhrase::Proposal, &[]);
@@ -43,7 +43,7 @@ pub fn proposal(
     if let Some(ending) = &document.ending {
         words.ending(b, ending);
     }
-    super::common::answer(b, object_facts, words, text_limit);
+    super::common::answer(b, &object_facts, words, text_limit);
     super::common::acts(b, &object_facts.card, &document.acts, object, words, bindings);
     super::close(b);
     true
@@ -143,7 +143,7 @@ pub(crate) fn address_change(b: &mut Builder, change: &jig_client::contract::Add
 /// The same keyed card for the independently supplied pending owner document.
 pub fn owner_proposal(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &super::Place,
     words: &Words,
@@ -175,7 +175,7 @@ pub fn owner_proposal(
         return false;
     }
     crate::owner_proposal::render(b, client, document, words, bindings);
-    super::common::answer(b, facts, words, text_limit);
+    super::common::answer(b, &facts, words, text_limit);
     super::common::acts(b, &facts.card, &document.acts, object, words, bindings);
     super::close(b);
     true

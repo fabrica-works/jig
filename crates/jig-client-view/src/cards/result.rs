@@ -6,7 +6,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     objects::{Object, result::facts as document},
 };
@@ -15,7 +15,7 @@ use skein_lib::Id;
 /// Build a result's shared card and all its contract payloads.
 pub fn result(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &super::Place,
     words: &Words,
@@ -25,7 +25,7 @@ pub fn result(
     let Some(fact) = client.objects().get(object) else {
         return false;
     };
-    let Some(document) = document(fact) else {
+    let Some(document) = document(&fact) else {
         return false;
     };
     let title = words.say(JigPhrase::Result, &[]);
@@ -33,13 +33,19 @@ pub fn result(
         return false;
     }
     facts(b, client, document, words, bindings);
-    super::common::answer(b, fact, words, text_limit);
+    super::common::answer(b, &fact, words, text_limit);
     super::common::acts(b, &fact.card, &document.acts, object, words, bindings);
     super::close(b);
     true
 }
 /// Render passive input results side by side without duplicating their domain objects.
-pub fn facts(b: &mut Builder, client: &Domain, facts: &ResultDocument, words: &Words, bindings: &mut JigBindings) {
+pub fn facts(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    facts: &ResultDocument,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     b.open(Role::Region);
     let title = words.say(JigPhrase::ChipNumber, &[Hole::Number(facts.task.task), name(facts.task.title.bytes())]);
     b.name(&title);
@@ -58,7 +64,13 @@ pub fn facts(b: &mut Builder, client: &Domain, facts: &ResultDocument, words: &W
     b.close();
 }
 /// The whole result vocabulary, including connector slots and follow-up chips.
-pub fn value_nodes(b: &mut Builder, client: &Domain, value: &ResultValue, words: &Words, bindings: &mut JigBindings) {
+pub fn value_nodes(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    value: &ResultValue,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     match value {
         ResultValue::Report(text) | ResultValue::Words(text) => crate::document_text::markdown(b, text, words),
         ResultValue::OwnerVerdict { verdict, words: explanation, fields } => {
@@ -118,7 +130,7 @@ fn verdict_payload(
 /// A reply opens the chat at its domain-kept first unread reply position.
 pub fn reply(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &super::Place,
     words: &Words,

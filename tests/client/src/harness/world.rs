@@ -553,7 +553,7 @@ impl<A: App, F: Front<A>> World<A, F> {
         A::take(&mut c.root, &env, &mut out);
         let mut wires = Vec::new();
         let mut shows = Vec::new();
-        let mut signs = Vec::new();
+        let mut signs = 0;
         let mut sign_outs = 0;
         let mut failed = self.quota_failure;
         self.quota_failure = false;
@@ -562,7 +562,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                 Duty::Store(write) => c.deferred.push(write),
                 Duty::Wire(request) => wires.push(request),
                 Duty::Show { address, replace } => shows.push((address, replace)),
-                Duty::SignIn { provider: _, back } => signs.push(back),
+                Duty::SignIn { provider: _ } => signs += 1,
                 Duty::SignOut => sign_outs += 1,
                 Duty::Fact => {}
             }
@@ -611,15 +611,11 @@ impl<A: App, F: Front<A>> World<A, F> {
             self.platform_show(id, address, replace);
         }
         for _ in 0..sign_outs {
+            self.observe(Observation::SignOutAsked { client: id });
             self.front.sign_out(id, self.now, env.wall);
         }
-        for back in signs {
+        for _ in 0..signs {
             self.front.sign_in(id, self.now, env.wall);
-            let navigation = self.advance_navigation(id);
-            self.schedule.send(
-                self.now.saturating_add(self.settings.latency.draw(&mut self.rng)),
-                Due { client: id, epoch: self.clients[id.0].epoch, event: A::went(back), navigation: Some(navigation) },
-            );
         }
         self.build(id);
     }

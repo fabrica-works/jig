@@ -1,16 +1,16 @@
 //! Sources opened once for each section's owner (client/domain/client.md, 5.1).
 use super::routing::{open_once, read};
 use crate::{
-    Domain, Request,
+    Request, Ui,
     address::{ProjectSection, TaskSection},
+    handles::Owner,
     page::{Section, project},
-    watches::Owner,
 };
 use jig_client::contract::{self, Read, Subject};
 use skein_lib::{Env, Queue};
 
 pub(crate) fn section(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     section: Section,
     owner: Owner,
@@ -52,8 +52,6 @@ pub(crate) fn section(
                     project::ask(domain, project::GOALS_READ, Read::Goals { project, after: None }, out);
                 }
                 ProjectSection::Tasks => {
-                    domain.project_page.tasks_more = false;
-                    domain.project_page.tasks.clear();
                     let subject =
                         Subject::Tasks { project, filter: domain.project_page.task_filter, window: env.limits.rows };
                     open_once(domain, subject, owner, out);

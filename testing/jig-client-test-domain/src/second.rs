@@ -1,7 +1,7 @@
 //! The second connector owns resource/kind words and the shared link only.
 use alloc::boxed::Box;
+use jig_client::Link;
 use jig_client::contract::Part;
-use jig_client_view::link::Link;
 use skein_lib::List;
 #[derive(Debug)]
 pub struct Side {
@@ -15,7 +15,6 @@ pub struct Side {
 #[derive(Debug)]
 struct Held {
     part: Part,
-    generation: u32,
 }
 impl Side {
     #[must_use]
@@ -38,7 +37,7 @@ impl Side {
         self.party = party;
         self.changed();
     }
-    pub(crate) fn show(&mut self, part: Part, generation: u32) -> bool {
+    pub(crate) fn show(&mut self, part: Part) -> bool {
         match &part {
             Part::Resource { path, .. } => {
                 if !jig_client::contract::resource_path_fits(path, self.segments, self.text) {
@@ -57,24 +56,18 @@ impl Side {
             | Part::Deployment { .. } => {}
         }
         for held in &self.parts {
-            if held.part == part && held.generation == generation {
+            if held.part == part {
                 return true;
             }
         }
-        if self.parts.push(Held { part, generation }).is_err() {
+        if self.parts.push(Held { part }).is_err() {
             return false;
         }
         self.changed();
         true
     }
-    pub(crate) fn left(&mut self, generation: u32) {
-        let capacity = self.parts.capacity();
-        let old = core::mem::replace(&mut self.parts, List::with_capacity(capacity));
-        for held in old.into_boxed() {
-            if held.generation != generation {
-                assert!(self.parts.push(held).is_ok(), "remaining parts fit");
-            }
-        }
+    pub(crate) fn left(&mut self) {
+        self.parts.clear();
         self.changed();
     }
     fn changed(&mut self) {

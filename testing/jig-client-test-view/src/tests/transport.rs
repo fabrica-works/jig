@@ -5,12 +5,6 @@ use skein_lib::{Duration, Env, Queue, RequestLimits, Time, Wall};
 
 pub(super) fn drive(root: &mut Domain, event: Event, limits: &jig_client_test_domain::Limits) -> Vec<Request> {
     let up = match event {
-        Event::Jig(jig_client_view::Event::Hello { served }) => Up::Served { served, versions: None },
-        Event::Jig(jig_client_view::Event::Watch { watch, event }) => Up::Watched { watch, event },
-        Event::Jig(jig_client_view::Event::Ended { watch, end }) => Up::WatchEnded { watch, end },
-        Event::Jig(jig_client_view::Event::Read { read, result }) => {
-            Up::ReadDone { read, result: jig_client::Readout::Jig(result) }
-        }
         Event::First(first::Event::Read { read, result }) => Up::ReadDone {
             read,
             result: match result {
@@ -82,7 +76,7 @@ pub(super) fn limits() -> jig_client_test_domain::Limits {
             save_delay: Duration::from_secs(1),
             intents: 2,
             fields: 4,
-            providers: 2,
+
             objects: 3,
             sources: 8,
             reads: 8,

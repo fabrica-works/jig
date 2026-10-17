@@ -325,7 +325,7 @@ impl Bytes {
             }
             if !offline && joint.work && joint.due.is_none() {
                 self.ready_admissions.append(&mut self.pending_admissions);
-                joint.engine.drain().expect("actual Ops byte decisions");
+                joint.engine.drain().expect("Ops byte decisions");
                 joint.work = false;
                 if self.crashed(joint) {
                     return Vec::new();

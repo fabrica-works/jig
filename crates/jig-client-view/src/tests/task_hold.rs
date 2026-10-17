@@ -41,7 +41,7 @@ fn owner_hold_confirmation_keeps_exact_prior_counts_loss_clock_presence_and_repe
                 let mut row = task_doc(&[ActKind::Release]);
                 row.hold = Some(TaskHold::Owner(Box::new(held.clone())));
                 let (mut domain, id, _) = loaded_with_watch(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
-                drive(&mut domain, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Release } });
+                drive(&mut domain, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Release } });
                 let envelope = limits();
                 let mut bindings = JigBindings::new(envelope.bindings, CLIENT.text);
                 let tree = dialog(&domain, words(), &mut bindings);

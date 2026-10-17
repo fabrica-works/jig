@@ -6,7 +6,7 @@ use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
 use crate::{
-    Domain,
+    Borrowed,
     objects::{Body, Object},
 };
 use jig_client::contract::{Hold, Phase, SpendLine};
@@ -14,7 +14,7 @@ use skein_lib::{Id, List};
 /// Build the held task's card in any place, preserving prior result and holders.
 pub fn escalation(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &super::Place,
     words: &Words,
@@ -51,13 +51,13 @@ pub fn escalation(
     if let Some(ending) = &document.ending {
         words.ending(b, ending);
     }
-    super::common::answer(b, facts, words, text_limit);
+    super::common::answer(b, &facts, words, text_limit);
     super::common::acts(b, &facts.card, &document.acts, object, words, bindings);
     super::close(b);
     true
 }
 /// Facts retained when the task entered its hold, including spend attribution.
-pub fn held(b: &mut Builder, client: &Domain, hold: &Hold, words: &Words, bindings: &mut JigBindings) {
+pub fn held(b: &mut Builder, client: &Borrowed<'_>, hold: &Hold, words: &Words, bindings: &mut JigBindings) {
     super::hold::reason(b, &hold.reason, words, bindings);
     words.waiting(b, client.wall(), hold.since);
     words.text(b, JigPhrase::BeforeHold, &[]);

@@ -276,7 +276,7 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
         w.event(
             c,
             jig_client_test_domain::Event::Jig(jig_client_view::Event::Act {
-                act: jig_client_view::action::Act::Edit { field, text: stories::text(&[b'f'; 32]) },
+                action: jig_client_view::action::Act::Edit { field, text: stories::text(&[b'f'; 32]) },
             }),
         );
     }

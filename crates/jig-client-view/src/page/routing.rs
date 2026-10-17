@@ -1,23 +1,22 @@
 //! Spine routing of page generations, watches, reads, names and parts.
 //! Detailed page policies are jig 22's modules. See client/domain/client.md, 5–7.
 use crate::{
-    Domain, Request,
+    Request, Ui,
     action::End,
     address::{Address, Place},
-    facts::Fact,
+    handles::Owner,
     objects::{Body, Source},
     page::{Page, Section},
-    watches::{Owner, Watch},
     windows::{Edge, Edges},
 };
 use alloc::boxed::Box;
 use jig_client::contract::{self, Delivery, Limit, ObjectKey, Part, PartyKind, Read, ReadResult, ReadValue, Subject};
-use skein_lib::{Env, Id, List, Queue, Token};
+use skein_lib::{Env, List, Queue, Token};
 
 fn blank_edges() -> Edges {
     Edges { before: Edge::End, after: Edge::End }
 }
-fn page_edges(before: Option<contract::Cursor>, after: Option<contract::Cursor>) -> Edges {
+pub(crate) fn page_edges(before: Option<contract::Cursor>, after: Option<contract::Cursor>) -> Edges {
     let before = match before {
         Some(cursor) => Edge::More(cursor),
         None => Edge::End,
@@ -28,7 +27,7 @@ fn page_edges(before: Option<contract::Cursor>, after: Option<contract::Cursor>)
     };
     Edges { before, after }
 }
-pub(crate) fn refuse(domain: &mut Domain, which: Limit) {
+pub(crate) fn refuse(domain: &mut Ui, which: Limit) {
     match &mut domain.page {
         Page::Work { refused, .. } => *refused = Some(which),
         Page::Elsewhere if !domain.sections.is_empty() && domain.section_context != 0 => {
@@ -40,7 +39,7 @@ pub(crate) fn refuse(domain: &mut Domain, which: Limit) {
     }
     domain.changed();
 }
-pub(crate) fn excess(domain: &mut Domain, count: u32) {
+pub(crate) fn excess(domain: &mut Ui, count: u32) {
     match &mut domain.page {
         Page::Work { excess, .. } => *excess = count,
         Page::Elsewhere => super::shown::status(domain, None, Some(count), false),
@@ -48,56 +47,74 @@ pub(crate) fn excess(domain: &mut Domain, count: u32) {
     }
     domain.changed();
 }
-pub(crate) fn open_once(domain: &mut Domain, subject: Subject, owner: Owner, out: &mut Queue<Request>) -> bool {
-    for (id, ()) in &domain.watch_ids {
-        let watch = domain.watches.get(*id).expect("registered watch exists");
-        match watch.state {
-            crate::watches::Following::Closing | crate::watches::Following::Closed => {}
-            crate::watches::Following::Opening | crate::watches::Following::Live => {
-                if watch.owner == owner && watch.subject == subject {
-                    return false;
-                }
-            }
+pub(crate) fn open_once(domain: &mut Ui, subject: Subject, owner: Owner, out: &mut Queue<Request>) -> bool {
+    for (_, watch) in &domain.handles.watches {
+        if watch.owner == owner && watch.subject == subject {
+            return false;
         }
     }
-    if domain.open(subject, owner, out).is_none() {
+    if domain.hold_watch(subject, owner, out).is_none() {
         refuse(domain, Limit::Watches);
     }
     true
 }
-pub(crate) fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
+pub(crate) fn read(domain: &mut Ui, number: u16, what: Read, out: &mut Queue<Request>) {
     crate::page::shown::context_read(domain, &what);
-    if domain.reads.pending(&what) {
+    if domain.handles.pending(&what) {
         return;
     }
-    let source = Source::Window { generation: domain.generation, number };
-    match domain.reads.ask(domain.generation, source, what, out) {
+    let source = Source::Window { number };
+    match domain.handles.read(source, what, out) {
         Some(_) => {}
         None => refuse(domain, Limit::Reads),
     }
 }
 /// Leaves in the order the contract requires; shell places replace their current entry.
 pub(crate) fn navigate(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     place: Place,
     replace: bool,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     if domain.blocked {
         return;
     }
-    let Some(generation) = domain.generation.checked_add(1) else {
-        refuse(domain, Limit::Reads);
-        return;
-    };
-    match domain.page {
-        Page::SigningIn => domain.signin.returning = true,
-        Page::Starting | Page::Work { .. } | Page::Elsewhere | Page::Missing | Page::OutOfDate | Page::SomeoneElse => {}
+    leave_page(domain, out);
+    match place {
+        Place::Jig(address) => {
+            domain.signin.application = false;
+            domain.address = address;
+            match domain.frame(lent).document {
+                Some(_) => enter(domain, env, out, lent),
+                None => {
+                    domain.page = Page::Starting;
+                    domain.changed();
+                }
+            }
+            out.push(Request::Show {
+                place: Place::Jig(address),
+                how: if replace { crate::How::Replace } else { crate::How::Push },
+            });
+            crate::store::place(domain, out);
+        }
+        Place::Elsewhere => {
+            domain.signin.application = true;
+            domain.page = Page::Elsewhere;
+            domain.changed();
+        }
+        Place::Missing => {
+            domain.page = Page::Missing;
+            domain.changed();
+        }
     }
-    domain.close_page(out);
-    domain.reads.abandon(domain.generation);
-    out.push(Request::PartsLeft { generation: domain.generation });
+}
+/// Releases a page's handles and owned read pages together (view.md, 18.2).
+pub(crate) fn leave_page(domain: &mut Ui, out: &mut Queue<Request>) {
+    domain.leave_handles(false, out);
+    domain.handles.leave_reads(out);
+    out.push(Request::PartsLeft);
     domain.sections.clear();
     domain.objects.clear();
     domain.task_page.clear();
@@ -120,33 +137,9 @@ pub(crate) fn navigate(
     domain.history_rows.rows.clear();
     domain.history_rows.cut = false;
     domain.history_rows.edges = blank_edges();
-    domain.generation = generation;
-    match place {
-        Place::Jig(address) => {
-            domain.address = address;
-            match domain.frame.document {
-                Some(_) if domain.versions.is_some() => enter(domain, env, out),
-                Some(_) | None => {
-                    domain.page = Page::Starting;
-                    domain.changed();
-                }
-            }
-            out.push(Request::Show { address, replace });
-            crate::store::place(domain, out);
-        }
-        Place::Elsewhere => {
-            domain.page = Page::Elsewhere;
-            domain.changed();
-        }
-        Place::Missing => {
-            domain.page = Page::Missing;
-            domain.changed();
-        }
-    }
-    crate::signin::returned(domain, out);
 }
 /// Opens only what the selected work page shows; services have no page.
-pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
+pub(crate) fn enter(domain: &mut Ui, env: &Env<crate::Limits>, out: &mut Queue<Request>, lent: &jig_client::Client) {
     domain.sections.clear();
     let hidden = match domain.confirmed {
         Some(party) => crate::ui::foreign_kept_requests(domain, party),
@@ -157,7 +150,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
         domain.changed();
         return;
     }
-    if let Some(frame) = &domain.frame.document {
+    if let Some(frame) = &domain.frame(lent).document {
         match frame.party.kind {
             PartyKind::Service => {
                 domain.page = Page::Elsewhere;
@@ -168,7 +161,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
         }
     }
     if domain.address == Address::Deployment {
-        let allowed = match &domain.frame.document {
+        let allowed = match &domain.frame(lent).document {
             Some(frame) => frame.deployment_role.is_some(),
             None => false,
         };
@@ -178,8 +171,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
             return;
         }
     }
-    domain.page =
-        Page::Work { address: domain.address, generation: domain.generation, behind: false, excess: 0, refused: None };
+    domain.page = Page::Work { address: domain.address, behind: false, excess: 0, refused: None };
     let section = match domain.address {
         Address::Inbox { project } => {
             domain
@@ -196,7 +188,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
     domain.sections.push(section).expect("page sections fit their fixed bound");
     super::shown::arrange(domain);
     domain.changed();
-    let owner = Owner::Page { generation: domain.generation };
+    let owner = Owner::Page;
     for index in 0..domain.sections().len() {
         let section = *domain.sections().get(index).expect("section index is in the page");
         open_section(domain, env, section, owner, out);
@@ -204,7 +196,7 @@ pub(crate) fn enter(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Que
 }
 /// Opens the sources one section needs (client/domain/client.md, 5.1).
 pub(crate) fn open_section(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     section: Section,
     owner: Owner,
@@ -226,11 +218,12 @@ pub(crate) fn document_read(key: ObjectKey) -> Read {
     }
 }
 pub(crate) fn names(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
     keys: List<ObjectKey>,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     let missed = domain.objects.replace(source, keys.as_slice());
     excess(domain, missed);
@@ -241,11 +234,27 @@ pub(crate) fn names(
                 Ok(()) | Err(_) => {}
             }
             let id = domain.objects.find(*key).expect("named object is present");
-            let object = domain.objects.get(id).expect("indexed object exists");
-            if object.body.is_none() {
+            let object = domain.borrow(lent).objects().get(id).expect("indexed object exists");
+            let needs_read = match object.body {
+                None | Some(Body::Chip(_)) => true,
+                Some(
+                    Body::Task(_)
+                    | Body::Historical(_)
+                    | Body::Proposal(_)
+                    | Body::OwnerProposal(_)
+                    | Body::Escalation(_)
+                    | Body::OwnerEscalation(_)
+                    | Body::Question(_)
+                    | Body::PersonTask(_)
+                    | Body::OwnerPersonTask(_)
+                    | Body::Result(_)
+                    | Body::Note { .. },
+                ) => false,
+            };
+            if needs_read {
                 let what = document_read(*key);
-                if !domain.reads.pending(&what) {
-                    match domain.reads.ask(domain.generation, source, what, out) {
+                if !domain.handles.pending(&what) {
+                    match domain.handles.read(source, what, out) {
                         Some(_) => {}
                         None => refuse(domain, Limit::Reads),
                     }
@@ -255,21 +264,26 @@ pub(crate) fn names(
     }
     if missed > 0 {
         refuse(domain, Limit::Objects);
-        out.push(Request::Fact { fact: Fact::Refused { which: Limit::Objects } });
     }
     // The page's names are bounded even when the incoming document has more rows.
     assert!(domain.object_rows.rows.len() <= env.limits.rows, "page rows fit their window");
 }
-pub(crate) fn parts(domain: &mut Domain, env: &Env<crate::Limits>, values: &[Part], out: &mut Queue<Request>) {
+pub(crate) fn parts(
+    domain: &mut Ui,
+    env: &Env<crate::Limits>,
+    values: &[Part],
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
     let mut count = 0_u32;
     for part in values {
         if count == env.limits.parts {
             refuse(domain, Limit::Objects);
             break;
         }
-        let scope = crate::application::scope(domain, part);
+        let scope = crate::application::scope(domain, part, lent);
         if let Some(scope) = scope {
-            out.push(Request::ShowPart { part: part.clone(), generation: domain.generation, scope });
+            out.push(Request::ShowPart { part: part.clone(), scope });
         } else {
             refuse(domain, Limit::Reads);
         }
@@ -278,12 +292,13 @@ pub(crate) fn parts(domain: &mut Domain, env: &Env<crate::Limits>, values: &[Par
 }
 
 fn one(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
     key: ObjectKey,
     body: Body,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     let missed = domain.objects.replace(source, &[key]);
     if missed > 0 {
@@ -292,7 +307,7 @@ fn one(
     }
     match domain.objects.find(key) {
         Some(_) => {
-            let stored = crate::application::put(domain, env, key, body, out);
+            let stored = crate::application::put(domain, env, key, body, out, lent, false);
             assert!(stored, "named object receives its facts");
         }
         None => refuse(domain, Limit::Objects),
@@ -301,52 +316,43 @@ fn one(
 }
 /// Applies one whole delivery to its source, never to an old generation.
 pub(crate) fn delivery(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
-    watch: Id<Watch>,
+    watch: jig_client::Handle,
     value: Delivery,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     let source = Source::Watch(watch);
     match value {
         Delivery::Frame(_) | Delivery::OwnerProject(_) => {}
-        Delivery::Run(value) => crate::conversation::routing::stream(domain, env, watch, *value, out),
-        Delivery::RunState(value) => crate::conversation::routing::run_state(domain, env, watch, *value, out),
+        Delivery::Run(_) | Delivery::RunState(_) => crate::conversation::routing::text(domain, env, watch, out, lent),
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
-            one(domain, env, source, key, Body::OwnerProposal(proposal), out);
+            one(domain, env, source, key, Body::OwnerProposal(proposal), out, lent);
         }
         Delivery::Task(task) => {
-            crate::conversation::routing::document(domain, &task, out);
+            crate::conversation::routing::document(domain, &task, out, lent);
             crate::page::task::delivered(domain, source, task);
-            crate::page::task::document(domain, env, out);
+            crate::page::task::document(domain, env, out, lent);
         }
-        Delivery::OwnerTree(tree) => owner_tree_delivery(domain, env, watch, source, tree, out),
+        Delivery::OwnerTree(tree) => owner_tree_delivery(domain, env, watch, source, tree, out, lent),
         Delivery::Tree(tree) => {
-            crate::page::task::tree(domain, *tree);
             let mut keys =
                 List::with_capacity(crate::limits::ui::tree_names(&env.limits).expect("tree names are bounded"));
-            for node in &domain.task_page.plan.nodes {
-                if !keys.as_slice().contains(&ObjectKey::Task(node.chip.task))
-                    && keys.push(ObjectKey::Task(node.chip.task)).is_err()
-                {
-                    break;
+            for node in &tree.nodes {
+                if !keys.as_slice().contains(&ObjectKey::Task(node.chip.task)) {
+                    keys.push(ObjectKey::Task(node.chip.task)).expect("tree names fit");
                 }
                 for proposal in &node.proposals {
                     let key = ObjectKey::Proposal(*proposal);
-                    if !keys.as_slice().contains(&key) && keys.push(key).is_err() {
-                        break;
+                    if !keys.as_slice().contains(&key) {
+                        keys.push(key).expect("tree names fit");
                     }
                 }
             }
-            names(domain, env, source, keys, out);
-            for node in &domain.task_page.plan.nodes {
-                let key = ObjectKey::Task(node.chip.task);
-                let stored = domain.objects.put(key, Body::Chip(node.chip.clone()));
-                if !stored {
-                    break;
-                }
-            }
+            crate::page::task::tree(domain, *tree);
+            names(domain, env, source, keys, out, lent);
             domain.changed();
         }
         Delivery::Chips(chips) => {
@@ -357,44 +363,29 @@ pub(crate) fn delivery(
                     Err(_) => break,
                 }
             }
-            names(domain, env, source, keys, out);
-            for chip in chips.into_boxed() {
-                let key = ObjectKey::Task(chip.task);
-                let stored = domain.objects.put(key, Body::Chip(chip));
-                if stored {
-                    domain.changed();
-                }
-            }
-        }
-        Delivery::OwnerInbox(inbox) => {
-            domain.inbox.owner(inbox);
-            crate::page::replies::inbox(domain, env, source, out);
-            crate::page::conversations::mark_results(domain, out);
-            domain.timed_page(!domain.inbox.rows.is_empty());
+            names(domain, env, source, keys, out, lent);
             domain.changed();
         }
-        Delivery::Inbox(inbox) => {
-            domain.inbox.needs = inbox.needs;
-            domain.inbox.updates = inbox.updates;
-            domain.inbox.results_seen = inbox.results_seen;
-            domain.inbox.marked_results = domain.inbox.marked_results.max(inbox.results_seen);
-            domain.inbox.document = Some(contract::InboxDocument::Entry(inbox.clone()));
-            domain.inbox.replace(inbox.entries, inbox.more);
-            crate::page::replies::inbox(domain, env, source, out);
-            crate::page::conversations::mark_results(domain, out);
-            domain.timed_page(!domain.inbox.rows.is_empty());
+        Delivery::OwnerInbox(_) | Delivery::Inbox(_) => {
+            let projected = domain.borrow(lent).inbox();
+            let timed = !projected.rows.is_empty();
+            domain.inbox = projected.into_state();
+            crate::page::replies::inbox(domain, env, source, out, lent);
+            crate::page::conversations::mark_results(domain, out, lent);
+            domain.timed_page(timed);
             domain.changed();
         }
-        Delivery::Goals(goals) => crate::page::project::live(domain, env, source, *goals, out),
-        Delivery::Tasks(tasks) => crate::page::project::task_rows(domain, env, source, *tasks, out),
+        Delivery::Goals(goals) => crate::page::project::live(domain, env, source, *goals, out, lent),
+        Delivery::Tasks(tasks) => crate::page::project::task_rows(domain, env, source, *tasks, out, lent),
         Delivery::Conversations(conversations) => {
-            super::conversations::delivered(domain, env, source, *conversations, out);
+            super::conversations::delivered(domain, env, source, *conversations, out, lent);
         }
-        Delivery::Deployment(deployment) => crate::page::deployment::document(domain, env, deployment, out),
-        Delivery::OwnerDeployment(deployment) => crate::page::deployment::owner_document(domain, env, deployment, out),
+        Delivery::Deployment(_) | Delivery::OwnerDeployment(_) => {
+            crate::page::deployment::watched(domain, env, out, lent);
+        }
     }
 }
-fn read_body(domain: &mut Domain, key: ObjectKey, body: Body) {
+fn read_body(domain: &mut Ui, key: ObjectKey, body: Body) {
     // Reading does not name objects: a source may have stopped naming this
     // object while its read was in flight in the same generation.
     if domain.objects.put(key, body) {
@@ -402,42 +393,42 @@ fn read_body(domain: &mut Domain, key: ObjectKey, body: Body) {
     }
 }
 fn owner_proposal_read(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     proposal: Box<contract::OwnerProposal>,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     let key = ObjectKey::Proposal(proposal.key);
-    if crate::application::put(domain, env, key, Body::OwnerProposal(proposal), out) {
+    if crate::application::put(domain, env, key, Body::OwnerProposal(proposal), out, lent, true) {
         domain.changed();
     }
 }
 /// Consumes one read terminal and drops old-generation values before applying them.
 pub(crate) fn read_result(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     token: Token,
     result: ReadResult,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
-    if !owner_escalation_read_valid(domain, token, &result)
+    if !owner_escalation_read_valid(domain, token, &result, lent)
         || !owner_project_read_valid(domain, token, &result)
         || !owner_inbox_read_valid(domain, env, token, &result)
         || !historical_read_valid(domain, env, token, &result)
     {
+        rejected_read(domain, token);
         refuse(domain, Limit::Reads);
         return;
     }
-    let Some(receipt) = domain.reads.terminal(token) else {
+    let Some(receipt) = domain.handles.received(crate::handles::handle(token)) else {
         return;
     };
-    if receipt.abandoned || receipt.generation != domain.generation {
-        return;
-    }
     super::shown::context_read(domain, &receipt.what);
     match receipt.source {
         Source::Window { number: crate::application::WINDOW, .. } => {
-            crate::application::read_result(domain, env, receipt.what, result, out);
+            crate::application::read_result(domain, env, receipt.what, result, out, lent);
             return;
         }
         Source::Window { .. } | Source::Watch(_) | Source::Card(_) => {}
@@ -514,27 +505,28 @@ pub(crate) fn read_result(
                 contract::ReadNone::Busy | contract::ReadNone::Unreachable => {
                     refuse(domain, Limit::Reads);
                 }
-                contract::ReadNone::SignedOut => crate::ui::signed_out(domain, out),
+                contract::ReadNone::SignedOut => {}
             }
         }
-        ReadResult::Value(value) => received_value(domain, env, receipt.source, receipt.what, value, out),
+        ReadResult::Value(value) => received_value(domain, env, receipt.source, receipt.what, value, out, lent),
     }
 }
 fn read_value(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
     value: ReadValue,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     match value {
         ReadValue::Frame(_) | ReadValue::OwnerInbox(_) | ReadValue::OwnerEnded(_) | ReadValue::OwnerSpend(_) => {}
         ReadValue::OwnerProject(value) => crate::page::project::owner_document(domain, value),
         ReadValue::Notes(page) => crate::page::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::page::project::spend(domain, *page),
-        ReadValue::Task(task) => task_read(domain, env, task, out),
+        ReadValue::Task(task) => task_read(domain, env, task, out, lent),
         ReadValue::Historical(value) => read_body(domain, value.key, Body::Historical(value)),
-        ReadValue::OwnerProposal(proposal) => owner_proposal_read(domain, env, proposal, out),
+        ReadValue::OwnerProposal(proposal) => owner_proposal_read(domain, env, proposal, out, lent),
         ReadValue::Proposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
             read_body(domain, key, Body::Proposal(proposal));
@@ -560,7 +552,7 @@ fn read_value(
             let key = ObjectKey::Result(result.task.task);
             read_body(domain, key, Body::Result(result));
         }
-        ReadValue::Activity(page) => crate::conversation::routing::page(domain, env, *page, out),
+        ReadValue::Activity(page) => crate::conversation::routing::page(domain, env, *page, out, lent),
         ReadValue::History(page) => {
             domain.history_rows.cut |= page.cut;
             let edges = page_edges(page.before, page.after);
@@ -571,21 +563,8 @@ fn read_value(
             domain.changed();
         }
         ReadValue::Conversations(page) => {
-            domain.conversation_rows.cut |= page.cut;
-            let edges = page_edges(page.before, page.after);
-            let mut rows = page.rows;
-            crate::page::conversations::order(&mut rows);
-            let end = super::conversations::read_end(source);
-            let dropped = if super::conversations::is_replay(source) {
-                domain.conversation_rows.replay(rows, edges)
-            } else {
-                domain.conversation_rows.slide(rows, edges, end)
-            };
-            if dropped > 0 {
-                domain.changed();
-            }
-            crate::page::conversations::order(&mut domain.conversation_rows.rows);
-            crate::page::replies::conversations(domain, env, source, out);
+            crate::page::conversations::read_page(domain, source, *page, lent);
+            crate::page::replies::conversations(domain, env, source, out, lent);
             domain.changed();
         }
         ReadValue::Inbox(page) => {
@@ -596,8 +575,8 @@ fn read_value(
                 return;
             };
             domain.inbox.page(group, *page);
-            crate::page::replies::inbox(domain, env, source, out);
-            crate::page::conversations::mark_results(domain, out);
+            crate::page::replies::inbox(domain, env, source, out, lent);
+            crate::page::conversations::mark_results(domain, out, lent);
             domain.changed();
         }
         ReadValue::Ended(page) => {
@@ -610,7 +589,7 @@ fn read_value(
                     Err(_) => break,
                 }
             }
-            names(domain, env, source, keys, out);
+            names(domain, env, source, keys, out, lent);
             for result in page.rows.into_boxed() {
                 let key = ObjectKey::Result(result.task.task);
                 let stored = domain.objects.put(key, Body::Result(Box::new(result)));
@@ -619,27 +598,35 @@ fn read_value(
                 }
             }
         }
-        ReadValue::Goals(page) => crate::page::project::ended(domain, env, source, *page, out),
-        ReadValue::Project(project) => crate::page::project::document(domain, env, project, out),
-        ReadValue::Deployment(deployment) => crate::page::deployment::document(domain, env, deployment, out),
-        ReadValue::OwnerDeployment(document) => crate::page::deployment::owner_document(domain, env, document, out),
+        ReadValue::Goals(page) => crate::page::project::ended(domain, env, source, *page, out, lent),
+        ReadValue::Project(project) => crate::page::project::document(domain, env, project, out, lent),
+        ReadValue::Deployment(deployment) => crate::page::deployment::document(domain, env, deployment, out, lent),
+        ReadValue::OwnerDeployment(document) => {
+            crate::page::deployment::owner_document(domain, env, document, out, lent);
+        }
     }
 }
 
-fn owner_escalation_read(domain: &mut Domain, value: Box<contract::OwnerEscalation>) {
+fn owner_escalation_read(domain: &mut Ui, value: Box<contract::OwnerEscalation>) {
     let key = ObjectKey::Escalation(value.task.chip.task);
     read_body(domain, key, Body::OwnerEscalation(value));
 }
 
-fn task_read(domain: &mut Domain, env: &Env<crate::Limits>, task: Box<contract::Task>, out: &mut Queue<Request>) {
-    crate::conversation::routing::document(domain, &task, out);
+fn task_read(
+    domain: &mut Ui,
+    env: &Env<crate::Limits>,
+    task: Box<contract::Task>,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
+    crate::conversation::routing::document(domain, &task, out, lent);
     let key = ObjectKey::Task(task.chip.task);
     read_body(domain, key, Body::Task(task));
-    crate::page::task::document(domain, env, out);
+    crate::page::task::document(domain, env, out, lent);
 }
 
 // The new carrier must match its original read before retiring the obligation.
-fn owner_project_read_valid(domain: &Domain, token: Token, result: &ReadResult) -> bool {
+fn owner_project_read_valid(domain: &Ui, token: Token, result: &ReadResult) -> bool {
     let value = match result {
         ReadResult::Value(value) => match value {
             ReadValue::OwnerProject(value) => value,
@@ -671,12 +658,9 @@ fn owner_project_read_valid(domain: &Domain, token: Token, result: &ReadResult) 
         },
         ReadResult::None(_) => return true,
     };
-    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+    let Some(read) = domain.handles.reads.get(&crate::handles::handle(token)) else {
         return true;
     };
-    if read.abandoned || read.terminal || read.generation != domain.generation {
-        return true;
-    }
     match &read.what {
         Read::Project { project } => *project == value.number,
         Read::Frame
@@ -699,7 +683,7 @@ fn owner_project_read_valid(domain: &Domain, token: Token, result: &ReadResult) 
 }
 
 // Validate the original query and entire group before consuming its terminal.
-fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token, result: &ReadResult) -> bool {
+fn owner_inbox_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, result: &ReadResult) -> bool {
     let page = match result {
         ReadResult::Value(value) => match value {
             ReadValue::OwnerInbox(page) => page,
@@ -731,12 +715,9 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
         },
         ReadResult::None(_) => return true,
     };
-    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+    let Some(read) = domain.handles.reads.get(&crate::handles::handle(token)) else {
         return true;
     };
-    if read.abandoned || read.terminal || read.generation != domain.generation {
-        return true;
-    }
     let group = match &read.what {
         Read::Inbox { group, .. } => *group,
         Read::Frame
@@ -780,12 +761,13 @@ fn owner_inbox_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Toke
 }
 
 fn received_value(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
     query: Read,
     value: ReadValue,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     match value {
         ReadValue::OwnerEnded(page) => super::task::owner_ended(domain, page),
@@ -815,7 +797,7 @@ fn received_value(
         },
         ReadValue::OwnerDeployment(page) => {
             if query == Read::Deployment {
-                crate::page::deployment::owner_document(domain, env, page, out);
+                crate::page::deployment::owner_document(domain, env, page, out, lent);
             }
         }
         ReadValue::OwnerInbox(page) => {
@@ -839,8 +821,8 @@ fn received_value(
                 | Read::Deployment => return,
             };
             domain.inbox.owner_page(group, query, *page);
-            crate::page::replies::inbox(domain, env, source, out);
-            crate::page::conversations::mark_results(domain, out);
+            crate::page::replies::inbox(domain, env, source, out, lent);
+            crate::page::conversations::mark_results(domain, out, lent);
             domain.changed();
         }
         ReadValue::Frame(_)
@@ -863,19 +845,20 @@ fn received_value(
         | ReadValue::Spend(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
-        | ReadValue::Deployment(_) => read_value(domain, env, source, value, out),
+        | ReadValue::Deployment(_) => read_value(domain, env, source, value, out, lent),
     }
 }
 
 fn owner_tree_delivery(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
-    watch: Id<Watch>,
+    watch: jig_client::Handle,
     source: Source,
     tree: Box<contract::OwnerTree>,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
-    let Some(watch) = domain.watches.get(watch) else {
+    let Some(watch) = domain.handles.watches.get(&watch) else {
         return;
     };
     match &watch.subject {
@@ -894,8 +877,7 @@ fn owner_tree_delivery(
         | Subject::Run { .. }
         | Subject::Deployment => return,
     }
-    crate::page::task::owner_tree(domain, tree);
-    let owner = domain.task_page.plan.owner.as_ref().expect("whole tree retained");
+    let owner = &tree;
     let mut keys = List::with_capacity(crate::limits::ui::tree_names(&env.limits).expect("tree names bounded"));
     keys.push(ObjectKey::Task(owner.root.task)).expect("root fits");
     for row in &owner.rows {
@@ -910,34 +892,8 @@ fn owner_tree_delivery(
             }
         }
     }
-    names(domain, env, source, keys, out);
-    let owner = domain.task_page.plan.owner.as_ref().expect("whole tree retained");
-    let root = ObjectKey::Task(owner.root.task);
-    let mut put_root = true;
-    if let Some(id) = domain.objects.find(root)
-        && let Some(body) = &domain.objects.get(id).expect("named root exists").body
-    {
-        match body {
-            Body::Task(_) => put_root = false,
-            Body::Historical(_)
-            | Body::Chip(_)
-            | Body::Proposal(_)
-            | Body::OwnerProposal(_)
-            | Body::Escalation(_)
-            | Body::OwnerEscalation(_)
-            | Body::Question(_)
-            | Body::PersonTask(_)
-            | Body::OwnerPersonTask(_)
-            | Body::Result(_)
-            | Body::Note { .. } => {}
-        }
-    }
-    if put_root {
-        let _stored = domain.objects.put(root, Body::Chip(owner.root.clone()));
-    }
-    for row in &owner.rows {
-        let _stored = domain.objects.put(ObjectKey::Task(row.chip.task), Body::Chip(row.chip.clone()));
-    }
+    names(domain, env, source, keys, out, lent);
+    crate::page::task::owner_tree(domain, &tree);
     domain.changed();
 }
 
@@ -958,17 +914,14 @@ fn historical_funders_fit(page: &contract::OwnerSpendPage, project: u32) -> bool
 }
 
 /// Validate the retained original request before consuming its terminal.
-fn historical_read_valid(domain: &Domain, env: &Env<crate::Limits>, token: Token, result: &ReadResult) -> bool {
+fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, result: &ReadResult) -> bool {
     let value = match result {
         ReadResult::Value(value) => value,
         ReadResult::None(_) => return true,
     };
-    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+    let Some(read) = domain.handles.reads.get(&crate::handles::handle(token)) else {
         return true;
     };
-    if read.abandoned || read.terminal || read.generation != domain.generation {
-        return true;
-    }
     match value {
         ReadValue::OwnerEnded(page) => {
             let task = match &read.what {
@@ -1073,7 +1026,7 @@ fn historical_edges_fit(before: Option<&contract::Cursor>, after: Option<&contra
 }
 
 // Check the original read and supplied scope before consuming its one terminal.
-fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResult) -> bool {
+fn owner_escalation_read_valid(domain: &Ui, token: Token, result: &ReadResult, lent: &jig_client::Client) -> bool {
     let document = match result {
         ReadResult::Value(ReadValue::OwnerEscalation(document)) => document,
         ReadResult::Value(
@@ -1105,12 +1058,9 @@ fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResul
         )
         | ReadResult::None(_) => return true,
     };
-    let Some(read) = domain.reads.slab.get(Id::from_token(token)) else {
+    let Some(read) = domain.handles.reads.get(&crate::handles::handle(token)) else {
         return true;
     };
-    if read.abandoned || read.terminal || read.generation != domain.generation {
-        return true;
-    }
     let task = match read.what {
         Read::Escalation { task } => task,
         Read::Frame
@@ -1136,11 +1086,20 @@ fn owner_escalation_read_valid(domain: &Domain, token: Token, result: &ReadResul
     let Some(id) = domain.objects.find(ObjectKey::Escalation(task)) else {
         return true;
     };
-    match domain.objects.get(id) {
+    match domain.borrow(lent).objects().get(id) {
         Some(object) => match object.project {
             Some(project) => project == document.task.project,
             None => true,
         },
         None => true,
+    }
+}
+
+fn rejected_read(domain: &mut Ui, token: Token) {
+    if let Some(receipt) = domain.handles.received(crate::handles::handle(token))
+        && let Read::Inbox { group, .. } = receipt.what
+        && domain.inbox.window(group).reading == Some(token)
+    {
+        domain.inbox.window_mut(group).reading = None;
     }
 }

@@ -3,9 +3,9 @@ use crate::regions::JigRegion;
 use crate::{JigBindings, phrases::jig::JigPhrase, words::Words};
 use skein_ui::{Builder, Role};
 
-use crate::{Domain, action::Act, page::Page};
+use crate::{Borrowed, page::Page};
 /// Render starting, signing in, missing, outdated or another party's kept work.
-pub fn not_the_work(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+pub fn not_the_work(b: &mut Builder, client: &Borrowed<'_>, words: &Words, _bindings: &mut JigBindings) -> bool {
     let region = match client.page() {
         Page::Starting => JigRegion::Starting,
         Page::SigningIn => JigRegion::SigningIn,
@@ -28,17 +28,7 @@ pub fn not_the_work(b: &mut Builder, client: &Domain, words: &Words, bindings: &
     b.name(&words.say(phrase, &[]));
     super::heading(b, words, phrase, &[]);
     if *client.page() == Page::SigningIn {
-        for provider in client.signin().providers() {
-            crate::frame::control(
-                b,
-                words,
-                bindings,
-                Role::Button,
-                JigPhrase::SignInWith,
-                &[crate::words::name(provider.name.bytes())],
-                Act::SignIn { provider: provider.number },
-            );
-        }
+        b.slot(crate::signin::SLOT, &words.say(JigPhrase::SignInPage, &[]));
     }
     b.close();
     b.close();

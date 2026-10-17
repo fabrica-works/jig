@@ -5,11 +5,12 @@
 )]
 use super::cards::{CLIENT, contains, document, drive, start};
 use crate::JigBindings;
+use crate::tests::fixtures::{Fixture, ReadPage, Watched};
 use crate::words::Words;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, Tree};
 
-use crate::{Domain, Event, Request};
+use crate::Request;
 use jig_client::contract::*;
 use skein_lib::{List, bytes::copy_of};
 fn words(selected: bool) -> Words {
@@ -76,23 +77,29 @@ fn whole(rows: impl IntoIterator<Item = OwnerInboxEntry>, limited: bool) -> Owne
         selection: None,
     }
 }
-fn domain(value: OwnerInbox) -> Domain {
+fn domain(value: OwnerInbox) -> Fixture {
     let (mut client, frame) = start();
     let out = drive(
         &mut client,
-        Event::Watch { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
+        Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Frame(Box::new(document()))) },
     );
-    let watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
-    drive(&mut client, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::OwnerInbox(Box::new(value))) });
+    let watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Inbox { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
+    drive(&mut client, Watched { watch, event: WatchEvent::Delivered(Delivery::OwnerInbox(Box::new(value))) });
     client
 }
-fn build(client: &Domain, w: &Words) -> Tree {
+fn build(client: &Fixture, w: &Words) -> Tree {
     let mut limits = crate::limits::of_words(&CLIENT, w).unwrap();
     limits.nodes = crate::inbox_nodes(&CLIENT, 0).unwrap().checked_add(1).unwrap();
     limits.bindings = limits.nodes;
@@ -101,7 +108,7 @@ fn build(client: &Domain, w: &Words) -> Tree {
     let mut b = Builder::new(&limits);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     b.open(Role::Page);
-    crate::pages::main(&mut b, client, w, &mut bindings);
+    crate::pages::main(&mut b, &client.view(), w, &mut bindings);
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= limits.nodes);
@@ -201,8 +208,8 @@ fn owner_inbox_both_full_groups_two_read_windows_counts_source_cuts_fit_the_whol
         }
         drive(
             &mut client,
-            Event::Read {
-                read: token,
+            ReadPage {
+                read: crate::handles::handle(token),
                 result: ReadResult::Value(ReadValue::OwnerInbox(Box::new(OwnerInboxPage {
                     selection: None,
                     cut: true,

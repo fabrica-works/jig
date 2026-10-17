@@ -10,7 +10,7 @@
 //! | words done, same touch | removed | clear composer; erase record |
 //! | words refused/unknown, or later edit | retained | none |
 use crate::{
-    Domain, Request,
+    Request, Ui,
     fields::Purpose,
     store::{Record, STORE_VERSION, StoreKey},
 };
@@ -95,7 +95,7 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_mul(2)?
         .checked_add(u64::from(limits.drafts).checked_mul(u64::from(limits.text))?)
 }
-fn erase(domain: &mut Domain, task: u64, out: &mut Queue<Request>) {
+fn erase(domain: &mut Ui, task: u64, out: &mut Queue<Request>) {
     domain.drafts.remove(task);
     if domain.drafts.active == Some(task) {
         let empty = Text::new(Box::from([]), 0).expect("empty text fits");
@@ -107,7 +107,7 @@ fn erase(domain: &mut Domain, task: u64, out: &mut Queue<Request>) {
     crate::store::erase(domain, StoreKey::Draft { task }, out);
 }
 /// Edits once, touches once, and keeps the record immediately for the save deadline.
-pub(crate) fn edit(domain: &mut Domain, task: u64, words: Text, out: &mut Queue<Request>) -> Result<(), Limit> {
+pub(crate) fn edit(domain: &mut Ui, task: u64, words: Text, out: &mut Queue<Request>) -> Result<(), Limit> {
     let Some(party) = domain.confirmed else {
         return Ok(());
     };
@@ -157,7 +157,7 @@ pub(crate) fn edit(domain: &mut Domain, task: u64, words: Text, out: &mut Queue<
     domain.changed();
     Ok(())
 }
-fn restore(domain: &mut Domain, out: &mut Queue<Request>) {
+fn restore(domain: &mut Ui, out: &mut Queue<Request>) {
     domain.fields.clear_composers();
     domain.drafts.rows.clear();
     domain.drafts.scope = domain.confirmed;
@@ -207,7 +207,7 @@ fn restore(domain: &mut Domain, out: &mut Queue<Request>) {
     }
 }
 /// Restores only when the party or the active task changes; typing is never overwritten.
-pub(crate) fn sync(domain: &mut Domain, out: &mut Queue<Request>) {
+pub(crate) fn sync(domain: &mut Ui, out: &mut Queue<Request>) {
     if domain.drafts.scope != domain.confirmed {
         restore(domain, out);
     }
@@ -233,7 +233,7 @@ pub(crate) fn sync(domain: &mut Domain, out: &mut Queue<Request>) {
 }
 /// Clears only the original scope and touch after a durable message number exists.
 pub(crate) fn sent(
-    domain: &mut Domain,
+    domain: &mut Ui,
     scope: u64,
     task: u64,
     touched: Option<u64>,

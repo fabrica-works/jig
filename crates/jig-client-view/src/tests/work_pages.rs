@@ -8,11 +8,12 @@ use super::{
     cards::{contains, document, drive, start, text, words},
     pages::{build, deliver, named_binding},
 };
+use crate::tests::fixtures::{Fixture, ReadPage};
 use crate::{JigBindings, words::Words};
 use skein_ui::{Role, Tree};
 
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act,
     address::{Address, Place, ProjectSection, TaskSection},
 };
@@ -37,10 +38,10 @@ pub(super) fn chip(task: u64) -> Chip {
     chip.task = task;
     chip
 }
-pub(super) fn entered(address: Address) -> (Domain, Vec<Request>) {
+pub(super) fn entered(address: Address) -> (Fixture, Vec<Request>) {
     entered_arranged(address, crate::page::Arrangement::none())
 }
-pub(super) fn entered_arranged(address: Address, arrangement: crate::page::Arrangement) -> (Domain, Vec<Request>) {
+pub(super) fn entered_arranged(address: Address, arrangement: crate::page::Arrangement) -> (Fixture, Vec<Request>) {
     let (mut d, f) = super::cards::start_arranged(arrangement);
     let mut frame = document();
     frame.charters.get_mut(0).unwrap().goals =
@@ -48,10 +49,13 @@ pub(super) fn entered_arranged(address: Address, arrangement: crate::page::Arran
     frame.projects.get_mut(0).unwrap().pool.as_mut().unwrap().left = 20;
     let initial = deliver(&mut d, f, Delivery::Frame(Box::new(frame)));
     for request in &initial {
-        if let Request::Read { read, what: Read::Inbox { .. } } = request {
+        if let Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Inbox { .. }) },
+        } = request
+        {
             drive(
                 &mut d,
-                Event::Read {
+                ReadPage {
                     read: *read,
                     result: ReadResult::Value(ReadValue::Inbox(Box::new(InboxPage {
                         cut: false,
@@ -67,22 +71,28 @@ pub(super) fn entered_arranged(address: Address, arrangement: crate::page::Arran
     let out = drive(&mut d, Event::Went { place: Place::Jig(address) });
     (d, out)
 }
-pub(super) fn task(section: TaskSection, executor: Executor) -> (Domain, Vec<Request>) {
+pub(super) fn task(section: TaskSection, executor: Executor) -> (Fixture, Vec<Request>) {
     task_arranged(section, executor, crate::page::Arrangement::none())
 }
 fn task_arranged(
     section: TaskSection,
     executor: Executor,
     arrangement: crate::page::Arrangement,
-) -> (Domain, Vec<Request>) {
+) -> (Fixture, Vec<Request>) {
     let (mut d, out) = entered_arranged(Address::Task { task: 8, section }, arrangement);
-    let watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Task { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Task { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let mut doc = super::cards_objects::task_doc(&[ActKind::Cancel]);
     doc.chip.executor = executor;
     doc.resources = list([TaskResource::Part(part())]);
@@ -137,13 +147,19 @@ fn task_sections(words: &Words) {
 }
 fn plan_folds(words: &Words) {
     let (mut d, out) = task(TaskSection::Plan, Executor::Agent { charter: 2 });
-    let tree_watch = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Tree { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let tree_watch =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Tree { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     let node = |task, parent| TreeNode {
         chip: chip(task),
         parent,
@@ -167,17 +183,17 @@ fn plan_folds(words: &Words) {
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
     assert!(contains(&tree, b"Held below: 2"));
     let fold = crate::decode(&mut bindings, named_binding(&tree, b"Fold subtree"), skein_ui::Act::Press).unwrap();
-    drive(&mut d, Event::Act { act: fold });
+    drive(&mut d, Event::Act { action: fold });
     let (folded, mut bindings) = build(&d, 3, words);
     assert_eq!(folded.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 1);
     assert!(contains(&folded, b"Held below: 1"));
     let open = crate::decode(&mut bindings, named_binding(&folded, b"Open subtree"), skein_ui::Act::Press).unwrap();
-    drive(&mut d, Event::Act { act: open });
+    drive(&mut d, Event::Act { action: open });
     assert_eq!(build(&d, 3, words).0.nodes().iter().filter(|n| n.role == Role::TreeItem).count(), 2);
     for filter in
         [crate::page::task::PlanFilter::Held, crate::page::task::PlanFilter::Live, crate::page::task::PlanFilter::All]
     {
-        drive(&mut d, Event::Act { act: Act::FilterPlan { filter } });
+        drive(&mut d, Event::Act { action: Act::FilterPlan { filter } });
         acts_are_named(&build(&d, 3, words).0);
     }
     drive(&mut d, Event::Went { place: Place::Jig(Address::Task { task: 8, section: TaskSection::Plan }) });
@@ -222,63 +238,19 @@ pub(super) fn recurring_task(number: u64, words: &[u8]) -> ProposedTask {
         cut: false,
     }
 }
-pub(super) fn project_doc() -> Project {
-    Project {
-        period: 3,
-        spend_lines: list([TaskSpend { chip: chip(8), spent: 5 }]),
-        number: 4,
-        name: text(b"Workshop"),
-        policy: Policy {
-            ceiling: super::cards_objects::authority(),
-            period: 3,
-            spend: 20,
-            roles: list([RolePolicy {
-                number: 1,
-                authority: super::cards_objects::authority(),
-                allotment: 10,
-                decisions: list([2]),
-            }]),
-            requirements: list([part()]),
-            deciders: list([Decider { kind: 2, role: 1 }]),
-        },
-        roles: list([Holding { party: 1, role: HeldRole::Policy { role: 1 } }]),
-        spend: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(1) },
-        pools: list([Pool {
-            party: 1,
-            period: 3,
-            budget: Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(1) },
-        }]),
-        resources: list([part()]),
-        services: list([Party { number: 2, kind: PartyKind::Service, name: text(b"Notifier") }]),
-        recurring: list([Recurring {
-            chip: chip(7),
-            key: 1,
-            batch: list([recurring_task(1, b"Daily work"), recurring_task(2, b"Then follow up")]),
-            budget: 10,
-            overlap: RecurringOverlap::Wait,
-            last_period: 3,
-            pending_period: Some(4),
-            last_batch: list([8, 10]),
-            cut: false,
-            current_period: 3,
-            began: Some(Wall::EPOCH),
-            next: Some(Wall::EPOCH),
-        }]),
-        parts: list([part()]),
-        acts: list([Offered { act: ActKind::SetGoal, admission: Admission::Allowed }]),
-    }
-}
-pub(super) fn project(section: ProjectSection) -> (Domain, Vec<Request>) {
+pub(super) fn project(section: ProjectSection) -> (Fixture, Vec<Request>) {
     let (mut d, out) = entered(Address::Project { project: 4, section });
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Project { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
     let mut outputs =
-        drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(project_doc()))) });
+        drive(&mut d, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(project_doc()))) });
     outputs.extend(out);
     (d, outputs)
 }
@@ -287,7 +259,9 @@ fn history(words: &Words) {
     let mut read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::History { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::History { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
@@ -304,7 +278,7 @@ fn history(words: &Words) {
     for (page, changes) in changes.chunks(2).enumerate() {
         drive(
             &mut d,
-            Event::Read {
+            ReadPage {
                 read,
                 result: ReadResult::Value(ReadValue::History(Box::new(HistoryPage {
                     cut: false,
@@ -341,20 +315,26 @@ fn history(words: &Words) {
             Some(Act::HistoryScope { subtree: true })
         );
         let more = crate::decode(&mut bindings, named_binding(&tree, b"Read later"), skein_ui::Act::Press).unwrap();
-        let out = drive(&mut d, Event::Act { act: more });
+        let out = drive(&mut d, Event::Act { action: more });
         read = out
             .iter()
             .find_map(|r| match r {
-                Request::Read { read, what: Read::History { .. } } => Some(*read),
+                Request::Client {
+                    asked:
+                        jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::History { .. }) },
+                } => Some(*read),
                 _ => None,
             })
             .unwrap();
     }
 }
-pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
+pub(super) fn project_rows(d: &mut Fixture, out: &[Request]) {
     for r in out {
         match r {
-            Request::Open { watch, subject: Subject::Goals { .. } } => {
+            Request::Client {
+                asked:
+                    jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Goals { .. }) },
+            } => {
                 let doc = super::cards_objects::task_doc(&[]);
                 deliver(
                     d,
@@ -373,7 +353,13 @@ pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
                     })),
                 );
             }
-            Request::Open { watch, subject: Subject::Tasks { filter, .. } } => {
+            Request::Client {
+                asked:
+                    jig_client::Event::Watch {
+                        handle: watch,
+                        subject: jig_client::Watchable::Jig(Subject::Tasks { filter, .. }),
+                    },
+            } => {
                 deliver(
                     d,
                     *watch,
@@ -391,10 +377,12 @@ pub(super) fn project_rows(d: &mut Domain, out: &[Request]) {
                     })),
                 );
             }
-            Request::Read { read, what: Read::Notes { .. } } => {
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Notes { .. }) },
+            } => {
                 drive(
                     d,
-                    Event::Read {
+                    ReadPage {
                         read: *read,
                         result: ReadResult::Value(ReadValue::Notes(Box::new(NotePage {
                             cut: false,
@@ -475,7 +463,7 @@ fn goal_form(words: &Words) {
         deadline: None,
         priority: 1,
     };
-    drive(&mut d, Event::Act { act: Act::GoalForm { form } });
+    drive(&mut d, Event::Act { action: Act::GoalForm { form } });
     let (tree, mut bindings) = build(&d, 3, words);
     assert!(contains(&tree, b"this will be proposed"));
     let action = crate::decode(
@@ -498,7 +486,7 @@ fn goal_form(words: &Words) {
     )
     .unwrap();
     assert_eq!(action, Act::GoalForm { form: crate::page::project::goals::GoalForm { deadline: Some(at), ..form } });
-    drive(&mut d, Event::Act { act: action });
+    drive(&mut d, Event::Act { action });
     let (dated, _) = build(&d, 3, words);
     let field = dated
         .nodes()
@@ -515,12 +503,12 @@ fn goal_form(words: &Words) {
         .is_none()
     );
 }
-pub(super) fn deployment_domain() -> Domain {
+pub(super) fn deployment_domain() -> Fixture {
     let (mut d, out) = entered(Address::Deployment);
     let watch = out
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Deployment } => Some(*watch),
+            Request::Client { asked: jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Deployment) } } => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -590,19 +578,25 @@ fn recurring_times_use_supplied_boundaries_without_inferred_cadence(words: &Word
     for next in [None, Some(Wall::from_nanos(3_600_000_000_000))] {
         for began in [None, Some(Wall::from_nanos(1_800_000_000_000))] {
             let (mut d, out) = entered(Address::Project { project: 4, section: ProjectSection::Recurring });
-            let read = out
-                .iter()
-                .find_map(|request| match request {
-                    Request::Read { read, what: Read::Project { .. } } => Some(*read),
-                    _ => None,
-                })
-                .unwrap();
+            let read =
+                out.iter()
+                    .find_map(|request| match request {
+                        Request::Client {
+                            asked:
+                                jig_client::Event::Read {
+                                    handle: read,
+                                    read: jig_client::Readable::Jig(Read::Project { .. }),
+                                },
+                        } => Some(*read),
+                        _ => None,
+                    })
+                    .unwrap();
             let mut doc = project_doc();
             let recurring = doc.recurring.get_mut(0).unwrap();
             recurring.next = next;
             recurring.current_period = 9;
             recurring.began = began;
-            drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+            drive(&mut d, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
             let (tree, _) = build(&d, 3, words);
             assert!(contains(&tree, b"Daily work"));
             assert!(contains(&tree, b"Last batch period 3"));
@@ -630,7 +624,9 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
     let read = out
         .iter()
         .find_map(|r| match r {
-            Request::Read { read, what: Read::Project { .. } } => Some(*read),
+            Request::Client {
+                asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { .. }) },
+            } => Some(*read),
             _ => None,
         })
         .unwrap();
@@ -653,7 +649,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
             beyond: Beyond::Proposed { to: Recipient::Party(9) },
         },
     }]);
-    drive(&mut d, Event::Read { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
+    drive(&mut d, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
     let (tree, mut bindings) = build(&d, 3, words);
     for (label, executor) in [
         (b"Charter 99".as_slice(), GoalExecutor::Charter(99)),
@@ -676,7 +672,7 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
         skein_ui::Act::Press,
     )
     .unwrap();
-    drive(&mut d, Event::Act { act: choice });
+    drive(&mut d, Event::Act { action: choice });
     let (tree, mut bindings) = build(&d, 3, words);
     let edit = crate::decode(
         &mut bindings,
@@ -689,18 +685,18 @@ fn procedure_goal_choices_render_whole_numeric_pairs_without_frame_charters() {
         edit,
         Act::GoalForm { form: GoalForm { project: 4, executor: exact, budget: 4, deadline: None, priority: 0 } }
     );
-    drive(&mut d, Event::Act { act: edit });
+    drive(&mut d, Event::Act { action: edit });
     drive(
         &mut d,
-        Event::Act { act: Act::Edit { field: crate::fields::Purpose::NewGoal, text: text(b"procedure words") } },
+        Event::Act { action: Act::Edit { field: crate::fields::Purpose::NewGoal, text: text(b"procedure words") } },
     );
     let (tree, _) = build(&d, 3, words);
     assert!(contains(&tree, b"proposed"));
-    drive(&mut d, Event::Act { act: Act::Submit { field: crate::fields::Purpose::NewGoal } });
+    drive(&mut d, Event::Act { action: Act::Submit { field: crate::fields::Purpose::NewGoal } });
     let mut b = skein_ui::Builder::new(&super::cards::limits());
     let mut bindings = JigBindings::new(32, super::cards::CLIENT.text);
     b.open(Role::Page);
-    crate::confirmation::confirmation(&mut b, &d, words, &mut bindings);
+    crate::confirmation::confirmation(&mut b, &d.view(), words, &mut bindings);
     b.close();
     let tree = b.finish();
     assert!(contains(&tree, b"Connector 65535, procedure 4294967295"));
@@ -716,7 +712,7 @@ fn a_task_section_not_shown_builds_nothing() {
     b.open(Role::Page);
     assert!(!crate::sections::section(
         &mut b,
-        &d,
+        &d.view(),
         words(),
         &mut bindings,
         crate::page::Section::Task { task: 9, section: TaskSection::Overview }
@@ -773,7 +769,7 @@ fn each_task_section_carries_its_region_name() {
 
 mod sections;
 
-fn arranged_task() -> Domain {
+fn arranged_task() -> Fixture {
     task_arranged(
         TaskSection::Plan,
         Executor::Agent { charter: 2 },
@@ -833,3 +829,6 @@ fn the_addresss_own_section_is_marked_current_on_an_arranged_page() {
         );
     }
 }
+
+mod project;
+pub(super) use project::project_doc;

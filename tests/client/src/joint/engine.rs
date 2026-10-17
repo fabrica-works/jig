@@ -20,6 +20,7 @@ pub struct Driver {
     pub world: World,
     pub transport: Transport,
     pub referee: super::referee::Referee,
+    paused_sources: Vec<root::Event>,
 }
 
 impl Driver {
@@ -33,6 +34,7 @@ impl Driver {
             world,
             transport: Transport::new(VersionRange { first: configured.minimum, last: configured.maximum }),
             referee: super::referee::Referee::default(),
+            paused_sources: Vec::new(),
         }
     }
 
@@ -42,7 +44,11 @@ impl Driver {
             self.referee.acknowledged(*watcher);
         }
         self.world.set_clock(now, wall);
-        self.world.send(event);
+        if self.world.reached_cut.is_some() {
+            self.paused_sources.push(event);
+        } else {
+            self.world.send(event);
+        }
     }
 
     /// Install an independently supplied ordinary person script and pump its
@@ -73,6 +79,8 @@ impl Driver {
     /// Cold-start the real root with externally supplied configuration. Released
     /// packets of the old connection cannot cross into its replacement.
     pub fn restart(&mut self, configuration: root::Config, now: Time, wall: Wall) {
+        self.paused_sources.clear();
+        self.world.reached_cut = None;
         self.register_replies();
         self.world.set_clock(now, wall);
         let peer = self.world.client_peer.as_mut().expect("actual protocol peer");
@@ -125,6 +133,10 @@ impl Driver {
     pub fn release_commits(&mut self) {
         self.world.reached_cut = None;
         self.world.release_commits();
+        let (now, wall) = self.world.clocks();
+        for event in std::mem::take(&mut self.paused_sources) {
+            self.send(now, wall, event);
+        }
     }
 
     /// Transfer the external store peer's complete applied transactions once.
@@ -152,6 +164,36 @@ mod tests {
     use jig_domain_people as people;
 
     #[test]
+    fn a_submitted_cut_stays_paused_when_another_source_event_arrives() {
+        let now = Time::ZERO;
+        let wall = Wall::from_nanos(1_000_000_000_000);
+        let mut driver = Driver::new(
+            jig_core_world::world::config(8455),
+            jig_core_world::world::limits(),
+            Peers::new(Vec::new(), Vec::new()),
+            now,
+            wall,
+        );
+        driver.transport.bind(
+            ClientId(0),
+            1,
+            people::Identity {
+                key: people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
+                login: Box::new([]),
+                name: Box::new([]),
+            },
+        );
+        driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(driver.world.store.applied + 1));
+        let event = driver.transport.start_sign_in(ClientId(0));
+        driver.send(now, wall, root::Event::Core(event));
+        assert!(driver.world.reached_cut.is_some());
+        let event = driver.transport.start_sign_in(ClientId(0));
+        driver.send(now, wall, root::Event::Core(event));
+        assert!(driver.poll(now, wall).is_empty());
+        assert!(driver.snapshots().is_empty());
+    }
+
+    #[test]
     fn actual_root_driver_releases_the_supplied_identity_and_independent_session_only_after_its_store_commit() {
         let now = Time::from_nanos(17);
         let wall = Wall::from_nanos(1_000_000_000_000);
@@ -165,7 +207,7 @@ mod tests {
             name: b"Person".as_slice().into(),
         };
         driver.transport.bind(ClientId(0), 1, supplied.clone());
-        assert_eq!(driver.transport.hello(), jig_client_view::Event::Hello { served: true });
+        assert_eq!(driver.transport.hello(), jig_client::Up::Served { served: true, versions: None });
         driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(driver.world.store.applied + 1));
         let event = driver.transport.start_sign_in(ClientId(0));
         let core::Event::SignIn { identity, .. } = &event else { panic!("real sign-in") };

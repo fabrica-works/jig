@@ -5,8 +5,9 @@
     reason = "ordinary view proofs drive public events and inspect selected semantic trees"
 )]
 use super::cards::{CLIENT, contains, text};
+use crate::tests::fixtures::Fixture;
 use crate::{
-    Domain, Request,
+    Request,
     address::{Address, TaskSection},
 };
 use crate::{owner_chip, owner_chip_words::ChipPhrase as P, words::Words};
@@ -108,19 +109,25 @@ fn task(observation: Option<OwnerChipObservation>, context: bool) -> Task {
     }
     task
 }
-fn page(task: Task, section: TaskSection) -> (Domain, Vec<Request>) {
+fn page(task: Task, section: TaskSection) -> (Fixture, Vec<Request>) {
     let (mut domain, requests) = super::work_pages::entered(Address::Task { task: 8, section });
     let watch = requests
         .iter()
         .find_map(|request| match request {
-            Request::Open { watch, subject: Subject::Task { task: 8 } } => Some(*watch),
+            Request::Client {
+                asked:
+                    jig_client::Event::Watch {
+                        handle: watch,
+                        subject: jig_client::Watchable::Jig(Subject::Task { task: 8 }),
+                    },
+            } => Some(*watch),
             _ => None,
         })
         .unwrap();
     let requests = super::pages::deliver(&mut domain, watch, Delivery::Task(Box::new(task)));
     (domain, requests)
 }
-fn render(domain: &Domain, words: &Words) -> Tree {
+fn render(domain: &Fixture, words: &Words) -> Tree {
     let (tree, _) = super::pages::build(domain, 3, words);
     super::cards_access::check(&tree);
     assert!(tree.len() <= crate::task_nodes(&CLIENT, 0).unwrap());
@@ -194,13 +201,20 @@ fn selected_owner_work_activity_preserves_conversation_and_opaque_provisional_te
         OwnerChipWork::Tool { call: copy_of(&[255, 0]), tool: copy_of(b"selected/tool") },
     ] {
         let (mut domain, requests) = page(task(Some(report(work, None)), false), TaskSection::Activity);
-        let run = requests
-            .iter()
-            .find_map(|request| match request {
-                Request::Open { watch, subject: Subject::Run { .. } } => Some(*watch),
-                _ => None,
-            })
-            .unwrap();
+        let run =
+            requests
+                .iter()
+                .find_map(|request| match request {
+                    Request::Client {
+                        asked:
+                            jig_client::Event::Watch {
+                                handle: watch,
+                                subject: jig_client::Watchable::Jig(Subject::Run { .. }),
+                            },
+                    } => Some(*watch),
+                    _ => None,
+                })
+                .unwrap();
         super::pages::deliver(
             &mut domain,
             run,

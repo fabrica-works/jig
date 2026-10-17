@@ -5,17 +5,18 @@
 )]
 use super::{
     objects::{chip, live, person, text},
-    spine::{LIMITS, drive},
+    spine::drive,
 };
+use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage};
 use crate::{
-    Domain, Event, Request,
+    Event, Request,
     action::Act,
     confirm::Missing,
     fields::Purpose,
     objects::{Body, Card, Left, Object, Source},
 };
 use jig_client::contract::*;
-use skein_lib::{Duration, Id, List, Queue, Time, Wall};
+use skein_lib::{Duration, Id, List, Time, Wall};
 fn values<T>(items: impl IntoIterator<Item = T>) -> List<T> {
     let items: Vec<_> = items.into_iter().collect();
     let mut rows = List::with_capacity(u32::try_from(items.len()).unwrap());
@@ -51,36 +52,32 @@ fn value(contract: TaskContractDocument) -> OwnerPersonTask {
         ]),
     }
 }
-fn installed(doc: OwnerPersonTask) -> (Domain, Id<Object>) {
+fn installed(doc: OwnerPersonTask) -> (Fixture, Id<Object>) {
     let (mut d, _) = live();
     let key = ObjectKey::PersonTask(doc.task.task);
-    let id = d.objects.name(key, Source::Window { generation: 0, number: 4 }).unwrap();
+    let id = d.objects.name(key, Source::Window { number: 4 }).unwrap();
     assert!(d.objects.put(key, Body::OwnerPersonTask(Box::new(doc))));
     (d, id)
 }
-fn act(d: &mut Domain, a: Act) -> Box<[Request]> {
-    drive(d, Time::ZERO, Event::Act { act: a })
+fn act(d: &mut Fixture, a: Act) -> Box<[Request]> {
+    drive(d, Time::ZERO, Event::Act { action: a })
 }
-fn open(d: &mut Domain, id: Id<Object>, kind: ActKind) {
+fn open(d: &mut Fixture, id: Id<Object>, kind: ActKind) {
     assert!(act(d, Act::Intend { object: id.token(), act: kind }).is_empty());
 }
-fn edit(d: &mut Domain, p: Purpose, b: &[u8]) {
+fn edit(d: &mut Fixture, p: Purpose, b: &[u8]) {
     assert!(act(d, Act::Edit { field: p, text: text(b) }).is_empty());
 }
 fn one(rows: &[Request]) -> &Ask {
     assert_eq!(rows.len(), 1);
-    let Request::Send { ask, .. } = &rows[0] else { panic!("one send expected") };
+    let Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } = &rows[0] else {
+        panic!("one send expected")
+    };
     ask
 }
-fn reread(d: &mut Domain, doc: OwnerPersonTask) {
-    let mut out = Queue::with_capacity(crate::max_out(&LIMITS));
-    let read =
-        d.reads.ask(0, Source::Window { generation: 0, number: 4 }, Read::PersonTask { task: 8 }, &mut out).unwrap();
-    drive(
-        d,
-        Time::ZERO,
-        Event::Read { read: read.token(), result: ReadResult::Value(ReadValue::OwnerPersonTask(Box::new(doc))) },
-    );
+fn reread(d: &mut Fixture, doc: OwnerPersonTask) {
+    let read = d.request_read(Source::Window { number: 4 }, Read::PersonTask { task: 8 }).unwrap();
+    drive(d, Time::ZERO, ReadPage { read, result: ReadResult::Value(ReadValue::OwnerPersonTask(Box::new(doc))) });
 }
 #[test]
 fn person_owner_carrier_keeps_full_width_addresses_requesters_wait_options_and_independent_loss() {
@@ -106,11 +103,12 @@ fn person_owner_carrier_keeps_full_width_addresses_requesters_wait_options_and_i
                 doc.cut = true;
                 let expected = doc.clone();
                 let (d, id) = installed(doc);
-                let body = d.objects().get(id).unwrap().body.as_ref().unwrap();
+                let projected = d.objects().get(id).unwrap();
+                let body = projected.body.as_ref().unwrap();
                 assert_eq!(body.key(), ObjectKey::PersonTask(u64::MAX));
                 assert_eq!(body.ending(), None);
                 assert_eq!(body.terminal(), None);
-                assert_eq!(crate::objects::person_task::owner_facts(d.objects().get(id).unwrap()), Some(&expected));
+                assert_eq!(crate::objects::person_task::owner_facts(&d.objects().get(id).unwrap()), Some(&expected));
                 assert_eq!(d.objects().get(id).unwrap().project, Some(u32::MAX));
                 assert_eq!(expected.results.capacity(), 3);
             }
@@ -283,12 +281,14 @@ fn person_owner_changed_revision_fences_old_selection_and_moved_refusal_preserve
             answer: PersonAnswer::Choice { option: 7, reason: text(b"") }
         }
     );
-    let Request::Send { request, .. } = rows[0] else { panic!("one request") };
+    let Request::Client { asked: jig_client::Event::Send { key: request, .. } } = rows[0] else {
+        panic!("one request")
+    };
     let why = Refusal::Moved { now: Revision { value: 93 }, what: Moved::PersonTask };
-    drive(&mut d, Time::ZERO, Event::Answered { request, answer: Answer::Refused(why.clone()) });
+    drive(&mut d, Time::ZERO, AnsweredByEngine { request, answer: Answer::Refused(why.clone()) });
     assert_eq!(d.objects().get(id).unwrap().card, Card::Refused { refusal: why.clone() });
     assert_eq!(d.objects().get(id).unwrap().answer, Some(Answer::Refused(why)));
-    assert_eq!(crate::objects::person_task::owner_facts(d.objects().get(id).unwrap()), Some(&newer));
+    assert_eq!(crate::objects::person_task::owner_facts(&d.objects().get(id).unwrap()), Some(&newer));
 }
 #[test]
 fn person_owner_original_read_identity_and_late_answer_remain_separate_from_current_body() {
@@ -297,23 +297,25 @@ fn person_owner_original_read_identity_and_late_answer_remain_separate_from_curr
     let mut wrong = doc.clone();
     wrong.task.task = 9;
     reread(&mut d, wrong);
-    assert_eq!(crate::objects::person_task::owner_facts(d.objects().get(id).unwrap()), Some(&doc));
+    assert_eq!(crate::objects::person_task::owner_facts(&d.objects().get(id).unwrap()), Some(&doc));
     open(&mut d, id, ActKind::Answer);
     edit(&mut d, Purpose::Answer, b"abc");
     let rows = act(&mut d, Act::Confirm);
-    let Request::Send { request, .. } = rows[0] else { panic!("one request") };
+    let Request::Client { asked: jig_client::Event::Send { key: request, .. } } = rows[0] else {
+        panic!("one request")
+    };
     let mut newer = doc.clone();
     newer.revision = Revision { value: 100 };
     assert!(d.objects.put(ObjectKey::PersonTask(8), Body::OwnerPersonTask(Box::new(newer.clone()))));
     let outcome = Outcome::Changed;
-    drive(&mut d, Time::ZERO, Event::Answered { request, answer: Answer::Done(outcome.clone()) });
-    assert_eq!(crate::objects::person_task::owner_facts(d.objects().get(id).unwrap()), Some(&newer));
+    drive(&mut d, Time::ZERO, AnsweredByEngine { request, answer: Answer::Done(outcome.clone()) });
+    assert_eq!(crate::objects::person_task::owner_facts(&d.objects().get(id).unwrap()), Some(&newer));
     assert_eq!(d.objects().get(id).unwrap().answer, Some(Answer::Done(outcome.clone())));
     assert_eq!(
         d.objects().get(id).unwrap().card,
         Card::Leaving { how: Left::Answered { outcome }, until: Time::from_nanos(5_000_000_000) }
     );
     assert_eq!(d.objects().get(id).unwrap().body.as_ref().unwrap().ending(), None);
-    assert_eq!(crate::objects::person_task::revision(d.objects().get(id).unwrap()), Some(Revision { value: 100 }));
-    assert!(crate::objects::person_task::facts(d.objects().get(id).unwrap()).is_none());
+    assert_eq!(crate::objects::person_task::revision(&d.objects().get(id).unwrap()), Some(Revision { value: 100 }));
+    assert!(crate::objects::person_task::facts(&d.objects().get(id).unwrap()).is_none());
 }

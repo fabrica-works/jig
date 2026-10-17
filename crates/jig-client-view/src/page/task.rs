@@ -12,7 +12,7 @@
 //! | plan | open ended subtree | pending read | ended-delegate cursor |
 //! | any | leave | empty | handled by generation routing |
 use crate::{
-    Domain, Request,
+    Request, Ui,
     address::TaskSection,
     objects::{Body, Object, Source},
 };
@@ -41,10 +41,6 @@ pub struct Offered {
 #[expect(clippy::partial_pub_fields, reason = "fold choices change only through admitted page actions")]
 pub struct Plan {
     /// Whole supplied owner tree, independent of older node fixtures.
-    pub owner: Option<Box<contract::OwnerTree>>,
-    pub nodes: List<TreeNode>,
-    pub folded: PhaseCounts,
-    pub held_below: u32,
     pub filter: PlanFilter,
     folds: Map<u64, bool>,
 }
@@ -74,10 +70,6 @@ impl TaskPage {
             proposal_activity: None,
             owner_ended: None,
             plan: Plan {
-                owner: None,
-                nodes: List::with_capacity(rows),
-                folded: counts(),
-                held_below: 0,
                 filter: PlanFilter::All,
                 folds: Map::with_capacity(rows.checked_add(1).expect("root fold fits")),
             },
@@ -93,10 +85,6 @@ impl TaskPage {
         self.proposals.clear();
         self.proposal_activity = None;
         self.owner_ended = None;
-        self.plan.owner = None;
-        self.plan.nodes.clear();
-        self.plan.folded = counts();
-        self.plan.held_below = 0;
         self.plan.filter = PlanFilter::All;
         let mut keys = List::with_capacity(self.plan.folds.len());
         for (task, _) in &self.plan.folds {
@@ -112,7 +100,7 @@ impl TaskPage {
         self.ended_task = None;
     }
 }
-fn counts() -> PhaseCounts {
+pub(crate) fn counts() -> PhaseCounts {
     PhaseCounts { ended: 0, waiting: 0, running: 0, held: 0, closing: 0, done: 0, failed: 0, cancelled: 0 }
 }
 /// Whether a section has content for this executor and its current facts.
@@ -179,23 +167,12 @@ pub fn offered(sections: &Offered, section: TaskSection) -> bool {
 }
 /// Retains a whole bounded tree, folding additional rows by phase and preserving
 /// the owner's total held count so a held descendant cannot disappear.
-pub(crate) fn tree(domain: &mut Domain, tree: Tree) {
+pub(crate) fn tree(domain: &mut Ui, tree: Tree) {
     let plan = &mut domain.task_page.plan;
-    plan.owner = None;
-    plan.nodes.clear();
-    plan.folded = tree.folded;
-    plan.held_below = tree.held_below;
-    for node in tree.nodes.into_boxed() {
-        if plan.nodes.room() == 0 {
-            add(&mut plan.folded, node.chip.phase);
-            continue;
-        }
-        plan.nodes.push(node).expect("a row fits its window");
-    }
     let mut removed = List::with_capacity(plan.folds.len());
     for (task, _) in &plan.folds {
         let mut retained = false;
-        for node in &plan.nodes {
+        for node in &tree.nodes {
             if node.chip.task == *task {
                 retained = true;
             }
@@ -210,11 +187,8 @@ pub(crate) fn tree(domain: &mut Domain, tree: Tree) {
     domain.changed();
 }
 /// Moves the complete owner envelope; local choices do not alter source rows.
-pub(crate) fn owner_tree(domain: &mut Domain, tree: Box<contract::OwnerTree>) {
+pub(crate) fn owner_tree(domain: &mut Ui, tree: &contract::OwnerTree) {
     let plan = &mut domain.task_page.plan;
-    plan.nodes.clear();
-    plan.folded = counts();
-    plan.held_below = 0;
     let mut removed = List::with_capacity(plan.folds.len());
     for (task, _) in &plan.folds {
         let mut retained = tree.root.task == *task;
@@ -228,23 +202,7 @@ pub(crate) fn owner_tree(domain: &mut Domain, tree: Box<contract::OwnerTree>) {
     for task in &removed {
         let _open = plan.folds.remove(task);
     }
-    plan.owner = Some(tree);
     domain.changed();
-}
-fn add(counts: &mut PhaseCounts, phase: Phase) {
-    let value = match phase {
-        Phase::Waiting | Phase::Idle => &mut counts.waiting,
-        Phase::Due | Phase::Preparing | Phase::Claimed | Phase::Running | Phase::BackingOff | Phase::Active => {
-            &mut counts.running
-        }
-        Phase::Held => &mut counts.held,
-        Phase::Closing => &mut counts.closing,
-        Phase::Ended => &mut counts.ended,
-        Phase::Done => &mut counts.done,
-        Phase::Failed => &mut counts.failed,
-        Phase::Cancelled => &mut counts.cancelled,
-    };
-    *value = value.checked_add(1).expect("a bounded tree count fits u32");
 }
 impl Plan {
     /// Existing local fold choice, defaulting to the supplied chip phase.
@@ -253,23 +211,6 @@ impl Plan {
         match self.folds.get(&chip.task) {
             Some(open) => *open,
             None => crate::page::conversations::live(chip.phase),
-        }
-    }
-    /// Source folds carry held work even when their parent is locally filtered.
-    #[must_use]
-    pub fn owner_visible(&self, row: &contract::OwnerTreeRow) -> bool {
-        match self.filter {
-            PlanFilter::All => true,
-            PlanFilter::Live => crate::page::conversations::live(row.chip.phase),
-            PlanFilter::Held => {
-                let mut held = row.chip.phase == Phase::Held;
-                if let Some(owner) = &self.owner {
-                    for fold in &owner.folded {
-                        held |= fold.parent == row.chip.task && fold.held_below > 0;
-                    }
-                }
-                held
-            }
         }
     }
     /// Live subtrees begin open; ended subtrees begin folded to their line.
@@ -380,15 +321,12 @@ fn result(out: &mut List<Part>, task: &Task) {
     }
 }
 /// A Task watch names its header and the exact proposal references together.
-pub(crate) fn delivered(domain: &mut Domain, source: Source, task: Box<Task>) {
+pub(crate) fn delivered(domain: &mut Ui, source: Source, task: Box<Task>) {
     let key = ObjectKey::Task(task.chip.task);
     let keys = task_names(task.chip.task, &task.proposals);
     let missed = domain.objects.replace(source, keys.as_slice());
     crate::page::routing::excess(domain, missed);
-    if domain.objects.find(key).is_some() {
-        let stored = domain.objects.put(key, Body::Task(task));
-        assert!(stored, "named task receives its whole facts");
-    } else {
+    if domain.objects.find(key).is_none() {
         crate::page::routing::refuse(domain, Limit::Objects);
     }
     domain.changed();
@@ -405,16 +343,16 @@ fn task_names(number: u64, proposals: &List<ProposalKey>) -> List<ObjectKey> {
     keys
 }
 fn proposal_cards(
-    domain: &mut Domain,
+    domain: &mut Ui,
     env: &Env<crate::Limits>,
     number: u64,
     proposals: List<ProposalKey>,
     activity: u64,
     out: &mut Queue<Request>,
+    lent: &jig_client::Client,
 ) {
     let mut source = None;
-    for (id, ()) in &domain.watch_ids {
-        let watch = domain.watches.get(*id).expect("registered watch exists");
+    for (id, watch) in &domain.handles.watches {
         if watch.owner == (crate::page::shown::owner(domain))
             && watch.subject == (contract::Subject::Task { task: number })
         {
@@ -448,12 +386,10 @@ fn proposal_cards(
             shown.push(*proposal).expect("unique proposal names fit the working set");
         }
         let id = domain.objects.find(key).expect("admitted proposal exists");
-        let object = domain.objects.get(id).expect("named proposal exists");
+        let object = domain.borrow(lent).objects().get(id).expect("named proposal exists");
         if moved || object.body.is_none() {
             let what = Read::Proposal { proposal: *proposal };
-            if !domain.reads.pending(&what)
-                && domain.reads.ask(domain.generation, Source::Card(id), what, out).is_none()
-            {
+            if !domain.handles.pending(&what) && domain.handles.read(Source::Card(id), what, out).is_none() {
                 crate::page::routing::refuse(domain, Limit::Reads);
             }
         }
@@ -461,7 +397,7 @@ fn proposal_cards(
     domain.task_page.proposals = shown;
 }
 /// After the task document reveals its executor, opens only that activity owner.
-pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut Queue<Request>) {
+pub(crate) fn document(domain: &mut Ui, env: &Env<crate::Limits>, out: &mut Queue<Request>, lent: &jig_client::Client) {
     let Some(number) = domain.shown_task() else {
         return;
     };
@@ -469,7 +405,8 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
         return;
     };
     domain.task_page.header = Some(id);
-    let task = match &domain.objects.get(id).expect("named task exists").body {
+    let projected = domain.borrow(lent).objects().get(id).expect("named task exists");
+    let task = match &projected.body {
         Some(Body::Task(task)) => task,
         Some(
             Body::Historical(_)
@@ -500,7 +437,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
         TaskSection::Budget,
         TaskSection::Panels,
     ] {
-        if domain.shows(crate::page::Section::Task { task: number, section }) {
+        if domain.shows(crate::page::Section::Task { task: number, section }, lent) {
             for part in parts(task, section, env.limits.parts.saturating_add(1)).into_boxed() {
                 if values.as_slice().contains(&part) {
                     continue;
@@ -511,7 +448,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
             }
         }
     }
-    proposal_cards(domain, env, number, proposals, activity, out);
+    proposal_cards(domain, env, number, proposals, activity, out, lent);
     let mut emitted = 0_u32;
     for part in values.into_boxed() {
         if emitted == env.limits.parts {
@@ -520,9 +457,9 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
         }
         emitted = emitted.saturating_add(1);
         let scope = crate::application::owner_scope(&part, contract::PartScope::Project(project));
-        out.push(Request::ShowPart { part, generation: domain.generation, scope });
+        out.push(Request::ShowPart { part, scope });
     }
-    if domain.shows(crate::page::Section::Task { task: number, section: TaskSection::Plan }) {
+    if domain.shows(crate::page::Section::Task { task: number, section: TaskSection::Plan }, lent) {
         if crate::page::conversations::live(phase) {
             open_once(domain, contract::Subject::Tree { task: number, window: env.limits.rows }, out);
         } else {
@@ -530,7 +467,7 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
             read(domain, ENDED_READ, Read::Ended { task: number, after: None }, out);
         }
     }
-    if !domain.shows(crate::page::Section::Task { task: number, section: TaskSection::Activity }) {
+    if !domain.shows(crate::page::Section::Task { task: number, section: TaskSection::Activity }, lent) {
         return;
     }
     match executor {
@@ -548,44 +485,40 @@ pub(crate) fn document(domain: &mut Domain, env: &Env<crate::Limits>, out: &mut 
         Executor::Procedure { .. } => {}
         Executor::Party { .. } | Executor::Role { .. } => {
             let key = ObjectKey::PersonTask(number);
-            let source = Source::Window { generation: domain.generation, number: PERSON_TASK_READ };
+            let source = Source::Window { number: PERSON_TASK_READ };
             if domain.objects.name(key, source).is_none() {
                 crate::page::routing::refuse(domain, Limit::Objects);
                 return;
             }
             let object = domain.objects.find(key).expect("person task named above");
-            if domain.objects.get(object).expect("named person task exists").body.is_none() {
+            if domain.borrow(lent).objects().get(object).expect("named person task exists").body.is_none() {
                 read(domain, PERSON_TASK_READ, Read::PersonTask { task: number }, out);
             }
         }
     }
 }
-fn open_once(domain: &mut Domain, subject: contract::Subject, out: &mut Queue<Request>) -> bool {
+fn open_once(domain: &mut Ui, subject: contract::Subject, out: &mut Queue<Request>) -> bool {
     super::routing::open_once(domain, subject, crate::page::shown::owner(domain), out)
 }
 
-fn read(domain: &mut Domain, number: u16, what: Read, out: &mut Queue<Request>) {
+fn read(domain: &mut Ui, number: u16, what: Read, out: &mut Queue<Request>) {
     crate::page::shown::context_read(domain, &what);
-    if domain.reads.pending(&what) {
+    if domain.handles.pending(&what) {
         return;
     }
-    if domain
-        .reads
-        .ask(domain.generation, Source::Window { generation: domain.generation, number }, what, out)
-        .is_none()
-    {
+    if domain.handles.read(Source::Window { number }, what, out).is_none() {
         crate::page::routing::refuse(domain, Limit::Reads);
     }
 }
 /// Fold presentation belongs to this page and never changes committed work.
-pub(crate) fn fold(domain: &mut Domain, object: Token, open: bool) {
+pub(crate) fn fold(domain: &mut Ui, object: Token, open: bool, lent: &jig_client::Client) {
     let Some(shown) = domain.shown_task() else {
         return;
     };
-    if !domain.shows(crate::page::Section::Task { task: shown, section: TaskSection::Plan }) {
+    if !domain.shows(crate::page::Section::Task { task: shown, section: TaskSection::Plan }, lent) {
         return;
     }
-    let Some(object) = domain.objects.get(Id::from_token(object)) else {
+    let Some(object) = domain.borrow(lent).objects().get(Id::from_token(object)) else {
         return;
     };
     let task = match object.key {
@@ -597,20 +530,21 @@ pub(crate) fn fold(domain: &mut Domain, object: Token, open: bool) {
         | ObjectKey::Result(_)
         | ObjectKey::Note { .. } => return,
     };
-    let plan = &mut domain.task_page.plan;
+    let projected = domain.borrow(lent).task_page();
+    let plan = &projected.plan;
     if let Some(owner) = &plan.owner {
         let mut retained = owner.root.task == task;
         for row in &owner.rows {
             retained |= row.chip.task == task;
         }
-        if retained && plan.folds.insert(task, open).is_ok() {
+        if retained && domain.task_page.plan.folds.insert(task, open).is_ok() {
             domain.changed();
         }
         return;
     }
     for node in &plan.nodes {
         if node.chip.task == task {
-            if plan.folds.insert(task, open).is_ok() {
+            if domain.task_page.plan.folds.insert(task, open).is_ok() {
                 domain.changed();
             }
             return;
@@ -618,12 +552,12 @@ pub(crate) fn fold(domain: &mut Domain, object: Token, open: bool) {
     }
 }
 /// Selects a plan filter and reopens its live source without inventing history.
-pub(crate) fn filter(domain: &mut Domain, filter: PlanFilter) {
+pub(crate) fn filter(domain: &mut Ui, filter: PlanFilter) {
     domain.task_page.plan.filter = filter;
     domain.changed();
 }
 /// Chooses task-only or subtree history and starts its first page.
-pub(crate) fn history(domain: &mut Domain, subtree: bool, out: &mut Queue<Request>) {
+pub(crate) fn history(domain: &mut Ui, subtree: bool, out: &mut Queue<Request>) {
     let Some(task) = domain.shown_task() else {
         return;
     };
@@ -634,21 +568,22 @@ pub(crate) fn history(domain: &mut Domain, subtree: bool, out: &mut Queue<Reques
     domain.changed();
 }
 /// Opens one ended subtree, whose results name shared cards.
-pub(crate) fn open_ended(domain: &mut Domain, task: u64, out: &mut Queue<Request>) {
+pub(crate) fn open_ended(domain: &mut Ui, task: u64, out: &mut Queue<Request>, lent: &jig_client::Client) {
     let Some(shown) = domain.shown_task() else {
         return;
     };
-    if !domain.shows(crate::page::Section::Task { task: shown, section: TaskSection::Plan }) {
+    if !domain.shows(crate::page::Section::Task { task: shown, section: TaskSection::Plan }, lent) {
         return;
     }
     let mut found = false;
-    if let Some(owner) = &domain.task_page.plan.owner {
+    let projected = domain.borrow(lent).task_page();
+    if let Some(owner) = &projected.plan.owner {
         found = owner.root.task == task;
         for row in &owner.rows {
             found |= row.chip.task == task;
         }
     }
-    for node in &domain.task_page.plan.nodes {
+    for node in &projected.plan.nodes {
         if node.chip.task == task {
             found = true;
         }
@@ -673,7 +608,7 @@ pub const ENDED_WINDOW: u64 = 13;
 pub(crate) const ENDED_READ: u16 = 16;
 /// The person task read source.
 pub(crate) const PERSON_TASK_READ: u16 = 15;
-pub(crate) fn more(domain: &mut Domain, window: Token, end: crate::action::End, out: &mut Queue<Request>) {
+pub(crate) fn more(domain: &mut Ui, window: Token, end: crate::action::End, out: &mut Queue<Request>) {
     if window == Token::new(HISTORY_WINDOW) {
         let edge = match end {
             crate::action::End::Before => &domain.history_rows.edges.before,
@@ -721,13 +656,13 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(limits.document_bytes)
 }
 
-pub(crate) fn ended(domain: &mut Domain, before: Option<contract::Cursor>, after: Option<contract::Cursor>) {
+pub(crate) fn ended(domain: &mut Ui, before: Option<contract::Cursor>, after: Option<contract::Cursor>) {
     domain.task_page.ended_before = before;
     domain.task_page.ended_after = after;
 }
 
 /// Install one admitted owner page without naming synthetic Result objects.
-pub(crate) fn owner_ended(domain: &mut Domain, page: Box<contract::OwnerEndedPage>) {
+pub(crate) fn owner_ended(domain: &mut Ui, page: Box<contract::OwnerEndedPage>) {
     domain.task_page.ended_cut = page.cut;
     ended(domain, page.before.clone(), page.after.clone());
     domain.task_page.owner_ended = Some(page);

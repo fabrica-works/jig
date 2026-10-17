@@ -493,9 +493,9 @@ const WATCH_ENDS: &[jig_client_domain::contract::WatchEnd] = &[
 ];
 #[test]
 fn a_frame_after_its_watchs_end_is_no_evidence() {
+    use jig_client::Up;
     use jig_client_domain::contract::{Delivery, WatchEvent};
-    use jig_client_view::Event;
-    use jig_client_world::observe::jig_received;
+    use jig_client_world::observe::up_received;
     const WATCH: Token = Token::new(1);
     for end in WATCH_ENDS {
         let span = Duration::from_millis(10);
@@ -506,17 +506,53 @@ fn a_frame_after_its_watchs_end_is_no_evidence() {
         referee.observe(Time::ZERO, Observation::Truth(Observed::Reachable { live: true }), &mut out);
         referee.observe(Time::ZERO, Observation::Delivered { client, receipt: Receipt::Parked }, &mut out);
         for event in [
-            Event::Ended { watch: WATCH, end: *end },
-            Event::Watch {
+            Up::WatchEnded { watch: WATCH, end: *end },
+            Up::Watched {
                 watch: WATCH,
                 event: WatchEvent::Delivered(Delivery::Frame(Box::new(jig_client_world::stories::frame(7)))),
             },
         ] {
-            for receipt in jig_received(&event) {
+            for receipt in up_received(&event) {
                 referee.observe(Time::ZERO, Observation::Delivered { client, receipt }, &mut out);
             }
         }
         referee.fire(Time::from_nanos(20_000_000), &mut out);
         assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed, "{end:?}");
     }
+}
+
+#[test]
+fn a_sign_out_shown_done_before_the_engine_received_it_is_caught() {
+    let span = Duration::from_millis(10);
+    let mut referee = skein_world::domain::Referee::new(referee::Rules::new(span, span, span));
+    let client = ClientId(0);
+    let mut out = Vec::new();
+    referee.observe(Time::ZERO, Observation::Client { client }, &mut out);
+    referee.observe(
+        Time::ZERO,
+        Observation::Delivered { client, receipt: Receipt::Party { party: 7, watch: None } },
+        &mut out,
+    );
+    referee.observe(Time::ZERO, Observation::SignOutAsked { client }, &mut out);
+    referee.observe(Time::ZERO, Observation::Shown { client, seen: vec![Seen::SignedOut] }, &mut out);
+    assert_eq!(
+        referee.verdict(),
+        skein_world::domain::Verdict::Failed(skein_world::domain::Failure {
+            at: Time::ZERO,
+            why: "a sign-out told: the engine did not receive sign-out".to_owned(),
+            pending: vec![]
+        })
+    );
+}
+
+#[test]
+fn a_sign_in_the_engine_ended_shows_the_sign_in_page_after_a_lost_sign_out() {
+    let span = Duration::from_millis(10);
+    let mut referee = skein_world::domain::Referee::new(referee::Rules::new(span, span, span));
+    let client = ClientId(0);
+    let mut out = Vec::new();
+    referee.observe(Time::ZERO, Observation::Truth(Observed::SignInEnded { client }), &mut out);
+    referee.observe(Time::ZERO, Observation::SignOutAsked { client }, &mut out);
+    referee.observe(Time::ZERO, Observation::Shown { client, seen: vec![Seen::SignedOut] }, &mut out);
+    assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed);
 }

@@ -380,7 +380,8 @@ impl Story {
                 | Observed::Retained { .. }
                 | Observed::Stopped { .. }
                 | Observed::Ended { .. }
-                | Observed::Reachable { .. } => None,
+                | Observed::Reachable { .. }
+                | Observed::SignInEnded { .. } => None,
             })
             .expect("party's made commit");
         self.seen
@@ -393,7 +394,8 @@ impl Story {
                 | Observed::Retained { .. }
                 | Observed::Stopped { .. }
                 | Observed::Ended { .. }
-                | Observed::Reachable { .. } => None,
+                | Observed::Reachable { .. }
+                | Observed::SignInEnded { .. } => None,
             })
             .expect("made commit is durable")
     }

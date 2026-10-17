@@ -20,7 +20,7 @@ pub enum Record {
     Draft { version: u16, party: u64, task: u64, words: Text, touched: u64 },
 }
 
-use crate::{Domain, Request, facts::Fact};
+use crate::{Request, Ui};
 use jig_client::contract::Limit;
 use skein_lib::{List, Queue};
 /// Version of this domain's small-store vocabulary.
@@ -53,7 +53,7 @@ impl Record {
         }
     }
 }
-fn retain(domain: &mut Domain, record: Record) -> bool {
+fn retain(domain: &mut Ui, record: Record) -> bool {
     for index in 0..domain.kept.len() {
         let kept = domain.kept.get_mut(index).expect("bounded record index exists");
         if kept.key() == record.key() {
@@ -64,28 +64,28 @@ fn retain(domain: &mut Domain, record: Record) -> bool {
     domain.kept.push(record).is_ok()
 }
 /// Restores only this version's bounded records; no table records cross here.
-pub(crate) fn restore(domain: &mut Domain, text: u32, records: List<Record>, out: &mut Queue<Request>) {
+pub(crate) fn restore(domain: &mut Ui, text: u32, records: List<Record>, _out: &mut Queue<Request>) {
     for record in records.into_boxed() {
         if record.valid(text) && !retain(domain, record) {
-            out.push(Request::Fact { fact: Fact::Refused { which: Limit::Records } });
+            crate::page::routing::refuse(domain, Limit::Records);
             break;
         }
     }
 }
 /// Keeps a record before asking its shell owner to save it.
-pub fn save(domain: &mut Domain, record: Record, out: &mut Queue<Request>) -> bool {
+pub fn save(domain: &mut Ui, record: Record, out: &mut Queue<Request>) -> bool {
     if !record.valid(domain.text_limit) || domain.confirmed != Some(record.party()) {
         return false;
     }
     if !retain(domain, record.clone()) {
-        out.push(Request::Fact { fact: Fact::Refused { which: Limit::Records } });
+        crate::page::routing::refuse(domain, Limit::Records);
         return false;
     }
-    out.push(Request::Save { record });
+    out.push(Request::Save { records: one(record) });
     true
 }
 /// Erases only this domain's record key; table keys cannot be expressed.
-pub fn erase(domain: &mut Domain, key: StoreKey, out: &mut Queue<Request>) {
+pub fn erase(domain: &mut Ui, key: StoreKey, out: &mut Queue<Request>) {
     let Some(party) = domain.confirmed else {
         return;
     };
@@ -102,10 +102,10 @@ pub fn erase(domain: &mut Domain, key: StoreKey, out: &mut Queue<Request>) {
         }
     }
     domain.timers.cancel(crate::ui::Timer::Save(key));
-    out.push(Request::Erase { key });
+    out.push(Request::Erase { records: one(key) });
 }
 /// Saves the selected jig place for the currently confirmed party.
-pub(crate) fn place(domain: &mut Domain, out: &mut Queue<Request>) {
+pub(crate) fn place(domain: &mut Ui, out: &mut Queue<Request>) {
     if let Some(party) = domain.confirmed {
         let saved = save(domain, Record::Place { version: STORE_VERSION, party, address: domain.address }, out);
         if !saved {
@@ -116,13 +116,13 @@ pub(crate) fn place(domain: &mut Domain, out: &mut Queue<Request>) {
 
 /// Keeps a policy's draft immediately and coalesces its shell saves on a
 /// monotonic deadline. Jig 21 chooses when a draft uses this API.
-pub fn coalesce(domain: &mut Domain, record: Record, out: &mut Queue<Request>) -> bool {
+pub fn coalesce(domain: &mut Ui, record: Record, _out: &mut Queue<Request>) -> bool {
     if !record.valid(domain.text_limit) || domain.confirmed != Some(record.party()) {
         return false;
     }
     let key = record.key();
     if !retain(domain, record) {
-        out.push(Request::Fact { fact: Fact::Refused { which: Limit::Records } });
+        crate::page::routing::refuse(domain, Limit::Records);
         return false;
     }
     domain
@@ -131,11 +131,17 @@ pub fn coalesce(domain: &mut Domain, record: Record, out: &mut Queue<Request>) -
         .expect("one save deadline per record fits");
     true
 }
-pub(crate) fn fire_save(domain: &Domain, key: StoreKey, out: &mut Queue<Request>) {
+pub(crate) fn fire_save(domain: &Ui, key: StoreKey, out: &mut Queue<Request>) {
     for record in &domain.kept {
         if record.key() == key {
-            out.push(Request::Save { record: record.clone() });
+            out.push(Request::Save { records: one(record.clone()) });
             return;
         }
     }
+}
+
+fn one<T>(value: T) -> List<T> {
+    let mut values = List::with_capacity(1);
+    assert!(values.push(value).is_ok(), "one record fits");
+    values
 }

@@ -52,15 +52,15 @@ fn owner_task_holds_retain_whole_read_facts_and_require_repeat_only_for_uncertai
         row.acts = offered(ActKind::Release, Admission::Allowed);
         let id = install(&mut domain, Body::Task(Box::new(row.clone())));
         reread(&mut domain, Body::Task(Box::new(row.clone())), Read::Task { task: 8 });
-        assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::Task(Box::new(row.clone()))));
-        assert_eq!(acts::hold_revision(domain.objects.get(id).unwrap()), Some(Revision { value: u64::MAX }));
+        assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::Task(Box::new(row.clone()))));
+        assert_eq!(acts::hold_revision(&domain.objects().get(id).unwrap()), Some(Revision { value: u64::MAX }));
         assert!(intend(&mut domain, id, ActKind::Release).is_empty());
         assert_eq!(domain.confirmation().unwrap().missing, if uncertain { Some(Missing::Again) } else { None });
         if uncertain {
-            assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
-            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Again { again: false } });
+            assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
+            drive(&mut domain, Time::ZERO, Event::Act { action: Act::Again { again: false } });
         }
-        let output = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+        let output = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
         assert_eq!(
             sent(&output),
             &Ask::Release {
@@ -70,7 +70,7 @@ fn owner_task_holds_retain_whole_read_facts_and_require_repeat_only_for_uncertai
                 again: if uncertain { Some(false) } else { None },
             }
         );
-        let Some(Body::Task(retained)) = &domain.objects.get(id).unwrap().body else { panic!("whole task") };
+        let Some(Body::Task(retained)) = &domain.objects().get(id).unwrap().body else { panic!("whole task") };
         assert_eq!(retained.hold, Some(TaskHold::Owner(Box::new(exact))));
         assert_eq!(retained.person_revision, Some(Revision { value: 23 }));
         assert_eq!(retained.spec_revision, Revision { value: 9 });
@@ -88,7 +88,7 @@ fn owner_task_hold_live_revision_moves_independently_before_atomic_amend_release
     let id = install(&mut domain, Body::Task(Box::new(row.clone())));
     intend(&mut domain, id, ActKind::AmendRelease);
     edit(&mut domain, Purpose::Reason, b"");
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     assert!(domain.confirmation().unwrap().missing.is_none());
     held.revision = u64::MAX;
     held.before = OwnerPriorPhase::Active(RunStage::Running { attempt: u64::MAX });
@@ -100,11 +100,11 @@ fn owner_task_hold_live_revision_moves_independently_before_atomic_amend_release
         domain.confirmation().unwrap().missing,
         Some(Missing::ChangedHold { now: Some(Revision { value: u64::MAX }) })
     );
-    assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
     intend(&mut domain, id, ActKind::AmendRelease);
     edit(&mut domain, Purpose::Reason, b"");
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
-    let output = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
+    let output = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert_eq!(
         sent(&output),
         &Ask::Amend {
@@ -116,6 +116,6 @@ fn owner_task_hold_live_revision_moves_independently_before_atomic_amend_release
             release: Some(Revision { value: u64::MAX }),
         }
     );
-    let Some(Body::Task(retained)) = &domain.objects.get(id).unwrap().body else { panic!("whole task") };
+    let Some(Body::Task(retained)) = &domain.objects().get(id).unwrap().body else { panic!("whole task") };
     assert_eq!(retained.hold, Some(TaskHold::Owner(Box::new(held))));
 }

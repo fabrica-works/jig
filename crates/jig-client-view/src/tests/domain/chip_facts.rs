@@ -42,7 +42,7 @@ pub(super) fn details() -> OwnerChipDetails {
 fn folded_generic_endings_keep_unknown_outcome_separate_and_retain_whole_visible_chip() {
     let mut limits = super::spine::LIMITS;
     limits.rows = 1;
-    let mut domain = crate::Domain::new(&limits);
+    let mut domain = crate::tests::fixtures::Fixture::new(&limits);
     let mut nodes = List::with_capacity(3);
     for (task, phase) in [(1, Phase::Active), (2, Phase::Ended), (3, Phase::Failed)] {
         let details = if phase == Phase::Failed {
@@ -88,22 +88,26 @@ fn folded_generic_endings_keep_unknown_outcome_separate_and_retain_whole_visible
             })
             .unwrap();
     }
-    crate::page::task::tree(
-        &mut domain,
-        Tree {
-            task: 1,
-            nodes,
-            folded: PhaseCounts {
-                ended: 0,
-                waiting: 0,
-                running: 0,
-                held: 0,
-                closing: 0,
-                done: 0,
-                failed: 0,
-                cancelled: 0,
-            },
-            held_below: 0,
+    let watch = domain.request_watch(Subject::Tree { task: 1, window: 1 }).unwrap();
+    domain.drive(
+        skein_lib::Time::ZERO,
+        crate::tests::fixtures::Watched {
+            watch,
+            event: WatchEvent::Delivered(Delivery::Tree(Box::new(Tree {
+                task: 1,
+                nodes,
+                folded: PhaseCounts {
+                    ended: 0,
+                    waiting: 0,
+                    running: 0,
+                    held: 0,
+                    closing: 0,
+                    done: 0,
+                    failed: 0,
+                    cancelled: 0,
+                },
+                held_below: 0,
+            }))),
         },
     );
     let plan = &domain.task_page().plan;

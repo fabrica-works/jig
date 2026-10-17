@@ -8,7 +8,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
 use crate::{
-    Domain,
+    Borrowed,
     action::Act,
     objects::{Card, Left, Object},
 };
@@ -30,7 +30,7 @@ pub enum Place {
 /// Open the named region, heading, context and state; caller adds content then calls `close`.
 pub fn open(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &Place,
     title: &[u8],
@@ -130,7 +130,7 @@ pub mod result;
 /// Build one object's card wherever it is named; the place changes its context only.
 pub fn card(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &Place,
     words: &Words,
@@ -222,7 +222,7 @@ pub fn card(
                         Act::Go { address: crate::address::Address::task(*task) },
                     );
                 }
-                common::answer(b, facts, words, text_limit);
+                common::answer(b, &facts, words, text_limit);
                 common::acts(b, &facts.card, &document.acts, object, words, bindings);
                 close(b);
             }
@@ -239,7 +239,7 @@ pub fn card(
 }
 fn received_card(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     object: Id<Object>,
     place: &Place,
     words: &Words,

@@ -1,4 +1,4 @@
-== Sign in == Offline
+== Sign in == Signed out
 Work:
   What needs you:
     * Nothing known yet
@@ -11,4 +11,3 @@ Navigation:
   [2] Family
 Sign in:
   [3] Sign in with Test
-  [4] Sign in with Other

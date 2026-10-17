@@ -6,10 +6,10 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role};
 
-use crate::{Domain, action::Act, notices::kept::Kind, page::IntentPurpose};
+use crate::{Borrowed, action::Act, notices::kept::Kind, page::IntentPurpose};
 use jig_client::contract::{Answer, ObjectKey, Seen};
 /// Build each visible notice as a named status, with one oldest-notice dismissal.
-pub fn notices(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn notices(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let text_limit = bindings.text_limit();
     if client.notices().ids().is_empty() {
         return;

@@ -6,13 +6,14 @@
 )]
 use super::cards::{CLIENT, drive, words};
 use crate::owner_person_task_words::PersonPhrase;
+use crate::tests::fixtures::Fixture;
 use crate::words::Words;
 use crate::{JigBindings, owner_person_task as view, owner_person_task_words};
 use skein_ui::Limits;
 use skein_ui::phrases::{Invalid, PhraseLimits, Phrasebook, Segment};
 use skein_ui::{Builder, Role, State, Tree};
 
-use crate::{Domain, Event, action::Act, fields::Purpose};
+use crate::{Event, action::Act, fields::Purpose};
 use jig_client::contract::*;
 use skein_lib::{Duration, List, Wall, bytes::copy_of};
 fn rows<T>(values: impl IntoIterator<Item = T>) -> List<T> {
@@ -113,10 +114,10 @@ fn limits_for(client: &crate::Limits, words: &Words) -> Limits {
     }
 }
 fn build(value: &OwnerPersonTask, words: &Words, cap: Limits) -> Tree {
-    let d = Domain::new(&client_limits());
+    let d = Fixture::new(&client_limits());
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    view::render(&mut b, &d, value, words, &mut bindings);
+    view::render(&mut b, &d.view(), value, words, &mut bindings);
     b.finish()
 }
 fn contains(tree: &Tree, text: &[u8]) -> bool {
@@ -188,7 +189,7 @@ fn person_owner_card_and_confirmation_show_numeric_rules_and_disable_field_beari
     };
     let (mut d, id) =
         super::cards_objects::loaded(ObjectKey::PersonTask(8), ReadValue::OwnerPersonTask(Box::new(value)));
-    drive(&mut d, Event::Act { act: Act::Intend { object: id.token(), act: ActKind::Answer } });
+    drive(&mut d, Event::Act { action: Act::Intend { object: id.token(), act: ActKind::Answer } });
     let w = words();
     let mut cap = limits(w);
     cap.nodes = cap.nodes.checked_add(view::form_nodes(&client_limits()).unwrap()).unwrap();
@@ -197,8 +198,8 @@ fn person_owner_card_and_confirmation_show_numeric_rules_and_disable_field_beari
     cap.slots = cap.nodes;
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    crate::cards::card(&mut b, &d, id, &crate::cards::Place::Elsewhere, w, &mut bindings);
-    crate::confirmation::confirmation(&mut b, &d, w, &mut bindings);
+    crate::cards::card(&mut b, &d.view(), id, &crate::cards::Place::Elsewhere, w, &mut bindings);
+    crate::confirmation::confirmation(&mut b, &d.view(), w, &mut bindings);
     let tree = b.finish();
     for text in [
         b"Choice code: 4294967295".as_slice(),
@@ -220,15 +221,15 @@ fn person_owner_card_and_confirmation_show_numeric_rules_and_disable_field_beari
         .unwrap();
     assert!(supported.binding.is_some());
     assert_eq!(d.objects().get(id).unwrap().project, Some(u32::MAX));
-    drive(&mut d, Event::Act { act: Act::Choose { option: u32::MAX } });
+    drive(&mut d, Event::Act { action: Act::Choose { option: u32::MAX } });
     drive(
         &mut d,
         Event::Act {
-            act: Act::Edit { field: Purpose::Reason, text: Text::new(copy_of(b"abc"), CLIENT.text).unwrap() },
+            action: Act::Edit { field: Purpose::Reason, text: Text::new(copy_of(b"abc"), CLIENT.text).unwrap() },
         },
     );
     let mut b = Builder::new(&cap);
-    crate::confirmation::confirmation(&mut b, &d, w, &mut bindings);
+    crate::confirmation::confirmation(&mut b, &d.view(), w, &mut bindings);
     let confirmation = b.finish();
     assert!(contains(&confirmation, b"Choice code: 7"));
     assert!(contains(&confirmation, b"field/a"));
@@ -248,10 +249,10 @@ fn person_owner_approval_renders_opaque_parts_without_inventing_application_scop
     };
     let w = words();
     let cap = limits(w);
-    let client = Domain::new(&client_limits());
+    let client = Fixture::new(&client_limits());
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
-    view::render(&mut b, &client, &value, w, &mut bindings);
+    view::render(&mut b, &client.view(), &value, w, &mut bindings);
     let tree = b.finish();
     for text in [
         b"Person destination: 18446744073709551615".as_slice(),
@@ -498,7 +499,7 @@ fn person_owner_view_admits_closed_offer_capacity_without_expanding_shown_result
     let mut builder = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, l.text);
     builder.open(Role::Page);
-    assert!(crate::cards::card(&mut builder, &domain, id, &crate::cards::Place::Elsewhere, w, &mut bindings));
+    assert!(crate::cards::card(&mut builder, &domain.view(), id, &crate::cards::Place::Elsewhere, w, &mut bindings));
     builder.close();
     let tree = builder.finish();
     assert!(tree.len() <= crate::card_nodes(&l).unwrap() + 1);

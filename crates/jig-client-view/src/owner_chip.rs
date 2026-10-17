@@ -7,7 +7,7 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::{Domain, Limits};
+use crate::{Borrowed, Limits};
 use jig_client::contract::{
     ClosingStage, DocumentText, HoldCategory, HoldFailure, OwnerChipDetails, OwnerChipEnding, OwnerChipHold,
     OwnerChipObservation, OwnerChipWork, OwnerEscalationHolder, OwnerHoldEscalation, OwnerPart, OwnerPartKey,
@@ -432,7 +432,13 @@ pub fn observation(b: &mut Builder, value: &OwnerChipObservation, words: &Words)
         None => text(b, words, P::StartUnknown, &[]),
     }
 }
-fn result_value(b: &mut Builder, value: &ResultValue, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn result_value(
+    b: &mut Builder,
+    value: &ResultValue,
+    client: &Borrowed<'_>,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     match value {
         ResultValue::Approved { state, words: explanation } => {
             words.text(b, crate::phrases::jig::JigPhrase::ApprovalExpected, &[]);
@@ -475,7 +481,7 @@ pub(crate) fn ending_summary(b: &mut Builder, value: &OwnerChipEnding, words: &W
 pub(crate) fn ending(
     b: &mut Builder,
     value: &OwnerChipEnding,
-    client: &Domain,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
@@ -491,8 +497,14 @@ pub(crate) fn ending(
     }
 }
 /// Render metadata without changing domain state, routing or issuing any read.
-/// A borrowed `Domain` is used only by the existing supplied `ResultValue` fragment.
-pub fn render(b: &mut Builder, value: &OwnerChipDetails, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+/// A borrowed `Ui` is used only by the existing supplied `ResultValue` fragment.
+pub fn render(
+    b: &mut Builder,
+    value: &OwnerChipDetails,
+    client: &Borrowed<'_>,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     b.open(Role::Region);
     let name = words
         .book

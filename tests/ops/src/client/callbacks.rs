@@ -80,7 +80,9 @@ pub fn events(
     let mut out = Vec::new();
     for (client, event) in values {
         let up = match event {
-            Event::Jig(jig_client_view::Event::Hello { served }) => {
+            Event::Client {
+                event: jig_client::Event::Up { up: jig_client::Up::Served { served, versions: None } },
+            } => {
                 out.push((
                     client,
                     Event::Client { event: jig_client::Event::Up { up: Up::Served { served, versions: None } } },

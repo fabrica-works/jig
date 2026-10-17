@@ -6,7 +6,7 @@ use crate::{JigBindings, Owner, phrases::jig::JigPhrase, words::Words};
 use skein_ui::{Builder, Key, Role, Run};
 
 use crate::{
-    Domain,
+    Borrowed,
     conversation::{Conversation, Words as WordState},
 };
 use jig_client::contract::{LiveCall, Party, TurnName};
@@ -14,7 +14,7 @@ mod activity;
 mod call;
 mod turn;
 /// Show an agent task's activity in its page's already opened section.
-pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+pub fn conversation(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let state = client.conversation();
     b.open(Role::List);
     b.open(Role::Item);
@@ -38,7 +38,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         let line = state.lines.rows.get(index).expect("retained line exists");
         let key = match (line.event.committed_turn(), line.event.word_message()) {
             (Some(name), _) => turn_key(name),
-            (None, Some((message, _))) => word_key(state, message),
+            (None, Some((message, _))) => word_key(&state, message),
             (None, None) => Key { owner: Owner::Jig.opaque(), kind: 27, a: state.task, b: line.position },
         };
         b.open(Role::Item);
@@ -50,7 +50,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
         b.close();
         b.close();
     }
-    pending(b, state, words);
+    pending(b, &state, words);
     for live in &state.live {
         b.open(Role::Item);
         b.key(turn_key(live.name.turn()));
@@ -92,7 +92,7 @@ pub fn conversation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
     b.close();
     b.close();
     crate::pages::cut(b, words, state.page_cut);
-    edges(b, state, words, bindings);
+    edges(b, &state, words, bindings);
 }
 fn pending(b: &mut Builder, state: &Conversation, words: &Words) {
     for sent in &state.words.rows {

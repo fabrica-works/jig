@@ -58,11 +58,11 @@ pub fn build(view: &mut View<'_>, root: &Domain, out: &mut Queue<Patch>) {
     view.first.begin();
     let mut b = view.render.builder();
     b.open(Role::Page);
-    if !jig_client_view::jig(&mut b, root.jig(), family::NAV, view.words, &mut view.jig) {
+    if !jig_client_view::jig(&mut b, &root.jig().borrow(root.client()), family::NAV, view.words, &mut view.jig) {
         b.open(Role::Main);
         family::page(&mut b, root.first(), view.first_words, view.words, &mut view.first);
         b.close();
-        jig_client_view::after_page(&mut b, root.jig(), view.words, &mut view.jig);
+        jig_client_view::after_page(&mut b, &root.jig().borrow(root.client()), view.words, &mut view.jig);
     }
     b.close();
     slots(view, root, &mut b);
@@ -72,12 +72,17 @@ pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
     for pass in 0..2 {
         for slot in b.slots(pass) {
             let mut fragment = Builder::new(&view.limits.tree);
+            if slot.reference == jig_client_view::signin::SLOT {
+                sign_in_slot(view, &mut fragment);
+                b.splice(slot.id, fragment);
+                continue;
+            }
             let filled = match Owner::from_opaque(slot.reference.owner) {
                 Some(Owner::Jig) => match view.first.object(slot.reference.token) {
                     Some(key) => match root.jig().objects().find(key) {
                         Some(id) => jig_client_view::cards::card(
                             &mut fragment,
-                            root.jig(),
+                            &root.jig().borrow(root.client()),
                             id,
                             &jig_client_view::cards::Place::Elsewhere,
                             view.words,
@@ -88,7 +93,7 @@ pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
                     None => match view.first.section(slot.reference.token) {
                         Some(section) => jig_client_view::sections::section(
                             &mut fragment,
-                            root.jig(),
+                            &root.jig().borrow(root.client()),
                             view.words,
                             &mut view.jig,
                             section,
@@ -108,7 +113,6 @@ pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
                                         &mut fragment,
                                         root.first(),
                                         part,
-                                        root.jig().generation(),
                                         view.first_words,
                                         view.words,
                                         &mut view.first,
@@ -127,7 +131,6 @@ pub(crate) fn slots(view: &mut View<'_>, root: &Domain, b: &mut Builder) {
                                                     &mut fragment,
                                                     root.first(),
                                                     &part,
-                                                    root.jig().generation(),
                                                     view.first_words,
                                                     view.words,
                                                     &mut view.first,
@@ -197,6 +200,14 @@ fn second(
 #[expect(clippy::manual_map, reason = "step code matches optional owner actions explicitly")]
 pub fn decode(view: &mut View<'_>, node: NodeId, act: Act) -> Option<Action> {
     let bound = view.render.act(node, act)?;
+    if bound.binding.owner == (Owner::Application { number: jig_client_test_domain::FIRST }).opaque()
+        && view.first.sign_in(bound.binding.token)
+    {
+        return match bound.act {
+            Act::Press | Act::Submit | Act::Toggle => Some(Action::SignIn),
+            Act::Input { .. } | Act::Drawing { .. } => None,
+        };
+    }
     match Owner::from_opaque(bound.binding.owner) {
         Some(Owner::Jig) => match jig_client_view::decode(&mut view.jig, bound.binding.token, bound.act) {
             Some(action) => Some(Action::Jig(action)),
@@ -211,4 +222,14 @@ pub fn decode(view: &mut View<'_>, node: NodeId, act: Act) -> Option<Action> {
         },
         None => None,
     }
+}
+
+fn sign_in_slot(view: &mut View<'_>, fragment: &mut Builder) {
+    let label =
+        view.words.say(jig_client_view::phrases::jig::JigPhrase::SignInWith, &[jig_client_view::words::name(b"Test")]);
+    fragment.open(Role::Button);
+    fragment.name(&label);
+    fragment.bind(view.first.insert(bindings::Meaning::SignIn));
+    fragment.text(skein_ui::Run::Plain, &label);
+    fragment.close();
 }

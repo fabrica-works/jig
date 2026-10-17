@@ -11,7 +11,7 @@
 //! | complete | confirm | closed; card pending | one send |
 //! | open | dismiss/navigation | closed; prior card | nothing |
 use crate::{
-    Domain, Request, acts,
+    Request, Ui, acts,
     fields::Purpose,
     intents::Progress,
     objects::{Body, Card, Object},
@@ -68,7 +68,7 @@ pub enum ReasonInput {
 /// One act and the revision its card showed when the confirmation opened.
 #[derive(Debug)]
 pub struct Confirmation {
-    /// Domain write generation for fields owned by this new confirmation.
+    /// Ui write generation for fields owned by this new confirmation.
     /// Stable through edits and live-document updates; advances on opening another.
     pub writes: u64,
     pub act: ActKind,
@@ -95,7 +95,7 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_add(limits.document_bytes.checked_mul(2)?)?
         .checked_add(List::<u16>::worst_case(limits.rows)?)
 }
-fn clear_fields(domain: &mut Domain) {
+fn clear_fields(domain: &mut Ui) {
     for purpose in [
         Purpose::Reason,
         Purpose::Answer,
@@ -112,7 +112,7 @@ fn clear_fields(domain: &mut Domain) {
     }
 }
 /// Closes and clears fields, restoring a card only while no request exists yet.
-pub(crate) fn close(domain: &mut Domain) {
+pub(crate) fn close(domain: &mut Ui) {
     let Some(open) = domain.confirming.take() else {
         return;
     };
@@ -135,20 +135,20 @@ struct NoteFields {
     body: Text,
 }
 /// Opens only an act present and admitted in the engine's document.
-pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>, act: ActKind) {
+pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, act: ActKind, lent: &jig_client::Client) {
     domain.project_page.form.confirmation = None;
     close(domain);
     if domain.blocked || domain.confirmed.is_none() {
         return;
     }
-    let Some(object) = domain.objects.get(id) else {
+    let Some(object) = domain.borrow(lent).objects().get(id) else {
         return;
     };
     match object.card {
         Card::Open | Card::Refused { .. } => {}
         Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => return,
     }
-    let proposed = match acts::offered(object, act) {
+    let proposed = match acts::offered(&object, act) {
         Admission::Allowed | Admission::Bounded { .. } => None,
         Admission::Proposed { to } => Some(to),
         Admission::Refused(refusal) => {
@@ -183,7 +183,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
         )
         | None => None,
     };
-    let revision = acts::revision(object, act);
+    let revision = acts::revision(&object, act);
     let previous = object.card.clone();
     if let Some(note_fields) = note_fields
         && act == ActKind::EditNote
@@ -213,7 +213,7 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
         act,
         object: id,
         revision,
-        release_revision: if act == ActKind::AmendRelease { acts::hold_revision(object) } else { None },
+        release_revision: if act == ActKind::AmendRelease { acts::hold_revision(&object) } else { None },
         release_changed: false,
         reason_input: ReasonInput::Missing,
         choices,
@@ -225,11 +225,11 @@ pub(crate) fn open(domain: &mut Domain, env: &Env<crate::Limits>, id: Id<Object>
     });
     domain.objects.get_mut(id).expect("named object exists").card =
         Card::Deciding { request: None, progress: Progress::Confirming };
-    sync(domain);
+    sync(domain, lent);
     domain.changed();
 }
 /// Receives a successful person edit without mistaking a domain-cleared blank for input.
-pub(crate) fn edited(domain: &mut Domain, field: Purpose) {
+pub(crate) fn edited(domain: &mut Ui, field: Purpose) {
     if field == Purpose::Reason
         && let Some(open) = domain.confirming.as_mut()
         && (open.act == ActKind::Amend || open.act == ActKind::AmendRelease)
@@ -238,20 +238,20 @@ pub(crate) fn edited(domain: &mut Domain, field: Purpose) {
     }
 }
 /// Updates only the validity of the revision the act names and the engine's admission.
-pub(crate) fn sync(domain: &mut Domain) {
+pub(crate) fn sync(domain: &mut Ui, lent: &jig_client::Client) {
     let Some(open) = domain.confirming.as_ref() else {
         return;
     };
-    let Some(object) = domain.objects.get(open.object) else {
+    let Some(object) = domain.borrow(lent).objects().get(open.object) else {
         domain.confirming.as_mut().expect("confirmation exists").missing =
             Some(Missing::Refused { why: Refusal::Unknown });
         return;
     };
-    let now = acts::revision(object, open.act);
-    let hold_now = if open.act == ActKind::AmendRelease { acts::hold_revision(object) } else { None };
+    let now = acts::revision(&object, open.act);
+    let hold_now = if open.act == ActKind::AmendRelease { acts::hold_revision(&object) } else { None };
     let release_changed = open.release_changed || hold_now != open.release_revision;
     let changed = open.changed || now != open.revision || release_changed;
-    let proposed = match draft_admission(object, open) {
+    let proposed = match draft_admission(&object, open) {
         Admission::Proposed { to } => Some(to),
         Admission::Allowed | Admission::Bounded { .. } | Admission::Refused(_) => None,
     };
@@ -260,7 +260,7 @@ pub(crate) fn sync(domain: &mut Domain) {
     } else if changed {
         Some(Missing::Changed { now })
     } else {
-        missing(domain, open, object)
+        missing(domain, open, &object)
     };
     let open = domain.confirming.as_mut().expect("confirmation exists");
     if open.changed != changed || open.missing != missing || open.proposed != proposed {
@@ -271,7 +271,7 @@ pub(crate) fn sync(domain: &mut Domain) {
         domain.changed();
     }
 }
-fn empty(domain: &Domain, field: Purpose) -> bool {
+fn empty(domain: &Ui, field: Purpose) -> bool {
     match domain.fields.get(field) {
         Some(field) => field.text.bytes().is_empty(),
         None => true,
@@ -459,7 +459,7 @@ fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
 }
 
 fn owner_answer_missing(
-    domain: &Domain,
+    domain: &Ui,
     open: &Confirmation,
     document: &jig_client::contract::OwnerPersonTask,
 ) -> Option<Missing> {
@@ -483,7 +483,7 @@ fn owner_answer_missing(
         | jig_client::contract::TaskContractDocument::Change { .. } => Missing::Refused { why: Refusal::NotOffered },
     })
 }
-fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Missing> {
+fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing> {
     if object.project.is_none() {
         return Some(Missing::Context);
     }
@@ -583,7 +583,7 @@ fn missing(domain: &Domain, open: &Confirmation, object: &Object) -> Option<Miss
     None
 }
 /// Changes one choice; the form checks membership again before sending.
-pub(crate) fn choose(domain: &mut Domain, option: u32) {
+pub(crate) fn choose(domain: &mut Ui, option: u32) {
     if let Some(open) = &mut domain.confirming {
         open.choices.option = Some(option);
         open.choices.cannot = false;
@@ -591,21 +591,21 @@ pub(crate) fn choose(domain: &mut Domain, option: u32) {
     }
 }
 /// Selects the failure answer that every person task contract permits.
-pub(crate) fn cannot(domain: &mut Domain) {
+pub(crate) fn cannot(domain: &mut Ui) {
     if let Some(open) = &mut domain.confirming {
         open.choices.cannot = true;
         domain.changed();
     }
 }
 /// Records the person's decision about an unrecoverable uncertain effect.
-pub(crate) fn again(domain: &mut Domain, again: bool) {
+pub(crate) fn again(domain: &mut Ui, again: bool) {
     if let Some(open) = &mut domain.confirming {
         open.choices.again = Some(again);
         domain.changed();
     }
 }
 /// Changes a disposal without growing past the configured live-delegate bound.
-pub(crate) fn dispose(domain: &mut Domain, task: u64, take_over: bool) {
+pub(crate) fn dispose(domain: &mut Ui, task: u64, take_over: bool) {
     let Some(open) = &mut domain.confirming else {
         return;
     };
@@ -627,14 +627,14 @@ pub(crate) fn dispose(domain: &mut Domain, task: u64, take_over: bool) {
     domain.changed();
 }
 /// Keeps the caller's decoded, bounded amendment for the one request.
-pub(crate) fn change(domain: &mut Domain, change: Amendment) {
+pub(crate) fn change(domain: &mut Ui, change: Amendment) {
     if let Some(open) = &mut domain.confirming {
         open.choices.change = Some(change);
         domain.changed();
     }
 }
 /// Records whether the one write also releases the held task.
-pub(crate) fn write_release(domain: &mut Domain, release: bool) {
+pub(crate) fn write_release(domain: &mut Ui, release: bool) {
     if let Some(open) = &mut domain.confirming
         && open.act == ActKind::Write
     {
@@ -643,7 +643,7 @@ pub(crate) fn write_release(domain: &mut Domain, release: bool) {
     }
 }
 /// Records a goal's new place, leaving admission to the engine.
-pub(crate) fn priority(domain: &mut Domain, priority: u32) {
+pub(crate) fn priority(domain: &mut Ui, priority: u32) {
     if let Some(open) = &mut domain.confirming
         && open.act == ActKind::Prioritise
     {
@@ -652,23 +652,23 @@ pub(crate) fn priority(domain: &mut Domain, priority: u32) {
     }
 }
 /// Checks the recalled revision and complete form before asking for one send.
-pub(crate) fn send(domain: &mut Domain, out: &mut Queue<Request>) {
-    sync(domain);
+pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client::Client) {
+    sync(domain, lent);
     let Some(open) = domain.confirming.as_ref() else {
         return;
     };
     if open.missing.is_some() || domain.blocked || domain.confirmed.is_none() {
         return;
     }
-    let Some(object) = domain.objects.get(open.object) else {
+    let Some(object) = domain.borrow(lent).objects().get(open.object) else {
         return;
     };
-    let Some(ask) = acts::ask(object, open, &domain.fields) else {
+    let Some(ask) = acts::ask(&object, open, &domain.fields) else {
         return;
     };
     let key = object.key;
     let act = open.act;
-    if crate::intents::send_card(domain, key, act, Box::new(ask), out).is_some() {
+    if crate::intents::send_card(domain, key, act, Box::new(ask), out, lent).is_some() {
         close(domain);
     } else if let Some(open) = &mut domain.confirming {
         open.missing = Some(Missing::Refused { why: Refusal::Limit { which: Limit::Requests } });

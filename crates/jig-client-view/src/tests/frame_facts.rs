@@ -1,15 +1,16 @@
 #![expect(clippy::disallowed_methods, reason = "ordinary tests inspect public trees and exact supplied source values")]
 use super::cards::{CLIENT, contains, document, drive, limits, start, text, words};
+use crate::tests::fixtures::{Fixture, Watched};
 use crate::{JigBindings, Owner, phrases::jig::JigPhrase};
 use skein_ui::{Builder, Role, SlotRef, Tree};
 
-use crate::{Domain, Event};
+use crate::Event;
 use jig_client::contract::*;
 use skein_lib::{List, Token, Wall};
-fn tree(domain: &Domain) -> Tree {
+fn tree(domain: &Fixture) -> Tree {
     frame_tree(domain, words())
 }
-fn frame_tree(domain: &Domain, words: &crate::words::Words) -> Tree {
+fn frame_tree(domain: &Fixture, words: &crate::words::Words) -> Tree {
     let mut sized = limits();
     sized.nodes = crate::banner_nodes(&CLIENT)
         .unwrap()
@@ -20,10 +21,10 @@ fn frame_tree(domain: &Domain, words: &crate::words::Words) -> Tree {
     let mut builder = Builder::new(&sized);
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     builder.open(Role::Page);
-    crate::frame::banner(&mut builder, domain, words, &mut bindings);
+    crate::frame::banner(&mut builder, &domain.view(), words, &mut bindings);
     crate::frame::navigation(
         &mut builder,
-        domain,
+        &domain.view(),
         SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings,
@@ -34,9 +35,9 @@ fn frame_tree(domain: &Domain, words: &crate::words::Words) -> Tree {
     super::cards_access::check(&tree);
     tree
 }
-fn ready(source: Frame) -> Domain {
+fn ready(source: Frame) -> Fixture {
     let (mut domain, watch) = start();
-    drive(&mut domain, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(source))) });
+    drive(&mut domain, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(source))) });
     domain
 }
 #[test]
@@ -70,7 +71,7 @@ fn frame_tree_keeps_absent_empty_and_partial_names_separate_from_identity_loss()
                 .count(),
             if name.as_ref().is_some_and(|value| value.cut) { 2 } else { 1 }
         );
-        assert_eq!(domain.frame().document.as_ref(), Some(&source));
+        assert_eq!(domain.frame().document, Some(&source));
     }
 }
 #[test]
@@ -109,7 +110,7 @@ fn frame_tree_uses_supplied_totals_goal_list_loss_and_all_pool_ledger_facts() {
         assert!(contains(&shown, bytes), "missing {bytes:?}");
     }
     assert!(!contains(&shown, b"Pool ledger not supplied"));
-    assert_eq!(domain.frame().document.as_ref().unwrap().projects.get(0).unwrap().pool.as_ref(), Some(&ledger));
+    assert_eq!(domain.frame().document.unwrap().projects.get(0).unwrap().pool.as_ref(), Some(&ledger));
     source.projects.get_mut(0).unwrap().pool.as_mut().unwrap().left = 0;
     source.projects.get_mut(0).unwrap().pool.as_mut().unwrap().closed = false;
     let zero = tree(&ready(source));
@@ -160,10 +161,10 @@ fn choosing_sign_out_keeps_the_frame_until_the_shell_answers() {
     let source = sign_out_frame(PartyKind::Person);
     let mut domain = ready(source.clone());
     let out = choose_sign_out(&mut domain);
-    assert_eq!(out.as_ref(), &[crate::Request::SignOut]);
-    assert_eq!(domain.frame().document.as_ref(), Some(&source));
+    assert_eq!(out.as_ref(), &[crate::Request::Client { asked: jig_client::Event::SignOut }]);
+    assert_eq!(domain.frame().document, Some(&source));
     assert!(offers_sign_out(&sign_out_tree(&domain)));
-    drive(&mut domain, Event::SignedOut);
+    drive(&mut domain, jig_client::Up::SignedOut);
     assert!(domain.frame().document.is_none());
     assert_eq!(domain.page(), &crate::page::Page::SigningIn);
 }
@@ -171,8 +172,8 @@ fn choosing_sign_out_keeps_the_frame_until_the_shell_answers() {
 fn offers_sign_out(shown: &Tree) -> bool {
     shown.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Sign out"))
 }
-fn choose_sign_out(domain: &mut Domain) -> Box<[crate::Request]> {
-    drive(domain, Event::Act { act: crate::action::Act::SignOut }).into_boxed_slice()
+fn choose_sign_out(domain: &mut Fixture) -> Box<[crate::Request]> {
+    drive(domain, Event::Act { action: crate::action::Act::SignOut }).into_boxed_slice()
 }
 
 fn sign_out_frame(kind: PartyKind) -> Frame {
@@ -207,7 +208,7 @@ const SIGN_OUT_PHRASES: [JigPhrase; 21] = [
     JigPhrase::LoadingNavigation,
 ];
 
-fn sign_out_tree(domain: &Domain) -> Tree {
+fn sign_out_tree(domain: &Fixture) -> Tree {
     frame_tree(domain, &sign_out_words())
 }
 fn sign_out_words() -> crate::words::Words {

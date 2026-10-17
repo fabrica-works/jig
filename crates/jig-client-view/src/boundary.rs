@@ -3,15 +3,13 @@
 //! answers arrive only once durable. See client/domain/client.md, 4.
 use crate::{
     action::Act,
-    address::{Address, Place},
-    facts::Fact,
+    address::Place,
     frame::me::FrameShown,
-    intents::{ByValue, Progress},
-    link::Link,
+    intents::ByValue,
     store::{Record, StoreKey},
 };
-use alloc::boxed::Box;
-use jig_client::contract::{Answer, Ask, Part, Read, ReadResult, Subject, WatchEnd, WatchEvent};
+use jig_client::Link;
+use jig_client::contract::{Answer, Part};
 use skein_lib::{Duration, List, Token};
 /// The person offset from universal time, in minutes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -19,77 +17,60 @@ pub struct Offset {
     pub minutes: i32,
 }
 
+/// How the shell enters a place in its history.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum How {
+    Push,
+    Replace,
+}
+
+/// A supplied presentation configuration cannot be admitted.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Refused {
+    Navigation,
+    Arrangement,
+}
+
 /// One input routed by the application root.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event {
-    /// Start with this domain records and display time offset.
-    Start { address: Address, kept: List<Record>, offset: Offset },
-    /// Whether the link's hello serves this client, independently of Frame.
-    Hello { served: bool },
+    /// What the application-held client tells the UI.
+    Client { told: jig_client::Told },
+    /// Its kept records, the initial place and the seed for fresh request keys.
+    Start { records: List<Record>, place: Place, seed: u64 },
     /// Restored table requests, counted once per scope after Start.
     Kept { scope: u64, requests: u32 },
     /// One restored request retired, with or without a known outcome.
     KeptGone { scope: u64 },
     /// The shell reports a place it went.
     Went { place: Place },
+    /// The application left for one of its own places.
+    Left,
     /// A person acted on the view.
-    Act { act: Act },
+    Act { action: Act },
     /// A program asks by value.
     Ask { ask: ByValue },
-    /// The table intent progress changed.
-    Progress { request: Token, progress: Progress },
-    /// The table handed the one durable answer.
-    Answered { request: Token, answer: Answer },
-    /// The one terminal of a read.
-    Read { read: Token, result: ReadResult },
-    /// A nonterminal watch event.
-    Watch { watch: Token, event: WatchEvent },
-    /// The one terminal of a watch.
-    Ended { watch: Token, end: WatchEnd },
-    /// An application page names jig objects for the current page generation.
-    ShowObjects { objects: List<jig_client::contract::ObjectKey> },
-    /// An application page names jig sections for the current generation.
-    ShowSections { sections: List<crate::page::Section> },
-    /// The application page stopped naming jig objects.
-    ObjectsLeft,
-    /// The sign-out exchange ended lost (protocol/client.md, 4):
-    /// the person is still signed in.
-    SignOutLost,
-    /// The shell or an answered exchange ended the sign-in.
-    SignedOut,
+    /// The application's page names the whole list of jig objects and sections.
+    Named { objects: List<jig_client::contract::ObjectKey>, sections: List<crate::page::Section> },
     /// A sibling requests the current frame within this step.
     Frame { asked: Token },
 }
 
 /// One effect or hand off routed by the application root.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Request {
-    /// Ask the root table to keep and send a request.
-    Send { request: Token, scope: u64, ask: Box<Ask> },
-    /// Read once without a key.
-    Read { read: Token, what: Read },
-    /// Open a live watch without a key.
-    Open { watch: Token, subject: Subject },
-    /// Continue a run watch from the conversation's retained turn and offset.
-    Continue { watch: Token, subject: Subject },
-    /// Close a watch and await its terminal.
-    Close { watch: Token },
+    /// An event for the application-held client, under the UI's asker.
+    Client { asked: jig_client::Event },
     /// Show a jig address in history.
-    Show { address: Address, replace: bool },
+    Show { place: Place, how: How },
     /// Save this domain record in the small store.
-    Save { record: Record },
+    Save { records: List<Record> },
     /// Erase this domain record.
-    Erase { key: StoreKey },
-    /// Ask the shell to end the sign-in on the engine. Its successful end is
-    /// `Event::SignedOut`, after which the sign-in page shows. A lost exchange
-    /// is `Event::SignOutLost`, leaving the person signed in.
-    SignOut,
-    /// Sign in and come back to an address.
-    SignIn { provider: u16, back: Address },
+    Erase { records: List<StoreKey> },
     /// Have the part owner show its value.
-    ShowPart { part: Part, generation: u32, scope: jig_client::contract::PartScope },
+    ShowPart { part: Part, scope: jig_client::contract::PartScope },
     /// The old page no longer shows its parts.
-    PartsLeft { generation: u32 },
+    PartsLeft,
     /// Tell siblings and the table the shared link.
     Link { link: Link },
     /// Tell the table whose parked requests may be sent.
@@ -102,6 +83,4 @@ pub enum Request {
     Answered { asked: Token, answer: Answer },
     /// Tell a program that retention ended without a known outcome.
     Unknown { asked: Token },
-    /// Report a content free fact.
-    Fact { fact: Fact },
 }

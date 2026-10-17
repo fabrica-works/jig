@@ -1,15 +1,13 @@
 use super::fixtures::{RECORD_ITEM, RECORD_PROJECT, ROUTED_TOKEN, UNOWNED_KEY_NUMBER};
 use super::{ask, confirm, drive, env, limits, out_iter, ready, start};
 use crate::{Address, Event, JigOut, Request, first, max_out, new, route};
+use jig_client::Link;
 use jig_client::{Asker, Key, Told, contract};
-use jig_client_view::link::Link;
 use skein_lib::{List, Queue};
 
 #[test]
 fn the_link_reaches_each_child() {
-    let mut root = new(&limits(), 7);
-    let mut out = Queue::with_capacity(max_out(&limits()));
-    route::told(&mut root, &env(), Told::Link { link: jig_client::Link::Live }, &mut out);
+    let root = ready(7);
     assert_eq!(root.first().link(), Link::Live);
     assert_eq!(root.second().link(), Link::Live);
     assert_eq!(root.jig().link(), Link::Live);

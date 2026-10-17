@@ -1,10 +1,11 @@
 //! Full-list/full-text envelopes exercise public acquisition and every renderer.
 use super::*;
 use crate::Owner;
+use crate::tests::fixtures::{Fixture, ReadPage, Watched};
 use skein_ui::Limits;
 use skein_ui::SlotRef;
 
-use crate::{address::Address, boundary::Offset};
+use crate::address::Address;
 use skein_lib::Token;
 
 fn full_text() -> Text {
@@ -168,7 +169,7 @@ fn full_result() -> Result {
     }));
     value
 }
-fn acquire(d: &mut Domain, watch: Token, root: ObjectKey, key: ObjectKey, value: ReadValue) {
+fn acquire(d: &mut Fixture, watch: jig_client::Handle, root: ObjectKey, key: ObjectKey, value: ReadValue) {
     let entry = InboxEntry {
         reply: None,
         lineage: list([]),
@@ -186,7 +187,7 @@ fn acquire(d: &mut Domain, watch: Token, root: ObjectKey, key: ObjectKey, value:
     other.position = 2;
     let out = drive(
         d,
-        Event::Watch {
+        Watched {
             watch,
             event: WatchEvent::Delivered(Delivery::Inbox(Box::new(Inbox {
                 entries: list([entry, other]),
@@ -201,13 +202,13 @@ fn acquire(d: &mut Domain, watch: Token, root: ObjectKey, key: ObjectKey, value:
     let read = out
         .iter()
         .find_map(|request| match request {
-            Request::Read { read, .. } => Some(*read),
+            Request::Client { asked: jig_client::Event::Read { handle: read, .. } } => Some(*read),
             _ => None,
         })
         .unwrap();
-    drive(d, Event::Read { read, result: ReadResult::Value(value) });
+    drive(d, ReadPage { read, result: ReadResult::Value(value) });
 }
-fn dependencies_and_proposal(d: &mut Domain, watch: Token, root: ObjectKey) {
+fn dependencies_and_proposal(d: &mut Fixture, watch: jig_client::Handle, root: ObjectKey) {
     let p = full_proposal(full_batch());
     acquire(d, watch, root, ObjectKey::Proposal(p.key), ReadValue::Proposal(Box::new(p)));
     let mut task = task_doc(&[ActKind::Close, ActKind::AmendRelease]);
@@ -216,13 +217,13 @@ fn dependencies_and_proposal(d: &mut Domain, watch: Token, root: ObjectKey) {
     assert_eq!(d.objects().len(), CLIENT.objects);
     assert!(d.objects().find(ObjectKey::Proposal(ProposalKey { proposer: Proposer::Task(8), number: 1 })).is_some());
 }
-fn card_tree(d: &Domain, id: Id<Object>, words: &crate::words::Words, sized: &Limits, bound: u32) {
+fn card_tree(d: &Fixture, id: Id<Object>, words: &crate::words::Words, sized: &Limits, bound: u32) {
     let mut b = Builder::new(sized);
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     b.open(Role::Page);
     assert!(cards::card(
         &mut b,
-        d,
+        &d.view(),
         id,
         &cards::Place::Inbox { lineage: list([full_chip(1), full_chip(2)]) },
         words,
@@ -265,7 +266,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     let root = ObjectKey::PersonTask(8);
     let (mut d, id, watch) = loaded_with_watch(root, ReadValue::PersonTask(Box::new(person_value)));
     dependencies_and_proposal(&mut d, watch, root);
-    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Answer } });
+    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Answer } });
     card_tree(&d, id, words, sized, crate::person_task_nodes(&CLIENT).unwrap());
     let root = ObjectKey::Result(8);
     let (mut d, id, watch) = loaded_with_watch(root, ReadValue::Result(Box::new(full_result())));
@@ -286,7 +287,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     let (mut d, id, watch) = loaded_with_watch(root, ReadValue::Escalation(Box::new(escalation_value)));
     dependencies_and_proposal(&mut d, watch, root);
     card_tree(&d, id, words, sized, crate::escalation_nodes(&CLIENT).unwrap());
-    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
+    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::AmendRelease } });
     full_dialog(&d, words, sized);
     let note = Note {
         number: 1,
@@ -336,14 +337,14 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     ]);
     let (mut d, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(task)));
     card_tree(&d, id, words, sized, crate::card_nodes(&CLIENT).unwrap());
-    drive(&mut d, Event::Act { act: Action::Intend { object: id.token(), act: ActKind::Close } });
+    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Close } });
     full_dialog(&d, words, sized);
 }
-fn full_dialog(d: &Domain, words: &crate::words::Words, sized: &Limits) {
+fn full_dialog(d: &Fixture, words: &crate::words::Words, sized: &Limits) {
     let mut b = Builder::new(sized);
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     b.open(Role::Page);
-    crate::confirmation::confirmation(&mut b, d, words, &mut bindings);
+    crate::confirmation::confirmation(&mut b, &d.view(), words, &mut bindings);
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= crate::confirmation_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
@@ -352,7 +353,7 @@ fn full_dialog(d: &Domain, words: &crate::words::Words, sized: &Limits) {
 }
 fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
     use crate::page::navigation::{Destination, Navigation};
-    let mut d = Domain::new(&CLIENT);
+    let mut d = Fixture::new(&CLIENT);
     let mut entries = List::with_capacity(CLIENT.navigation_entries);
     for task in 0..CLIENT.navigation_entries {
         entries.push(Destination::Jig(Address::task(u64::from(task)))).unwrap();
@@ -360,12 +361,16 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
     d.configure_navigation(Navigation { home: Destination::Jig(Address::Inbox { project: None }), entries }).unwrap();
     let out = drive(
         &mut d,
-        Event::Start { address: Address::Inbox { project: None }, kept: list([]), offset: Offset { minutes: 0 } },
+        Event::Start {
+            seed: 8,
+            place: crate::address::Place::Jig(Address::Inbox { project: None }),
+            records: list([]),
+        },
     );
     let watch = out
         .iter()
         .find_map(|r| match r {
-            Request::Open { watch, .. } => Some(*watch),
+            Request::Client { asked: jig_client::Event::Watch { handle: watch, .. } } => Some(*watch),
             _ => None,
         })
         .unwrap();
@@ -376,14 +381,14 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
     let mut second = f.projects.get(0).unwrap().clone();
     second.project = 5;
     f.projects.push(second).unwrap();
-    let out = drive(&mut d, Event::Watch { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(f))) });
+    let out = drive(&mut d, Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(f))) });
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     let mut b = Builder::new(sized);
     b.open(Role::Page);
-    crate::frame::banner(&mut b, &d, words, &mut bindings);
+    crate::frame::banner(&mut b, &d.view(), words, &mut bindings);
     crate::frame::navigation(
         &mut b,
-        &d,
+        &d.view(),
         SlotRef { owner: (Owner::Application { number: 1 }).opaque(), token: Token::new(1) },
         words,
         &mut bindings,
@@ -401,16 +406,22 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
     );
     assert_eq!(tree.nodes().iter().filter(|node| node.role == Role::Link).count(), 10);
     super::super::cards_access::check(&tree);
-    let inbox = out
-        .iter()
-        .find_map(|r| match r {
-            Request::Open { watch, subject: Subject::Inbox { .. } } => Some(*watch),
-            _ => None,
-        })
-        .unwrap();
+    let inbox =
+        out.iter()
+            .find_map(|r| match r {
+                Request::Client {
+                    asked:
+                        jig_client::Event::Watch {
+                            handle: watch,
+                            subject: jig_client::Watchable::Jig(Subject::Inbox { .. }),
+                        },
+                } => Some(*watch),
+                _ => None,
+            })
+            .unwrap();
     full_replies_notices(&mut d, inbox, words, sized);
 }
-fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Words, sized: &Limits) {
+fn full_replies_notices(d: &mut Fixture, inbox: jig_client::Handle, words: &crate::words::Words, sized: &Limits) {
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
     let reply = ConversationLine {
         cached_replies: 0,
@@ -447,7 +458,7 @@ fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Word
     };
     drive(
         d,
-        Event::Watch {
+        Watched {
             watch: inbox,
             event: WatchEvent::Delivered(Delivery::Inbox(Box::new(Inbox {
                 entries: list([entry]),
@@ -471,7 +482,7 @@ fn full_replies_notices(d: &mut Domain, inbox: Token, words: &crate::words::Word
     }
     let mut b = Builder::new(sized);
     b.open(Role::Page);
-    crate::notices::notices(&mut b, d, words, &mut bindings);
+    crate::notices::notices(&mut b, &d.view(), words, &mut bindings);
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= crate::notices_nodes(&CLIENT).unwrap().checked_add(1).unwrap());

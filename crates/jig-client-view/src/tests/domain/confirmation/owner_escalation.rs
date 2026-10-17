@@ -1,4 +1,5 @@
 use super::*;
+use crate::tests::fixtures::ReadPage;
 
 fn row(act: ActKind, reason: HoldCategory) -> OwnerEscalation {
     let mut task = task();
@@ -58,16 +59,16 @@ fn owner_escalation_original_reads_keep_whole_task_and_independent_offers_and_re
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(original.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(original.clone()))) },
     );
-    let id = domain.objects.find(key).unwrap();
-    let object = domain.objects.get(id).unwrap();
+    let id = domain.objects().find(key).unwrap();
+    let object = domain.objects().get(id).unwrap();
     assert_eq!(object.project, Some(1));
     assert_eq!(object.body, Some(Body::OwnerEscalation(Box::new(original.clone()))));
-    assert_eq!(acts::offered(object, ActKind::Release), Admission::Allowed);
-    assert_eq!(acts::offered(object, ActKind::Stop), Admission::Refused(Refusal::NotOffered));
-    assert_eq!(acts::revision(object, ActKind::Release), Some(Revision { value: u64::MAX }));
-    assert_eq!(acts::revision(object, ActKind::AmendRelease), Some(Revision { value: 9 }));
+    assert_eq!(acts::offered(&object, ActKind::Release), Admission::Allowed);
+    assert_eq!(acts::offered(&object, ActKind::Stop), Admission::Refused(Refusal::NotOffered));
+    assert_eq!(acts::revision(&object, ActKind::Release), Some(Revision { value: u64::MAX }));
+    assert_eq!(acts::revision(&object, ActKind::AmendRelease), Some(Revision { value: 9 }));
     assert_eq!(object.body.as_ref().unwrap().terminal(), None);
     assert_eq!(original.task.context, None);
     assert_eq!(original.task.person_revision, Some(Revision { value: 23 }));
@@ -84,7 +85,7 @@ fn owner_escalation_wrong_task_or_project_never_consumes_the_original_read_and_o
     let (mut domain, page) = live();
     let key = ObjectKey::Escalation(8);
     let output = super::super::objects::watched(&mut domain, page, &[key]);
-    let read = super::super::objects::read_token(&output);
+    let mut read = super::super::objects::read_token(&output);
     let original = row(ActKind::Release, HoldCategory::Budget);
     for wrong_scope in [false, true] {
         let mut wrong = original.clone();
@@ -96,32 +97,34 @@ fn owner_escalation_wrong_task_or_project_never_consumes_the_original_read_and_o
         drive(
             &mut domain,
             Time::ZERO,
-            Event::Read { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(wrong))) },
+            ReadPage { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(wrong))) },
         );
-        assert!(domain.objects.get(domain.objects.find(key).unwrap()).unwrap().body.is_none());
+        assert!(domain.objects().get(domain.objects().find(key).unwrap()).unwrap().body.is_none());
+        assert!(domain.handles.reads.get(&read).is_none());
+        read = domain.read_again(read);
     }
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(original.clone()))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(original.clone()))) },
     );
-    let id = domain.objects.find(key).unwrap();
-    assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original.clone()))));
+    let id = domain.objects().find(key).unwrap();
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original.clone()))));
     let mut wrong = original.clone();
     wrong.task.activity = u64::MAX;
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(wrong))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(wrong))) }.late(),
     );
-    assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original.clone()))));
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original.clone()))));
     drive(&mut domain, Time::ZERO, Event::Went { place: crate::address::Place::Elsewhere });
     drive(
         &mut domain,
         Time::ZERO,
-        Event::Read { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(original))) },
+        ReadPage { read, result: ReadResult::Value(ReadValue::OwnerEscalation(Box::new(original))) }.late(),
     );
-    assert!(domain.objects.find(key).is_none());
+    assert!(domain.objects().find(key).is_none());
 }
 
 #[test]
@@ -133,13 +136,13 @@ fn owner_escalation_decisions_name_supplied_hold_and_outer_offers_without_guessi
         intend(&mut domain, id, act);
         if act == ActKind::Release {
             assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Again));
-            assert!(drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm }).is_empty());
-            drive(&mut domain, Time::ZERO, Event::Act { act: Act::Again { again: false } });
+            assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
+            drive(&mut domain, Time::ZERO, Event::Act { action: Act::Again { again: false } });
         }
         if act == ActKind::LeaveHeld {
             edit(&mut domain, Purpose::Reason, b"keep this held");
         }
-        let output = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+        let output = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
         let expected = match act {
             ActKind::Release => {
                 Ask::Release { project: 1, task: 8, revision: Revision { value: u64::MAX }, again: Some(false) }
@@ -180,13 +183,13 @@ fn owner_escalation_decisions_name_supplied_hold_and_outer_offers_without_guessi
             | ActKind::SetPool => unreachable!(),
         };
         assert_eq!(sent(&output), &expected);
-        assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original))));
+        assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original))));
     }
     let (mut domain, _) = live();
     let id = install(&mut domain, Body::OwnerEscalation(Box::new(row(ActKind::Release, HoldCategory::Budget))));
     intend(&mut domain, id, ActKind::PassUp);
     assert!(domain.confirmation().is_none());
-    assert_eq!(domain.objects.get(id).unwrap().card, Card::Refused { refusal: Refusal::NotOffered });
+    assert_eq!(domain.objects().get(id).unwrap().card, Card::Refused { refusal: Refusal::NotOffered });
 }
 
 #[test]
@@ -208,10 +211,10 @@ fn owner_escalation_atomic_amend_release_preserves_supplied_reason_and_independe
     );
     let id = install(&mut domain, Body::OwnerEscalation(Box::new(original.clone())));
     intend(&mut domain, id, ActKind::AmendRelease);
-    drive(&mut domain, Time::ZERO, Event::Act { act: Act::Change { change: Box::new(change()) } });
+    drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Words { field: Purpose::Reason }));
     edit(&mut domain, Purpose::Reason, b"");
-    let output = drive(&mut domain, Time::ZERO, Event::Act { act: Act::Confirm });
+    let output = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert_eq!(
         sent(&output),
         &Ask::Amend {
@@ -223,5 +226,5 @@ fn owner_escalation_atomic_amend_release_preserves_supplied_reason_and_independe
             release: Some(Revision { value: u64::MAX })
         }
     );
-    assert_eq!(domain.objects.get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original))));
+    assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original))));
 }

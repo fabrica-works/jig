@@ -5,7 +5,7 @@ use crate::{JigBindings, cards};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
-use crate::{Domain, action::Act, page::task::PlanFilter};
+use crate::{Borrowed, action::Act, page::task::PlanFilter};
 use jig_client::contract::{ObjectKey, TreeNode};
 use skein_lib::{Set, Stack};
 #[derive(Clone, Copy, Debug)]
@@ -13,8 +13,9 @@ enum Visit {
     Enter(u32),
     Leave,
 }
-pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
-    let plan = &client.task_page().plan;
+pub(super) fn plan(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
+    let task = client.task_page();
+    let plan = &task.plan;
     for (filter, phrase) in [
         (PlanFilter::All, JigPhrase::AllPlan),
         (PlanFilter::Held, JigPhrase::HeldPlan),
@@ -24,13 +25,13 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
     }
     if let Some(owner) = &plan.owner {
         crate::owner_tree::render(b, owner, plan, client, words, bindings);
-        crate::pages::cut(b, words, client.task_page().ended_cut);
+        crate::pages::cut(b, words, task.ended_cut);
         crate::pages::work::cursors(
             b,
             words,
             bindings,
-            client.task_page().ended_before.as_ref(),
-            client.task_page().ended_after.as_ref(),
+            task.ended_before.as_ref(),
+            task.ended_after.as_ref(),
             crate::page::task::ENDED_WINDOW,
         );
         owner_ended(b, client, words, bindings);
@@ -87,18 +88,26 @@ pub(super) fn plan(b: &mut Builder, client: &Domain, words: &Words, bindings: &m
     b.close();
     crate::pages::work::counts(b, plan.folded, words);
     words.text(b, JigPhrase::HeldBelow, &[Hole::Number(u64::from(plan.held_below))]);
-    crate::pages::cut(b, words, client.task_page().ended_cut);
+    crate::pages::cut(b, words, task.ended_cut);
     crate::pages::work::cursors(
         b,
         words,
         bindings,
-        client.task_page().ended_before.as_ref(),
-        client.task_page().ended_after.as_ref(),
+        task.ended_before.as_ref(),
+        task.ended_after.as_ref(),
         crate::page::task::ENDED_WINDOW,
     );
     owner_ended(b, client, words, bindings);
 }
-fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words: &Words, bindings: &mut JigBindings) {
+fn item(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    node: &TreeNode,
+    expanded: bool,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    let objects = client.objects();
     b.open(Role::TreeItem);
     b.key(crate::pages::object_key(ObjectKey::Task(node.chip.task)));
     b.name(
@@ -111,7 +120,7 @@ fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words
     words.amount(b, node.spend);
     crate::pages::work::counts(b, node.folded, words);
     words.text(b, JigPhrase::HeldBelow, &[Hole::Number(u64::from(node.held_below))]);
-    if let Some(id) = client.objects().find(ObjectKey::Task(node.chip.task)) {
+    if let Some(id) = objects.find(ObjectKey::Task(node.chip.task)) {
         crate::pages::work::control(
             b,
             words,
@@ -137,7 +146,7 @@ fn item(b: &mut Builder, client: &Domain, node: &TreeNode, expanded: bool, words
     }
     if expanded {
         for proposal in &node.proposals {
-            if let Some(id) = client.objects().find(ObjectKey::Proposal(*proposal)) {
+            if let Some(id) = objects.find(ObjectKey::Proposal(*proposal)) {
                 cards::card(b, client, id, &cards::Place::TaskPage, words, bindings);
             }
         }
@@ -162,7 +171,7 @@ pub(super) fn scratch(rows: u32) -> Option<u64> {
         .checked_add(crate::owner_tree::scratch(rows)?)
 }
 
-fn owner_ended(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+fn owner_ended(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     if let Some(page) = &client.task_page().owner_ended {
         crate::historical_pages::ended_render(b, client, page, words, bindings);
     }

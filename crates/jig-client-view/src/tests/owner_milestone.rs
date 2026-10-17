@@ -1,10 +1,10 @@
+use crate::tests::fixtures::Fixture;
 use crate::words::Words;
 use crate::{JigBindings, owner_milestone as view};
 use skein_ui::Limits;
 use skein_ui::phrases::{Hole, Invalid, PhraseLimits, Phrasebook, Segment, SpanUnit, WallFormat};
 use skein_ui::{Builder, Tree};
 
-use crate::Domain;
 use jig_client::contract::*;
 use skein_lib::{
     List, Wall,
@@ -83,8 +83,8 @@ fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view:
     };
     let mut b = Builder::new(&capacity);
     let mut bindings = JigBindings::new(f.bindings, 256);
-    let client = Domain::new(&limits());
-    view::render(&mut b, value, &client, words, &mut bindings);
+    let client = Fixture::new(&limits());
+    view::render(&mut b, value, &client.view(), words, &mut bindings);
     let tree = b.finish();
     let region = tree.nodes().first().expect("standalone milestone region");
     assert_eq!(region.role, skein_ui::Role::Region);

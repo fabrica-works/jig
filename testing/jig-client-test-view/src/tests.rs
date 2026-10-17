@@ -58,7 +58,10 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_client_view::Event::Hello { served: true }));
+    drive(
+        &mut root,
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } } },
+    );
     for family in [1, 2] {
         drive(
             &mut root,
@@ -71,27 +74,31 @@ fn ready() -> Domain {
     }
     drive(
         &mut root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
-                party: FrameParty {
-                    number: 7,
-                    kind: PartyKind::Person,
-                    login: DocumentText::complete(text(b"fixture-login")),
-                    name: DocumentText::complete(text(b"Pat")),
-                },
-                projects: List::with_capacity(0),
-                needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
-                needs_total: 0,
-                results_seen: 0,
-                charters: List::with_capacity(0),
-                cut: false,
-                updates: Count { value: 0, limited: false },
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: WatchEvent::Delivered(Delivery::Frame(Box::new(Frame {
+                        party: FrameParty {
+                            number: 7,
+                            kind: PartyKind::Person,
+                            login: DocumentText::complete(text(b"fixture-login")),
+                            name: DocumentText::complete(text(b"Pat")),
+                        },
+                        projects: List::with_capacity(0),
+                        needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
+                        needs_total: 0,
+                        results_seen: 0,
+                        charters: List::with_capacity(0),
+                        cut: false,
+                        updates: Count { value: 0, limited: false },
 
-                retention: Duration::from_secs(1000),
-                deployment_role: Some(HeldRole::Policy { role: 1 }),
-            }))),
-        }),
+                        retention: Duration::from_secs(1000),
+                        deployment_role: Some(HeldRole::Policy { role: 1 }),
+                    }))),
+                },
+            },
+        },
     );
     root
 }
@@ -297,8 +304,17 @@ fn load_cards(root: &mut Domain, rows: Vec<Request>) {
                 Read::Proposal { proposal: key } => ReadValue::Proposal(Box::new(proposal(key))),
                 _ => continue,
             };
-            let parts =
-                drive(root, Event::Jig(jig_client_view::Event::Read { read, result: ReadResult::Value(value) }));
+            let parts = drive(
+                root,
+                Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::ReadDone {
+                            read,
+                            result: jig_client::Readout::Jig(ReadResult::Value(value)),
+                        },
+                    },
+                },
+            );
             for row in parts {
                 if let Request::First(first::Out::Read { read, subject }) = row {
                     let parameters = match subject.kind {
@@ -545,20 +561,27 @@ fn check_outbox_family_keys_keep_scope_entry_and_effect_proposal_distinct() {
     for scope in [PartScope::Project(3), PartScope::Project(4), PartScope::Deployment] {
         parts.push(Part::Outbox { connector: jig_client_test_domain::FIRST, scope, entry }).unwrap();
     }
-    drive(&mut root, Event::Jig(jig_client_view::Event::Hello { served: true }));
     drive(
         &mut root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
-                hosts: list([]),
-                accounts: list([]),
-                capacity: list([]),
-                proposals: 0,
-                refusals: list([]),
-                parts,
-            }))),
-        }),
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } } },
+    );
+    drive(
+        &mut root,
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                        hosts: list([]),
+                        accounts: list([]),
+                        capacity: list([]),
+                        proposals: 0,
+                        refusals: list([]),
+                        parts,
+                    }))),
+                },
+            },
+        },
     );
     let mut view = view();
     patches(&mut view, &root);
@@ -605,17 +628,21 @@ fn effect_family_keys_keep_equal_task_and_party_makers_in_distinct_public_items(
     let parts = list(keys.map(|proposal| Part::Effect { connector: jig_client_test_domain::FIRST, proposal }));
     let reads = drive(
         &mut root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
-                hosts: list([]),
-                accounts: list([]),
-                capacity: list([]),
-                proposals: 0,
-                refusals: list([]),
-                parts,
-            }))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                        hosts: list([]),
+                        accounts: list([]),
+                        capacity: list([]),
+                        proposals: 0,
+                        refusals: list([]),
+                        parts,
+                    }))),
+                },
+            },
+        },
     );
     let subjects: Vec<_> = reads
         .iter()
@@ -772,10 +799,8 @@ fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_f
 fn unsupported_individual_deployment_parts_say_cannot_show_without_a_project_or_unknown_value() {
     let mut root = ready();
     let part = Part::Outbox { connector: jig_client_test_domain::FIRST, scope: PartScope::Deployment, entry: u64::MAX };
-    let opened = drive(
-        &mut root,
-        Event::First(first::Event::Show { part: part.clone(), generation: 1, scope: family::Scope::Deployment }),
-    );
+    let opened =
+        drive(&mut root, Event::First(first::Event::Show { part: part.clone(), scope: family::Scope::Deployment }));
     let read = family_read(&opened);
     let watch = opened
         .iter()
@@ -794,7 +819,7 @@ fn unsupported_individual_deployment_parts_say_cannot_show_without_a_project_or_
     let mut builder = skein_ui::Builder::new(&bounds.tree);
     let mut bindings = crate::bindings::Bindings::new(bounds.tree.bindings, limits().first.text);
     builder.open(Role::Page);
-    crate::family::part(&mut builder, root.first(), &part, 1, &family_words, jig, &mut bindings);
+    crate::family::part(&mut builder, root.first(), &part, &family_words, jig, &mut bindings);
     builder.close();
     let tree = builder.finish();
     assert!(
@@ -854,10 +879,11 @@ fn family_with_plan(second: Option<u64>) -> Domain {
     document.context.as_mut().unwrap().impact.tasks.waiting = 1;
     drive(
         &mut root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+            },
+        },
     );
     root
 }

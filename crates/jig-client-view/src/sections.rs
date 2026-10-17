@@ -2,14 +2,20 @@
 use crate::{JigBindings, words::Words};
 use skein_ui::Builder;
 
-use crate::{Domain, page::Section};
+use crate::{Borrowed, page::Section};
 mod conversations;
 mod deployment;
 pub mod inbox;
 pub mod project;
 pub mod task;
 /// Build one section, or nothing and false when the domain does not show it.
-pub fn section(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings, section: Section) -> bool {
+pub fn section(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    words: &Words,
+    bindings: &mut JigBindings,
+    section: Section,
+) -> bool {
     if !client.shows(section) {
         return false;
     }
@@ -22,7 +28,7 @@ pub fn section(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
     }
 }
 
-fn status(b: &mut Builder, client: &Domain, words: &Words, section: Section) {
+fn status(b: &mut Builder, client: &Borrowed<'_>, words: &Words, section: Section) {
     use crate::phrases::jig::JigPhrase;
     let text_limit = client.text_limit;
     if let Some(status) = client.section_status(section) {

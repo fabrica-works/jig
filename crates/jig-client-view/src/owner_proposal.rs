@@ -6,7 +6,7 @@ use crate::words::Words;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
-use crate::{Domain, Limits};
+use crate::{Borrowed, Limits};
 use jig_client::contract::{
     ChipPhase, DocumentText, OwnerChipHold, OwnerHoldEscalation, OwnerProposal, OwnerProposalAction, OwnerTaskLink,
 };
@@ -148,7 +148,7 @@ fn saying(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
 /// Render the five exact supplied action kinds without historical joins or routing guesses.
 pub fn action(
     b: &mut Builder,
-    client: &Domain,
+    client: &Borrowed<'_>,
     value: &OwnerProposalAction,
     words: &Words,
     bindings: &mut JigBindings,
@@ -214,7 +214,13 @@ pub fn action(
     }
 }
 /// Whole pending envelope: original maker/key, independent waiting and funding facts.
-pub fn render(b: &mut Builder, client: &Domain, value: &OwnerProposal, words: &Words, bindings: &mut JigBindings) {
+pub fn render(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    value: &OwnerProposal,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
     b.open(Role::Region);
     let name = words.book.say(words.language, P::Proposal.id(), &[]).expect("checked proposal region name");
     b.name(&name.text);

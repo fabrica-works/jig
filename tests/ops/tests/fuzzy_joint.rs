@@ -6,9 +6,9 @@ use jig_client_world::{
 };
 use jig_conformance::Cut;
 use jig_ops_client_domain::{Address, observability as obs};
-use jig_ops_domain as root;
 use jig_ops_world::joint::engine::Milestone;
 use jig_ops_world::joint::fixture;
+use jig_ops_world::joint::fixture::{incident_lead, press, remediation, see};
 use sha2::{Digest, Sha256};
 use skein_fake_person::{Find, Step};
 use skein_lib::Duration;
@@ -17,12 +17,7 @@ use skein_world::domain::{Verdict, heap::Counting};
 #[global_allocator]
 static HEAP: Counting = Counting;
 const WITHIN: Duration = Duration::from_secs(3);
-fn see(words: &[u8]) -> Step<Address> {
-    Step::See { find: Find::text(words), within: WITHIN }
-}
-fn press(role: Role, words: &[u8]) -> Step<Address> {
-    Step::Press { find: Find::named(role, words) }
-}
+
 #[test]
 fn p_accepts_the_restart_from_the_incidents_page() {
     p_story(511, Cut::None, false);
@@ -31,30 +26,6 @@ fn p_accepts_the_restart_from_the_incidents_page() {
 type OpsEngine = jig_conformance::Harness<jig_ops_world::joint::engine::OpsApplication>;
 
 type StoryWorld = jig_client_world::World<fixture::Client, jig_ops_world::joint::front::Joint>;
-
-fn incident_lead(engine: &OpsEngine) -> u64 {
-    let mut rows = engine.store.rows.values();
-    rows.find_map(|row| match row {
-        jig_ops_domain::Record::Observability(jig_ops_domain_observability::Record::Incident(incident))
-            if incident.project == 1 && incident.number == 12 =>
-        {
-            incident.lead
-        }
-        root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => None,
-    })
-    .expect("incident 12 has its retained lead")
-}
-
-fn remediation(engine: &OpsEngine, lead: u64) -> u64 {
-    let mut rows = engine.store.rows.values();
-    rows.find_map(|row| match row {
-        jig_ops_domain::Record::Core(jig_domain_core::Record::Tasks(
-            jig_domain_tasks::Stored::Live(task) | jig_domain_tasks::Stored::Ended(task),
-        )) if task.requester == jig_domain_tasks::Party::Task(lead) => Some(task.number),
-        root::Record::Core(_) | root::Record::Observability(_) | root::Record::Infrastructure(_) => None,
-    })
-    .expect("the lead has its remediation delegate")
-}
 
 fn p_story(seed: u64, cut: Cut, noise: bool) -> StoryWorld {
     let (mut world, p) = monitor(seed);
