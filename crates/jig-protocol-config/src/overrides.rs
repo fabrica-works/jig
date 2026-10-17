@@ -389,7 +389,7 @@ fn set_hub(limits: &mut jig_domain_host::Limits, name: &[u8], value: u64) -> Res
 }
 
 fn set_documents(limits: &mut jig_domain_core::documents::DocumentLimits, name: &[u8], value: u64) -> Result<(), What> {
-    let jig_domain_core::documents::DocumentLimits { rows, text_bytes, chips, lines, versions } = limits;
+    let jig_domain_core::documents::DocumentLimits { rows, text_bytes, chips, lines, versions, segments: _ } = limits;
     let jig_domain_core::documents::Versions { minimum, maximum } = versions;
     match name {
         b"rows" => *rows = count(value)?,
@@ -518,6 +518,7 @@ pub fn parse(document: &Document, at: u32, path: &Path) -> Result<Limits, Proble
             problems.push(path, what);
         }
     }
+    limits.core.documents.segments = profile::name_segments(&limits.core.tasks, &limits.core.authority);
     object.finish(document, path, &mut problems);
     if problems.is_empty() { Ok(limits) } else { Err(problems) }
 }

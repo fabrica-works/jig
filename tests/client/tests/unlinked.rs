@@ -24,6 +24,7 @@ fn limits() -> jig_client::Limits {
             requests: world.table,
             ask_bytes: 16384,
             rows: l.rows,
+            segments: l.segments,
             text: l.text,
             projects: l.projects,
             charters: l.charters,

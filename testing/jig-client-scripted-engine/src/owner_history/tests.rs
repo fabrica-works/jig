@@ -169,7 +169,7 @@ fn line() -> OwnerHistoryLine {
     }
 }
 fn bounds() -> Bounds {
-    Bounds { text: 8, rows: 3, document_bytes: u64::MAX, ..Bounds::default() }
+    Bounds { text: 8, rows: 3, segments: 3, document_bytes: u64::MAX, ..Bounds::default() }
 }
 #[test]
 fn owner_history_whole_bytes_charge_boxes_reserved_lists_and_nested_opaque_allocations_at_plus_minus_one() {
@@ -219,7 +219,7 @@ fn owner_history_reserved_empty_batch_and_optional_delta_fields_keep_actual_pres
         bytes(&b, &bounds()).unwrap() - bytes(&a, &bounds()).unwrap(),
         List::<ProposedTask>::worst_case(3).unwrap()
     );
-    assert!(!fits(&b, &Bounds { rows: 2, ..bounds() }));
+    assert!(!fits(&b, &Bounds { rows: 2, segments: 2, ..bounds() }));
     assert_eq!(b.proposal.as_ref().unwrap().action, OwnerRetainedAction::Batch(List::with_capacity(3)));
 }
 #[test]
@@ -230,7 +230,7 @@ fn owner_history_whole_batch_and_every_nested_text_or_row_boundary_refuses_uncha
         ..line()
     };
     assert!(fits(&source, &bounds()));
-    for bound in [Bounds { text: 7, ..bounds() }, Bounds { rows: 2, ..bounds() }] {
+    for bound in [Bounds { text: 7, ..bounds() }, Bounds { rows: 2, segments: 2, ..bounds() }] {
         let original = source.clone();
         assert!(!fits(&source, &bound));
         assert_eq!(source, original);

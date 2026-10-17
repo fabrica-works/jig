@@ -129,6 +129,7 @@ pub fn read(query: &client::Read, source: &reads::Historical, limits: &Limits) -
         &admission::Bounds {
             text: limits.text,
             rows: limits.rows,
+            segments: limits.segments,
             document_bytes: limits.document_bytes,
             ..admission::Bounds::default()
         },

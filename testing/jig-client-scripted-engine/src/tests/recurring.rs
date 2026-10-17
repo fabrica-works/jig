@@ -69,7 +69,7 @@ fn recurring_prices_the_whole_template_batch_and_final_members_owned_bytes() {
         + 3
         + 5
         + 6;
-    let mut bounds = Bounds { rows: 2, document_bytes: bytes, ..Bounds::default() };
+    let mut bounds = Bounds { rows: 2, segments: 2, document_bytes: bytes, ..Bounds::default() };
     assert!(fits(&row, &bounds));
     bounds.document_bytes = bytes - 1;
     assert!(!fits(&row, &bounds));
@@ -81,7 +81,7 @@ fn recurring_prices_the_whole_template_batch_and_final_members_owned_bytes() {
 
 #[test]
 fn recurring_checks_allocated_batch_last_batch_and_nested_member_capacities() {
-    let bounds = Bounds { rows: 2, document_bytes: u64::MAX, ..Bounds::default() };
+    let bounds = Bounds { rows: 2, segments: 2, document_bytes: u64::MAX, ..Bounds::default() };
     assert!(fits(&recurring(), &bounds));
     let mut row = recurring();
     row.batch = skein_lib::List::with_capacity(3);
@@ -157,7 +157,7 @@ fn recurring_checks_allocated_batch_last_batch_and_nested_member_capacities() {
 
 #[test]
 fn exact_parts_and_contracts_price_every_segment_choice_and_opaque_state_byte() {
-    let mut bounds = Bounds { rows: 2, document_bytes: u64::MAX, ..Bounds::default() };
+    let mut bounds = Bounds { rows: 2, segments: 2, document_bytes: u64::MAX, ..Bounds::default() };
     let reference = OwnerPart {
         connector: u16::MAX,
         kind: OwnerPartKind::Outbox,

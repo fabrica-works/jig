@@ -64,7 +64,7 @@ fn result_metadata_prices_allocated_lists_nested_chips_and_verdict_field_bytes()
     let delegates = List::<OwnerTaskLink>::worst_case(4).unwrap().checked_add(chip).unwrap();
     let heap =
         contract.checked_add(delegates).unwrap().checked_add(List::<OwnerTaskLink>::worst_case(2).unwrap()).unwrap();
-    let mut bounds = Bounds { text: 3, rows: 4, ..Bounds::default() };
+    let mut bounds = Bounds { text: 3, rows: 4, segments: 4, ..Bounds::default() };
     at_bound(&value, &mut bounds, heap);
     let followup_allocation = List::<OwnerTaskLink>::worst_case(2).unwrap();
     value.followups = Some(List::with_capacity(2));
@@ -88,7 +88,7 @@ fn result_metadata_prices_opaque_approval_paths_and_every_task_link_form() {
         state: copy_of(&[128, 0, 255]),
         part: OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Outbox, key: OwnerPartKey::Path(path) },
     });
-    let mut bounds = Bounds { text: 3, rows: 4, ..Bounds::default() };
+    let mut bounds = Bounds { text: 3, rows: 4, segments: 4, ..Bounds::default() };
     let base = 8_u64
         .checked_add(List::<Box<[u8]>>::worst_case(3).unwrap())
         .unwrap()

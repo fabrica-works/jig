@@ -188,3 +188,20 @@ fn documents_keep_every_supplied_field() {
         ("a_current_call_keeps_every_supplied_field", a_current_call_keeps_every_supplied_field),
     ]);
 }
+
+#[test]
+fn a_resource_path_at_its_segment_bound_is_decoded_past_the_row_bound() {
+    let mut expected = fixtures::task();
+    let c::TaskContractDocument::Approval { part, .. } = &mut expected.result_contract else { panic!("approval") };
+    let mut path = skein_lib::List::with_capacity(4);
+    for _ in 0_u32..4 {
+        path.push(Box::from(b"segment".as_slice())).unwrap();
+    }
+    part.key = c::OwnerPartKey::Path(path);
+    assert_eq!(documents::task(fixtures::task_with_resource_path(4), &fixtures::limits()), Ok(expected));
+}
+
+#[test]
+fn a_resource_path_one_segment_past_its_bound_is_refused() {
+    assert_eq!(documents::task(fixtures::task_with_resource_path(5), &fixtures::limits()), Err(Undecodable::TooLarge));
+}

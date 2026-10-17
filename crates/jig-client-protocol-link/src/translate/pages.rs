@@ -81,7 +81,7 @@ fn receiving_part0(checked: &mut Limits, limits: &Limits) {
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.owner_inbox_page_rows =
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
-    checked.wire.owner_part_key_path_value = limits.client.rows;
+    checked.wire.owner_part_key_path_value = limits.client.segments;
     checked.wire.owner_part_key_path_value_item = limits.client.text;
     checked.wire.owner_person_proposal_goal_dependencies = limits.client.rows;
     checked.wire.owner_person_proposal_goal_holdings =
@@ -105,7 +105,7 @@ fn receiving_part1(checked: &mut Limits, limits: &Limits) {
     checked.wire.owner_word_result_approved_state = limits.client.text;
     checked.wire.owner_word_result_verdict_fields = limits.client.rows;
     checked.wire.parameter_bytes_value = limits.client.text;
-    checked.wire.part_resource_path = limits.client.rows;
+    checked.wire.part_resource_path = limits.client.segments;
     checked.wire.part_resource_path_item = limits.client.text;
     checked.wire.party_name = limits.client.text;
     checked.wire.person_contract_approval_state = limits.client.text;

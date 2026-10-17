@@ -53,6 +53,7 @@ pub fn acts(
     words: &Words,
     bindings: &mut JigBindings,
 ) {
+    let text_limit = bindings.text_limit();
     match card {
         Card::Open | Card::Refused { .. } => {}
         Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => return,
@@ -70,7 +71,7 @@ pub fn acts(
             ),
             Admission::Refused(why) => {
                 words.text(b, act_phrase(offered.act), &[]);
-                words.refusal(b, why);
+                words.refusal(b, why, text_limit);
             }
         }
     }
@@ -155,6 +156,7 @@ pub fn taken_by(b: &mut Builder, by: &TakenBy, words: &Words) {
 }
 /// Show the whole authority facts, with grants' connector descriptions in slots.
 pub fn authority(b: &mut Builder, facts: &Authority, words: &Words, bindings: &mut JigBindings) {
+    let text_limit = bindings.text_limit();
     words.text(b, JigPhrase::Budget, &[Hole::Amount(facts.budget)]);
     words.text(b, JigPhrase::Depth, &[Hole::Number(u64::from(facts.depth))]);
     words.text(b, JigPhrase::TasksAllowed, &[Hole::Number(u64::from(facts.tasks))]);
@@ -170,7 +172,7 @@ pub fn authority(b: &mut Builder, facts: &Authority, words: &Words, bindings: &m
             JigPhrase::LiteralGrant,
             &[Hole::Number(u64::from(grant.kind)), Hole::Number(u64::from(grant.connector))],
         );
-        crate::owner_authority::pattern(b, words, &grant.pattern);
+        crate::owner_authority::pattern(b, words, &grant.pattern, text_limit);
         part(b, &Part::Kind { connector: grant.connector, kind: grant.kind }, words, bindings);
     }
     for tool in &facts.tools {
@@ -185,7 +187,7 @@ pub fn authority(b: &mut Builder, facts: &Authority, words: &Words, bindings: &m
             jig_client::contract::NoteScope::Resource { project, connector, pattern } => {
                 words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(*project))]);
                 words.text(b, JigPhrase::PartConnector, &[Hole::Number(u64::from(*connector))]);
-                crate::owner_authority::pattern(b, words, pattern);
+                crate::owner_authority::pattern(b, words, pattern, text_limit);
             }
             jig_client::contract::NoteScope::Goal { project, goal } => {
                 words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(*project))]);
@@ -205,14 +207,14 @@ pub fn funding(b: &mut Builder, facts: &Budget, amount: u64, words: &Words) {
     words.actor(b, facts.funder);
 }
 /// Each prior holder and its committed reason and missing authority.
-pub fn trail(b: &mut Builder, rows: &List<Passed>, words: &Words) {
+pub fn trail(b: &mut Builder, rows: &List<Passed>, words: &Words, text_limit: u32) {
     for passed in rows {
         words.text(b, JigPhrase::PassedBy, &[]);
         words.actor(b, passed.by);
         words.wall(b, passed.at);
         b.text(Run::Plain, passed.reason.bytes());
         if let Some(lacking) = &passed.lacking {
-            words.lacking(b, lacking);
+            words.lacking(b, lacking, text_limit);
         }
     }
 }
@@ -244,11 +246,11 @@ pub fn answering(client: &Domain, object: Id<Object>) -> bool {
     }
 }
 /// Display any kept durable answer even on a card whose object remains open.
-pub fn answer(b: &mut Builder, object: &Object, words: &Words) {
+pub fn answer(b: &mut Builder, object: &Object, words: &Words, text_limit: u32) {
     if let Some(answer) = &object.answer {
         match answer {
             jig_client::contract::Answer::Done(outcome) => words.outcome(b, outcome),
-            jig_client::contract::Answer::Refused(why) => words.refusal(b, why),
+            jig_client::contract::Answer::Refused(why) => words.refusal(b, why, text_limit),
         }
     }
 }

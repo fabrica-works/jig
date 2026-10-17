@@ -149,6 +149,7 @@ pub(crate) mod tests {
         let bounds = jig_client_scripted_engine::Bounds {
             text: limits.text,
             rows: limits.rows,
+            segments: limits.segments,
             document_bytes: limits.document_bytes,
             ..jig_client_scripted_engine::Bounds::default()
         };

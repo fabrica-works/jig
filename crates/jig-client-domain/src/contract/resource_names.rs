@@ -6,8 +6,8 @@ use super::{OwnerPattern, OwnerPatternEnd};
 
 /// Each allocated segment and its opaque bytes fit the decoding owner's bounds.
 #[must_use]
-pub fn resource_path_fits(path: &List<Box<[u8]>>, rows: u32, text: u32) -> bool {
-    if path.capacity() > rows {
+pub fn resource_path_fits(path: &List<Box<[u8]>>, segments: u32, text: u32) -> bool {
+    if path.capacity() > segments {
         return false;
     }
     for segment in path {

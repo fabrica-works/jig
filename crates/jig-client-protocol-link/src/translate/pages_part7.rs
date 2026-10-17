@@ -104,7 +104,7 @@ pub(crate) fn owner_goal_holding_fields(
 ) -> Result<c::OwnerGoalHolding, w::Problem> {
     Ok(match value {
         w::OwnerGoalHolding::Write(row) => {
-            if row.path().len() > limits.client.rows {
+            if row.path().len() > limits.client.segments {
                 return Err(too_large());
             }
             let mut list0 = List::with_capacity(row.path().len());
@@ -114,7 +114,7 @@ pub(crate) fn owner_goal_holding_fields(
             c::OwnerGoalHolding::Write { connector: row.connector(), path: list0, kind: row.kind() }
         }
         w::OwnerGoalHolding::Slot(row) => {
-            if row.path().len() > limits.client.rows {
+            if row.path().len() > limits.client.segments {
                 return Err(too_large());
             }
             let mut list0 = List::with_capacity(row.path().len());

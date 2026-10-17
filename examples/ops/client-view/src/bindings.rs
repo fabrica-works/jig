@@ -30,6 +30,9 @@ impl Bindings {
     pub fn new(capacity: u32, text: u32, connector: u16) -> Self {
         Self { entries: List::with_capacity(capacity), next: 0, connector, text }
     }
+    pub(crate) const fn text_limit(&self) -> u32 {
+        self.text
+    }
     pub fn begin(&mut self) {
         self.entries.clear();
     }

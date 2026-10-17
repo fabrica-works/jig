@@ -117,6 +117,7 @@ fn object(
     jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
 ) {
+    let text_limit = bindings.text_limit();
     let Some(object) = side.object(id) else {
         words.status(b, Word::Unknown, &[]);
         return;
@@ -208,7 +209,7 @@ fn object(
             }
         },
     }
-    card(b, &object.card, words, jig);
+    card(b, &object.card, words, jig, text_limit);
     b.close();
     b.close();
 }
@@ -291,7 +292,7 @@ fn button(b: &mut Builder, word: Word, action: first::Act, card: &Card, words: &
     }
     b.close();
 }
-fn card(b: &mut Builder, card: &Card, words: &Words, jig: &jig_client_view::words::Words) {
+fn card(b: &mut Builder, card: &Card, words: &Words, jig: &jig_client_view::words::Words, text_limit: u32) {
     match card {
         Card::Open => {}
         Card::Unknown => words.status(b, Word::Unknown, &[]),
@@ -308,7 +309,7 @@ fn card(b: &mut Builder, card: &Card, words: &Words, jig: &jig_client_view::word
             first::Answer::Touched { revision, .. } => words.status(b, Word::Touched, &[Hole::Number(revision.value)]),
             first::Answer::Moved { revision, .. } => words.status(b, Word::Moved, &[Hole::Number(revision.value)]),
             first::Answer::Gone => words.status(b, Word::Gone, &[]),
-            first::Answer::Refused(refusal) => jig.refusal(b, refusal.refusal()),
+            first::Answer::Refused(refusal) => jig.refusal(b, refusal.refusal(), text_limit),
             first::Answer::Connector(value) => {
                 let saying = jig
                     .book
@@ -316,7 +317,7 @@ fn card(b: &mut Builder, card: &Card, words: &Words, jig: &jig_client_view::word
                     .expect("checked application terminal name");
                 b.open(Role::Status);
                 b.name(&saying.text);
-                crate::connector_values::answer(b, value, jig);
+                crate::connector_values::answer(b, value, jig, text_limit);
                 b.close();
             }
         },

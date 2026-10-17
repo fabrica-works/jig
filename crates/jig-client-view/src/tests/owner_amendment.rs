@@ -88,7 +88,7 @@ fn fixture() -> OwnerAmendmentState {
     }
 }
 fn client_limits() -> crate::Limits {
-    crate::Limits { rows: 3, text: 8, ..super::cards::CLIENT }
+    crate::Limits { rows: 3, segments: 3, text: 8, ..super::cards::CLIENT }
 }
 fn phrase_limits() -> PhraseLimits {
     PhraseLimits {
@@ -147,7 +147,7 @@ fn build(value: &OwnerAmendmentState, words: &Words) -> Tree {
     };
     assert!(crate::limits::jig_worst_case(&limits).is_some());
     let mut builder = Builder::new(&limits);
-    view::render(&mut builder, value, words);
+    view::render(&mut builder, value, words, client_limits().text);
     let tree = builder.finish();
     assert!(tree.len() <= f.nodes);
     assert!(tree.nodes().iter().all(|node| crate::tests::text_bytes(node) <= f.text_per_node));
@@ -388,7 +388,7 @@ fn owner_amendment_whole_tree_envelope_checks_full_nested_capacities_and_overflo
         let mut larger = value.clone();
         mutate(&mut larger);
         assert!(view::required(&larger, &limits, words).is_none());
-        assert!(view::required(&larger, &crate::Limits { rows: 4, ..limits }, words).is_some());
+        assert!(view::required(&larger, &crate::Limits { rows: 4, segments: 4, ..limits }, words).is_some());
     }
     assert!(view::required(&value, &crate::Limits { text: 4, ..limits }, words).is_none());
     assert!(view::worst_case(&crate::Limits { text: u32::MAX, ..limits }, words).is_none());

@@ -26,6 +26,9 @@ impl PolicyFragment {
         self.leaf(words.book.capacity(phrase.id())?)
     }
     fn pattern(&mut self, pattern: &OwnerPattern, words: &Words) -> Option<()> {
+        self.text_per_node = self
+            .text_per_node
+            .max(words.book.capacity(crate::owner_authority_words::AuthorityPhrase::OmittedSegments.id())?);
         for segment in &pattern.segments {
             self.leaf(crate::literal_segment::display_bytes(segment)?)?;
         }
@@ -104,15 +107,22 @@ pub fn required(value: &PolicyEdit, words: &Words) -> Option<PolicyFragment> {
     }
     Some(result)
 }
-fn pattern(b: &mut Builder, value: &OwnerPattern, words: &Words) {
-    for segment in &value.segments {
-        crate::literal_segment::render(b, segment);
-    }
+fn pattern(b: &mut Builder, value: &OwnerPattern, words: &Words, text_limit: u32) {
     let (phrase, bytes) = match &value.last {
         OwnerPatternEnd::Exact(bytes) => (crate::owner_authority_words::AuthorityPhrase::Exact, bytes),
         OwnerPatternEnd::Open(bytes) => (crate::owner_authority_words::AuthorityPhrase::Open, bytes),
     };
     let label = words.book.say(words.language, phrase.id(), &[]).expect("checked terminal label").text;
+    let reserved = u32::try_from(label.len())
+        .expect("bounded ending")
+        .checked_add(crate::literal_segment::display_bytes(bytes).expect("bounded segment"))
+        .expect("bounded path words");
+    crate::literal_segment::path(
+        b,
+        value.segments.as_slice(),
+        words,
+        crate::literal_segment::PathDisplay { text: text_limit, reserved, keep_last: false },
+    );
     b.text(Run::Plain, &label);
     crate::literal_segment::render(b, bytes);
 }
@@ -120,7 +130,7 @@ fn effect(b: &mut Builder, connector: u16, kind: u16, words: &Words) {
     words.text(b, JigPhrase::PolicyEffect, &[Hole::Number(u64::from(connector)), Hole::Number(u64::from(kind))]);
 }
 /// Display one whole edit without inventing role names or parsing resource names.
-pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words) {
+pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words, text_limit: u32) {
     b.open(Role::Region);
     let name = match value {
         PolicyEdit::ProjectSpend { period_spend } => {
@@ -138,7 +148,7 @@ pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words) {
         }
         PolicyEdit::Role(role) => {
             words.text(b, JigPhrase::PolicyEditRole, &[Hole::Number(u64::from(role.number))]);
-            crate::owner_authority::render_words(b, &role.authority, words);
+            crate::owner_authority::render_words(b, &role.authority, words, text_limit);
             words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(role.period_spend)]);
             words.text(b, JigPhrase::PolicyRequests, &[Hole::Number(u64::from(role.requests))]);
             words.text(b, JigPhrase::PolicyDecides, &[Hole::Number(u64::from(role.decides))]);
@@ -147,7 +157,7 @@ pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words) {
             words.text(b, JigPhrase::PolicyRequirements, &[]);
             for requirement in requirements {
                 effect(b, requirement.connector, requirement.kind, words);
-                pattern(b, &requirement.pattern, words);
+                pattern(b, &requirement.pattern, words, text_limit);
                 words.text(
                     b,
                     JigPhrase::PolicyJudge,
@@ -178,7 +188,7 @@ pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words) {
             words.text(b, JigPhrase::PolicyProjections, &[]);
             for grant in grants {
                 effect(b, grant.connector, grant.kind, words);
-                pattern(b, &grant.pattern, words);
+                pattern(b, &grant.pattern, words, text_limit);
             }
         }
         PolicyEdit::Permissions { mappings } => {

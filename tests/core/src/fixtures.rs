@@ -361,3 +361,28 @@ pub fn second_party(world: &mut crate::effects::World, subject: &[u8], role: jig
     })));
     sign_in
 }
+
+/// A real admitted hold spans four segments while short document lists hold two.
+#[must_use]
+pub fn long_resource_world(seed: u64) -> (crate::effects::World, u64, jig_test_connector::Path) {
+    let (mut configuration, mut limits) = crate::effects::fixture(seed, false);
+    limits.core.documents.lines = 2;
+    limits.connector.path_segments = limits.core.tasks.hold_segments;
+    let mut path = skein_lib::List::with_capacity(limits.core.tasks.hold_segments);
+    for segment in jig_test_connector_world::path(1, 1).segments() {
+        path.push(segment.clone()).expect("prefix fits");
+    }
+    for segment in [b"third".as_slice(), b"last".as_slice()] {
+        path.push(segment.into()).expect("four admitted segments");
+    }
+    let path = jig_test_connector::Path::new(path, 128).expect("bounded resource");
+    configuration.first.resources[0].path = path.clone();
+    let mut world = crate::effects::World::configured(seed, false, configuration, limits);
+    world.delegate_on_path(CREDENTIAL_RESOURCE, path.clone());
+    let core::CallPart::Delegated(numbers) = &world.answers.last().expect("delegation answer").2 else {
+        panic!("resource delegate admitted: {:?}", world.answers.last())
+    };
+    let child = numbers[0];
+    world.reads = Some(crate::reads::Parties::new(world.store.applied));
+    (world, child, path)
+}

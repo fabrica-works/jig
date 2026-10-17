@@ -62,7 +62,7 @@ pub(crate) fn value() -> OwnerPersonTask {
     }
 }
 fn bounds() -> Bounds {
-    Bounds { rows: 3, text: 8, document_bytes: 65536, ..Bounds::default() }
+    Bounds { rows: 3, segments: 3, text: 8, document_bytes: 65536, ..Bounds::default() }
 }
 #[test]
 fn person_owner_admission_prices_reserved_slots_boxes_and_optional_whole_results_at_exact_boundary() {

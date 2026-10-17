@@ -73,7 +73,8 @@ pub fn worst_case(bounds: &Bounds) -> Option<u64> {
     let text = u64::from(bounds.text);
     let authority = crate::owner_authority::worst_case(bounds)?
         .checked_sub(u64::try_from(size_of::<OwnerAuthorityDocument>()).ok()?)?;
-    let part = List::<Box<[u8]>>::worst_case(bounds.rows)?.checked_add(rows.checked_mul(text)?)?;
+    let part =
+        List::<Box<[u8]>>::worst_case(bounds.segments)?.checked_add(u64::from(bounds.segments).checked_mul(text)?)?;
     let spec = List::<ParameterDocument>::worst_case(bounds.rows)?
         .checked_add(rows.checked_mul(text)?)?
         .checked_add(List::<u64>::worst_case(bounds.rows)?)?

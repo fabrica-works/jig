@@ -31,8 +31,8 @@ pub struct ChipFragment {
 pub fn max_nodes(limits: &Limits) -> Option<u32> {
     120_u32
         .checked_add(crate::proposed_task::part_nodes(limits)?)?
-        .checked_add(limits.rows.checked_add(20)?.checked_mul(limits.rows)?)?
-        .checked_add(limits.rows.checked_add(6)?.checked_mul(2)?)?
+        .checked_add(limits.segments.checked_add(20)?.checked_mul(limits.rows)?)?
+        .checked_add(limits.segments.checked_add(6)?.checked_mul(2)?)?
         .checked_add(limits.rows)?
         .checked_add(crate::result_nodes(limits)?)
 }
@@ -40,7 +40,7 @@ pub(crate) fn part_fits(part: &OwnerPart, limits: &Limits) -> Option<()> {
     match &part.key {
         OwnerPartKey::Number(_) => Some(()),
         OwnerPartKey::Path(segments) => {
-            if segments.capacity() > limits.rows {
+            if segments.capacity() > limits.segments {
                 return None;
             }
             for segment in segments {
@@ -93,7 +93,7 @@ pub(crate) fn result_nodes(value: &ResultValue, limits: &Limits) -> Option<u32> 
         ResultValue::Connector { summary, part } => {
             text_fits(summary, limits)?;
             if let jig_client::contract::Part::Resource { path, .. } = part
-                && !jig_client::contract::resource_path_fits(path, limits.rows, limits.text)
+                && !jig_client::contract::resource_path_fits(path, limits.segments, limits.text)
             {
                 return None;
             }
@@ -174,10 +174,10 @@ pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Opt
             | OwnerChipWork::Ending => {}
         }
     }
-    let resource_nodes = limits.rows.checked_add(20)?.checked_mul(value.resources.len())?;
+    let resource_nodes = limits.segments.checked_add(20)?.checked_mul(value.resources.len())?;
     let mut nodes = 120_u32
         .checked_add(resource_nodes)?
-        .checked_add(limits.rows.checked_add(6)?.checked_mul(2)?)?
+        .checked_add(limits.segments.checked_add(6)?.checked_mul(2)?)?
         .checked_add(limits.rows)?;
     if let Some(ending) = &value.ending {
         match ending {

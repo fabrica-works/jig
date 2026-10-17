@@ -88,6 +88,7 @@ pub struct Versions {
 /// Bounds of one constructed document and its configured served versions.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct DocumentLimits {
+    pub segments: u32,
     pub rows: u32,
     pub text_bytes: u32,
     pub chips: u32,

@@ -315,6 +315,7 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
             },
         },
         words,
+        CLIENT.text,
     );
     builder.close();
     let tree = builder.finish();

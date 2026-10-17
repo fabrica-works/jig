@@ -42,7 +42,7 @@ impl Words {
     }
 
     /// Show the exact current hold reason supplied with a moved refusal.
-    pub(super) fn hold_fact(&self, b: &mut Builder, reason: &HoldReason) {
+    pub(super) fn hold_fact(&self, b: &mut Builder, reason: &HoldReason, text_limit: u32) {
         match reason {
             HoldReason::Tries { failures } => {
                 self.text(b, JigPhrase::TriesExhausted, &[]);
@@ -63,15 +63,15 @@ impl Words {
             }
             HoldReason::Drift { part } => {
                 self.text(b, JigPhrase::DriftHold, &[]);
-                self.part_fact(b, part);
+                self.part_fact(b, part, text_limit);
             }
             HoldReason::EffectFailed { part } => {
                 self.text(b, JigPhrase::EffectFailedHold, &[]);
-                self.part_fact(b, part);
+                self.part_fact(b, part, text_limit);
             }
             HoldReason::EffectUncertain { part } => {
                 self.text(b, JigPhrase::EffectUncertainHold, &[]);
-                self.part_fact(b, part);
+                self.part_fact(b, part, text_limit);
             }
             HoldReason::Budget { spent, limit } => {
                 self.text(b, JigPhrase::BudgetHold, &[Hole::Amount(*spent), Hole::Amount(*limit)]);
@@ -84,20 +84,20 @@ impl Words {
             }
             HoldReason::Resource { resource, holder } => {
                 self.text(b, JigPhrase::ResourceHold, &[]);
-                self.part_fact(b, resource);
+                self.part_fact(b, resource, text_limit);
                 self.actor(b, *holder);
             }
             HoldReason::Pool { part } => {
                 self.text(b, JigPhrase::PoolHold, &[]);
-                self.part_fact(b, part);
+                self.part_fact(b, part, text_limit);
             }
             HoldReason::Procedure { part } => {
                 self.text(b, JigPhrase::ProcedureHold, &[]);
-                self.part_fact(b, part);
+                self.part_fact(b, part, text_limit);
             }
         }
     }
-    fn part_fact(&self, b: &mut Builder, part: &Part) {
+    fn part_fact(&self, b: &mut Builder, part: &Part, text_limit: u32) {
         let connector = match part {
             Part::Connector { connector }
             | Part::Resource { connector, .. }
@@ -117,9 +117,13 @@ impl Words {
             Part::Deployment { .. } => self.text(b, JigPhrase::Deployment, &[]),
             Part::Resource { path, .. } => {
                 self.text(b, JigPhrase::ResourceSegments, &[]);
-                for segment in path {
-                    crate::literal_segment::render(b, segment);
-                }
+                let reserved = u32::try_from(self.say(JigPhrase::ResourceSegments, &[]).len()).expect("bounded phrase");
+                crate::literal_segment::path(
+                    b,
+                    path.as_slice(),
+                    self,
+                    crate::literal_segment::PathDisplay { text: text_limit, reserved, keep_last: true },
+                );
             }
             Part::Kind { kind, .. } => self.text(b, JigPhrase::PartKind, &[Hole::Number(u64::from(*kind))]),
             Part::Panel { task, .. } => {

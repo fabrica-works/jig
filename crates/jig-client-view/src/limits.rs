@@ -71,10 +71,7 @@ pub fn envelope(
         .checked_add(3)?;
     // A field carries a saying as its name and the full domain value.
     // Markdown links may carry both label and external target.
-    let text_per_node = phrase
-        .checked_mul(2)?
-        .checked_add(client.text.checked_mul(2)?)?
-        .max(crate::literal_segment::max_bytes(client.text)?.checked_mul(2)?);
+    let text_per_node = node_text(client.text, phrase)?;
     Some(Limits {
         nodes,
         // Page, card/input result, verdict proposal, and its deepest
@@ -103,3 +100,10 @@ pub fn jig_worst_case(limits: &Limits) -> Option<u64> {
 }
 
 pub mod ui;
+
+/// Room for a path's preceding words, omitted-segment mark and one escaped segment.
+#[must_use]
+pub fn node_text(text: u32, phrase: u32) -> Option<u32> {
+    let segment = crate::literal_segment::max_bytes(text)?;
+    Some(phrase.checked_mul(2)?.checked_add(segment)?.max(segment.checked_mul(2)?))
+}

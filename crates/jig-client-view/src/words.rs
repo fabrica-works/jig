@@ -25,6 +25,19 @@ impl Words {
     pub fn say(&self, phrase: JigPhrase, holes: &[Hole]) -> Box<[u8]> {
         self.book.say(self.language, phrase.id(), holes).expect("checked phrase and bounded facts").text
     }
+    pub(crate) fn node_text(&self, text: u32) -> u32 {
+        let phrase = match crate::phrases::jig_capacity(&self.book) {
+            Some(phrase) => phrase,
+            None => {
+                let mut largest = 0;
+                for phrase in crate::owner_authority_words::ALL {
+                    largest = largest.max(self.book.capacity(phrase.id()).expect("authority words checked"));
+                }
+                largest
+            }
+        };
+        crate::limits::node_text(text, phrase).expect("checked node text")
+    }
     /// Emit a text leaf using a phrase's checked words.
     pub fn text(&self, b: &mut Builder, phrase: JigPhrase, holes: &[Hole]) {
         let text = self.say(phrase, holes);

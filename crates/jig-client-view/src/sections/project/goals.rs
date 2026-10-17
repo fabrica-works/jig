@@ -52,6 +52,7 @@ pub(super) fn goals(b: &mut Builder, client: &Domain, doc: &Project, words: &Wor
     form(b, client, doc, words, bindings);
 }
 fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings) {
+    let text_limit = bindings.text_limit();
     b.open(Role::Form);
     b.region(crate::regions::JigRegion::NewGoal.region());
     b.name(&words.say(JigPhrase::GoalWords, &[]));
@@ -113,7 +114,7 @@ fn form(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings
         b.close();
     }
     if let Some(why) = &state.refusal {
-        words.refusal(b, why);
+        words.refusal(b, why, text_limit);
     }
     if let Some(answer) = &state.answer {
         words.outcome(b, answer);
@@ -226,6 +227,7 @@ pub(super) fn choice(
     }
 }
 fn inputs(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindings: &mut JigBindings, pool_left: u64) {
+    let text_limit = bindings.text_limit();
     let state = &client.project_page().form;
     if let Some(form) = state.form {
         if form.project != doc.number {
@@ -276,7 +278,7 @@ fn inputs(b: &mut Builder, client: &Domain, doc: &Project, words: &Words, bindin
                         words.text(b, phrase, &[]);
                         cards::common::recipient(b, &to, words);
                     }
-                    Admission::Refused(why) => words.refusal(b, &why),
+                    Admission::Refused(why) => words.refusal(b, &why, text_limit),
                     Admission::Allowed | Admission::Bounded { .. } => {}
                 }
             }

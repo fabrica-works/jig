@@ -11,8 +11,8 @@ fn bytes(value: u8, count: u32) -> Box<[u8]> {
 }
 
 fn bounded(limits: &DocumentLimits, order_rows: u32) -> Admission {
-    let mut segments = List::with_capacity(limits.lines);
-    for _ in 0..limits.lines {
+    let mut segments = List::with_capacity(limits.segments);
+    for _ in 0..limits.segments {
         segments.push(bytes(255, limits.text_bytes)).unwrap();
     }
     let last = PatternEnd::Open(bytes(254, limits.text_bytes));
@@ -57,7 +57,14 @@ fn bounded(limits: &DocumentLimits, order_rows: u32) -> Admission {
     }
 }
 fn limits() -> DocumentLimits {
-    DocumentLimits { rows: 2, text_bytes: 2, chips: 2, lines: 2, versions: Versions { minimum: 1, maximum: 1 } }
+    DocumentLimits {
+        segments: 4,
+        rows: 2,
+        text_bytes: 2,
+        chips: 2,
+        lines: 2,
+        versions: Versions { minimum: 1, maximum: 1 },
+    }
 }
 
 #[test]

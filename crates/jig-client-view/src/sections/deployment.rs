@@ -8,6 +8,7 @@ use skein_ui::{Builder, Role, Run};
 use crate::Domain;
 /// Show the admitted deployment document and its connector-owned parts.
 pub(crate) fn section(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) -> bool {
+    let text_limit = bindings.text_limit();
     if !client.shows(crate::page::Section::Deployment) {
         return false;
     }
@@ -83,7 +84,7 @@ pub(crate) fn section(b: &mut Builder, client: &Domain, words: &Words, bindings:
     }
     words.text(b, JigPhrase::ProposalsWaiting, &[Hole::Number(u64::from(doc.proposals))]);
     for why in &doc.refusals {
-        words.refusal(b, why);
+        words.refusal(b, why, text_limit);
     }
     b.close();
     region(

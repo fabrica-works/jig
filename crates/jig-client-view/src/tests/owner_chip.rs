@@ -774,3 +774,17 @@ fn supplied_hold_account_and_origin_keep_distinct_public_slots_and_absence() {
 }
 
 const UTF8_TEXTS: [&[u8]; 3] = [b"~", &[b'~'; 256], &[b'?'; 256]];
+
+#[test]
+fn a_long_resource_path_shows_its_tail_and_keeps_the_whole_slot() {
+    let path = crate::tests::fixtures::long_resource_path::<256>();
+    let reference = OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(path) };
+    let mut value = details();
+    value.procedure = Some(reference.clone());
+    let (tree, bindings, _) = build(&value, words());
+    assert!(has(&tree, "…".as_bytes()));
+    assert!(contains(&tree, b"\\xF3"));
+    assert!(!contains(&tree, b"\\xF0"));
+    let slot = tree.nodes().iter().find_map(|node| node.slot).expect("whole resource slot");
+    assert_eq!(bindings.owner_part(slot.token), Some(&reference));
+}

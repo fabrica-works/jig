@@ -594,6 +594,7 @@ pub const CORE_LIMITS: core::Limits = core::Limits {
     templates: 8,
     fill_mark: 1000,
     documents: core::documents::DocumentLimits {
+        segments: 2,
         rows: 32,
         text_bytes: 256,
         chips: 32,

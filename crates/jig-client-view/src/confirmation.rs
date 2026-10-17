@@ -19,6 +19,7 @@ use jig_client::contract::{ActKind, Hold, HoldReason, Impact, ObjectKey, OwnerCh
 pub mod amendment;
 /// Build the domain's one object or goal confirmation, or nothing when closed.
 pub fn confirmation(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    let text_limit = bindings.text_limit();
     if let Some(open) = client.confirmation() {
         begin(b, words, common::act_phrase(open.act));
         if let Some(object) = client.objects().get(open.object) {
@@ -32,7 +33,7 @@ pub fn confirmation(b: &mut Builder, client: &Domain, words: &Words, bindings: &
             }
         }
         if let Some(missing) = &open.missing {
-            missing_words(b, missing, words);
+            missing_words(b, missing, words, text_limit);
         }
         if open.changed {
             words.status(b, JigPhrase::ChangedConfirmation, &[]);
@@ -133,6 +134,7 @@ fn action(
     words: &Words,
     bindings: &mut JigBindings,
 ) {
+    let text_limit = bindings.text_limit();
     match open.act {
         ActKind::Accept => {
             words.text(b, JigPhrase::WillAccept, &[]);
@@ -312,7 +314,7 @@ fn action(
         | ActKind::ChangePolicy
         | ActKind::SetRoles
         | ActKind::MakeService
-        | ActKind::SetPool => words.refusal(b, &jig_client::contract::Refusal::NotOffered),
+        | ActKind::SetPool => words.refusal(b, &jig_client::contract::Refusal::NotOffered, text_limit),
     }
 }
 fn held(object: &Object) -> bool {
@@ -554,7 +556,7 @@ fn delegates(
     }
 }
 /// Every incomplete/changed state is semantic text; style never carries its meaning.
-pub fn missing_words(b: &mut Builder, missing: &Missing, words: &Words) {
+pub fn missing_words(b: &mut Builder, missing: &Missing, words: &Words, text_limit: u32) {
     b.open(Role::Status);
     b.name(&words.say(JigPhrase::Confirmation, &[]));
     b.style(JigStyle::Warning.token());
@@ -578,7 +580,7 @@ pub fn missing_words(b: &mut Builder, missing: &Missing, words: &Words) {
                 words.text(b, JigPhrase::HoldRevision, &[Hole::Number(now.value)]);
             }
         }
-        Missing::Refused { why } => words.refusal(b, why),
+        Missing::Refused { why } => words.refusal(b, why, text_limit),
     }
     b.close();
 }

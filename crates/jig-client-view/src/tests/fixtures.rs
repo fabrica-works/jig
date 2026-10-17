@@ -57,3 +57,13 @@ pub fn places() -> skein_lib::List<Record> {
     }
     saved
 }
+
+/// Four opaque segments expose a display cut while preserving every byte.
+#[must_use]
+pub(crate) fn long_resource_path<const N: usize>() -> skein_lib::List<Box<[u8]>> {
+    let mut path = skein_lib::List::with_capacity(4);
+    for byte in [0xF0_u8, 0xF1, 0xF2, 0xF3] {
+        path.push(Box::from([byte; N])).unwrap();
+    }
+    path
+}

@@ -21,6 +21,7 @@ pub fn card(
     words: &Words,
     bindings: &mut JigBindings,
 ) -> bool {
+    let text_limit = bindings.text_limit();
     let Some(facts) = client.objects().get(object) else {
         return false;
     };
@@ -53,7 +54,7 @@ pub fn card(
     }
     crate::sections::task::overview(b, client, &document.task, words, bindings);
     crate::sections::task::budget(b, &document.task, words, bindings);
-    super::common::answer(b, facts, words);
+    super::common::answer(b, facts, words, text_limit);
     super::common::acts(b, &facts.card, &document.acts, object, words, bindings);
     super::close(b);
     true

@@ -261,7 +261,7 @@ pub fn document(b: &mut Builder, value: &ConnectorDocument, words: &Words) {
     b.close();
 }
 /// Render the whole closed terminal; the exact owner refusal stays in its carrier.
-pub fn answer(b: &mut Builder, value: &ConnectorAnswer, words: &Words) {
+pub fn answer(b: &mut Builder, value: &ConnectorAnswer, words: &Words, text_limit: u32) {
     region(b, words, Word::Answer);
     match value.value {
         ApplicationOutcome::Changed { object: number, now } => {
@@ -294,7 +294,7 @@ pub fn answer(b: &mut Builder, value: &ConnectorAnswer, words: &Words) {
                 | application_core::Refusal::NotOffered
                 | application_core::Refusal::KeyConflict => {
                     if let Some(why) = super::connector_values_refusal::refusal(why) {
-                        words.refusal(b, &why);
+                        words.refusal(b, &why, text_limit);
                     }
                 }
             }

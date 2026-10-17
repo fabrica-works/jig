@@ -281,3 +281,14 @@ fn an_own_scope_application_request_reaches_its_connector_with_no_role() {
     );
     world.watches.as_ref().expect("watch parties").finish();
 }
+
+#[test]
+fn a_task_document_keeps_a_held_name_past_the_short_list_bound() {
+    let (mut world, task, path) = jig_core_world::fixtures::long_resource_world(886);
+    reads::ask(&mut world, OWN_REQUEST, core::reads::Read::Task { task });
+    let core::reads::Answer::Document(document) = reads::latest(&world) else { panic!("task document") };
+    let core::documents::Document::Task(value) = document.as_ref() else { panic!("task document") };
+    let resource = value.resources.get(0).expect("held resource");
+    let core::documents::PartKey::Path(segments) = &resource.part.key else { panic!("resource path") };
+    assert_eq!(segments.as_slice(), path.segments());
+}

@@ -76,6 +76,7 @@ pub(super) fn notes(b: &mut Builder, client: &Domain, project: u32, words: &Word
     );
 }
 fn scope_choice(b: &mut Builder, words: &Words, bindings: &mut JigBindings, filter: &NoteFilter, scope: NoteScope) {
+    let text_limit = bindings.text_limit();
     let (phrase, holes): (JigPhrase, Box<[Hole]>) = match &scope {
         NoteScope::Deployment => (JigPhrase::Deployment, Box::new([])),
         NoteScope::Project(project) => (JigPhrase::ContextProject, Box::new([Hole::Number(u64::from(*project))])),
@@ -90,7 +91,7 @@ fn scope_choice(b: &mut Builder, words: &Words, bindings: &mut JigBindings, filt
     b.name(&label);
     b.text(skein_ui::Run::Plain, &label);
     if let NoteScope::Resource { pattern, .. } = &scope {
-        crate::owner_authority::pattern(b, words, pattern);
+        crate::owner_authority::pattern(b, words, pattern, text_limit);
     }
     if scope == filter.scope {
         b.state(State::Selected);
@@ -100,3 +101,6 @@ fn scope_choice(b: &mut Builder, words: &Words, bindings: &mut JigBindings, filt
     })));
     b.close();
 }
+
+#[cfg(test)]
+mod tests;

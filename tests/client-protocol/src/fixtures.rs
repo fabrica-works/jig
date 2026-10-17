@@ -142,6 +142,7 @@ pub fn domain_limits() -> jig_client_domain::Limits {
         document_bytes: jig.document_bytes,
         backoff: jig_client_domain::Backoff { first: jig.backoff.first, most: jig.backoff.most },
         rows: jig.rows,
+        segments: jig.segments,
         text: jig.text,
         projects: jig.projects,
         charters: jig.charters,

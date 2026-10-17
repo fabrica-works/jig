@@ -22,6 +22,7 @@ pub fn person_task(
     words: &Words,
     bindings: &mut JigBindings,
 ) -> bool {
+    let text_limit = bindings.text_limit();
     let Some(fact) = client.objects().get(object) else {
         return false;
     };
@@ -59,7 +60,7 @@ pub fn person_task(
     if let Some(ending) = &document.ending {
         words.ending(b, ending);
     }
-    super::common::answer(b, fact, words);
+    super::common::answer(b, fact, words, text_limit);
     super::common::acts(b, &fact.card, &document.acts, object, words, bindings);
     super::close(b);
     true

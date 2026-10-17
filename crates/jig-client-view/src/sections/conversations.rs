@@ -15,6 +15,7 @@ pub(crate) fn section(
     bindings: &mut JigBindings,
     project: Option<u32>,
 ) -> bool {
+    let text_limit = bindings.text_limit();
     if !client.shows(crate::page::Section::Conversations { project }) {
         return false;
     }
@@ -97,7 +98,7 @@ pub(crate) fn section(
         b.close();
     }
     if let Some(refusal) = &state.refusal {
-        words.refusal(b, refusal);
+        words.refusal(b, refusal, text_limit);
     }
     forms(b, client, words, bindings);
     b.close();

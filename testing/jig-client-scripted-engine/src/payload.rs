@@ -88,6 +88,9 @@ impl<T: Payload> Payload for List<T> {
         Some(total)
     }
 }
+pub(crate) fn path<T: Payload>(value: &List<T>, bounds: &Bounds) -> Option<u64> {
+    value.heap(&Bounds { rows: bounds.segments, ..*bounds })
+}
 impl<T: Payload> Payload for Option<T> {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         self.as_ref().map_or(Some(0), |value| value.heap(bounds))
@@ -338,7 +341,7 @@ impl Payload for PartScope {
 impl Payload for Part {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Resource { connector, path } => sum(&[connector.heap(bounds), path.heap(bounds)]),
+            Self::Resource { connector, path } => sum(&[connector.heap(bounds), self::path(path, bounds)]),
             Self::Kind { connector, kind } => sum(&[connector.heap(bounds), kind.heap(bounds)]),
             Self::Panel { connector, task } | Self::Result { connector, task } | Self::Hold { connector, task } => {
                 sum(&[connector.heap(bounds), task.heap(bounds)])
@@ -660,7 +663,7 @@ fields!(jig_client_domain::contract::OwnerPart { connector, kind, key });
 impl Payload for jig_client_domain::contract::OwnerPartKey {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Path(segments) => segments.heap(bounds),
+            Self::Path(segments) => path(segments, bounds),
             Self::Number(_) => Some(0),
         }
     }

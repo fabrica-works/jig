@@ -311,3 +311,28 @@ fn seen_over_a_conversations_turns_clears_its_lines_unread_count() {
         Some(documents::ConversationRead { seen: SEEN_CONVERSATION, unread: documents::Count::Known(0) })
     );
 }
+
+#[test]
+fn a_task_line_keeps_a_held_name_past_the_short_list_bound() {
+    let (mut world, task, path) = jig_core_world::fixtures::long_resource_world(1210);
+    ask(
+        &mut world,
+        QUERY_READ,
+        reads::Read::Tasks {
+            query: documents::TaskQuery { project: Some(1), requester: None, ..jig_core_world::fixtures::OWN_TASKS },
+            from: None,
+        },
+    );
+    let reads::Answer::Page(page) = latest(&world) else { panic!("task query") };
+    let line = page
+        .rows
+        .iter()
+        .find_map(|row| {
+            let reads::PageRow::Line(line) = row else { return None };
+            (line.chip.number == task).then_some(line)
+        })
+        .expect("resource task line served");
+    let resource = line.chip.details.resources.get(0).expect("held resource");
+    let documents::PartKey::Path(segments) = &resource.part.key else { panic!("resource path") };
+    assert_eq!(segments.as_slice(), path.segments());
+}

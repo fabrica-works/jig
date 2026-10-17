@@ -1108,7 +1108,7 @@ fn notice_scenarios(words: &crate::words::Words) {
         Kind::Refused(Limit::Objects),
     ] {
         let mut b = Builder::new(&limits());
-        crate::notices::facts(&mut b, &kind, words);
+        crate::notices::facts(&mut b, &kind, words, CLIENT.text);
         let tree = b.finish();
         super::cards_access::check(&tree);
         assert_eq!(tree.nodes()[0].role, Role::Status);
@@ -1365,7 +1365,7 @@ fn authority_refusal_uses_only_supplied_proposal_eligibility(words: &crate::word
     for proposable in [None, Some(true), Some(false)] {
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
-        words.refusal(&mut b, &Refusal::Authority { lacking: Lacking::Approver, proposable });
+        words.refusal(&mut b, &Refusal::Authority { lacking: Lacking::Approver, proposable }, CLIENT.text);
         b.close();
         let tree = b.finish();
         assert!(contains(&tree, b"Proposal approval authority is missing"));
@@ -1699,6 +1699,7 @@ fn proposed_outcomes_and_effect_parts_keep_the_supplied_maker_kind_and_full_numb
                     }))),
                 },
             },
+            CLIENT.text,
         );
         b.close();
         let tree = b.finish();
@@ -1968,6 +1969,7 @@ fn moved_effect_facts_say_the_supplied_connector_proposal_without_inventing_a_ma
                     }))),
                 },
             },
+            CLIENT.text,
         );
         builder.close();
         let tree = builder.finish();

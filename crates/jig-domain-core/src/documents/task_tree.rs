@@ -326,10 +326,10 @@ pub(super) fn part_path(limits: &Limits, connector: u16, kind: PartKind, bytes: 
 }
 
 fn path(limits: &Limits, bytes: &[Box<[u8]>]) -> Result<List<Box<[u8]>>, Missing> {
-    if bytes.len() > usize::try_from(limits.documents.lines).expect("line count fits") {
+    if bytes.len() > usize::try_from(limits.documents.segments).expect("segment count fits") {
         return Err(Missing::TooLarge);
     }
-    let mut result = List::with_capacity(limits.documents.lines);
+    let mut result = List::with_capacity(limits.documents.segments);
     for segment in bytes {
         if segment.len() > usize::try_from(limits.documents.text_bytes).expect("text bound fits") {
             return Err(Missing::TooLarge);
@@ -402,7 +402,7 @@ pub(super) fn contract(limits: &Limits, value: &tasks::Contract) -> Result<Contr
             match &part.key {
                 PartKey::Number(_) => {}
                 PartKey::Path(segments) => {
-                    if segments.capacity() > limits.documents.lines {
+                    if segments.capacity() > limits.documents.segments {
                         return Err(Missing::TooLarge);
                     }
                     for segment in segments {
@@ -968,7 +968,8 @@ pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64>
     let lines = u64::from(limits.lines);
     let rows = u64::from(limits.rows);
     let chip = super::chip_phase::heap_worst_case(limits)?;
-    let path = List::<Box<[u8]>>::worst_case(limits.lines)?.checked_add(lines.checked_mul(text)?)?;
+    let path =
+        List::<Box<[u8]>>::worst_case(limits.segments)?.checked_add(u64::from(limits.segments).checked_mul(text)?)?;
     let authority = authority_worst_case(limits)?;
     let references = List::<TaskLink>::worst_case(limits.lines)?.checked_add(lines.checked_mul(chip)?)?;
     let specification = text
@@ -1008,8 +1009,8 @@ pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64>
 }
 
 pub(super) fn grant_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
-    List::<Box<[u8]>>::worst_case(limits.lines)?
-        .checked_add(u64::from(limits.lines).checked_add(1)?.checked_mul(u64::from(limits.text_bytes))?)
+    List::<Box<[u8]>>::worst_case(limits.segments)?
+        .checked_add(u64::from(limits.segments).checked_add(1)?.checked_mul(u64::from(limits.text_bytes))?)
 }
 pub(super) fn authority_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     List::<GrantLine>::worst_case(limits.lines)?

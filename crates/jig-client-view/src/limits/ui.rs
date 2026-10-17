@@ -43,6 +43,7 @@ pub struct Limits {
     pub charters: u32,
     pub text: u32,
     pub rows: u32,
+    pub segments: u32,
     /// Whole pending or sent word snapshots kept for the displayed conversation.
     pub conversation_words: u32,
     /// Maximum configured navigation destinations.

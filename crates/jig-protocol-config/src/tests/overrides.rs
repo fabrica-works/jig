@@ -362,3 +362,22 @@ fn invalid_override_names_and_values_are_refused() {
         ("overrides_past_their_types_are_refused", overrides_past_their_types_are_refused),
     ]);
 }
+
+#[test]
+fn document_segments_follow_the_largest_admitted_name_after_overrides() {
+    const CASES: [(&[u8], u32); 3] = [
+        (br#"{"profile":"small","overrides":{"tasks.hold_segments":6}}"#, 6),
+        (br#"{"profile":"small","overrides":{"tasks.authority_segments":7}}"#, 7),
+        (br#"{"profile":"small","overrides":{"authority.segments":8}}"#, 8),
+    ];
+    for (configuration, segments) in CASES {
+        let limits = parse(configuration).expect("admitted name bounds");
+        assert_eq!(limits.core.documents.segments, segments, "{configuration:?}");
+        assert_eq!(limits.core.documents.lines, 4, "short lists stay bounded independently");
+    }
+}
+
+#[test]
+fn document_segments_have_no_operator_override() {
+    assert_eq!(overrides::apply(&mut small(), b"documents.segments", 8), Err(What::Override));
+}

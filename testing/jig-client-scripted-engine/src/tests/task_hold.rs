@@ -4,7 +4,7 @@ use core::mem::size_of;
 
 #[test]
 fn task_hold_parent_prices_whole_owner_box_reserved_source_and_rejected_words_at_exact_bounds() {
-    let bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
+    let bounds = Bounds { rows: 2, segments: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
     let mut row = task();
     row.hold = None;
     let absent = row.heap(&bounds).unwrap();
@@ -31,7 +31,7 @@ fn task_hold_parent_prices_whole_owner_box_reserved_source_and_rejected_words_at
     let before = row.clone();
     assert!(payload::fits(&row, &Bounds { document_bytes: exact, ..bounds }));
     assert!(!payload::fits(&row, &Bounds { document_bytes: exact - 1, ..bounds }));
-    assert!(!payload::fits(&row, &Bounds { rows: 1, ..bounds }));
+    assert!(!payload::fits(&row, &Bounds { rows: 1, segments: 1, ..bounds }));
     assert!(!payload::fits(&row, &Bounds { text: 31, ..bounds }));
     assert_eq!(row, before);
     assert_eq!(row.hold, Some(TaskHold::Owner(Box::new(held))));

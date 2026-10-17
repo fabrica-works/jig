@@ -62,12 +62,13 @@ fn kind(b: &mut Builder, value: OwnerMessageProposalKind, words: &Words) {
     );
 }
 fn goal(b: &mut Builder, value: &OwnerPersonProposalGoal, words: &Words, bindings: &mut JigBindings) {
+    let text_limit = bindings.text_limit();
     number(b, words, P::Goal, value.number);
     number(b, words, P::Project, u64::from(value.project));
     crate::proposed_task::executor(b, value.executor, words);
     crate::specification::specification(b, &value.spec, words);
     crate::proposed_task::contract(b, &value.contract, words, bindings);
-    crate::owner_authority::render_words(b, &value.authority, words);
+    crate::owner_authority::render_words(b, &value.authority, words, text_limit);
     for (phrase, amount) in [
         (P::Budget, value.numbers.budget),
         (P::Spent, value.numbers.spent),
@@ -89,9 +90,12 @@ fn goal(b: &mut Builder, value: &OwnerPersonProposalGoal, words: &Words, binding
         label(b, words, phrase);
         number(b, words, P::Connector, u64::from(connector));
         number(b, words, P::Kind, u64::from(kind));
-        for segment in path {
-            crate::literal_segment::render(b, segment.bytes());
-        }
+        crate::literal_segment::path(
+            b,
+            path.as_slice(),
+            words,
+            crate::literal_segment::PathDisplay { text: bindings.text_limit(), reserved: 0, keep_last: true },
+        );
         b.close();
     }
     crate::owner_wake::policy(b, &value.wake, &words.book, words.language);
@@ -305,9 +309,9 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
     let proposal = crate::owner_history::proposal_max_nodes(l)?;
     let person_goal = crate::specification::nodes(l)?
         .checked_add(crate::proposed_task::contract_nodes(l)?)?
-        .checked_add(crate::owner_authority::document_nodes(l.rows)?)?
+        .checked_add(crate::owner_authority::document_nodes(l.rows, l.segments)?)?
         .checked_add(crate::owner_wake::policy_nodes())?
-        .checked_add(l.rows.checked_mul(l.rows.checked_add(5)?)?)?
+        .checked_add(l.rows.checked_mul(l.segments.checked_add(5)?)?)?
         .checked_add(40)?;
     let question = crate::chip_nodes(l)?
         .checked_add(skein_ui::markdown::max_nodes(l.text)?)?
@@ -484,7 +488,7 @@ pub fn required(value: &OwnerHistorical, l: &Limits, words: &Words) -> Option<Hi
                 let path = match holding {
                     OwnerGoalHolding::Write { path, .. } | OwnerGoalHolding::Slot { path, .. } => path,
                 };
-                if path.capacity() > l.rows {
+                if path.capacity() > l.segments {
                     return None;
                 }
                 for segment in path {
@@ -569,7 +573,7 @@ fn contract_fits(value: &TaskContractDocument, l: &Limits) -> Option<()> {
     Some(())
 }
 fn pattern_fits(value: &OwnerPattern, l: &Limits) -> Option<()> {
-    if value.segments.capacity() > l.rows {
+    if value.segments.capacity() > l.segments {
         return None;
     }
     for segment in &value.segments {

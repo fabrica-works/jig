@@ -291,6 +291,7 @@ pub fn card(
     words: &Words,
     bindings: &mut JigBindings,
 ) -> bool {
+    let text_limit = bindings.text_limit();
     let Some(fact) = client.objects().get(object) else {
         return false;
     };
@@ -302,7 +303,7 @@ pub fn card(
     }
     render(b, client, value, words, bindings);
     // The card keeps the whole contract; editable drafts live only in its confirmation.
-    crate::cards::common::answer(b, fact, words);
+    crate::cards::common::answer(b, fact, words, text_limit);
     crate::cards::common::acts(b, &fact.card, &value.acts, object, words, bindings);
     crate::cards::close(b);
     true

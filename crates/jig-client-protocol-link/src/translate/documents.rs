@@ -309,7 +309,7 @@ fn receiving_part1(checked: &mut Limits, limits: &Limits) {
     checked.wire.owner_deployment_person_room_refusals = limits.client.rows;
     checked.wire.owner_deployment_task_room_refusals = limits.client.rows;
     checked.wire.owner_deployment_connectors = limits.client.rows;
-    checked.wire.owner_part_key_path_value = limits.client.rows;
+    checked.wire.owner_part_key_path_value = limits.client.segments;
     checked.wire.owner_part_key_path_value_item = limits.client.text;
     checked.wire.owner_project_acts = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.owner_project_resources =
@@ -327,7 +327,7 @@ fn receiving_part1(checked: &mut Limits, limits: &Limits) {
     checked.wire.owner_project_policy_requirements =
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.owner_project_policy_permissions_some = limits.client.rows;
-    checked.wire.part_resource_path = limits.client.rows;
+    checked.wire.part_resource_path = limits.client.segments;
     checked.wire.part_resource_path_item = limits.client.text;
     checked.wire.party_name = limits.client.text;
     checked.wire.recipient_roles_roles = limits.client.rows;

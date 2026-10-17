@@ -52,7 +52,7 @@ fn fixture() -> OwnerAuthorityDocument {
     }
 }
 fn phrase_limits() -> PhraseLimits {
-    PhraseLimits { languages: 2, phrases: 18, holes: 1, segments: 100, text_bytes: 4096, hole_bytes: 0 }
+    PhraseLimits { languages: 2, phrases: 19, holes: 1, segments: 100, text_bytes: 4096, hole_bytes: 0 }
 }
 fn english() -> OwnerAuthorityWords {
     OwnerAuthorityWords::load(Box::new([words::english()]), &phrase_limits(), 0, 0).expect("checked English")
@@ -74,7 +74,7 @@ fn render(value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords) -> Tree {
         scene_bytes: 0,
     };
     let mut builder = Builder::new(&limits);
-    view::document(&mut builder, value, words);
+    view::document(&mut builder, value, words, 5);
     let tree = builder.finish();
     assert_eq!(tree.len(), required.nodes);
     assert!(
@@ -114,9 +114,9 @@ fn exact_authority_fragment_keeps_opaque_boundaries_full_codes_and_explicit_cut(
     let tree = render(&complete, &words);
     assert!(!has(&tree, b"Authority document is cut"));
     assert_eq!(tree.len(), 25);
-    let envelope = view::worst_case(3, 5, &words).expect("configured envelope");
+    let envelope = view::worst_case(3, 3, 5, &words).expect("configured envelope");
     assert!(tree.len() <= envelope.nodes);
-    assert_eq!(view::worst_case(u32::MAX, u32::MAX, &words), None);
+    assert_eq!(view::worst_case(u32::MAX, u32::MAX, u32::MAX, &words), None);
 }
 #[test]
 fn owner_authority_words_use_selected_language_and_person_offset() {

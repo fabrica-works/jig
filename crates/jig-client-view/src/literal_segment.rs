@@ -3,6 +3,7 @@
     clippy::disallowed_methods,
     reason = "Q39 permits UTF-8 classification for display only; supplied literal bytes remain opaque"
 )]
+use alloc::boxed::Box;
 use skein_lib::List;
 use skein_ui::{Builder, Run};
 
@@ -39,4 +40,60 @@ pub fn render(b: &mut Builder, bytes: &[u8]) {
         }
     }
     b.text(Run::Code, display.as_slice());
+}
+
+/// The words beside a displayed path share its finite node-text allowance.
+pub(crate) struct PathDisplay {
+    pub text: u32,
+    pub reserved: u32,
+    pub keep_last: bool,
+}
+pub(crate) trait Segment {
+    fn bytes(&self) -> &[u8];
+}
+impl Segment for Box<[u8]> {
+    fn bytes(&self) -> &[u8] {
+        self
+    }
+}
+impl Segment for jig_client::contract::Bytes {
+    fn bytes(&self) -> &[u8] {
+        self.bytes()
+    }
+}
+pub(crate) fn path<S: Segment>(b: &mut Builder, path: &[S], words: &crate::words::Words, space: PathDisplay) {
+    let mut total = 0_u32;
+    for segment in path {
+        total =
+            total.checked_add(display_bytes(segment.bytes()).expect("bounded segment")).expect("bounded path bytes");
+    }
+    let minimum = max_bytes(space.text)
+        .expect("checked segment bytes")
+        .checked_mul(2)
+        .expect("checked node text")
+        .saturating_sub(space.reserved);
+    let bound = if total <= minimum { minimum } else { words.node_text(space.text).saturating_sub(space.reserved) };
+    let mut first = 0;
+    if total > bound {
+        let mark = words
+            .book
+            .say(words.language, crate::owner_authority_words::AuthorityPhrase::OmittedSegments.id(), &[])
+            .expect("checked path mark")
+            .text;
+        first = path.len();
+        let mut bytes = u32::try_from(mark.len()).expect("bounded mark");
+        for segment in path.iter().rev() {
+            let next =
+                bytes.checked_add(display_bytes(segment.bytes()).expect("bounded segment")).expect("bounded path");
+            if next > bound && !(space.keep_last && first == path.len()) {
+                break;
+            }
+            bytes = next;
+            first = first.checked_sub(1).expect("one preceding segment remains");
+        }
+        b.text(Run::Plain, &mark);
+    }
+    for segment in path.get(first..).expect("suffix lies inside path") {
+        render(b, segment.bytes());
+    }
 }

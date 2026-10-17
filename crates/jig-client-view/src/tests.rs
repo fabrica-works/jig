@@ -1,11 +1,11 @@
 mod binding;
-mod fixtures;
+pub(crate) mod fixtures;
 mod owner;
 mod phrases;
 mod records;
 mod regions;
 
-mod cards;
+pub(crate) mod cards;
 mod cards_objects;
 
 mod cards_access;

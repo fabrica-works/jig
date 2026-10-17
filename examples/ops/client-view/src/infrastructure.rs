@@ -123,7 +123,7 @@ fn show_object(
             }
         }
     }
-    show_card(builder, &object.card, words, jig_words);
+    show_card(builder, &object.card, words, jig_words, bindings.text_limit());
     builder.close();
 }
 fn form(
@@ -195,7 +195,13 @@ fn native_form(
     }
     builder.close();
 }
-fn show_card(builder: &mut Builder, card: &Card, words: &Words, jig_words: &jig_client_view::words::Words) {
+fn show_card(
+    builder: &mut Builder,
+    card: &Card,
+    words: &Words,
+    jig_words: &jig_client_view::words::Words,
+    text_limit: u32,
+) {
     match card {
         Card::Open => {}
         Card::Unknown => words.status(builder, Word::Unknown, &[]),
@@ -225,7 +231,7 @@ fn show_card(builder: &mut Builder, card: &Card, words: &Words, jig_words: &jig_
             }
             Answer::Gone => words.status(builder, Word::Gone, &[]),
             Answer::EntranceRefused(refusal) => {
-                jig_client_view::cards::refusal(builder, refusal.refusal(), jig_words);
+                jig_client_view::cards::refusal(builder, refusal.refusal(), jig_words, text_limit);
             }
             Answer::Refused { why } => {
                 words.status(builder, Word::Refused, &[]);

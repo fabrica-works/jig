@@ -58,6 +58,11 @@ impl JigBindings {
     pub fn new(capacity: u32, text_limit: u32) -> Self {
         Self { entries: skein_lib::List::with_capacity(capacity), next: 0, text_limit, task: None }
     }
+    /// The client's bound on one literal segment's bytes.
+    #[must_use]
+    pub const fn text_limit(&self) -> u32 {
+        self.text_limit
+    }
     /// Retire the prior tree's meanings before building its replacement.
     pub fn begin(&mut self) {
         self.entries.clear();

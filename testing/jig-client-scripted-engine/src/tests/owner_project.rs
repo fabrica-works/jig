@@ -51,7 +51,7 @@ fn owner_project_kit_prices_every_empty_reserved_list_at_exact_bytes_and_refuses
         + List::<PoolLedger>::worst_case(2).unwrap()
         + List::<OwnerProjectSpend>::worst_case(2).unwrap()
         + List::<Recurring>::worst_case(2).unwrap();
-    let mut bounds = Bounds { rows: 2, document_bytes: bytes, ..Bounds::default() };
+    let mut bounds = Bounds { rows: 2, segments: 2, document_bytes: bytes, ..Bounds::default() };
     assert_eq!(owner_project::bytes(&value, &bounds), Some(bytes));
     assert!(owner_project::fits(&value, &bounds));
     assert_eq!(owner_project::worst_case(&bounds), Some(bytes));
@@ -86,7 +86,7 @@ fn owner_project_kit_checks_final_member_text_and_whole_segment_and_nested_reser
             role: OwnerProjectResourceRole::Unavailable,
         })
         .unwrap();
-    let mut bounds = Bounds { rows: 2, text: 4, document_bytes: u64::MAX, ..Bounds::default() };
+    let mut bounds = Bounds { rows: 2, segments: 2, text: 4, document_bytes: u64::MAX, ..Bounds::default() };
     assert!(owner_project::fits(&value, &bounds));
     bounds.text = 3;
     assert!(!owner_project::fits(&value, &bounds));
@@ -140,7 +140,7 @@ fn owner_project_kit_original_public_read_keeps_whole_source_and_rejects_unadmit
 #[test]
 fn owner_project_kit_distinguishes_missing_empty_and_full_width_permission_capacities_and_configured_pool_loss() {
     let mut value = source();
-    let mut bounds = Bounds { rows: 2, text: 4, document_bytes: u64::MAX, ..Bounds::default() };
+    let mut bounds = Bounds { rows: 2, segments: 2, text: 4, document_bytes: u64::MAX, ..Bounds::default() };
     let absent = owner_project::bytes(&value, &bounds).unwrap();
     value.policy.permissions = Some(List::with_capacity(2));
     assert_eq!(owner_project::bytes(&value, &bounds), Some(absent + List::<PolicyPermission>::worst_case(2).unwrap()));
@@ -199,7 +199,7 @@ fn owner_project_closed_offer_reservations_price_empty_partial_and_twenty_five_a
         value.acts = project_offers(populated, MAX_OFFERED_ACTS);
         let original = value.clone();
         let bytes = reserved_project_bytes(MAX_OFFERED_ACTS);
-        let mut bounds = Bounds { rows: 2, document_bytes: bytes, ..Bounds::default() };
+        let mut bounds = Bounds { rows: 2, segments: 2, document_bytes: bytes, ..Bounds::default() };
         assert_eq!(owner_project::bytes(&value, &bounds), Some(bytes));
         assert!(owner_project::fits(&value, &bounds));
         bounds.document_bytes -= 1;
@@ -271,7 +271,7 @@ fn owner_project_last_of_twenty_five_offers_keeps_recursive_rows_and_source_orde
     let bytes = reserved_project_bytes(MAX_OFFERED_ACTS)
         + List::<u32>::worst_case(2).unwrap() * 2
         + List::<GoalProcedure>::worst_case(2).unwrap();
-    let mut bounds = Bounds { rows: 2, document_bytes: bytes, ..Bounds::default() };
+    let mut bounds = Bounds { rows: 2, segments: 2, document_bytes: bytes, ..Bounds::default() };
     assert_eq!(owner_project::bytes(&value, &bounds), Some(bytes));
     assert!(owner_project::fits(&value, &bounds));
     bounds.document_bytes -= 1;

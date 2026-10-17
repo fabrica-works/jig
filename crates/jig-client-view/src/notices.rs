@@ -10,6 +10,7 @@ use crate::{Domain, action::Act, notices::kept::Kind, page::IntentPurpose};
 use jig_client::contract::{Answer, ObjectKey, Seen};
 /// Build each visible notice as a named status, with one oldest-notice dismissal.
 pub fn notices(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings) {
+    let text_limit = bindings.text_limit();
     if client.notices().ids().is_empty() {
         return;
     }
@@ -18,7 +19,7 @@ pub fn notices(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
     b.name(&words.say(JigPhrase::NoticesPart, &[]));
     for (id, ()) in client.notices().ids() {
         if let Some(notice) = client.notices().get(*id) {
-            facts(b, &notice.kind, words);
+            facts(b, &notice.kind, words, text_limit);
         }
     }
     if !client.notices().ids().is_empty()
@@ -30,7 +31,7 @@ pub fn notices(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
     b.close();
 }
 /// Whole notice facts, shared by the status renderer and vocabulary tests.
-pub fn facts(b: &mut Builder, kind: &Kind, words: &Words) {
+pub fn facts(b: &mut Builder, kind: &Kind, words: &Words, text_limit: u32) {
     b.open(Role::Status);
     b.name(&words.say(JigPhrase::Notice, &[]));
     match kind {
@@ -38,9 +39,9 @@ pub fn facts(b: &mut Builder, kind: &Kind, words: &Words) {
         Kind::Link(link) => words.link(b, *link),
         Kind::Answer { object, answer: outcome } => {
             object_words(b, *object, words);
-            answer(b, outcome, words);
+            answer(b, outcome, words, text_limit);
         }
-        Kind::PageAnswer { answer: outcome } => answer(b, outcome, words),
+        Kind::PageAnswer { answer: outcome } => answer(b, outcome, words, text_limit),
         Kind::Unknown { object, act } => {
             object_words(b, *object, words);
             words.text(b, common::act_phrase(*act), &[]);
@@ -60,14 +61,14 @@ pub fn facts(b: &mut Builder, kind: &Kind, words: &Words) {
             }
             words.text(b, JigPhrase::UnknownAction, &[]);
         }
-        Kind::Refused(which) => words.refusal(b, &jig_client::contract::Refusal::Limit { which: *which }),
+        Kind::Refused(which) => words.refusal(b, &jig_client::contract::Refusal::Limit { which: *which }, text_limit),
     }
     b.close();
 }
-fn answer(b: &mut Builder, answer: &Answer, words: &Words) {
+fn answer(b: &mut Builder, answer: &Answer, words: &Words, text_limit: u32) {
     match answer {
         Answer::Done(outcome) => words.outcome(b, outcome),
-        Answer::Refused(why) => words.refusal(b, why),
+        Answer::Refused(why) => words.refusal(b, why, text_limit),
     }
 }
 fn object_words(b: &mut Builder, object: ObjectKey, words: &Words) {

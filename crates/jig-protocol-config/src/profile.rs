@@ -48,3 +48,10 @@ pub fn profile(profile: Profile) -> Limits {
         Profile::Standard => standard::LIMITS,
     }
 }
+
+/// A document retains every name the engine can admit.
+pub(crate) const fn name_segments(tasks: &jig_domain_tasks::Limits, authority: &jig_domain_authority::Limits) -> u32 {
+    let task =
+        if tasks.hold_segments > tasks.authority_segments { tasks.hold_segments } else { tasks.authority_segments };
+    if authority.segments > task { authority.segments } else { task }
+}

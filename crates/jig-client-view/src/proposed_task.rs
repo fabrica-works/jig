@@ -89,9 +89,13 @@ pub fn part(b: &mut Builder, value: &OwnerPart, words: &Words, bindings: &mut Ji
     match &value.key {
         OwnerPartKey::Number(number) => text(b, words, ProposedPhrase::PartNumber, &[Hole::Number(*number)]),
         OwnerPartKey::Path(segments) => {
-            for segment in segments {
-                crate::literal_segment::render(b, segment);
-            }
+            let reserved = u32::try_from(name.text.len()).expect("bounded resource words");
+            crate::literal_segment::path(
+                b,
+                segments.as_slice(),
+                words,
+                crate::literal_segment::PathDisplay { text: bindings.text_limit(), reserved, keep_last: true },
+            );
         }
     }
     let token = bindings.insert(JigMeaning::OwnerPart(value.clone())).token;
@@ -143,7 +147,7 @@ pub fn contract(b: &mut Builder, value: &TaskContractDocument, words: &Words, bi
 }
 #[must_use]
 pub fn part_nodes(limits: &Limits) -> Option<u32> {
-    limits.rows.max(1).checked_add(6)
+    limits.segments.max(1).checked_add(6)
 }
 #[must_use]
 pub fn contract_nodes(limits: &Limits) -> Option<u32> {

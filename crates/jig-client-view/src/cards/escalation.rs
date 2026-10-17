@@ -20,6 +20,7 @@ pub fn escalation(
     words: &Words,
     bindings: &mut JigBindings,
 ) -> bool {
+    let text_limit = bindings.text_limit();
     let Some(facts) = client.objects().get(object) else {
         return false;
     };
@@ -46,11 +47,11 @@ pub fn escalation(
     super::chip::chip(b, client, &document.task, words, bindings);
     held(b, client, &document.hold, words, bindings);
     super::common::recipient(b, &document.waiting, words);
-    super::common::trail(b, &document.trail, words);
+    super::common::trail(b, &document.trail, words, text_limit);
     if let Some(ending) = &document.ending {
         words.ending(b, ending);
     }
-    super::common::answer(b, facts, words);
+    super::common::answer(b, facts, words, text_limit);
     super::common::acts(b, &facts.card, &document.acts, object, words, bindings);
     super::close(b);
     true

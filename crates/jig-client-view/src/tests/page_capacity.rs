@@ -854,14 +854,14 @@ fn full_cursor() -> Cursor {
 
 #[test]
 fn each_page_bound_keeps_its_value_at_the_client_limits() {
-    assert_eq!(crate::inbox_nodes(&CLIENT, 0), Some(337_499));
-    assert_eq!(crate::conversations_nodes(&CLIENT, 0), Some(85_194));
-    assert_eq!(crate::conversation_nodes(&CLIENT, 0), Some(1_010_760));
-    assert_eq!(crate::task_nodes(&CLIENT, 0), Some(1_166_881));
-    assert_eq!(crate::project_nodes(&CLIENT, 0), Some(506_365));
+    assert_eq!(crate::inbox_nodes(&CLIENT, 0), Some(338_939));
+    assert_eq!(crate::conversations_nodes(&CLIENT, 0), Some(85_554));
+    assert_eq!(crate::conversation_nodes(&CLIENT, 0), Some(1_015_080));
+    assert_eq!(crate::task_nodes(&CLIENT, 0), Some(1_171_879));
+    assert_eq!(crate::project_nodes(&CLIENT, 0), Some(508_525));
     assert_eq!(crate::deployment_nodes(&CLIENT, 0), Some(2729));
     assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(29));
-    assert_eq!(crate::page_nodes(&CLIENT, 0), Some(1_166_881));
+    assert_eq!(crate::page_nodes(&CLIENT, 0), Some(1_171_879));
 }
 
 #[test]
@@ -877,20 +877,20 @@ fn an_arranged_task_page_counts_the_sum_of_its_sections() {
     let counts = sections.map(|s| crate::task_section_nodes(&CLIENT, s).unwrap());
     assert_eq!(
         (crate::task_header_nodes(&CLIENT).unwrap(), counts),
-        (42_352, [182_751, 1_124_529, 311_099, 13_778, 60, 94])
+        (42_532, [183_521, 1_129_347, 312_429, 13_822, 68, 94])
     );
     let arrangement = crate::page::Arrangement { task: list(sections), project: list([]) };
     assert_eq!(
         crate::arranged_nodes(&CLIENT, 0, &arrangement),
-        Some(42_352 + 182_751 + 1_124_529 + 311_099 + 13_778 + 60 + 94)
+        Some(42_532 + 183_521 + 1_129_347 + 312_429 + 13_822 + 68 + 94)
     );
 }
 #[test]
 fn no_arrangement_keeps_each_page_bound() {
     each_page_bound_keeps_its_value_at_the_client_limits();
     let arrangement = crate::page::Arrangement::none();
-    assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_166_881));
-    assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_166_890));
+    assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_171_879));
+    assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_171_888));
 }
 
 fn most_owed_cards() -> Domain {

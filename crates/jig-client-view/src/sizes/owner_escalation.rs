@@ -68,7 +68,7 @@ fn case(l: &Limits, results: u32, persons: u32, proposals: u32) -> Option<u32> {
         .checked_add(result)?
         .checked_add(person)?
         .checked_add(l.rows.checked_mul(36)?)?
-        .checked_add(crate::owner_authority::document_nodes(l.rows)?)?
+        .checked_add(crate::owner_authority::document_nodes(l.rows, l.segments)?)?
         .checked_add(crate::owner_budget::budget_nodes())?
         .checked_add(28)
 }

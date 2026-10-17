@@ -1,5 +1,5 @@
 //! Checked authority words and selected language (client/domain/view.md, 7).
-//! Phrase IDs 3000..3017 are reserved for the owner authority vocabulary.
+//! Phrase IDs 3000..3018 are reserved for the owner authority vocabulary.
 use crate::Owner;
 use alloc::boxed::Box;
 use skein_lib::{List, Wall, bytes::copy_of};
@@ -29,9 +29,10 @@ pub enum AuthorityPhrase {
     Open,
     Cut,
     Deadline,
+    OmittedSegments,
 }
 /// All phrases, in their stable owner vocabulary order.
-pub const ALL: [AuthorityPhrase; 18] = [
+pub const ALL: [AuthorityPhrase; 19] = [
     AuthorityPhrase::Tools,
     AuthorityPhrase::Tasks,
     AuthorityPhrase::Depth,
@@ -50,6 +51,7 @@ pub const ALL: [AuthorityPhrase; 18] = [
     AuthorityPhrase::Open,
     AuthorityPhrase::Cut,
     AuthorityPhrase::Deadline,
+    AuthorityPhrase::OmittedSegments,
 ];
 impl AuthorityPhrase {
     /// Stable phrase identity, available when composing owner language data.
@@ -74,6 +76,7 @@ impl AuthorityPhrase {
             Self::Open => 3015,
             Self::Cut => 3016,
             Self::Deadline => 3017,
+            Self::OmittedSegments => 3018,
         };
         PhraseId { owner: Owner::Jig.opaque(), number }
     }
@@ -96,14 +99,15 @@ impl AuthorityPhrase {
             | Self::Segments
             | Self::Exact
             | Self::Open
-            | Self::Cut => None,
+            | Self::Cut
+            | Self::OmittedSegments => None,
         }
     }
 }
 /// Phrase contracts independent of language word order.
 #[must_use]
 pub fn shapes() -> Box<[PhraseShape]> {
-    let mut shapes = List::with_capacity(18);
+    let mut shapes = List::with_capacity(19);
     for phrase in ALL {
         let holes: Box<[HoleShape]> = match phrase.hole() {
             Some(kind) => Box::new([HoleShape { kind, bytes: 0 }]),
@@ -116,7 +120,7 @@ pub fn shapes() -> Box<[PhraseShape]> {
 /// Explicit English language data; callers select a checked loaded language.
 #[must_use]
 pub fn english() -> Language {
-    let mut phrases = List::with_capacity(18);
+    let mut phrases = List::with_capacity(19);
     for phrase in ALL {
         let words: &[u8] = match phrase {
             AuthorityPhrase::Tools => b"Tool bits: ",
@@ -137,6 +141,7 @@ pub fn english() -> Language {
             AuthorityPhrase::Open => b"Open ending",
             AuthorityPhrase::Cut => b"Authority document is cut",
             AuthorityPhrase::Deadline => b"Deadline: ",
+            AuthorityPhrase::OmittedSegments => "…".as_bytes(),
         };
         let segments: Box<[Segment]> = match phrase.hole() {
             Some(kind) => Box::new([Segment::Text(copy_of(words)), Segment::Hole { index: 0, kind }]),

@@ -6,7 +6,7 @@ use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 impl Words {
     /// Say the supplied refusal, never deriving permission or numerical limits.
-    pub fn refusal(&self, b: &mut Builder, refusal: &Refusal) {
+    pub fn refusal(&self, b: &mut Builder, refusal: &Refusal, text_limit: u32) {
         match refusal {
             Refusal::Role { held } => {
                 self.text(b, JigPhrase::RoleNotAllowed, &[]);
@@ -24,7 +24,7 @@ impl Words {
             Refusal::NotWaiting => self.text(b, JigPhrase::NotWaitingForYou, &[]),
             Refusal::NoFurther => self.text(b, JigPhrase::NoFurtherHolder, &[]),
             Refusal::Authority { lacking, proposable } => {
-                self.lacking(b, lacking);
+                self.lacking(b, lacking, text_limit);
                 if let Some(false) = proposable {
                     self.text(b, JigPhrase::NobodyMayAccept, &[]);
                 }
@@ -44,7 +44,7 @@ impl Words {
                     Moved::Hold { reason } => {
                         if let Some(reason) = reason {
                             match reason {
-                                CurrentHold::Document(reason) => self.hold_fact(b, reason),
+                                CurrentHold::Document(reason) => self.hold_fact(b, reason, text_limit),
                                 CurrentHold::Reason(reason) => self.hold_category(b, *reason),
                             }
                         }

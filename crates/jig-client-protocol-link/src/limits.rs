@@ -38,7 +38,7 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.owner_chip_phase_waiting_dependencies = client.rows;
     wire.call_identity_id = client.text;
     wire.run_work_tool_tool = client.text;
-    wire.part_resource_path = client.rows;
+    wire.part_resource_path = client.segments;
     wire.part_resource_path_item = client.text;
     wire.wake_policy_topics = client.rows;
     wire.wake_policy_subscriptions = u32::try_from(client.document_bytes).ok()?;
@@ -48,7 +48,7 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.decision_rejected_reason = client.text;
     wire.decision_left_held_reason = client.text;
     wire.attempt_failure_reason = client.text;
-    wire.owner_part_key_path_value = client.rows;
+    wire.owner_part_key_path_value = client.segments;
     wire.owner_part_key_path_value_item = client.text;
     wire.result_field_name = client.text;
     wire.result_field_value = client.text;
@@ -86,7 +86,7 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.specification_inputs = client.rows;
     wire.owner_pattern_end_exact_value = client.text;
     wire.owner_pattern_end_open_value = client.text;
-    wire.owner_pattern_segments = client.rows;
+    wire.owner_pattern_segments = client.segments;
     wire.owner_pattern_segments_item = client.text;
     wire.owner_delegation_kinds = client.rows;
     wire.owner_authority_grants = u32::try_from(client.document_bytes).ok()?;

@@ -408,3 +408,22 @@ pub fn decoded_live_call_expected() -> c::LiveCall {
 }
 
 const UTF8_TEXTS: [&[u8]; 1] = [&[b'~'; 40]];
+
+pub fn task_with_resource_path(count: u32) -> w::Task {
+    let mut wire = limits().wire;
+    wire.owner_part_key_path_value = count;
+    let mut parts = task_record().into_parts();
+    let w::TaskContractDocument::Approval(approval) = parts.result_contract else { panic!("approval fixture") };
+    let mut approval = approval.into_parts();
+    let mut part = approval.part.into_parts();
+    let mut path = List::with_capacity(count);
+    for _ in 0..count {
+        path.push(Box::from(b"segment".as_slice())).unwrap();
+    }
+    part.key =
+        w::OwnerPartKey::Path(w::OwnerPartKeyPath::new(&wire, w::OwnerPartKeyPathParts { value: path }).unwrap());
+    approval.part = w::OwnerPart::new(&wire, part).unwrap();
+    parts.result_contract =
+        w::TaskContractDocument::Approval(w::TaskContractDocumentApproval::new(&wire, approval).unwrap());
+    w::Task::new(&wire, parts).unwrap()
+}

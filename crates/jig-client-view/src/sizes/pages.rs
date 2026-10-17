@@ -137,7 +137,7 @@ pub fn task_section_nodes(l: &Limits, section: TaskSection) -> Option<u32> {
         TaskSection::Overview => overview_in(l, card, chip),
         TaskSection::Plan => plan_in(l, card, chip),
         TaskSection::History => history(l),
-        TaskSection::Budget => crate::owner_authority::document_nodes(l.rows)?
+        TaskSection::Budget => crate::owner_authority::document_nodes(l.rows, l.segments)?
             .checked_add(crate::owner_budget::budget_nodes())?
             .checked_add(l.rows.checked_mul(4)?)?
             .checked_add(4),

@@ -22,6 +22,7 @@ pub fn domain_limits() -> DomainLimits {
         },
         ask_bytes: 16384,
         rows: 2,
+        segments: 4,
         text: 32,
         projects: 2,
         charters: 2,

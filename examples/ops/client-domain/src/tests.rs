@@ -35,6 +35,7 @@ const JIG: jig_client_view::Limits = jig_client_view::Limits {
     charters: 2,
     text: 32,
     rows: 2,
+    segments: 4,
     conversation_words: 2,
     navigation_entries: 8,
     updates_count: 99,
@@ -52,6 +53,7 @@ fn limits() -> Limits {
             reads: 24,
             requests: 4,
             rows: 2,
+            segments: 4,
             retry: Duration::from_nanos(10),
             document_bytes: 65536,
         },
@@ -61,6 +63,7 @@ fn limits() -> Limits {
             reads: 24,
             watches: 24,
             rows: 2,
+            segments: 4,
             text: 32,
             retry: Duration::from_nanos(10),
             document_bytes: 65536,
@@ -1143,7 +1146,7 @@ fn resource_parts_bound_allocated_segments_and_whole_segment_bytes_in_both_conne
         let mut valid = List::with_capacity(2);
         valid.push(Box::<[u8]>::from([0xFF; 32])).unwrap();
         valid.push(Box::<[u8]>::from(*b"/\0")).unwrap();
-        let empty_overallocated = List::with_capacity(3);
+        let empty_overallocated = List::with_capacity(5);
         let mut too_long = List::with_capacity(1);
         too_long.push(Box::<[u8]>::from([b'x'; 33])).unwrap();
         for (path, accepted) in [(valid, true), (empty_overallocated, false), (too_long, false)] {

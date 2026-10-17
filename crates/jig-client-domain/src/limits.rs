@@ -18,6 +18,7 @@ pub struct Limits {
     pub document_bytes: u64,
     pub backoff: Backoff,
     pub rows: u32,
+    pub segments: u32,
     pub text: u32,
     pub projects: u32,
     pub charters: u32,

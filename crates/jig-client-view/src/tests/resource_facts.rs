@@ -58,6 +58,7 @@ fn segmented_names_and_exact_open_patterns_keep_raw_bindings_and_separate_litera
                 }))),
             },
         },
+        CLIENT.text,
     );
     b.close();
     let slots = b.slots(0);

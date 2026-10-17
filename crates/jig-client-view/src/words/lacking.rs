@@ -6,7 +6,7 @@ use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 impl Words {
     /// Say missing authority, keeping unavailable requested facts absent.
-    pub fn lacking(&self, b: &mut Builder, lacking: &Lacking) {
+    pub fn lacking(&self, b: &mut Builder, lacking: &Lacking, text_limit: u32) {
         match lacking {
             Lacking::Approver => self.text(b, JigPhrase::ApprovalAuthorityMissing, &[]),
             Lacking::Budget { needed, left } => {
@@ -18,7 +18,7 @@ impl Words {
                     JigPhrase::LiteralGrantMissing,
                     &[Hole::Number(u64::from(grant.kind)), Hole::Number(u64::from(grant.connector))],
                 );
-                crate::owner_authority::pattern(b, self, &grant.pattern);
+                crate::owner_authority::pattern(b, self, &grant.pattern, text_limit);
             }
             Lacking::GrantKind { kind } => self.text(b, JigPhrase::GrantKindMissing, &[Hole::Number(u64::from(*kind))]),
             Lacking::TaskKind { executor } => {

@@ -39,6 +39,7 @@ pub fn world(settings: Settings) -> World<Test, Scripted> {
                 bounds: Bounds {
                     text: 128,
                     rows: 8,
+                    segments: 4,
                     document_bytes: 65536,
                     commit_delay: Duration::from_millis(5),
                     heartbeat: Duration::from_millis(20),

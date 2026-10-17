@@ -24,7 +24,7 @@ use skein_ui::Act;
 use skein_ui::phrases::{Hole, PhraseLimits, Phrasebook};
 use skein_ui::{Builder, Role, SlotRef, Tree};
 
-pub(super) const CLIENT: crate::Limits = crate::Limits {
+pub(crate) const CLIENT: crate::Limits = crate::Limits {
     watches: 8,
     notices: 2,
     notice_life: Duration::from_secs(5),
@@ -47,6 +47,7 @@ pub(super) const CLIENT: crate::Limits = crate::Limits {
     charters: 2,
     text: 128,
     rows: 2,
+    segments: 4,
     conversation_words: 2,
     navigation_entries: 8,
     updates_count: 99,
@@ -69,7 +70,7 @@ pub(super) fn limits() -> skein_ui::Limits {
         scene_bytes: 0,
     }
 }
-pub(super) fn shared_words() -> &'static Words {
+pub(crate) fn shared_words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
     WORDS.get_or_init(|| Words { book: english::english(CLIENT.text).unwrap(), language: 0, offset_minutes: 60 })
 }

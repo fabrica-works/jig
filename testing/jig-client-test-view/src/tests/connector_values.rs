@@ -105,7 +105,7 @@ fn answer(value: ApplicationOutcome, words: &jig_client_view::words::Words) -> T
     let bound = render::requirements(&limits(), words).unwrap();
     let mut b = Builder::new(&bound);
     b.open(Role::Page);
-    render::answer(&mut b, &ConnectorAnswer { value }, words);
+    render::answer(&mut b, &ConnectorAnswer { value }, words, limits().segment_bytes);
     b.close();
     let tree = b.finish();
     assert!(tree.len() <= render::answer_nodes().saturating_add(1));

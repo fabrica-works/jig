@@ -106,6 +106,7 @@ pub fn form(
     words: &Words,
     bindings: &mut JigBindings,
 ) {
+    let text_limit = bindings.text_limit();
     let Some(before) = before(object) else {
         return;
     };
@@ -113,7 +114,7 @@ pub fn form(
     proposal::amendment(b, &before, words, bindings);
     loss(b, object, words);
     task_loss(b, object, words);
-    authority_loss(b, object, words);
+    authority_loss(b, object, words, text_limit);
     let empty = empty();
     let change = open.choices.change.as_ref().unwrap_or(&empty);
     let value = values(&before, change);
@@ -206,7 +207,7 @@ pub fn form(
         | None => {}
     }
 }
-fn authority_loss(b: &mut Builder, object: &Object, words: &Words) {
+fn authority_loss(b: &mut Builder, object: &Object, words: &Words, text_limit: u32) {
     let document = match &object.body {
         Some(Body::Task(doc)) => Some(&doc.authority),
         Some(Body::OwnerEscalation(doc)) => Some(&doc.task.authority),
@@ -227,7 +228,7 @@ fn authority_loss(b: &mut Builder, object: &Object, words: &Words) {
     if let Some(document) = document
         && document.cut
     {
-        crate::owner_authority::document_words(b, document, words);
+        crate::owner_authority::document_words(b, document, words, text_limit);
     }
 }
 fn task_loss(b: &mut Builder, object: &Object, words: &Words) {

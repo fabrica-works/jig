@@ -60,11 +60,11 @@ fn policy_edits_price_whole_lists_reserved_capacity_and_every_literal_boundary()
         bytes(&value, &Bounds::default()),
         Some(u64::try_from(size_of::<PolicyEdit>()).unwrap() + List::<PolicyRequirement>::worst_case(4).unwrap())
     );
-    assert!(!fits(&value, &Bounds { rows: 3, ..Bounds::default() }));
+    assert!(!fits(&value, &Bounds { rows: 3, segments: 3, ..Bounds::default() }));
     let mut rows = List::with_capacity(1);
     rows.push(requirement()).unwrap();
     let value = PolicyEdit::Requirements { requirements: rows };
-    assert!(!fits(&value, &Bounds { rows: 2, ..Bounds::default() }));
+    assert!(!fits(&value, &Bounds { rows: 2, segments: 2, ..Bounds::default() }));
     assert!(!fits(&value, &Bounds { text: 3, ..Bounds::default() }));
 }
 #[test]
@@ -80,7 +80,7 @@ fn policy_role_prices_nested_authority_and_rejects_an_oversized_terminal_whole()
         requests: u16::MAX,
         decides: u8::MAX,
     });
-    let cap = Bounds { rows: 3, text: 4, ..Bounds::default() };
+    let cap = Bounds { rows: 3, segments: 3, text: 4, ..Bounds::default() };
     let price = bytes(&value, &cap).unwrap();
     assert!(fits(&value, &Bounds { document_bytes: price, ..cap }));
     assert!(!fits(&value, &Bounds { document_bytes: price - 1, ..cap }));

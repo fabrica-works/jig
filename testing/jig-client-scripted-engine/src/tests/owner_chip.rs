@@ -86,7 +86,7 @@ fn value() -> OwnerChipDetails {
 #[test]
 fn nested_chip_metadata_prices_every_allocation_at_exact_and_adjacent_whole_value_bounds() {
     let value = value();
-    let bounds = Bounds { text: 6, rows: 3, document_bytes: u64::MAX, ..Bounds::default() };
+    let bounds = Bounds { text: 6, rows: 3, segments: 3, document_bytes: u64::MAX, ..Bounds::default() };
     // Independent sum of the actual allocated capacities and byte literals.
     let each_part = List::<Box<[u8]>>::worst_case(3).unwrap() + 3 + 2;
     let exact = u64::try_from(core::mem::size_of::<OwnerChipDetails>()).unwrap()
@@ -120,7 +120,7 @@ fn nested_chip_metadata_prices_every_allocation_at_exact_and_adjacent_whole_valu
 }
 #[test]
 fn chip_admission_refuses_oversized_terminal_bytes_nested_raw_parts_and_unused_list_capacity() {
-    let bounds = Bounds { text: 6, rows: 3, document_bytes: u64::MAX, ..Bounds::default() };
+    let bounds = Bounds { text: 6, rows: 3, segments: 3, document_bytes: u64::MAX, ..Bounds::default() };
     let base = value();
     let mut invalid = base.clone();
     invalid.ending = Some(OwnerChipEnding::Failed(doc(UTF8_TEXTS[0], true)));
@@ -164,7 +164,7 @@ fn chip_admission_refuses_oversized_terminal_bytes_nested_raw_parts_and_unused_l
 
 #[test]
 fn owner_retry_scalar_notices_price_whole_retained_and_boxed_envelopes_at_adjacent_bounds() {
-    let bounds = Bounds { text: 6, rows: 3, document_bytes: u64::MAX, ..Bounds::default() };
+    let bounds = Bounds { text: 6, rows: 3, segments: 3, document_bytes: u64::MAX, ..Bounds::default() };
     let each_part = List::<Box<[u8]>>::worst_case(3).unwrap() + 3 + 2;
     let exact = u64::try_from(core::mem::size_of::<OwnerChipDetails>()).unwrap()
         + List::<OwnerResourceLine>::worst_case(2).unwrap()

@@ -14,16 +14,16 @@ fn markdown(limits: &Limits) -> Option<u32> {
 fn authority(limits: &Limits) -> Option<u32> {
     // Four scalars; each row may occur in kinds, grants (two slots), tools,
     // and note scopes (one slot).
-    limits.rows.checked_mul(limits.rows.checked_mul(2)?.checked_add(14)?)?.checked_add(4)
+    limits.rows.checked_mul(limits.segments.checked_mul(2)?.checked_add(14)?)?.checked_add(4)
 }
 fn trail(limits: &Limits) -> Option<u32> {
     // Introduction, actor, time, reason and a whole lacking-authority explanation.
-    limits.rows.checked_mul(limits.rows.checked_add(9)?)
+    limits.rows.checked_mul(limits.segments.checked_add(9)?)
 }
 fn outcome(limits: &Limits) -> Option<u32> {
     // A moved hold includes its complete bounded attempt failures or exact
     // connector part identity; endings retain only supplied actor/decision facts.
-    limits.rows.checked_mul(limits.rows.checked_add(9)?)?.checked_add(12)
+    Some(limits.rows.checked_mul(limits.rows.checked_add(9)?)?.checked_add(12)?.max(limits.segments.checked_add(12)?))
 }
 /// Whole closed offer controls or refusals, independent of paged rows.
 #[must_use]
@@ -54,7 +54,7 @@ fn amendment(limits: &Limits) -> Option<u32> {
     crate::specification::nodes(limits)?
         .checked_add(crate::instructions::nodes(limits)?)?
         .checked_add(crate::owner_wake::policy_nodes())?
-        .checked_add(crate::owner_authority::document_nodes(limits.rows)?)?
+        .checked_add(crate::owner_authority::document_nodes(limits.rows, limits.segments)?)?
         .checked_add(limits.rows.checked_mul(5)?)?
         .checked_add(5)
 }
@@ -62,7 +62,7 @@ fn amendment(limits: &Limits) -> Option<u32> {
 pub(crate) fn proposed_task_nodes(limits: &Limits) -> Option<u32> {
     crate::specification::nodes(limits)?
         .checked_add(crate::proposed_task::contract_nodes(limits)?)?
-        .checked_add(crate::owner_authority::document_nodes(limits.rows)?)?
+        .checked_add(crate::owner_authority::document_nodes(limits.rows, limits.segments)?)?
         .checked_add(crate::owner_wake::policy_nodes())?
         .checked_add(limits.rows)?
         .checked_add(crate::proposed_task::part_nodes(limits)?.checked_mul(limits.rows)?)?

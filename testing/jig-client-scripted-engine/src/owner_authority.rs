@@ -17,7 +17,7 @@ impl Payload for OwnerPatternEnd {
 }
 impl Payload for OwnerPattern {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
-        self.segments.heap(bounds)?.checked_add(self.last.heap(bounds)?)
+        crate::payload::path(&self.segments, bounds)?.checked_add(self.last.heap(bounds)?)
     }
 }
 impl Payload for OwnerGrant {
@@ -78,8 +78,8 @@ pub fn document_fits(value: &OwnerAuthorityDocument, bounds: &Bounds) -> bool {
 #[must_use]
 pub fn worst_case(bounds: &Bounds) -> Option<u64> {
     let rows = u64::from(bounds.rows);
-    let pattern = List::<Box<[u8]>>::worst_case(bounds.rows)?
-        .checked_add(rows.checked_mul(u64::from(bounds.text))?)?
+    let pattern = List::<Box<[u8]>>::worst_case(bounds.segments)?
+        .checked_add(u64::from(bounds.segments).checked_mul(u64::from(bounds.text))?)?
         .checked_add(u64::from(bounds.text))?;
     let nested = pattern.checked_mul(rows)?.checked_mul(2)?;
     List::<OwnerGrant>::worst_case(bounds.rows)?

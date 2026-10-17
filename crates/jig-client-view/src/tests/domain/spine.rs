@@ -35,6 +35,7 @@ pub(super) const LIMITS: Limits = Limits {
     charters: 2,
     text: 32,
     rows: 2,
+    segments: 4,
     conversation_words: 2,
     navigation_entries: 8,
     updates_count: 99,

@@ -466,6 +466,7 @@ fn owner_project_public_required_envelope_checks_last_nested_capacity_and_both_l
     let w = words(false);
     let mut small = limits();
     small.rows = 3;
+    small.segments = 3;
     assert!(view::required(&value, &small, w).is_none());
     let mut changed = value.clone();
     changed.recurring.get_mut(0).unwrap().batch.get_mut(1).unwrap().resources = List::with_capacity(5);

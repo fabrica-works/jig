@@ -10,7 +10,7 @@ use skein_ui::{Builder, Role, Tree};
 fn render(refusal: Refusal) -> Tree {
     let mut builder = Builder::new(&limits());
     builder.open(Role::Page);
-    shared_words().refusal(&mut builder, &refusal);
+    shared_words().refusal(&mut builder, &refusal, CLIENT.text);
     builder.close();
     let tree = builder.finish();
     assert!(tree.len() <= crate::refusal_nodes(&CLIENT).unwrap().checked_add(1).unwrap());

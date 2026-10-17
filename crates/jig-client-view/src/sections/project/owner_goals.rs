@@ -38,6 +38,7 @@ pub(super) fn offer_fits(value: &Admission, limits: &crate::Limits) -> Option<()
 }
 
 pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: &Words, bindings: &mut JigBindings) {
+    let text_limit = bindings.text_limit();
     b.open(Role::Form);
     b.region(crate::regions::JigRegion::NewGoal.region());
     b.name(&words.say(JigPhrase::GoalWords, &[]));
@@ -71,7 +72,7 @@ pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: 
     }
     match offer {
         Some(Admission::Bounded { within: Bounds::Goal { pool_left, .. }, .. }) => pool = Some(*pool_left),
-        Some(Admission::Refused(why)) => words.refusal(b, why),
+        Some(Admission::Refused(why)) => words.refusal(b, why, text_limit),
         None
         | Some(
             Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { within: Bounds::Amend { .. }, .. },
@@ -108,7 +109,7 @@ pub(super) fn form(b: &mut Builder, client: &Domain, doc: &OwnerProject, words: 
         b.close();
     }
     if let Some(why) = &state.refusal {
-        words.refusal(b, why);
+        words.refusal(b, why, text_limit);
     }
     if let Some(answer) = &state.answer {
         words.outcome(b, answer);
@@ -175,6 +176,7 @@ fn inputs(
     bindings: &mut JigBindings,
 ) {
     use super::goals::Field;
+    let text_limit = bindings.text_limit();
     let state = &client.project_page().form;
     let Some(form) = state.form else {
         return;
@@ -210,7 +212,7 @@ fn inputs(
             words.text(b, if form.budget > pool_left { JigPhrase::GoalPropose } else { JigPhrase::WillPropose }, &[]);
             cards::common::recipient(b, &to, words);
         }
-        Admission::Refused(why) => words.refusal(b, &why),
+        Admission::Refused(why) => words.refusal(b, &why, text_limit),
         Admission::Allowed | Admission::Bounded { .. } => {}
     }
     crate::pages::work::control(

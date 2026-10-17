@@ -24,6 +24,7 @@ pub fn section(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut J
 
 fn status(b: &mut Builder, client: &Domain, words: &Words, section: Section) {
     use crate::phrases::jig::JigPhrase;
+    let text_limit = client.text_limit;
     if let Some(status) = client.section_status(section) {
         if status.behind {
             words.status(b, JigPhrase::Behind, &[]);
@@ -32,7 +33,7 @@ fn status(b: &mut Builder, client: &Domain, words: &Words, section: Section) {
             words.status(b, JigPhrase::MoreRows, &[]);
         }
         if let Some(which) = status.refused {
-            words.refusal(b, &jig_client::contract::Refusal::Limit { which });
+            words.refusal(b, &jig_client::contract::Refusal::Limit { which }, text_limit);
         }
         if status.missing {
             words.status(b, JigPhrase::MissingPage, &[]);

@@ -4,6 +4,12 @@ use skein_lib::{ReplyTo, Token};
 
 impl World {
     pub fn delegate_on_resource(&mut self, resource: u64) {
+        self.delegate_on_path(
+            resource,
+            jig_test_connector_world::path(1, u8::try_from(resource).expect("fixture resource")),
+        );
+    }
+    pub fn delegate_on_path(&mut self, resource: u64, path: connector::Path) {
         self.configure_holds(
             1,
             Box::new([tasks::Kind {
@@ -14,11 +20,7 @@ impl World {
         );
         self.send(root::Event::Connector {
             number: 1,
-            event: connector::Event::Adopt {
-                project: 1,
-                resource: jig_test_connector_world::path(1, u8::try_from(resource).expect("fixture resource")),
-                role: connector::ResourceRole::Owned,
-            },
+            event: connector::Event::Adopt { project: 1, resource: path, role: connector::ResourceRole::Owned },
         });
         let mut authority = self.assigned.as_ref().expect("assigned caller").run.authority.clone();
         authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };

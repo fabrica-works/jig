@@ -33,7 +33,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // Start counts restored scope facts only within that step.
     total = total.checked_add(skein_lib::Map::<u64, u32>::worst_case(limits.table.requests)?)?;
     total = total.checked_add(first::worst_case(&limits.first)?)?;
-    total = total.checked_add(crate::second::worst_case(limits.second_parts, limits.first.rows, limits.first.text)?)?;
+    total =
+        total.checked_add(crate::second::worst_case(limits.second_parts, limits.first.segments, limits.first.text)?)?;
     total = total.checked_add(RequestTable::<Owner, Held>::worst_case(&limits.table)?)?;
     total = total.checked_add(limits.table.bytes.checked_mul(3)?)?;
     // Synchronous frame hand-offs nest at most three child output queues.

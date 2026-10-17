@@ -25,7 +25,7 @@ fn text_fits(value: &DocumentText, limits: &Limits) -> Option<()> {
     if value.bytes.fits(limits.text) { Some(()) } else { None }
 }
 fn pattern_fits(value: &OwnerPattern, limits: &Limits) -> Option<()> {
-    if value.segments.capacity() > limits.rows {
+    if value.segments.capacity() > limits.segments {
         return None;
     }
     for segment in &value.segments {
@@ -86,7 +86,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
     20_u32
         .checked_add(skein_ui::markdown::max_nodes(limits.text)?)?
         .checked_add(crate::specification::nodes(limits)?)?
-        .checked_add(crate::owner_authority::document_nodes(limits.rows)?)?
+        .checked_add(crate::owner_authority::document_nodes(limits.rows, limits.segments)?)?
         .checked_add(limits.rows)
 }
 /// Configured envelope; it does not attest that an absent field was supplied.
@@ -112,7 +112,7 @@ fn saying(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
 }
 /// Render only supplied owner facts, borrowing the normal checked language book.
 /// No request, revision, actor, project, clock, origin or subscription is inferred.
-pub fn render(b: &mut Builder, value: &OwnerAmendmentState, words: &Words) {
+pub fn render(b: &mut Builder, value: &OwnerAmendmentState, words: &Words, text_limit: u32) {
     b.open(Role::Region);
     let name = words.book.say(words.language, P::State.id(), &[]).expect("checked amendment region name");
     b.name(&name.text);
@@ -130,7 +130,7 @@ pub fn render(b: &mut Builder, value: &OwnerAmendmentState, words: &Words) {
     saying(b, words, P::Specification, &[]);
     crate::specification::document(b, &value.spec, words);
     saying(b, words, P::Authority, &[]);
-    crate::owner_authority::document_words(b, &value.authority, words);
+    crate::owner_authority::document_words(b, &value.authority, words, text_limit);
     crate::owner_wake::policy(b, &value.wake, &words.book, words.language);
     for task in &value.dependencies {
         saying(b, words, P::Dependencies, &[Hole::Number(*task)]);

@@ -58,13 +58,14 @@ fn edge(b: &mut Builder, words: &Words, bindings: &mut JigBindings, edge: &Edge,
 }
 /// Show the page's excess rows and admission refusal after its sections.
 pub fn excess(b: &mut Builder, client: &Domain, words: &Words) {
+    let text_limit = client.text_limit;
     match client.page() {
         crate::page::Page::Work { excess, refused, .. } => {
             if *excess > 0 {
                 words.status(b, JigPhrase::MoreRows, &[]);
             }
             if let Some(which) = refused {
-                words.refusal(b, &jig_client::contract::Refusal::Limit { which: *which });
+                words.refusal(b, &jig_client::contract::Refusal::Limit { which: *which }, text_limit);
             }
         }
         crate::page::Page::Starting

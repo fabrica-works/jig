@@ -74,13 +74,14 @@ pub fn open(
 }
 /// Build the card's authoritative state, including full refusal and departure facts.
 pub fn state(b: &mut Builder, card: &Card, object: Id<Object>, words: &Words, bindings: &mut JigBindings) {
+    let text_limit = bindings.text_limit();
     match card {
         Card::Open => words.status(b, JigPhrase::Open, &[]),
         Card::Deciding { progress, .. } => words.progress(b, *progress),
         Card::Refused { refusal } => {
             b.open(Role::Status);
             b.name(&words.say(JigPhrase::Refused, &[]));
-            words.refusal(b, refusal);
+            words.refusal(b, refusal, text_limit);
             b.close();
         }
         Card::Unknown { .. } => {
@@ -135,6 +136,7 @@ pub fn card(
     words: &Words,
     bindings: &mut JigBindings,
 ) -> bool {
+    let text_limit = bindings.text_limit();
     let Some(facts) = client.objects().get(object) else {
         return false;
     };
@@ -220,7 +222,7 @@ pub fn card(
                         Act::Go { address: crate::address::Address::task(*task) },
                     );
                 }
-                common::answer(b, facts, words);
+                common::answer(b, facts, words, text_limit);
                 common::acts(b, &facts.card, &document.acts, object, words, bindings);
                 close(b);
             }
@@ -253,10 +255,10 @@ fn received_card(
     None
 }
 /// A refusal without a current object remains a named card of its whole facts.
-pub fn refusal(b: &mut Builder, refusal: &jig_client::contract::Refusal, words: &Words) {
+pub fn refusal(b: &mut Builder, refusal: &jig_client::contract::Refusal, words: &Words, text_limit: u32) {
     b.open(Role::Region);
     b.name(&words.say(JigPhrase::Refused, &[]));
-    words.refusal(b, refusal);
+    words.refusal(b, refusal, text_limit);
     b.close();
 }
 

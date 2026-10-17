@@ -45,7 +45,7 @@ fn authority() -> OwnerAuthority {
     }
 }
 fn bounds() -> Bounds {
-    Bounds { rows: 3, text: 4, document_bytes: u64::MAX, ..Bounds::default() }
+    Bounds { rows: 3, segments: 3, text: 4, document_bytes: u64::MAX, ..Bounds::default() }
 }
 #[test]
 fn saturated_authority_prices_every_capacity_and_byte_exactly() {
@@ -124,13 +124,13 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     use skein_ui::phrases::PhraseLimits;
 
     let language_limits =
-        PhraseLimits { languages: 1, phrases: 18, holes: 1, segments: 40, text_bytes: 4096, hole_bytes: 0 };
+        PhraseLimits { languages: 1, phrases: 19, holes: 1, segments: 40, text_bytes: 4096, hole_bytes: 0 };
     let word_meter = Meter::new();
     let words = OwnerAuthorityWords::load(Box::new([words::english()]), &language_limits, 0, 0)
         .expect("closed English authority words");
     assert!(word_meter.held() <= words::worst_case(&language_limits).expect("checked word envelope"));
     let value = OwnerAuthorityDocument { authority: authority(), cut: true };
-    let envelope = view::worst_case(3, 4, &words).expect("full view envelope");
+    let envelope = view::worst_case(3, 3, 4, &words).expect("full view envelope");
     let required = view::document_required(&value, &words).expect("value capacity");
     assert_eq!(required.nodes, 59, "full three-by-three patterns and executor rows");
     assert_eq!(required.nodes, envelope.nodes);
@@ -151,7 +151,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     };
     let meter = Meter::new();
     let mut builder = Builder::new(&limits);
-    view::document(&mut builder, &value, &words);
+    view::document(&mut builder, &value, &words, 4);
     let tree = builder.finish();
     assert_eq!(tree.len(), 59);
     assert!(meter.held() <= jig_client_view::limits::jig_worst_case(&limits).expect("tree heap envelope"));

@@ -17,6 +17,7 @@ fn bounds(limits: &Limits) -> admission::Bounds {
     admission::Bounds {
         text: limits.text,
         rows: limits.rows,
+        segments: limits.segments,
         document_bytes: limits.document_bytes,
         ..admission::Bounds::default()
     }

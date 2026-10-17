@@ -10,7 +10,7 @@ use jig_client_domain::contract::{
 impl Payload for OwnerGoalHolding {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Write { path, .. } | Self::Slot { path, .. } => path.heap(bounds),
+            Self::Write { path, .. } | Self::Slot { path, .. } => crate::payload::path(path, bounds),
         }
     }
 }

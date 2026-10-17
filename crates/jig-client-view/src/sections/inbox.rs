@@ -89,6 +89,7 @@ pub(crate) fn group(
     true
 }
 pub(crate) fn status(b: &mut Builder, client: &Domain, words: &Words) {
+    let text_limit = client.text_limit;
     let page = client.inbox();
     if page.goal_context_pending {
         owner_text(b, words, crate::owner_inbox_words::InboxPhrase::GoalContextPending, &[]);
@@ -97,7 +98,7 @@ pub(crate) fn status(b: &mut Builder, client: &Domain, words: &Words) {
         words.status(b, JigPhrase::MoreRows, &[]);
     }
     if let Some(refusal) = &page.refusal {
-        words.refusal(b, refusal);
+        words.refusal(b, refusal, text_limit);
     }
 }
 fn window(b: &mut Builder, client: &Domain, words: &Words, bindings: &mut JigBindings, parent: InboxReadGroup) {

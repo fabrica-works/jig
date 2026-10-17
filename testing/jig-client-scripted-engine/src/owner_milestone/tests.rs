@@ -19,7 +19,7 @@ fn part(capacity: u32) -> OwnerPart {
     OwnerPart { connector: u16::MAX, kind: OwnerPartKind::Resource, key: OwnerPartKey::Path(path) }
 }
 fn bounds() -> Bounds {
-    Bounds { text: 8, rows: 3, document_bytes: 65536, ..Bounds::default() }
+    Bounds { text: 8, rows: 3, segments: 3, document_bytes: 65536, ..Bounds::default() }
 }
 #[test]
 fn owner_milestone_recursive_heap_counts_reserved_fields_parts_and_bytes_at_exact_and_adjacent_whole_bounds() {
@@ -73,7 +73,7 @@ fn owner_milestone_reserved_empty_lists_optional_approval_and_every_nested_capac
         fields: fields.clone(),
     })));
     assert_eq!(bytes(&source, &base), Some(root.checked_add(List::<ResultField>::worst_case(3).unwrap()).unwrap()));
-    assert!(bytes(&source, &Bounds { rows: 2, ..base }).is_none());
+    assert!(bytes(&source, &Bounds { rows: 2, segments: 2, ..base }).is_none());
     fields.push(ResultField { name: copy_of(&[255; 8]), value: copy_of(&[254; 8]) }).unwrap();
     source.phase = OwnerMilestonePhase::Ended(OwnerChipEnding::Done(ResultValue::OwnerVerdict {
         verdict: u32::MAX,
@@ -123,7 +123,7 @@ fn owner_milestone_verdict_followup_allocations_remain_whole_and_no_terminal_clo
         .checked_add(List::<Chip>::worst_case(3).unwrap())
         .unwrap();
     assert_eq!(bytes(&value, &base), Some(expected));
-    assert!(bytes(&value, &Bounds { rows: 2, ..base }).is_none());
+    assert!(bytes(&value, &Bounds { rows: 2, segments: 2, ..base }).is_none());
     assert_eq!(value.at, None);
     let numeric = line(OwnerMilestonePhase::Held {
         before: OwnerPriorPhase::Active(RunStage::BackingOff { until: Wall::from_nanos(u64::MAX) }),

@@ -95,7 +95,7 @@ fn person_value(state: OwnerPersonProposalState, decision: Option<OwnerProposalD
     )
 }
 fn bounds() -> Bounds {
-    Bounds { rows: 3, text: 32, document_bytes: 1_000_000, ..Bounds::default() }
+    Bounds { rows: 3, segments: 3, text: 32, document_bytes: 1_000_000, ..Bounds::default() }
 }
 #[test]
 fn historical_person_goal_keeps_raw_project_all_four_numbers_parameters_and_distinct_literal_holdings() {

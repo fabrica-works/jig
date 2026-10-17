@@ -20,6 +20,7 @@ pub fn proposal(
     words: &Words,
     bindings: &mut JigBindings,
 ) -> bool {
+    let text_limit = bindings.text_limit();
     let Some(object_facts) = client.objects().get(object) else {
         return false;
     };
@@ -38,11 +39,11 @@ pub fn proposal(
     super::common::authority(b, &document.needs, words, bindings);
     super::common::funding(b, &document.funding, document.needs.budget, words);
     super::common::recipient(b, &document.waiting, words);
-    super::common::trail(b, &document.trail, words);
+    super::common::trail(b, &document.trail, words, text_limit);
     if let Some(ending) = &document.ending {
         words.ending(b, ending);
     }
-    super::common::answer(b, object_facts, words);
+    super::common::answer(b, object_facts, words, text_limit);
     super::common::acts(b, &object_facts.card, &document.acts, object, words, bindings);
     super::close(b);
     true
@@ -82,12 +83,13 @@ pub fn action(b: &mut Builder, action: &ProposalAction, words: &Words, bindings:
     }
 }
 pub(crate) fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words, bindings: &mut JigBindings) {
+    let text_limit = bindings.text_limit();
     b.open(Role::Item);
     words.text(b, JigPhrase::BatchTask, &[Hole::Number(task.number)]);
     crate::specification::document(b, &task.spec, words);
     crate::proposed_task::executor(b, task.executor, words);
     crate::proposed_task::contract(b, &task.contract, words, bindings);
-    crate::owner_authority::document_words(b, &task.authority, words);
+    crate::owner_authority::document_words(b, &task.authority, words, text_limit);
     words.text(b, JigPhrase::Budget, &[Hole::Amount(task.budget)]);
     crate::proposed_task::funder(b, task.funder, words);
     crate::owner_wake::policy(b, &task.wake, &words.book, words.language);
@@ -106,7 +108,8 @@ pub(crate) fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words,
     b.close();
 }
 /// Changes retain the before/after facts instead of interpreting instructions.
-pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, _bindings: &mut JigBindings) {
+pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &mut JigBindings) {
+    let text_limit = bindings.text_limit();
     if let Some(to) = &change.addressed {
         address_change(b, to, words);
     }
@@ -125,7 +128,7 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, _bindings: 
         }
     }
     if let Some(authority) = &change.authority {
-        crate::owner_authority::render_words(b, authority, words);
+        crate::owner_authority::render_words(b, authority, words, text_limit);
     }
     b.open(Role::Separator);
     b.close();
@@ -146,6 +149,7 @@ pub fn owner_proposal(
     words: &Words,
     bindings: &mut JigBindings,
 ) -> bool {
+    let text_limit = bindings.text_limit();
     let Some(facts) = client.objects().get(object) else {
         return false;
     };
@@ -171,7 +175,7 @@ pub fn owner_proposal(
         return false;
     }
     crate::owner_proposal::render(b, client, document, words, bindings);
-    super::common::answer(b, facts, words);
+    super::common::answer(b, facts, words, text_limit);
     super::common::acts(b, &facts.card, &document.acts, object, words, bindings);
     super::close(b);
     true

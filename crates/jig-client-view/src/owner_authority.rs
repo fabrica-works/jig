@@ -28,6 +28,7 @@ impl AuthorityFragment {
         Some(())
     }
     fn pattern(&mut self, pattern: &OwnerPattern, words: &Words) -> Option<()> {
+        self.text_per_node = self.text_per_node.max(words.book.capacity(AuthorityPhrase::OmittedSegments.id())?);
         self.phrase(words, AuthorityPhrase::Segments)?;
         for segment in &pattern.segments {
             self.leaf(crate::literal_segment::display_bytes(segment)?)?;
@@ -94,15 +95,15 @@ pub fn document_required_words(value: &OwnerAuthorityDocument, words: &Words) ->
 }
 /// Configured envelope for full rows of grants, resource scopes and pattern segments.
 #[must_use]
-pub fn worst_case_words(rows: u32, text: u32, words: &Words) -> Option<AuthorityFragment> {
+pub fn worst_case_words(rows: u32, segments: u32, text: u32, words: &Words) -> Option<AuthorityFragment> {
     let mut phrase = 0;
     for id in crate::owner_authority_words::ALL {
         phrase = phrase.max(words.book.capacity(id.id())?);
     }
     let patterns = rows.checked_mul(2)?;
-    let raw = rows.checked_add(1)?.checked_mul(patterns)?;
+    let raw = segments.checked_add(1)?.checked_mul(patterns)?;
     let sayings = rows.checked_mul(8)?.checked_add(10)?;
-    let nodes = document_nodes(rows)?;
+    let nodes = document_nodes(rows, segments)?;
     let text = crate::literal_segment::max_bytes(text)?;
     let text_bytes = raw.checked_mul(text)?.checked_add(sayings.checked_mul(phrase)?)?;
     Some(AuthorityFragment { nodes, text_bytes, text_per_node: text.max(phrase), depth: 2 })
@@ -114,11 +115,23 @@ fn text(b: &mut Builder, words: &Words, phrase: AuthorityPhrase, holes: &[Hole])
 fn number(b: &mut Builder, words: &Words, phrase: AuthorityPhrase, value: u64) {
     text(b, words, phrase, &[Hole::Number(value)]);
 }
-pub(crate) fn pattern(b: &mut Builder, words: &Words, value: &OwnerPattern) {
+pub(crate) fn pattern(b: &mut Builder, words: &Words, value: &OwnerPattern, text_limit: u32) {
     text(b, words, AuthorityPhrase::Segments, &[]);
-    for segment in &value.segments {
-        crate::literal_segment::render(b, segment);
-    }
+    let last = match &value.last {
+        OwnerPatternEnd::Exact(bytes) | OwnerPatternEnd::Open(bytes) => bytes,
+    };
+    let reserved = u32::try_from(
+        words.book.say(words.language, AuthorityPhrase::Segments.id(), &[]).expect("checked segments").text.len(),
+    )
+    .expect("bounded phrase")
+    .checked_add(crate::literal_segment::display_bytes(last).expect("bounded ending"))
+    .expect("bounded path words");
+    crate::literal_segment::path(
+        b,
+        value.segments.as_slice(),
+        words,
+        crate::literal_segment::PathDisplay { text: text_limit, reserved, keep_last: false },
+    );
     match &value.last {
         OwnerPatternEnd::Exact(bytes) => {
             text(b, words, AuthorityPhrase::Exact, &[]);
@@ -130,7 +143,7 @@ pub(crate) fn pattern(b: &mut Builder, words: &Words, value: &OwnerPattern) {
         }
     }
 }
-fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words) {
+fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words, text_limit: u32) {
     number(b, words, AuthorityPhrase::Tools, value.tools);
     number(b, words, AuthorityPhrase::Tasks, u64::from(value.delegation.tasks));
     number(b, words, AuthorityPhrase::Depth, u64::from(value.delegation.depth));
@@ -143,7 +156,7 @@ fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words) {
     for grant in &value.grants {
         number(b, words, AuthorityPhrase::Connector, u64::from(grant.connector));
         number(b, words, AuthorityPhrase::Kind, u64::from(grant.kind));
-        pattern(b, words, &grant.pattern);
+        pattern(b, words, &grant.pattern, text_limit);
     }
     text(b, words, AuthorityPhrase::Delegation, &[]);
     for kind in &value.delegation.kinds {
@@ -156,19 +169,19 @@ fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words) {
     text(b, words, AuthorityPhrase::Resources, &[]);
     for resource in &value.note_resources {
         number(b, words, AuthorityPhrase::Connector, u64::from(resource.connector));
-        pattern(b, words, &resource.pattern);
+        pattern(b, words, &resource.pattern, text_limit);
     }
 }
 /// Render a whole admitted payload using a separately reserved fragment capacity.
-pub fn render_words(b: &mut Builder, value: &OwnerAuthority, words: &Words) {
+pub fn render_words(b: &mut Builder, value: &OwnerAuthority, words: &Words, text_limit: u32) {
     b.open(Role::Description);
-    body(b, value, words);
+    body(b, value, words, text_limit);
     b.close();
 }
 /// Render a document projection and its explicit cut metadata.
-pub fn document_words(b: &mut Builder, value: &OwnerAuthorityDocument, words: &Words) {
+pub fn document_words(b: &mut Builder, value: &OwnerAuthorityDocument, words: &Words, text_limit: u32) {
     b.open(Role::Description);
-    body(b, &value.authority, words);
+    body(b, &value.authority, words, text_limit);
     if value.cut {
         text(b, words, AuthorityPhrase::Cut, &[]);
     }
@@ -177,8 +190,8 @@ pub fn document_words(b: &mut Builder, value: &OwnerAuthorityDocument, words: &W
 
 /// Maximum nodes for a supplied authority document, including its cut marker.
 #[must_use]
-pub fn document_nodes(rows: u32) -> Option<u32> {
-    let raw = rows.checked_add(1)?.checked_mul(rows.checked_mul(2)?)?;
+pub fn document_nodes(rows: u32, segments: u32) -> Option<u32> {
+    let raw = segments.checked_add(1)?.checked_mul(rows.checked_mul(2)?)?;
     raw.checked_add(rows.checked_mul(8)?.checked_add(10)?)?.checked_add(1)
 }
 /// Standalone capacity API shares the original checked book.
@@ -193,14 +206,14 @@ pub fn document_required(value: &OwnerAuthorityDocument, words: &OwnerAuthorityW
 }
 /// Standalone configured envelope includes escaped literal presentation.
 #[must_use]
-pub fn worst_case(rows: u32, text: u32, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
-    worst_case_words(rows, text, words.words())
+pub fn worst_case(rows: u32, segments: u32, text: u32, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
+    worst_case_words(rows, segments, text, words.words())
 }
 /// Render a standalone authority with its selected checked language.
-pub fn render(b: &mut Builder, value: &OwnerAuthority, words: &OwnerAuthorityWords) {
-    render_words(b, value, words.words());
+pub fn render(b: &mut Builder, value: &OwnerAuthority, words: &OwnerAuthorityWords, text_limit: u32) {
+    render_words(b, value, words.words(), text_limit);
 }
 /// Render a standalone authority document and its supplied cut marker.
-pub fn document(b: &mut Builder, value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords) {
-    document_words(b, value, words.words());
+pub fn document(b: &mut Builder, value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords, text_limit: u32) {
+    document_words(b, value, words.words(), text_limit);
 }

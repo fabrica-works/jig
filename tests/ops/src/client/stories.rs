@@ -324,6 +324,7 @@ fn configured(seed: u64, truth: Truth, ops: OpsScript, rules: Vec<jig_client_scr
                 bounds: Bounds {
                     text: 32,
                     rows: 8,
+                    segments: 4,
                     document_bytes: 65536,
                     commit_delay: Duration::from_millis(5),
                     heartbeat: Duration::from_millis(20),

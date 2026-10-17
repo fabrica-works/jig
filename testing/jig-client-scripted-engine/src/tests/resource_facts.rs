@@ -7,7 +7,7 @@ fn whole_segmented_resource_admission_prices_reserved_slots_terminal_bytes_and_e
     path.push(Box::<[u8]>::from(*b"a/b\0")).unwrap();
     path.push(Box::<[u8]>::from([255, 0, 128])).unwrap();
     let resource = Part::Resource { connector: u16::MAX, path };
-    let mut bounds = Bounds { text: 4, rows: 3, document_bytes: u64::MAX, ..Bounds::default() };
+    let mut bounds = Bounds { text: 4, rows: 3, segments: 3, document_bytes: u64::MAX, ..Bounds::default() };
     let whole = u64::try_from(size_of::<Part>()).unwrap() + resource.heap(&bounds).unwrap();
     assert_eq!(whole, u64::try_from(size_of::<Part>() + 3 * size_of::<Box<[u8]>>()).unwrap() + 7);
     bounds.document_bytes = whole;
@@ -15,9 +15,9 @@ fn whole_segmented_resource_admission_prices_reserved_slots_terminal_bytes_and_e
     bounds.document_bytes = whole - 1;
     assert!(!payload::fits(&resource, &bounds));
     bounds.document_bytes = whole + 1;
-    bounds.rows = 2;
+    bounds.segments = 2;
     assert!(!payload::fits(&resource, &bounds));
-    bounds.rows = 3;
+    bounds.segments = 3;
     bounds.text = 3;
     assert!(!payload::fits(&resource, &bounds));
     let mut segments = List::with_capacity(3);

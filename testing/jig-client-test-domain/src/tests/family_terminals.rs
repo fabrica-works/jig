@@ -19,6 +19,7 @@ fn limits() -> first::Limits {
         reads: 4,
         watches: 4,
         requests: 2,
+        segments: 4,
         rows: 2,
         text: 32,
         connector: crate::connector_values::ConnectorLimits {

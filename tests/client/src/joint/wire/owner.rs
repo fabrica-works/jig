@@ -196,7 +196,9 @@ pub fn part(value: &tasks::Part, limits: &Limits) -> Result<client::OwnerPart, I
         key: match &value.key {
             tasks::PartKey::Number(number) => client::OwnerPartKey::Number(*number),
             tasks::PartKey::Path(segments) => {
-                client::OwnerPartKey::Path(list(segments, limits, |value| bytes(value, limits))?)
+                client::OwnerPartKey::Path(list(segments, &Limits { rows: limits.segments, ..*limits }, |value| {
+                    bytes(value, limits)
+                })?)
             }
         },
     })
@@ -208,7 +210,7 @@ pub(super) fn pattern(
     limits: &Limits,
 ) -> Result<client::OwnerPattern, Invalid> {
     Ok(client::OwnerPattern {
-        segments: list(segments, limits, |value| bytes(value, limits))?,
+        segments: list(segments, &Limits { rows: limits.segments, ..*limits }, |value| bytes(value, limits))?,
         last: match last {
             documents::PatternEnd::Exact(value) => client::OwnerPatternEnd::Exact(bytes(value, limits)?),
             documents::PatternEnd::Open(value) => client::OwnerPatternEnd::Open(bytes(value, limits)?),
@@ -605,14 +607,14 @@ pub(super) mod tests {
             segments.push(b"a/b".as_slice().into()).expect("the complete supplied fixture is admitted");
             segments.push(Box::new([255, 0])).expect("the complete supplied fixture is admitted");
             let source = tasks::Part { connector: u16::MAX, kind, key: tasks::PartKey::Path(segments) };
-            let limits = Limits { rows: 3, text: 3, ..crate::test::limits().jig };
+            let limits = Limits { rows: 3, segments: 3, text: 3, ..crate::test::limits().jig };
             let actual = part(&source, &limits).expect("the complete supplied fixture is admitted");
             assert_eq!(actual.connector, u16::MAX);
             let client::OwnerPartKey::Path(path) = actual.key else { panic!("literal segments stay a path") };
             assert_eq!(path.capacity(), 3);
             assert_eq!(path.get(0).expect("the complete supplied row is retained").as_ref(), b"a/b");
             assert_eq!(path.get(1).expect("the complete supplied row is retained").as_ref(), &[255, 0]);
-            assert_eq!(part(&source, &Limits { rows: 2, ..limits }), Err(Invalid::TooLarge));
+            assert_eq!(part(&source, &Limits { rows: 2, segments: 2, ..limits }), Err(Invalid::TooLarge));
             assert_eq!(part(&source, &Limits { text: 2, ..limits }), Err(Invalid::TooLarge));
         }
     }

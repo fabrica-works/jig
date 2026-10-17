@@ -1875,14 +1875,14 @@ fn result_document_loss_and_raw_change_paths_are_admitted_whole_at_exact_allocat
         + 3
         + 2
         + 3;
-    let mut bounds = Bounds { rows: 4, text: 3, document_bytes: exact, ..Bounds::default() };
+    let mut bounds = Bounds { rows: 2, segments: 4, text: 3, document_bytes: exact, ..Bounds::default() };
     assert!(crate::payload::fits(&value, &bounds));
     bounds.document_bytes -= 1;
     assert!(!crate::payload::fits(&value, &bounds));
     bounds.document_bytes = exact;
-    bounds.rows = 3;
-    assert!(!crate::payload::fits(&value, &bounds), "allocated path rows are charged even when unused");
-    bounds.rows = 4;
+    bounds.segments = 3;
+    assert!(!crate::payload::fits(&value, &bounds), "allocated path segments are charged even when unused");
+    bounds.segments = 4;
     bounds.text = 2;
     assert!(
         !crate::payload::fits(&value, &bounds),

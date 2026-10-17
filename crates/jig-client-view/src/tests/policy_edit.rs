@@ -28,7 +28,7 @@ fn shown(value: &PolicyEdit) -> skein_ui::Tree {
         scene_bytes: 0,
     });
     b.open(Role::Page);
-    policy_edit::render(&mut b, value, words);
+    policy_edit::render(&mut b, value, words, super::cards::CLIENT.text);
     b.close();
     let tree = b.finish();
     assert_eq!(tree.len(), required.nodes.checked_add(1).unwrap());

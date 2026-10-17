@@ -28,7 +28,9 @@ fn list<T, U>(
 }
 fn pattern(value: &tasks::Pattern, limits: &Limits) -> Result<client::OwnerPattern, owner::Invalid> {
     Ok(client::OwnerPattern {
-        segments: list(&value.segments, limits, |value| owner::bytes(value, limits))?,
+        segments: list(&value.segments, &Limits { rows: limits.segments, ..*limits }, |value| {
+            owner::bytes(value, limits)
+        })?,
         last: match &value.last {
             tasks::Last::Exact(value) => client::OwnerPatternEnd::Exact(owner::bytes(value, limits)?),
             tasks::Last::Open(value) => client::OwnerPatternEnd::Open(owner::bytes(value, limits)?),
@@ -127,7 +129,7 @@ pub(super) fn goal(value: &tasks::New, limits: &Limits) -> Result<client::OwnerP
                 tasks::Holding::Slot { pool, kind } => (pool, *kind),
             };
             let connector = name.connector;
-            let path = list(&name.path, limits, |value| opaque(value, limits))?;
+            let path = list(&name.path, &Limits { rows: limits.segments, ..*limits }, |value| opaque(value, limits))?;
             Ok(match value {
                 tasks::Holding::Write { .. } => client::OwnerGoalHolding::Write { connector, path, kind },
                 tasks::Holding::Slot { .. } => client::OwnerGoalHolding::Slot { connector, path, kind },
