@@ -1,5 +1,6 @@
 //! A supplied amendment reason is independent of the six selected changes.
 use super::*;
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Fixture};
 
 fn opened(act: ActKind) -> (Fixture, Id<Object>) {
@@ -49,7 +50,6 @@ fn amendment_requires_person_reason_presence_and_accepts_explicit_empty() {
             task: 8,
             revision: Some(Revision { value: 9 }),
             change: Box::new(change()),
-            release: None,
             reason: text(b"")
         }
     );
@@ -87,14 +87,17 @@ fn amendment_release_keeps_opaque_reason_delta_and_independent_revisions_in_one_
     let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert_eq!(
         sent(&out),
-        &Ask::Amend {
-            project: 1,
-            task: 8,
-            revision: Some(Revision { value: 9 }),
-            change: Box::new(selected),
-            release: Some(Revision { value: 3 }),
-            reason: text(bytes)
-        }
+        &crate::tests::fixtures::releasing(
+            Ask::Amend {
+                project: 1,
+                task: 8,
+                revision: Some(Revision { value: 9 }),
+                change: Box::new(selected),
+
+                reason: text(bytes)
+            },
+            Some(Revision { value: 3 })
+        )
     );
     assert!(domain.fields().get(Purpose::Reason).unwrap().text.bytes().is_empty());
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().writes, 1);
@@ -116,7 +119,7 @@ fn a_late_amendment_answer_preserves_another_forms_supplied_reason_until_page_sw
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
     edit(&mut domain, Purpose::Reason, b"new reason");
     let writes = domain.fields().get(Purpose::Reason).unwrap().writes;
-    drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: Answer::Refused(Refusal::NotOffered) });
+    drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: refusal_answer(Refusal::NotOffered) });
     assert_eq!(domain.confirmation().unwrap().object, id);
     assert_eq!(domain.confirmation().unwrap().reason_input, crate::confirm::ReasonInput::Supplied);
     assert_eq!(domain.fields().get(Purpose::Reason).unwrap().text.bytes(), b"new reason");

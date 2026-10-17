@@ -5,14 +5,24 @@ use crate::{Ui, intents::Intent};
 use jig_client::contract::{Answer, Ask, FrameParty, Limit, Text};
 use skein_lib::{Id, Token};
 
-fn words(ask: &Ask, task: u64) -> Option<&Text> {
+pub(crate) fn words(ask: &Ask, task: u64) -> Option<&Text> {
     match ask {
-        Ask::Write { task: written, words, .. } => {
+        Ask::Message { task: written, words, .. } => {
             if *written == task {
                 Some(words)
             } else {
                 None
             }
+        }
+        Ask::Compound { operations, .. } => {
+            for operation in operations {
+                if let jig_client::contract::Operation::Message { task: written, words, .. } = operation
+                    && *written == task
+                {
+                    return Some(words);
+                }
+            }
+            None
         }
         Ask::StartChat { .. }
         | Ask::Answer { .. }
@@ -84,6 +94,10 @@ pub(crate) fn answered(domain: &mut Ui, request: Token, answer: &Answer) {
         return;
     }
     let message = match answer {
+        Answer::Done(jig_client::contract::Outcome::Owner(jig_client::contract::OwnerOutcome::Compound {
+            first_message,
+            ..
+        })) => Some(*first_message),
         Answer::Done(outcome) => match crate::outcome::route(outcome) {
             crate::outcome::Route::Words { task, message } => {
                 if task == domain.conversation.task {
@@ -97,7 +111,7 @@ pub(crate) fn answered(domain: &mut Ui, request: Token, answer: &Answer) {
             | crate::outcome::Route::Proposed
             | crate::outcome::Route::Other => None,
         },
-        Answer::Refused(_) => None,
+        Answer::Refused { refusal: _, .. } => None,
     };
     match message {
         Some(message) => {

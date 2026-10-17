@@ -6,6 +6,7 @@
 )]
 use super::cards::{CLIENT, contains, document, drive, start, text, words};
 use crate::JigBindings;
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Ended, Fixture, ReadPage, Served, Watched};
 use crate::{
     Event, Request,
@@ -304,7 +305,7 @@ fn conversations_form(words: &crate::words::Words) {
         .unwrap();
     let waiting = build(&d, 1, words).0;
     assert!(waiting.nodes().iter().any(|n| n.states.as_slice().contains(&skein_ui::State::Busy)));
-    drive(&mut d, AnsweredByEngine { request, answer: Answer::Refused(Refusal::NotOffered) });
+    drive(&mut d, AnsweredByEngine { request, answer: refusal_answer(Refusal::NotOffered) });
     assert!(contains(&build(&d, 1, words).0, b"This act is not offered"));
     assert!(
         tree.nodes()

@@ -13,6 +13,10 @@ use skein_ui::phrases::{
 /// The closed phrases for committed outcomes and their supplied facts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutcomePhrase {
+    /// The operations committed saying.
+    Compound,
+    /// The number of committed operations.
+    Operations,
     /// The chat closed saying.
     Closing,
     /// The read position marked seen saying.
@@ -73,7 +77,6 @@ pub enum OutcomePhrase {
     Withdrawn,
     /// The no longer applies saying.
     Stale,
-    /// The released saying.
     ReleaseChoice,
     /// The chat saying.
     Chat,
@@ -105,10 +108,6 @@ pub enum OutcomePhrase {
     Question,
     /// The hold revision saying.
     Revision,
-    /// The released: yes saying.
-    ReleasedYes,
-    /// The released: no saying.
-    ReleasedNo,
     /// The results seen through saying.
     ResultsThrough,
     /// The replies seen through saying.
@@ -116,6 +115,8 @@ pub enum OutcomePhrase {
 }
 /// Every outcome phrase in stable owner order.
 pub const ALL: [OutcomePhrase; 50] = [
+    OutcomePhrase::Compound,
+    OutcomePhrase::Operations,
     OutcomePhrase::Closing,
     OutcomePhrase::MarkedSeen,
     OutcomePhrase::NoteEdited,
@@ -162,8 +163,6 @@ pub const ALL: [OutcomePhrase; 50] = [
     OutcomePhrase::Message,
     OutcomePhrase::Question,
     OutcomePhrase::Revision,
-    OutcomePhrase::ReleasedYes,
-    OutcomePhrase::ReleasedNo,
     OutcomePhrase::ResultsThrough,
     OutcomePhrase::RepliesThrough,
 ];
@@ -172,6 +171,8 @@ impl OutcomePhrase {
     #[must_use]
     pub fn id(self) -> PhraseId {
         let number = match self {
+            Self::Compound => 6450,
+            Self::Operations => 6451,
             Self::Closing => 6400,
             Self::MarkedSeen => 6401,
             Self::NoteEdited => 6402,
@@ -218,8 +219,6 @@ impl OutcomePhrase {
             Self::Message => 6443,
             Self::Question => 6444,
             Self::Revision => 6445,
-            Self::ReleasedYes => 6446,
-            Self::ReleasedNo => 6447,
             Self::ResultsThrough => 6448,
             Self::RepliesThrough => 6449,
         };
@@ -227,7 +226,8 @@ impl OutcomePhrase {
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Chat
+            Self::Operations
+            | Self::Chat
             | Self::CancelledCount
             | Self::KeptCount
             | Self::Note
@@ -244,7 +244,8 @@ impl OutcomePhrase {
             | Self::ResultsThrough
             | Self::RepliesThrough => Some(HoleKind::Number),
             Self::At => Some(HoleKind::Wall),
-            Self::Closing
+            Self::Compound
+            | Self::Closing
             | Self::MarkedSeen
             | Self::NoteEdited
             | Self::ServiceMade
@@ -274,9 +275,7 @@ impl OutcomePhrase {
             | Self::Passed
             | Self::Withdrawn
             | Self::Stale
-            | Self::ReleaseChoice
-            | Self::ReleasedYes
-            | Self::ReleasedNo => None,
+            | Self::ReleaseChoice => None,
         }
     }
 }
@@ -299,6 +298,8 @@ pub fn english() -> Language {
     let mut values = List::with_capacity(50);
     for phrase in ALL {
         let text: &[u8] = match phrase {
+            OutcomePhrase::Compound => b"Operations committed",
+            OutcomePhrase::Operations => b"Operations: ",
             OutcomePhrase::Closing => b"Chat closed",
             OutcomePhrase::MarkedSeen => b"Read position marked seen",
             OutcomePhrase::NoteEdited => b"Note edited",
@@ -345,8 +346,6 @@ pub fn english() -> Language {
             OutcomePhrase::Message => b"Message: ",
             OutcomePhrase::Question => b"Question: ",
             OutcomePhrase::Revision => b"Hold revision: ",
-            OutcomePhrase::ReleasedYes => b"Released: yes",
-            OutcomePhrase::ReleasedNo => b"Released: no",
             OutcomePhrase::ResultsThrough => b"Results seen through: ",
             OutcomePhrase::RepliesThrough => b"Replies seen through: ",
         };

@@ -88,7 +88,7 @@ fn stop(task: u64) -> Ask {
 }
 fn assert_one_refusal(story: &Story) {
     let answers = story.answered(STOP);
-    let [Outcome::Answered(Answered::Jig(contract::Answer::Refused(_)))] = answers.as_slice() else {
+    let [Outcome::Answered(Answered::Jig(contract::Answer::Refused { refusal: _, .. }))] = answers.as_slice() else {
         panic!("one refusal: {answers:?}");
     };
     assert_eq!(story.made(fixtures::FIRST_OWNER), 1);
@@ -232,7 +232,7 @@ fn an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing
 const FAMILY_REQUEST: Key = Key { asker: Asker(1), number: 77 };
 const FAMILY_OBJECT: u64 = 1;
 const PROOF_WAIT: Duration = Duration::from_secs(1);
-const HELD_WAIT: Duration = Duration::from_secs(2);
+const HELD_WAIT: Duration = Duration::from_millis(160);
 fn family_change() -> jig_client_test_domain::first::Ask {
     jig_client_test_domain::first::Ask::ChangeObject {
         project: PROJECT_NUMBER,
@@ -287,7 +287,7 @@ fn a_family_request_in_the_deployment_scope_reaches_the_people_child_with_it() {
 
 const CANCEL: Key = Key { asker: Asker::JIG, number: 81 };
 const OVERRIDE: Key = Key { asker: Asker::JIG, number: 82 };
-const GRACE: Duration = Duration::from_millis(200);
+const GRACE: Duration = Duration::from_millis(20);
 const OVERRIDE_BUDGET: u64 = 50;
 #[test]
 fn a_cancel_with_a_grace_ends_the_task_once_its_grace_has_passed() {
@@ -335,4 +335,45 @@ fn an_owner_s_template_override_is_answered_policy_changed() {
             contract::OwnerOutcome::PolicyChanged { project: PROJECT_NUMBER }
         ))))]
     );
+}
+
+const COMPOUND_STOP: Key = Key { asker: Asker::JIG, number: 83 };
+const COMPOUND: Key = Key { asker: Asker::JIG, number: 84 };
+#[test]
+fn a_compound_answer_names_the_durable_words_before_its_release() {
+    let mut story = Story::live(fixtures::SEED);
+    let task = story.running_task();
+    story.send(COMPOUND_STOP, Ask::Jig(Box::new(contract::Ask::Stop { project: PROJECT_NUMBER, task })));
+    assert!(story.run_until(|s| s.phase(task) == Some(contract::Phase::Held), PROOF_WAIT));
+    let mut operations = skein_lib::List::with_capacity(2);
+    operations
+        .push(contract::Operation::Message {
+            project: PROJECT_NUMBER,
+            task,
+            words: contract::Text::new(b"Please resume".as_slice().into(), 64).expect("bounded compound fixture"),
+        })
+        .expect("bounded compound fixture");
+    operations
+        .push(contract::Operation::Release {
+            project: PROJECT_NUMBER,
+            task,
+            revision: story.hold_revision(task),
+            again: None,
+        })
+        .expect("bounded compound fixture");
+    story.send(COMPOUND, Ask::Jig(Box::new(contract::Ask::Compound { project: PROJECT_NUMBER, operations })));
+    assert!(story.run_until(|s| !s.answered(COMPOUND).is_empty(), PROOF_WAIT));
+    let answers = story.answered(COMPOUND);
+    let [
+        Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::Compound { project, operations, first_message },
+        )))),
+    ] = answers.as_slice()
+    else {
+        panic!("compound answer: {answers:?}");
+    };
+    assert_eq!((*project, *operations), (PROJECT_NUMBER, 2));
+    assert_eq!(story.activity_message(task, *first_message), Some(b"Please resume".to_vec()));
+    let message = *first_message;
+    assert!(story.run_until(|s| s.worker_started_with(task, message), PROOF_WAIT));
 }

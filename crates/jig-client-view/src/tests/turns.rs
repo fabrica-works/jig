@@ -250,10 +250,7 @@ fn words_states(words: &Words) {
     assert!(contains(&build(&d, 3, words).0, b"Being sent"));
     drive(
         &mut d,
-        AnsweredByEngine {
-            request,
-            answer: Answer::Done(Outcome::Made { what: Made::Words { task: 8, message: 12 } }),
-        },
+        AnsweredByEngine { request, answer: Answer::Done(Outcome::Owner(OwnerOutcome::Said { task: 8, message: 12 })) },
     );
     assert!(contains(&build(&d, 3, words).0, b"Sent"));
     assert!(contains(&build(&d, 3, words).0, b"whole new words"));

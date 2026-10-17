@@ -24,7 +24,8 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
         // Only the separately supplied configured target establishes this baseline.
         Ask::SetPool { project, .. } => (*project, ActKind::SetPool, !doc.configured_pools_cut),
         Ask::StartChat { .. }
-        | Ask::Write { .. }
+        | Ask::Message { .. }
+        | Ask::Compound { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
@@ -186,7 +187,8 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
         }
         Ask::MakeService { .. }
         | Ask::StartChat { .. }
-        | Ask::Write { .. }
+        | Ask::Message { .. }
+        | Ask::Compound { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
@@ -229,7 +231,8 @@ pub(crate) fn review(domain: &mut Ui, ask: Box<Ask>) {
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
             | Ask::StartChat { .. }
-            | Ask::Write { .. }
+            | Ask::Message { .. }
+            | Ask::Compound { .. }
             | Ask::Answer { .. }
             | Ask::Take { .. }
             | Ask::HandBack { .. }
@@ -278,7 +281,8 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>) {
         | Ask::ChangePolicy { .. }
         | Ask::SetRoles { .. }
         | Ask::StartChat { .. }
-        | Ask::Write { .. }
+        | Ask::Message { .. }
+        | Ask::Compound { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }

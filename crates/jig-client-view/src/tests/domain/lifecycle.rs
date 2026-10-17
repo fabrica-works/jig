@@ -1,4 +1,5 @@
 use super::spine::{LIMITS, delivered, drain, drive, frame, start};
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Ended, Fixture, ReadPage, Reported};
 use crate::{
     Event, Request,
@@ -64,7 +65,7 @@ fn intents_join_progress_and_one_terminal_and_refuse_past_the_limit() {
         domain.objects().get(id).unwrap().card,
         Card::Deciding { request: Some(request), progress: Progress::Parked }
     );
-    let answer = Answer::Refused(Refusal::NotOffered);
+    let answer = refusal_answer(Refusal::NotOffered);
     assert!(drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: answer.clone() }).is_empty());
     assert_eq!(domain.intents().get(Id::from_token(request)).unwrap().answer, Some(answer.clone()));
     assert_eq!(domain.objects().get(id).unwrap().card, Card::Refused { refusal: Refusal::NotOffered });

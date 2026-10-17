@@ -163,7 +163,10 @@ fn keyed_contract_durability_sign_ins_conflict_and_decided_first() {
         4,
         Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: p.key, decision: Decision::PassedUp } },
     );
-    assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), &Answer::Refused(Refusal::KeyConflict));
+    assert_eq!(
+        final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]),
+        &Answer::Refused { refusal: Refusal::KeyConflict, at: None }
+    );
     send(&mut engine, 20_000_000, 11, 1, 5, ask);
     assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), final_answer(&up[0]));
     assert_eq!(engine.commits().len(), 2);
@@ -293,29 +296,32 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     send(&mut engine, 0, 11, 1, 1, ask);
     assert_eq!(
         final_answer(&engine.poll(Time::from_nanos(10_000_000))[0]),
-        &Answer::Refused(Refusal::Moved {
-            now: Revision { value: 2 },
-            what: Moved::Hold {
-                reason: Some(CurrentHold::Document(Box::new(HoldReason::Budget { spent: 100, limit: 100 })))
-            }
-        })
+        &Answer::Refused {
+            refusal: Refusal::Moved {
+                now: Revision { value: 2 },
+                what: Moved::Hold {
+                    reason: Some(CurrentHold::Document(Box::new(HoldReason::Budget { spent: 100, limit: 100 })))
+                }
+            },
+            at: None
+        }
     );
     let mut setup = script();
     let ask = Ask::StartChat { project: 1, words: text(b"hello") };
     setup.rules.push(Rule {
         party: None,
         ask: ask.clone(),
-        answer: Answer::Refused(Refusal::Authority {
-            lacking: Lacking::Budget { needed: 100, left: 5 },
-            proposable: None,
-        }),
+        answer: Answer::Refused {
+            refusal: Refusal::Authority { lacking: Lacking::Budget { needed: 100, left: 5 }, proposable: None },
+            at: None,
+        },
         changes: vec![],
     });
     let mut engine = Engine::new(setup, 3).expect("valid script");
     send(&mut engine, 0, 11, 1, 1, ask.clone());
     assert!(matches!(
         final_answer(&engine.poll(Time::from_nanos(10_000_000))[0]),
-        Answer::Refused(Refusal::Authority { .. })
+        Answer::Refused { refusal: Refusal::Authority { .. }, at: None }
     ));
     send(&mut engine, 2_000_000_000, 11, 1, 2, ask);
     drop(engine.poll(Time::from_nanos(2_010_000_000)));
@@ -962,7 +968,6 @@ fn bounded_offer_payloads_and_predictions() {
             project: 1,
             task: 8,
             revision: Some(Revision { value: 1 }),
-            release: None,
             change: Box::new(Amendment {
                 addressed: None,
                 spec: None,
@@ -1172,38 +1177,44 @@ fn amendment_release_checks_the_named_hold_separately_from_the_spec() {
             11,
             1,
             1,
-            Ask::Amend {
-                reason: text(b""),
-                project: 1,
-                task: 8,
-                revision: Some(Revision { value: if stale_hold { 1 } else { 2 } }),
-                release: Some(Revision { value: if stale_hold { 6 } else { 7 } }),
-                change: Box::new(Amendment {
-                    addressed: None,
-                    spec: Some(specification(text(b"new spec")).whole().unwrap()),
-                    wake: None,
-                    dependencies: None,
-                    authority: None,
-                    instructions: None,
-                    tracked: None,
-                }),
-            },
+            crate::tests::releasing(
+                Ask::Amend {
+                    reason: text(b""),
+                    project: 1,
+                    task: 8,
+                    revision: Some(Revision { value: if stale_hold { 1 } else { 2 } }),
+
+                    change: Box::new(Amendment {
+                        addressed: None,
+                        spec: Some(specification(text(b"new spec")).whole().unwrap()),
+                        wake: None,
+                        dependencies: None,
+                        authority: None,
+                        instructions: None,
+                        tracked: None,
+                    }),
+                },
+                Revision { value: if stale_hold { 6 } else { 7 } },
+            ),
         );
         assert_eq!(
             final_answer(&engine.poll(Time::from_nanos(10_000_000))[0]),
-            &Answer::Refused(Refusal::Moved {
-                now: Revision { value: if stale_hold { 7 } else { 1 } },
-                what: if stale_hold {
-                    Moved::Hold {
-                        reason: Some(CurrentHold::Document(Box::new(HoldReason::Stopped {
-                            by: party(1),
-                            at: Wall::EPOCH,
-                        }))),
-                    }
-                } else {
-                    Moved::Spec
+            &Answer::Refused {
+                refusal: Refusal::Moved {
+                    now: Revision { value: if stale_hold { 7 } else { 1 } },
+                    what: if stale_hold {
+                        Moved::Hold {
+                            reason: Some(CurrentHold::Document(Box::new(HoldReason::Stopped {
+                                by: party(1),
+                                at: Wall::EPOCH,
+                            }))),
+                        }
+                    } else {
+                        Moved::Spec
+                    },
                 },
-            })
+                at: None
+            }
         );
     }
 }
@@ -1214,10 +1225,13 @@ fn moved_hold_refusal_prices_the_complete_reason_allocation_and_each_nested_fail
         AttemptFailure { attempt: 1, class: FailureClass::HostLost, reason: text(b"first"), at: Wall::EPOCH },
         AttemptFailure { attempt: 2, class: FailureClass::Temporary, reason: text(b"second"), at: Wall::EPOCH },
     ]);
-    let answer = Answer::Refused(Refusal::Moved {
-        now: Revision { value: 8 },
-        what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(HoldReason::Tries { failures }))) },
-    });
+    let answer = Answer::Refused {
+        refusal: Refusal::Moved {
+            now: Revision { value: 8 },
+            what: Moved::Hold { reason: Some(CurrentHold::Document(Box::new(HoldReason::Tries { failures }))) },
+        },
+        at: None,
+    };
     let mut bounds = Bounds {
         document_bytes: u64::try_from(core::mem::size_of::<Answer>())
             .unwrap()
@@ -1600,10 +1614,18 @@ fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
             4,
             Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: Proposer::Task(1), number: 2 } }),
         ),
-        (GoalExecutor::Procedure { connector: 6, code: u32::MAX }, 3, Answer::Refused(Refusal::NotOffered)),
-        (GoalExecutor::Procedure { connector: u16::MAX, code: 7 }, 3, Answer::Refused(Refusal::NotOffered)),
-        (GoalExecutor::Charter(1), 3, Answer::Refused(Refusal::NotOffered)),
-        (exact, 11, Answer::Refused(Refusal::NotOffered)),
+        (
+            GoalExecutor::Procedure { connector: 6, code: u32::MAX },
+            3,
+            Answer::Refused { refusal: Refusal::NotOffered, at: None },
+        ),
+        (
+            GoalExecutor::Procedure { connector: u16::MAX, code: 7 },
+            3,
+            Answer::Refused { refusal: Refusal::NotOffered, at: None },
+        ),
+        (GoalExecutor::Charter(1), 3, Answer::Refused { refusal: Refusal::NotOffered, at: None }),
+        (exact, 11, Answer::Refused { refusal: Refusal::NotOffered, at: None }),
     ] {
         let mut setup = live_script();
         // A project-scoped ask reads only its actual project's offered facts.
@@ -1760,7 +1782,10 @@ fn full_width_task_and_party_makers_remain_distinct_in_scripted_reads_decisions_
     assert_eq!(engine.commits()[0].ask, Some(asks[0].clone()));
     assert_eq!(engine.commits()[1].ask, Some(asks[1].clone()));
     send(&mut engine, 20_000_000, 11, 1, 12, asks[1].clone());
-    assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), &Answer::Refused(Refusal::KeyConflict));
+    assert_eq!(
+        final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]),
+        &Answer::Refused { refusal: Refusal::KeyConflict, at: None }
+    );
     send(&mut engine, 20_000_000, 11, 1, 13, asks[0].clone());
     assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), final_answer(&answers[0]));
     send(&mut engine, 20_000_000, 11, 2, 14, asks[1].clone());
@@ -2321,3 +2346,6 @@ const UTF8_TEXTS: [&[u8]; 9] = [
 ];
 
 use jig_client_domain::contract::DecideOn;
+
+mod compound;
+use compound::releasing;

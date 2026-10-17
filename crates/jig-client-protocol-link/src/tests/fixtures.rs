@@ -195,7 +195,7 @@ pub fn refusal_with_hold(rows: Box<[u8]>) -> Box<[u8]> {
     let what = w::MovedHold::new(&lim, w::MovedHoldParts { reason: Some(w::CurrentHold::Document(reason)) }).unwrap();
     let now = w::Revision::new(&lim, w::RevisionParts { value: u64::MAX }).unwrap();
     let value = w::RefusalMoved::new(&lim, w::RefusalMovedParts { now, what: w::Moved::Hold(what) }).unwrap();
-    let value = w::Refused::new(&lim, w::RefusedParts { refusal: w::Refusal::Moved(value) }).unwrap();
+    let value = w::Refused::new(&lim, w::RefusedParts { at: None, refusal: w::Refusal::Moved(value) }).unwrap();
     final_answer(w::Final::Refused(value))
 }
 pub fn hold_budget_fact() -> w::Fact {

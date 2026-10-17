@@ -215,9 +215,6 @@ impl Words {
             Outcome::Owner(value) => crate::owner_outcome::render(b, value, self),
             Outcome::Made { what } => match what {
                 Made::Chat { task } => self.text(b, JigPhrase::MadeChat, &[Hole::Number(*task)]),
-                Made::Words { task, message } => {
-                    self.text(b, JigPhrase::MadeWords, &[Hole::Number(*task), Hole::Number(*message)]);
-                }
                 Made::Goal { task } => self.text(b, JigPhrase::MadeGoal, &[Hole::Number(*task)]),
                 Made::Tasks { tasks } => {
                     for task in tasks {

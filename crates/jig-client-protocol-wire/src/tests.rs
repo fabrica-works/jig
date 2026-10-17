@@ -327,6 +327,7 @@ fn a_sign_out_not_ready_round_trips_unchanged() {
 #[test]
 fn wire_values_round_trip_unchanged() {
     table([
+        ("a_compound_s_operations_round_trip_as_pieces", a_compound_s_operations_round_trip_as_pieces),
         ("version_not_served_is_tag_zero_of_each_answer", version_not_served_is_tag_zero_of_each_answer),
         (
             "a_family_record_round_trips_with_its_scope_and_window",
@@ -412,4 +413,31 @@ fn each_merged_operation_target_round_trips_unchanged() {
         let bytes = fixtures::encoded(&value, Ask::measure, Ask::encode);
         assert_eq!(Ask::decode(&limits, &mut Reader::new(&bytes)), Ok(value), "{name}");
     }
+}
+
+fn a_compound_s_operations_round_trip_as_pieces() {
+    use skein_lib::Writer;
+    let limits = fixtures::limits();
+    let values = fixtures::compound_operations();
+    let mut size = 0_usize;
+    for value in &values {
+        size = size.checked_add(usize::try_from(value.measure()).unwrap()).unwrap().checked_add(4).unwrap();
+    }
+    let mut bytes = Writer::new(size);
+    for value in &values {
+        bytes.put(&value.measure().to_be_bytes()).unwrap();
+        value.encode(&mut bytes).unwrap();
+    }
+    let record =
+        Compound::new(&limits, CompoundParts { project: fixtures::COMPOUND_PROJECT, operations: bytes.finish() })
+            .unwrap();
+    let bytes = fixtures::encoded(&record, Compound::measure, Compound::encode);
+    let restored = Compound::decode(&limits, &mut Reader::new(&bytes)).unwrap();
+    assert_eq!(restored, record);
+    let mut reader = Reader::new(restored.operations());
+    for expected in values {
+        let bytes = skein_codec::piece::split(&mut reader).unwrap().unwrap();
+        assert_eq!(Operation::decode(&limits, &mut Reader::new(&bytes)), Ok(expected));
+    }
+    assert!(reader.is_empty());
 }

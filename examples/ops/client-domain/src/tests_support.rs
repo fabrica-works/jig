@@ -168,7 +168,7 @@ pub fn answer(attempt: Token, envelope: skein_lib::RequestEnvelope, answer: Opti
     let answer = answer.map(|value| match value {
         d::Answered::Jig(value) => jig_client::Answered::Jig(value),
         d::Answered::Infrastructure(infra::Answer::EntranceRefused(why)) => {
-            jig_client::Answered::Jig(jig_client::contract::Answer::Refused(why.into_refusal()))
+            jig_client::Answered::Jig(jig_client::contract::Answer::Refused { refusal: why.into_refusal(), at: None })
         }
         d::Answered::Infrastructure(value) => jig_client::Answered::Family(jig_client::Family {
             family: 2,

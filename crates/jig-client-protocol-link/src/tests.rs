@@ -46,3 +46,5 @@ fn owner_declarations_fit_one_hello_without_duplicates() {
 mod store;
 
 mod sign_in;
+
+mod compound;

@@ -50,14 +50,14 @@ fn answered(root: &mut Domain, env: &Env<Limits>, key: Key, outcome: Outcome, ou
             let Ok(answer) = wire::answer_value(&record.bytes) else { return };
             d::Event::Answered { request, answer }
         }
-        Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused(why))) => {
-            d::Event::Answered {
-                request,
-                answer: d::Answer::EntranceRefused(
-                    jig_client::contract::EntranceRefusal::new(why).expect("entrance refusal"),
-                ),
-            }
-        }
+        Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused {
+            refusal: why, ..
+        })) => d::Event::Answered {
+            request,
+            answer: d::Answer::EntranceRefused(
+                jig_client::contract::EntranceRefusal::new(why).expect("entrance refusal"),
+            ),
+        },
         Outcome::Answered(jig_client::Answered::Jig(_))
         | Outcome::NotKept
         | Outcome::Limit

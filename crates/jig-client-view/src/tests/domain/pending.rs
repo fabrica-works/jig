@@ -1,7 +1,8 @@
 use super::{confirmation, native, spine};
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::{
     cards::{contains, tree},
-    fixtures::{FireClient, Fixture, kept, one},
+    fixtures::{FireClient, Fixture, MOST, kept, one},
 };
 use crate::{Event, Request, action::Act, intents, notices::kept::Kind, objects::Card, page::Page};
 use jig_client::{Asker, Down, Handle, Key, Progress, Retry, Up, contract::*};
@@ -66,14 +67,8 @@ fn answer(fixture: &mut Fixture, attempt: Token, answer: Answer) {
         },
     );
 }
-fn restored(rows: &[(u8, u64)]) -> (Fixture, Handle) {
-    let mut records = List::with_capacity(u32::try_from(rows.len()).unwrap());
-    for (number, party) in rows {
-        records.push(kept(*number, *party)).unwrap();
-    }
-    let fixture = Fixture::restored(&spine::LIMITS, List::with_capacity(0), records);
-    let handle = fixture.frame_watch.unwrap();
-    (fixture, handle)
+fn inbox() -> Page {
+    Page::Work { address: crate::address::Address::Inbox { project: None }, behind: false, excess: 0, refused: None }
 }
 
 #[test]
@@ -99,12 +94,12 @@ fn a_request_shows_the_progress_the_client_reports() {
         fixture.objects().get(id).unwrap().card,
         Card::Deciding { request: Some(token), progress: intents::Progress::Retrying }
     );
-    fixture.drive(Time::from_nanos(80), FireClient { wall: Wall::EPOCH });
+    fixture.drive(Time::from_nanos(MOST.as_nanos()), FireClient { wall: Wall::EPOCH });
     let next = attempt(&fixture);
     answer(&mut fixture, next, Answer::Done(Outcome::Changed));
     assert_eq!(fixture.client.pending(key), None);
     assert_eq!(fixture.objects().get(id).unwrap().answer, Some(Answer::Done(Outcome::Changed)));
-    answer(&mut fixture, next, Answer::Refused(Refusal::NotOffered));
+    answer(&mut fixture, next, refusal_answer(Refusal::NotOffered));
     assert_eq!(fixture.objects().get(id).unwrap().answer, Some(Answer::Done(Outcome::Changed)));
 }
 
@@ -126,14 +121,14 @@ fn a_request_not_kept_is_offered_again() {
 
 #[test]
 fn a_kept_request_refused_shows_a_notice() {
-    let (mut fixture, handle) = restored(&[(FIRST, ME)]);
+    let (mut fixture, handle) = spine::restored(&[(FIRST, ME)], List::with_capacity(0), &spine::LIMITS);
     spine::delivered(&mut fixture, Time::ZERO, handle, spine::frame(ME));
     let sent = attempt(&fixture);
-    answer(&mut fixture, sent, Answer::Refused(Refusal::NotOffered));
+    answer(&mut fixture, sent, refusal_answer(Refusal::NotOffered));
     let (id, ()) = fixture.notices().ids().first().unwrap();
     assert_eq!(
         fixture.notices().get(*id).unwrap().kind,
-        Kind::PageAnswer { answer: Answer::Refused(Refusal::NotOffered) }
+        Kind::PageAnswer { answer: refusal_answer(Refusal::NotOffered) }
     );
     assert!(fixture.intents().ids().is_empty());
     assert!(fixture.kept_requests.is_empty());
@@ -141,7 +136,7 @@ fn a_kept_request_refused_shows_a_notice() {
 
 #[test]
 fn another_party_s_kept_work_shows_someone_else_s_work() {
-    let (mut fixture, handle) = restored(&[(FIRST, OTHER)]);
+    let (mut fixture, handle) = spine::restored(&[(FIRST, OTHER)], List::with_capacity(0), &spine::LIMITS);
     spine::delivered(&mut fixture, Time::ZERO, handle, spine::frame(ME));
     assert_eq!(fixture.client.pending(Key { asker: Asker::JIG, number: u64::from(FIRST) }).unwrap().party, OTHER);
     assert_eq!(fixture.page(), &Page::SomeoneElse);
@@ -167,7 +162,7 @@ fn an_act_past_the_client_s_limit_is_refused_in_place() {
     assert_eq!(fixture.objects().get(id).unwrap().answer, None);
     assert!(fixture.down.as_slice().is_empty());
     assert!(contains(&tree(&fixture, None, Some(id)), b"Too many requests in flight"));
-    fixture.drive(Time::from_nanos(80), FireClient { wall: Wall::EPOCH });
+    fixture.drive(Time::from_nanos(MOST.as_nanos()), FireClient { wall: Wall::EPOCH });
     assert!(fixture.down.as_slice().is_empty());
 }
 
@@ -190,38 +185,23 @@ fn an_act_answered_unconfirmed_is_offered_again_once_live() {
 
 #[test]
 fn someone_else_s_work_leaves_when_its_party_signs_in() {
-    let (mut fixture, handle) = restored(&[(FIRST, OTHER)]);
+    let (mut fixture, handle) = spine::restored(&[(FIRST, OTHER)], List::with_capacity(0), &spine::LIMITS);
     spine::delivered(&mut fixture, Time::ZERO, handle, spine::frame(ME));
     assert_eq!(fixture.page(), &Page::SomeoneElse);
     spine::delivered(&mut fixture, Time::ZERO, handle, spine::frame(OTHER));
-    assert_eq!(
-        fixture.page(),
-        &Page::Work {
-            address: crate::address::Address::Inbox { project: None },
-            behind: false,
-            excess: 0,
-            refused: None
-        }
-    );
+    assert_eq!(fixture.page(), &inbox());
     assert_eq!(fixture.client.pending(Key { asker: Asker::JIG, number: u64::from(FIRST) }).unwrap().party, OTHER);
 }
 
 #[test]
 fn someone_else_s_work_leaves_when_its_requests_are_unknown() {
-    let (mut fixture, handle) = restored(&[(FIRST, OTHER), (SECOND, OTHER)]);
+    let (mut fixture, handle) =
+        spine::restored(&[(FIRST, OTHER), (SECOND, OTHER)], List::with_capacity(0), &spine::LIMITS);
     spine::delivered(&mut fixture, Time::ZERO, handle, spine::frame(ME));
     assert_eq!(fixture.page(), &Page::SomeoneElse);
     fixture.drive(Time::from_nanos(EXPIRES.as_nanos()), FireClient { wall: Wall::from_nanos(EXPIRES.as_nanos()) });
     assert!(fixture.kept_requests.is_empty());
-    assert_eq!(
-        fixture.page(),
-        &Page::Work {
-            address: crate::address::Address::Inbox { project: None },
-            behind: false,
-            excess: 0,
-            refused: None
-        }
-    );
+    assert_eq!(fixture.page(), &inbox());
     for number in [FIRST, SECOND] {
         assert_eq!(fixture.client.pending(Key { asker: Asker::JIG, number: u64::from(number) }), None);
     }

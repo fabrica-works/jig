@@ -250,7 +250,7 @@ pub fn answer(b: &mut Builder, object: &Object, words: &Words, text_limit: u32) 
     if let Some(answer) = &object.answer {
         match answer {
             jig_client::contract::Answer::Done(outcome) => words.outcome(b, outcome),
-            jig_client::contract::Answer::Refused(why) => words.refusal(b, why, text_limit),
+            jig_client::contract::Answer::Refused { refusal: why, .. } => words.refusal(b, why, text_limit),
         }
     }
 }

@@ -1,0 +1,69 @@
+//! The joint peer preserves each operation's standalone meaning.
+use super::{Invalid, List, client, people};
+pub(super) fn ask(project: u32, values: &List<client::Operation>) -> Result<people::Ask, Invalid> {
+    let mut operations = List::with_capacity(values.len());
+    for value in values {
+        let ask = match value.clone() {
+            client::Operation::Message { project, task, words } => client::Ask::Message { project, task, words },
+            client::Operation::Amend { project, task, revision, change, reason } => {
+                client::Ask::Amend { project, task, revision, change, reason }
+            }
+            client::Operation::Cancel { project, task, reason, grace } => {
+                client::Ask::Cancel { project, task, reason, grace }
+            }
+            client::Operation::Release { project, task, revision, again } => {
+                client::Ask::Release { project, task, revision, again }
+            }
+            client::Operation::Stop { project, task } => client::Ask::Stop { project, task },
+            client::Operation::Move { project, task, reason } => client::Ask::Move { project, task, reason },
+        };
+        let operation = match super::ask(&ask)? {
+            people::Ask::Say { project: owner, task, words, release } if owner == project => {
+                people::Operation::Message { task, words, release }
+            }
+            people::Ask::Amend { project: owner, task, revision, amendment, release } if owner == project => {
+                people::Operation::Amend { task, revision, amendment: Box::new(amendment), release }
+            }
+            people::Ask::Cancel { project: owner, task, reason, grace } if owner == project => {
+                people::Operation::Cancel { task, reason, grace }
+            }
+            people::Ask::Move { project: owner, task, reason } if owner == project => {
+                people::Operation::Move { task, reason }
+            }
+            people::Ask::Release { project: owner, task, revision, again } if owner == project => {
+                people::Operation::Release { task, revision, again }
+            }
+            people::Ask::Stop { project: owner, task } if owner == project => people::Operation::Stop { task },
+            people::Ask::Compound { .. }
+            | people::Ask::Create { .. }
+            | people::Ask::Close { .. }
+            | people::Ask::MarkSeen { .. }
+            | people::Ask::Application { .. }
+            | people::Ask::EditNote { .. }
+            | people::Ask::MakeService { .. }
+            | people::Ask::Adopt { .. }
+            | people::Ask::Propose { .. }
+            | people::Ask::Withdraw { .. }
+            | people::Ask::SetGoal { .. }
+            | people::Ask::Stop { .. }
+            | people::Ask::Cancel { .. }
+            | people::Ask::Release { .. }
+            | people::Ask::TakePerson { .. }
+            | people::Ask::HandBackPerson { .. }
+            | people::Ask::AnswerPerson { .. }
+            | people::Ask::Move { .. }
+            | people::Ask::DecideProposal { .. }
+            | people::Ask::Say { .. }
+            | people::Ask::AnswerQuestion { .. }
+            | people::Ask::Prioritise { .. }
+            | people::Ask::Amend { .. }
+            | people::Ask::SetRoles { .. }
+            | people::Ask::ChangePolicy { .. }
+            | people::Ask::SetPool { .. }
+            | people::Ask::DecideEscalation { .. }
+            | people::Ask::StartChat { .. } => return Err(Invalid::CompoundProject),
+        };
+        operations.push(operation).expect("same capacity");
+    }
+    Ok(people::Ask::Compound { project, operations })
+}

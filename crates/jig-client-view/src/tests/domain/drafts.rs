@@ -4,6 +4,7 @@ use super::{
     pages::{offers, project},
     spine::{LIMITS, delivered, drain, drive, frame},
 };
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Fixture, Reported, Served, Watched};
 use crate::{
     Event, Limits, Request,
@@ -85,7 +86,10 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
     match act {
         ActKind::Write => {
             drive(domain, Time::ZERO, Event::Act { action: Act::WriteRelease { release: true } });
-            Ask::Write { project: 1, task: 8, words: text(b"wake up"), release: true }
+            crate::tests::fixtures::releasing(
+                Ask::Message { project: 1, task: 8, words: text(b"wake up") },
+                Some(Revision { value: 3 }),
+            )
         }
         ActKind::Stop => Ask::Stop { project: 1, task: 8 },
         ActKind::Cancel | ActKind::TakeOver => {
@@ -99,14 +103,16 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
         ActKind::AmendRelease => {
             drive(domain, Time::ZERO, Event::Act { action: Act::Edit { field: Purpose::Reason, text: text(b"") } });
             drive(domain, Time::ZERO, Event::Act { action: Act::Change { change: Box::new(change()) } });
-            Ask::Amend {
-                reason: text(b""),
-                project: 1,
-                task: 8,
-                revision: Some(Revision { value: 9 }),
-                change: Box::new(change()),
-                release: Some(Revision { value: 3 }),
-            }
+            crate::tests::fixtures::releasing(
+                Ask::Amend {
+                    reason: text(b""),
+                    project: 1,
+                    task: 8,
+                    revision: Some(Revision { value: 9 }),
+                    change: Box::new(change()),
+                },
+                Some(Revision { value: 3 }),
+            )
         }
         ActKind::Prioritise => {
             assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Priority));
@@ -283,7 +289,7 @@ fn a_words_answer_clears_only_the_submitted_touch_and_refused_or_unknown_words_k
         if case == 2 {
             edit(&mut domain, 8, b"words");
         }
-        let answer = Answer::Done(Outcome::Made { what: Made::Words { task: 8, message: 3 } });
+        let answer = Answer::Done(Outcome::Owner(OwnerOutcome::Said { task: 8, message: 3 }));
         let rows = if case == 4 {
             drive(&mut domain, Time::ZERO, Reported { request, progress: Progress::Unknown })
         } else if case == 3 {
@@ -292,7 +298,7 @@ fn a_words_answer_clears_only_the_submitted_touch_and_refused_or_unknown_words_k
                 Time::ZERO,
                 AnsweredByEngine {
                     request,
-                    answer: Answer::Refused(Refusal::Limit { which: Limit::Inbox { task: 8, limit: 1 } }),
+                    answer: refusal_answer(Refusal::Limit { which: Limit::Inbox { task: 8, limit: 1 } }),
                 },
             )
         } else {
@@ -362,14 +368,16 @@ fn amend_release_recalls_the_hold_independently_and_requires_review_when_either_
             let rows = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
             assert_eq!(
                 only_send(&rows).1,
-                &Ask::Amend {
-                    reason: text(b""),
-                    project: 1,
-                    task: 8,
-                    revision: Some(document.spec_revision),
-                    change: Box::new(change()),
-                    release: Some(document.hold.as_ref().unwrap().revision())
-                }
+                &crate::tests::fixtures::releasing(
+                    Ask::Amend {
+                        reason: text(b""),
+                        project: 1,
+                        task: 8,
+                        revision: Some(document.spec_revision),
+                        change: Box::new(change()),
+                    },
+                    Some(document.hold.as_ref().unwrap().revision())
+                )
             );
         }
     }

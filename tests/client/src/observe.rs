@@ -56,7 +56,16 @@ pub fn sent(request: &Request) -> Option<Sent> {
 #[must_use]
 pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> Sent {
     let (card, revision, words) = match ask {
-        Ask::Write { task, words, .. } | Ask::Answer { on: AnswerOn::Question { task, words, .. }, .. } => {
+        Ask::Compound { operations, .. } => match operations.as_slice().first() {
+            Some(jig_client_domain::contract::Operation::Message { task, words, .. }) => {
+                (None, None, Some((*task, words.bytes().to_vec())))
+            }
+            Some(jig_client_domain::contract::Operation::Amend { task, revision, .. }) => {
+                (Some(key(ObjectKey::Task(*task))), revision.map(|v| (1, v.value)), None)
+            }
+            _ => (None, None, None),
+        },
+        Ask::Message { task, words, .. } | Ask::Answer { on: AnswerOn::Question { task, words, .. }, .. } => {
             (None, None, Some((*task, words.bytes().to_vec())))
         }
         Ask::Answer { on: AnswerOn::Person { task, revision, .. }, .. } => {
@@ -205,12 +214,9 @@ pub fn up_received(up: &jig_client::Up) -> Vec<Receipt> {
     match up {
         Up::Answer { attempt, envelope, answer, why: None } => {
             let words = match answer {
-                Some(jig_client::Answered::Jig(Answer::Done(
-                    Outcome::Made { what: Made::Words { task, message } }
-                    | Outcome::Owner(
-                        OwnerOutcome::Said { task, message, .. } | OwnerOutcome::QuestionAnswered { task, message, .. },
-                    ),
-                ))) => Some((*task, *message)),
+                Some(jig_client::Answered::Jig(Answer::Done(Outcome::Owner(
+                    OwnerOutcome::Said { task, message, .. } | OwnerOutcome::QuestionAnswered { task, message, .. },
+                )))) => Some((*task, *message)),
                 Some(jig_client::Answered::Jig(_) | jig_client::Answered::Family(_)) | None => None,
             };
             if *envelope == RequestEnvelope::SignedOut {
@@ -568,8 +574,8 @@ mod tests {
         use jig_client_test_domain::Event;
         use skein_lib::{RequestEnvelope, Token};
         let cases = [
-            (OwnerOutcome::Said { task: u64::MAX, message: 37, released: false }, Some((u64::MAX, 37))),
-            (OwnerOutcome::Said { task: 41, message: u64::MAX, released: true }, Some((41, u64::MAX))),
+            (OwnerOutcome::Said { task: u64::MAX, message: 37 }, Some((u64::MAX, 37))),
+            (OwnerOutcome::Said { task: 41, message: u64::MAX }, Some((41, u64::MAX))),
             (OwnerOutcome::QuestionAnswered { task: 43, question: 47, message: 53 }, Some((43, 53))),
             (OwnerOutcome::GoalProposed { proposal: 59 }, None),
             (OwnerOutcome::Closing { chat: 61, cancelled: 67, kept: 71 }, None),

@@ -72,7 +72,6 @@ fn expect_lines(tree: &Tree, lines: &[&[u8]]) {
     }
     assert_eq!(text_nodes, lines.len());
 }
-#[expect(clippy::too_many_lines, reason = "closed fixture lists every owner variant and independent expected facts")]
 fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 26] {
     [
         (
@@ -131,8 +130,8 @@ fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 26] {
             ],
         ),
         (
-            OwnerOutcome::Said { task: u64::MAX, message: u64::MAX, released: true },
-            &[b"Words admitted", b"Task: 18446744073709551615", b"Message: 18446744073709551615", b"Released: yes"],
+            OwnerOutcome::Said { task: u64::MAX, message: u64::MAX },
+            &[b"Words admitted", b"Task: 18446744073709551615", b"Message: 18446744073709551615"],
         ),
         (
             OwnerOutcome::QuestionAnswered { task: u64::MAX, question: u64::MAX, message: u64::MAX },
@@ -144,18 +143,10 @@ fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 26] {
             ],
         ),
         (OwnerOutcome::Prioritised { project: u32::MAX }, &[b"Goal priorities changed", b"Project: 4294967295"]),
+        (OwnerOutcome::Amended { task: u64::MAX }, &[b"Task amended", b"Task: 18446744073709551615"]),
         (
-            OwnerOutcome::Amended { task: u64::MAX, released: true },
-            &[b"Task amended", b"Task: 18446744073709551615", b"Released: yes"],
-        ),
-        (
-            OwnerOutcome::AmendProposed { task: u64::MAX, proposal: u64::MAX, released: true },
-            &[
-                b"Amendment proposed",
-                b"Task: 18446744073709551615",
-                b"Proposal number: 18446744073709551615",
-                b"Released: yes",
-            ],
+            OwnerOutcome::AmendProposed { task: u64::MAX, proposal: u64::MAX },
+            &[b"Amendment proposed", b"Task: 18446744073709551615", b"Proposal number: 18446744073709551615"],
         ),
         (OwnerOutcome::RolesSet { project: u32::MAX }, &[b"Project roles set", b"Project: 4294967295"]),
         (OwnerOutcome::PolicyChanged { project: u32::MAX }, &[b"Project policy changed", b"Project: 4294967295"]),
@@ -265,17 +256,13 @@ fn escalation_decisions_keep_revision_winner_clock_and_every_closed_choice() {
 #[test]
 fn released_flags_and_question_message_identities_remain_independent() {
     let words = words();
-    for released in [false, true] {
-        let wanted: &[u8] = if released { b"Released: yes" } else { b"Released: no" };
+    {
         let cases: [(OwnerOutcome, &[&[u8]]); 3] = [
+            (OwnerOutcome::Said { task: 7, message: 11 }, &[b"Words admitted", b"Task: 7", b"Message: 11"]),
+            (OwnerOutcome::Amended { task: 13 }, &[b"Task amended", b"Task: 13"]),
             (
-                OwnerOutcome::Said { task: 7, message: 11, released },
-                &[b"Words admitted", b"Task: 7", b"Message: 11", wanted],
-            ),
-            (OwnerOutcome::Amended { task: 13, released }, &[b"Task amended", b"Task: 13", wanted]),
-            (
-                OwnerOutcome::AmendProposed { task: 17, proposal: 23, released },
-                &[b"Amendment proposed", b"Task: 17", b"Proposal number: 23", wanted],
+                OwnerOutcome::AmendProposed { task: 17, proposal: 23 },
+                &[b"Amendment proposed", b"Task: 17", b"Proposal number: 23"],
             ),
         ];
         for (value, expected) in cases {
@@ -408,14 +395,14 @@ fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
     let mut incomplete = english::language();
     let mut kept = List::with_capacity(crate::owner_words::phrase_count());
     for phrase in incomplete.phrases {
-        if phrase.id != phrases::OutcomePhrase::ReleasedYes.id() {
+        if phrase.id != phrases::OutcomePhrase::Compound.id() {
             kept.push(phrase).unwrap();
         }
     }
     incomplete.phrases = kept.into_boxed();
     assert_eq!(
         Phrasebook::load(jig::shapes(super::cards::CLIENT.text), Box::new([incomplete]), &limits).unwrap_err(),
-        Invalid::Missing { id: phrases::OutcomePhrase::ReleasedYes.id() }
+        Invalid::Missing { id: phrases::OutcomePhrase::Compound.id() }
     );
 }
 

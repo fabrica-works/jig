@@ -64,7 +64,8 @@ pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<A
         },
         Ask::SetRoles { .. }
         | Ask::StartChat { .. }
-        | Ask::Write { .. }
+        | Ask::Message { .. }
+        | Ask::Compound { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
@@ -615,7 +616,8 @@ fn policy_request(ask: &Ask) -> Option<&PolicyEdit> {
     match ask {
         Ask::ChangePolicy { edit, .. } => Some(edit),
         Ask::StartChat { .. }
-        | Ask::Write { .. }
+        | Ask::Message { .. }
+        | Ask::Compound { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
@@ -690,7 +692,8 @@ fn holdings_request(ask: &Ask) -> Option<&skein_lib::List<jig_client::contract::
     match ask {
         Ask::SetRoles { holdings, .. } => Some(holdings),
         Ask::StartChat { .. }
-        | Ask::Write { .. }
+        | Ask::Message { .. }
+        | Ask::Compound { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
@@ -715,7 +718,8 @@ fn pool_request(ask: &Ask) -> bool {
     match ask {
         Ask::SetPool { .. } => true,
         Ask::StartChat { .. }
-        | Ask::Write { .. }
+        | Ask::Message { .. }
+        | Ask::Compound { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
@@ -740,7 +744,8 @@ fn service_request(ask: &Ask) -> Option<(&jig_client::contract::Text, jig_client
     match ask {
         Ask::MakeService { name, role, .. } => Some((name, *role)),
         Ask::StartChat { .. }
-        | Ask::Write { .. }
+        | Ask::Message { .. }
+        | Ask::Compound { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
@@ -1183,7 +1188,8 @@ fn render_request(b: &mut Builder, ask: &Ask, words: &Words, text_limit: u32) {
             words.held_role(b, Some(*role));
         }
         Ask::StartChat { .. }
-        | Ask::Write { .. }
+        | Ask::Message { .. }
+        | Ask::Compound { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }

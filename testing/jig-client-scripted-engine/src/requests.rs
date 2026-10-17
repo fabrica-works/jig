@@ -5,7 +5,7 @@ use jig_client_domain::contract::{
     ActKind, Actor, Admission, Answer, Ask, ChipPhase, CurrentHold, Decision, Ending, Moved, ObjectKey, Offered,
     Outcome, OwnerRequester, Phase, ReadValue, Recipient, Refusal, Revision, Runtime, TaskHold,
 };
-use jig_client_domain::contract::{AnswerOn, DecideOn};
+use jig_client_domain::contract::{AnswerOn, DecideOn, Operation};
 use skein_lib::{List, Time, Token, Wall};
 
 impl<A: crate::Application> Engine<A> {
@@ -36,9 +36,13 @@ impl<A: crate::Application> Engine<A> {
         self.keys.retain(|_, keyed| keyed.retained_until.is_none_or(|until| now <= until));
         if let Some(old) = self.keys.get(&(party, key)) {
             let answer = if let (RequestIdentity::Jig(previous), Retained::Jig(answer)) = (&old.ask, &old.answer) {
-                if **previous == ask { answer.clone() } else { Answer::Refused(Refusal::KeyConflict) }
+                if **previous == ask {
+                    answer.clone()
+                } else {
+                    Answer::Refused { refusal: Refusal::KeyConflict, at: None }
+                }
             } else {
-                Answer::Refused(Refusal::KeyConflict)
+                Answer::Refused { refusal: Refusal::KeyConflict, at: None }
             };
             let commit = old.commit;
             self.answer(now, commit, attempt, answer);
@@ -82,30 +86,38 @@ impl<A: crate::Application> Engine<A> {
         ask: &Ask,
         wall: Wall,
     ) -> core::result::Result<(Answer, Vec<crate::Change>), Invalid> {
+        if let Ask::Compound { project, operations } = ask
+            && compound_target(*project, operations).is_none()
+        {
+            return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
+        }
         let (project, object, kind, revision) = target(ask);
         if project.is_some_and(|project| !self.truth.visible(party, project)) {
-            return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
+            return Ok((Answer::Refused { refusal: Refusal::Unknown, at: None }, Vec::new()));
         }
         if let Ask::EditNote { note, revision, .. } | Ask::DeleteNote { note, revision, .. } = ask {
             let Some(current) = self.truth.notes.get(note) else {
-                return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
+                return Ok((Answer::Refused { refusal: Refusal::Unknown, at: None }, Vec::new()));
             };
             if *revision != current.revision {
-                return Ok((Answer::Refused(Refusal::Moved { now: current.revision, what: Moved::Note }), Vec::new()));
+                return Ok((
+                    Answer::Refused { refusal: Refusal::Moved { now: current.revision, what: Moved::Note }, at: None },
+                    Vec::new(),
+                ));
             }
         }
         if let Some(key) = object {
             if project != self.truth.project(key) {
-                return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
+                return Ok((Answer::Refused { refusal: Refusal::Unknown, at: None }, Vec::new()));
             }
             let Some(value) = self.truth.objects.get(&key) else {
-                return Ok((Answer::Refused(Refusal::Unknown), Vec::new()));
+                return Ok((Answer::Refused { refusal: Refusal::Unknown, at: None }, Vec::new()));
             };
             if let Some(Ending::Decided { party: Some(by), how: Some(how), at, .. }) = ending(value) {
                 return Ok((Answer::Done(Outcome::DecidedFirst { by: by.clone(), how: how.clone(), at }), Vec::new()));
             }
             if let Some(how) = ending(value) {
-                return Ok((Answer::Refused(Refusal::Ended { how: how.clone() }), Vec::new()));
+                return Ok((Answer::Refused { refusal: Refusal::Ended { how: how.clone() }, at: None }, Vec::new()));
             }
             if let Some((seen, what)) = revision {
                 let current = match (value, &what) {
@@ -186,22 +198,26 @@ impl<A: crate::Application> Engine<A> {
                             }
                             Moved::Spec | Moved::PersonTask | Moved::Note | Moved::Waiting => what,
                         };
-                        return Ok((Answer::Refused(Refusal::Moved { now, what }), Vec::new()));
+                        return Ok((Answer::Refused { refusal: Refusal::Moved { now, what }, at: None }, Vec::new()));
                     }
                 } else {
-                    return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+                    return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
                 }
             }
-            if let Ask::Amend { release: Some(seen), .. } = ask
+            if let Ask::Compound { operations, .. } = ask
+                && let Some(Operation::Release { revision: seen, .. }) = operations.as_slice().last()
                 && let ReadValue::Task(task) = value
                 && let Some(hold) = &task.hold
                 && *seen != hold.revision()
             {
                 return Ok((
-                    Answer::Refused(Refusal::Moved {
-                        now: hold.revision(),
-                        what: Moved::Hold { reason: Some(task_hold_reason(hold)) },
-                    }),
+                    Answer::Refused {
+                        refusal: Refusal::Moved {
+                            now: hold.revision(),
+                            what: Moved::Hold { reason: Some(task_hold_reason(hold)) },
+                        },
+                        at: None,
+                    },
                     Vec::new(),
                 ));
             }
@@ -235,7 +251,10 @@ impl<A: crate::Application> Engine<A> {
             };
             if waiting.is_some_and(|waiting| !recipient(&self.truth, party, waiting)) {
                 return Ok((
-                    Answer::Refused(Refusal::Moved { now: Revision { value: 0 }, what: Moved::Waiting }),
+                    Answer::Refused {
+                        refusal: Refusal::Moved { now: Revision { value: 0 }, what: Moved::Waiting },
+                        at: None,
+                    },
                     Vec::new(),
                 ));
             }
@@ -245,7 +264,8 @@ impl<A: crate::Application> Engine<A> {
                 self.truth.notes.get(note).map(|note| &note.acts)
             }
             Ask::StartChat { .. }
-            | Ask::Write { .. }
+            | Ask::Compound { .. }
+            | Ask::Message { .. }
             | Ask::Answer { .. }
             | Ask::Take { .. }
             | Ask::HandBack { .. }
@@ -279,22 +299,16 @@ impl<A: crate::Application> Engine<A> {
                 Ask::SetGoal { executor, budget, deadline, .. } => {
                     jig_client_domain::contract::admission::goal(offer, *executor, *budget, *deadline)
                 }
-                Ask::Amend { task, change, .. } => match self.truth.objects.get(&ObjectKey::Task(*task)) {
-                    Some(ReadValue::Task(before)) => {
-                        jig_client_domain::contract::admission::amendment(offer, change, &before.authority)
-                    }
-                    _ => match self.truth.objects.get(&ObjectKey::Escalation(*task)) {
-                        Some(ReadValue::OwnerEscalation(before)) => {
-                            jig_client_domain::contract::admission::amendment(offer, change, &before.task.authority)
-                        }
-                        Some(ReadValue::Escalation(before)) => {
-                            jig_client_domain::contract::admission::amendment(offer, change, &before.steering.authority)
-                        }
-                        _ => Admission::Refused(Refusal::Unknown),
-                    },
-                },
+                Ask::Amend { task, change, .. } => self.amendment_admission(offer, *task, change),
+                Ask::Compound { operations, .. } => {
+                    let [Operation::Amend { task, change, .. }, Operation::Release { .. }] = operations.as_slice()
+                    else {
+                        return Admission::Refused(Refusal::NotOffered);
+                    };
+                    self.amendment_admission(offer, *task, change)
+                }
                 Ask::StartChat { .. }
-                | Ask::Write { .. }
+                | Ask::Message { .. }
                 | Ask::Answer { .. }
                 | Ask::Take { .. }
                 | Ask::HandBack { .. }
@@ -317,14 +331,14 @@ impl<A: crate::Application> Engine<A> {
         });
         let admission = prediction.as_ref();
         if let Some(Admission::Refused(refusal)) = admission {
-            return Ok((Answer::Refused(refusal.clone()), Vec::new()));
+            return Ok((Answer::Refused { refusal: refusal.clone(), at: None }, Vec::new()));
         }
         if let Ask::StartChat { project, .. } = ask
             && !self.truth.frames.get(&party).is_some_and(|frame| {
                 frame.charters.iter().any(|offer| offer.project == *project && !offer.chats.is_empty())
             })
         {
-            return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+            return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
         }
         if let Some(rule) = self
             .rules
@@ -333,7 +347,7 @@ impl<A: crate::Application> Engine<A> {
             .or_else(|| self.rules.iter().find(|rule| rule.ask == *ask && rule.party.is_none()))
             .cloned()
         {
-            if bounded && matches!(rule.answer, Answer::Refused(_)) {
+            if bounded && matches!(rule.answer, Answer::Refused { refusal: _, .. }) {
                 return Err(Invalid::Script);
             }
             if matches!(rule.answer, Answer::Done(_)) {
@@ -349,7 +363,7 @@ impl<A: crate::Application> Engine<A> {
                     return Err(Invalid::Script);
                 }
                 if admission.is_none() && !matches!(ask, Ask::StartChat { .. } | Ask::Seen { .. }) {
-                    return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+                    return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
                 }
             }
             let mut next = self.truth.clone();
@@ -360,17 +374,18 @@ impl<A: crate::Application> Engine<A> {
             return Ok((rule.answer, rule.changes));
         }
         if admission.is_none() {
-            return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+            return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
         }
         if let Some(Admission::Proposed { .. }) = admission {
-            return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+            return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
         }
         let how = match ask {
             Ask::Decide { on: DecideOn::Proposal { decision, .. }, .. }
             | Ask::Decide { on: DecideOn::Escalation { decision, .. }, .. } => Some(decision.clone()),
             Ask::Release { again, .. } => Some(Decision::Released { again: *again }),
             Ask::StartChat { .. }
-            | Ask::Write { .. }
+            | Ask::Compound { .. }
+            | Ask::Message { .. }
             | Ask::Answer { .. }
             | Ask::Take { .. }
             | Ask::HandBack { .. }
@@ -391,7 +406,7 @@ impl<A: crate::Application> Engine<A> {
         };
         if let (Some(key), Some(how)) = (object, how) {
             if matches!(how, Decision::PassedUp | Decision::LeftHeld { .. }) {
-                return Ok((Answer::Refused(Refusal::NotOffered), Vec::new()));
+                return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
             }
             let by = self.truth.frames.get(&party).expect("signed-in party has a frame").party.clone();
             let mut value = self.truth.objects.get(&key).expect("target checked").clone();
@@ -437,7 +452,9 @@ impl<A: crate::Application> Engine<A> {
                 | ReadValue::Project(_)
                 | ReadValue::Notes(_)
                 | ReadValue::Deployment(_)
-                | ReadValue::OwnerDeployment(_) => return Ok((Answer::Refused(Refusal::NotOffered), Vec::new())),
+                | ReadValue::OwnerDeployment(_) => {
+                    return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
+                }
             }
             let change =
                 crate::Change::Object { project: project.expect("object requests name a project"), key, value };
@@ -445,7 +462,28 @@ impl<A: crate::Application> Engine<A> {
             self.truth.apply(&change)?;
             return Ok((Answer::Done(Outcome::Decided { by: Actor::Party(party), how, at: wall }), vec![change]));
         }
-        Ok((Answer::Refused(Refusal::NotOffered), Vec::new()))
+        Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()))
+    }
+    fn amendment_admission(
+        &self,
+        offer: &Admission,
+        task: u64,
+        change: &jig_client_domain::contract::Amendment,
+    ) -> Admission {
+        match self.truth.objects.get(&ObjectKey::Task(task)) {
+            Some(ReadValue::Task(before)) => {
+                jig_client_domain::contract::admission::amendment(offer, change, &before.authority)
+            }
+            _ => match self.truth.objects.get(&ObjectKey::Escalation(task)) {
+                Some(ReadValue::OwnerEscalation(before)) => {
+                    jig_client_domain::contract::admission::amendment(offer, change, &before.task.authority)
+                }
+                Some(ReadValue::Escalation(before)) => {
+                    jig_client_domain::contract::admission::amendment(offer, change, &before.steering.authority)
+                }
+                _ => Admission::Refused(Refusal::Unknown),
+            },
+        }
     }
 }
 pub(crate) fn recipient(truth: &crate::Truth, party: u64, to: &Recipient) -> bool {
@@ -548,8 +586,11 @@ fn decision_kind(decision: &Decision) -> ActKind {
 type Target = (Option<u32>, Option<ObjectKey>, ActKind, Option<(Revision, Moved)>);
 fn target(ask: &Ask) -> Target {
     match ask {
+        Ask::Compound { project, operations } => {
+            compound_target(*project, operations).unwrap_or((Some(*project), None, ActKind::Write, None))
+        }
         Ask::StartChat { project, .. } => (Some(*project), None, ActKind::Write, None),
-        Ask::Write { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Write, None),
+        Ask::Message { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Write, None),
         Ask::Answer { project, on: AnswerOn::Question { task, message, .. }, .. } => {
             (Some(*project), Some(ObjectKey::Question { task: *task, message: *message }), ActKind::Answer, None)
         }
@@ -575,12 +616,9 @@ fn target(ask: &Ask) -> Target {
             ActKind::Release,
             Some((*revision, Moved::Hold { reason: None })),
         ),
-        Ask::Amend { project, task, revision, release, .. } => (
-            Some(*project),
-            Some(ObjectKey::Task(*task)),
-            if release.is_some() { ActKind::AmendRelease } else { ActKind::Amend },
-            revision.map(|value| (value, Moved::Spec)),
-        ),
+        Ask::Amend { project, task, revision, .. } => {
+            (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Amend, revision.map(|value| (value, Moved::Spec)))
+        }
         Ask::Stop { project, task } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Stop, None),
         Ask::Cancel { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Cancel, None),
         Ask::Close { project, chat, .. } => (Some(*project), Some(ObjectKey::Task(*chat)), ActKind::Close, None),
@@ -594,5 +632,25 @@ fn target(ask: &Ask) -> Target {
         Ask::SetRoles { project, .. } => (Some(*project), None, ActKind::SetRoles, None),
         Ask::MakeService { project, .. } => (Some(*project), None, ActKind::MakeService, None),
         Ask::SetPool { project, .. } => (Some(*project), None, ActKind::SetPool, None),
+    }
+}
+
+fn compound_target(project: u32, operations: &List<Operation>) -> Option<Target> {
+    match operations.as_slice() {
+        [Operation::Message { project: first, task, .. }, Operation::Release { project: last, task: released, .. }]
+            if *first == project && *last == project && task == released =>
+        {
+            Some((Some(project), Some(ObjectKey::Task(*task)), ActKind::Write, None))
+        }
+        [
+            Operation::Amend { project: first, task, revision, .. },
+            Operation::Release { project: last, task: released, .. },
+        ] if *first == project && *last == project && task == released => Some((
+            Some(project),
+            Some(ObjectKey::Task(*task)),
+            ActKind::AmendRelease,
+            revision.map(|v| (v, Moved::Spec)),
+        )),
+        _ => None,
     }
 }

@@ -7,7 +7,6 @@ fn amendment(reason: &[u8]) -> Ask {
         project: 1,
         task: 8,
         revision: Some(Revision { value: 1 }),
-        release: None,
         reason: text(reason),
         change: Box::new(Amendment {
             addressed: None,
@@ -58,7 +57,10 @@ fn durable_amendment_key_replay_keeps_reason_and_changed_reason_is_a_conflict() 
     assert_eq!(engine.commits()[0].key, Some([1; 16]));
     assert_eq!(engine.commits()[0].durable, Some(Time::from_nanos(10_000_000)));
     send(&mut engine, 20_000_000, 11, 1, 3, amendment(b"different"));
-    assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), &Answer::Refused(Refusal::KeyConflict));
+    assert_eq!(
+        final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]),
+        &Answer::Refused { refusal: Refusal::KeyConflict, at: None }
+    );
     send(&mut engine, 20_000_000, 12, 1, 4, ask.clone());
     assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), final_answer(&up[0]));
     assert_eq!(engine.commits().len(), 1);

@@ -29,11 +29,11 @@ fn maximum_outcomes() -> [OwnerOutcome; 26] {
             at: Wall::from_nanos(u64::MAX),
             choice: OwnerProposalChoice::Accepted,
         },
-        OwnerOutcome::Said { task: u64::MAX, message: u64::MAX, released: true },
+        OwnerOutcome::Said { task: u64::MAX, message: u64::MAX },
         OwnerOutcome::QuestionAnswered { task: u64::MAX, question: u64::MAX, message: u64::MAX },
         OwnerOutcome::Prioritised { project: u32::MAX },
-        OwnerOutcome::Amended { task: u64::MAX, released: true },
-        OwnerOutcome::AmendProposed { task: u64::MAX, proposal: u64::MAX, released: true },
+        OwnerOutcome::Amended { task: u64::MAX },
+        OwnerOutcome::AmendProposed { task: u64::MAX, proposal: u64::MAX },
         OwnerOutcome::RolesSet { project: u32::MAX },
         OwnerOutcome::PolicyChanged { project: u32::MAX },
         OwnerOutcome::PoolSet { project: u32::MAX, person: u64::MAX },
@@ -93,11 +93,11 @@ fn closed_decision_choices_and_release_flags_need_no_explanation_payload() {
         assert_eq!(owner_outcome_bytes(&value, &bounds), Some(bytes));
         assert_eq!(admit_owner_outcome(&value, &bounds), Ok(()));
     }
-    for released in [false, true] {
+    {
         for value in [
-            OwnerOutcome::Said { task: 7, message: 11, released },
-            OwnerOutcome::Amended { task: 13, released },
-            OwnerOutcome::AmendProposed { task: 17, proposal: 23, released },
+            OwnerOutcome::Said { task: 7, message: 11 },
+            OwnerOutcome::Amended { task: 13 },
+            OwnerOutcome::AmendProposed { task: 17, proposal: 23 },
         ] {
             assert_eq!(owner_outcome_bytes(&value, &bounds), Some(bytes));
             assert_eq!(admit_owner_outcome(&value, &bounds), Ok(()));

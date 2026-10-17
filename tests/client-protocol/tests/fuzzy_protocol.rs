@@ -25,7 +25,7 @@ fn random_people_over_bytes_keep_the_referee_s_rules() {
             bytes::held(&mut world, client);
         } else {
             let words = format!("Please continue {}", rng.between(0, 99));
-            bytes::send_words(&mut world, client, words.as_bytes());
+            bytes::send_words(&mut world, client, words.as_bytes(), false);
             bytes::finish(&mut world);
             assert!(world.front().words_reached_worker(words.as_bytes()), "drawn words seed {seed}");
         }

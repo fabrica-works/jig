@@ -80,6 +80,7 @@ pub(crate) fn parts(output: &[crate::Request], capacity: u32) -> Box<[crate::Req
 }
 
 mod client;
+pub(crate) use client::MOST;
 pub(crate) use client::{
     AnsweredByEngine, CardAsk, Ended, FireClient, Fixture, Input, ReadPage, Reported, SendIntent, Served, Tick,
     Watched, intent, kept,
@@ -89,4 +90,44 @@ pub(crate) fn one<T>(value: T) -> skein_lib::List<T> {
     let mut list = skein_lib::List::with_capacity(1);
     list.push(value).ok().unwrap();
     list
+}
+
+/// A send and the release the displayed hold names share one request.
+pub(crate) fn releasing(
+    ask: jig_client::contract::Ask,
+    revision: Option<jig_client::contract::Revision>,
+) -> jig_client::contract::Ask {
+    use jig_client::contract::{Ask, Operation};
+    let Some(revision) = revision else {
+        return ask;
+    };
+    let (project, task, first) = if let Ask::Message { project, task, words } = ask {
+        (project, task, Operation::Message { project, task, words })
+    } else {
+        let Ask::Amend { project, task, revision, change, reason } = ask else {
+            panic!("message or amendment");
+        };
+        (project, task, Operation::Amend { project, task, revision, change, reason })
+    };
+    let mut operations = skein_lib::List::with_capacity(2);
+    operations.push(first).unwrap();
+    operations.push(Operation::Release { project, task, revision, again: None }).unwrap();
+    Ask::Compound { project, operations }
+}
+pub(crate) fn selected_change(ask: &jig_client::contract::Ask) -> Option<&jig_client::contract::Amendment> {
+    use jig_client::contract::{Ask, Operation};
+    if let Ask::Amend { change, .. } = ask {
+        return Some(change);
+    }
+    let Ask::Compound { operations, .. } = ask else {
+        return None;
+    };
+    let [Operation::Amend { change, .. }, Operation::Release { .. }] = operations.as_slice() else {
+        return None;
+    };
+    Some(change)
+}
+
+pub(crate) fn refusal_answer(refusal: jig_client::contract::Refusal) -> jig_client::contract::Answer {
+    jig_client::contract::Answer::Refused { refusal, at: None }
 }

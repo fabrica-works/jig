@@ -8,6 +8,7 @@ impl Words {
     /// Say the supplied refusal, never deriving permission or numerical limits.
     pub fn refusal(&self, b: &mut Builder, refusal: &Refusal, text_limit: u32) {
         match refusal {
+            Refusal::Malformed { at, .. } => self.text(b, JigPhrase::MalformedProject, &[Hole::Number(u64::from(*at))]),
             Refusal::Role { held } => {
                 self.text(b, JigPhrase::RoleNotAllowed, &[]);
                 self.held_role(b, *held);
@@ -91,6 +92,7 @@ impl Words {
     }
     fn engine_limit(&self, b: &mut Builder, which: AdmissionLimit) {
         let phrase = match which {
+            AdmissionLimit::Operations => JigPhrase::EngineLimitOperations,
             AdmissionLimit::Grace => JigPhrase::EngineLimitGrace,
             AdmissionLimit::Words => JigPhrase::EngineLimitWords,
             AdmissionLimit::Identity => JigPhrase::EngineLimitIdentity,

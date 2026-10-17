@@ -252,7 +252,7 @@ impl<A: Application> Engine<A> {
                     requests.push((**ask).clone());
                     effects.extend(changes);
                 }
-                Ok((jig_client_domain::contract::Answer::Refused(refusal), _)) => {
+                Ok((jig_client_domain::contract::Answer::Refused { refusal, .. }, _)) => {
                     self.truth = original;
                     return Err(Judged::Refused(refusal));
                 }

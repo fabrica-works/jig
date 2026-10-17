@@ -1,6 +1,7 @@
 //! Exact request translation (client/domain/contract.md, 3).
 //! Whole supplied fields preserve independent revisions and optional edits.
 use super::request_arguments;
+mod compound;
 mod policy;
 use jig_client_domain::contract as client;
 use jig_domain_people as people;
@@ -12,6 +13,7 @@ pub enum Invalid {
     Decision,
     NoteRevision,
     NoteProject,
+    CompoundProject,
 }
 
 /// # Errors
@@ -22,11 +24,12 @@ pub enum Invalid {
 )]
 pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
     Ok(match value {
+        client::Ask::Compound { project, operations } => compound::ask(*project, operations)?,
         client::Ask::StartChat { project, words } => {
             people::Ask::StartChat { project: *project, words: Box::from(words.bytes()) }
         }
-        client::Ask::Write { project, task, words, release } => {
-            people::Ask::Say { project: *project, task: *task, words: Box::from(words.bytes()), release: *release }
+        client::Ask::Message { project, task, words } => {
+            people::Ask::Say { project: *project, task: *task, words: Box::from(words.bytes()), release: false }
         }
         client::Ask::Answer { project, on: client::AnswerOn::Question { task, message, words } } => {
             people::Ask::AnswerQuestion {
@@ -119,7 +122,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
                 recalled: u32::try_from(revision.value).map_err(|_| Invalid::NoteRevision)?,
             }),
         },
-        client::Ask::Amend { project, task, revision, change, release, reason } => people::Ask::Amend {
+        client::Ask::Amend { project, task, revision, change, reason } => people::Ask::Amend {
             project: *project,
             task: *task,
             revision: revision.map_or(0, |value| value.value),
@@ -139,7 +142,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
                 authority: change.authority.as_ref().map(authority),
                 reason: Box::from(reason.bytes()),
             },
-            release: release.map(|value| value.value),
+            release: None,
         },
         client::Ask::ChangePolicy { project, edit } => {
             people::Ask::ChangePolicy { project: *project, change: policy_edit(edit) }
@@ -302,14 +305,37 @@ mod tests {
                         authority: None,
                         tracked: None,
                     }),
-                    release: Some(client::Revision { value: 4 }),
                     reason: reason.clone(),
                 };
-                let before = request.clone();
-                let Ok(people::Ask::Amend { project, task, revision, amendment, release }) = ask(&request) else {
-                    panic!("whole amendment")
+                let client::Ask::Amend { project, task, revision, change, reason: supplied_reason } = request else {
+                    panic!("amendment");
                 };
-                assert_eq!((project, task, revision, release), (u32::MAX, 0, 6, Some(4)));
+                let mut operations = List::with_capacity(2);
+                operations
+                    .push(client::Operation::Amend { project, task, revision, change, reason: supplied_reason })
+                    .expect("two operations fit");
+                operations
+                    .push(client::Operation::Release {
+                        project,
+                        task,
+                        revision: client::Revision { value: 4 },
+                        again: None,
+                    })
+                    .expect("two operations fit");
+                let request = client::Ask::Compound { project, operations };
+                let before = request.clone();
+                let Ok(people::Ask::Compound { project, operations }) = ask(&request) else {
+                    panic!("whole compound");
+                };
+                let [
+                    people::Operation::Amend { task, revision, amendment, release: None },
+                    people::Operation::Release { revision: release, .. },
+                ] = operations.as_slice()
+                else {
+                    panic!("amend and release");
+                };
+                let amendment = amendment.clone();
+                assert_eq!((project, *task, *revision, Some(*release)), (u32::MAX, 0, 6, Some(4)));
                 let addressed = amendment.addressed.expect("selected address");
                 assert_eq!(addressed.revision, 12);
                 assert_eq!(
@@ -363,7 +389,6 @@ mod tests {
                 authority: Some(authority.clone()),
                 tracked: None,
             }),
-            release: None,
             reason: text(b"supplied"),
         };
         let Ok(people::Ask::Amend { project, task, revision, amendment, release }) = ask(&request) else {

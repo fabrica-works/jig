@@ -221,14 +221,16 @@ fn owner_escalation_atomic_amend_release_preserves_supplied_reason_and_independe
     let output = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert_eq!(
         sent(&output),
-        &Ask::Amend {
-            project: 1,
-            task: 8,
-            revision: Some(Revision { value: 9 }),
-            change: Box::new(change()),
-            reason: text(b""),
-            release: Some(Revision { value: u64::MAX })
-        }
+        &crate::tests::fixtures::releasing(
+            Ask::Amend {
+                project: 1,
+                task: 8,
+                revision: Some(Revision { value: 9 }),
+                change: Box::new(change()),
+                reason: text(b""),
+            },
+            Some(Revision { value: u64::MAX })
+        )
     );
     assert_eq!(domain.objects().get(id).unwrap().body, Some(Body::OwnerEscalation(Box::new(original))));
 }

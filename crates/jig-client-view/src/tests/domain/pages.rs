@@ -3,6 +3,7 @@ mod conversation_merge;
 mod owner_effect_proposals;
 mod task_proposals;
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Ended, Fixture, ReadPage, Served, Watched};
 use crate::{
     Event, Request,
@@ -532,7 +533,7 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
             &Page::Work { address: Address::Inbox { project: None }, behind: false, excess: 0, refused: None }
         );
         let answer = if refused {
-            Answer::Refused(Refusal::Authority { lacking: Lacking::Budget { needed: 10, left: 2 }, proposable: None })
+            refusal_answer(Refusal::Authority { lacking: Lacking::Budget { needed: 10, left: 2 }, proposable: None })
         } else {
             Answer::Done(Outcome::Made { what: Made::Chat { task: 42 } })
         };
@@ -971,7 +972,7 @@ fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
     assert_eq!(sent.len(), 1);
     assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
     let request = *request;
-    drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: Answer::Refused(Refusal::NotOffered) });
+    drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: refusal_answer(Refusal::NotOffered) });
     assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
     assert_eq!(domain.fields().get(Purpose::NewGoal).unwrap().text, text(b"new goal"));
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
@@ -1130,7 +1131,7 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
         Time::ZERO,
         AnsweredByEngine {
             request,
-            answer: Answer::Refused(Refusal::Moved { now: Revision { value: 2 }, what: Moved::Note }),
+            answer: refusal_answer(Refusal::Moved { now: Revision { value: 2 }, what: Moved::Note }),
         },
     );
     let Request::Client { asked: jig_client::Event::Read { handle: read, .. } } = refresh[0] else {

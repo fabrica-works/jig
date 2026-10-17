@@ -47,6 +47,11 @@ pub(crate) fn owner_escalation_choice(value: &w::OwnerEscalationChoice, _limits:
 
 pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::OwnerOutcome {
     match value {
+        w::OwnerOutcome::Compound(row) => c::OwnerOutcome::Compound {
+            project: row.project(),
+            operations: row.operations(),
+            first_message: row.first_message(),
+        },
         w::OwnerOutcome::Closing(row) => {
             c::OwnerOutcome::Closing { chat: row.chat(), cancelled: row.cancelled(), kept: row.kept() }
         }
@@ -69,16 +74,14 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::Owne
             at: Wall::from_nanos(row.at()),
             choice: owner_proposal_choice(row.choice(), limits),
         },
-        w::OwnerOutcome::Said(row) => {
-            c::OwnerOutcome::Said { task: row.task(), message: row.message(), released: row.released() }
-        }
+        w::OwnerOutcome::Said(row) => c::OwnerOutcome::Said { task: row.task(), message: row.message() },
         w::OwnerOutcome::QuestionAnswered(row) => {
             c::OwnerOutcome::QuestionAnswered { task: row.task(), question: row.question(), message: row.message() }
         }
         w::OwnerOutcome::Prioritised(row) => c::OwnerOutcome::Prioritised { project: row.project() },
-        w::OwnerOutcome::Amended(row) => c::OwnerOutcome::Amended { task: row.task(), released: row.released() },
+        w::OwnerOutcome::Amended(row) => c::OwnerOutcome::Amended { task: row.task() },
         w::OwnerOutcome::AmendProposed(row) => {
-            c::OwnerOutcome::AmendProposed { task: row.task(), proposal: row.proposal(), released: row.released() }
+            c::OwnerOutcome::AmendProposed { task: row.task(), proposal: row.proposal() }
         }
         w::OwnerOutcome::RolesSet(row) => c::OwnerOutcome::RolesSet { project: row.project() },
         w::OwnerOutcome::PolicyChanged(row) => c::OwnerOutcome::PolicyChanged { project: row.project() },
@@ -125,7 +128,6 @@ pub(crate) fn note_scope(value: &w::NoteScope, limits: &Limits) -> c::NoteScope 
 pub(crate) fn made(value: &w::Made, limits: &Limits) -> c::Made {
     match value {
         w::Made::Chat(row) => c::Made::Chat { task: row.task() },
-        w::Made::Words(row) => c::Made::Words { task: row.task(), message: row.message() },
         w::Made::Goal(row) => c::Made::Goal { task: row.task() },
         w::Made::Tasks(row) => {
             let mut list0 = List::with_capacity(row.tasks().len());
@@ -301,6 +303,7 @@ pub(crate) fn lacking(value: &w::Lacking, limits: &Limits) -> c::Lacking {
 
 pub(crate) fn admission_limit(value: &w::AdmissionLimit, _limits: &Limits) -> c::AdmissionLimit {
     match value {
+        w::AdmissionLimit::Operations => c::AdmissionLimit::Operations,
         w::AdmissionLimit::Grace => c::AdmissionLimit::Grace,
         w::AdmissionLimit::Words => c::AdmissionLimit::Words,
         w::AdmissionLimit::Identity => c::AdmissionLimit::Identity,
@@ -447,6 +450,12 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
             c::Refusal::Moved { now: revision(row.now(), limits), what: moved(row.what(), limits)? }
         }
         w::Refusal::Ended(row) => c::Refusal::Ended { how: ending(row.how(), limits)? },
+        w::Refusal::Malformed(row) => c::Refusal::Malformed {
+            at: row.at(),
+            why: match row.why() {
+                w::Malformed::ProjectMismatch => c::Malformed::ProjectMismatch,
+            },
+        },
         w::Refusal::Unknown => c::Refusal::Unknown,
         w::Refusal::NotOffered => c::Refusal::NotOffered,
         w::Refusal::KeyConflict => c::Refusal::KeyConflict,
@@ -492,7 +501,7 @@ pub fn answer(record: w::KeyedAnswer, limits: &Limits) -> Result<c::Answer, supe
             Err(problem) => Err(classify(problem)),
         },
         w::Final::Refused(value) => match refusal(value.refusal(), limits) {
-            Ok(value) => Ok(c::Answer::Refused(value)),
+            Ok(refusal) => Ok(c::Answer::Refused { refusal, at: *value.at() }),
             Err(problem) => Err(classify(problem)),
         },
     }

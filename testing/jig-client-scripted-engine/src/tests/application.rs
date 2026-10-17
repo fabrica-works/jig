@@ -193,7 +193,7 @@ fn scenario_application_hooks_share_keys_commits_retention_and_restart() {
     assert!(engine.poll(at(10_000_001)).contains(&Up::Answer {
         attempt: Token::new(5),
         envelope: Envelope::Final,
-        answer: Some(Answer::Refused(Refusal::KeyConflict))
+        answer: Some(Answer::Refused { refusal: Refusal::KeyConflict, at: None })
     }));
     engine
         .send_application(
@@ -377,10 +377,10 @@ fn scenario_deployment_parts_dynamic_rules_and_scheduling() {
     assert!(engine.commits().is_empty());
     let first = engine.poll(at(10_000_000));
     let mut invalid = rule.clone();
-    invalid.answer = Answer::Refused(Refusal::NotOffered);
+    invalid.answer = Answer::Refused { refusal: Refusal::NotOffered, at: None };
     assert_eq!(engine.script(invalid), Err(Invalid::Script));
     let mut replacement = rule;
-    replacement.answer = Answer::Refused(Refusal::NotOffered);
+    replacement.answer = Answer::Refused { refusal: Refusal::NotOffered, at: None };
     replacement.changes = vec![];
     engine.script(replacement).expect("replace future outcome");
     send(&mut engine, 10_000_001, 11, 1, 2, ask);

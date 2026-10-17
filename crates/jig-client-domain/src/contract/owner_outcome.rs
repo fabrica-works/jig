@@ -33,6 +33,8 @@ pub enum OwnerEscalationChoice {
 /// Facts returned by a committed jig request, including a historical winner.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerOutcome {
+    /// Operations committed together, taking consecutive message numbers.
+    Compound { project: u32, operations: u32, first_message: u64 },
     /// A chat closed with the supplied counts of cancelled and kept delegates.
     Closing { chat: u64, cancelled: u32, kept: u32 },
     /// A results or chat-replies position was marked seen.
@@ -64,15 +66,15 @@ pub enum OwnerOutcome {
     /// A proposal's current or historical decision names its maker and winner.
     ProposalDecided { proposal: ProposalKey, by: u64, at: Wall, choice: OwnerProposalChoice },
     /// Words were admitted under a message number, with the supplied release fact.
-    Said { task: u64, message: u64, released: bool },
+    Said { task: u64, message: u64 },
     /// A named question was answered by a message.
     QuestionAnswered { task: u64, question: u64, message: u64 },
     /// A project's goal priorities changed together.
     Prioritised { project: u32 },
     /// A task accepted an amendment, with the supplied release fact.
-    Amended { task: u64, released: bool },
+    Amended { task: u64 },
     /// An amendment awaits the supplied proposal number, without an inferred maker.
-    AmendProposed { task: u64, proposal: u64, released: bool },
+    AmendProposed { task: u64, proposal: u64 },
     /// A project's roster and affected waiting recipients changed together.
     RolesSet { project: u32 },
     /// A project's policy changed for later checks.

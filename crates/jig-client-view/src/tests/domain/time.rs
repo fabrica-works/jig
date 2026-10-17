@@ -1,4 +1,5 @@
 use super::spine::{LIMITS, drain, frame, open_token};
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage, Watched};
 use crate::{
     Event, Limits, Request,
@@ -115,7 +116,7 @@ fn hidden_answers_have_notices_and_lingers_and_coalesced_saves_end_on_deadlines(
     )
     .unwrap();
     drive(&mut domain, &limits, Time::ZERO, Event::Went { place: Place::Elsewhere });
-    drive(&mut domain, &limits, Time::ZERO, AnsweredByEngine { request, answer: Answer::Refused(Refusal::NotOffered) });
+    drive(&mut domain, &limits, Time::ZERO, AnsweredByEngine { request, answer: refusal_answer(Refusal::NotOffered) });
     let notice = *domain.notices().ids().first().unwrap().0;
     let Kind::Answer { object, .. } = &domain.notices().get(notice).unwrap().kind else {
         panic!("hidden card outcome");

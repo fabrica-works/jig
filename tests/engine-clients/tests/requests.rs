@@ -119,7 +119,6 @@ fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
                     },
                 )
                 .expect("change"),
-                release: None,
                 reason: b"more work".as_slice().into(),
             },
         )
@@ -192,7 +191,7 @@ fn a_v8_amend_beyond_the_role_is_proposed_and_answered_amend_proposed() {
     let w::Final::Done(done) = final_answer(&peer, socket) else { panic!("done") };
     let w::Outcome::Owner(owner) = done.outcome() else { panic!("owner outcome") };
     let w::OwnerOutcome::AmendProposed(row) = owner.value() else { panic!("amend proposed") };
-    assert_eq!((row.task(), row.proposal(), row.released()), (2, 1, false));
+    assert_eq!((row.task(), row.proposal()), (2, 1));
     assert_eq!(jig_core_world::fixtures::live_row(&world, 2).numbers.budget, 20);
 }
 #[test]

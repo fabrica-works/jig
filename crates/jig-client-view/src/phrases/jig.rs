@@ -222,8 +222,6 @@ pub enum JigPhrase {
     DecidedFirst,
     /// Made chat (0).
     MadeChat,
-    /// Sent words to task (0), message (1).
-    MadeWords,
     /// Made goal (0).
     MadeGoal,
     /// Made task (0).
@@ -1008,6 +1006,8 @@ pub enum JigPhrase {
     HeldPriorLifecycle,
     HeldPriorWaiting,
 
+    EngineLimitOperations,
+    MalformedProject,
     EngineLimitGrace,
     EngineLimitWords,
     EngineLimitIdentity,
@@ -1259,7 +1259,6 @@ impl JigPhrase {
             Self::LeftHeld => 49,
             Self::DecidedFirst => 50,
             Self::MadeChat => 51,
-            Self::MadeWords => 52,
             Self::MadeGoal => 53,
             Self::MadeTask => 54,
             Self::MadeService => 55,
@@ -1641,6 +1640,8 @@ impl JigPhrase {
             Self::OutboxEntry => 508,
             Self::TakenByNumber => 509,
 
+            Self::EngineLimitOperations => 7411,
+            Self::MalformedProject => 7412,
             Self::EngineLimitGrace => 7410,
             Self::EngineLimitWords => 413,
             Self::EngineLimitIdentity => 414,
@@ -1810,6 +1811,7 @@ impl JigPhrase {
             | Self::PanelPart
             | Self::ResultPart
             | Self::HoldPart
+            | Self::EngineLimitOperations
             | Self::EngineLimitGrace
             | Self::EngineLimitWords
             | Self::EngineLimitIdentity
@@ -2266,6 +2268,7 @@ impl JigPhrase {
             | Self::ByTask
             | Self::MadeChat
             | Self::MadeGoal
+            | Self::MalformedProject
             | Self::MadeTask
             | Self::MadeService
             | Self::MadeResult
@@ -2324,7 +2327,6 @@ impl JigPhrase {
             | Self::PartProposalParty
             | Self::ProposedByParty
             | Self::Proposed
-            | Self::MadeWords
             | Self::RoleMissing
             | Self::DepthMissing
             | Self::TasksMissing
@@ -2421,7 +2423,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 632] = [
+pub const ALL: [JigPhrase; 633] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2574,7 +2576,6 @@ pub const ALL: [JigPhrase; 632] = [
     JigPhrase::LeftHeld,
     JigPhrase::DecidedFirst,
     JigPhrase::MadeChat,
-    JigPhrase::MadeWords,
     JigPhrase::MadeGoal,
     JigPhrase::MadeTask,
     JigPhrase::MadeService,
@@ -2955,6 +2956,8 @@ pub const ALL: [JigPhrase; 632] = [
     JigPhrase::HoldPart,
     JigPhrase::OutboxEntry,
     JigPhrase::TakenByNumber,
+    JigPhrase::EngineLimitOperations,
+    JigPhrase::MalformedProject,
     JigPhrase::EngineLimitGrace,
     JigPhrase::EngineLimitWords,
     JigPhrase::EngineLimitIdentity,

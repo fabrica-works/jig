@@ -159,10 +159,10 @@ pub(crate) fn answered(
         IntentPurpose::Seen(_) => {
             match answer {
                 Answer::Done(_) => {}
-                Answer::Refused(refusal) => {
+                Answer::Refused { refusal, .. } => {
                     crate::notices::kept::show(
                         domain,
-                        crate::notices::kept::Kind::PageAnswer { answer: Answer::Refused(refusal) },
+                        crate::notices::kept::Kind::PageAnswer { answer: Answer::Refused { refusal, at: None } },
                     );
                 }
             }
@@ -174,7 +174,7 @@ pub(crate) fn answered(
             }
             domain.chats.starting = None;
             match answer {
-                Answer::Refused(refusal) => domain.chats.refusal = Some(refusal),
+                Answer::Refused { refusal, .. } => domain.chats.refusal = Some(refusal),
                 Answer::Done(outcome) => match crate::outcome::route(&outcome) {
                     crate::outcome::Route::Chat { task } => {
                         let same = match &domain.chats.words {

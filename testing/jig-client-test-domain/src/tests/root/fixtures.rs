@@ -232,7 +232,9 @@ pub(super) fn family_request(ask: first::Ask) -> jig_client::Family {
 }
 pub(super) fn family_answer(answer: first::Answer) -> jig_client::Answered {
     match answer {
-        first::Answer::Refused(why) => jig_client::Answered::Jig(Answer::Refused(why.into_refusal())),
+        first::Answer::Refused(why) => {
+            jig_client::Answered::Jig(Answer::Refused { refusal: why.into_refusal(), at: None })
+        }
         answer => jig_client::Answered::Family(jig_client::Family {
             family: crate::FIRST,
             version: jig_client_test_protocol_wire::VERSION,

@@ -305,6 +305,13 @@ pub fn language() -> Language {
             JigPhrase::ResultPart => Box::new([Segment::Text(copy_of(b"Connector result"))]),
             JigPhrase::HoldPart => Box::new([Segment::Text(copy_of(b"Connector hold"))]),
 
+            JigPhrase::EngineLimitOperations => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: operations"))])
+            }
+            JigPhrase::MalformedProject => Box::new([
+                Segment::Text(copy_of(b"Operation in another project at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
             JigPhrase::EngineLimitGrace => Box::new([Segment::Text(copy_of(b"Engine admission limit: grace"))]),
             JigPhrase::EngineLimitWords => Box::new([Segment::Text(copy_of(b"Engine admission limit: words"))]),
             JigPhrase::EngineLimitIdentity => Box::new([Segment::Text(copy_of(b"Engine admission limit: identity"))]),
@@ -877,12 +884,6 @@ pub fn language() -> Language {
             JigPhrase::MadeChat => {
                 Box::new([Segment::Text(copy_of(b"Made chat ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
-            JigPhrase::MadeWords => Box::new([
-                Segment::Text(copy_of(b"Sent words to task ")),
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b", message ")),
-                Segment::Hole { index: 1, kind: HoleKind::Number },
-            ]),
             JigPhrase::MadeGoal => {
                 Box::new([Segment::Text(copy_of(b"Made goal ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }

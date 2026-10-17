@@ -579,13 +579,14 @@ pub(crate) fn wire_holding(value: &c::Holding, limits: &w::Limits) -> Result<w::
 #[expect(clippy::too_many_lines, reason = "one exhaustive field translation arm per client ask")]
 pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
     Ok(match value {
+        c::Ask::Compound { project, operations } => super::compound::encode(*project, operations, limits)?,
         c::Ask::StartChat { project, words } => w::Ask::StartChat(w::StartChat::new(
             limits,
             w::StartChatParts { project: *project, words: bytes::copy_of(words.bytes()) },
         )?),
-        c::Ask::Write { project, task, words, release } => w::Ask::Write(w::Write::new(
+        c::Ask::Message { project, task, words } => w::Ask::Message(w::Message::new(
             limits,
-            w::WriteParts { project: *project, task: *task, words: bytes::copy_of(words.bytes()), release: *release },
+            w::MessageParts { project: *project, task: *task, words: bytes::copy_of(words.bytes()) },
         )?),
         c::Ask::Answer { project, on } => w::Ask::Answer(w::Answer::new(
             limits,
@@ -616,26 +617,19 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
                 },
             )?)
         }
-        c::Ask::Amend { project, task, revision, change, release, reason } => {
-            let opt0 = match release {
-                Some(item) => Some(wire_revision(*item, limits)?),
-                None => None,
-            };
-            w::Ask::Amend(Box::new(w::Amend::new(
-                limits,
-                w::AmendParts {
-                    project: *project,
-                    task: *task,
-                    revision: match revision {
-                        Some(value) => Some(wire_revision(*value, limits)?),
-                        None => None,
-                    },
-                    change: wire_amendment(change, limits)?,
-                    release: opt0,
-                    reason: bytes::copy_of(reason.bytes()),
+        c::Ask::Amend { project, task, revision, change, reason } => w::Ask::Amend(Box::new(w::Amend::new(
+            limits,
+            w::AmendParts {
+                project: *project,
+                task: *task,
+                revision: match revision {
+                    Some(value) => Some(wire_revision(*value, limits)?),
+                    None => None,
                 },
-            )?))
-        }
+                change: wire_amendment(change, limits)?,
+                reason: bytes::copy_of(reason.bytes()),
+            },
+        )?)),
         c::Ask::Stop { project, task } => {
             w::Ask::Stop(w::Stop::new(limits, w::StopParts { project: *project, task: *task })?)
         }

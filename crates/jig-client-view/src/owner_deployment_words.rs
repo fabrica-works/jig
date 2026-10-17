@@ -175,6 +175,7 @@ pub enum DeploymentPhrase {
     FunderRecurring,
     FunderPeriod,
     FunderTask,
+    AdmissionOperations,
     AdmissionGrace,
     AdmissionWords,
     AdmissionIdentity,
@@ -217,7 +218,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 225] = [
+pub const ALL: [DeploymentPhrase; 226] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -402,6 +403,7 @@ pub const ALL: [DeploymentPhrase; 225] = [
     DeploymentPhrase::FunderRecurring,
     DeploymentPhrase::FunderPeriod,
     DeploymentPhrase::FunderTask,
+    DeploymentPhrase::AdmissionOperations,
     DeploymentPhrase::AdmissionGrace,
     DeploymentPhrase::AdmissionWords,
     DeploymentPhrase::AdmissionIdentity,
@@ -614,6 +616,7 @@ impl DeploymentPhrase {
                 Self::FunderRecurring => 9358,
                 Self::FunderPeriod => 9359,
                 Self::FunderTask => 9360,
+                Self::AdmissionOperations => 12002,
                 Self::AdmissionGrace => 12001,
                 Self::AdmissionWords => 9361,
                 Self::AdmissionIdentity => 9362,
@@ -783,6 +786,7 @@ impl DeploymentPhrase {
             | Self::FunderRecurring
             | Self::FunderPeriod
             | Self::FunderTask
+            | Self::AdmissionOperations
             | Self::AdmissionGrace
             | Self::AdmissionWords
             | Self::AdmissionIdentity
@@ -1031,6 +1035,7 @@ impl DeploymentPhrase {
             Self::FunderRecurring => b"Funding from recurring",
             Self::FunderPeriod => b"Funding from period",
             Self::FunderTask => b"Funding from task",
+            Self::AdmissionOperations => b"Structural limit: operations",
             Self::AdmissionGrace => b"Structural limit: grace",
             Self::AdmissionWords => b"Structural limit: words",
             Self::AdmissionIdentity => b"Structural limit: identity",

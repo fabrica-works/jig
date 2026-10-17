@@ -460,7 +460,7 @@ fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
             &mut domain.ui,
             ObjectKey::Task(8),
             ActKind::Write,
-            Box::new(Ask::Write { project: 1, task: 8, words: text(b"changed"), release: false }),
+            Box::new(Ask::Message { project: 1, task: 8, words: text(b"changed") }),
             &mut out,
             &domain.client
         ),
@@ -469,7 +469,7 @@ fn routed_words_join_the_original_request_and_clear_the_composer_only_once() {
     assert!(drain(out).is_empty());
     assert_eq!(domain.conversation().words.rows.get(0).unwrap().words, text(b"first"));
     domain.conversation.words.refused(Token::new(999));
-    let answer = Answer::Done(Outcome::Made { what: Made::Words { task: 8, message: 4 } });
+    let answer = Answer::Done(Outcome::Owner(OwnerOutcome::Said { task: 8, message: 4 }));
     drive(&mut domain, Time::ZERO, AnsweredByEngine { request: submitted, answer: answer.clone() });
     assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, crate::conversation::Words::Sent { message: 4 });
     assert_eq!(domain.fields.get(field).unwrap().text.bytes(), b"");
@@ -505,7 +505,7 @@ fn routed_later_words(domain: &mut Fixture) {
     drive(
         domain,
         Time::ZERO,
-        AnsweredByEngine { request, answer: Answer::Done(Outcome::Made { what: Made::Words { task: 8, message: 5 } }) },
+        AnsweredByEngine { request, answer: Answer::Done(Outcome::Owner(OwnerOutcome::Said { task: 8, message: 5 })) },
     );
     assert_eq!(domain.fields.get(field).unwrap().text.bytes(), b"later");
     assert_eq!(domain.fields.get(field).unwrap().writes, writes);
@@ -526,7 +526,7 @@ fn card_words(domain: &mut Fixture) -> Box<[Request]> {
         crate::tests::fixtures::CardAsk {
             object: ObjectKey::Task(8),
             act: jig_client::contract::ActKind::Write,
-            ask: jig_client::contract::Ask::Write { project: 1, task: 8, words: text(b"program"), release: false },
+            ask: jig_client::contract::Ask::Message { project: 1, task: 8, words: text(b"program") },
         },
     )
 }
@@ -700,7 +700,7 @@ fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_ed
     use jig_client::contract::*;
     use skein_lib::Time;
     for later in [false, true] {
-        for released in [false, true] {
+        {
             for actual_task in [8, 9] {
                 let (mut domain, _) = super::objects::live();
                 drive(
@@ -720,8 +720,7 @@ fn owner_said_receipts_join_only_the_pending_task_and_preserve_later_composer_ed
                     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Edit { field, text: text(b"later") } });
                 }
                 let writes = domain.fields.get(field).unwrap().writes;
-                let answer =
-                    Answer::Done(Outcome::Owner(OwnerOutcome::Said { task: actual_task, message: u64::MAX, released }));
+                let answer = Answer::Done(Outcome::Owner(OwnerOutcome::Said { task: actual_task, message: u64::MAX }));
                 drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: answer.clone() });
                 if actual_task == 8 {
                     assert_eq!(

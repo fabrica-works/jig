@@ -363,15 +363,15 @@ fn the_test_clients_family_revision_and_durable_outcome_are_observed() {
 
 #[test]
 fn the_test_clients_sent_words_are_found_in_committed_activity() {
-    use jig_client_domain::contract::{Activity, ActivityLine, Answer, Ask, Made, Outcome, Read};
+    use jig_client_domain::contract::{Activity, ActivityLine, Answer, Ask, Outcome, Read};
     use jig_client_world::stories;
     let mut w = stories::chat_ready(21);
     w.front()
         .engine
         .script(jig_client_scripted_engine::Rule {
             party: Some(7),
-            ask: Ask::Write { project: 1, task: 9, words: stories::text(b"Words"), release: false },
-            answer: Answer::Done(Outcome::Made { what: Made::Words { task: 9, message: 1 } }),
+            ask: Ask::Message { project: 1, task: 9, words: stories::text(b"Words") },
+            answer: Answer::Done(Outcome::Owner(jig_client::contract::OwnerOutcome::Said { task: 9, message: 1 })),
             changes: vec![jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                 party: 7,
                 read: Read::Activity { task: 9, before: None },

@@ -195,7 +195,6 @@ fn each_decision_sends_only_its_recalled_revision_and_double_confirmation_sends_
                 task: 8,
                 revision: Some(Revision { value: 9 }),
                 change: Box::new(change()),
-                release: None,
             },
             2 => Ask::Answer {
                 project: 1,
@@ -334,7 +333,6 @@ fn a_changed_revision_refuses_in_the_confirmation_while_spend_changes_only_its_w
             task: 8,
             revision: Some(Revision { value: 9 }),
             change: Box::new(change()),
-            release: None
         }
     );
 }
@@ -450,14 +448,16 @@ fn bounded_amendment_confirms_supplied_budget_and_grants_and_refreshes_a_moved_o
         assert_eq!(domain.confirmation().unwrap().proposed, None);
         assert_eq!(
             sent(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })),
-            &Ask::Amend {
-                reason: text(b""),
-                project: 1,
-                task: 8,
-                revision: Some(row.spec_revision),
-                change: Box::new(draft),
-                release: if act == ActKind::AmendRelease { Some(row.hold.as_ref().unwrap().revision()) } else { None }
-            }
+            &crate::tests::fixtures::releasing(
+                Ask::Amend {
+                    reason: text(b""),
+                    project: 1,
+                    task: 8,
+                    revision: Some(row.spec_revision),
+                    change: Box::new(draft),
+                },
+                if act == ActKind::AmendRelease { Some(row.hold.as_ref().unwrap().revision()) } else { None }
+            )
         );
     }
 }
@@ -577,7 +577,6 @@ fn bounded_amendment_keeps_every_supplied_policy_recipient_in_order() {
             task: 8,
             revision: Some(row.spec_revision),
             change: Box::new(draft),
-            release: None
         }
     );
 }
@@ -732,7 +731,6 @@ fn bounded_authority_drafts_use_literal_pattern_order_and_complete_source_facts(
                         task: 8,
                         revision: Some(row.spec_revision),
                         change: Box::new(draft),
-                        release: None
                     }
                 );
             }
@@ -804,7 +802,6 @@ fn bounded_authority_uses_only_supplied_connector_kind_implications_and_preserve
                     task: 8,
                     revision: Some(row.spec_revision),
                     change: Box::new(draft),
-                    release: None
                 }
             );
             let Bounds::Amend { implications: retained, .. } = within else { panic!("whole amendment offer") };

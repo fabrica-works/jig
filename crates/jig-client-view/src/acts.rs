@@ -206,32 +206,24 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
         ActKind::Release => {
             Some(Ask::Release { project, task, revision: confirmation.revision?, again: choices.again })
         }
-        ActKind::Amend | ActKind::AmendRelease => {
-            if confirmation.reason_input == crate::confirm::ReasonInput::Missing {
-                return None;
-            }
-            Some(Ask::Amend {
-                project,
-                task,
-                revision: Some(confirmation.revision?),
-                change: Box::new(choices.change.clone()?),
-                reason: words(fields, Purpose::Reason)?,
-                release: if confirmation.act == ActKind::AmendRelease {
-                    Some(confirmation.release_revision?)
-                } else {
-                    None
-                },
-            })
-        }
+        ActKind::Amend | ActKind::AmendRelease => amend(confirmation, fields, project, task),
+
         ActKind::Answer => answer(object, confirmation, fields, project, task),
         ActKind::Take => Some(Ask::Take { project, task }),
         ActKind::HandBack => Some(Ask::HandBack { project, task }),
-        ActKind::Write => Some(Ask::Write {
-            project,
-            task,
-            words: words(fields, Purpose::Composer { task })?,
-            release: choices.release,
-        }),
+        ActKind::Write => {
+            let words = words(fields, Purpose::Composer { task })?;
+            if choices.release {
+                Some(releasing(
+                    project,
+                    task,
+                    confirmation.release_revision?,
+                    jig_client::contract::Operation::Message { project, task, words },
+                ))
+            } else {
+                Some(Ask::Message { project, task, words })
+            }
+        }
         ActKind::Stop => Some(Ask::Stop { project, task }),
         ActKind::Cancel => Some(Ask::Cancel { project, task, reason: words(fields, Purpose::Reason)?, grace: None }),
         ActKind::Close => Some(Ask::Close { project, chat: task, disposals: choices.disposals.clone() }),
@@ -438,5 +430,35 @@ pub fn note_ask(project: u32, note: &Note, act: ActKind, description: Text, body
         | ActKind::SetRoles
         | ActKind::MakeService
         | ActKind::SetPool => None,
+    }
+}
+
+fn releasing(project: u32, task: u64, revision: Revision, first: jig_client::contract::Operation) -> Ask {
+    let mut operations = List::with_capacity(2);
+    operations.push(first).expect("two operations");
+    operations
+        .push(jig_client::contract::Operation::Release { project, task, revision, again: None })
+        .expect("two operations");
+    Ask::Compound { project, operations }
+}
+
+fn amend(confirmation: &Confirmation, fields: &Fields, project: u32, task: u64) -> Option<Ask> {
+    let choices = &confirmation.choices;
+
+    if confirmation.reason_input == crate::confirm::ReasonInput::Missing {
+        return None;
+    }
+    let change = Box::new(choices.change.clone()?);
+    let revision = Some(confirmation.revision?);
+    let reason = words(fields, Purpose::Reason)?;
+    if confirmation.act == ActKind::AmendRelease {
+        Some(releasing(
+            project,
+            task,
+            confirmation.release_revision?,
+            jig_client::contract::Operation::Amend { project, task, revision, change, reason },
+        ))
+    } else {
+        Some(Ask::Amend { project, task, revision, change, reason })
     }
 }

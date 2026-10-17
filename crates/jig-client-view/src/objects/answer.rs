@@ -32,7 +32,8 @@ pub fn recovery(object: &Object) -> Recovery {
         Card::Refused { refusal } => match refusal {
             Refusal::Moved { .. } => recovery.look_again = true,
             Refusal::Authority { .. } | Refusal::Limit { .. } => recovery.change_ask = true,
-            Refusal::Disposal { .. }
+            Refusal::Malformed { .. }
+            | Refusal::Disposal { .. }
             | Refusal::Taken { .. }
             | Refusal::NotWaiting
             | Refusal::NoFurther
@@ -80,7 +81,7 @@ pub(crate) fn answered(
     }
     domain.objects.get_mut(id).expect("named card exists").answer = Some(answer.clone());
     match answer {
-        Answer::Refused(refusal) => {
+        Answer::Refused { refusal, .. } => {
             domain.objects.get_mut(id).expect("named card exists").card = Card::Refused { refusal };
             if recovery(&domain.borrow(lent).objects().get(id).expect("named card exists")).look_again {
                 look_again(domain, id, out, lent);

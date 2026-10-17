@@ -29,13 +29,20 @@ pub fn reply(value: people::Reply) -> Reply {
         people::Reply::SignedIn { person, sign_in, expires } => Reply::SignedIn { person, sign_in, expires },
         people::Reply::SignedOut => Reply::SignedOut,
         people::Reply::Again(why) => Reply::Again(why),
-        people::Reply::Refused(why) => Reply::Final(client::Answer::Refused(refusals::refusal(why))),
+        people::Reply::Refused(why) => {
+            Reply::Final(client::Answer::Refused { refusal: refusals::refusal(why), at: None })
+        }
         people::Reply::Outcome(value) => match outcomes::outcome(&value) {
             outcomes::Outcome::Owner(value) => Reply::Final(client::Answer::Done(client::Outcome::Owner(value))),
             outcomes::Outcome::Applied { connector, token } => Reply::Applied { connector, token },
             outcomes::Outcome::Again(why) => Reply::Again(why),
             outcomes::Outcome::SignedOut => Reply::SignedOut,
-            outcomes::Outcome::Refused(why) => Reply::Final(client::Answer::Refused(refusals::refusal(why))),
+            outcomes::Outcome::CompoundRefused { at, why } => {
+                Reply::Final(client::Answer::Refused { refusal: refusals::refusal(why), at: Some(at) })
+            }
+            outcomes::Outcome::Refused(why) => {
+                Reply::Final(client::Answer::Refused { refusal: refusals::refusal(why), at: None })
+            }
         },
     }
 }
@@ -67,10 +74,13 @@ mod tests {
             keyed(entrance),
             Ok((
                 RequestEnvelope::Final,
-                Some(client::Answer::Refused(client::Refusal::Moved {
-                    now: client::Revision { value: u64::MAX },
-                    what: client::Moved::PersonTask,
-                }))
+                Some(client::Answer::Refused {
+                    refusal: client::Refusal::Moved {
+                        now: client::Revision { value: u64::MAX },
+                        what: client::Moved::PersonTask,
+                    },
+                    at: None
+                })
             ))
         );
     }
@@ -113,7 +123,6 @@ mod tests {
                 Some(client::Answer::Done(client::Outcome::Owner(client::OwnerOutcome::Said {
                     task: u64::MAX,
                     message: u64::MAX,
-                    released: true,
                 })))
             ))
         );

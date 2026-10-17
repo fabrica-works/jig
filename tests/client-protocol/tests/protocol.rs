@@ -99,7 +99,7 @@ fn a_slow_reader_gets_fewer_deliveries_and_others_are_answered() {
     let before = world.front().deliveries(first);
     let answered = world.front().answers(second);
     let second_before = world.front().deliveries(second);
-    bytes::send_words(&mut world, second, b"Please continue");
+    bytes::send_words(&mut world, second, b"Please continue", false);
     bytes::finish(&mut world);
     assert_eq!(world.front().deliveries(first), before);
     assert!(world.now() < now.saturating_add(Duration::from_secs(1)));
@@ -151,7 +151,7 @@ fn a_person_s_words_reach_a_running_run_through_bytes() {
     use jig_client_protocol_world::stories as bytes;
     for &seed in bytes::SEEDS {
         let (mut world, client) = bytes::ready(seed);
-        bytes::send_words(&mut world, client, b"Please continue");
+        bytes::send_words(&mut world, client, b"Please continue", false);
         bytes::finish(&mut world);
         assert!(world.front().words_reached_worker(b"Please continue"), "worker seed {seed}");
     }
@@ -204,4 +204,21 @@ fn pending_stop(world: &mut jig_client_protocol_world::stories::Story, client: j
         world.kept(client).iter().any(|record| matches!(record, jig_client_test_domain::store::Record::Client(..))),
         "the request remains in the small store"
     );
+}
+
+#[test]
+fn words_to_a_stopped_task_release_it_in_one_compound_request() {
+    use jig_client_protocol_world::stories as bytes;
+    for &seed in bytes::SEEDS {
+        let (mut world, client) = bytes::ready(seed);
+        bytes::submit_stop(&mut world, client);
+        bytes::held(&mut world, client);
+        let before = world.front().requests_made();
+        let runs = world.front().runs_started();
+        bytes::send_words(&mut world, client, b"Please resume", true);
+        bytes::finish(&mut world);
+        assert_eq!(world.front().requests_made() - before, 1, "one compound seed {seed}");
+        bytes::settle(&mut world, skein_lib::Duration::from_millis(100));
+        assert_eq!(world.front().runs_started() - runs, 1, "resumed worker seed {seed}");
+    }
 }

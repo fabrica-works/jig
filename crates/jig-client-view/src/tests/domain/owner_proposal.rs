@@ -7,6 +7,7 @@ use super::{
     objects::{live, read_token, text, watched},
     spine::drive,
 };
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, ReadPage, Watched};
 use crate::{
     Event, Request,
@@ -91,7 +92,7 @@ fn owner_proposal_original_maker_keys_all_three_decisions_and_reason_survive_dou
                 | Card::Unknown { .. }
                 | Card::Deciding { .. } => false,
             });
-            drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: Answer::Refused(Refusal::KeyConflict) });
+            drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: refusal_answer(Refusal::KeyConflict) });
             assert_eq!(domain.objects().get(id).unwrap().answer, Some(answer.clone()));
         }
     }

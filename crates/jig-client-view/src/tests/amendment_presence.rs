@@ -20,6 +20,7 @@ fn sent(out: &[Request]) -> &Amendment {
             Request::Client { asked: jig_client::Event::Send { request: jig_client::Ask::Jig(ask), .. } } => {
                 match &**ask {
                     Ask::Amend { change, .. } => Some(change.as_ref()),
+                    Ask::Compound { .. } => crate::tests::fixtures::selected_change(ask),
                     _ => None,
                 }
             }
@@ -203,11 +204,15 @@ fn amendment_rebuild_keeps_selected_authority_and_distinct_person_spec_and_hold_
             _ => None,
         })
         .expect("sent amendment request");
-    let Ask::Amend { revision, release, .. } = ask else {
-        panic!("sent amendment request");
+    let Ask::Compound { operations, .. } = ask else {
+        panic!("compound amendment");
+    };
+    let [Operation::Amend { revision, .. }, Operation::Release { revision: release, .. }] = operations.as_slice()
+    else {
+        panic!("amend and release");
     };
     assert_eq!(*revision, Some(Revision { value: 6 }));
-    assert_eq!(*release, Some(Revision { value: 4 }));
+    assert_eq!(Some(*release), Some(Revision { value: 4 }));
 }
 
 #[test]
@@ -255,12 +260,17 @@ fn person_address_inputs_preserve_full_width_targets_and_the_named_person_revisi
                 _ => None,
             })
             .unwrap();
-        let Ask::Amend { project, revision, release, .. } = ask else {
-            panic!("sent amendment");
+        let Ask::Compound { operations, .. } = ask else {
+            panic!("compound amendment");
+        };
+        let [Operation::Amend { project, revision, .. }, Operation::Release { revision: release, .. }] =
+            operations.as_slice()
+        else {
+            panic!("amend and release");
         };
         assert_eq!(*project, 4);
         assert_eq!(*revision, Some(Revision { value: 6 }));
-        assert_eq!(*release, Some(Revision { value: 4 }));
+        assert_eq!(Some(*release), Some(Revision { value: 4 }));
     }
 }
 

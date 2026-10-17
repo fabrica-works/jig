@@ -26,3 +26,14 @@ impl Payload for TemplateOverride {
         Some(0)
     }
 }
+
+impl Payload for jig_client_domain::contract::Operation {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Message { words, .. } => words.heap(bounds),
+            Self::Amend { change, reason, .. } => change.heap(bounds)?.checked_add(reason.heap(bounds)?),
+            Self::Cancel { reason, .. } | Self::Move { reason, .. } => reason.heap(bounds),
+            Self::Release { .. } | Self::Stop { .. } => Some(0),
+        }
+    }
+}

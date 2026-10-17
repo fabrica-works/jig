@@ -218,7 +218,7 @@ pub struct Rule {
 }
 impl Rule {
     pub(crate) fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
-        if matches!(self.answer, Answer::Refused(_)) && !self.changes.is_empty() {
+        if matches!(self.answer, Answer::Refused { refusal: _, .. }) && !self.changes.is_empty() {
             return Err(Invalid::Script);
         }
         if !payload::fits(&self.ask, bounds) || !payload::fits(&self.answer, bounds) {

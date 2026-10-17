@@ -44,20 +44,23 @@ fn an_amendment_record_keeps_its_release_and_reason() {
     for (release, expected_release, reason) in
         [(None, None, b"".as_slice()), (Some(f::revision(4)), Some(4), b"supplied".as_slice())]
     {
-        assert_eq!(
-            ask(f::amendment(release.clone(), reason), &f::wire()),
-            Ok(p::Ask::Amend {
-                project: 3,
-                task: 8,
-                revision: 6,
-                release: expected_release,
-                amendment: p::Amendment {
-                    instructions: Some(Box::new([])),
-                    dependencies: Some(Box::new([])),
-                    ..f::person_unchanged(reason)
-                }
-            })
-        );
+        let amendment = p::Amendment {
+            instructions: Some(Box::new([])),
+            dependencies: Some(Box::new([])),
+            ..f::person_unchanged(reason)
+        };
+        let expected = match expected_release {
+            Some(revision) => {
+                let mut operations = skein_lib::List::with_capacity(2);
+                operations
+                    .push(p::Operation::Amend { task: 8, revision: 6, amendment: Box::new(amendment), release: None })
+                    .unwrap();
+                operations.push(p::Operation::Release { task: 8, revision, again: None }).unwrap();
+                p::Ask::Compound { project: 3, operations }
+            }
+            None => p::Ask::Amend { project: 3, task: 8, revision: 6, amendment, release: None },
+        };
+        assert_eq!(ask(f::amendment(release, reason), &f::wire()), Ok(expected));
     }
 }
 fn invalid() -> w::Ask {
@@ -201,11 +204,11 @@ fn a_priority_only_amend_names_no_revision() {
             project: 3,
             task: 8,
             revision: 0,
+            release: None,
             amendment: p::Amendment {
                 tracked: Some(p::Tracking::Tracked { priority: u32::MAX }),
                 ..f::person_unchanged(b"")
             },
-            release: None
         })
     );
 }

@@ -160,9 +160,10 @@ fields!(Decider { kind, role });
 impl Payload for Ask {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Compound { operations, .. } => operations.heap(bounds),
             Self::StartChat { project, words } => sum(&[project.heap(bounds), words.heap(bounds)]),
-            Self::Write { project, task, words, release } => {
-                sum(&[project.heap(bounds), task.heap(bounds), words.heap(bounds), release.heap(bounds)])
+            Self::Message { project, task, words } => {
+                sum(&[project.heap(bounds), task.heap(bounds), words.heap(bounds)])
             }
             Self::Answer { project, on } => sum(&[project.heap(bounds), on.heap(bounds)]),
             Self::Take { project, task } | Self::HandBack { project, task } | Self::Stop { project, task } => {
@@ -172,12 +173,11 @@ impl Payload for Ask {
             Self::Release { project, task, revision, again } => {
                 sum(&[project.heap(bounds), task.heap(bounds), revision.heap(bounds), again.heap(bounds)])
             }
-            Self::Amend { project, task, revision, change, release, reason } => sum(&[
+            Self::Amend { project, task, revision, change, reason } => sum(&[
                 project.heap(bounds),
                 task.heap(bounds),
                 revision.heap(bounds),
                 change.heap(bounds),
-                release.heap(bounds),
                 reason.heap(bounds),
             ]),
             Self::Cancel { project, task, reason, .. } | Self::Move { project, task, reason } => {
@@ -235,7 +235,6 @@ impl Payload for Made {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Chat { task } | Self::Goal { task } | Self::PersonResult { task } => sum(&[task.heap(bounds)]),
-            Self::Words { task, message } => sum(&[task.heap(bounds), message.heap(bounds)]),
             Self::Tasks { tasks } => sum(&[tasks.heap(bounds)]),
             Self::Service { party } => sum(&[party.heap(bounds)]),
             Self::Note { note, scope } => sum(&[note.heap(bounds), scope.heap(bounds)]),
@@ -246,7 +245,7 @@ impl Payload for Answer {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Done(value0) => sum(&[value0.heap(bounds)]),
-            Self::Refused(value0) => sum(&[value0.heap(bounds)]),
+            Self::Refused { refusal, .. } => refusal.heap(bounds),
         }
     }
 }
@@ -1068,7 +1067,12 @@ impl Payload for Refusal {
             Self::Limit { which } => sum(&[which.heap(bounds)]),
             Self::Moved { now, what } => sum(&[now.heap(bounds), what.heap(bounds)]),
             Self::Ended { how } => sum(&[how.heap(bounds)]),
-            Self::NotWaiting | Self::NoFurther | Self::Unknown | Self::NotOffered | Self::KeyConflict => Some(0),
+            Self::Malformed { .. }
+            | Self::NotWaiting
+            | Self::NoFurther
+            | Self::Unknown
+            | Self::NotOffered
+            | Self::KeyConflict => Some(0),
         }
     }
 }
@@ -1188,7 +1192,8 @@ fn sum(values: &[Option<u64>]) -> Option<u64> {
 impl Payload for AdmissionLimit {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Grace
+            Self::Operations
+            | Self::Grace
             | Self::Words
             | Self::Identity
             | Self::Roles

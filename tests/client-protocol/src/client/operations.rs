@@ -57,3 +57,41 @@ impl Story {
         })
     }
 }
+
+impl Story {
+    #[must_use]
+    pub fn hold_revision(&self, task: u64) -> contract::Revision {
+        contract::Revision { value: self.task_record(task).expect("live task").revisions.hold }
+    }
+    #[must_use]
+    pub fn activity_message(&self, task: u64, message: u64) -> Option<Vec<u8>> {
+        self.engine.driver.world.store.rows.values().find_map(|record| match record {
+            jig_test_domain::Record::Core(jig_domain_core::Record::Tasks(tasks::Stored::Activity(line)))
+                if line.task == task =>
+            {
+                match &line.line {
+                    tasks::Line::Words { message: number, words, .. } if *number == message => Some(words.to_vec()),
+                    tasks::Line::Heard(word) if word.number == message => Some(word.words.to_vec()),
+                    tasks::Line::Words { .. }
+                    | tasks::Line::Heard(_)
+                    | tasks::Line::Notified { .. }
+                    | tasks::Line::RunBegan { .. }
+                    | tasks::Line::RunEnded { .. }
+                    | tasks::Line::Turn { .. }
+                    | tasks::Line::Decided { .. }
+                    | tasks::Line::Milestone { .. } => None,
+                }
+            }
+            jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
+        })
+    }
+}
+
+impl Story {
+    #[must_use]
+    pub fn worker_started_with(&self, task: u64, message: u64) -> bool {
+        self.engine.driver.world.peers.as_ref().expect("workers").workers.iter().any(|worker| {
+            worker.seen.iter().any(|assignment| assignment.task == task && assignment.messages.contains(&message))
+        })
+    }
+}

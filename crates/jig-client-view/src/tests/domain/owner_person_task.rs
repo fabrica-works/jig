@@ -7,6 +7,7 @@ use super::{
     objects::{chip, live, person, text},
     spine::drive,
 };
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage};
 use crate::{
     Event, Request,
@@ -295,9 +296,9 @@ fn person_owner_changed_revision_fences_old_selection_and_moved_refusal_preserve
         panic!("one request")
     };
     let why = Refusal::Moved { now: Revision { value: 93 }, what: Moved::PersonTask };
-    drive(&mut d, Time::ZERO, AnsweredByEngine { request, answer: Answer::Refused(why.clone()) });
+    drive(&mut d, Time::ZERO, AnsweredByEngine { request, answer: refusal_answer(why.clone()) });
     assert_eq!(d.objects().get(id).unwrap().card, Card::Refused { refusal: why.clone() });
-    assert_eq!(d.objects().get(id).unwrap().answer, Some(Answer::Refused(why)));
+    assert_eq!(d.objects().get(id).unwrap().answer, Some(refusal_answer(why)));
     assert_eq!(crate::objects::person_task::owner_facts(&d.objects().get(id).unwrap()), Some(&newer));
 }
 #[test]

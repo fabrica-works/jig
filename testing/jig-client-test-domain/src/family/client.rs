@@ -168,14 +168,15 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: Told, out: &mut Q
                 let Ok(answer) = answer(&record.bytes, env) else { return };
                 first::Event::Answered { request: Token::new(key.number ^ root.salt), answer }
             }
-            Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused(why))) => {
-                first::Event::Answered {
-                    request: Token::new(key.number ^ root.salt),
-                    answer: first::Answer::Refused(
-                        jig_client::contract::EntranceRefusal::new(why).expect("entrance refusal"),
-                    ),
-                }
-            }
+            Outcome::Answered(jig_client::Answered::Jig(jig_client::contract::Answer::Refused {
+                refusal: why,
+                ..
+            })) => first::Event::Answered {
+                request: Token::new(key.number ^ root.salt),
+                answer: first::Answer::Refused(
+                    jig_client::contract::EntranceRefusal::new(why).expect("entrance refusal"),
+                ),
+            },
             Outcome::Answered(jig_client::Answered::Jig(_))
             | Outcome::NotKept
             | Outcome::Limit

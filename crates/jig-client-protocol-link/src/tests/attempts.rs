@@ -96,12 +96,15 @@ fn malformed_outer_bodies_are_lost() {
 fn a_final_refusal_keeps_its_revision_and_whole_hold_facts() {
     let (mut h, exchange) = fixtures::Harness::sending();
     h.answer(exchange, &fixtures::refusal_with_hold(fixtures::fact_bytes(&fixtures::hold_budget_fact())));
-    let expected = c::Answer::Refused(c::Refusal::Moved {
-        now: c::Revision { value: u64::MAX },
-        what: c::Moved::Hold {
-            reason: Some(c::CurrentHold::Document(Box::new(c::HoldReason::Budget { spent: u64::MAX, limit: 16 }))),
+    let expected = c::Answer::Refused {
+        refusal: c::Refusal::Moved {
+            now: c::Revision { value: u64::MAX },
+            what: c::Moved::Hold {
+                reason: Some(c::CurrentHold::Document(Box::new(c::HoldReason::Budget { spent: u64::MAX, limit: 16 }))),
+            },
         },
-    });
+        at: None,
+    };
     assert_eq!(h.answered(fixtures::ATTEMPT), Some((RequestEnvelope::Final, Some(&Answered::Jig(expected)))));
 }
 #[test]

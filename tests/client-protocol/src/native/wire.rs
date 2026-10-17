@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Copy)]
 enum Kind {
-    Request,
+    Request(Option<(u64, u32)>),
     Read(Option<jig_client_test_domain::family::Subject>),
     SignIn,
     SignOut,
@@ -45,7 +45,7 @@ impl Wire {
         }
         let Request::Exchange { exchange, message, .. } = request else { return vec![] };
         let kind = match message {
-            Message::Request(_) => Kind::Request,
+            Message::Request(bytes) => Kind::Request(compound::message(bytes)),
             Message::Read(bytes) => {
                 let record = w::Owned::decode(&w::CEILINGS, &mut Reader::new(bytes)).expect("owned read");
                 let subject = match record.owner() {
@@ -118,12 +118,12 @@ impl Wire {
         }
         let Event::Reply { exchange, message } = event else { return Vec::new() };
         match self.exchanges.get(exchange) {
-            Some(Kind::Request) => {
+            Some(Kind::Request(words)) => {
                 match w::KeyedAnswer::decode(&w::CEILINGS, &mut Reader::new(message)).expect("answer bytes") {
                     w::KeyedAnswer::FinalAnswer(value) if matches!(value.owner(), w::Owner::Family(_)) => {
                         vec![Receipt::Answer { attempt: *exchange, final_answer: true, words: None }]
                     }
-                    w::KeyedAnswer::FinalAnswer(_) => Vec::new(),
+                    w::KeyedAnswer::FinalAnswer(value) => compound::receipt(*exchange, *words, value.record()),
                     w::KeyedAnswer::NotServed(_) | w::KeyedAnswer::SignedOut => vec![Receipt::Parked],
                     w::KeyedAnswer::Busy | w::KeyedAnswer::NotReady => {
                         vec![Receipt::Answer { attempt: *exchange, final_answer: false, words: None }]
@@ -151,7 +151,7 @@ impl Wire {
     pub fn received_with(&mut self, event: &Event, limits: jig_client_protocol_link::Limits) -> Vec<Received> {
         match event {
             Event::Reply { exchange, message } => match self.exchanges.remove(exchange) {
-                Some(Kind::Request) => {
+                Some(Kind::Request(_)) => {
                     let answer = w::KeyedAnswer::decode(&w::CEILINGS, &mut Reader::new(message)).expect("answer bytes");
                     translate::answers::answer(answer, &limits)
                         .map_or_else(|_| vec![], |answer| vec![Received::Answer { attempt: *exchange, answer }])
@@ -223,3 +223,8 @@ impl Wire {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
+
+mod compound;

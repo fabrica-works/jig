@@ -137,8 +137,10 @@ pub enum AnswerOn {
 pub enum Ask {
     /// Start a chat.
     StartChat { project: u32, words: Text },
-    /// Write words and optionally release a stopped chat.
-    Write { project: u32, task: u64, words: Text, release: bool },
+    /// Add words to a task inbox.
+    Message { project: u32, task: u64, words: Text },
+    /// Commit the operations together, or refuse at the first failure.
+    Compound { project: u32, operations: List<super::Operation> },
     /// Answer a named question or a person task revision.
     Answer { project: u32, on: AnswerOn },
     /// Take a role-addressed person task.
@@ -149,15 +151,8 @@ pub enum Ask {
     Decide { project: u32, on: DecideOn },
     /// Release a hold, choosing whether to repeat an uncertain effect.
     Release { project: u32, task: u64, revision: Revision, again: Option<bool> },
-    /// Amend and optionally release in one decision.
-    Amend {
-        project: u32,
-        task: u64,
-        revision: Option<Revision>,
-        change: Box<Amendment>,
-        release: Option<Revision>,
-        reason: Text,
-    },
+    /// Amend a task.
+    Amend { project: u32, task: u64, revision: Option<Revision>, change: Box<Amendment>, reason: Text },
     /// Stop a run and hold its task.
     Stop { project: u32, task: u64 },
     /// Cancel a task and its subtree.
@@ -216,8 +211,6 @@ pub enum Outcome {
 pub enum Made {
     /// A chat task.
     Chat { task: u64 },
-    /// Words in the task inbox.
-    Words { task: u64, message: u64 },
     /// A goal task.
     Goal { task: u64 },
     /// Tasks accepted from a batch.
@@ -236,5 +229,5 @@ pub enum Answer {
     /// A durable outcome.
     Done(Outcome),
     /// A durable refusal.
-    Refused(Refusal),
+    Refused { refusal: Refusal, at: Option<u32> },
 }

@@ -20,8 +20,11 @@ pub(super) fn answered(
         super::super::refresh_kept_page(domain, env, out, client);
         if !domain.intents.ids().contains_key(&Id::from_token(token)) {
             match outcome {
-                Outcome::Answered(Answered::Jig(jig_client::contract::Answer::Refused(why))) => {
-                    kept::show(domain, Kind::PageAnswer { answer: jig_client::contract::Answer::Refused(why) });
+                Outcome::Answered(Answered::Jig(jig_client::contract::Answer::Refused { refusal: why, at })) => {
+                    kept::show(
+                        domain,
+                        Kind::PageAnswer { answer: jig_client::contract::Answer::Refused { refusal: why, at } },
+                    );
                 }
                 Outcome::Answered(Answered::Jig(jig_client::contract::Answer::Done(_)) | Answered::Family(_)) => {}
                 Outcome::Unknown => kept::show(domain, Kind::KeptUnknown),

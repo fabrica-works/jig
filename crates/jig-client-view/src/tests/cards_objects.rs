@@ -6,6 +6,7 @@
     reason = "ordinary tests inspect trees and script public domain requests"
 )]
 use super::cards::{CLIENT, contains, document, drive, limits, start, text, words};
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage, Watched};
 use crate::{JigBindings, cards, decode};
 use skein_ui::Act;
@@ -309,7 +310,7 @@ fn whole_object_cards_keep_facts_while_confirmation_request_refusal_and_leaving_
             &mut d,
             AnsweredByEngine {
                 request,
-                answer: Answer::Refused(Refusal::Moved { now: Revision { value: 19 }, what: Moved::PersonTask }),
+                answer: refusal_answer(Refusal::Moved { now: Revision { value: 19 }, what: Moved::PersonTask }),
             },
         );
         let tree = render_with_confirmation(&d, id, words, &mut bindings);
@@ -1111,7 +1112,7 @@ fn notice_scenarios(words: &crate::words::Words) {
         Kind::Link(jig_client::Link::Live),
         Kind::Answer { object: ObjectKey::Task(8), answer: Answer::Done(Outcome::Changed) },
         Kind::PageAnswer {
-            answer: Answer::Refused(Refusal::Authority {
+            answer: refusal_answer(Refusal::Authority {
                 lacking: Lacking::Budget { needed: 40, left: 12 },
                 proposable: None,
             }),
@@ -1292,7 +1293,7 @@ fn changed_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindin
         &mut d,
         AnsweredByEngine {
             request,
-            answer: Answer::Refused(Refusal::Moved { now: Revision { value: 5 }, what: Moved::Hold { reason: None } }),
+            answer: refusal_answer(Refusal::Moved { now: Revision { value: 5 }, what: Moved::Hold { reason: None } }),
         },
     );
     let mut moved = row;

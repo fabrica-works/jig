@@ -1,4 +1,5 @@
 use super::spine::{LIMITS, delivered, drain, drive, env, frame, open_token, start};
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage, Watched};
 use crate::{
     Event, Request,
@@ -490,7 +491,7 @@ fn equal_number_task_and_party_proposals_keep_separate_requests_and_terminal_car
         drive(
             &mut domain,
             Time::ZERO,
-            AnsweredByEngine { request: pending.get(0).unwrap().2, answer: Answer::Refused(Refusal::KeyConflict) }
+            AnsweredByEngine { request: pending.get(0).unwrap().2, answer: refusal_answer(Refusal::KeyConflict) }
         )
         .is_empty()
     );

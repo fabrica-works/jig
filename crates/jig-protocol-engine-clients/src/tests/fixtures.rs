@@ -79,14 +79,13 @@ pub fn revision(value: u64) -> w::Revision {
     w::Revision::new(&wire(), w::RevisionParts { value }).expect("revision")
 }
 pub fn amendment(release: Option<w::Revision>, reason: &[u8]) -> w::Ask {
-    w::Ask::Amend(Box::new(
+    let value = Box::new(
         w::Amend::new(
             &wire(),
             w::AmendParts {
                 project: 3,
                 task: 8,
                 revision: Some(revision(6)),
-                release,
                 reason: Box::from(reason),
                 change: w::Amendment::new(
                     &wire(),
@@ -104,7 +103,19 @@ pub fn amendment(release: Option<w::Revision>, reason: &[u8]) -> w::Ask {
             },
         )
         .expect("amend"),
-    ))
+    );
+    match release {
+        Some(revision) => compound(
+            3,
+            &[
+                w::Operation::Amend(value),
+                w::Operation::Release(
+                    w::Release::new(&wire(), w::ReleaseParts { project: 3, task: 8, revision, again: None }).unwrap(),
+                ),
+            ],
+        ),
+        None => w::Ask::Amend(value),
+    }
 }
 pub struct Exchange {
     pub component: Component,
@@ -253,14 +264,11 @@ pub fn other_asks() -> [(w::Ask, people::Ask); 20] {
 fn write_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
     use jig_domain_people as p;
     (
-        w::Ask::Write(
-            w::Write::new(
-                limits,
-                w::WriteParts { project: 3, task: 8, words: Box::from(b"say".as_slice()), release: true },
-            )
-            .expect("Write"),
+        w::Ask::Message(
+            w::Message::new(limits, w::MessageParts { project: 3, task: 8, words: Box::from(b"say".as_slice()) })
+                .expect("Write"),
         ),
-        p::Ask::Say { project: 3, task: 8, words: Box::from(b"say".as_slice()), release: true },
+        p::Ask::Say { project: 3, task: 8, words: Box::from(b"say".as_slice()), release: false },
     )
 }
 fn answer_question_case(limits: &w::Limits) -> (w::Ask, people::Ask) {

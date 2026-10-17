@@ -107,14 +107,16 @@ fn owner_task_hold_live_revision_moves_independently_before_atomic_amend_release
     let output = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
     assert_eq!(
         sent(&output),
-        &Ask::Amend {
-            reason: text(b""),
-            project: 1,
-            task: 8,
-            revision: Some(Revision { value: 9 }),
-            change: Box::new(change()),
-            release: Some(Revision { value: u64::MAX })
-        }
+        &crate::tests::fixtures::releasing(
+            Ask::Amend {
+                reason: text(b""),
+                project: 1,
+                task: 8,
+                revision: Some(Revision { value: 9 }),
+                change: Box::new(change()),
+            },
+            Some(Revision { value: u64::MAX })
+        )
     );
     let Some(Body::Task(retained)) = &domain.objects().get(id).unwrap().body else { panic!("whole task") };
     assert_eq!(retained.hold, Some(TaskHold::Owner(Box::new(held))));

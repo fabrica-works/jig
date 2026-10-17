@@ -94,8 +94,7 @@ fn case_12() -> (p::Reply, w::Final) {
     (
         p::Reply::Outcome(p::Outcome::Said { task: 8, message: 8, released: true }),
         owner(w::OwnerOutcome::Said(
-            w::OwnerOutcomeSaid::new(&wire(), w::OwnerOutcomeSaidParts { task: 8, message: 8, released: true })
-                .expect("Said"),
+            w::OwnerOutcomeSaid::new(&wire(), w::OwnerOutcomeSaidParts { task: 8, message: 8 }).expect("Said"),
         )),
     )
 }
@@ -124,8 +123,7 @@ fn case_15() -> (p::Reply, w::Final) {
     (
         p::Reply::Outcome(p::Outcome::Amended { task: 8, released: true }),
         owner(w::OwnerOutcome::Amended(
-            w::OwnerOutcomeAmended::new(&wire(), w::OwnerOutcomeAmendedParts { task: 8, released: true })
-                .expect("Amended"),
+            w::OwnerOutcomeAmended::new(&wire(), w::OwnerOutcomeAmendedParts { task: 8 }).expect("Amended"),
         )),
     )
 }

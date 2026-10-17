@@ -73,7 +73,7 @@ pub fn facts(b: &mut Builder, kind: &Kind, words: &Words, text_limit: u32) {
 fn answer(b: &mut Builder, answer: &Answer, words: &Words, text_limit: u32) {
     match answer {
         Answer::Done(outcome) => words.outcome(b, outcome),
-        Answer::Refused(why) => words.refusal(b, why, text_limit),
+        Answer::Refused { refusal: why, .. } => words.refusal(b, why, text_limit),
     }
 }
 fn object_words(b: &mut Builder, object: ObjectKey, words: &Words) {

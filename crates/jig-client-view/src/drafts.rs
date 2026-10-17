@@ -241,30 +241,11 @@ pub(crate) fn sent(
     answer: &Answer,
     out: &mut Queue<Request>,
 ) {
-    let words = match ask {
-        Ask::Write { words, .. } => words,
-        Ask::StartChat { .. }
-        | Ask::Answer { .. }
-        | Ask::Take { .. }
-        | Ask::HandBack { .. }
-        | Ask::Decide { .. }
-        | Ask::Release { .. }
-        | Ask::Amend { .. }
-        | Ask::Stop { .. }
-        | Ask::Cancel { .. }
-        | Ask::Close { .. }
-        | Ask::Move { .. }
-        | Ask::SetGoal { .. }
-        | Ask::Prioritise { .. }
-        | Ask::Seen { .. }
-        | Ask::EditNote { .. }
-        | Ask::DeleteNote { .. }
-        | Ask::ChangePolicy { .. }
-        | Ask::SetRoles { .. }
-        | Ask::MakeService { .. }
-        | Ask::SetPool { .. } => return,
+    let Some(words) = crate::conversation::sending::words(ask, task) else {
+        return;
     };
     let message_task = match answer {
+        Answer::Done(jig_client::contract::Outcome::Owner(jig_client::contract::OwnerOutcome::Compound { .. })) => task,
         Answer::Done(outcome) => match crate::outcome::route(outcome) {
             crate::outcome::Route::Words { task, .. } => task,
             crate::outcome::Route::Chat { .. }
@@ -272,7 +253,7 @@ pub(crate) fn sent(
             | crate::outcome::Route::Proposed
             | crate::outcome::Route::Other => return,
         },
-        Answer::Refused(_) => return,
+        Answer::Refused { refusal: _, .. } => return,
     };
     if message_task != task || domain.confirmed != Some(scope) {
         return;

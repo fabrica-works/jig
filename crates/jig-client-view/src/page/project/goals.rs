@@ -260,13 +260,13 @@ pub(crate) fn answered(
     }
     let pending = domain.project_page.form.pending.take().expect("matching pending form");
     match answer {
-        Answer::Refused(why) => {
+        Answer::Refused { refusal: why, .. } => {
             if handle == domain.page_handle() && domain.confirmed == Some(pending.scope) {
                 domain.project_page.form.refusal = Some(why);
             } else {
                 crate::notices::kept::show(
                     domain,
-                    crate::notices::kept::Kind::PageAnswer { answer: Answer::Refused(why) },
+                    crate::notices::kept::Kind::PageAnswer { answer: Answer::Refused { refusal: why, at: None } },
                 );
             }
         }

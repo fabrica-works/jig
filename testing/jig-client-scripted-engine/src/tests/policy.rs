@@ -76,7 +76,10 @@ fn each_closed_policy_edit_is_one_durable_keyed_request_and_replays_without_spli
             3,
             Ask::ChangePolicy { project: 1, edit: PolicyEdit::ProjectSpend { period_spend: 0 } },
         );
-        assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), &Answer::Refused(Refusal::KeyConflict));
+        assert_eq!(
+            final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]),
+            &Answer::Refused { refusal: Refusal::KeyConflict, at: None }
+        );
         send(&mut engine, 20_000_000, 11, 1, 4, ask);
         assert_eq!(final_answer(&engine.poll(Time::from_nanos(20_000_000))[0]), &Answer::Done(Outcome::Changed));
         assert_eq!(engine.commits().len(), 1);

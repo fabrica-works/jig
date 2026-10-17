@@ -382,7 +382,9 @@ pub fn family_subject(record: &jig_client::Family, read: bool) -> domain::family
 #[must_use]
 pub fn family_answer(answer: domain::family::Answer) -> jig_client::Answered {
     match answer {
-        domain::family::Answer::Refused(why) => jig_client::Answered::Jig(Answer::Refused(why.into_refusal())),
+        domain::family::Answer::Refused(why) => {
+            jig_client::Answered::Jig(Answer::Refused { refusal: why.into_refusal(), at: None })
+        }
         value @ (domain::family::Answer::Touched { .. }
         | domain::family::Answer::Moved { .. }
         | domain::family::Answer::Gone

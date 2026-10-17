@@ -32,6 +32,7 @@ pub fn required(words: &Words) -> Option<OutcomeFragment> {
 }
 fn header(value: &OwnerOutcome) -> P {
     match value {
+        OwnerOutcome::Compound { .. } => P::Compound,
         OwnerOutcome::Closing { .. } => P::Closing,
         OwnerOutcome::MarkedSeen { .. } => P::MarkedSeen,
         OwnerOutcome::NoteEdited { .. } => P::NoteEdited,
@@ -65,9 +66,6 @@ fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
 }
 fn number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
     text(b, words, phrase, &[Hole::Number(value)]);
-}
-fn released(b: &mut Builder, words: &Words, value: bool) {
-    text(b, words, if value { P::ReleasedYes } else { P::ReleasedNo }, &[]);
 }
 fn seen(b: &mut Builder, value: &SeenThrough, words: &Words) {
     match value {
@@ -140,24 +138,26 @@ fn details(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
         | OwnerOutcome::Started { task } => number(b, words, P::Task, *task),
         OwnerOutcome::GoalProposed { proposal } => number(b, words, P::ProposalNumber, *proposal),
         OwnerOutcome::ProposalDecided { proposal: key, by, at, choice } => proposal(b, key, *by, *at, *choice, words),
-        OwnerOutcome::Said { task, message, released: release } => {
+        OwnerOutcome::Compound { project, operations, first_message } => {
+            number(b, words, P::Project, u64::from(*project));
+            number(b, words, P::Operations, u64::from(*operations));
+            number(b, words, P::Message, *first_message);
+        }
+        OwnerOutcome::Said { task, message } => {
             number(b, words, P::Task, *task);
             number(b, words, P::Message, *message);
-            released(b, words, *release);
         }
         OwnerOutcome::QuestionAnswered { task, question, message } => {
             number(b, words, P::Task, *task);
             number(b, words, P::Question, *question);
             number(b, words, P::Message, *message);
         }
-        OwnerOutcome::Amended { task, released: release } => {
+        OwnerOutcome::Amended { task } => {
             number(b, words, P::Task, *task);
-            released(b, words, *release);
         }
-        OwnerOutcome::AmendProposed { task, proposal, released: release } => {
+        OwnerOutcome::AmendProposed { task, proposal } => {
             number(b, words, P::Task, *task);
             number(b, words, P::ProposalNumber, *proposal);
-            released(b, words, *release);
         }
         OwnerOutcome::PoolSet { project, person } => {
             number(b, words, P::Project, u64::from(*project));

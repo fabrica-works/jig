@@ -27,3 +27,6 @@ mod watches;
 
 #[path = "tests/closing.rs"]
 mod closing;
+
+#[path = "tests/compound.rs"]
+mod compound;

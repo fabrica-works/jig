@@ -8,13 +8,14 @@ use skein_lib::{List, Reader, Wall};
 #[expect(clippy::too_many_lines, reason = "one total match names every wire ask")]
 pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
     Ok(match record {
+        w::Ask::Compound(value) => super::operations::compound(value, limits)?,
         w::Ask::StartChat(value) => {
             let v = value.into_parts();
             p::Ask::StartChat { project: v.project, words: v.words }
         }
-        w::Ask::Write(value) => {
+        w::Ask::Message(value) => {
             let v = value.into_parts();
-            p::Ask::Say { project: v.project, task: v.task, words: v.words, release: v.release }
+            p::Ask::Say { project: v.project, task: v.task, words: v.words, release: false }
         }
         w::Ask::Answer(value) => {
             let v = value.into_parts();
@@ -39,6 +40,7 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
         w::Ask::Amend(value) => {
             let v = value.into_parts();
             p::Ask::Amend {
+                release: None,
                 project: v.project,
                 task: v.task,
                 revision: match v.revision {
@@ -46,10 +48,6 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
                     None => 0,
                 },
                 amendment: amendment(v.change, v.reason, limits)?,
-                release: match v.release {
-                    Some(value) => Some(revision(value)),
-                    None => None,
-                },
             }
         }
         w::Ask::Stop(value) => {
@@ -310,7 +308,11 @@ fn address(value: w::AddressChange) -> p::AddressChange {
     }
 }
 #[expect(clippy::manual_map, reason = "optional step fields use named total functions")]
-fn amendment(value: w::Amendment, reason: Box<[u8]>, limits: &w::Limits) -> Result<p::Amendment, Untranslatable> {
+pub(super) fn amendment(
+    value: w::Amendment,
+    reason: Box<[u8]>,
+    limits: &w::Limits,
+) -> Result<p::Amendment, Untranslatable> {
     let v = value.into_parts();
     let authority = match v.authority {
         Some(value) => Some(authority(value, limits)?),
@@ -342,7 +344,7 @@ fn amendment(value: w::Amendment, reason: Box<[u8]>, limits: &w::Limits) -> Resu
         reason,
     })
 }
-fn count(bytes: &[u8], path: w::Path) -> Result<u32, Untranslatable> {
+pub(super) fn count(bytes: &[u8], path: w::Path) -> Result<u32, Untranslatable> {
     let mut reader = Reader::new(bytes);
     let mut count = 0_u32;
     for _ in 0..bytes.len() {

@@ -17,7 +17,8 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
             OwnerOutcome::GoalStarted { task } => Route::Goal { task: *task },
             OwnerOutcome::Said { task, message, .. } => Route::Words { task: *task, message: *message },
             OwnerOutcome::GoalProposed { .. } | OwnerOutcome::AmendProposed { .. } => Route::Proposed,
-            OwnerOutcome::Closing { .. }
+            OwnerOutcome::Compound { .. }
+            | OwnerOutcome::Closing { .. }
             | OwnerOutcome::MarkedSeen { .. }
             | OwnerOutcome::NoteEdited { .. }
             | OwnerOutcome::ServiceMade { .. }
@@ -41,7 +42,6 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
         Outcome::Made { what } => match what {
             Made::Chat { task } => Route::Chat { task: *task },
             Made::Goal { task } => Route::Goal { task: *task },
-            Made::Words { task, message } => Route::Words { task: *task, message: *message },
             Made::Tasks { .. } | Made::Service { .. } | Made::PersonResult { .. } | Made::Note { .. } => Route::Other,
         },
         Outcome::Proposed { .. } => Route::Proposed,

@@ -149,6 +149,8 @@ pub enum Moved {
 /// A durable request refusal and all facts needed to show it.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Refusal {
+    /// A malformed operation, at its place in the compound.
+    Malformed { at: u32, why: super::Malformed },
     /// The project role does not allow the act.
     Role { held: Option<HeldRole> },
     /// A named delegate disposal is absent or invalid.

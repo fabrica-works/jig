@@ -300,7 +300,7 @@ fn records_7(bytes: &[u8]) {
     check!(HeldRole, bytes);
     check!(Holding, bytes);
     check!(StartChat, bytes);
-    check!(Write, bytes);
+    check!(Message, bytes);
     check!(AnswerQuestion, bytes);
     check!(AnswerPerson, bytes);
     check!(Take, bytes);
@@ -369,7 +369,6 @@ fn records_8(bytes: &[u8]) {
     check!(OwnerOutcomeStarted, bytes);
     check!(OwnerOutcome, bytes);
     check!(MadeChat, bytes);
-    check!(MadeWords, bytes);
     check!(MadeGoal, bytes);
     check!(MadeTasks, bytes);
     check!(MadeService, bytes);

@@ -40,7 +40,6 @@ fn task_authority_receiving_prices_whole_documents_replacements_and_reserved_nes
             project: 1,
             task: 8,
             revision: Some(Revision { value: 1 }),
-            release: None,
             change: Box::new(Amendment {
                 addressed: None,
                 spec: None,

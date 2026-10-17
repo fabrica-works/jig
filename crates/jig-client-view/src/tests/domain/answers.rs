@@ -3,6 +3,7 @@ use super::{
     objects::{live, person, proposal},
     spine::{LIMITS, drain, drive},
 };
+use crate::tests::fixtures::refusal_answer;
 use crate::tests::fixtures::{AnsweredByEngine, Fixture, ReadPage, Reported};
 use crate::{
     Event, Request,
@@ -48,7 +49,7 @@ fn read_token(rows: &[Request]) -> jig_client::Handle {
 #[test]
 fn durable_outcomes_remain_on_open_cards_and_decided_first_leaves_with_all_facts() {
     for outcome in [
-        Outcome::Made { what: Made::Words { task: 8, message: 3 } },
+        Outcome::Owner(OwnerOutcome::Said { task: 8, message: 3 }),
         Outcome::Proposed { proposal: proposal().key },
         Outcome::Changed,
     ] {
@@ -59,7 +60,7 @@ fn durable_outcomes_remain_on_open_cards_and_decided_first_leaves_with_all_facts
         assert!(answered(&mut domain, request, answer.clone()).is_empty());
         assert_eq!(domain.objects().get(id).unwrap().card, Card::Open);
         assert_eq!(domain.objects().get(id).unwrap().answer, Some(answer.clone()));
-        assert!(answered(&mut domain, request, Answer::Refused(Refusal::Unknown)).is_empty());
+        assert!(answered(&mut domain, request, refusal_answer(Refusal::Unknown)).is_empty());
         assert_eq!(domain.objects().get(id).unwrap().answer, Some(answer));
     }
     let (mut domain, _) = live();
@@ -118,10 +119,10 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
         let (mut domain, _) = live();
         let id = install(&mut domain, Body::Task(Box::new(task())));
         let request = send(&mut domain, ObjectKey::Task(8));
-        let rows = answered(&mut domain, request, Answer::Refused(refusal.clone()));
+        let rows = answered(&mut domain, request, refusal_answer(refusal.clone()));
         let object = domain.objects().get(id).unwrap();
         assert_eq!(object.card, Card::Refused { refusal: refusal.clone() });
-        assert_eq!(object.answer, Some(Answer::Refused(refusal.clone())));
+        assert_eq!(object.answer, Some(refusal_answer(refusal.clone())));
         match refusal {
             Refusal::Moved { .. } => {
                 assert!(recovery(&object).look_again);
@@ -146,7 +147,8 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
                 assert!(recovery(&object).change_ask);
                 assert!(rows.is_empty());
             }
-            Refusal::Disposal { .. }
+            Refusal::Malformed { .. }
+            | Refusal::Disposal { .. }
             | Refusal::Taken { .. }
             | Refusal::NotWaiting
             | Refusal::NoFurther
@@ -268,11 +270,11 @@ fn every_owner_outcome_remains_whole_on_its_original_card_after_duplicate_termin
             at: Wall::from_nanos(121),
             choice: OwnerProposalChoice::Stale,
         },
-        O::Said { task: 122, message: 123, released: false },
+        O::Said { task: 122, message: 123 },
         O::QuestionAnswered { task: 124, question: 125, message: 126 },
         O::Prioritised { project: 127 },
-        O::Amended { task: 128, released: true },
-        O::AmendProposed { task: 129, proposal: 130, released: false },
+        O::Amended { task: 128 },
+        O::AmendProposed { task: 129, proposal: 130 },
         O::RolesSet { project: 131 },
         O::PolicyChanged { project: 132 },
         O::PoolSet { project: 133, person: 134 },
@@ -293,7 +295,7 @@ fn every_owner_outcome_remains_whole_on_its_original_card_after_duplicate_termin
         assert!(answered(&mut domain, request, answer.clone()).is_empty());
         assert_eq!(domain.objects().get(id).unwrap().card, Card::Open);
         assert_eq!(domain.objects().get(id).unwrap().answer.as_ref(), Some(&answer));
-        assert!(answered(&mut domain, request, Answer::Refused(Refusal::Unknown)).is_empty());
+        assert!(answered(&mut domain, request, refusal_answer(Refusal::Unknown)).is_empty());
         assert_eq!(domain.objects().get(id).unwrap().answer, Some(answer));
     }
 }
@@ -344,10 +346,9 @@ fn owner_historical_proposal_choices_keep_the_named_winner_and_clock_without_exp
             assert_eq!(domain.objects().get(id).unwrap().answer, Some(Answer::Done(outcome)));
         }
     }
-    for value in [
-        OwnerOutcome::GoalProposed { proposal: u64::MAX },
-        OwnerOutcome::AmendProposed { task: 8, proposal: u64::MAX, released: true },
-    ] {
+    for value in
+        [OwnerOutcome::GoalProposed { proposal: u64::MAX }, OwnerOutcome::AmendProposed { task: 8, proposal: u64::MAX }]
+    {
         assert!(!crate::objects::stops_waiting(ObjectKey::Proposal(proposal().key), &Outcome::Owner(value)));
     }
 }

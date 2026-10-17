@@ -31,3 +31,5 @@ pub mod watches;
 
 pub(crate) mod envelope;
 pub mod store;
+
+mod compound;

@@ -8,9 +8,14 @@ pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::KeyedAns
     let final_answer = match reply {
         p::Reply::Outcome(p::Outcome::Again(why)) | p::Reply::Again(why) => return Ok(again(*why)),
         p::Reply::Outcome(p::Outcome::SignedOut) | p::Reply::SignedOut => return Ok(w::KeyedAnswer::SignedOut),
-        p::Reply::Outcome(p::Outcome::Refused(why)) | p::Reply::Refused(why) => {
-            w::Final::Refused(w::Refused::new(limits, w::RefusedParts { refusal: refusals::refusal(*why, limits)? })?)
-        }
+        p::Reply::Outcome(p::Outcome::Refused(why)) | p::Reply::Refused(why) => w::Final::Refused(w::Refused::new(
+            limits,
+            w::RefusedParts { at: None, refusal: refusals::refusal(*why, limits)? },
+        )?),
+        p::Reply::Outcome(p::Outcome::CompoundRefused { at, why }) => w::Final::Refused(w::Refused::new(
+            limits,
+            w::RefusedParts { refusal: refusals::refusal(*why, limits)?, at: Some(*at) },
+        )?),
         p::Reply::Outcome(p::Outcome::ServiceMade { person }) => {
             let what = w::Made::Service(w::MadeService::new(
                 limits,
@@ -62,6 +67,16 @@ fn problem() -> w::Problem {
 #[expect(clippy::too_many_lines, reason = "one total match names every people outcome")]
 fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::Problem> {
     Ok(match value {
+        p::Outcome::Compound { project, operations, first_message } => {
+            w::OwnerOutcome::Compound(w::OwnerOutcomeCompound::new(
+                limits,
+                w::OwnerOutcomeCompoundParts {
+                    project: *project,
+                    operations: *operations,
+                    first_message: *first_message,
+                },
+            )?)
+        }
         p::Outcome::Closing { chat, cancelled, kept } => w::OwnerOutcome::Closing(w::OwnerOutcomeClosing::new(
             limits,
             w::OwnerOutcomeClosingParts { chat: *chat, cancelled: *cancelled, kept: *kept },
@@ -107,9 +122,9 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
         p::Outcome::Moved { task } => {
             w::OwnerOutcome::Moved(w::OwnerOutcomeMoved::new(limits, w::OwnerOutcomeMovedParts { task: *task })?)
         }
-        p::Outcome::Said { task, message, released } => w::OwnerOutcome::Said(w::OwnerOutcomeSaid::new(
+        p::Outcome::Said { task, message, .. } => w::OwnerOutcome::Said(w::OwnerOutcomeSaid::new(
             limits,
-            w::OwnerOutcomeSaidParts { task: *task, message: *message, released: *released },
+            w::OwnerOutcomeSaidParts { task: *task, message: *message },
         )?),
         p::Outcome::QuestionAnswered { task, question, message } => {
             w::OwnerOutcome::QuestionAnswered(w::OwnerOutcomeQuestionAnswered::new(
@@ -121,10 +136,9 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
             limits,
             w::OwnerOutcomePrioritisedParts { project: *project },
         )?),
-        p::Outcome::Amended { task, released } => w::OwnerOutcome::Amended(w::OwnerOutcomeAmended::new(
-            limits,
-            w::OwnerOutcomeAmendedParts { task: *task, released: *released },
-        )?),
+        p::Outcome::Amended { task, .. } => {
+            w::OwnerOutcome::Amended(w::OwnerOutcomeAmended::new(limits, w::OwnerOutcomeAmendedParts { task: *task })?)
+        }
         p::Outcome::RolesSet { project } => w::OwnerOutcome::RolesSet(w::OwnerOutcomeRolesSet::new(
             limits,
             w::OwnerOutcomeRolesSetParts { project: *project },
@@ -177,8 +191,7 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
                 },
             )?)
         }
-        p::Outcome::Compound { .. }
-        | p::Outcome::CompoundRefused { .. }
+        p::Outcome::CompoundRefused { .. }
         | p::Outcome::Created { .. }
         | p::Outcome::Proposed { .. }
         | p::Outcome::Withdrawn { .. }
@@ -230,7 +243,7 @@ pub(crate) fn amend_answer(
     {
         let value = w::OwnerOutcome::AmendProposed(w::OwnerOutcomeAmendProposed::new(
             limits,
-            w::OwnerOutcomeAmendProposedParts { task: *task, proposal: *proposal, released: false },
+            w::OwnerOutcomeAmendProposedParts { task: *task, proposal: *proposal },
         )?);
         let outcome = w::Outcome::Owner(w::OutcomeOwner::new(limits, w::OutcomeOwnerParts { value })?);
         let final_answer = w::Final::Done(w::Done::new(limits, w::DoneParts { outcome })?);

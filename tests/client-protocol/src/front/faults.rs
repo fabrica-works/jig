@@ -122,6 +122,10 @@ impl Protocol {
             .count()
     }
     #[must_use]
+    pub fn runs_started(&self) -> usize {
+        self.engine.driver.world.peers.as_ref().expect("workers").workers.iter().map(|worker| worker.seen.len()).sum()
+    }
+    #[must_use]
     pub fn words_reached_worker(&self, words: &[u8]) -> bool {
         self.engine.driver.world.peers.as_ref().expect("worker").workers[0]
             .messages

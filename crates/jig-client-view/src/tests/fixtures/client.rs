@@ -2,6 +2,7 @@
 use crate::{Event, Limits, Request, Ui};
 use jig_client::{Client, Down, Handle, Key, Readout, Up, Watchable, contract};
 use skein_lib::{Duration, List, Queue, Time, Token, Wall};
+pub(crate) const MOST: Duration = Duration::from_nanos(80);
 const OBSERVATIONS: u32 = 4096;
 const OUTPUTS: u32 = 512;
 const EXCHANGES: u32 = 256;
@@ -59,7 +60,7 @@ impl Fixture {
                 bytes: 1 << 20,
                 out: EXCHANGES,
                 first: Duration::from_nanos(10),
-                most: Duration::from_nanos(80),
+                most: MOST,
                 margin: Duration::from_secs(1),
             },
             ask_bytes: 65536,
@@ -68,7 +69,7 @@ impl Fixture {
             reads: limits.reads,
             turn_bytes: limits.text,
             document_bytes: limits.document_bytes,
-            backoff: jig_client::Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
+            backoff: jig_client::Backoff { first: Duration::from_nanos(10), most: MOST },
             rows: limits.rows,
             segments: limits.segments,
             text: limits.text,

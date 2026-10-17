@@ -42,7 +42,13 @@ impl Component {
         let request = match keyed.owner {
             w::Owner::Jig => {
                 let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
-                    Ok(value) => crate::translate::asks::ask(value, &env.limits.wire),
+                    Ok(value) => {
+                        if let Ok(Some(answer)) = crate::translate::operations::refused(&value, &env.limits.wire) {
+                            self.respond(env, exchange, routes::encoded(&answer));
+                            return;
+                        }
+                        crate::translate::asks::ask(value, &env.limits.wire)
+                    }
                     Err(problem) => Err(crate::translate::Untranslatable { path: problem.path }),
                 };
                 let Ok(ask) = ask else {

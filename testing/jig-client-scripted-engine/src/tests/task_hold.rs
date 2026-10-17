@@ -73,32 +73,38 @@ fn scripted_owner_hold_moves_return_exact_category_for_release_and_atomic_amend_
         setup.truth.objects.insert(ObjectKey::Task(8), ReadValue::Task(Box::new(row)));
         let mut engine = Engine::new(setup, 1).unwrap();
         let ask = if amendment {
-            Ask::Amend {
-                reason: text(b""),
-                project: 1,
-                task: 8,
-                revision: Some(spec_revision),
-                release: Some(Revision { value: 6 }),
-                change: Box::new(Amendment {
-                    addressed: None,
-                    spec: None,
-                    wake: None,
-                    dependencies: None,
-                    authority: None,
-                    instructions: Some(text(b"")),
-                    tracked: None,
-                }),
-            }
+            crate::tests::releasing(
+                Ask::Amend {
+                    reason: text(b""),
+                    project: 1,
+                    task: 8,
+                    revision: Some(spec_revision),
+
+                    change: Box::new(Amendment {
+                        addressed: None,
+                        spec: None,
+                        wake: None,
+                        dependencies: None,
+                        authority: None,
+                        instructions: Some(text(b"")),
+                        tracked: None,
+                    }),
+                },
+                Revision { value: 6 },
+            )
         } else {
             Ask::Release { project: 1, task: 8, revision: Revision { value: 6 }, again: None }
         };
         send(&mut engine, 0, 11, 1, 1, ask);
         assert_eq!(
             final_answer(&engine.poll(Time::from_nanos(10_000_000))[0]),
-            &Answer::Refused(Refusal::Moved {
-                now: Revision { value: 7 },
-                what: Moved::Hold { reason: Some(CurrentHold::Reason(reason)) },
-            })
+            &Answer::Refused {
+                refusal: Refusal::Moved {
+                    now: Revision { value: 7 },
+                    what: Moved::Hold { reason: Some(CurrentHold::Reason(reason)) },
+                },
+                at: None
+            }
         );
     }
 }

@@ -38,7 +38,8 @@ pub fn store_asks() -> List<c::Ask> {
     let revision = read_value_revision();
     list([
         start_chat(),
-        c::Ask::Write { project: 7, task: u64::MAX, words: store_text(), release: true },
+        compound_ask(revision),
+        c::Ask::Message { project: 7, task: u64::MAX, words: store_text() },
         c::Ask::Answer {
             project: 7,
             on: c::AnswerOn::Question { task: u64::MAX, message: u64::MAX, words: store_text() },
@@ -74,7 +75,6 @@ pub fn store_asks() -> List<c::Ask> {
             task: u64::MAX,
             revision: Some(revision),
             change: Box::new(amendment()),
-            release: Some(revision),
             reason: store_text(),
         },
         c::Ask::Stop { project: 7, task: u64::MAX },
@@ -115,7 +115,6 @@ pub fn store_asks() -> List<c::Ask> {
                 tracked: Some(c::Tracking::Tracked { priority: u32::MAX }),
                 ..amendment()
             }),
-            release: None,
             reason: store_text(),
         },
         c::Ask::Amend {
@@ -123,7 +122,6 @@ pub fn store_asks() -> List<c::Ask> {
             task: u64::MAX,
             revision: Some(revision),
             change: Box::new(c::Amendment { tracked: Some(c::Tracking::Untracked), ..amendment() }),
-            release: None,
             reason: store_text(),
         },
         c::Ask::SetRoles {
@@ -267,5 +265,25 @@ fn templates() -> c::Ask {
                 },
             ]),
         },
+    }
+}
+
+fn compound_ask(revision: c::Revision) -> c::Ask {
+    c::Ask::Compound {
+        project: 7,
+        operations: list([
+            c::Operation::Message { project: 7, task: u64::MAX, words: store_text() },
+            c::Operation::Amend {
+                project: 7,
+                task: u64::MAX,
+                revision: Some(revision),
+                change: Box::new(amendment()),
+                reason: store_text(),
+            },
+            c::Operation::Release { project: 7, task: u64::MAX, revision, again: Some(true) },
+            c::Operation::Cancel { project: 7, task: u64::MAX, reason: store_text(), grace: None },
+            c::Operation::Move { project: 7, task: u64::MAX, reason: store_text() },
+            c::Operation::Stop { project: 7, task: u64::MAX },
+        ]),
     }
 }

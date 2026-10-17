@@ -151,7 +151,7 @@ fn ended_refusals_keep_one_sparse_row_and_its_wall_time() {
 fn done_ending_round_trips(limits: &w::Limits) {
     let refusal =
         crate::translate::refusals::refusal(p::Refusal::Ended { how: p::Ending::Done }, limits).expect("ending fits");
-    let value = w::Final::Refused(w::Refused::new(limits, w::RefusedParts { refusal }).expect("refusal"));
+    let value = w::Final::Refused(w::Refused::new(limits, w::RefusedParts { at: None, refusal }).expect("refusal"));
     let mut out = skein_lib::Writer::new(usize::try_from(value.measure()).expect("short final"));
     value.encode(&mut out).expect("final answer");
     let owned = w::Owned::new(
@@ -161,9 +161,10 @@ fn done_ending_round_trips(limits: &w::Limits) {
     .expect("owned final");
     assert_eq!(
         jig_client_protocol_link::translate::answers::answer(w::KeyedAnswer::FinalAnswer(owned), &f::client_limits()),
-        Ok(jig_client_domain::contract::Answer::Refused(jig_client_domain::contract::Refusal::Ended {
-            how: jig_client_domain::contract::Ending::Done
-        }))
+        Ok(jig_client_domain::contract::Answer::Refused {
+            refusal: jig_client_domain::contract::Refusal::Ended { how: jig_client_domain::contract::Ending::Done },
+            at: None
+        })
     );
 }
 #[test]

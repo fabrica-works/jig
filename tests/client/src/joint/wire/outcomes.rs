@@ -11,6 +11,7 @@ pub enum Outcome {
     Again(people::Again),
     SignedOut,
     Refused(people::Refusal),
+    CompoundRefused { at: u32, why: people::Refusal },
 }
 
 #[must_use]
@@ -22,11 +23,11 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::NoteEdited { name } => client::OwnerOutcome::NoteEdited { name: *name },
         people::Outcome::ServiceMade { person } => client::OwnerOutcome::ServiceMade { person: *person },
         people::Outcome::Adopted { project } => client::OwnerOutcome::Adopted { project: *project },
-        people::Outcome::Compound { .. }
-        | people::Outcome::CompoundRefused { .. }
-        | people::Outcome::Created { .. }
-        | people::Outcome::Proposed { .. }
-        | people::Outcome::Withdrawn { .. } => {
+        people::Outcome::Compound { project, operations, first_message } => {
+            client::OwnerOutcome::Compound { project: *project, operations: *operations, first_message: *first_message }
+        }
+        people::Outcome::CompoundRefused { at, why } => return Outcome::CompoundRefused { at: *at, why: *why },
+        people::Outcome::Created { .. } | people::Outcome::Proposed { .. } | people::Outcome::Withdrawn { .. } => {
             unreachable!("no v8 ask leads to these outcomes")
         }
         people::Outcome::GoalStarted { task } => client::OwnerOutcome::GoalStarted { task: *task },
@@ -37,16 +38,12 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::PersonHandedBack { task } => client::OwnerOutcome::PersonHandedBack { task: *task },
         people::Outcome::PersonAnswered { task } => client::OwnerOutcome::PersonAnswered { task: *task },
         people::Outcome::Moved { task } => client::OwnerOutcome::Moved { task: *task },
-        people::Outcome::Said { task, message, released } => {
-            client::OwnerOutcome::Said { task: *task, message: *message, released: *released }
-        }
+        people::Outcome::Said { task, message, .. } => client::OwnerOutcome::Said { task: *task, message: *message },
         people::Outcome::QuestionAnswered { task, question, message } => {
             client::OwnerOutcome::QuestionAnswered { task: *task, question: *question, message: *message }
         }
         people::Outcome::Prioritised { project } => client::OwnerOutcome::Prioritised { project: *project },
-        people::Outcome::Amended { task, released } => {
-            client::OwnerOutcome::Amended { task: *task, released: *released }
-        }
+        people::Outcome::Amended { task, .. } => client::OwnerOutcome::Amended { task: *task },
 
         people::Outcome::RolesSet { project } => client::OwnerOutcome::RolesSet { project: *project },
         people::Outcome::PolicyChanged { project } => client::OwnerOutcome::PolicyChanged { project: *project },
@@ -171,11 +168,11 @@ mod tests {
         for released in [false, true] {
             assert_eq!(
                 outcome(&people::Outcome::Said { task: u64::MAX, message: 17, released }),
-                Outcome::Owner(client::OwnerOutcome::Said { task: u64::MAX, message: 17, released })
+                Outcome::Owner(client::OwnerOutcome::Said { task: u64::MAX, message: 17 })
             );
             assert_eq!(
                 outcome(&people::Outcome::Amended { task: 11, released }),
-                Outcome::Owner(client::OwnerOutcome::Amended { task: 11, released })
+                Outcome::Owner(client::OwnerOutcome::Amended { task: 11 })
             );
         }
         assert_eq!(

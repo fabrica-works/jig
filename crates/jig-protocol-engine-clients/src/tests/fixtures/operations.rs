@@ -33,7 +33,6 @@ pub fn priority_amend() -> w::Ask {
                 task: 8,
                 revision: None,
                 change: empty_amendment(Some(tracked)),
-                release: None,
                 reason: Box::new([]),
             },
         )
@@ -75,4 +74,17 @@ pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
         authority: None,
         reason: reason.into(),
     }
+}
+
+pub fn compound(project: u32, values: &[w::Operation]) -> w::Ask {
+    let mut size = 0_usize;
+    for value in values {
+        size = size.checked_add(usize::try_from(value.measure()).unwrap()).unwrap().checked_add(4).unwrap();
+    }
+    let mut bytes = Writer::new(size);
+    for value in values {
+        bytes.put(&value.measure().to_be_bytes()).unwrap();
+        value.encode(&mut bytes).unwrap();
+    }
+    w::Ask::Compound(w::Compound::new(&wire(), w::CompoundParts { project, operations: bytes.finish() }).unwrap())
 }

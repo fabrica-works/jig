@@ -59,7 +59,6 @@ fn rendered_amendment_reason_preserves_empty_opaque_bytes_and_only_selected_inst
                 task: 8,
                 revision: Some(Revision { value: 6 }),
                 change: Box::new(selected),
-                release: None,
                 reason: text(bytes)
             }
         );

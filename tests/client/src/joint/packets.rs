@@ -318,8 +318,8 @@ pub fn people_reply(
             }
             wire::answers::Reply::Again(why) => Incoming::SignInAgain { client, why },
             wire::answers::Reply::SignedOut => Incoming::SignInFailed { client, failure: SignInFailure::SignedOut },
-            wire::answers::Reply::Final(client::Answer::Refused(why)) => {
-                admission::admit_answer(&client::Answer::Refused(why.clone()), &bounds(limits))
+            wire::answers::Reply::Final(client::Answer::Refused { refusal: why, .. }) => {
+                admission::admit_answer(&client::Answer::Refused { refusal: why.clone(), at: None }, &bounds(limits))
                     .map_err(|_| Invalid::Payload)?;
                 Incoming::SignInFailed { client, failure: SignInFailure::Refused(why) }
             }
@@ -345,7 +345,7 @@ pub fn people_reply(
                     Some(match owner {
                         KeyedOwner::Jig => Answered::Jig(value),
                         KeyedOwner::Application { connector: 1 } => {
-                            let client::Answer::Refused(why) = value else {
+                            let client::Answer::Refused { refusal: why, .. } = value else {
                                 return Err(Invalid::OwnerRoute);
                             };
                             let why = client::EntranceRefusal::new(why).map_err(|_| Invalid::Payload)?;
@@ -955,7 +955,7 @@ mod tests {
                                 jig_client::Up::Answer {
                                     attempt: actual,
                                     envelope,
-                                    answer: Some(Answered::Jig(client::Answer::Refused(answer))),
+                                    answer: Some(Answered::Jig(client::Answer::Refused { refusal: answer, at: None })),
                                     why: None,
                                 },
                         },

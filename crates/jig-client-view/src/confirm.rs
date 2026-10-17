@@ -214,7 +214,11 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
         act,
         object: id,
         revision,
-        release_revision: if act == ActKind::AmendRelease { acts::hold_revision(&object) } else { None },
+        release_revision: if act == ActKind::AmendRelease || act == ActKind::Write {
+            acts::hold_revision(&object)
+        } else {
+            None
+        },
         release_changed: false,
         reason_input: ReasonInput::Missing,
         choices,
@@ -249,7 +253,11 @@ pub(crate) fn sync(domain: &mut Ui, lent: &jig_client::Client) {
         return;
     };
     let now = acts::revision(&object, open.act);
-    let hold_now = if open.act == ActKind::AmendRelease { acts::hold_revision(&object) } else { None };
+    let hold_now = if open.act == ActKind::AmendRelease || open.act == ActKind::Write {
+        acts::hold_revision(&object)
+    } else {
+        None
+    };
     let release_changed = open.release_changed || hold_now != open.release_revision;
     let changed = open.changed || now != open.revision || release_changed;
     let proposed = match draft_admission(&object, open) {

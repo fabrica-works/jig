@@ -53,7 +53,25 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
         w::Owner::Jig => {
             let ask = w::Ask::decode(&w::CEILINGS, &mut Reader::new(keyed.request())).expect("jig ask bytes");
             let decided = match ask {
-                w::Ask::Write(value) => {
+                w::Ask::Compound(value) => {
+                    let mut reader = Reader::new(value.operations());
+                    let length = reader.u32().expect("piece length");
+                    let bytes = reader.bytes(length).expect("first operation");
+                    match w::Operation::decode(&w::CEILINGS, &mut Reader::new(bytes)).expect("operation") {
+                        w::Operation::Message(v) => {
+                            sent.words = Some((v.task(), v.words().to_vec()));
+                            None
+                        }
+                        w::Operation::Amend(v) => {
+                            v.revision().as_ref().map(|r| (c::ObjectKey::Task(v.task()), 1, r.value()))
+                        }
+                        w::Operation::Cancel(_)
+                        | w::Operation::Release(_)
+                        | w::Operation::Stop(_)
+                        | w::Operation::MoveTask(_) => None,
+                    }
+                }
+                w::Ask::Message(value) => {
                     sent.words = Some((value.task(), value.words().to_vec()));
                     None
                 }

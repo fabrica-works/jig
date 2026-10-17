@@ -194,7 +194,12 @@ fn an_unsupported_version_parks_work_and_never_sends_a_new_engine_request() {
 
 #[test]
 fn foreign_kept_requests_hide_work_but_confirm_only_the_frame_party() {
-    let mut domain = restored(&[(1, 7), (2, 7)], List::with_capacity(0));
+    let mut domain = restored(
+        &[(1, 7), (2, 7)],
+        List::with_capacity(0),
+        &Limits { intents: LIMITS.kept, conversation_words: LIMITS.kept, ..LIMITS },
+    )
+    .0;
     let watch = domain.frame_watch.unwrap();
     delivered(&mut domain, Time::ZERO, watch, frame(8));
     assert_eq!(domain.frame().party(), Some(8));
@@ -205,7 +210,12 @@ fn foreign_kept_requests_hide_work_but_confirm_only_the_frame_party() {
 
 #[test]
 fn the_last_foreign_kept_request_retiring_restores_the_work_page() {
-    let mut domain = restored(&[(1, 7), (2, 7), (3, 9)], List::with_capacity(0));
+    let mut domain = restored(
+        &[(1, 7), (2, 7), (3, 9)],
+        List::with_capacity(0),
+        &Limits { intents: LIMITS.kept, conversation_words: LIMITS.kept, ..LIMITS },
+    )
+    .0;
     let watch = domain.frame_watch.unwrap();
     // All three restored keys must retire before work returns.
     delivered(&mut domain, Time::ZERO, watch, frame(8));
@@ -219,7 +229,12 @@ fn the_last_foreign_kept_request_retiring_restores_the_work_page() {
 
 #[test]
 fn own_kept_requests_do_not_hide_work_or_override_kept_draft_guard() {
-    let mut domain = restored(&[(1, 7), (2, 7)], List::with_capacity(0));
+    let mut domain = restored(
+        &[(1, 7), (2, 7)],
+        List::with_capacity(0),
+        &Limits { intents: LIMITS.kept, conversation_words: LIMITS.kept, ..LIMITS },
+    )
+    .0;
     let watch = domain.frame_watch.unwrap();
     delivered(&mut domain, Time::ZERO, watch, frame(7));
     assert!(work_page(&domain));
@@ -235,7 +250,8 @@ fn own_kept_requests_do_not_hide_work_or_override_kept_draft_guard() {
         touched: 1,
     })
     .unwrap();
-    let mut guarded = restored(&[(1, 7)], kept);
+    let mut guarded =
+        restored(&[(1, 7)], kept, &Limits { intents: LIMITS.kept, conversation_words: LIMITS.kept, ..LIMITS }).0;
     let watch = guarded.frame_watch.unwrap();
     delivered(&mut guarded, Time::ZERO, watch, frame(7));
     drive(&mut guarded, Time::ZERO, jig_client::Up::NotKept { key: [1; 16] });
@@ -259,10 +275,12 @@ pub(super) fn party(number: u64) -> jig_client::contract::Party {
     }
 }
 
-pub(super) fn restored(rows: &[(u8, u64)], records: List<Record>) -> Fixture {
+pub(super) fn restored(rows: &[(u8, u64)], records: List<Record>, limits: &Limits) -> (Fixture, jig_client::Handle) {
     let mut kept = List::with_capacity(u32::try_from(rows.len()).unwrap());
     for (number, party) in rows {
         kept.push(crate::tests::fixtures::kept(*number, *party)).unwrap();
     }
-    Fixture::restored(&Limits { intents: LIMITS.kept, conversation_words: LIMITS.kept, ..LIMITS }, records, kept)
+    let fixture = Fixture::restored(limits, records, kept);
+    let handle = fixture.frame_watch.unwrap();
+    (fixture, handle)
 }

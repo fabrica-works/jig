@@ -27,17 +27,21 @@ pub fn finish(world: &mut Story) {
     assert!(outcome.judged.0 > 0);
     assert!(world.front().rules().records > 0 && world.front().rules().domains > 0);
 }
-pub fn send_words(world: &mut Story, client: ClientId, words: &[u8]) {
-    world.person(
-        client,
-        vec![
-            Step::Press { find: Find::exactly_named(Role::Button, b"Write") },
-            Step::Type { find: Find::named(Role::TextArea, b"Your answer"), words: words.into() },
-            Step::Press { find: Find::named(Role::Button, b"Confirm") },
-            Step::See { find: Find::text(words), within: Duration::from_secs(2) },
-        ],
-    );
+pub fn send_words(world: &mut Story, client: ClientId, words: &[u8], release: bool) {
+    let mut steps = vec![
+        Step::Press { find: Find::exactly_named(Role::Button, b"Write") },
+        Step::Type { find: Find::named(Role::TextArea, b"Your answer"), words: words.into() },
+    ];
+    if release {
+        steps.push(Step::Press { find: Find::named(Role::Button, b"Write and release together") });
+    }
+    steps.extend([
+        Step::Press { find: Find::named(Role::Button, b"Confirm") },
+        Step::See { find: Find::text(words), within: Duration::from_secs(2) },
+    ]);
+    world.person(client, steps);
 }
+
 pub fn submit_stop(world: &mut Story, client: ClientId) {
     world.person(
         client,

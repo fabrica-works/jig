@@ -73,7 +73,7 @@ pub fn refused_moved() -> Refused {
         MovedHold::new(&limits, MovedHoldParts { reason: Some(CurrentHold::Document(reason)) }).expect("moved hold");
     let now = Revision::new(&limits, RevisionParts { value: u64::MAX }).expect("whole revision");
     let moved = RefusalMoved::new(&limits, RefusalMovedParts { now, what: Moved::Hold(what) }).expect("refusal facts");
-    Refused::new(&limits, RefusedParts { refusal: Refusal::Moved(moved) }).expect("complete refusal")
+    Refused::new(&limits, RefusedParts { at: None, refusal: Refusal::Moved(moved) }).expect("complete refusal")
 }
 
 pub fn encoded<T>(value: &T, measure: fn(&T) -> u32, encode: fn(&T, &mut Writer) -> Result<(), Overflow>) -> Box<[u8]> {
@@ -787,3 +787,6 @@ pub fn not_served() -> NotServed {
 }
 mod operations;
 pub use operations::merged_targets;
+
+mod compound;
+pub use compound::{COMPOUND_PROJECT, compound_operations};

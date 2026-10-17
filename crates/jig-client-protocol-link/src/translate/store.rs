@@ -76,15 +76,13 @@ fn policy_edit(value: &w::PolicyEdit, limits: &Limits) -> Result<c::PolicyEdit, 
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 #[expect(clippy::too_many_lines, reason = "one exhaustive translation arm per kept client ask")]
-fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
+pub(super) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
     Ok(match value {
+        w::Ask::Compound(value) => super::compound::restore(value, limits)?,
         w::Ask::StartChat(value) => c::Ask::StartChat { project: value.project(), words: text(value.words(), limits)? },
-        w::Ask::Write(value) => c::Ask::Write {
-            project: value.project(),
-            task: value.task(),
-            words: text(value.words(), limits)?,
-            release: value.release(),
-        },
+        w::Ask::Message(value) => {
+            c::Ask::Message { project: value.project(), task: value.task(), words: text(value.words(), limits)? }
+        }
         w::Ask::Answer(value) => c::Ask::Answer {
             project: value.project(),
             on: match value.on() {
@@ -120,23 +118,16 @@ fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
             revision: answers::revision(value.revision(), limits),
             again: *value.again(),
         },
-        w::Ask::Amend(value) => {
-            let release = match value.release() {
+        w::Ask::Amend(value) => c::Ask::Amend {
+            project: value.project(),
+            task: value.task(),
+            revision: match value.revision() {
                 Some(value) => Some(answers::revision(value, limits)),
                 None => None,
-            };
-            c::Ask::Amend {
-                project: value.project(),
-                task: value.task(),
-                revision: match value.revision() {
-                    Some(value) => Some(answers::revision(value, limits)),
-                    None => None,
-                },
-                change: Box::new(pages::amendment_fields(value.change(), limits)?),
-                release,
-                reason: text(value.reason(), limits)?,
-            }
-        }
+            },
+            change: Box::new(pages::amendment_fields(value.change(), limits)?),
+            reason: text(value.reason(), limits)?,
+        },
         w::Ask::Stop(value) => c::Ask::Stop { project: value.project(), task: value.task() },
         w::Ask::Cancel(value) => c::Ask::Cancel {
             project: value.project(),

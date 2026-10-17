@@ -512,7 +512,10 @@ fn a_family_entrance_refusal_shows_its_budget_and_keeps_the_object_present() {
                 up: jig_client::Up::Answer {
                     attempt: attempt.unwrap(),
                     envelope: skein_lib::RequestEnvelope::Final,
-                    answer: Some(jig_client::Answered::Jig(Answer::Refused(refusal.into_refusal()))),
+                    answer: Some(jig_client::Answered::Jig(Answer::Refused {
+                        refusal: refusal.into_refusal(),
+                        at: None,
+                    })),
                     why: None,
                 },
             },
