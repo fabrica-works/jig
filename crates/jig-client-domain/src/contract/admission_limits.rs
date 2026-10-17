@@ -2,6 +2,7 @@
 /// The exact category supplied by engine admission.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AdmissionLimit {
+    Goals,
     Operations,
     Grace,
     Words,

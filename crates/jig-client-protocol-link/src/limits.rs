@@ -81,6 +81,10 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.person_answer_words_value = client.text;
     wire.person_answer_cannot_reason = client.text;
     wire.parameter_bytes_value = client.text;
+    wire.create_tasks = u32::try_from(client.document_bytes).ok()?.min(w::CEILINGS.create_tasks);
+    wire.new_task_named = u32::try_from(client.document_bytes).ok()?.min(w::CEILINGS.new_task_named);
+    wire.new_task_dependencies = client.rows.min(w::CEILINGS.new_task_dependencies);
+    wire.contract_verdict_choices = client.rows.min(w::CEILINGS.contract_verdict_choices);
     wire.specification_words = client.text;
     wire.specification_parameters = client.rows;
     wire.specification_inputs = client.rows;

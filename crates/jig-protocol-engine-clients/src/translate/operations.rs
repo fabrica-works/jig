@@ -200,3 +200,90 @@ fn wire_piece(reader: &mut skein_lib::Reader<'_>) -> Result<Option<Box<[u8]>>, w
         Err(_) => Err(super::problem(skein_codec::Reason::Malformed)),
     }
 }
+
+/// Batch members remain data until people admission resolves their authority.
+pub(super) fn create(value: w::Create, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
+    let path = w::Path::CreateTasks;
+    let mut tasks = List::with_capacity(asks::count(value.tasks(), path)?);
+    let mut reader = skein_lib::Reader::new(value.tasks());
+    for _ in 0..tasks.capacity() {
+        let bytes = asks::item(&mut reader, path)?;
+        let Ok(task) = w::NewTask::decode(limits, &mut skein_lib::Reader::new(&bytes)) else {
+            return Err(Untranslatable { path });
+        };
+        tasks.push(member(task, limits)?).expect("counted pieces");
+    }
+    Ok(p::Ask::Create { project: value.project(), batch: tasks.into_boxed() })
+}
+fn member(value: w::NewTask, limits: &w::Limits) -> Result<p::Member, Untranslatable> {
+    let v = value.into_parts();
+    let spec = asks::spec(v.spec);
+    let mut dependencies = List::with_capacity(v.dependencies.len());
+    for dependency in v.dependencies.into_boxed() {
+        dependencies
+            .push(match dependency {
+                w::TaskRef::Member(v) => p::Dependency::Batch(v.value()),
+                w::TaskRef::Task(v) => p::Dependency::Existing(v.value()),
+            })
+            .expect("same capacity");
+    }
+    let flags = v.flags.into_parts();
+    Ok(p::Member {
+        executor: match v.executor {
+            w::OwnerExecutor::Agent(v) => p::TaskExecutor::Agent { charter: v.charter() },
+            w::OwnerExecutor::Procedure(v) => p::TaskExecutor::Procedure { connector: v.connector(), code: v.code() },
+            w::OwnerExecutor::Person(v) => p::TaskExecutor::Person(match v.value() {
+                w::PersonAddress::Party(v) => p::PersonAddress::Person(v.value()),
+                w::PersonAddress::Role(v) => p::PersonAddress::Role(v.value()),
+            }),
+        },
+        words: spec.words,
+        parameters: spec.parameters,
+        inputs: spec.inputs,
+        contract: new_contract(v.contract),
+        authority: asks::authority(v.authority, limits)?,
+        budget: match v.budget {
+            w::NewBudget::Named => p::Budget::Named,
+            w::NewBudget::AsAllowed(v) => p::Budget::AsAllowed { cap: *v.cap() },
+        },
+        wake: asks::wake(v.wake),
+        dependencies: dependencies.into_boxed(),
+        named: asks::grants(&v.named, limits.new_task_named, w::Path::NewTaskNamed, limits)?,
+        tracked: v.tracked,
+        label: v.label,
+        flags: p::Flags {
+            conversation: flags.conversation,
+            listed: flags.listed,
+            retention: match flags.retention {
+                w::Retention::Kept => p::Retention::Kept,
+                w::Retention::ForgottenOnceRead => p::Retention::ForgottenOnceRead,
+            },
+        },
+    })
+}
+fn new_contract(value: w::NewContract) -> p::Contract {
+    match value {
+        w::NewContract::Report(v) => p::Contract::Report { words: v.words() },
+        w::NewContract::Change(v) => p::Contract::Change { connector: v.connector(), kind: v.kind(), words: v.words() },
+        w::NewContract::Verdict(v) => {
+            let mut choices = List::with_capacity(v.choices().len());
+            for choice in v.into_parts().choices.into_boxed() {
+                let v = choice.into_parts();
+                let mut fields = List::with_capacity(v.fields.len());
+                for field in v.fields.into_boxed() {
+                    let v = field.into_parts();
+                    fields.push(p::FieldRule { name: v.name, max: v.max }).expect("same capacity");
+                }
+                choices
+                    .push(p::Verdict {
+                        code: v.code,
+                        words: v.words,
+                        followups: v.followups,
+                        fields: fields.into_boxed(),
+                    })
+                    .expect("same capacity");
+            }
+            p::Contract::Verdict { choices: choices.into_boxed() }
+        }
+    }
+}

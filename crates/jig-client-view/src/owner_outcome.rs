@@ -32,6 +32,7 @@ pub fn required(words: &Words) -> Option<OutcomeFragment> {
 }
 fn header(value: &OwnerOutcome) -> P {
     match value {
+        OwnerOutcome::Created { .. } => P::Created,
         OwnerOutcome::Compound { .. } => P::Compound,
         OwnerOutcome::Closing { .. } => P::Closing,
         OwnerOutcome::MarkedSeen { .. } => P::MarkedSeen,
@@ -115,6 +116,7 @@ fn escalation(
 }
 fn details(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
     match value {
+        OwnerOutcome::Created { first, last, given } => created(b, *first, *last, *given, words),
         OwnerOutcome::Closing { chat, cancelled, kept } => {
             number(b, words, P::Chat, *chat);
             number(b, words, P::CancelledCount, u64::from(*cancelled));
@@ -178,4 +180,13 @@ pub fn render(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
     b.close();
     details(b, value, words);
     b.close();
+}
+
+fn created(b: &mut Builder, first: u64, last: u64, given: Option<jig_client::contract::CreatedGiven>, words: &Words) {
+    number(b, words, P::FirstTask, first);
+    number(b, words, P::LastTask, last);
+    if let Some(given) = given {
+        number(b, words, P::GivenTask, given.task);
+        number(b, words, P::GivenAmount, given.amount);
+    }
 }

@@ -100,7 +100,8 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
                     4,
                     value.revision().value(),
                 )),
-                w::Ask::StartChat(_)
+                w::Ask::Create(_)
+                | w::Ask::StartChat(_)
                 | w::Ask::Take(_)
                 | w::Ask::HandBack(_)
                 | w::Ask::Stop(_)

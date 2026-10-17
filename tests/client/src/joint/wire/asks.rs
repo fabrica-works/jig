@@ -2,6 +2,7 @@
 //! Whole supplied fields preserve independent revisions and optional edits.
 use super::request_arguments;
 mod compound;
+mod create;
 mod policy;
 use jig_client_domain::contract as client;
 use jig_domain_people as people;
@@ -24,6 +25,7 @@ pub enum Invalid {
 )]
 pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
     Ok(match value {
+        client::Ask::Create { project, tasks } => create::ask(*project, tasks),
         client::Ask::Compound { project, operations } => compound::ask(*project, operations)?,
         client::Ask::StartChat { project, words } => {
             people::Ask::StartChat { project: *project, words: Box::from(words.bytes()) }

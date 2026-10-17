@@ -86,6 +86,9 @@ impl<A: crate::Application> Engine<A> {
         ask: &Ask,
         wall: Wall,
     ) -> core::result::Result<(Answer, Vec<crate::Change>), Invalid> {
+        if let Ask::Create { .. } = ask {
+            return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
+        }
         if let Ask::Compound { project, operations } = ask
             && compound_target(*project, operations).is_none()
         {
@@ -264,6 +267,7 @@ impl<A: crate::Application> Engine<A> {
                 self.truth.notes.get(note).map(|note| &note.acts)
             }
             Ask::StartChat { .. }
+            | Ask::Create { .. }
             | Ask::Compound { .. }
             | Ask::Message { .. }
             | Ask::Answer { .. }
@@ -325,6 +329,7 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::ChangePolicy { .. }
                 | Ask::SetRoles { .. }
                 | Ask::MakeService { .. }
+                | Ask::Create { .. }
                 | Ask::SetPool { .. } => Admission::Refused(Refusal::NotOffered),
             },
             Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) => offer.clone(),
@@ -384,6 +389,7 @@ impl<A: crate::Application> Engine<A> {
             | Ask::Decide { on: DecideOn::Escalation { decision, .. }, .. } => Some(decision.clone()),
             Ask::Release { again, .. } => Some(Decision::Released { again: *again }),
             Ask::StartChat { .. }
+            | Ask::Create { .. }
             | Ask::Compound { .. }
             | Ask::Message { .. }
             | Ask::Answer { .. }
@@ -589,7 +595,7 @@ fn target(ask: &Ask) -> Target {
         Ask::Compound { project, operations } => {
             compound_target(*project, operations).unwrap_or((Some(*project), None, ActKind::Write, None))
         }
-        Ask::StartChat { project, .. } => (Some(*project), None, ActKind::Write, None),
+        Ask::Create { project, .. } | Ask::StartChat { project, .. } => (Some(*project), None, ActKind::Write, None),
         Ask::Message { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Write, None),
         Ask::Answer { project, on: AnswerOn::Question { task, message, .. }, .. } => {
             (Some(*project), Some(ObjectKey::Question { task: *task, message: *message }), ActKind::Answer, None)

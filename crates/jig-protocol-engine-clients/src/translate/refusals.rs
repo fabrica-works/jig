@@ -40,11 +40,23 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
             w::Refusal::Ended(w::RefusalEnded::new(limits, w::RefusalEndedParts { how: ending(how, limits)? })?)
         }
         p::Refusal::Taken { by } => w::Refusal::Taken(w::RefusalTaken::new(limits, w::RefusalTakenParts { by })?),
-        p::Refusal::NotWellFormed { .. } => return Err(super::problem(skein_codec::Reason::Tag)),
+        p::Refusal::NotWellFormed { at, why } => w::Refusal::Malformed(w::RefusalMalformed::new(
+            limits,
+            w::RefusalMalformedParts {
+                at,
+                why: match why {
+                    p::Malformed::AsAllowedTwice => w::Malformed::TwoAsAllowed,
+                    p::Malformed::Conversation => w::Malformed::ConversationNotAgent,
+                    p::Malformed::Cycle => w::Malformed::Cycle,
+                    p::Malformed::ProposedAsAllowed => return Err(super::problem(skein_codec::Reason::Tag)),
+                },
+            },
+        )?),
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
         p::Refusal::NoFurther => w::Refusal::NoFurther,
         p::Refusal::Unknown => w::Refusal::Unknown,
-        p::Refusal::NotOffered | p::Refusal::NoEscalationHolder => w::Refusal::NotOffered,
+        p::Refusal::NotOffered => w::Refusal::NotOffered,
+        p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,
     })
 }
@@ -113,7 +125,8 @@ pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
         p::LimitKind::Duplicate => w::AdmissionLimit::Duplicate,
         p::LimitKind::Empty => w::AdmissionLimit::Empty,
         p::LimitKind::Batch => w::AdmissionLimit::Batch,
-        p::LimitKind::ProjectLiveTasks | p::LimitKind::Goals => w::AdmissionLimit::ProjectLiveTasks,
+        p::LimitKind::ProjectLiveTasks => w::AdmissionLimit::ProjectLiveTasks,
+        p::LimitKind::Goals => w::AdmissionLimit::Goals,
         p::LimitKind::LiveTasks => w::AdmissionLimit::LiveTasks,
         p::LimitKind::Tree => w::AdmissionLimit::Tree,
         p::LimitKind::Depth => w::AdmissionLimit::Depth,

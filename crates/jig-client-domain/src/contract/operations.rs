@@ -16,4 +16,61 @@ pub enum Operation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Malformed {
     ProjectMismatch,
+    TwoAsAllowed,
+    ConversationNotAgent,
+    Cycle,
+}
+
+/// A dependency names a place in this batch or an existing task.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TaskRef {
+    Member(u32),
+    Task(u64),
+}
+/// The result a new task owes.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum NewContract {
+    Report { words: u32 },
+    Verdict { choices: skein_lib::List<super::VerdictChoice> },
+    Change { connector: u16, kind: u16, words: u32 },
+}
+/// A named authority budget, or an amount resolved by the engine.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum NewBudget {
+    Named,
+    AsAllowed { cap: Option<u64> },
+}
+/// A task's retention after it ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Retention {
+    Kept,
+    ForgottenOnceRead,
+}
+/// Independent flags carried to task admission.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct TaskFlags {
+    pub conversation: bool,
+    pub listed: bool,
+    pub retention: Retention,
+}
+/// A batch member, including grants named after it.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct NewTask {
+    pub executor: super::OwnerExecutor,
+    pub spec: super::Specification,
+    pub contract: NewContract,
+    pub authority: super::OwnerAuthority,
+    pub budget: NewBudget,
+    pub wake: super::OwnerWakePolicy,
+    pub dependencies: skein_lib::List<TaskRef>,
+    pub named: skein_lib::List<super::OwnerGrant>,
+    pub tracked: Option<u32>,
+    pub label: u32,
+    pub flags: TaskFlags,
+}
+/// The engine's resolved budget for one task of a created batch.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CreatedGiven {
+    pub task: u64,
+    pub amount: u64,
 }

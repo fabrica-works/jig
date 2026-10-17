@@ -259,6 +259,7 @@ dependencies = [
  "jig-client-view",
  "jig-client-world",
  "jig-core-world",
+ "jig-domain-authority",
  "jig-domain-core",
  "jig-domain-people",
  "jig-domain-tasks",

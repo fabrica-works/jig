@@ -86,26 +86,11 @@ fn owner_outcomes_keep_every_supplied_fact() {
     let limits = f::wire();
     for cases in [f::owner_outcomes().as_slice(), f::decision_outcomes().as_slice(), f::seen_outcomes().as_slice()] {
         for (reply, expected) in cases {
-            assert_eq!(translated(reply, &limits), *expected);
+            assert_eq!(f::translated(reply, &limits), *expected);
         }
     }
 }
-fn translated(reply: &p::Reply, limits: &w::Limits) -> w::Final {
-    let record = crate::translate::answers::answer(reply, limits).expect("translated answer");
-    match record {
-        w::KeyedAnswer::FinalAnswer(value) => {
-            assert_eq!(value.owner(), &w::Owner::Jig);
-            assert_eq!(value.version(), 8);
-            w::Final::decode(limits, &mut Reader::new(value.record())).expect("jig answer")
-        }
-        other @ (w::KeyedAnswer::NotServed(_)
-        | w::KeyedAnswer::Busy
-        | w::KeyedAnswer::NotReady
-        | w::KeyedAnswer::SignedOut) => {
-            panic!("expected final, got {other:?}")
-        }
-    }
-}
+
 #[test]
 fn a_service_result_contains_its_party_and_no_credential() {
     let answer =

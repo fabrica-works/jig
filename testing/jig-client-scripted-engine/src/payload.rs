@@ -160,6 +160,7 @@ fields!(Decider { kind, role });
 impl Payload for Ask {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Create { tasks, .. } => tasks.heap(bounds),
             Self::Compound { operations, .. } => operations.heap(bounds),
             Self::StartChat { project, words } => sum(&[project.heap(bounds), words.heap(bounds)]),
             Self::Message { project, task, words } => {
@@ -1071,6 +1072,7 @@ impl Payload for Refusal {
             | Self::NotWaiting
             | Self::NoFurther
             | Self::Unknown
+            | Self::NoEscalationHolder
             | Self::NotOffered
             | Self::KeyConflict => Some(0),
         }
@@ -1192,7 +1194,8 @@ fn sum(values: &[Option<u64>]) -> Option<u64> {
 impl Payload for AdmissionLimit {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Operations
+            Self::Goals
+            | Self::Operations
             | Self::Grace
             | Self::Words
             | Self::Identity

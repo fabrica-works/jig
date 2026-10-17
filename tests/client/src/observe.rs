@@ -84,7 +84,8 @@ pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> 
         Ask::Decide { on: DecideOn::Proposal { proposal, .. }, .. } => {
             (Some(key(ObjectKey::Proposal(*proposal))), None, None)
         }
-        Ask::StartChat { .. }
+        Ask::Create { .. }
+        | Ask::StartChat { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
         | Ask::Stop { .. }

@@ -38,6 +38,7 @@ pub fn store_asks() -> List<c::Ask> {
     let revision = read_value_revision();
     list([
         start_chat(),
+        create_ask(),
         compound_ask(revision),
         c::Ask::Message { project: 7, task: u64::MAX, words: store_text() },
         c::Ask::Answer {

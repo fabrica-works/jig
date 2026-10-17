@@ -210,7 +210,7 @@ pub(crate) fn wire_owner_grant(value: &c::OwnerGrant, limits: &w::Limits) -> Res
     )
 }
 
-fn wire_owner_grant_piece(rows: &List<w::OwnerGrant>, limits: &w::Limits) -> Result<Box<[u8]>, w::Problem> {
+pub(super) fn wire_owner_grant_piece(rows: &List<w::OwnerGrant>, limits: &w::Limits) -> Result<Box<[u8]>, w::Problem> {
     let mut length = 0_u32;
     for row in rows {
         length = length.checked_add(row.measure()).ok_or(too_large())?;
@@ -579,6 +579,7 @@ pub(crate) fn wire_holding(value: &c::Holding, limits: &w::Limits) -> Result<w::
 #[expect(clippy::too_many_lines, reason = "one exhaustive field translation arm per client ask")]
 pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
     Ok(match value {
+        c::Ask::Create { project, tasks } => super::operations::create(*project, tasks, limits)?,
         c::Ask::Compound { project, operations } => super::compound::encode(*project, operations, limits)?,
         c::Ask::StartChat { project, words } => w::Ask::StartChat(w::StartChat::new(
             limits,

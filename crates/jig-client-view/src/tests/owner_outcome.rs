@@ -9,7 +9,7 @@ use jig_client::contract::{
 use skein_lib::{Wall, bytes::copy_of};
 
 fn phrase_limits() -> PhraseLimits {
-    PhraseLimits { languages: 2, phrases: 50, holes: 1, segments: 200, text_bytes: 8192, hole_bytes: 0 }
+    PhraseLimits { languages: 2, phrases: 55, holes: 1, segments: 200, text_bytes: 8192, hole_bytes: 0 }
 }
 fn words() -> Words {
     Words {
@@ -72,17 +72,10 @@ fn expect_lines(tree: &Tree, lines: &[&[u8]]) {
     }
     assert_eq!(text_nodes, lines.len());
 }
-fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 26] {
+fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 27] {
     [
-        (
-            OwnerOutcome::Closing { chat: u64::MAX, cancelled: u32::MAX, kept: u32::MAX },
-            &[
-                b"Chat closed",
-                b"Chat: 18446744073709551615",
-                b"Cancelled delegates: 4294967295",
-                b"Kept delegates: 4294967295",
-            ],
-        ),
+        created_case(),
+        closing_case(),
         (
             OwnerOutcome::MarkedSeen { seen: SeenThrough::Results { through: u64::MAX } },
             &[b"Read position marked seen", b"Results seen through: 18446744073709551615"],
@@ -435,4 +428,33 @@ fn durable_answer_rendering_keeps_every_owner_fact_within_the_existing_notice_en
     // incoming rows; the owner fragment needs eight, including its region.
     let client = crate::Limits { rows: 0, notices: 1, ..super::cards::CLIENT };
     assert!(crate::notices_nodes(&client).unwrap() >= required.nodes + 4);
+}
+
+fn created_case() -> (OwnerOutcome, &'static [&'static [u8]]) {
+    (
+        OwnerOutcome::Created {
+            first: 1,
+            last: u64::MAX,
+            given: Some(jig_client::contract::CreatedGiven { task: 2, amount: u64::MAX }),
+        },
+        &[
+            b"Tasks created",
+            b"First task: 1",
+            b"Last task: 18446744073709551615",
+            b"Budget given to task: 2",
+            b"Amount given: 18446744073709551615",
+        ],
+    )
+}
+
+fn closing_case() -> (OwnerOutcome, &'static [&'static [u8]]) {
+    (
+        OwnerOutcome::Closing { chat: u64::MAX, cancelled: u32::MAX, kept: u32::MAX },
+        &[
+            b"Chat closed",
+            b"Chat: 18446744073709551615",
+            b"Cancelled delegates: 4294967295",
+            b"Kept delegates: 4294967295",
+        ],
+    )
 }

@@ -24,7 +24,8 @@ pub(crate) fn words(ask: &Ask, task: u64) -> Option<&Text> {
             }
             None
         }
-        Ask::StartChat { .. }
+        Ask::Create { .. }
+        | Ask::StartChat { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }

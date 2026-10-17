@@ -33,6 +33,8 @@ pub enum OwnerEscalationChoice {
 /// Facts returned by a committed jig request, including a historical winner.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerOutcome {
+    /// Consecutive task numbers and any resolved `AsAllowed` budget.
+    Created { first: u64, last: u64, given: Option<super::CreatedGiven> },
     /// Operations committed together, taking consecutive message numbers.
     Compound { project: u32, operations: u32, first_message: u64 },
     /// A chat closed with the supplied counts of cancelled and kept delegates.

@@ -305,6 +305,20 @@ pub fn language() -> Language {
             JigPhrase::ResultPart => Box::new([Segment::Text(copy_of(b"Connector result"))]),
             JigPhrase::HoldPart => Box::new([Segment::Text(copy_of(b"Connector hold"))]),
 
+            JigPhrase::EngineLimitGoals => Box::new([Segment::Text(copy_of(b"Engine admission limit: goals"))]),
+            JigPhrase::NoEscalationHolder => Box::new([Segment::Text(copy_of(b"No one to escalate to"))]),
+            JigPhrase::MalformedTwoAsAllowed => Box::new([
+                Segment::Text(copy_of(b"Two AsAllowed budgets at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::MalformedConversation => Box::new([
+                Segment::Text(copy_of(b"Conversation task is not an agent at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
+            JigPhrase::MalformedCycle => Box::new([
+                Segment::Text(copy_of(b"Dependency cycle at ")),
+                Segment::Hole { index: 0, kind: HoleKind::Number },
+            ]),
             JigPhrase::EngineLimitOperations => {
                 Box::new([Segment::Text(copy_of(b"Engine admission limit: operations"))])
             }

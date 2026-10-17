@@ -41,6 +41,7 @@ pub fn recovery(object: &Object) -> Recovery {
             | Refusal::Ended { .. }
             | Refusal::Unknown
             | Refusal::NotOffered
+            | Refusal::NoEscalationHolder
             | Refusal::KeyConflict => {}
         },
         Card::Open | Card::NotSent { .. } | Card::Deciding { .. } | Card::Leaving { .. } => {}

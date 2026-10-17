@@ -1,14 +1,23 @@
 //! Durable engine categories and complete refusal facts; client/domain/contract.md, 4.
 use super::Words;
 use crate::phrases::jig::JigPhrase;
-use jig_client::contract::{AdmissionLimit, CurrentHold, DisposalIssue, HeldRole, Limit, Moved, Refusal};
+use jig_client::contract::{AdmissionLimit, CurrentHold, DisposalIssue, HeldRole, Limit, Malformed, Moved, Refusal};
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 impl Words {
     /// Say the supplied refusal, never deriving permission or numerical limits.
     pub fn refusal(&self, b: &mut Builder, refusal: &Refusal, text_limit: u32) {
         match refusal {
-            Refusal::Malformed { at, .. } => self.text(b, JigPhrase::MalformedProject, &[Hole::Number(u64::from(*at))]),
+            Refusal::Malformed { at, why } => self.text(
+                b,
+                match why {
+                    Malformed::ProjectMismatch => JigPhrase::MalformedProject,
+                    Malformed::TwoAsAllowed => JigPhrase::MalformedTwoAsAllowed,
+                    Malformed::ConversationNotAgent => JigPhrase::MalformedConversation,
+                    Malformed::Cycle => JigPhrase::MalformedCycle,
+                },
+                &[Hole::Number(u64::from(*at))],
+            ),
             Refusal::Role { held } => {
                 self.text(b, JigPhrase::RoleNotAllowed, &[]);
                 self.held_role(b, *held);
@@ -55,6 +64,7 @@ impl Words {
             }
             Refusal::Ended { how } => self.ending(b, how),
             Refusal::Unknown => self.text(b, JigPhrase::NoObject, &[]),
+            Refusal::NoEscalationHolder => self.text(b, JigPhrase::NoEscalationHolder, &[]),
             Refusal::NotOffered => self.text(b, JigPhrase::NotOffered, &[]),
             Refusal::KeyConflict => self.text(b, JigPhrase::KeyConflict, &[]),
         }
@@ -92,6 +102,7 @@ impl Words {
     }
     fn engine_limit(&self, b: &mut Builder, which: AdmissionLimit) {
         let phrase = match which {
+            AdmissionLimit::Goals => JigPhrase::EngineLimitGoals,
             AdmissionLimit::Operations => JigPhrase::EngineLimitOperations,
             AdmissionLimit::Grace => JigPhrase::EngineLimitGrace,
             AdmissionLimit::Words => JigPhrase::EngineLimitWords,

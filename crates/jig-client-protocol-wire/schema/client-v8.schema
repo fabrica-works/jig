@@ -298,7 +298,22 @@ record MakeService { project: u32 name: text 65536 role: HeldRole }
 record SetPool { project: u32 party: u64 budget: u64 }
 enum Operation { message: Message, amend: boxed Amend, cancel: Cancel, release: Release, stop: Stop, move_task: Move }
 record Compound { project: u32 operations: bytes 1048576 }
-enum Ask { start_chat: StartChat, message: Message, answer: Answer, take: Take, hand_back: HandBack, decide: Decide, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, close: Close, move_task: Move, set_goal: SetGoal, prioritise: Prioritise, seen: Seen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool, compound: Compound }
+record FieldRule { name: bytes 65536 max: u32 }
+record VerdictChoice { code: u32 words: u32 followups: u32 fields: list 32 FieldRule }
+record TaskRefMember { value: u32 }
+record TaskRefTask { value: u64 }
+enum TaskRef { member: TaskRefMember, task: TaskRefTask }
+record ContractReport { words: u32 }
+record ContractVerdict { choices: list 32 VerdictChoice }
+record ContractChange { connector: u16 kind: u16 words: u32 }
+enum NewContract { report: ContractReport, verdict: ContractVerdict, change: ContractChange }
+record BudgetAsAllowed { cap: option u64 }
+enum NewBudget { named, as_allowed: BudgetAsAllowed }
+enum Retention { kept, forgotten_once_read }
+record TaskFlags { conversation: bool listed: bool retention: Retention }
+record NewTask { executor: OwnerExecutor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget wake: OwnerWakePolicy dependencies: list 32 TaskRef named: bytes 16777216 tracked: option u32 label: u32 flags: TaskFlags }
+record Create { project: u32 tasks: bytes 1048576 }
+enum Ask { start_chat: StartChat, message: Message, answer: Answer, take: Take, hand_back: HandBack, decide: Decide, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, close: Close, move_task: Move, set_goal: SetGoal, prioritise: Prioritise, seen: Seen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool, compound: Compound, create: Create }
 enum OwnerProposalChoice { accepted, rejected, passed, withdrawn, stale }
 enum OwnerEscalationChoice { released, rejected, passed }
 record OwnerOutcomeClosing { chat: u64 cancelled: u32 kept: u32 }
@@ -327,7 +342,9 @@ record OwnerOutcomePoolSet { project: u32 person: u64 }
 record OwnerOutcomeEscalationDecided { task: u64 revision: Revision by: u64 at: u64 choice: OwnerEscalationChoice }
 record OwnerOutcomeStarted { task: u64 }
 record OwnerOutcomeCompound { project: u32 operations: u32 first_message: u64 }
-enum OwnerOutcome { closing: OwnerOutcomeClosing, marked_seen: OwnerOutcomeMarkedSeen, note_edited: OwnerOutcomeNoteEdited, service_made: OwnerOutcomeServiceMade, adopted: OwnerOutcomeAdopted, goal_started: OwnerOutcomeGoalStarted, goal_proposed: OwnerOutcomeGoalProposed, stopped: OwnerOutcomeStopped, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, person_taken: OwnerOutcomePersonTaken, person_handed_back: OwnerOutcomePersonHandedBack, person_answered: OwnerOutcomePersonAnswered, moved: OwnerOutcomeMoved, proposal_decided: OwnerOutcomeProposalDecided, said: OwnerOutcomeSaid, question_answered: OwnerOutcomeQuestionAnswered, prioritised: OwnerOutcomePrioritised, amended: OwnerOutcomeAmended, amend_proposed: OwnerOutcomeAmendProposed, roles_set: OwnerOutcomeRolesSet, policy_changed: OwnerOutcomePolicyChanged, pool_set: OwnerOutcomePoolSet, escalation_decided: OwnerOutcomeEscalationDecided, started: OwnerOutcomeStarted, compound: OwnerOutcomeCompound }
+record CreatedGiven { task: u64 amount: u64 }
+record OwnerOutcomeCreated { first: u64 last: u64 given: option CreatedGiven }
+enum OwnerOutcome { closing: OwnerOutcomeClosing, marked_seen: OwnerOutcomeMarkedSeen, note_edited: OwnerOutcomeNoteEdited, service_made: OwnerOutcomeServiceMade, adopted: OwnerOutcomeAdopted, goal_started: OwnerOutcomeGoalStarted, goal_proposed: OwnerOutcomeGoalProposed, stopped: OwnerOutcomeStopped, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, person_taken: OwnerOutcomePersonTaken, person_handed_back: OwnerOutcomePersonHandedBack, person_answered: OwnerOutcomePersonAnswered, moved: OwnerOutcomeMoved, proposal_decided: OwnerOutcomeProposalDecided, said: OwnerOutcomeSaid, question_answered: OwnerOutcomeQuestionAnswered, prioritised: OwnerOutcomePrioritised, amended: OwnerOutcomeAmended, amend_proposed: OwnerOutcomeAmendProposed, roles_set: OwnerOutcomeRolesSet, policy_changed: OwnerOutcomePolicyChanged, pool_set: OwnerOutcomePoolSet, escalation_decided: OwnerOutcomeEscalationDecided, started: OwnerOutcomeStarted, compound: OwnerOutcomeCompound, created: OwnerOutcomeCreated }
 record MadeChat { task: u64 }
 record MadeGoal { task: u64 }
 record MadeTasks { tasks: list 32 u64 }
@@ -355,7 +372,7 @@ record LackingDepth { needed: option u32 allowed: u32 }
 record LackingDeadline { asked: option u64 latest: option u64 }
 record LackingTasks { needed: option u32 left: u32 }
 enum Lacking { approver, budget: LackingBudget, grant: LackingGrant, grant_kind: LackingGrantKind, funding, tool, scope, reference, resource_access, resource_unavailable, shape, again: LackingAgain, account, writer, required: LackingRequired, failed: LackingFailed, unguarded: LackingUnguarded, task_kind: LackingTaskKind, depth: LackingDepth, deadline: LackingDeadline, tasks: LackingTasks }
-enum AdmissionLimit { operations, grace, words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service }
+enum AdmissionLimit { goals, operations, grace, words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service }
 record LimitAdmission { which: AdmissionLimit }
 record LimitLiveTasks { project: u32 limit: u32 }
 record LimitInbox { task: u64 limit: u32 }
@@ -374,9 +391,9 @@ record RefusalAuthority { lacking: Lacking proposable: option bool }
 record RefusalLimit { which: Limit }
 record RefusalMoved { now: Revision what: Moved }
 record RefusalEnded { how: Ending }
-enum Malformed { project_mismatch }
+enum Malformed { project_mismatch, two_as_allowed, conversation_not_agent, cycle }
 record RefusalMalformed { at: u32 why: Malformed }
-enum Refusal { malformed: RefusalMalformed, role: RefusalRole, disposal: RefusalDisposal, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict }
+enum Refusal { malformed: RefusalMalformed, role: RefusalRole, disposal: RefusalDisposal, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder }
 record Done { outcome: Outcome }
 record Refused { refusal: Refusal at: option u32 }
 enum Final { done: Done, refused: Refused }
@@ -454,8 +471,6 @@ record RunBeginningFresh { tail_count: u32 }
 enum RunBeginning { resumed, fresh: RunBeginningFresh }
 record RunEndingFailed { class: FailureClass reason: text 65536 }
 enum RunEnding { parked, finished, cancelled, failed: RunEndingFailed }
-record FieldRule { name: bytes 65536 max: u32 }
-record VerdictChoice { code: u32 words: u32 followups: u32 fields: list 32 FieldRule }
 record TaskContractDocumentApproval { state: bytes 65536 part: OwnerPart }
 record TaskContractDocumentReport { words: u32 }
 record TaskContractDocumentVerdict { choices: bytes 16777216 cut: bool }

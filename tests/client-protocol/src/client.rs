@@ -230,10 +230,13 @@ impl Story {
         Self::bounded(seed, &limits)
     }
     fn bounded(seed: u64, limits: &jig_test_domain::Limits) -> Self {
+        Self::configured(seed, limits, jig_core_world::world::config(seed))
+    }
+    fn configured(seed: u64, limits: &jig_test_domain::Limits, config: jig_test_domain::Config) -> Self {
         let mut story = Self {
             front: Front::new(seed),
             second: None,
-            engine: Engine::bounded(seed, limits),
+            engine: Engine::configured(seed, limits, config),
             net: Net::new(seed),
             now: Time::ZERO,
             seen: Vec::new(),

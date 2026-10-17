@@ -1006,6 +1006,11 @@ pub enum JigPhrase {
     HeldPriorLifecycle,
     HeldPriorWaiting,
 
+    EngineLimitGoals,
+    NoEscalationHolder,
+    MalformedTwoAsAllowed,
+    MalformedConversation,
+    MalformedCycle,
     EngineLimitOperations,
     MalformedProject,
     EngineLimitGrace,
@@ -1640,6 +1645,11 @@ impl JigPhrase {
             Self::OutboxEntry => 508,
             Self::TakenByNumber => 509,
 
+            Self::EngineLimitGoals => 7413,
+            Self::NoEscalationHolder => 7414,
+            Self::MalformedTwoAsAllowed => 7415,
+            Self::MalformedConversation => 7416,
+            Self::MalformedCycle => 7417,
             Self::EngineLimitOperations => 7411,
             Self::MalformedProject => 7412,
             Self::EngineLimitGrace => 7410,
@@ -1811,6 +1821,8 @@ impl JigPhrase {
             | Self::PanelPart
             | Self::ResultPart
             | Self::HoldPart
+            | Self::EngineLimitGoals
+            | Self::NoEscalationHolder
             | Self::EngineLimitOperations
             | Self::EngineLimitGrace
             | Self::EngineLimitWords
@@ -2268,6 +2280,9 @@ impl JigPhrase {
             | Self::ByTask
             | Self::MadeChat
             | Self::MadeGoal
+            | Self::MalformedTwoAsAllowed
+            | Self::MalformedConversation
+            | Self::MalformedCycle
             | Self::MalformedProject
             | Self::MadeTask
             | Self::MadeService
@@ -2423,7 +2438,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 633] = [
+pub const ALL: [JigPhrase; 638] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2956,6 +2971,11 @@ pub const ALL: [JigPhrase; 633] = [
     JigPhrase::HoldPart,
     JigPhrase::OutboxEntry,
     JigPhrase::TakenByNumber,
+    JigPhrase::EngineLimitGoals,
+    JigPhrase::NoEscalationHolder,
+    JigPhrase::MalformedTwoAsAllowed,
+    JigPhrase::MalformedConversation,
+    JigPhrase::MalformedCycle,
     JigPhrase::EngineLimitOperations,
     JigPhrase::MalformedProject,
     JigPhrase::EngineLimitGrace,

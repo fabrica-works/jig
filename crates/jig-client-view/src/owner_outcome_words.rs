@@ -14,6 +14,11 @@ use skein_ui::phrases::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutcomePhrase {
     /// The operations committed saying.
+    Created,
+    FirstTask,
+    LastTask,
+    GivenTask,
+    GivenAmount,
     Compound,
     /// The number of committed operations.
     Operations,
@@ -114,7 +119,12 @@ pub enum OutcomePhrase {
     RepliesThrough,
 }
 /// Every outcome phrase in stable owner order.
-pub const ALL: [OutcomePhrase; 50] = [
+pub const ALL: [OutcomePhrase; 55] = [
+    OutcomePhrase::Created,
+    OutcomePhrase::FirstTask,
+    OutcomePhrase::LastTask,
+    OutcomePhrase::GivenTask,
+    OutcomePhrase::GivenAmount,
     OutcomePhrase::Compound,
     OutcomePhrase::Operations,
     OutcomePhrase::Closing,
@@ -171,6 +181,11 @@ impl OutcomePhrase {
     #[must_use]
     pub fn id(self) -> PhraseId {
         let number = match self {
+            Self::Created => 6452,
+            Self::FirstTask => 6453,
+            Self::LastTask => 6454,
+            Self::GivenTask => 6455,
+            Self::GivenAmount => 6456,
             Self::Compound => 6450,
             Self::Operations => 6451,
             Self::Closing => 6400,
@@ -226,7 +241,11 @@ impl OutcomePhrase {
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::Operations
+            Self::FirstTask
+            | Self::LastTask
+            | Self::GivenTask
+            | Self::GivenAmount
+            | Self::Operations
             | Self::Chat
             | Self::CancelledCount
             | Self::KeptCount
@@ -244,7 +263,8 @@ impl OutcomePhrase {
             | Self::ResultsThrough
             | Self::RepliesThrough => Some(HoleKind::Number),
             Self::At => Some(HoleKind::Wall),
-            Self::Compound
+            Self::Created
+            | Self::Compound
             | Self::Closing
             | Self::MarkedSeen
             | Self::NoteEdited
@@ -282,7 +302,7 @@ impl OutcomePhrase {
 /// Phrase contracts independent of the selected language's word order.
 #[must_use]
 pub fn shapes() -> Box<[PhraseShape]> {
-    let mut values = List::with_capacity(50);
+    let mut values = List::with_capacity(55);
     for phrase in ALL {
         let holes: Box<[HoleShape]> = match phrase.hole() {
             Some(kind) => Box::new([HoleShape { kind, bytes: 0 }]),
@@ -295,9 +315,14 @@ pub fn shapes() -> Box<[PhraseShape]> {
 /// Explicit English data for composition, never a rendering fallback.
 #[must_use]
 pub fn english() -> Language {
-    let mut values = List::with_capacity(50);
+    let mut values = List::with_capacity(55);
     for phrase in ALL {
         let text: &[u8] = match phrase {
+            OutcomePhrase::Created => b"Tasks created",
+            OutcomePhrase::FirstTask => b"First task: ",
+            OutcomePhrase::LastTask => b"Last task: ",
+            OutcomePhrase::GivenTask => b"Budget given to task: ",
+            OutcomePhrase::GivenAmount => b"Amount given: ",
             OutcomePhrase::Compound => b"Operations committed",
             OutcomePhrase::Operations => b"Operations: ",
             OutcomePhrase::Closing => b"Chat closed",

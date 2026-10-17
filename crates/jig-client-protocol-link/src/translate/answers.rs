@@ -45,8 +45,17 @@ pub(crate) fn owner_escalation_choice(value: &w::OwnerEscalationChoice, _limits:
     }
 }
 
+#[expect(clippy::manual_map, reason = "step code matches optional fields")]
 pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::OwnerOutcome {
     match value {
+        w::OwnerOutcome::Created(row) => c::OwnerOutcome::Created {
+            first: row.first(),
+            last: row.last(),
+            given: match row.given() {
+                Some(v) => Some(c::CreatedGiven { task: v.task(), amount: v.amount() }),
+                None => None,
+            },
+        },
         w::OwnerOutcome::Compound(row) => c::OwnerOutcome::Compound {
             project: row.project(),
             operations: row.operations(),
@@ -303,6 +312,7 @@ pub(crate) fn lacking(value: &w::Lacking, limits: &Limits) -> c::Lacking {
 
 pub(crate) fn admission_limit(value: &w::AdmissionLimit, _limits: &Limits) -> c::AdmissionLimit {
     match value {
+        w::AdmissionLimit::Goals => c::AdmissionLimit::Goals,
         w::AdmissionLimit::Operations => c::AdmissionLimit::Operations,
         w::AdmissionLimit::Grace => c::AdmissionLimit::Grace,
         w::AdmissionLimit::Words => c::AdmissionLimit::Words,
@@ -453,10 +463,14 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
         w::Refusal::Malformed(row) => c::Refusal::Malformed {
             at: row.at(),
             why: match row.why() {
+                w::Malformed::TwoAsAllowed => c::Malformed::TwoAsAllowed,
+                w::Malformed::ConversationNotAgent => c::Malformed::ConversationNotAgent,
+                w::Malformed::Cycle => c::Malformed::Cycle,
                 w::Malformed::ProjectMismatch => c::Malformed::ProjectMismatch,
             },
         },
         w::Refusal::Unknown => c::Refusal::Unknown,
+        w::Refusal::NoEscalationHolder => c::Refusal::NoEscalationHolder,
         w::Refusal::NotOffered => c::Refusal::NotOffered,
         w::Refusal::KeyConflict => c::Refusal::KeyConflict,
     })

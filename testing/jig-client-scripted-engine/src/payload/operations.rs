@@ -37,3 +37,41 @@ impl Payload for jig_client_domain::contract::Operation {
         }
     }
 }
+
+impl Payload for jig_client_domain::contract::NewTask {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        let Self {
+            executor: _,
+            spec,
+            contract,
+            authority,
+            budget: _,
+            wake: _,
+            dependencies,
+            named,
+            tracked: _,
+            label: _,
+            flags: _,
+        } = self;
+        super::sum(&[
+            spec.heap(bounds),
+            contract.heap(bounds),
+            authority.heap(bounds),
+            dependencies.heap(bounds),
+            named.heap(bounds),
+        ])
+    }
+}
+impl Payload for jig_client_domain::contract::TaskRef {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        Some(0)
+    }
+}
+impl Payload for jig_client_domain::contract::NewContract {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::Report { .. } | Self::Change { .. } => Some(0),
+            Self::Verdict { choices } => choices.heap(bounds),
+        }
+    }
+}

@@ -1,3 +1,6 @@
+#[path = "fixtures/create.rs"]
+mod create;
+pub use create::*;
 #[path = "fixtures/operations.rs"]
 mod operations;
 pub use operations::*;
@@ -53,21 +56,6 @@ pub fn env() -> Env<Limits> {
             stall: Duration::from_secs(30),
         },
     }
-}
-pub fn encode_ask(ask: &w::Ask) -> Box<[u8]> {
-    let mut out = Writer::new(usize::try_from(ask.measure()).expect("short ask"));
-    ask.encode(&mut out).expect("bounded ask");
-    out.finish()
-}
-pub fn keyed(owner: w::Owner, version: u32, request: Box<[u8]>) -> Box<[u8]> {
-    let request = match owner {
-        w::Owner::Jig => request,
-        w::Owner::Family(_) => family_request(request),
-    };
-    let value = w::Keyed::new(&wire(), w::KeyedParts { key: [5; 16], owner, version, request }).expect("keyed");
-    let mut out = Writer::new(usize::try_from(value.measure()).expect("short keyed record"));
-    value.encode(&mut out).expect("bounded keyed");
-    out.finish()
 }
 pub fn start(limits: &w::Limits) -> w::Ask {
     w::Ask::StartChat(
@@ -734,20 +722,7 @@ impl Exchange {
         w::KeyedAnswer::decode(&self.env.limits.wire, &mut skein_lib::Reader::new(bytes)).expect("wire answer")
     }
     pub fn final_answer(&self, owner: Token) -> w::Final {
-        match self.answer(owner) {
-            w::KeyedAnswer::FinalAnswer(answer) => {
-                assert_eq!(answer.owner(), &w::Owner::Jig);
-                assert_eq!(answer.version(), 8);
-                w::Final::decode(&self.env.limits.wire, &mut skein_lib::Reader::new(answer.record()))
-                    .expect("jig final")
-            }
-            other @ (w::KeyedAnswer::NotServed(_)
-            | w::KeyedAnswer::Busy
-            | w::KeyedAnswer::NotReady
-            | w::KeyedAnswer::SignedOut) => {
-                panic!("expected final, got {other:?}")
-            }
-        }
+        final_record(self.answer(owner), &self.env.limits.wire)
     }
     pub fn application(&mut self) -> (Token, ReplyTo) {
         let family =
@@ -794,3 +769,23 @@ pub use watches::*;
 #[path = "fixtures/closing.rs"]
 mod closing;
 pub use closing::*;
+
+pub fn translated(reply: &people::Reply, limits: &w::Limits) -> w::Final {
+    let record = crate::translate::answers::answer(reply, limits).expect("translated answer");
+    final_record(record, limits)
+}
+pub fn final_record(record: w::KeyedAnswer, limits: &w::Limits) -> w::Final {
+    match record {
+        w::KeyedAnswer::FinalAnswer(value) => {
+            assert_eq!(value.owner(), &w::Owner::Jig);
+            assert_eq!(value.version(), 8);
+            w::Final::decode(limits, &mut skein_lib::Reader::new(value.record())).expect("jig answer")
+        }
+        other @ (w::KeyedAnswer::NotServed(_)
+        | w::KeyedAnswer::Busy
+        | w::KeyedAnswer::NotReady
+        | w::KeyedAnswer::SignedOut) => {
+            panic!("expected final, got {other:?}")
+        }
+    }
+}

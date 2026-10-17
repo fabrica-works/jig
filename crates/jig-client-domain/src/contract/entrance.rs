@@ -71,7 +71,8 @@ fn fixed(refusal: &Refusal) -> bool {
         | Refusal::Limit { .. }
         | Refusal::Unknown
         | Refusal::NotOffered
-        | Refusal::KeyConflict => true,
+        | Refusal::KeyConflict
+        | Refusal::NoEscalationHolder => true,
     }
 }
 fn fixed_decision(decision: Option<&Decision>) -> bool {

@@ -23,7 +23,7 @@ impl Payload for OwnerEscalationChoice {
 impl Payload for OwnerOutcome {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Compound { .. } => Some(0),
+            Self::Created { .. } | Self::Compound { .. } => Some(0),
             Self::Closing { chat, cancelled, kept } => {
                 sum(&[chat.heap(bounds), cancelled.heap(bounds), kept.heap(bounds)])
             }

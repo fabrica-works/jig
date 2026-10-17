@@ -1,5 +1,6 @@
 //! General operation targets and project template overrides on the wire.
 use super::asks;
+use alloc::boxed::Box;
 use jig_client_domain::contract as c;
 use jig_client_protocol_wire::v8 as w;
 use skein_lib::{List, bytes};
@@ -152,5 +153,185 @@ pub(super) fn restore_tracking(value: &w::Tracking) -> c::Tracking {
     match value {
         w::Tracking::Tracked(v) => c::Tracking::Tracked { priority: v.priority() },
         w::Tracking::Untracked => c::Tracking::Untracked,
+    }
+}
+
+pub(super) fn create(project: u32, tasks: &List<c::NewTask>, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
+    let mut records = List::with_capacity(tasks.len());
+    let mut size = 0_u32;
+    for task in tasks {
+        let record = new_task(task, limits)?;
+        size = size.checked_add(record.measure()).ok_or(super::too_large())?.checked_add(4).ok_or(super::too_large())?;
+        if size > limits.create_tasks {
+            return Err(super::too_large());
+        }
+        records.push(record).expect("same capacity");
+    }
+    let mut out = skein_lib::Writer::new(usize::try_from(size).expect("wire size fits"));
+    for record in records.into_boxed() {
+        out.put(&record.measure().to_be_bytes()).expect("measured piece");
+        record.encode(&mut out).expect("measured task");
+    }
+    Ok(w::Ask::Create(w::Create::new(limits, w::CreateParts { project, tasks: out.finish() })?))
+}
+fn new_task(v: &c::NewTask, limits: &w::Limits) -> Result<w::NewTask, w::Problem> {
+    let mut dependencies = List::with_capacity(v.dependencies.len());
+    for item in &v.dependencies {
+        dependencies
+            .push(match item {
+                c::TaskRef::Member(value) => {
+                    w::TaskRef::Member(w::TaskRefMember::new(limits, w::TaskRefMemberParts { value: *value })?)
+                }
+                c::TaskRef::Task(value) => {
+                    w::TaskRef::Task(w::TaskRefTask::new(limits, w::TaskRefTaskParts { value: *value })?)
+                }
+            })
+            .expect("same capacity");
+    }
+    let mut named = List::with_capacity(v.named.len());
+    for grant in &v.named {
+        named.push(asks::wire_owner_grant(grant, limits)?).expect("same capacity");
+    }
+    let executor = match v.executor {
+        c::OwnerExecutor::Agent { charter } => {
+            w::OwnerExecutor::Agent(w::OwnerExecutorAgent::new(limits, w::OwnerExecutorAgentParts { charter })?)
+        }
+        c::OwnerExecutor::Procedure { connector, code } => w::OwnerExecutor::Procedure(w::OwnerExecutorProcedure::new(
+            limits,
+            w::OwnerExecutorProcedureParts { connector, code },
+        )?),
+        c::OwnerExecutor::Person(address) => w::OwnerExecutor::Person(w::OwnerExecutorPerson::new(
+            limits,
+            w::OwnerExecutorPersonParts { value: asks::wire_person_address(&address, limits)? },
+        )?),
+    };
+    w::NewTask::new(
+        limits,
+        w::NewTaskParts {
+            executor,
+            spec: asks::wire_specification(&v.spec, limits)?,
+            contract: new_contract(&v.contract, limits)?,
+            authority: asks::wire_owner_authority(&v.authority, limits)?,
+            budget: match v.budget {
+                c::NewBudget::Named => w::NewBudget::Named,
+                c::NewBudget::AsAllowed { cap } => {
+                    w::NewBudget::AsAllowed(w::BudgetAsAllowed::new(limits, w::BudgetAsAllowedParts { cap })?)
+                }
+            },
+            wake: asks::wire_owner_wake_policy(&v.wake, limits)?,
+            dependencies,
+            named: asks::wire_owner_grant_piece(&named, limits)?,
+            tracked: v.tracked,
+            label: v.label,
+            flags: w::TaskFlags::new(
+                limits,
+                w::TaskFlagsParts {
+                    conversation: v.flags.conversation,
+                    listed: v.flags.listed,
+                    retention: match v.flags.retention {
+                        c::Retention::Kept => w::Retention::Kept,
+                        c::Retention::ForgottenOnceRead => w::Retention::ForgottenOnceRead,
+                    },
+                },
+            )?,
+        },
+    )
+}
+fn new_contract(value: &c::NewContract, limits: &w::Limits) -> Result<w::NewContract, w::Problem> {
+    Ok(match value {
+        c::NewContract::Report { words } => {
+            w::NewContract::Report(w::ContractReport::new(limits, w::ContractReportParts { words: *words })?)
+        }
+        c::NewContract::Change { connector, kind, words } => w::NewContract::Change(w::ContractChange::new(
+            limits,
+            w::ContractChangeParts { connector: *connector, kind: *kind, words: *words },
+        )?),
+        c::NewContract::Verdict { choices } => {
+            let mut records = List::with_capacity(choices.len());
+            for v in choices {
+                let mut fields = List::with_capacity(v.fields.len());
+                for field in &v.fields {
+                    fields
+                        .push(w::FieldRule::new(
+                            limits,
+                            w::FieldRuleParts { name: bytes::copy_of(&field.name), max: field.max },
+                        )?)
+                        .expect("same capacity");
+                }
+                records
+                    .push(w::VerdictChoice::new(
+                        limits,
+                        w::VerdictChoiceParts { code: v.code, words: v.words, followups: v.followups, fields },
+                    )?)
+                    .expect("same capacity");
+            }
+            w::NewContract::Verdict(w::ContractVerdict::new(limits, w::ContractVerdictParts { choices: records })?)
+        }
+    })
+}
+pub(super) fn restore_create(value: &w::Create, limits: &crate::Limits) -> Result<c::Ask, w::Problem> {
+    let mut reader = skein_lib::Reader::new(value.tasks());
+    let mut tasks = List::with_capacity(limits.client.rows);
+    while let Some(bytes) = create_piece(&mut reader)? {
+        if tasks.len() == tasks.capacity() {
+            return Err(super::too_large());
+        }
+        let v = w::NewTask::decode(&limits.wire, &mut skein_lib::Reader::new(&bytes))?;
+        tasks.push(restore_task(&v, limits)?).expect("checked capacity");
+    }
+    Ok(c::Ask::Create { project: value.project(), tasks })
+}
+fn restore_task(v: &w::NewTask, limits: &crate::Limits) -> Result<c::NewTask, w::Problem> {
+    let mut dependencies = List::with_capacity(v.dependencies().len());
+    for item in v.dependencies() {
+        dependencies
+            .push(match item {
+                w::TaskRef::Member(v) => c::TaskRef::Member(v.value()),
+                w::TaskRef::Task(v) => c::TaskRef::Task(v.value()),
+            })
+            .expect("same capacity");
+    }
+    let contract = match v.contract() {
+        w::NewContract::Report(v) => c::NewContract::Report { words: v.words() },
+        w::NewContract::Change(v) => {
+            c::NewContract::Change { connector: v.connector(), kind: v.kind(), words: v.words() }
+        }
+        w::NewContract::Verdict(v) => {
+            let mut choices = List::with_capacity(v.choices().len());
+            for choice in v.choices() {
+                choices.push(super::documents::verdict_choice_fields(choice, limits)?).expect("same capacity");
+            }
+            c::NewContract::Verdict { choices }
+        }
+    };
+    Ok(c::NewTask {
+        executor: super::facts::owner_executor(v.executor(), limits),
+        spec: super::pages::specification_fields(v.spec(), limits)?,
+        contract,
+        authority: super::documents::owner_authority_fields(v.authority(), limits)?,
+        budget: match v.budget() {
+            w::NewBudget::Named => c::NewBudget::Named,
+            w::NewBudget::AsAllowed(v) => c::NewBudget::AsAllowed { cap: *v.cap() },
+        },
+        wake: super::facts::owner_wake_policy(v.wake(), limits),
+        dependencies,
+        named: super::documents::owner_grant_piece(v.named(), limits, limits.client.rows)?,
+        tracked: *v.tracked(),
+        label: v.label(),
+        flags: c::TaskFlags {
+            conversation: v.flags().conversation(),
+            listed: v.flags().listed(),
+            retention: match v.flags().retention() {
+                w::Retention::Kept => c::Retention::Kept,
+                w::Retention::ForgottenOnceRead => c::Retention::ForgottenOnceRead,
+            },
+        },
+    })
+}
+
+fn create_piece(reader: &mut skein_lib::Reader<'_>) -> Result<Option<Box<[u8]>>, w::Problem> {
+    match skein_codec::piece::split(reader) {
+        Ok(value) => Ok(value),
+        Err(reason) => Err(super::piece_problem(reason)),
     }
 }

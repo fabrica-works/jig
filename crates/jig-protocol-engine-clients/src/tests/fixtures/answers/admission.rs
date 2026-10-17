@@ -41,7 +41,7 @@ pub fn admission_1() -> [(p::LimitKind, w::AdmissionLimit); 19] {
         (p::LimitKind::Resource, w::AdmissionLimit::Resource),
         (p::LimitKind::Service, w::AdmissionLimit::Service),
         (p::LimitKind::Grace, w::AdmissionLimit::Grace),
-        (p::LimitKind::Goals, w::AdmissionLimit::ProjectLiveTasks),
+        (p::LimitKind::Goals, w::AdmissionLimit::Goals),
     ]
 }
 pub fn admission_refusal(which: w::AdmissionLimit) -> w::Refusal {

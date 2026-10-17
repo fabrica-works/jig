@@ -377,3 +377,39 @@ fn a_compound_answer_names_the_durable_words_before_its_release() {
     let message = *first_message;
     assert!(story.run_until(|s| s.worker_started_with(task, message), PROOF_WAIT));
 }
+
+const CREATE: Key = Key { asker: Asker::JIG, number: 85 };
+#[test]
+fn a_party_creates_a_batch_whose_as_allowed_task_hears_what_it_was_given() {
+    let mut story = Story::live_batch(fixtures::SEED, true);
+    assert_eq!(story.client.link().party, Some(fixtures::FIRST_OWNER));
+    story.send(CREATE, Ask::Jig(Box::new(contract::Ask::Create { project: 1, tasks: fixtures::create_tasks() })));
+    assert!(story.run_until(|s| !s.answered(CREATE).is_empty(), PROOF_WAIT));
+    assert_eq!(
+        story.answered(CREATE),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::Created {
+                first: 1,
+                last: 2,
+                given: Some(contract::CreatedGiven { task: 1, amount: 20 })
+            }
+        ))))]
+    );
+    assert_eq!((story.task_budget(1), story.task_budget(2)), (Some(20), Some(10)));
+    assert!(story.run_until(|s| s.worker_budget(1).is_some(), PROOF_WAIT));
+    assert_eq!(story.worker_budget(1), Some(20));
+}
+#[test]
+fn a_root_task_with_no_one_to_escalate_to_is_refused_saying_so() {
+    let mut story = Story::live_batch(fixtures::SEED, false);
+    story.send(CREATE, Ask::Jig(Box::new(contract::Ask::Create { project: 1, tasks: fixtures::create_tasks() })));
+    assert!(story.run_until(|s| !s.answered(CREATE).is_empty(), PROOF_WAIT));
+    assert_eq!(
+        story.answered(CREATE),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Refused {
+            refusal: contract::Refusal::NoEscalationHolder,
+            at: None
+        }))]
+    );
+    assert_eq!((story.task_budget(1), story.task_budget(2)), (None, None));
+}

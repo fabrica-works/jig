@@ -67,6 +67,19 @@ fn problem() -> w::Problem {
 #[expect(clippy::too_many_lines, reason = "one total match names every people outcome")]
 fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::Problem> {
     Ok(match value {
+        p::Outcome::Created { first, last, given } => w::OwnerOutcome::Created(w::OwnerOutcomeCreated::new(
+            limits,
+            w::OwnerOutcomeCreatedParts {
+                first: *first,
+                last: *last,
+                given: match given {
+                    Some(v) => {
+                        Some(w::CreatedGiven::new(limits, w::CreatedGivenParts { task: v.task, amount: v.amount })?)
+                    }
+                    None => None,
+                },
+            },
+        )?),
         p::Outcome::Compound { project, operations, first_message } => {
             w::OwnerOutcome::Compound(w::OwnerOutcomeCompound::new(
                 limits,
@@ -192,7 +205,6 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
             )?)
         }
         p::Outcome::CompoundRefused { .. }
-        | p::Outcome::Created { .. }
         | p::Outcome::Proposed { .. }
         | p::Outcome::Withdrawn { .. }
         | p::Outcome::Applied { .. }

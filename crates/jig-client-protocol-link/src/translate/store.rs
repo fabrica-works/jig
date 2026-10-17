@@ -76,8 +76,9 @@ fn policy_edit(value: &w::PolicyEdit, limits: &Limits) -> Result<c::PolicyEdit, 
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 #[expect(clippy::too_many_lines, reason = "one exhaustive translation arm per kept client ask")]
-pub(super) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
+pub(crate) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
     Ok(match value {
+        w::Ask::Create(value) => super::operations::restore_create(&value, limits)?,
         w::Ask::Compound(value) => super::compound::restore(value, limits)?,
         w::Ask::StartChat(value) => c::Ask::StartChat { project: value.project(), words: text(value.words(), limits)? },
         w::Ask::Message(value) => {

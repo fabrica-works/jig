@@ -88,3 +88,19 @@ pub fn compound(project: u32, values: &[w::Operation]) -> w::Ask {
     }
     w::Ask::Compound(w::Compound::new(&wire(), w::CompoundParts { project, operations: bytes.finish() }).unwrap())
 }
+
+pub fn encode_ask(ask: &w::Ask) -> Box<[u8]> {
+    let mut out = Writer::new(usize::try_from(ask.measure()).expect("short ask"));
+    ask.encode(&mut out).expect("bounded ask");
+    out.finish()
+}
+pub fn keyed(owner: w::Owner, version: u32, request: Box<[u8]>) -> Box<[u8]> {
+    let request = match owner {
+        w::Owner::Jig => request,
+        w::Owner::Family(_) => family_request(request),
+    };
+    let value = w::Keyed::new(&wire(), w::KeyedParts { key: [5; 16], owner, version, request }).expect("keyed");
+    let mut out = Writer::new(usize::try_from(value.measure()).expect("short keyed record"));
+    value.encode(&mut out).expect("bounded keyed");
+    out.finish()
+}

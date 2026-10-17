@@ -8,6 +8,7 @@ use skein_lib::{List, Reader, Wall};
 #[expect(clippy::too_many_lines, reason = "one total match names every wire ask")]
 pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
     Ok(match record {
+        w::Ask::Create(value) => super::operations::create(value, limits)?,
         w::Ask::Compound(value) => super::operations::compound(value, limits)?,
         w::Ask::StartChat(value) => {
             let v = value.into_parts();
@@ -256,7 +257,7 @@ fn note_scope(value: w::NoteScope, project: u32, path: w::Path) -> Result<p::Not
         }
     })
 }
-fn spec(value: w::Specification) -> p::Spec {
+pub(super) fn spec(value: w::Specification) -> p::Spec {
     let v = value.into_parts();
     let mut parameters = List::with_capacity(v.parameters.capacity());
     for item in v.parameters.into_boxed() {
@@ -281,7 +282,7 @@ fn wake_rule(value: w::WakeRule) -> p::WakeRule {
         w::WakeRule::Batch(v) => p::WakeRule::Batch { count: v.count(), age: v.age() },
     }
 }
-fn wake(value: w::OwnerWakePolicy) -> p::WakePolicy {
+pub(super) fn wake(value: w::OwnerWakePolicy) -> p::WakePolicy {
     let v = value.into_parts();
     p::WakePolicy {
         words: wake_rule(v.words),
@@ -357,7 +358,7 @@ pub(super) fn count(bytes: &[u8], path: w::Path) -> Result<u32, Untranslatable> 
     }
     Ok(count)
 }
-fn item(reader: &mut Reader<'_>, path: w::Path) -> Result<Box<[u8]>, Untranslatable> {
+pub(super) fn item(reader: &mut Reader<'_>, path: w::Path) -> Result<Box<[u8]>, Untranslatable> {
     match skein_codec::piece::split(reader) {
         Ok(Some(bytes)) => Ok(bytes),
         Ok(None) | Err(_) => Err(Untranslatable { path }),
@@ -374,7 +375,12 @@ fn grant(value: w::OwnerGrant) -> p::Grant {
     let v = value.into_parts();
     p::Grant { connector: v.connector, kind: v.kind, pattern: pattern(v.pattern) }
 }
-fn grants(bytes: &[u8], ceiling: u32, path: w::Path, limits: &w::Limits) -> Result<Box<[p::Grant]>, Untranslatable> {
+pub(super) fn grants(
+    bytes: &[u8],
+    ceiling: u32,
+    path: w::Path,
+    limits: &w::Limits,
+) -> Result<Box<[p::Grant]>, Untranslatable> {
     let count = count(bytes, path)?;
     let mut values = List::with_capacity(count);
     let mut reader = Reader::new(bytes);
@@ -391,7 +397,7 @@ fn grants(bytes: &[u8], ceiling: u32, path: w::Path, limits: &w::Limits) -> Resu
     Ok(values.into_boxed())
 }
 #[expect(clippy::manual_map, reason = "step code matches optional fields")]
-fn authority(value: w::OwnerAuthority, limits: &w::Limits) -> Result<p::Authority, Untranslatable> {
+pub(super) fn authority(value: w::OwnerAuthority, limits: &w::Limits) -> Result<p::Authority, Untranslatable> {
     let v = value.into_parts();
     let delegation = v.delegation.into_parts();
     let mut kinds = List::with_capacity(delegation.kinds.capacity());

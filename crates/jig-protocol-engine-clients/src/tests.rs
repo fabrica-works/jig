@@ -30,3 +30,5 @@ mod closing;
 
 #[path = "tests/compound.rs"]
 mod compound;
+#[path = "tests/create.rs"]
+mod create;

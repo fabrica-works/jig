@@ -27,14 +27,12 @@ pub(super) struct Engine {
 }
 impl Engine {
     pub fn bounded(seed: u64, limits: &root::Limits) -> Self {
+        Self::configured(seed, limits, jig_core_world::world::config(seed))
+    }
+    pub fn configured(seed: u64, limits: &root::Limits, config: root::Config) -> Self {
         let limits = crate::fixtures::journal(*limits);
-        let driver = Driver::new(
-            jig_core_world::world::config(seed),
-            limits,
-            crate::fixtures::peers(),
-            Time::ZERO,
-            crate::fixtures::wall(Time::ZERO),
-        );
+        let driver =
+            Driver::new(config, limits, crate::fixtures::peers(), Time::ZERO, crate::fixtures::wall(Time::ZERO));
         let truth = Truth::after(driver.world.store.rows.clone());
         let env =
             Env { now: Time::ZERO, wall: crate::fixtures::wall(Time::ZERO), limits: crate::fixtures::engine_limits() };

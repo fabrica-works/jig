@@ -27,6 +27,7 @@ jig-client-protocol-http.workspace = true
 jig-client-protocol-wire.workspace = true
 jig-protocol-engine-clients.workspace = true
 jig-domain-core.workspace = true
+jig-domain-authority.workspace = true
 jig-domain-people.workspace = true
 jig-domain-tasks.workspace = true
 jig-domain-views.workspace = true

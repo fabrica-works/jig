@@ -95,3 +95,46 @@ impl Story {
         })
     }
 }
+
+impl Story {
+    /// The core fixture admits two roots, optionally with no escalation policy.
+    #[must_use]
+    pub fn live_batch(seed: u64, holder: bool) -> Self {
+        let mut limits = crate::fixtures::owner_limits();
+        limits.core.people.sign_ins = 3;
+        limits.core.tasks.batch = 2;
+        limits.core.authority.batch = 2;
+        let mut config = crate::fixtures::batch_config(seed);
+        if !holder {
+            use jig_domain_authority as a;
+            let mut policy = config.core.authority.policy(1).expect("project policy").clone();
+            policy.escalation_role = None;
+            policy.roles[0].decides = a::Proposals(0);
+            let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
+            a::step(&mut config.core.authority, a::Event::Policy { project: 1, policy }, &mut out);
+            assert_eq!(out.pop(), Some(a::PolicyFact::Changed { project: 1 }));
+        }
+        let mut story = Self::configured(seed, &limits, config);
+        story.sign_in();
+        assert!(story.run_until(|s| s.client.link().state == jig_client::Link::Live, RUNNING_WAIT));
+        story
+    }
+    #[must_use]
+    pub fn task_budget(&self, task: u64) -> Option<u64> {
+        self.task_record(task).map(|v| v.numbers.budget)
+    }
+    #[must_use]
+    pub fn worker_budget(&self, task: u64) -> Option<u64> {
+        self.engine
+            .driver
+            .world
+            .peers
+            .as_ref()
+            .expect("workers")
+            .workers
+            .iter()
+            .flat_map(|w| &w.seen)
+            .find(|v| v.task == task)
+            .map(|v| v.budget)
+    }
+}

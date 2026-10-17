@@ -135,6 +135,8 @@ pub enum AnswerOn {
 /// Every jig request, without keys owned by the root table.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Ask {
+    /// Admit and create a batch together.
+    Create { project: u32, tasks: List<super::NewTask> },
     /// Start a chat.
     StartChat { project: u32, words: Text },
     /// Add words to a task inbox.

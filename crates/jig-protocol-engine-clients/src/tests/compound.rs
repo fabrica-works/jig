@@ -1,8 +1,8 @@
 use super::fixtures as f;
-use crate::translate::{answers, asks, operations};
+use crate::translate::{asks, operations};
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_people as p;
-use skein_lib::{List, Reader};
+use skein_lib::List;
 const PROJECT: u32 = 3;
 const OTHER_PROJECT: u32 = 4;
 const TASK: u64 = 8;
@@ -32,12 +32,7 @@ fn a_compound_reaches_the_people_child_in_order() {
 fn a_compound_operation_naming_another_project_is_refused_at_its_place() {
     let limits = f::wire();
     let answer = operations::refused(&compound(PROJECT, OTHER_PROJECT), &limits).unwrap().unwrap();
-    let w::KeyedAnswer::FinalAnswer(value) = answer else {
-        panic!("final answer");
-    };
-    let w::Final::Refused(value) = w::Final::decode(&limits, &mut Reader::new(value.record())).unwrap() else {
-        panic!("refusal");
-    };
+    let w::Final::Refused(value) = f::final_record(answer, &limits) else { panic!("refusal") };
     assert_eq!(*value.at(), Some(1));
     assert_eq!(
         value.refusal(),
@@ -50,14 +45,10 @@ fn a_compound_operation_naming_another_project_is_refused_at_its_place() {
 #[test]
 fn a_compound_refusal_names_its_first_failing_place() {
     let limits = f::wire();
-    let answer =
-        answers::answer(&p::Reply::Outcome(p::Outcome::CompoundRefused { at: 1, why: p::Refusal::Unknown }), &limits)
-            .unwrap();
-    let w::KeyedAnswer::FinalAnswer(value) = answer else {
-        panic!("final answer");
-    };
-    let w::Final::Refused(value) = w::Final::decode(&limits, &mut Reader::new(value.record())).unwrap() else {
-        panic!("refusal");
+    let w::Final::Refused(value) =
+        f::translated(&p::Reply::Outcome(p::Outcome::CompoundRefused { at: 1, why: p::Refusal::Unknown }), &limits)
+    else {
+        panic!("refusal")
     };
     assert_eq!(*value.at(), Some(1));
     assert_eq!(value.refusal(), &w::Refusal::Unknown);
@@ -65,14 +56,10 @@ fn a_compound_refusal_names_its_first_failing_place() {
 #[test]
 fn a_compound_answer_keeps_its_message_and_operation_count() {
     let limits = f::wire();
-    let answer = answers::answer(
+    let value = f::translated(
         &p::Reply::Outcome(p::Outcome::Compound { project: PROJECT, operations: 2, first_message: FIRST_MESSAGE }),
         &limits,
-    )
-    .unwrap();
-    let w::KeyedAnswer::FinalAnswer(value) = answer else {
-        panic!("final answer");
-    };
+    );
     let expected = w::OwnerOutcome::Compound(
         w::OwnerOutcomeCompound::new(
             &limits,
@@ -80,7 +67,7 @@ fn a_compound_answer_keeps_its_message_and_operation_count() {
         )
         .unwrap(),
     );
-    let w::Final::Done(value) = w::Final::decode(&limits, &mut Reader::new(value.record())).unwrap() else {
+    let w::Final::Done(value) = value else {
         panic!("done");
     };
     assert_eq!(

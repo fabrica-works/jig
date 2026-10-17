@@ -336,6 +336,21 @@ fn records_7(bytes: &[u8]) {
     check!(SetRoles, bytes);
     check!(MakeService, bytes);
     check!(SetPool, bytes);
+    check!(TaskRefMember, bytes);
+    check!(TaskRefTask, bytes);
+    check!(ContractReport, bytes);
+    check!(ContractVerdict, bytes);
+    check!(ContractChange, bytes);
+    check!(BudgetAsAllowed, bytes);
+    check!(Create, bytes);
+    check!(NewTask, bytes);
+    check!(TaskRef, bytes);
+    check!(NewContract, bytes);
+    check!(NewBudget, bytes);
+    check!(TaskFlags, bytes);
+    check!(Retention, bytes);
+    check!(CreatedGiven, bytes);
+    check!(OwnerOutcomeCreated, bytes);
     check!(Ask, bytes);
 }
 
