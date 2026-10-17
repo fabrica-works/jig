@@ -7,7 +7,7 @@ use crate::contract::{
 use skein_lib::{List, Wall};
 pub const CHAT: u32 = 1;
 pub const GOAL: u32 = 2;
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NotOffered {
     Project,
     Template,
@@ -40,7 +40,7 @@ pub enum Judged {
     Refused(Refusal),
     NotOffered(NotOffered),
 }
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Fall {
     Within,
     Proposable(Recipient),

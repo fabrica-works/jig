@@ -1,5 +1,6 @@
 //! Safety and liveness from shell, tree and durable boundary observations
 //! (client/domain/testing.md, 6). No rule reads a root or a binding table.
+pub(crate) mod offers;
 use super::{CardKey, CardSeen, ClientId, Observation, Observed, Receipt, Seen, Sent};
 use skein_lib::{Duration, Token};
 use skein_world::domain::{Expectations, Judge};
@@ -40,6 +41,7 @@ struct Pending {
 #[derive(Debug)]
 pub struct Rules {
     checks: BTreeMap<ClientId, Checks>,
+    offers: offers::Offers,
     heartbeat: Duration,
     request_within: Duration,
     link_within: Duration,
@@ -71,6 +73,7 @@ impl Rules {
     pub fn new(heartbeat: Duration, request_within: Duration, link_within: Duration) -> Self {
         Self {
             checks: BTreeMap::new(),
+            offers: offers::Offers::default(),
             heartbeat,
             request_within,
             link_within,
@@ -163,6 +166,7 @@ impl Rules {
         }
     }
     fn request(&mut self, client: ClientId, party: u64, sent: Sent, judge: &mut JudgeOf) {
+        self.offers.requested(client, sent.attempt, judge);
         let key = (party, sent.key);
         let fresh = !self.requests.contains_key(&key);
         if fresh && let (Some(card), Some((kind, revision))) = (&sent.card, sent.revision) {
@@ -189,7 +193,11 @@ impl Rules {
     }
     fn delivered(&mut self, client: ClientId, receipt: Receipt, judge: &mut JudgeOf) {
         match receipt {
-            Receipt::Document { value } => self.checks.entry(client).or_default().delivered(&value),
+            Receipt::Document { value } => {
+                self.offers.delivered(client, &value, judge);
+                self.checks.entry(client).or_default().delivered(&value);
+            }
+            Receipt::DraftAnswer { attempt, outcome } => self.offers.answered(client, attempt, outcome, judge),
             Receipt::Card { key, revisions } => {
                 for (kind, revision) in revisions {
                     self.documents
@@ -255,6 +263,7 @@ impl Rules {
         }
     }
     fn shown(&mut self, client: ClientId, seen: Vec<Seen>, judge: &mut JudgeOf) {
+        self.offers.shown(client);
         let mut cards = BTreeSet::new();
         if seen.contains(&Seen::HiddenPage) {
             judge.check(!seen.iter().any(|s| matches!(s, Seen::Card { .. })), "a hidden work page exposes a card");
@@ -263,6 +272,7 @@ impl Rules {
         }
         for seen in seen {
             match seen {
+                Seen::Draft { key, offer } => self.offers.draft(client, key, offer),
                 Seen::Card { key, state, revision } => {
                     let card = (client, key.clone());
                     cards.insert(card.clone());
@@ -337,6 +347,11 @@ impl Expectations for Rules {
     fn observe(&mut self, observation: Observation, judge: &mut JudgeOf) {
         match observation {
             Observation::Decision { client, key, ask, scene } => {
+                if scene.is_some()
+                    && let Some(offer) = self.offers.sent(client, &ask, judge)
+                {
+                    self.offers.draft(client, key, offer);
+                }
                 let fault = self.checks.entry(client).or_default().sent(key, &ask, scene.as_ref());
                 if let Some(fault) = fault {
                     let why = match fault {

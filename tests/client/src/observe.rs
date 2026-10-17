@@ -234,7 +234,18 @@ pub fn up_received(up: &jig_client::Up) -> Vec<Receipt> {
             if *envelope == RequestEnvelope::SignedOut {
                 vec![Receipt::Parked]
             } else {
-                vec![Receipt::Answer { attempt: *attempt, final_answer: *envelope == RequestEnvelope::Final, words }]
+                let mut receipts = vec![Receipt::Answer {
+                    attempt: *attempt,
+                    final_answer: *envelope == RequestEnvelope::Final,
+                    words,
+                }];
+                if *envelope == RequestEnvelope::Final
+                    && let Some(jig_client::Answered::Jig(answer)) = answer
+                    && let Some(outcome) = crate::harness::referee::offers::outcome(answer)
+                {
+                    receipts.push(Receipt::DraftAnswer { attempt: *attempt, outcome });
+                }
+                receipts
             }
         }
         Up::Served { served: false, .. } => vec![Receipt::OutOfDate],
@@ -242,7 +253,15 @@ pub fn up_received(up: &jig_client::Up) -> Vec<Receipt> {
         Up::Watched { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => {
             read(&ReadValue::Task(value.clone()))
         }
-        Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Me(value)) } => frame(value, Some(*watch)),
+        Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Me(value)) } => {
+            let mut receipts = frame(value, Some(*watch));
+            receipts.push(Receipt::Document { value: Box::new(ReadValue::Me(value.clone())) });
+            receipts
+        }
+
+        Up::Watched { event: WatchEvent::Delivered(Delivery::OwnerProject(value)), .. } => {
+            read(&ReadValue::OwnerProject(value.clone()))
+        }
         Up::Watched { event: WatchEvent::Delivered(Delivery::OwnerProposal(value)), .. } => {
             read(&ReadValue::OwnerProposal(value.clone()))
         }
@@ -609,7 +628,8 @@ mod tests {
                         },
                     },
                 };
-                let receipts = received(&event);
+                let receipts: Vec<_> =
+                    received(&event).into_iter().filter(|receipt| matches!(receipt, Receipt::Answer { .. })).collect();
                 let [Receipt::Answer { attempt, final_answer, words }] = receipts.as_slice() else {
                     panic!("one original answer envelope");
                 };

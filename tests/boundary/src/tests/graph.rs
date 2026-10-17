@@ -278,7 +278,7 @@ fn test_client_view_links_only_client_children_and_foundation() {
     dependencies.sort();
     assert_eq!(
         dependencies,
-        ["jig-client-domain", "jig-client-test-domain", "jig-client-view", "skein-lib", "skein-ui"]
+        ["jig-client", "jig-client-domain", "jig-client-test-domain", "jig-client-view", "skein-lib", "skein-ui"]
     );
     let source = fs::read_to_string(kit_root().join("testing/jig-client-test-view/src/lib.rs"))
         .expect("view source is readable");

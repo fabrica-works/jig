@@ -4,6 +4,7 @@
 //! stopping and dropped watches wait for the supplied retry deadline; signed
 //! out watches park until confirmation (contract.md, sections 6–7).
 pub mod me;
+pub mod proposal;
 use crate::family::{self, Document, Kind, Scope, Subject};
 pub use crate::family::{Answer, Ask, ReadResult, WatchEnd, WatchEvent};
 use alloc::boxed::Box;
@@ -18,6 +19,7 @@ pub struct Address {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Act {
     Go { address: Address },
+    Proposal(proposal::Act),
     Touch { object: Token, revision: Revision },
     Parameters { object: Token, revision: Revision, value: u64 },
 }
@@ -181,10 +183,12 @@ pub struct Side {
     me: bool,
     kept: Option<Record>,
     shown: u64,
+    proposal: Option<proposal::Choice>,
+    proposal_sequence: u64,
 }
 impl Side {
     #[must_use]
-    pub fn new(limits: &Limits, _seed: u64) -> Self {
+    pub fn new(limits: &Limits, seed: u64) -> Self {
         Self {
             parts: List::with_capacity(limits.parts),
             objects: Slab::with_capacity(limits.objects.checked_mul(2).expect("object retirement room fits")),
@@ -200,6 +204,8 @@ impl Side {
             me: false,
             kept: None,
             shown: 0,
+            proposal: None,
+            proposal_sequence: seed,
         }
     }
     pub(crate) fn read_subject(&self, read: Token) -> Option<Subject> {
@@ -305,6 +311,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             side.changed();
         }
         Event::Act { act } => match act {
+            Act::Proposal(act) => proposal::act(side, act, out),
             Act::Go { address } => out.push(Request::Show { address }),
             Act::Touch { object, revision } => touch(side, Id::from_token(object), revision, out),
             Act::Parameters { object, revision, value } => {

@@ -10,6 +10,7 @@ pub mod connector_values_words;
 pub mod drawing;
 pub mod family;
 pub mod limits;
+mod proposal;
 pub mod root;
 pub mod words;
 pub use jig_client_test_domain::Action;

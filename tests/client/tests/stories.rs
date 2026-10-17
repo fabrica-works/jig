@@ -449,3 +449,27 @@ fn a_project_s_tasks_section_watches_one_query_by_last_change() {
         }]
     );
 }
+
+#[test]
+fn the_test_application_s_own_proposal_view_is_held_to_jig_s_check() {
+    let mut world = stories::own_proposal::world(31);
+    let client = world.client(stories::own_proposal::PERSON, stories::own_proposal::address());
+    let mut person = stories::own_proposal::person();
+    person.insert(3, Step::See { find: Find::text(b"After"), within: WITHIN });
+    world.person(client, person);
+    assert_eq!(world.run(Until::Done).verdict, skein_world::domain::Verdict::Passed);
+    assert_eq!(world.front().engine.commits().iter().filter(|commit| commit.key.is_some()).count(), 1);
+}
+#[test]
+#[should_panic(expected = "jig's check: a deciding act did not show its facts")]
+fn an_own_proposal_view_hiding_its_effect_fails_jig_s_check() {
+    let mut world = stories::own_proposal::world(31);
+    let client = world.client_with(
+        stories::own_proposal::PERSON,
+        stories::own_proposal::address(),
+        test::limits(),
+        stories::own_proposal::hidden,
+    );
+    world.person(client, stories::own_proposal::person());
+    world.run(Until::Done);
+}

@@ -19,6 +19,7 @@ pub struct View<'a> {
     pub(crate) first: Bindings,
     limits: Limits,
     navigation: first::Address,
+    hide_proposal_effect: bool,
 }
 impl<'a> View<'a> {
     #[must_use]
@@ -38,7 +39,12 @@ impl<'a> View<'a> {
             first_words,
             limits: *limits,
             navigation,
+            hide_proposal_effect: false,
         }
+    }
+    /// Exercises the referee against an application omitting decision facts.
+    pub fn hide_proposal_effect(&mut self) {
+        self.hide_proposal_effect = true;
     }
     #[must_use]
     pub fn tree(&self) -> &Tree {
@@ -60,10 +66,18 @@ pub fn build(view: &mut View<'_>, root: &Domain, out: &mut Queue<Patch>) {
     b.open(Role::Page);
     if !jig_client_view::jig(&mut b, &root.jig().borrow(root.client()), family::NAV, view.words, &mut view.jig) {
         b.open(Role::Main);
-        family::page(&mut b, root.first(), view.first_words, view.words, &mut view.first);
+        family::page(&mut b, root, view.first_words, view.words, &mut view.first, view.hide_proposal_effect);
         b.close();
         jig_client_view::after_page(&mut b, &root.jig().borrow(root.client()), view.words, &mut view.jig);
     }
+    crate::proposal::confirmation(
+        &mut b,
+        root,
+        view.words,
+        view.first_words,
+        &mut view.first,
+        view.hide_proposal_effect,
+    );
     b.close();
     slots(view, root, &mut b);
     view.render.finish(b, shown, out);

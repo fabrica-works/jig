@@ -11,6 +11,8 @@ use skein_lib::{List, bytes::copy_of};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Word {
     Navigation,
+    Proposal,
+    ReviewProposal,
     Family,
     Item,
     Loading,
@@ -40,8 +42,10 @@ pub enum Word {
     WatchBusy,
     WatchStopping,
 }
-const ALL: [Word; 29] = [
+const ALL: [Word; 31] = [
     Word::Navigation,
+    Word::Proposal,
+    Word::ReviewProposal,
     Word::Family,
     Word::Item,
     Word::Loading,
@@ -76,6 +80,8 @@ impl Word {
     pub const fn id(self) -> PhraseId {
         let number = match self {
             Self::Navigation => 0,
+            Self::Proposal => 30,
+            Self::ReviewProposal => 31,
             Self::Family => 1,
             Self::Item => 2,
             Self::Loading => 3,
@@ -115,10 +121,12 @@ pub struct Words {
 }
 impl Words {
     pub fn english(text: u32) -> Result<Self, Invalid> {
-        let mut shapes = List::with_capacity(29);
-        let mut phrases = List::with_capacity(29);
+        let mut shapes = List::with_capacity(31);
+        let mut phrases = List::with_capacity(31);
         for word in ALL {
             let (literal, hole) = match word {
+                Word::Proposal => (b"Family proposal".as_slice(), None),
+                Word::ReviewProposal => (b"Review family proposal".as_slice(), None),
                 Word::Navigation => (b"Family".as_slice(), None),
                 Word::Family => (b"Family item".as_slice(), None),
                 Word::Item => (b"Item ".as_slice(), Some(HoleKind::Number)),
@@ -195,5 +203,5 @@ impl Words {
 }
 #[must_use]
 pub const fn phrase_limits(text: u32) -> PhraseLimits {
-    PhraseLimits { languages: 1, phrases: 29, holes: 1, segments: 58, text_bytes: 1024, hole_bytes: text }
+    PhraseLimits { languages: 1, phrases: 31, holes: 1, segments: 62, text_bytes: 1024, hole_bytes: text }
 }

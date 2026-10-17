@@ -556,3 +556,70 @@ fn a_sign_in_the_engine_ended_shows_the_sign_in_page_after_a_lost_sign_out() {
     referee.observe(Time::ZERO, Observation::Shown { client, seen: vec![Seen::SignedOut] }, &mut out);
     assert_eq!(referee.verdict(), skein_world::domain::Verdict::Passed);
 }
+
+const DRAFT_SPAN: Duration = Duration::from_millis(10);
+const DRAFT_CLIENT: ClientId = ClientId(0);
+const DRAFT_KEY: jig_client::Key = jig_client::Key { asker: jig_client::Asker::JIG, number: 47 };
+const DRAFT_ATTEMPT: Token = Token::new(DRAFT_KEY.number);
+fn draft_answer(offer: jig_client::shapes::Fall) -> skein_world::domain::Verdict {
+    let mut referee = skein_world::domain::Referee::new(referee::Rules::new(DRAFT_SPAN, DRAFT_SPAN, DRAFT_SPAN));
+    let mut out = Vec::new();
+    referee.observe(
+        Time::ZERO,
+        Observation::Shown { client: DRAFT_CLIENT, seen: vec![Seen::Draft { key: DRAFT_KEY, offer }] },
+        &mut out,
+    );
+    referee.observe(
+        Time::ZERO,
+        Observation::Delivered {
+            client: DRAFT_CLIENT,
+            receipt: Receipt::DraftAnswer {
+                attempt: DRAFT_ATTEMPT,
+                outcome: DraftOutcome::Proposed(jig_client_world::stories::proposal().key),
+            },
+        },
+        &mut out,
+    );
+    referee.observe(
+        Time::ZERO,
+        Observation::Delivered {
+            client: DRAFT_CLIENT,
+            receipt: Receipt::Document {
+                value: Box::new(jig_client::contract::ReadValue::Proposal(Box::new(
+                    jig_client_world::stories::proposal(),
+                ))),
+            },
+        },
+        &mut out,
+    );
+    referee.verdict()
+}
+#[test]
+fn a_draft_within_its_offer_answered_proposed_fails_offers_kept() {
+    assert_eq!(
+        draft_answer(jig_client::shapes::Fall::Within),
+        skein_world::domain::Verdict::Failed(skein_world::domain::Failure {
+            at: Time::ZERO,
+            why: "offers kept: draft answer differs from its offer".to_owned(),
+            pending: vec![],
+        })
+    );
+}
+#[test]
+fn a_goal_past_the_first_bound_answered_proposed_keeps_the_offer() {
+    assert_eq!(
+        draft_answer(jig_client::shapes::Fall::Proposable(jig_client::contract::Recipient::Party(7))),
+        skein_world::domain::Verdict::Passed
+    );
+}
+#[test]
+fn a_draft_proposed_to_another_recipient_fails_offers_kept() {
+    assert_eq!(
+        draft_answer(jig_client::shapes::Fall::Proposable(jig_client::contract::Recipient::Party(8))),
+        skein_world::domain::Verdict::Failed(skein_world::domain::Failure {
+            at: Time::ZERO,
+            why: "offers kept: proposed to a different recipient".to_owned(),
+            pending: vec![],
+        })
+    );
+}

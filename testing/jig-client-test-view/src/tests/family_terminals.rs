@@ -104,7 +104,7 @@ fn every_family_departure_fits_the_public_view_and_checked_selected_words() {
         assert!(view.tree().len() <= view.limits().tree.nodes);
 
         assert!(crate::worst_case(&bounds, &client, jig, family).unwrap() > 0);
-        assert_eq!(family.book.limits().phrases, 29);
+        assert_eq!(family.book.limits().phrases, 31);
         assert!(patches(&mut view, &root).is_empty());
     }
     let checked = &family;
@@ -159,6 +159,8 @@ fn selected_words() -> words::Words {
         W::Family,
         W::Item,
         W::Loading,
+        W::Proposal,
+        W::ReviewProposal,
         W::Unknown,
         W::Unshowable,
         W::Value,
@@ -234,7 +236,7 @@ fn selected_words() -> words::Words {
         book: Phrasebook::load(
             shapes.into_boxed_slice(),
             languages.into_boxed_slice(),
-            &PhraseLimits { languages: 2, phrases: 29, holes: 1, segments: 116, text_bytes: 4096, hole_bytes: 32 },
+            &PhraseLimits { languages: 2, phrases: 31, holes: 1, segments: 124, text_bytes: 4096, hole_bytes: 32 },
         )
         .unwrap(),
         language: 1,

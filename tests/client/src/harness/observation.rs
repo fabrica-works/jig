@@ -21,6 +21,8 @@ pub enum CardSeen {
 /// Facts read from a visible accessibility tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Seen {
+    /// A keyed draft judged against the offer shown before it left.
+    Draft { key: jig_client::Key, offer: jig_client::shapes::Fall },
     /// The changed tree broke the page outline.
     Outline { fault: skein_ui::outline::Fault },
     /// One card; a printed revision overrides its last delivered document's.
@@ -46,6 +48,8 @@ pub struct Sent {
 /// Facts in a delivered shell callback, before the root consumes it.
 #[derive(Clone, Debug)]
 pub enum Receipt {
+    /// A final draft outcome; proposal documents supply its recipient independently.
+    DraftAnswer { attempt: Token, outcome: DraftOutcome },
     /// A complete jig document delivered before the application consumes it.
     Document { value: Box<jig_client::contract::ReadValue> },
     /// The document revision available to a card in the next build.
@@ -62,6 +66,14 @@ pub enum Receipt {
     OutOfDate,
     /// Requests park until the party can sign in again.
     Parked,
+}
+/// A draft's committed result, before its proposal document is delivered.
+#[derive(Clone, Debug)]
+pub enum DraftOutcome {
+    Made,
+    Proposed(jig_client::contract::ProposalKey),
+    ProposedByParty { number: u64 },
+    Refused,
 }
 /// Durable truth reported by the engine boundary, drained once.
 #[derive(Clone, Debug, PartialEq, Eq)]

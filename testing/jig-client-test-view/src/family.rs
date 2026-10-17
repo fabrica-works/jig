@@ -17,7 +17,7 @@ use skein_lib::{Decimal, Id, Token};
 pub const NAV: SlotRef =
     SlotRef { owner: (Owner::Application { number: jig_client_test_domain::FIRST }).opaque(), token: Token::new(0) };
 /// A fragment includes a document heading, drawing fallback, card status and form.
-pub const PART_NODES: u32 = 39;
+pub const PART_NODES: u32 = 79;
 pub const NAV_NODES: u32 = 2;
 pub fn navigation(b: &mut Builder, address: first::Address, words: &Words, bindings: &mut Bindings) {
     b.open(Role::Link);
@@ -31,11 +31,13 @@ pub fn navigation(b: &mut Builder, address: first::Address, words: &Words, bindi
 }
 pub fn page(
     b: &mut Builder,
-    side: &first::Side,
+    root: &jig_client_test_domain::Domain,
     words: &Words,
     jig: &jig_client_view::words::Words,
     bindings: &mut Bindings,
+    hide_effect: bool,
 ) {
+    let side = root.first();
     b.open(Role::Heading { level: 1 });
     words.text(b, Word::Family, &[]);
     b.close();
@@ -49,7 +51,10 @@ pub fn page(
     match &object.value {
         Value::Known(document @ Document::Item(item)) => {
             jig_slot(b, ObjectKey::Task(item.task), words, bindings);
-            for proposal in &item.proposals {
+            for (index, proposal) in item.proposals.iter().enumerate() {
+                if index == 0 {
+                    crate::proposal::section(b, root, *proposal, jig, words, bindings, hide_effect);
+                }
                 jig_slot(b, ObjectKey::Proposal(*proposal), words, bindings);
             }
             for section in document.sections().into_boxed() {
