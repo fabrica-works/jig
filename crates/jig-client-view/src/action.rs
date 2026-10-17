@@ -77,11 +77,3 @@ pub enum Act {
     SignOut,
 }
 
-/// The end of a window requested by a person.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum End {
-    /// Earlier rows.
-    Before,
-    /// Later rows.
-    After,
-}
