@@ -57,8 +57,9 @@ What it does not know, and how it is told:
 - **Executors** are a kind (agent, procedure, person) and a reference
   the core gives it: for an agent, a charter's number; for a procedure,
   the connector that owns it (or the core) and an opaque code; for a
-  person, a party or a role. It asks for a task to be activated, and
-  hears when the activation ends.
+  person, a party or a role, the task's project's role (people.md,
+  section 1). It asks for a task to be activated, and hears when the
+  activation ends.
 - **Authority** is a value of its own type, which it carries and keeps
   the numbers of (budgets spent and reserved, tasks made), as it keeps
   every other funder's (authority.md, section 7), and never judges: every
