@@ -73,6 +73,10 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
         to: ReplyTo::new(Token::new(5002)),
         key: world.call_key(1),
         batch: Box::new([core::Delegate {
+            label: 0,
+            flags: jig_domain_tasks::Flags::PLAIN,
+            tracked: None,
+            budget: jig_domain_people::Budget::Named,
             executor: tasks::Executor::Agent { charter: 1 },
             spec: tasks::Spec {
                 words: b"a delegate's work".as_slice().into(),
@@ -90,7 +94,7 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
     let core::CallPart::Delegated(children) = &world.answers.last().expect("delegate answer").2 else {
         panic!("delegate was refused: {:?}", world.answers);
     };
-    let child = *world.assignments.iter().find(|(task, _)| *task == children[0]).expect("delegate assigned");
+    let child = *world.assignments.iter().find(|(task, _)| *task == children[0].task).expect("delegate assigned");
     assert_ne!(parent.0, child.0);
     world.end(
         tasks::End::Finished {

@@ -164,6 +164,7 @@ fn propose_amendment(world: &mut World) {
             project: 1,
             action: jig_domain_tasks::PersonAction::Amend {
                 task: 1,
+                revision: 0,
                 amendment: Box::new(jig_domain_tasks::Amendment {
                     tracked: None,
                     addressed: None,

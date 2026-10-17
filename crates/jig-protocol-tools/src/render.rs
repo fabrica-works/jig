@@ -47,7 +47,7 @@ pub fn render(part: &CallPart) -> Rendered {
             text(&[b"Effect ", Decimal::of(*entry).as_bytes(), b": ", status], false)
         }
         CallPart::Connector { .. } => text(&[b"Connector answer"], false),
-        CallPart::Proposed { proposal } => text(&[b"Proposed ", Decimal::of(*proposal).as_bytes()], false),
+        CallPart::Proposed { proposal, holder } => proposed(*proposal, *holder),
         CallPart::ProposalDecided { proposal, .. } => {
             text(&[b"Decided proposal ", Decimal::of(*proposal).as_bytes()], false)
         }
@@ -118,20 +118,36 @@ pub fn render(part: &CallPart) -> Rendered {
         CallPart::Unavailable => text(&[b"Unavailable"], true),
     }
 }
-fn delegated(numbers: &[u64]) -> Rendered {
-    let mut size = b"Delegated tasks:".len();
-    for number in numbers {
-        size =
-            size.checked_add(1).expect("separator").checked_add(Decimal::of(*number).as_bytes().len()).expect("number");
+fn delegated(members: &[core::Made]) -> Rendered {
+    let mut parts = List::with_capacity(u32::try_from(members.len()).expect("bounded batch"));
+    let mut size = b"Delegated tasks: ".len();
+    for (at, member) in members.iter().enumerate() {
+        let given = match member.given {
+            Some(given) => text(&[b", given ", Decimal::of(given).as_bytes()], false).text,
+            None => Box::new([]),
+        };
+        let line = text(
+            &[
+                if at == 0 { b"" } else { b"; " },
+                Decimal::of(member.task).as_bytes(),
+                b" at spec revision ",
+                Decimal::of(member.revision).as_bytes(),
+                &given,
+            ],
+            false,
+        )
+        .text;
+        size = size.checked_add(line.len()).expect("bounded delegate answer");
+        parts.push(line).expect("one line per delegate");
     }
     let mut writer = Writer::new(size);
-    writer.put(b"Delegated tasks:").expect("heading");
-    for number in numbers {
-        writer.put(b" ").expect("separator");
-        writer.put(Decimal::of(*number).as_bytes()).expect("number");
+    writer.put(b"Delegated tasks: ").expect("heading");
+    for part in &parts {
+        writer.put(part).expect("delegate");
     }
     Rendered { error: false, text: writer.finish() }
 }
+
 fn denied(answer: authority::Answer, findings: &[authority::Finding]) -> Rendered {
     let status: &[u8] = match answer {
         authority::Answer::Allow => b"Allowed",
@@ -399,4 +415,20 @@ fn hold_reason(reason: &jig_domain_people::HoldReason) -> &'static [u8] {
         HoldReason::PoolLost { .. } => b"for a lost pool",
         HoldReason::Procedure => b"for its procedure",
     }
+}
+
+fn proposed(proposal: u64, holder: jig_domain_tasks::ProposalHolder) -> Rendered {
+    use jig_domain_tasks::{ProposalHolder, ProposalKind};
+    let to = match holder {
+        ProposalHolder::Task(task) => text(&[b"task ", Decimal::of(task).as_bytes()], false).text,
+        ProposalHolder::Person(person) => text(&[b"person ", Decimal::of(person).as_bytes()], false).text,
+        ProposalHolder::Policy { kind, .. } => Box::from(match kind {
+            ProposalKind::Batch => b"the project's role for batches".as_slice(),
+            ProposalKind::Effect => b"the project's role for effects",
+            ProposalKind::Amend => b"the project's role for amendments",
+            ProposalKind::Widen => b"the project's role for widenings",
+            ProposalKind::Release => b"the project's role for releases",
+        }),
+    };
+    text(&[b"Proposed ", Decimal::of(proposal).as_bytes(), b", to ", &to], false)
 }

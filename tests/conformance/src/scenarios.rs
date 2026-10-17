@@ -255,7 +255,7 @@ impl Continuation {
                     else {
                         panic!("race delegation refused");
                     };
-                    let task = numbers[0];
+                    let task = numbers[0].task;
                     world.peers.children.push(task);
                     ask(
                         world,
@@ -328,6 +328,10 @@ impl Continuation {
                             to: ReplyTo::new(Token::new(8000 + u64::from(completion))),
                             key: core::CallKey { task, attempt, completion, position: 0 },
                             batch: Box::new([core::Delegate {
+                                label: 0,
+                                flags: jig_domain_tasks::Flags::PLAIN,
+                                tracked: None,
+                                budget: jig_domain_people::Budget::Named,
                                 executor: tasks::Executor::Agent { charter: 1 },
                                 spec: tasks::Spec {
                                     words: b"pool work".as_slice().into(),
@@ -361,7 +365,7 @@ impl Continuation {
                         else {
                             panic!("delegate refused: {:?}", named_part(world, self.completion));
                         };
-                        world.peers.children.push(members[0]);
+                        world.peers.children.push(members[0].task);
                         self.completion += 1;
                         self.tries = 0;
                         self.phase = if self.completion <= 3 { 1 } else { 3 };
@@ -418,7 +422,7 @@ impl Continuation {
                         return Ok(true);
                     }
                     _ => {
-                        let core::CallPart::Proposed { proposal } =
+                        let core::CallPart::Proposed { proposal, .. } =
                             named_part(world, 2).expect("durable proposal reply")
                         else {
                             panic!("proposal refused: {:?}", world.peers.calls);

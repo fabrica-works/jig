@@ -1243,7 +1243,7 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
     };
     assert_eq!(row.proposer, 1);
     assert!(
-        matches!(&row.action, tasks::PersonAction::Amend { task: target, amendment } if *target == task && amendment.release.is_none())
+        matches!(&row.action, tasks::PersonAction::Amend { task: target, amendment, .. } if *target == task && amendment.release.is_none())
     );
 
     widened_authority.spend = 1000;

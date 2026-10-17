@@ -28,7 +28,7 @@ pub const FIELDS: &[(&[u8], &[&[u8]])] = &[
     (b"subscribe", &[b"kind", b"target", b"held", b"at", b"period"]),
     (b"unsubscribe", &[b"subscription"]),
     (b"amend", &[b"target", b"revision", b"amendment"]),
-    (b"propose", &[b"action", b"reason", b"batch"]),
+    (b"propose", &[b"action", b"reason", b"batch", b"target", b"revision", b"amendment", b"authority"]),
     (b"note", &[b"name", b"recalled", b"scope", b"description", b"body", b"references"]),
     (b"recall", &[b"kind", b"name", b"page", b"scopes", b"query"]),
 ];
@@ -46,3 +46,6 @@ pub(crate) fn word(kind: jig_domain_tasks::MessageKind) -> jig_domain_tasks::Wor
         eligible: true,
     }
 }
+
+pub const DELEGATE_NAMED: &[u8] = br#"{"batch":[{"executor":{"kind":"agent","charter":1},"spec":{"words":"check"},"contract":{"kind":"report","words":100},"authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":100},"notes":0},"label":7,"flags":{"conversation":true,"listed":true,"retention":"forgotten_once_read"},"tracked":4,"budget":{"as_allowed":{"cap":40}}},{"executor":{"kind":"agent","charter":1},"spec":{"words":"report"},"contract":{"kind":"report","words":100},"authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":100},"notes":0}}]}"#;
+pub const TWO_AS_ALLOWED: &[u8] = br#"{"batch":[{"executor":{"kind":"agent","charter":1},"spec":{"words":"check"},"contract":{"kind":"report","words":100},"authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":100},"notes":0},"label":7,"flags":{"conversation":true,"listed":true,"retention":"forgotten_once_read"},"tracked":4,"budget":{"as_allowed":{"cap":40}}},{"executor":{"kind":"agent","charter":1},"spec":{"words":"report"},"contract":{"kind":"report","words":100},"authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":100},"notes":0},"budget":{"as_allowed":{}}}]}"#;

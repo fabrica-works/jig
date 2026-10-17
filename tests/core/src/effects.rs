@@ -465,7 +465,7 @@ impl World {
             proposal: Some(b"ask the holder".as_slice().into()),
         });
         match self.answers.last() {
-            Some((_, _, core::CallPart::Proposed { proposal })) => *proposal,
+            Some((_, _, core::CallPart::Proposed { proposal, .. })) => *proposal,
             answer => panic!("effect proposed: {answer:?}; {:?}", self.trace),
         }
     }
@@ -516,6 +516,10 @@ impl World {
             to: ReplyTo::new(Token::new(201)),
             key: self.call_key(1),
             batch: Box::new([core::Delegate {
+                label: 0,
+                flags: jig_domain_tasks::Flags::PLAIN,
+                tracked: None,
+                budget: jig_domain_people::Budget::Named,
                 executor: tasks::Executor::Procedure { connector: 1, code: 1 },
                 spec: tasks::Spec {
                     words: b"make a checked effect".as_slice().into(),

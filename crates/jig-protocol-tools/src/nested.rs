@@ -43,7 +43,43 @@ pub(crate) fn delegate(value: &Value) -> Result<engine::Delegate, Problem> {
         Some(wake) => wake_policy(wake)?,
         None => tasks::WakePolicy::DEFAULT,
     };
-    Ok(engine::Delegate { executor, spec, contract, authority, symbolic_grants, dependencies, wake })
+    let label = match value.field(b"label")? {
+        Some(value) => value.small()?,
+        None => 0,
+    };
+    let tracked = match value.field(b"tracked")? {
+        Some(value) => Some(value.small()?),
+        None => None,
+    };
+    let flags = match value.field(b"flags")? {
+        Some(value) => flags(value)?,
+        None => tasks::Flags::PLAIN,
+    };
+    let budget = match value.field(b"budget")? {
+        Some(budget) => {
+            let allowed = budget.required(b"as_allowed")?;
+            jig_domain_people::Budget::AsAllowed {
+                cap: match allowed.field(b"cap")? {
+                    Some(value) => Some(value.number()?),
+                    None => None,
+                },
+            }
+        }
+        None => jig_domain_people::Budget::Named,
+    };
+    Ok(engine::Delegate {
+        executor,
+        spec,
+        contract,
+        authority,
+        symbolic_grants,
+        dependencies,
+        wake,
+        label,
+        flags,
+        tracked,
+        budget,
+    })
 }
 
 pub(crate) fn delegates(value: &Value) -> Result<Box<[engine::Delegate]>, Problem> {
@@ -336,4 +372,17 @@ fn texts(value: &Value) -> Result<Box<[Box<[u8]>]>, Problem> {
         let Ok(()) = out.push(item.text()?) else { return Err(Problem { field: b"", why: crate::Why::TooLarge }) };
     }
     Ok(out.into_boxed())
+}
+
+fn flags(value: &Value) -> Result<tasks::Flags, Problem> {
+    let retention = value.required(b"retention")?.text()?;
+    Ok(tasks::Flags {
+        conversation: value.required(b"conversation")?.boolean()?,
+        listed: value.required(b"listed")?.boolean()?,
+        retention: match retention.as_ref() {
+            b"kept" => tasks::Retention::Kept,
+            b"forgotten_once_read" => tasks::Retention::ForgottenOnceRead,
+            _ => return Err(Problem { field: b"retention", why: crate::Why::Range }),
+        },
+    })
 }

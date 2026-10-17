@@ -3,6 +3,12 @@ use alloc::boxed::Box;
 use jig_domain_core as core;
 mod fixtures;
 
+const PROPOSED_NUMBER: u64 = 9;
+const TASK_HOLDER: u64 = 3;
+const PERSON_HOLDER: u64 = 4;
+const FIRST_MADE: u64 = 7;
+const SECOND_MADE: u64 = 8;
+
 #[test]
 fn a_cancel_call_decodes_to_its_named_action() {
     match crate::decode(b"cancel", fixtures::CANCEL, &fixtures::LIMITS) {
@@ -211,8 +217,14 @@ fn a_batch_past_its_bound_names_the_batch() {
 #[test]
 fn a_delegated_part_renders_its_task_numbers() {
     assert_eq!(
-        crate::render(&core::CallPart::Delegated(Box::new([3, 12]))),
-        crate::Rendered { error: false, text: b"Delegated tasks: 3 12".as_slice().into() }
+        crate::render(&core::CallPart::Delegated(Box::new([
+            core::Made { task: 3, revision: 0, given: None },
+            core::Made { task: 12, revision: 0, given: None }
+        ]))),
+        crate::Rendered {
+            error: false,
+            text: b"Delegated tasks: 3 at spec revision 0; 12 at spec revision 0".as_slice().into()
+        }
     );
 }
 #[test]
@@ -457,3 +469,89 @@ fn decide_escalation_is_no_longer_a_declared_tool() {
 }
 
 mod words;
+
+#[test]
+fn a_delegate_call_names_label_flags_and_as_allowed() {
+    let Decoded::Delegate(batch) = crate::decode(b"delegate", fixtures::DELEGATE_NAMED, &fixtures::LIMITS) else {
+        panic!("delegate batch");
+    };
+    assert_eq!(batch[0].label, 7);
+    assert_eq!(batch[0].tracked, Some(4));
+    assert_eq!(
+        batch[0].flags,
+        jig_domain_tasks::Flags {
+            conversation: true,
+            listed: true,
+            retention: jig_domain_tasks::Retention::ForgottenOnceRead,
+        }
+    );
+    assert_eq!(batch[0].budget, jig_domain_people::Budget::AsAllowed { cap: Some(40) });
+}
+
+#[test]
+fn a_proposed_answer_names_the_holder_it_waits_for() {
+    use jig_domain_tasks::{ProposalHolder, ProposalKind};
+    for (holder, expected) in [
+        (ProposalHolder::Task(TASK_HOLDER), b"Proposed 9, to task 3".as_slice()),
+        (ProposalHolder::Person(PERSON_HOLDER), b"Proposed 9, to person 4"),
+        (
+            ProposalHolder::Policy { project: 1, kind: ProposalKind::Amend },
+            b"Proposed 9, to the project's role for amendments",
+        ),
+    ] {
+        assert_eq!(
+            crate::render(&core::CallPart::Proposed { proposal: PROPOSED_NUMBER, holder }).text.as_ref(),
+            expected,
+            "{holder:?}"
+        );
+    }
+}
+
+#[test]
+fn a_delegated_answer_names_each_spec_revision_and_what_was_given() {
+    let part = core::CallPart::Delegated(Box::new([
+        core::Made { task: FIRST_MADE, revision: 0, given: None },
+        core::Made { task: SECOND_MADE, revision: 0, given: Some(40) },
+    ]));
+    assert_eq!(
+        crate::render(&part).text.as_ref(),
+        b"Delegated tasks: 7 at spec revision 0; 8 at spec revision 0, given 40"
+    );
+}
+
+#[test]
+fn a_propose_call_amends_naming_the_spec_revision() {
+    let input = br#"{"action":"amend","target":3,"revision":7,"amendment":{"spec":{"words":"new"},"reason":"evidence"},"reason":"please"}"#;
+    let Decoded::Action(core::NamedAction::Propose {
+        action: jig_domain_tasks::ProposalAction::Amend { task, revision, amendment },
+        reason,
+        as_holder,
+    }) = crate::decode(b"propose", input, &fixtures::LIMITS)
+    else {
+        panic!("amend proposal")
+    };
+    assert_eq!((task, revision, as_holder), (fixtures::TARGET, 7, false));
+    assert_eq!(amendment.spec.expect("changed spec").words.as_ref(), b"new");
+    assert_eq!(reason.as_ref(), b"please");
+}
+#[test]
+fn a_propose_call_widens_its_own_authority() {
+    let input = br#"{"action":"widen","authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":40},"notes":0},"reason":"please"}"#;
+    let Decoded::Action(core::NamedAction::Propose {
+        action: jig_domain_tasks::ProposalAction::Widen { task, authority },
+        reason,
+        as_holder,
+    }) = crate::decode(b"propose", input, &fixtures::LIMITS)
+    else {
+        panic!("widen proposal")
+    };
+    assert_eq!((task, authority.budget.spend, as_holder), (0, 40, false));
+    assert_eq!(reason.as_ref(), b"please");
+}
+#[test]
+fn a_delegate_batch_with_two_as_allowed_budgets_is_not_well_formed() {
+    let Decoded::Problem(problem) = crate::decode(b"delegate", fixtures::TWO_AS_ALLOWED, &fixtures::LIMITS) else {
+        panic!("malformed batch")
+    };
+    assert_eq!(problem, Problem { field: b"budget", why: Why::Malformed });
+}

@@ -171,6 +171,10 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
                 position: 0,
             },
             batch: Box::new([jig_domain_core::Delegate {
+                label: 0,
+                flags: jig_domain_tasks::Flags::PLAIN,
+                tracked: None,
+                budget: jig_domain_people::Budget::Named,
                 executor: tasks::Executor::Agent { charter: 1 },
                 spec: tasks::Spec {
                     words: b"retry this delegate".as_slice().into(),
@@ -187,7 +191,7 @@ fn a_delegate_held_past_its_tries_is_escalated_to_a_person_and_released() {
         }),
     );
     let child = match &world.front().session.driver.world.answers.last().expect("delegate answer").2 {
-        jig_domain_core::CallPart::Delegated(numbers) => numbers[0],
+        jig_domain_core::CallPart::Delegated(numbers) => numbers[0].task,
         other => panic!("delegation must be admitted: {other:?}"),
     };
     world.person(member, vec![Step::Pause { span: Duration::from_millis(2100) }]);

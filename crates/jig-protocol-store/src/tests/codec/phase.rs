@@ -15,7 +15,11 @@ fn a_held_phase_reads_back_with_its_source() {
 fn a_pending_person_proposal_reads_back() {
     for action in [
         fixtures::task_person_proposal().action,
-        jig_domain_tasks::PersonAction::Amend { task: 23, amendment: Box::new(fixtures::task_amendment()) },
+        jig_domain_tasks::PersonAction::Amend {
+            task: 23,
+            revision: 0,
+            amendment: Box::new(fixtures::task_amendment()),
+        },
     ] {
         let mut proposal = fixtures::task_person_proposal();
         proposal.action = action;
@@ -185,7 +189,7 @@ fn each_proposal_action_reads_back() {
             purpose: 11,
         },
         ProposalAction::ProcedureEffect { connector: 2, authority: fixtures::task_authority(), step: 13, purpose: 17 },
-        ProposalAction::Amend { task: 17, amendment: fixtures::task_amendment() },
+        ProposalAction::Amend { task: 17, revision: 0, amendment: fixtures::task_amendment() },
         ProposalAction::Widen { task: 17, authority: fixtures::task_authority() },
         ProposalAction::Release { task: 17 },
     ] {

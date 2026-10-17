@@ -1,5 +1,6 @@
 use jig_core_world::effects::World;
 const CHILD: u64 = 2;
+const REQUESTER: u64 = 1;
 const EFFECT: u64 = 1;
 use jig_domain_core as core;
 use jig_domain_fleet as fleet;
@@ -87,7 +88,7 @@ fn a_delegate_call_makes_its_batch_and_answers_their_numbers() {
     world.tool_call(b"delegate", br#"{"batch":[{"executor":{"kind":"procedure","connector":1,"code":1},"spec":{"words":"check"},"contract":{"kind":"report","words":64},"authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":20},"notes":0}}]}"#, true);
     assert_eq!(
         answer(&world),
-        &core::SettledAnswer::Host { error: false, body: b"Delegated tasks: 2".as_slice().into() }
+        &core::SettledAnswer::Host { error: false, body: b"Delegated tasks: 2 at spec revision 0".as_slice().into() }
     );
     assert_eq!(world.procedure, Some(2));
 }
@@ -218,4 +219,135 @@ fn a_held_delegates_notice_reaches_its_requester_with_its_hold_revision() {
         .find(|story| story.name == "held notice")
         .expect("held notice story");
     (story.run)(&mut World::new(182, false), None);
+}
+
+const PROPOSE_AMEND: &[u8] = br#"{"action":"amend","target":2,"revision":0,"amendment":{"spec":{"words":"proposed"},"reason":"evidence"},"reason":"please"}"#;
+const DIRECT_AMEND: &[u8] = br#"{"target":2,"revision":0,"amendment":{"spec":{"words":"newer"},"reason":"evidence"}}"#;
+const ACCEPT_REQUEST: u8 = 71;
+const PARTY_PROPOSE_REQUEST: u8 = 72;
+const STALE_DECISION_AT: skein_lib::Wall = skein_lib::Wall::from_nanos(92_000_000);
+fn proposed(world: &World) -> u64 {
+    let part = &world.answers.last().expect("proposed answer").2;
+    let core::CallPart::Proposed { proposal, .. } = part else { panic!("proposed: {part:?}") };
+    *proposal
+}
+fn accept(world: &mut World, proposer: jig_domain_people::Proposer, proposal: u64) {
+    jig_core_world::fixtures::ask_as(
+        world,
+        world.sign_in.expect("signed in"),
+        ACCEPT_REQUEST,
+        jig_domain_people::Ask::DecideProposal {
+            project: 1,
+            proposer,
+            proposal,
+            decision: jig_domain_people::ProposalDecision::Accept,
+        },
+    );
+}
+#[test]
+fn a_proposed_amendment_naming_an_old_revision_is_answered_moved() {
+    let mut world = World::new(194, false);
+    world.hold_procedures = true;
+    world.delegate();
+    world.tool_call(b"amend", DIRECT_AMEND, true);
+    world.turn(1, 0, None, b"record calls");
+    world.turn(2, 0, None, b"record calls");
+    world.tool_call(b"propose", PROPOSE_AMEND, true);
+    assert_eq!(
+        answer(&world),
+        &core::SettledAnswer::Host { error: true, body: b"Moved: task 2 is at spec revision 1 now".as_slice().into() }
+    );
+}
+#[test]
+fn a_propose_call_answers_its_number_and_to_whom() {
+    let mut world = World::new(195, false);
+    world.hold_procedures = true;
+    world.delegate();
+    world.tool_call(b"propose", PROPOSE_AMEND, true);
+    assert_eq!(
+        answer(&world),
+        &core::SettledAnswer::Host { error: false, body: b"Proposed 1, to person 1".as_slice().into() }
+    );
+}
+#[test]
+fn an_amendment_proposal_accepted_after_its_spec_moved_is_stale() {
+    use jig_domain_people as people;
+    let mut world = World::new(196, false);
+    world.hold_procedures = true;
+    world.delegate();
+    world.tool_call(b"propose", PROPOSE_AMEND, true);
+    let proposal = proposed(&world);
+    world.turn(1, 0, None, b"record calls");
+    world.turn(2, 0, None, b"record calls");
+    world.tool_call(b"amend", DIRECT_AMEND, true);
+    accept(&mut world, people::Proposer::Task(REQUESTER), proposal);
+    jig_core_world::fixtures::refusal(&world, people::Refusal::Moved { now: people::Moved::Spec { revision: 1 } });
+    assert_eq!(jig_core_world::fixtures::live_row(&world, CHILD).spec.words.as_ref(), b"newer");
+    let row = world
+        .store
+        .rows
+        .values()
+        .find_map(|row| {
+            if let root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::History(row))) = row
+                && row.change == jig_domain_tasks::Change::ProposalWithdrawn
+                && let Some(row) = &row.proposal
+                && row.number == proposal
+            {
+                return Some(row);
+            }
+            None
+        })
+        .expect("withdrawn proposal history");
+    assert_eq!(row.state, jig_domain_tasks::ProposalState::Withdrawn);
+}
+#[test]
+fn a_partys_amendment_proposal_accepted_after_its_spec_moved_is_stale() {
+    use jig_domain_people as people;
+    let mut world = World::new(197, false);
+    world.hold_procedures = true;
+    world.delegate();
+    let sign_in = world.sign_in.expect("party");
+    let mut amendment = jig_core_world::fixtures::person_unchanged(b"evidence");
+    amendment.spec =
+        Some(people::Spec { words: b"proposed".as_slice().into(), parameters: Box::new([]), inputs: Box::new([]) });
+    jig_core_world::fixtures::ask_as(
+        &mut world,
+        sign_in,
+        PARTY_PROPOSE_REQUEST,
+        people::Ask::Propose {
+            project: 1,
+            action: people::Action::Amend { task: CHILD, revision: 0, amendment: Box::new(amendment) },
+            reason: b"please".as_slice().into(),
+        },
+    );
+    let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, .. })) = world.people_answers.last().copied()
+    else {
+        panic!("party proposed: {:?}", world.people_answers.last())
+    };
+    world.tool_call(b"amend", DIRECT_AMEND, true);
+    world.set_clock(skein_lib::Time::ZERO, STALE_DECISION_AT);
+    accept(&mut world, people::Proposer::Party(REQUESTER), proposal);
+    jig_core_world::fixtures::refusal(&world, people::Refusal::Moved { now: people::Moved::Spec { revision: 1 } });
+    assert_eq!(jig_core_world::fixtures::live_row(&world, CHILD).spec.words.as_ref(), b"newer");
+    let key = root::Key::Core(core::Key::Tasks(jig_domain_tasks::Key::DecidedProposal(proposal)));
+    let Some(root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::DecidedProposal(row)))) =
+        world.store.rows.get(&key)
+    else {
+        panic!("withdrawn party proposal")
+    };
+    assert_eq!(row.state, jig_domain_tasks::PersonProposalState::Withdrawn { at: STALE_DECISION_AT });
+}
+#[test]
+fn a_delegate_given_as_allowed_answers_what_it_was_given() {
+    jig_core_world::agents_tools::delegate_given(&mut World::new(198, false), None);
+}
+#[test]
+fn a_delegate_call_answers_its_tasks_spec_revisions() {
+    let mut world = World::new(199, false);
+    world.hold_procedures = true;
+    world.delegate();
+    assert_eq!(
+        &world.answers.last().expect("delegate answer").2,
+        &core::CallPart::Delegated(Box::new([core::Made { task: CHILD, revision: 0, given: None }]))
+    );
 }

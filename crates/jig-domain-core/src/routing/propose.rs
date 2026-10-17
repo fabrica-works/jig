@@ -142,7 +142,9 @@ pub(super) fn withdraw_request(core: &mut Core, work: &mut Queue<Event>, out: &m
             return;
         }
         assert!(
-            core.goal_routes.insert(request, GoalRoute::Withdrawing { proposer: person, proposal }).is_ok(),
+            core.goal_routes
+                .insert(request, GoalRoute::Withdrawing { proposer: person, proposal, moved: None })
+                .is_ok(),
             "one withdrawal flight"
         );
         work.push(Event::Tasks(tasks::Event::WithdrawPersonProposal {
@@ -214,7 +216,7 @@ fn offer_amendment(
             number,
             proposer: person,
             project,
-            action: tasks::PersonAction::Amend { task, amendment: Box::new(amendment) },
+            action: tasks::PersonAction::Amend { task, revision, amendment: Box::new(amendment) },
             reason,
             state: tasks::PersonProposalState::Pending { since: env.wall },
         },

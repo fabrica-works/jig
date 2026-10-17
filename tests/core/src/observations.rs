@@ -754,7 +754,7 @@ impl Observer {
                         self.settled_calls.insert((value.key.task, value.key.attempt, settled.serial));
                     }
                     if let core::CallPart::Delegated(members) = &value.part {
-                        snapshot.batches.push(members.to_vec());
+                        snapshot.batches.push(members.iter().map(|member| member.task).collect());
                     }
                 }
                 root::Record::Core(core::Record::Core(core::CoreRecord::ProposalDecision(value)))

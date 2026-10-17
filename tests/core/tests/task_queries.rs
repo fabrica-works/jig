@@ -30,6 +30,10 @@ fn delegate_question(world: &mut jig_core_world::effects::World, parent: u64) {
         to: ReplyTo::new(Token::new(4001)),
         key: world.call_key(1),
         batch: Box::new([core::Delegate {
+            label: 0,
+            flags: jig_domain_tasks::Flags::PLAIN,
+            tracked: None,
+            budget: jig_domain_people::Budget::Named,
             executor: tasks::Executor::Agent { charter: 1 },
             spec: tasks::Spec {
                 words: b"ask the requester".as_slice().into(),
@@ -47,7 +51,7 @@ fn delegate_question(world: &mut jig_core_world::effects::World, parent: u64) {
     let core::CallPart::Delegated(numbers) = &world.answers.last().expect("delegation answered").2 else {
         panic!("admitted delegate")
     };
-    let child = numbers[0];
+    let child = numbers[0].task;
     world.end(tasks::End::Parked, 0);
     assert_eq!(world.assigned.as_ref().expect("delegate assigned").task, child);
     world.send(root::Event::Core(core::Event::NamedAction {

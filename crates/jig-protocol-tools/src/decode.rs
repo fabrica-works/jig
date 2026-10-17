@@ -99,18 +99,7 @@ fn read(tool: &[u8], input: &[u8], limits: &Limits) -> Result<Decoded, Problem> 
             };
             core::NamedAction::Subscribe { kind }
         }
-        b"propose" => {
-            let reason = value.required(b"reason")?.text()?;
-            let kind = value.required(b"action")?.text()?;
-            match kind.as_ref() {
-                b"batch" => core::NamedAction::ProposeBatch {
-                    batch: delegates(value.required(b"batch")?, limits)?,
-                    reason,
-                    as_holder: false,
-                },
-                _ => return Err(Problem { field: b"action", why: Why::Range }),
-            }
-        }
+        b"propose" => propose(&value, limits)?,
         b"note" => {
             let (entry, recalled) = notes::new(&value)?;
             core::NamedAction::Note { entry, recalled }
@@ -133,7 +122,17 @@ fn delegates(value: &json::Value, limits: &Limits) -> Result<Box<[core::Delegate
     if value.array()?.len() > usize::try_from(limits.batch).expect("u32 fits usize") {
         return Err(Problem { field: b"batch", why: Why::TooLarge });
     }
-    nested::delegates(value)
+    let batch = nested::delegates(value)?;
+    let mut allowed = false;
+    for member in &batch {
+        if let jig_domain_people::Budget::AsAllowed { .. } = member.budget {
+            if allowed {
+                return Err(Problem { field: b"budget", why: Why::Malformed });
+            }
+            allowed = true;
+        }
+    }
+    Ok(batch)
 }
 
 fn message(value: &json::Value) -> Result<core::NamedAction, Problem> {
@@ -147,5 +146,35 @@ fn message(value: &json::Value) -> Result<core::NamedAction, Problem> {
         target: value.required(b"target")?.number()?,
         kind,
         words: value.required(b"words")?.text()?,
+    })
+}
+
+fn propose(value: &json::Value, limits: &Limits) -> Result<core::NamedAction, Problem> {
+    let reason = value.required(b"reason")?.text()?;
+    let kind = value.required(b"action")?.text()?;
+    Ok(match kind.as_ref() {
+        b"amend" => core::NamedAction::Propose {
+            action: tasks::ProposalAction::Amend {
+                task: value.required(b"target")?.number()?,
+                revision: value.required(b"revision")?.number()?,
+                amendment: nested::amendment(value.required(b"amendment")?)?,
+            },
+            reason,
+            as_holder: false,
+        },
+        b"widen" => core::NamedAction::Propose {
+            action: tasks::ProposalAction::Widen {
+                task: 0,
+                authority: nested::authority(value.required(b"authority")?)?,
+            },
+            reason,
+            as_holder: false,
+        },
+        b"batch" => core::NamedAction::ProposeBatch {
+            batch: delegates(value.required(b"batch")?, limits)?,
+            reason,
+            as_holder: false,
+        },
+        _ => return Err(Problem { field: b"action", why: Why::Range }),
     })
 }

@@ -114,6 +114,10 @@ fn propose_member_batch(world: &mut World) -> u64 {
     given.delegation.tasks = 0;
     given.delegation.depth = 0;
     let delegate = core::Delegate {
+        label: 0,
+        flags: jig_domain_tasks::Flags::PLAIN,
+        tracked: None,
+        budget: jig_domain_people::Budget::Named,
         executor: tasks::Executor::Agent { charter: 1 },
         spec: tasks::Spec { words: b"proposed root".as_slice().into(), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
@@ -131,7 +135,7 @@ fn propose_member_batch(world: &mut World) -> u64 {
             as_holder: true,
         },
     }));
-    let core::CallPart::Proposed { proposal } = &world.answers.last().expect("proposal answer").2 else {
+    let core::CallPart::Proposed { proposal, .. } = &world.answers.last().expect("proposal answer").2 else {
         panic!("batch proposed: {:?}", world.answers)
     };
     *proposal

@@ -897,7 +897,7 @@ fn person_address_proposals_keep_the_named_revision_and_actual_beforefacts() {
         authority: Some(wider),
         reason: b"new address".as_slice().into(),
     };
-    let action = tasks::ProposalAction::Amend { task: 2, amendment: edit.clone() };
+    let action = tasks::ProposalAction::Amend { task: 2, revision: 0, amendment: edit.clone() };
     send_task(
         &mut core,
         &limits,
@@ -979,6 +979,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
         tasks::ProposalAction::ProcedureEffect { connector: 2, authority: wider.clone(), step: 13, purpose: 17 },
         tasks::ProposalAction::Amend {
             task: 2,
+            revision: 0,
             amendment: tasks::Amendment {
                 tracked: None,
                 addressed: None,

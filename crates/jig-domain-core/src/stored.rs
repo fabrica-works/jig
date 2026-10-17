@@ -39,7 +39,7 @@ pub enum CallPart {
     /// A task holder's decision call was refused before mutation.
     EscalationRefused(jig_domain_tasks::Problem),
     /// Proposal entered its proposer's pending state.
-    Proposed { proposal: u64 },
+    Proposed { proposal: u64, holder: jig_domain_tasks::ProposalHolder },
     /// Proposal was accepted, rejected, passed or withdrawn.
     ProposalDecided { proposal: u64, outcome: jig_domain_tasks::ProposalOutcome },
     /// Proposal action or standing failed before mutation.
@@ -63,7 +63,7 @@ pub enum CallPart {
     /// A standing interest failed admission.
     SubscriptionRefused(jig_domain_tasks::Problem),
     /// All members of an authorized batch, in call order.
-    Delegated(Box<[u64]>),
+    Delegated(Box<[Made]>),
     /// A batch declined by authority, with findings.
     DelegationDenied { answer: jig_domain_authority::Answer, findings: Box<[jig_domain_authority::Finding]> },
     /// A batch refused by structural or funding admission.
@@ -76,6 +76,14 @@ pub enum CallPart {
     NoteRefused(jig_domain_notes::Refusal),
     /// The named tool is deferred to a later route.
     Unavailable,
+}
+
+/// A delegate made by a named call, with the spec revision and resolved allotment.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Made {
+    pub task: u64,
+    pub revision: u64,
+    pub given: Option<u64>,
 }
 
 impl CallPart {
@@ -101,7 +109,7 @@ impl CallPart {
             | CallPart::Controlled
             | CallPart::NoteRefused(_)
             | CallPart::ControlDenied { .. } => true,
-            CallPart::Proposed { proposal } | CallPart::ProposalDecided { proposal, .. } => {
+            CallPart::Proposed { proposal, .. } | CallPart::ProposalDecided { proposal, .. } => {
                 *proposal != 0 && *proposal <= deployment.messages
             }
             CallPart::EscalationDecided { task, revision, .. } => {
@@ -126,11 +134,11 @@ impl CallPart {
                     return false;
                 }
                 for (at, &number) in numbers.iter().enumerate() {
-                    if number == 0 || number > deployment.tasks {
+                    if number.task == 0 || number.task > deployment.tasks {
                         return false;
                     }
                     for &earlier in numbers.iter().take(at) {
-                        if number == earlier {
+                        if number.task == earlier.task {
                             return false;
                         }
                     }

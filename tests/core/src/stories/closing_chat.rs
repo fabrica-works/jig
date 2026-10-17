@@ -62,6 +62,10 @@ fn fixture_with_delegates() -> (World, root::Config, u64, [u64; 2]) {
     authority.budget.spend = 10;
     authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
     let delegate = core::Delegate {
+        label: 0,
+        flags: jig_domain_tasks::Flags::PLAIN,
+        tracked: None,
+        budget: jig_domain_people::Budget::Named,
         executor: tasks::Executor::Agent { charter: 1 },
         spec: tasks::Spec { words: Box::from(&b"delegate"[..]), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
@@ -86,7 +90,7 @@ fn fixture_with_delegates() -> (World, root::Config, u64, [u64; 2]) {
         let core::CallPart::Delegated(numbers) = &world.answers.last().expect("close story fixture").2 else {
             panic!("delegates admitted: {:?}", world.answers)
         };
-        *slot = numbers[0];
+        *slot = numbers[0].task;
     }
     (world, configuration, run.0, delegates)
 }

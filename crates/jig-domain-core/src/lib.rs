@@ -14,6 +14,7 @@ pub mod templates;
 pub use templates::Template;
 pub mod acts;
 mod amendments;
+mod as_allowed;
 mod authority_facts;
 mod brief_text;
 mod compound;
@@ -82,7 +83,7 @@ pub use run::{
     RunAdmission, RunCharter, RunPolicy, Transcript, reserve_floor,
 };
 pub use stored::{
-    CallKey, CallPart, CallRecord, CallReplay, CoreKey, CoreRecord, EscalationDecisionRecord, Key,
+    CallKey, CallPart, CallRecord, CallReplay, CoreKey, CoreRecord, EscalationDecisionRecord, Key, Made,
     ProposalDecisionRecord, Record, Restored, RunProof, TerminalRecord, TurnProof, TurnRecord,
 };
 pub use translate::task_authority;
@@ -224,6 +225,9 @@ pub(crate) struct WatchedSubject {
     pub(crate) watchers: u32,
 }
 
+/// One delegation waiting for the task child's durable creation reply.
+pub type Delegating = (CallKey, Box<[tasks::Stub]>, Option<people::Given>);
+
 /// The eight child domains of the core; routing owns durable live state.
 /// added here as the root's boundary is drawn.
 #[derive(Debug)]
@@ -257,7 +261,7 @@ pub struct Core {
     /// Goal proposal decisions in flight.
     pub goal_routes: Map<Token, GoalRoute>,
     /// Delegations awaiting input checks.
-    pub delegating: Map<Token, (CallKey, Box<[tasks::Stub]>)>,
+    pub delegating: Map<Token, Delegating>,
     /// Person proposal decisions in flight.
     pub routing_people_proposals: Map<Token, PersonProposalRoute>,
     /// Ended result positions waiting to be delivered.

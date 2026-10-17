@@ -904,7 +904,8 @@ fn complete_accept(
                             request: token,
                             proposer: proposal.proposer,
                             proposal: proposal.number,
-                            by: person
+                            by: person,
+                            moved: None
                         }
                     )
                     .is_ok(),

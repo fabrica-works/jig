@@ -3,6 +3,7 @@
 use crate::{CallKey, Core, TurnRecord};
 use alloc::boxed::Box;
 use jig_domain_authority as authority;
+use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::{List, Queue, Token, Wall};
 
@@ -350,7 +351,7 @@ pub enum RoutedCall {
     Escalation { key: CallKey, task: u64, revision: u64, passed_up: bool },
     Propose { key: CallKey, proposal: u64 },
     Decide { key: CallKey, proposal: u64 },
-    Withdraw { key: CallKey, proposal: u64 },
+    Withdraw { key: CallKey, proposal: u64, moved: Option<(u64, people::Moved)> },
     Accepting { key: CallKey, proposer: u64, proposal: u64, message: u64 },
     Message(CallKey),
     Introduce(CallKey),
@@ -374,7 +375,7 @@ pub struct PendingRelay {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PersonProposalRoute {
-    Deciding { request: Token, proposer: u64, proposal: u64, by: u64 },
+    Deciding { request: Token, proposer: u64, proposal: u64, by: u64, moved: Option<people::Moved> },
     Accepting { request: Token, person: u64, proposer: u64, proposal: u64, message: u64 },
 }
 
@@ -395,7 +396,7 @@ pub enum PersonTaskRoute {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum GoalRoute {
     Offering { proposal: u64, to: u32, stubs: Box<[tasks::Stub]> },
-    Withdrawing { proposer: u64, proposal: u64 },
+    Withdrawing { proposer: u64, proposal: u64, moved: Option<people::Moved> },
     Accepting { proposer: u64, proposal: u64, by: u64 },
     Deciding { proposer: u64, proposal: u64, by: u64 },
 }

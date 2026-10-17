@@ -21,7 +21,7 @@ fn kind(action: &tasks::ProposalAction) -> (tasks::ProposalKind, authority::Prop
     }
 }
 
-fn action_for_check(action: &tasks::ProposalAction) -> Option<authority::Action> {
+fn action_for_check(core: &Core, action: &tasks::ProposalAction) -> Option<authority::Action> {
     match action {
         tasks::ProposalAction::Batch(batch) => {
             let mut members = List::with_capacity(u32::try_from(batch.len()).expect("bounded proposed batch"));
@@ -48,9 +48,9 @@ fn action_for_check(action: &tasks::ProposalAction) -> Option<authority::Action>
         | tasks::ProposalAction::Widen { authority, .. } => {
             Some(authority::Action::Widen(translate::authority_value(authority)))
         }
-        tasks::ProposalAction::Amend { amendment, .. } => Some(authority::Action::Amend(translate::authority_value(
-            amendment.authority.as_ref().expect("proposal amendment widens"),
-        ))),
+        tasks::ProposalAction::Amend { task, amendment, .. } => Some(authority::Action::Amend(
+            translate::authority_value(amendment.authority.as_ref().unwrap_or(&core.tasks.task(*task)?.authority)),
+        )),
         tasks::ProposalAction::Release { .. } => Some(authority::Action::Escalate { release: None }),
     }
 }
@@ -129,7 +129,7 @@ fn holder(
     after: Option<tasks::ProposalHolder>,
 ) -> Option<tasks::ProposalHolder> {
     let context = core.tasks.delegation(proposer)?;
-    let checked = action_for_check(action)?;
+    let checked = action_for_check(core, action)?;
     let needed = authority::needs(&checked)?;
     let (kind, policy_kind) = kind(action);
     let mut next = context.requester;
@@ -202,7 +202,7 @@ impl Core {
         project: u32,
         action: &tasks::ProposalAction,
     ) -> Result<authority::Authority, tasks::Refusal> {
-        let Some(checked) = action_for_check(action) else { return Err(tasks::Refusal::Executor) };
+        let Some(checked) = action_for_check(self, action) else { return Err(tasks::Refusal::Executor) };
         let Some(needed) = authority::needs(&checked) else { return Err(tasks::Refusal::AuthorityShape) };
         let Some(policy) = self.authority.policy(project) else { return Err(tasks::Refusal::Project) };
         let implies = &self.authority.rules().implies;
@@ -223,7 +223,7 @@ impl Core {
         project: u32,
         action: &tasks::ProposalAction,
     ) -> Result<(), tasks::Refusal> {
-        let Some(checked) = action_for_check(action) else { return Err(tasks::Refusal::Executor) };
+        let Some(checked) = action_for_check(self, action) else { return Err(tasks::Refusal::Executor) };
         let Some(needed) = authority::needs(&checked) else { return Err(tasks::Refusal::AuthorityShape) };
         let Some(depth) = distance(self, limits, proposer, holder) else { return Err(tasks::Refusal::Reference) };
         if covers_task(self, limits, &needed, holder, depth, project) { Ok(()) } else { Err(tasks::Refusal::Funding) }
@@ -274,8 +274,8 @@ impl Core {
 
     /// Translate a proposal action for authority admission.
     #[must_use]
-    pub fn proposal_action_for_check(action: &tasks::ProposalAction) -> Option<authority::Action> {
-        action_for_check(action)
+    pub fn proposal_action_for_check(&self, action: &tasks::ProposalAction) -> Option<authority::Action> {
+        action_for_check(self, action)
     }
 
     /// Whether one ancestor can decide this proposal.

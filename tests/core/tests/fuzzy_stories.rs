@@ -67,6 +67,10 @@ fn random_pool_sizes_shrink_and_grow_while_finishes_wait_for_their_commits() {
                     to: ReplyTo::new(Token::new(9000 + u64::from(completion))),
                     key: core::CallKey { task: parent.0, attempt: parent.1, completion, position: 0 },
                     batch: Box::new([core::Delegate {
+                        label: 0,
+                        flags: jig_domain_tasks::Flags::PLAIN,
+                        tracked: None,
+                        budget: jig_domain_people::Budget::Named,
                         executor: tasks::Executor::Agent { charter: 1 },
                         spec: tasks::Spec {
                             words: b"pool work".as_slice().into(),
@@ -84,7 +88,7 @@ fn random_pool_sizes_shrink_and_grow_while_finishes_wait_for_their_commits() {
                 let core::CallPart::Delegated(numbers) = &world.answers.last().expect("admitted delegate").2 else {
                     panic!("delegate not admitted");
                 };
-                children.push(numbers[0]);
+                children.push(numbers[0].task);
             }
             assert_eq!(world.assignments.len(), 1 + usize::try_from(initial).expect("small pool"));
             pool(&mut world, 0);

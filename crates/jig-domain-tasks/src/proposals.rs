@@ -85,7 +85,7 @@ pub enum ProposalAction {
     /// A procedure-origin effect keeps its genuine stable purpose and step.
     ProcedureEffect { connector: u16, authority: Authority, step: u64, purpose: u64 },
     /// Change an existing live task after its holder accepts the needed authority.
-    Amend { task: u64, amendment: Amendment },
+    Amend { task: u64, revision: u64, amendment: Amendment },
     /// Widen a task's current authority.
     Widen { task: u64, authority: Authority },
     /// Release a held task whose decision needs the holder.
@@ -175,7 +175,7 @@ impl PersonProposal {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum PersonAction {
     Batch(Box<[New]>),
-    Amend { task: u64, amendment: Box<Amendment> },
+    Amend { task: u64, revision: u64, amendment: Box<Amendment> },
 }
 
 /// Durable decision on a person-origin proposal; terminal rows remain in the store.

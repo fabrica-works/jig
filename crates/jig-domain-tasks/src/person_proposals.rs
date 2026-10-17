@@ -8,7 +8,7 @@ use skein_lib::{Env, List, Queue, ReplyTo};
 pub(crate) fn valid_action(proposal: &PersonProposal, limits: &Limits) -> bool {
     let batch = match &proposal.action {
         PersonAction::Batch(batch) => batch,
-        PersonAction::Amend { task, amendment } => {
+        PersonAction::Amend { task, amendment, .. } => {
             return *task != 0 && crate::stored::valid_amendment(limits, amendment);
         }
     };
@@ -119,7 +119,7 @@ pub(crate) fn ended(domain: &mut Domain, env: &Env<Limits>, task: u64, out: &mut
 }
 
 pub(crate) fn check(domain: &Domain, env: &Env<Limits>, proposal: &PersonProposal) -> Result<(), Refusal> {
-    let PersonAction::Amend { task, amendment } = &proposal.action else { return Ok(()) };
+    let PersonAction::Amend { task, amendment, .. } = &proposal.action else { return Ok(()) };
     let row = crate::domain::record(domain, *task).ok_or(Refusal::Unknown)?;
     if row.project != proposal.project {
         return Err(Refusal::Unknown);

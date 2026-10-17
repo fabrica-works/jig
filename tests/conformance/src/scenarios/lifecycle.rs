@@ -47,6 +47,10 @@ fn delegate(world: &mut World) {
     authority.budget.spend = 10;
     authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
     let batch = [b"moved delegate".as_slice(), b"cancelled delegate".as_slice()].map(|words| core::Delegate {
+        label: 0,
+        flags: jig_domain_tasks::Flags::PLAIN,
+        tracked: None,
+        budget: jig_domain_people::Budget::Named,
         executor: tasks::Executor::Agent { charter: 1 },
         spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
@@ -85,7 +89,7 @@ pub(super) fn prepare(world: &mut World, phase: &mut u8) -> Result<bool, Violati
     else {
         panic!("compound delegates refused: {:?}", super::named_part(world, DELEGATE_COMPLETION))
     };
-    world.peers.children = children.to_vec();
+    world.peers.children = children.iter().map(|member| member.task).collect();
     let running = world.peers.children.iter().all(|&child| {
         matches!(row(world, child).phase, tasks::Phase::Active(tasks::Active::Running { attempt })
             if world.peers.assignments.contains(&(child, attempt)))

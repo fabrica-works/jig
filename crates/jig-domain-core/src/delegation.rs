@@ -32,6 +32,10 @@ pub struct Delegate {
     pub symbolic_grants: Box<[tasks::Grant]>,
     pub dependencies: Box<[Dependency]>,
     pub wake: tasks::WakePolicy,
+    pub tracked: Option<u32>,
+    pub label: u32,
+    pub flags: tasks::Flags,
+    pub budget: jig_domain_people::Budget,
 }
 
 /// A connector-owned procedure's chosen task action before core admission.

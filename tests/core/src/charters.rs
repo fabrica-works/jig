@@ -63,6 +63,10 @@ impl World {
             to: ReplyTo::new(Token::new(201)),
             key: self.call_key(1),
             batch: Box::new([core::Delegate {
+                label: 0,
+                flags: jig_domain_tasks::Flags::PLAIN,
+                tracked: None,
+                budget: jig_domain_people::Budget::Named,
                 executor: tasks::Executor::Agent { charter },
                 spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
                 contract: tasks::Contract::Report { words: 128 },

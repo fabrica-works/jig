@@ -197,7 +197,7 @@ fn valid_proposal(task: &TaskRecord, limits: &Limits) -> bool {
         crate::ProposalAction::ProcedureEffect { authority, step, .. } => {
             *step != 0 && crate::batch::valid_authority(limits, authority)
         }
-        crate::ProposalAction::Amend { task: target, amendment } => {
+        crate::ProposalAction::Amend { task: target, amendment, .. } => {
             *target != 0 && amendment.authority.is_some() && valid_amendment(limits, amendment)
         }
         crate::ProposalAction::Widen { task: target, authority } => {

@@ -29,6 +29,10 @@ impl World {
             to: ReplyTo::new(Token::new(201)),
             key: self.call_key(1),
             batch: Box::new([core::Delegate {
+                label: 0,
+                flags: jig_domain_tasks::Flags::PLAIN,
+                tracked: None,
+                budget: jig_domain_people::Budget::Named,
                 executor: tasks::Executor::Agent { charter: 1 },
                 spec: tasks::Spec {
                     words: b"work on the resource".as_slice().into(),

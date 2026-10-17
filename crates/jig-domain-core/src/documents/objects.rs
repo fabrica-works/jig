@@ -393,7 +393,9 @@ fn action(
                 purpose: *purpose,
             }
         }
-        tasks::ProposalAction::Amend { task, amendment } => party::amendment(core, limits, party, *task, amendment)?,
+        tasks::ProposalAction::Amend { task, amendment, .. } => {
+            party::amendment(core, limits, party, *task, amendment)?
+        }
         tasks::ProposalAction::Widen { task, authority } => ProposalAction::Widen {
             task: super::task_tree::link(core, limits, party, *task)?,
             before: super::task_tree::authority(limits, &super::small::visible(core, party, *task)?.authority)?,
@@ -845,7 +847,7 @@ pub fn retained_action(limits: &Limits, number: u64, value: &tasks::ProposalActi
                 purpose: *purpose,
             }
         }
-        tasks::ProposalAction::Amend { task, amendment: change } => RetainedAction::Amend {
+        tasks::ProposalAction::Amend { task, amendment: change, .. } => RetainedAction::Amend {
             task: *task,
             change: Box::new(AmendmentChange {
                 addressed: change.addressed,

@@ -40,14 +40,24 @@ pub(super) fn delegate_validated(
     env: &Env<Limits>,
     to: ReplyTo,
     key: CallKey,
-    batch: Box<[Delegate]>,
+    mut batch: Box<[Delegate]>,
     stubs: Box<[tasks::Stub]>,
 ) -> Requests {
+    assert!(core.current_proof(key.task, key.attempt), "delegation belongs to current claim");
+    if let Some(part) = core.call_parts.get(&key) {
+        let mut out = Queue::with_capacity(2);
+        out.push(Request::Held(Box::new(crate::Held::CallAnswer { to, key, part: part.clone() })));
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
     if let Some(part) = core.authorize_tool(key, ToolKind::Delegate) {
         let mut out = Queue::with_capacity(3);
         call_decision(core, &mut out, to, key, part);
         out.push(Request::Decided);
         return Requests::Out(out);
+    }
+    if let Err(why) = core.task_as_allowed(key.task, &mut batch) {
+        return delegate_refused(core, to, key, None, why);
     }
     if let Err(part) = core.delegate_preflight(&env.limits.tasks, key, &batch) {
         let mut out = Queue::with_capacity(3);
@@ -64,6 +74,7 @@ pub(super) fn delegate_validated(
         };
         numbers.push(number).expect("bounded delegation IDs");
     }
+    let mut given = None;
     let mut created = List::with_capacity(env.limits.tasks.batch);
     for (index, member) in batch.into_iter().enumerate() {
         let index = u32::try_from(index).expect("batch length fits u32");
@@ -89,6 +100,9 @@ pub(super) fn delegate_validated(
             }
         }
         let number = *numbers.get(index).expect("one ID per member");
+        if let jig_domain_people::Budget::AsAllowed { .. } = member.budget {
+            given = Some(jig_domain_people::Given { task: number, amount: member.authority.budget.spend });
+        }
         let Some(authority) = crate::resolved_delegate_authority(
             &member.authority,
             &member.symbolic_grants,
@@ -99,8 +113,8 @@ pub(super) fn delegate_validated(
         };
         created
             .push(tasks::New {
-                label: 0,
-                flags: jig_domain_tasks::Flags::PLAIN,
+                label: member.label,
+                flags: member.flags,
                 number,
                 project: context.project,
                 executor: member.executor,
@@ -118,7 +132,7 @@ pub(super) fn delegate_validated(
                 holdings: Box::new([]),
                 wake: member.wake,
                 recurring: None,
-                tracked: None,
+                tracked: member.tracked,
             })
             .expect("bounded delegation batch");
     }
@@ -129,25 +143,14 @@ pub(super) fn delegate_validated(
     }
     let remaining = u32::try_from(core.connectors.len()).expect("configured connector count fits u32");
     assert!(remaining > 0, "delegation has a numbered connector");
-    let mut asked = List::with_capacity(u32::try_from(members.len()).expect("bounded delegation batch"));
-    for member in &members {
-        asked
-            .push(HoldingsNeed {
-                project: member.project,
-                root,
-                number: member.number,
-                executor: member.executor,
-                spec: member.spec.clone(),
-            })
-            .expect("one holdings request per member");
-    }
+    let asked = holdings_need(root, &members, env.limits.tasks.batch);
     assert!(
         core.creating_delegates
             .insert(
                 request,
                 DelegateCreation {
                     key,
-                    kind: BatchKind::Delegation { stubs },
+                    kind: BatchKind::Delegation { stubs, given },
                     members,
                     remaining,
                     answered: List::with_capacity(remaining),
@@ -220,8 +223,11 @@ pub(super) fn delegate_holdings(
         };
     }
     match flight.kind {
-        BatchKind::Delegation { stubs } => {
-            assert!(core.delegating.insert(request, (flight.key, stubs)) == Ok(None), "one pending delegated call");
+        BatchKind::Delegation { stubs, given } => {
+            assert!(
+                core.delegating.insert(request, (flight.key, stubs, given)) == Ok(None),
+                "one pending delegated call"
+            );
             work.push(Event::Tasks(tasks::Event::Make {
                 reply_to: ReplyTo::new(request),
                 creator: tasks::Party::Task(flight.key.task),
@@ -253,7 +259,7 @@ pub(super) fn propose_batch(
     env: &Env<Limits>,
     to: ReplyTo,
     key: CallKey,
-    batch: Box<[Delegate]>,
+    mut batch: Box<[Delegate]>,
     reason: Box<[u8]>,
     as_holder: bool,
     tracked: Option<u32>,
@@ -266,6 +272,9 @@ pub(super) fn propose_batch(
     };
     if batch.is_empty() || batch.len() > usize::try_from(env.limits.tasks.batch).expect("u32 fits usize") {
         return proposal_refused(core, to, key, tasks::Refusal::Batch);
+    }
+    if let Err(why) = core.task_as_allowed(key.task, &mut batch) {
+        return proposal_refused(core, to, key, why);
     }
     let root = core.tasks.root(key.task).expect("proposer live");
     let mut numbers = List::with_capacity(env.limits.tasks.batch);
@@ -293,8 +302,8 @@ pub(super) fn propose_batch(
         let number = *numbers.get(u32::try_from(index).expect("batch index")).expect("one ID per member");
         created
             .push(tasks::New {
-                label: 0,
-                flags: jig_domain_tasks::Flags::PLAIN,
+                label: member.label,
+                flags: member.flags,
                 number,
                 project: context.project,
                 executor: member.executor,
@@ -312,7 +321,7 @@ pub(super) fn propose_batch(
                 holdings: Box::new([]),
                 wake: member.wake,
                 recurring: None,
-                tracked,
+                tracked: tracked.or(member.tracked),
             })
             .expect("bounded proposal batch");
     }
@@ -320,18 +329,7 @@ pub(super) fn propose_batch(
     let members = created.into_boxed();
     let remaining = u32::try_from(core.connectors.len()).expect("configured connector count fits u32");
     assert!(remaining > 0, "proposal has a numbered connector");
-    let mut asked = List::with_capacity(u32::try_from(members.len()).expect("bounded proposal batch"));
-    for member in &members {
-        asked
-            .push(HoldingsNeed {
-                project: member.project,
-                root,
-                number: member.number,
-                executor: member.executor,
-                spec: member.spec.clone(),
-            })
-            .expect("one holdings request per member");
-    }
+    let asked = holdings_need(root, &members, env.limits.tasks.batch);
     assert!(
         core.creating_delegates
             .insert(
@@ -372,7 +370,7 @@ pub(super) fn procedure_step(
     step: u64,
     connector: u16,
     procedure_code: u32,
-    decision: ProcedureStep,
+    mut decision: ProcedureStep,
 ) -> Requests {
     if core.tasks.procedure_due(task) != Some((connector, procedure_code, step)) {
         if !decision.batch.is_empty() {
@@ -386,6 +384,9 @@ pub(super) fn procedure_step(
         let mut out = Queue::with_capacity(1);
         out.push(Request::Decided);
         return Requests::Out(out);
+    }
+    if let Err(why) = core.task_as_allowed(task, &mut decision.batch) {
+        return super::procedure_steps::refused(core, task, step, super::procedure_steps::problem(task, why));
     }
     let parts = match super::procedure_steps::parts(core, env, task, &decision) {
         Ok(parts) => parts,
@@ -472,8 +473,8 @@ pub(super) fn procedure_step(
                 };
                 created
                     .push(tasks::New {
-                        label: 0,
-                        flags: jig_domain_tasks::Flags::PLAIN,
+                        label: member.label,
+                        flags: member.flags,
                         number,
                         project: context.project,
                         executor: member.executor,
@@ -491,7 +492,7 @@ pub(super) fn procedure_step(
                         holdings: Box::new([]),
                         wake: member.wake,
                         recurring: None,
-                        tracked: None,
+                        tracked: member.tracked,
                     })
                     .expect("bounded procedure batch");
             }
@@ -707,4 +708,20 @@ pub(super) fn delegate_input_failed(work: &mut Queue<Event>, to: ReplyTo, key: C
     let mut out = Queue::with_capacity(1);
     out.push(Request::Decided);
     Requests::Out(out)
+}
+
+fn holdings_need(root: u64, members: &[tasks::New], capacity: u32) -> List<HoldingsNeed> {
+    let mut asked = List::with_capacity(capacity);
+    for member in members {
+        asked
+            .push(HoldingsNeed {
+                project: member.project,
+                root,
+                number: member.number,
+                executor: member.executor,
+                spec: member.spec.clone(),
+            })
+            .expect("one holdings request per member");
+    }
+    asked
 }

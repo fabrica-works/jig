@@ -90,7 +90,8 @@ pub(crate) fn proposal(
             }
             match act {
                 Act::Accept => {
-                    let action = Core::proposal_action_for_check(&row.action)
+                    let action = core
+                        .proposal_action_for_check(&row.action)
                         .ok_or(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape })?;
                     core.proposal_person_admit(
                         party,

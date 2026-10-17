@@ -91,9 +91,9 @@ pub(super) fn encode_call_part(value: &domain::CallPart, limits: &Limits) -> Res
                 wire::CallPartEscalationRefusedParts { value: encode_task_problem(value, limits)? },
             )?)
         }
-        domain::CallPart::Proposed { proposal } => wire::CallPart::Proposed(wire::CallPartProposed::new(
+        domain::CallPart::Proposed { proposal, holder } => wire::CallPart::Proposed(wire::CallPartProposed::new(
             &limits.core,
-            wire::CallPartProposedParts { proposal: *proposal },
+            wire::CallPartProposedParts { proposal: *proposal, holder: encode_holder(holder, limits)? },
         )?),
         domain::CallPart::ProposalDecided { proposal, outcome } => {
             encode_part_proposal_decided(*proposal, *outcome, limits)?
@@ -199,8 +199,8 @@ pub(super) fn decode_call_part(value: wire::CallPart, limits: &Limits) -> Result
             domain::CallPart::EscalationRefused(decode_task_problem(value, limits)?)
         }
         wire::CallPart::Proposed(value) => {
-            let wire::CallPartProposedParts { proposal } = value.into_parts();
-            domain::CallPart::Proposed { proposal }
+            let wire::CallPartProposedParts { proposal, holder } = value.into_parts();
+            domain::CallPart::Proposed { proposal, holder: decode_holder(holder, limits) }
         }
         wire::CallPart::ProposalDecided(value) => {
             let wire::CallPartProposalDecidedParts { proposal, outcome } = value.into_parts();
@@ -347,22 +347,29 @@ fn decode_call_part_tool_denied_findings(values: List<wire::Finding>, limits: &L
     result.into_boxed()
 }
 
-fn encode_call_part_delegated_value(values: &[u64], limits: &Limits) -> Result<List<wire::Number>, wire::Problem> {
+fn encode_call_part_delegated_value(
+    values: &[domain::Made],
+    limits: &Limits,
+) -> Result<List<wire::Made>, wire::Problem> {
     let mut result = List::with_capacity(match u32::try_from(values.len()) {
         Ok(value) => value,
         Err(error) => return Err(too_large(error)),
     });
     for value in values {
         result
-            .push(wire::Number::new(&limits.core, wire::NumberParts { value: *value })?)
+            .push(wire::Made::new(
+                &limits.core,
+                wire::MadeParts { task: value.task, revision: value.revision, given: value.given },
+            )?)
             .expect("same number of members");
     }
     Ok(result)
 }
-fn decode_call_part_delegated_value(values: List<wire::Number>, _limits: &Limits) -> Box<[u64]> {
+fn decode_call_part_delegated_value(values: List<wire::Made>, _limits: &Limits) -> Box<[domain::Made]> {
     let mut result = List::with_capacity(values.len());
     for value in values.into_boxed() {
-        result.push(value.into_parts().value).expect("same number of members");
+        let wire::MadeParts { task, revision, given } = value.into_parts();
+        result.push(domain::Made { task, revision, given }).expect("same number of members");
     }
     result.into_boxed()
 }
@@ -610,4 +617,29 @@ fn decode_again(value: wire::CallPartAgain) -> domain::CallPart {
 fn decode_passed_up(value: wire::CallPartPassedUp) -> domain::CallPart {
     let wire::CallPartPassedUpParts { task } = value.into_parts();
     domain::CallPart::PassedUp { task }
+}
+
+fn encode_holder(value: &tasks::ProposalHolder, limits: &Limits) -> Result<wire::ProposalHolder, wire::Problem> {
+    Ok(match value {
+        tasks::ProposalHolder::Task(value) => {
+            wire::ProposalHolder::Task(wire::Number::new(&limits.core, wire::NumberParts { value: *value })?)
+        }
+        tasks::ProposalHolder::Person(value) => {
+            wire::ProposalHolder::Person(wire::Number::new(&limits.core, wire::NumberParts { value: *value })?)
+        }
+        tasks::ProposalHolder::Policy { project, kind } => wire::ProposalHolder::Policy(wire::PolicyHolder::new(
+            &limits.core,
+            wire::PolicyHolderParts { project: *project, kind: super::encode_proposal_kind(kind, limits) },
+        )?),
+    })
+}
+fn decode_holder(value: wire::ProposalHolder, limits: &Limits) -> tasks::ProposalHolder {
+    match value {
+        wire::ProposalHolder::Task(value) => tasks::ProposalHolder::Task(value.into_parts().value),
+        wire::ProposalHolder::Person(value) => tasks::ProposalHolder::Person(value.into_parts().value),
+        wire::ProposalHolder::Policy(value) => {
+            let wire::PolicyHolderParts { project, kind } = value.into_parts();
+            tasks::ProposalHolder::Policy { project, kind: super::decode_proposal_kind(kind, limits) }
+        }
+    }
 }

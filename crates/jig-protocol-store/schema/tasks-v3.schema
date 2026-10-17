@@ -131,7 +131,7 @@ record Amendment {
 record ProposedBatch { members: list 4 Creation }
 record ProposedEffect { connector: u16 authority: Authority attempt: u64 completion: u32 position: u32 purpose: u64 }
 record ProposedProcedureEffect { connector: u16 authority: Authority step: u64 purpose: u64 }
-record ProposedAmendment { task: u64 amendment: Amendment }
+record ProposedAmendment { task: u64 revision: u64 amendment: Amendment }
 record ProposedWidening { task: u64 authority: Authority }
 enum ProposalAction { batch: ProposedBatch, effect: ProposedEffect, procedure_effect: ProposedProcedureEffect, amend: boxed ProposedAmendment, widen: ProposedWidening, release: Task }
 record Proposal { number: u64 proposer: u64 project: u32 action: ProposalAction reason: bytes 65536 as_holder: bool state: ProposalState }

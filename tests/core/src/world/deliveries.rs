@@ -90,6 +90,10 @@ impl World {
                         };
                         self.delegated = true;
                         let delegate = core::Delegate {
+                            label: 0,
+                            flags: jig_domain_tasks::Flags::PLAIN,
+                            tracked: None,
+                            budget: jig_domain_people::Budget::Named,
                             executor: tasks::Executor::Procedure { connector: 1, code: 1 },
                             spec: tasks::Spec {
                                 words: b"run the check".as_slice().into(),
@@ -131,7 +135,7 @@ impl World {
             }
             root::Delivery::Core(core::Held::CallAnswer { part: core::CallPart::Delegated(tasks), .. }) => {
                 assert_eq!(tasks.len(), 1);
-                self.procedure = Some(tasks[0]);
+                self.procedure = Some(tasks[0].task);
             }
             root::Delivery::Core(core::Held::CallAnswer {
                 part: core::CallPart::DelegationDenied { findings, .. },

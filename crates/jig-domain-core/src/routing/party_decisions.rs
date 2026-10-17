@@ -46,6 +46,9 @@ pub(super) fn goal_decide(
     }
     let event = match choice {
         people::ProposalDecision::Accept => {
+            if super::proposal_revisions::party(core, work, request, &proposal) {
+                return;
+            }
             let (source, _) = core.goal_pool(project, person);
             let (period, pool) = core.goal_open_pool(project, person);
             if let Some(event) = period {
@@ -65,7 +68,7 @@ pub(super) fn goal_decide(
                         batch,
                     }
                 }
-                tasks::PersonAction::Amend { task, amendment } => {
+                tasks::PersonAction::Amend { task, amendment, .. } => {
                     let Some(current) = core.tasks.task(task) else {
                         pool_refused(work, request, people::Refusal::Unknown);
                         return;
@@ -190,9 +193,10 @@ pub(super) fn person_proposal_decide(
         tasks::ProposalDecision::Accept => unreachable!("accept routed separately"),
     };
     assert!(
-        core.routing_people_proposals
-            .insert(request, PersonProposalRoute::Deciding { request, proposer, proposal: number, by: person },)
-            == Ok(None),
+        core.routing_people_proposals.insert(
+            request,
+            PersonProposalRoute::Deciding { request, proposer, proposal: number, by: person, moved: None },
+        ) == Ok(None),
         "one person proposal route"
     );
     work.push(Event::PersonProposal(tasks::Event::DecideProposal {
@@ -213,6 +217,9 @@ pub(super) fn person_proposal_accept(
     person: u64,
     proposal: tasks::Proposal,
 ) {
+    if super::proposal_revisions::person(core, work, request, person, &proposal) {
+        return;
+    }
     let source = tasks::Funder::Pool { project: proposal.project, person, period: core.period(proposal.project) };
     match &proposal.action {
         tasks::ProposalAction::Amend { .. } | tasks::ProposalAction::Widen { .. } => {
@@ -286,7 +293,7 @@ pub(super) fn person_proposal_accept(
                 tasks::Event::Make { reply_to: ReplyTo::new(request), creator, batch }
             }
         }
-        tasks::ProposalAction::Amend { task, amendment } => {
+        tasks::ProposalAction::Amend { task, amendment, .. } => {
             if let Err(why) = core.amendment_accept_revision(proposal.proposer, task, amendment.release) {
                 pool_refused(work, request, why);
                 return;
@@ -299,7 +306,7 @@ pub(super) fn person_proposal_accept(
                 pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
                 return;
             };
-            let after = crate::translate::authority_value(amendment.authority.as_ref().expect("admitted authority"));
+            let after = crate::translate::authority_value(amendment.authority.as_ref().unwrap_or(&current.authority));
             let before = crate::translate::authority_value(&current.authority);
             let stop_run = !authority::at_most(&before, &after, &core.authority.rules().implies);
             tasks::Event::Amend {

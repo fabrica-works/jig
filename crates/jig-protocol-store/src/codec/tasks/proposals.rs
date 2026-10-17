@@ -186,10 +186,14 @@ pub fn action(source: &domain::ProposalAction, limits: &wire::Limits) -> Result<
                 },
             )?)
         }
-        domain::ProposalAction::Amend { task, amendment } => {
+        domain::ProposalAction::Amend { task, revision, amendment } => {
             wire::ProposalAction::Amend(Box::new(wire::ProposedAmendment::new(
                 limits,
-                wire::ProposedAmendmentParts { task: *task, amendment: self::amendment(amendment, limits)? },
+                wire::ProposedAmendmentParts {
+                    task: *task,
+                    revision: *revision,
+                    amendment: self::amendment(amendment, limits)?,
+                },
             )?))
         }
         domain::ProposalAction::Widen { task, authority } => wire::ProposalAction::Widen(wire::ProposedWidening::new(
@@ -233,8 +237,8 @@ pub fn read_action(
             }
         }
         wire::ProposalAction::Amend(value) => {
-            let wire::ProposedAmendmentParts { task, amendment } = (*value).into_parts();
-            domain::ProposalAction::Amend { task, amendment: read_amendment(amendment, limits)? }
+            let wire::ProposedAmendmentParts { task, revision, amendment } = (*value).into_parts();
+            domain::ProposalAction::Amend { task, revision, amendment: read_amendment(amendment, limits)? }
         }
         wire::ProposalAction::Widen(value) => {
             let wire::ProposedWideningParts { task, authority } = value.into_parts();
@@ -466,10 +470,14 @@ pub fn person_proposal(
             limits,
             wire::ProposedBatchParts { members: batch(members, limits)? },
         )?),
-        domain::PersonAction::Amend { task, amendment } => {
+        domain::PersonAction::Amend { task, revision, amendment } => {
             wire::PersonAction::Amend(Box::new(wire::ProposedAmendment::new(
                 limits,
-                wire::ProposedAmendmentParts { task: *task, amendment: self::amendment(amendment, limits)? },
+                wire::ProposedAmendmentParts {
+                    task: *task,
+                    revision: *revision,
+                    amendment: self::amendment(amendment, limits)?,
+                },
             )?))
         }
     };
@@ -496,8 +504,8 @@ pub fn read_person_proposal(
             domain::PersonAction::Batch(read_batch(batch.into_parts().members, limits)?)
         }
         wire::PersonAction::Amend(value) => {
-            let wire::ProposedAmendmentParts { task, amendment } = (*value).into_parts();
-            domain::PersonAction::Amend { task, amendment: Box::new(read_amendment(amendment, limits)?) }
+            let wire::ProposedAmendmentParts { task, revision, amendment } = (*value).into_parts();
+            domain::PersonAction::Amend { task, revision, amendment: Box::new(read_amendment(amendment, limits)?) }
         }
     };
     Ok(domain::PersonProposal { number, proposer, project, action, reason, state: read_person_state(state, limits)? })

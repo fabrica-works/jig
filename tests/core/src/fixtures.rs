@@ -126,6 +126,10 @@ pub fn member(world: &crate::effects::World, executor: tasks::Executor, words: &
     authority.delegation =
         tasks::Delegation { kinds: Box::new([tasks::AuthorityExecutor::Charter(1)]), tasks: 1, depth: 1 };
     core::Delegate {
+        label: 0,
+        flags: jig_domain_tasks::Flags::PLAIN,
+        tracked: None,
+        budget: jig_domain_people::Budget::Named,
         executor,
         spec: tasks::Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) },
         contract: tasks::Contract::Report { words: 128 },
@@ -191,7 +195,7 @@ pub fn delegate(world: &mut crate::effects::World, run: (u64, u64), completion: 
     let core::CallPart::Delegated(numbers) = &world.answers.last().expect("delegate answer").2 else {
         panic!("delegation was not admitted");
     };
-    numbers[0]
+    numbers[0].task
 }
 
 #[must_use]
@@ -382,7 +386,7 @@ pub fn long_resource_world(seed: u64) -> (crate::effects::World, u64, jig_test_c
     let core::CallPart::Delegated(numbers) = &world.answers.last().expect("delegation answer").2 else {
         panic!("resource delegate admitted: {:?}", world.answers.last())
     };
-    let child = numbers[0];
+    let child = numbers[0].task;
     world.reads = Some(crate::reads::Parties::new(world.store.applied));
     (world, child, path)
 }

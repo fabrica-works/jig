@@ -45,7 +45,7 @@ pub enum MadeRoute {
     /// A person request receives its keyed result.
     Person { event: Box<people::Event>, stubs: Box<[tasks::Stub]> },
     /// A named run call receives its batch, after remembering historical stubs.
-    Delegated { key: CallKey, tasks: Box<[u64]>, stubs: Box<[tasks::Stub]> },
+    Delegated { key: CallKey, tasks: Box<[u64]>, stubs: Box<[tasks::Stub]>, given: Option<people::Given> },
 }
 
 /// One authenticated person word awaiting a durable task admission.
@@ -251,7 +251,7 @@ impl Core {
         {
             assert!(request == named, "person acceptance correlation");
             self.routing_people_proposals
-                .insert(request, PersonProposalRoute::Deciding { request, proposer, proposal, by: person })
+                .insert(request, PersonProposalRoute::Deciding { request, proposer, proposal, by: person, moved: None })
                 .expect("person route room");
             return MadeRoute::PersonProposal(tasks::Event::DecideProposal {
                 reply_to: skein_lib::ReplyTo::new(request),
@@ -274,7 +274,7 @@ impl Core {
             });
         }
         match self.delegating.remove(&request) {
-            Some((key, stubs)) => MadeRoute::Delegated { key, tasks, stubs },
+            Some((key, stubs, given)) => MadeRoute::Delegated { key, tasks, stubs, given },
             None => {
                 let crate::routing::Made { first: expected, goal, given, stubs } =
                     self.made.remove(&request).expect("pending make route");
@@ -323,9 +323,15 @@ impl Core {
     ) -> people::Event {
         let route = self.goal_routes.remove(&request).expect("goal decision route");
         let (named, proposal, by) = match route {
-            GoalRoute::Withdrawing { proposer: named, proposal } => {
+            GoalRoute::Withdrawing { proposer: named, proposal, moved } => {
                 assert!(named == proposer && proposal == number, "withdrawal identity");
-                return people::Event::Decided { request, outcome: people::Outcome::Withdrawn { proposal: number } };
+                return people::Event::Decided {
+                    request,
+                    outcome: match moved {
+                        Some(now) => people::Outcome::Refused(people::Refusal::Moved { now }),
+                        None => people::Outcome::Withdrawn { proposal: number },
+                    },
+                };
             }
             GoalRoute::Deciding { proposer, proposal, by } => (proposer, proposal, by),
             GoalRoute::Offering { .. } | GoalRoute::Accepting { .. } => unreachable!("proposal decision stage"),
@@ -363,9 +369,16 @@ impl Core {
     ) -> Option<people::Event> {
         let route = if person_proposal { self.routing_people_proposals.remove(&request) } else { None };
         match route {
-            Some(PersonProposalRoute::Deciding { request: named, proposer: expected, proposal, by })
+            Some(PersonProposalRoute::Deciding { request: named, proposer: expected, proposal, by, moved })
                 if expected == proposer && proposal == number =>
             {
+                if let Some(now) = moved {
+                    assert!(outcome == tasks::ProposalOutcome::Withdrawn, "stale proposal withdrawn");
+                    return Some(people::Event::Decided {
+                        request: named,
+                        outcome: people::Outcome::Refused(people::Refusal::Moved { now }),
+                    });
+                }
                 let choice = match outcome {
                     tasks::ProposalOutcome::Accepted => people::ProposalChoice::Accepted,
                     tasks::ProposalOutcome::Rejected => people::ProposalChoice::Rejected,

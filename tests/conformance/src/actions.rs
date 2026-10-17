@@ -74,6 +74,10 @@ pub(crate) fn prepare_racing_decisions(world: &mut World) {
         to: ReplyTo::new(Token::new(8001)),
         key: core::CallKey { task, attempt, completion: 1, position: 0 },
         batch: Box::new([core::Delegate {
+            label: 0,
+            flags: jig_domain_tasks::Flags::PLAIN,
+            tracked: None,
+            budget: jig_domain_people::Budget::Named,
             executor: tasks::Executor::Agent { charter: 1 },
             spec: tasks::Spec {
                 words: b"race target".as_slice().into(),

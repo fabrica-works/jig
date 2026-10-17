@@ -17,6 +17,7 @@ pub const STORIES: &[Story] = &[
     Story { name: "amend moved", run: amend_moved },
     Story { name: "release moved", run: release_moved },
     Story { name: "held notice", run: held_notice },
+    Story { name: "delegate given", run: delegate_given },
 ];
 fn amend_done(world: &mut World, cut: Option<Cut>) -> u64 {
     amend(world, cut, false)
@@ -172,6 +173,38 @@ fn held_notice(world: &mut World, cut: Option<Cut>) -> u64 {
             state: tasks::NoticeState::Held { revision: 1 }
         }
     );
+    let commits = world.store.applied - before;
+    if cut.is_some() {
+        world.reached_cut = cut;
+    }
+    commits
+}
+
+/// A capped `AsAllowed` delegate leaves room for the caller to keep running.
+pub const DELEGATE_GIVEN: &[u8] = br#"{"batch":[{"executor":{"kind":"procedure","connector":1,"code":1},"spec":{"words":"check"},"contract":{"kind":"report","words":64},"authority":{"tools":0,"grants":[],"delegation":{"kinds":[],"tasks":0,"depth":0},"budget":{"spend":0},"notes":0},"budget":{"as_allowed":{"cap":40}}}]}"#;
+pub fn delegate_given(world: &mut World, cut: Option<Cut>) -> u64 {
+    world.hold_procedures = true;
+    let before = world.store.applied;
+    world.cut = cut.map(|cut| match cut {
+        Cut::Submitted(at) => Cut::Submitted(before + at),
+        Cut::Durable(at) => Cut::Durable(before + at),
+    });
+    world.tool_call(b"delegate", DELEGATE_GIVEN, true);
+    let key = world.call_key(1);
+    if cut.is_some() {
+        assert!(world.reached_cut.is_some(), "delegate reaches its cut");
+        world.restart(190, false);
+        reconnect(world, key);
+    }
+    replay(world, key, b"delegate", DELEGATE_GIVEN);
+    assert_eq!(
+        &world.host_answers.last().expect("delegate answer").1.answer,
+        &core::SettledAnswer::Host {
+            error: false,
+            body: b"Delegated tasks: 2 at spec revision 0, given 40".as_slice().into()
+        }
+    );
+    assert_eq!(crate::fixtures::live_row(world, CHILD).numbers.budget, 40);
     let commits = world.store.applied - before;
     if cut.is_some() {
         world.reached_cut = cut;

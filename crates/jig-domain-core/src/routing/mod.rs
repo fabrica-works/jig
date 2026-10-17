@@ -58,6 +58,7 @@ mod party_decisions;
 #[path = "people.rs"]
 mod people_routes;
 mod procedure_steps;
+mod proposal_revisions;
 pub(crate) mod refusals;
 mod run_delegation;
 mod run_payloads;
@@ -143,7 +144,7 @@ pub(crate) struct DelegateCreation {
 
 #[derive(Debug)]
 enum BatchKind {
-    Delegation { stubs: Box<[tasks::Stub]> },
+    Delegation { stubs: Box<[tasks::Stub]>, given: Option<people::Given> },
     Proposal { reason: Box<[u8]>, as_holder: bool },
 }
 

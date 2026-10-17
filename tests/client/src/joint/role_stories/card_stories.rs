@@ -42,6 +42,10 @@ fn a_real_engine_question_offers_exactly_its_admitted_answer_act() {
                 position: 0,
             },
             batch: Box::new([jig_domain_core::Delegate {
+                label: 0,
+                flags: jig_domain_tasks::Flags::PLAIN,
+                tracked: None,
+                budget: jig_domain_people::Budget::Named,
                 executor: jig_domain_tasks::Executor::Agent { charter: 1 },
                 spec: jig_domain_tasks::Spec {
                     words: b"ask its parent".as_slice().into(),

@@ -67,6 +67,13 @@ pub(super) fn named_proposal_accept(
     key: CallKey,
     proposal: tasks::Proposal,
 ) -> Requests {
+    let token = to.into_token();
+    let to = ReplyTo::new(token);
+    if super::proposal_revisions::call(core, work, token, key, &proposal) {
+        let mut out = Queue::with_capacity(1);
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
     let result_followups = core.tasks.result_proposal(proposal.proposer, proposal.number);
     if let Err(why) =
         core.proposal_accept_allowed(&env.limits, proposal.proposer, key.task, proposal.project, &proposal.action)
@@ -120,15 +127,14 @@ pub(super) fn named_proposal_accept(
                 tasks::Event::Make { reply_to: ReplyTo::new(token), creator, batch }
             }
         }
-        tasks::ProposalAction::Amend { task, amendment } => {
+        tasks::ProposalAction::Amend { task, amendment, .. } => {
             let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
                 return proposal_refused(core, ReplyTo::new(token), key, tasks::Refusal::Busy);
             };
             let Some(current) = core.tasks.delegation(task) else {
                 return proposal_refused(core, ReplyTo::new(token), key, tasks::Refusal::Unknown);
             };
-            let after =
-                crate::translate::authority_value(amendment.authority.as_ref().expect("proposal amendment authority"));
+            let after = crate::translate::authority_value(amendment.authority.as_ref().unwrap_or(&current.authority));
             let before = crate::translate::authority_value(&current.authority);
             let stop_run = !authority::at_most(&before, &after, &core.authority.rules().implies);
             tasks::Event::Amend {
@@ -252,7 +258,7 @@ pub(crate) fn named_propose(
     work: &mut Queue<Event>,
     to: ReplyTo,
     key: CallKey,
-    action: tasks::ProposalAction,
+    mut action: tasks::ProposalAction,
     reason: Box<[u8]>,
     as_holder: bool,
 ) -> Requests {
@@ -262,10 +268,16 @@ pub(crate) fn named_propose(
     let Some(context) = core.tasks.delegation(key.task) else {
         return proposal_refused(core, to, key, tasks::Refusal::Unknown);
     };
-    if let tasks::ProposalAction::Amend { amendment, .. } = &action
-        && (amendment.authority.is_none() || amendment.release.is_some())
+    if let tasks::ProposalAction::Widen { task, .. } = &mut action {
+        *task = key.task;
+    }
+    if let tasks::ProposalAction::Amend { task, revision, amendment } = &action
+        && let Err(jig_domain_people::Refusal::Moved { now }) = core.party_amend_revision(*task, *revision, amendment)
     {
-        return proposal_refused(core, to, key, tasks::Refusal::AuthorityShape);
+        let mut out = Queue::with_capacity(3);
+        call_decision(core, &mut out, to, key, CallPart::Moved { task: *task, now });
+        out.push(Request::Decided);
+        return Requests::Out(out);
     }
     if let Err(why) = core.proposal_admit_action(context.project, &action) {
         return proposal_refused(core, to, key, why);
@@ -641,7 +653,10 @@ pub(super) fn named_action(
                 return proposal_refused(core, ReplyTo::new(token), key, tasks::Refusal::Unknown);
             }
             assert!(core.pending_calls.insert(key, true).is_ok(), "proposal call room reserved");
-            assert!(core.routing_calls.insert(token, RoutedCall::Withdraw { key, proposal }) == Ok(None), "one route");
+            assert!(
+                core.routing_calls.insert(token, RoutedCall::Withdraw { key, proposal, moved: None }) == Ok(None),
+                "one route"
+            );
             work.push(Event::Tasks(tasks::Event::WithdrawProposal {
                 reply_to: ReplyTo::new(token),
                 proposer: key.task,

@@ -120,7 +120,7 @@ impl Core {
                 }
                 authority::Action::Batch(members.into_boxed())
             }
-            tasks::PersonAction::Amend { task, amendment } => {
+            tasks::PersonAction::Amend { task, amendment, .. } => {
                 let row = self.tasks.task(*task).ok_or(people::Refusal::Unknown)?;
                 authority::Action::Amend(translate::authority_value(
                     amendment.authority.as_ref().unwrap_or(&row.authority),

@@ -37,7 +37,7 @@ fn program_world(seed: u64, actions: Option<Box<[connector::ProcedureAction]>>) 
     let core::CallPart::Delegated(numbers) = &world.answers.last().expect("procedure made").2 else {
         panic!("procedure refused")
     };
-    let task = numbers[0];
+    let task = numbers[0].task;
     (world, task)
 }
 

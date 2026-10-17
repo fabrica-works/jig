@@ -36,7 +36,7 @@ pub(super) fn action(
             }
             Ok((ProposalAction::Batch(batch), tasks::ProposalKind::Batch))
         }
-        tasks::PersonAction::Amend { task, amendment: change } => {
+        tasks::PersonAction::Amend { task, amendment: change, .. } => {
             Ok((amendment(core, limits, party, *task, change)?, tasks::ProposalKind::Amend))
         }
     }

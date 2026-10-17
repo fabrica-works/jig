@@ -425,7 +425,7 @@ pub(super) fn tag_tasks(
                         }
                         append_people(core, env, *event, &mut out);
                     }
-                    crate::MadeRoute::Delegated { key, tasks, stubs } => {
+                    crate::MadeRoute::Delegated { key, tasks, stubs, given } => {
                         for stub in stubs {
                             let mut follow = Queue::with_capacity(room);
                             tasks::step(
@@ -438,7 +438,13 @@ pub(super) fn tag_tasks(
                                 pending.push(follow.pop().expect("stub output count"));
                             }
                         }
-                        call_decision(core, &mut out, ReplyTo::new(request), key, CallPart::Delegated(tasks));
+                        call_decision(
+                            core,
+                            &mut out,
+                            ReplyTo::new(request),
+                            key,
+                            CallPart::Delegated(crate::as_allowed::made(&tasks, given, env.limits.tasks.batch)),
+                        );
                     }
                 }
                 continue;
@@ -452,8 +458,13 @@ pub(super) fn tag_tasks(
                     continue;
                 }
                 let route = core.routing_calls.remove(&token).expect("pending proposal decision route");
+                if let RoutedCall::Withdraw { key, moved: Some((task, now)), .. } = route {
+                    assert!(outcome == tasks::ProposalOutcome::Withdrawn, "stale proposal withdrawn");
+                    call_decision(core, &mut out, ReplyTo::new(token), key, CallPart::Moved { task, now });
+                    continue;
+                }
                 let key = match route {
-                    RoutedCall::Decide { key, proposal } | RoutedCall::Withdraw { key, proposal }
+                    RoutedCall::Decide { key, proposal } | RoutedCall::Withdraw { key, proposal, .. }
                         if proposal == number =>
                     {
                         key
@@ -598,7 +609,10 @@ pub(super) fn tag_tasks(
                     person_route
                 {
                     core.routing_people_proposals
-                        .insert(request, PersonProposalRoute::Deciding { request, proposer, proposal, by: person })
+                        .insert(
+                            request,
+                            PersonProposalRoute::Deciding { request, proposer, proposal, by: person, moved: None },
+                        )
                         .expect("person acceptance route room");
                     let mut follow = Queue::with_capacity(room);
                     tasks::step(
@@ -633,7 +647,12 @@ pub(super) fn tag_tasks(
                                     }),
                                 });
                             }
-                            Some((key, CallPart::Proposed { proposal }))
+                            let tasks::ProposalState::Pending { holder, .. } =
+                                core.tasks.proposal(key.task, proposal).expect("admitted proposal").state
+                            else {
+                                unreachable!("new proposal pending");
+                            };
+                            Some((key, CallPart::Proposed { proposal, holder }))
                         }
                         RoutedCall::Introduce(key) => Some((key, CallPart::Introduced)),
                         RoutedCall::Control { key, target, revised } => {
@@ -1243,7 +1262,7 @@ pub(super) fn tag_tasks(
                         continue;
                     }
                 }
-                if let Some((key, _stubs)) = core.delegating.remove(&token) {
+                if let Some((key, _stubs, _given)) = core.delegating.remove(&token) {
                     call_decision(core, &mut out, ReplyTo::new(token), key, CallPart::DelegationRefused(problem));
                     continue;
                 }

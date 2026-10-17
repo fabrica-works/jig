@@ -540,6 +540,10 @@ fn question_world(seed: u64, bound: Option<u32>) -> (jig_core_world::effects::Wo
         to: skein_lib::ReplyTo::new(skein_lib::Token::new(49_001)),
         key: run_key(&world, parent, 1),
         batch: Box::new([core::Delegate {
+            label: 0,
+            flags: jig_domain_tasks::Flags::PLAIN,
+            tracked: None,
+            budget: jig_domain_people::Budget::Named,
             executor: tasks::Executor::Agent { charter: 1 },
             spec: tasks::Spec {
                 words: b"ask the parent".as_slice().into(),

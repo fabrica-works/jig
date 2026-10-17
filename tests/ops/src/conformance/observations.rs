@@ -238,7 +238,7 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                     row.key.position,
                 ));
                 if let core::CallPart::Delegated(members) = &row.part {
-                    snapshot.batches.push(members.to_vec());
+                    snapshot.batches.push(members.iter().map(|member| member.task).collect());
                 }
             }
             root::Record::Core(core::Record::Core(core::CoreRecord::ProposalDecision(row)))

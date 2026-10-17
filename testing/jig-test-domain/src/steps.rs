@@ -77,6 +77,10 @@ pub(crate) fn translate(
                 authority.delegation = tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 };
                 batch
                     .push(core::Delegate {
+                        label: 0,
+                        flags: jig_domain_tasks::Flags::PLAIN,
+                        tracked: None,
+                        budget: jig_domain_people::Budget::Named,
                         executor: tasks::Executor::Agent { charter: u32::from(kind) },
                         spec: tasks::Spec { words: words(task, step), parameters: Box::new([]), inputs: Box::new([]) },
                         contract: tasks::Contract::Report { words: 128 },

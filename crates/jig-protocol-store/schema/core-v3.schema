@@ -39,7 +39,10 @@ record CallPartConnector { connector: u16 }
 record CallPartEffectDenied { answer: Answer findings: list 1024 Finding }
 record CallPartToolDenied { answer: Answer findings: list 1024 Finding }
 record CallPartEscalationDecided { task: u64 revision: u64 outcome: EscalationOutcome }
-record CallPartProposed { proposal: u64 }
+record Number { value: u64 }
+record PolicyHolder { project: u32 kind: ProposalKind }
+enum ProposalHolder { task: Number, person: Number, policy: PolicyHolder }
+record CallPartProposed { proposal: u64 holder: ProposalHolder }
 record CallPartProposalDecided { proposal: u64 outcome: ProposalOutcome }
 record CallPartControlDenied { answer: Answer }
 record CallPartSent { message: u64 }
@@ -53,8 +56,8 @@ record CallPartControlRefused { value: TaskBytes }
 record CallPartMessageRefused { value: TaskBytes }
 record CallPartSubscriptionRefused { value: TaskBytes }
 record CallPartDelegationRefused { value: TaskBytes }
-record Number { value: u64 }
-record CallPartDelegated { value: list 1024 Number }
+record Made { task: u64 revision: u64 given: option u64 }
+record CallPartDelegated { value: list 1024 Made }
 record NoteBytes { value: bytes 2097152 }
 record CallPartNoteRecalled { entries: list 16 NoteBytes more: bool }
 record NoteRefusalMoved { revision: u32 }
