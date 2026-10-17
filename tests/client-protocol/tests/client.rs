@@ -659,3 +659,98 @@ fn a_running_chat_reads_as_writing_from_the_engine_s_documents() {
     assert!(story.run_until(|s| s.chat_statuses(task) == Some((waiting.clone(), waiting.clone())), PROOF_WAIT));
     assert_eq!(story.chat_statuses(task), Some((waiting.clone(), waiting)));
 }
+
+const SHAPED_CHAT: Key = Key { asker: Asker::JIG, number: 101 };
+const SHAPED_CLOSE: Key = Key { asker: Asker::JIG, number: 102 };
+const SHAPED_GOAL: Key = Key { asker: Asker::JIG, number: 103 };
+const SHAPED_DELEGATE: u64 = 2;
+const CLOSE_FIRST_MESSAGE: u64 = 2;
+const GOAL_PROPOSAL: u64 = 1;
+const GRACE_PASSED: Duration = Duration::from_secs(6);
+#[test]
+fn a_chat_made_by_shapes_is_a_conversation_under_the_chat_label() {
+    let mut story = Story::live(fixtures::SEED);
+    let task = story.shapes_chat(SHAPED_CHAT);
+    story.watch_chat_facts(task);
+    assert!(story.run_until(|s| s.line(task).is_some(), PROOF_WAIT));
+    let line = story.line(task).expect("delivered chat line");
+    assert_eq!(line.label, 1);
+    assert!(line.flags.conversation);
+}
+#[test]
+fn closing_a_chat_by_shapes_moves_its_delegate_then_cancels_it_after_its_grace() {
+    let mut story = Story::writing_chat(fixtures::SEED);
+    let task = story.running_task();
+    story.watch_chat_facts(task);
+    assert!(story.run_until(|s| s.phase(SHAPED_DELEGATE).is_some(), PROOF_WAIT));
+    story.watch_delegate(SHAPED_DELEGATE);
+    assert!(story.run_until(|s| s.delegate_requester().is_some(), PROOF_WAIT));
+    assert_eq!(story.delegate_requester(), Some(contract::OwnerRequester::Task(task)));
+    let grace = close_shaped_chat(&mut story, task);
+    assert!(story.run_until(
+        |s| s.delegate_requester() == Some(contract::OwnerRequester::Person(fixtures::FIRST_OWNER)),
+        PROOF_WAIT
+    ));
+    assert_ne!(story.phase(task), Some(contract::Phase::Cancelled));
+    assert!(story.run_until(|s| s.phase(task) == Some(contract::Phase::Cancelled), GRACE_PASSED));
+    assert!(story.elapsed_since_answer(SHAPED_CLOSE) >= grace);
+    assert_ne!(story.phase(SHAPED_DELEGATE), Some(contract::Phase::Cancelled));
+}
+#[test]
+fn a_goal_past_the_first_bound_is_proposed_to_the_policy_s_role() {
+    use jig_client::shapes::{self, GoalDraft, Judged};
+    let mut story = Story::live(fixtures::SEED);
+    let me = story.shapes_me();
+    let words = contract::Text::new(b"goal".as_slice().into(), 32).expect("words fit");
+    let draft = GoalDraft {
+        words: words.clone(),
+        executor: contract::OwnerExecutor::Agent { charter: 1 },
+        budget: 150,
+        deadline: None,
+        priority: Some(7),
+    };
+    let Judged::Propose { ask, to } = shapes::set_goal(&me, PROJECT_NUMBER, draft, words, story.wall()) else {
+        panic!("goal proposed")
+    };
+    let mut roles = skein_lib::List::with_capacity(1);
+    roles.push(0).expect("owner role");
+    assert_eq!(to, contract::Recipient::Roles { project: PROJECT_NUMBER, roles });
+    story.send(SHAPED_GOAL, Ask::Jig(Box::new(ask)));
+    assert!(story.run_until(|s| !s.answered(SHAPED_GOAL).is_empty(), PROOF_WAIT));
+    assert_eq!(
+        story.answered(SHAPED_GOAL),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::Proposed { proposal: GOAL_PROPOSAL }
+        ))))]
+    );
+}
+
+fn close_shaped_chat(story: &mut Story, task: u64) -> Duration {
+    let me = story.shapes_me();
+    let grace = jig_client::shapes::template(&me, PROJECT_NUMBER, jig_client::shapes::CHAT)
+        .expect("chat template")
+        .grace
+        .expect("grace");
+    let reason = contract::Text::new(b"enough".as_slice().into(), 32).expect("reason fits");
+    let ask = jig_client::shapes::close_chat(
+        &me,
+        PROJECT_NUMBER,
+        task,
+        &[jig_client::shapes::Delegate { task: SHAPED_DELEGATE, fate: jig_client::shapes::Fate::Move }],
+        reason,
+    )
+    .expect("close offered");
+    story.send(SHAPED_CLOSE, Ask::Jig(Box::new(ask)));
+    assert!(story.run_until(|s| !s.answered(SHAPED_CLOSE).is_empty(), PROOF_WAIT));
+    assert_eq!(
+        story.answered(SHAPED_CLOSE),
+        vec![Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::Compound {
+                project: PROJECT_NUMBER,
+                operations: 2,
+                first_message: CLOSE_FIRST_MESSAGE
+            }
+        ))))]
+    );
+    grace
+}

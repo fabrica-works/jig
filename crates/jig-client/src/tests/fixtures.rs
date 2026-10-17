@@ -364,14 +364,14 @@ pub fn me() -> contract::Me {
                     contract::TemplateBudget::Given
                 },
                 deadline: contract::TemplateDeadline::None,
-                tracked: None,
+                tracked: if number == 2 { Some(10) } else { None },
                 flags: contract::TaskFlags {
                     conversation: number == 1,
                     listed: number == 2,
                     retention: contract::Retention::Kept,
                 },
-                label: 0,
-                grace: None,
+                label: number,
+                grace: Some(SHAPE_GRACE),
             })
             .unwrap();
     }
@@ -382,7 +382,7 @@ pub fn me() -> contract::Me {
             role: contract::HeldRole::Owner,
             pool: None,
             templates,
-            creating: None,
+            creating: Some(creating()),
             chat_budget: 0,
         })
         .unwrap();
@@ -420,3 +420,25 @@ pub const OWNER_ROLE: u32 = 0;
 pub const MEMBER_ROLE: u32 = 2;
 pub const RETRY_NOTICE: contract::RetryNotice =
     contract::RetryNotice::OwnerFailed { class: contract::HoldFailure::Lost, count: 2, allowance: 3 };
+
+pub const SHAPE_GRACE: Duration = Duration::from_secs(5);
+pub fn creating() -> contract::Creating {
+    let mut authority = facts_task().authority;
+    authority.cut = false;
+    authority.authority.delegation.depth = 4;
+    let mut charters = List::with_capacity(1);
+    charters.push(1).unwrap();
+    contract::Creating {
+        within: contract::CreateBounds {
+            authority: Box::new(authority),
+            pool_left: 100,
+            charters,
+            procedures: List::with_capacity(0),
+            latest: None,
+            budget: 100,
+            maximum_budget: 500,
+            maximum_deadline: None,
+        },
+        beyond: contract::Beyond::Proposed { to: contract::Recipient::Role { project: PROJECT, role: OWNER_ROLE } },
+    }
+}

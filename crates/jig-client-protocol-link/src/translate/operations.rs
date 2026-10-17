@@ -392,6 +392,6 @@ pub(super) fn restore_propose(value: &w::Propose, limits: &crate::Limits) -> Res
 }
 
 fn restore_wake(value: Option<&w::OwnerWakePolicy>, limits: &crate::Limits) -> Option<c::OwnerWakePolicy> {
-    let Some(wake) = value else { return None };
+    let wake = value?;
     Some(super::facts::owner_wake_policy(wake, limits))
 }

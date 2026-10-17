@@ -1,5 +1,6 @@
 mod facts;
 mod fixtures;
+mod shapes;
 mod sign_in;
 mod store;
 mod unlinked;
