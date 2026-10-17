@@ -248,7 +248,11 @@ dependencies among them.
   commit (6.4); resources named after the new task, which the batch
   resolves once the task has its number (authority.md, section 4); or
   any other its authority covers, which the task takes when it is ready
-  (section 6).
+  (section 6). Which of those a task will hold, besides what is handed
+  down, each connector says from its executor and spec before the batch
+  commits, whoever creates it. So a party's batch names its tasks'
+  resources by their specs and the grants named after them, and hands
+  down none, since a party holds nothing (6.1).
 - **Procedure tasks' parameters** go to their connector in the same
   decision, under the numbers the batch gives (connectors.md, 6.1).
 

@@ -157,7 +157,7 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 
 | Operation | Names | Becomes |
 |---|---|---|
-| `Create` | a project; a batch: for each task its executor (an agent's charter, a procedure and its parameters, a person or a role), spec, result contract, authority, budget (an amount, or `AsAllowed`), deadline, wake policy, dependencies and inputs, the resources it will write, tracked and priority, label and flags; and the dependencies among its tasks | the batch checked whole and made at once (`../../domain/tasks.md`, section 4), its tasks' numbers answered, each `AsAllowed` budget with what it was given |
+| `Create` | a project; a batch: for each task its executor (an agent's charter, a procedure and its parameters, a person or a role), spec, result contract (a report, a change or a verdict: an approval is a procedure's, `../../domain/people.md`, section 8), authority, whose spend and deadline are the task's budget and deadline (`../../domain/authority.md`, section 3), that budget as named there or `AsAllowed`, wake policy, dependencies and inputs, the grants named after it (`../../domain/authority.md`, section 4), tracked and priority, label and flags; and the dependencies among its tasks. The other resources a task will write are those its connectors name from its executor and spec (`../../domain/tasks.md`, section 4) | the batch checked whole and made at once (`../../domain/tasks.md`, section 4), its tasks numbered consecutively in the batch's order, the first and the last answered, and the `AsAllowed` task, if any, with what it was given |
 | `Propose` | a project; the action: a batch, or an amendment (a widening of a task's authority among them); a party makes no effect (`../../domain/people.md`, 5.1); a reason | a proposal to whoever may accept it, its number answered (3.5) |
 | `Withdraw` | the party's own pending proposal | withdrawn |
 | `Message` | a task; the words | words in its inbox, their message number answered |
@@ -312,8 +312,8 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   agent. A `Create` or an `Amend` whose authority, budget, deadline or
   grants pass what the party may give alone is refused as lacking
   authority: what it lacked and by how much, and whether a proposal of
-  it could be accepted, and by whom (section 4). Nothing is proposed on
-  the party's behalf.
+  it could be accepted (section 4); to whom it would go, the offer says
+  (5.3). Nothing is proposed on the party's behalf.
 - **`Propose` asks.** The party proposes the action, which waits for the
   roles the project's policy names for its kind
   (`../../domain/tasks.md`, section 9). Where the policy names none that
@@ -384,10 +384,11 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
 
 Every request has one answer, of one of these kinds:
 
-- **done,** with its outcome: what was made (the tasks' numbers, the
-  `AsAllowed` budget, if any, with what it was given; a word's message
-  number; a
-  proposal's number), or what was decided; for a compound request, its
+- **done,** with its outcome: what was made (the first and the last of
+  the tasks' numbers, consecutive in the batch's order, and the
+  `AsAllowed` task, if any, with what it was given; a word's message
+  number; a proposal's number, whom it waits for being in its
+  document), or what was decided; for a compound request, its
   operations made, in order, and the first of the message numbers they
   took, one each (3.4); and, when another party decided first,
   who, how and when;
@@ -395,8 +396,15 @@ Every request has one answer, of one of these kinds:
   the first operation that failed:
   - *role:* the party's role here does not allow it;
   - *authority:* what was lacking, typed (a budget and how much is left,
-    a grant, a kind of task, a depth, a deadline, tasks left), and
-    whether a proposal of it could be accepted, and by whom (3.5);
+    a grant, a kind of task, a depth, a deadline, tasks left); and, where
+    the request was judged against the party's role and pool and found
+    beyond them (`../../domain/authority.md`, 8.4), whether a proposal of
+    it could be accepted (3.5). A refusal that another check decided
+    (the request's shape, a reference, an uncertain effect's choice, its
+    funding, the project's spend per period, an `AsAllowed` that would
+    give nothing) makes no claim either way. Who would accept a proposal
+    is the offer's to say (5.3), and the proposal's document's once it
+    is made, not the refusal's;
   - *no one to escalate to:* a party's root task whose escalations would
     have no holder (3.2);
   - *limit:* which one (the project's live tasks, its goals, the
@@ -409,7 +417,8 @@ Every request has one answer, of one of these kinds:
     not have);
   - *not well formed:* which task or operation, and why (two tasks of a
     batch giving `AsAllowed`; the conversation flag on a task that is not
-    an agent's; a proposed batch giving `AsAllowed`);
+    an agent's; a proposed batch giving `AsAllowed`; a cycle among a
+    batch's dependencies);
   - *key conflict:* the key names another ask, which is a client's bug;
 - **busy** or **not ready:** nothing was made and nothing kept; send it
   again, under its key, after a backoff;
@@ -881,7 +890,7 @@ Changes this design asks of `../../domain/`, adopted there with it
    live tasks per project are (`../../domain/tasks.md`, section 11).
 3. **Proposing explicit** (3.5): a party's create or amendment beyond
    their authority refused, saying what it lacked and whether a proposal
-   of it could be accepted, and by whom; a party's proposal naming the
+   of it could be accepted (section 4); a party's proposal naming the
    party as its proposer.
 4. **A party's root has someone to escalate to** (3.2).
 5. **A task's fields** (3.2): its label, its conversation and listed

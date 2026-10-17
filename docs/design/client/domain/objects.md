@@ -308,7 +308,7 @@ What a request asked, and why it was refused, from the refusal's facts
 
 - **the role,** or the authority it lacked, said as what was missing
   ("your pool has 12 left; this needs 40"), and whether a proposal could
-  be accepted, and by whom;
+  be accepted, and, from the offer, by whom (contract.md, 4 and 5.3);
 - **a limit:** the project's live tasks, the inbox full, the chat's words
   too long, a compound request's operations past their bound;
 - **no one to escalate to:** the party would become the requester of a
