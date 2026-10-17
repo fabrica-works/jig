@@ -585,6 +585,18 @@ fn client_wire_links_only_its_codec_and_foundation() {
 }
 
 #[test]
+fn ops_client_wire_links_only_its_codec_and_foundation() {
+    let wires: Vec<_> = manifests()
+        .into_iter()
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-ops-client-protocol-wire"))
+        .collect();
+    assert_eq!(wires.len(), 1, "one ops client wire family");
+    let mut dependencies = wires[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(dependencies, ["skein-codec", "skein-lib"]);
+}
+
+#[test]
 fn engine_worker_channels_link_only_their_boundary_and_foundation() {
     let roots: Vec<_> = manifests()
         .into_iter()

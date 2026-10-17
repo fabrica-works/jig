@@ -708,6 +708,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "jig-ops-client-protocol-wire"
+version = "0.0.0"
+dependencies = [
+ "skein-codec",
+ "skein-lib",
+]
+
+[[package]]
 name = "jig-ops-client-view"
 version = "0.0.0"
 dependencies = [

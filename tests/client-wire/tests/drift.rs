@@ -16,9 +16,20 @@ fn view_records_schema_matches_generated_code_and_goldens() {
     let source = fs::read_to_string(root.join("schema/records-v1.schema")).expect("view records schema");
     check(&root, &source, "records-v1");
 }
+#[test]
+fn ops_client_wire_schema_matches_generated_code_and_goldens() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/ops/client-protocol-wire");
+    let source = fs::read_to_string(root.join("schema/ops-client-v1.schema")).expect("ops client schema");
+    check(&root, &source, "v1");
+}
 fn check(root: &Path, source: &str, version: &str) {
     let output = generate(&parse(source).expect("schema valid"));
-    let code = root.join(if version == "v8" { "src/generated/v8.rs" } else { "src/generated/records_v1.rs" });
+    let file = match version {
+        "v8" => "src/generated/v8.rs",
+        "v1" => "src/generated/v1.rs",
+        _ => "src/generated/records_v1.rs",
+    };
+    let code = root.join(file);
     let goldens = root.join("golden").join(version);
     let write = std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1");
     let again = "run SKEIN_CODEGEN_WRITE=1 heavy cargo nextest run -p jig-client-wire-world --test drift";
