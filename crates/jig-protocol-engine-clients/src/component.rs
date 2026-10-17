@@ -568,7 +568,7 @@ impl Component {
         &mut self,
         env: &Env<Limits>,
         exchange: Token,
-        answer: Result<w::Answer, w::Problem>,
+        answer: Result<w::KeyedAnswer, w::Problem>,
         out: &mut Queue<Request>,
     ) {
         let Some(owner) = self.owner(exchange) else {
@@ -668,74 +668,6 @@ impl Component {
         }
         count
     }
-    fn request(&mut self, env: &Env<Limits>, exchange: Token, sign_in: u64, body: &[u8], out: &mut Queue<Request>) {
-        if self.stopping() {
-            self.respond(env, exchange, routes::not_ready());
-            return;
-        }
-        let Some(owner) = self.owner(exchange) else {
-            return;
-        };
-        let active = self.active(sign_in);
-        if active >= env.limits.exchanges_per_client || self.admitted() >= env.limits.exchanges {
-            self.respond(env, exchange, routes::busy());
-            return;
-        }
-        let keyed = match w::Keyed::decode(&env.limits.wire, &mut skein_lib::Reader::new(body)) {
-            Ok(value) => value.into_parts(),
-            Err(_) => {
-                self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
-                return;
-            }
-        };
-        let family = match &keyed.owner {
-            w::Owner::Jig => None,
-            w::Owner::Family(value) => Some(value.number()),
-        };
-        if !self.serves(family, keyed.version) {
-            self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
-            return;
-        }
-        let mut amendment = None;
-        let request = match keyed.owner {
-            w::Owner::Jig => {
-                let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
-                    Ok(value) => crate::translate::asks::ask(value, &env.limits.wire),
-                    Err(problem) => Err(crate::translate::Untranslatable { path: problem.path }),
-                };
-                let Ok(ask) = ask else {
-                    self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
-                    return;
-                };
-                if let people::Ask::Amend { .. } = &ask {
-                    amendment = Some((keyed.key, Box::new(ask.clone())));
-                }
-                Request::Core(Box::new(core::Event::People(people::Event::Ask {
-                    reply_to: ReplyTo::new(exchange),
-                    sign_in,
-                    key: keyed.key,
-                    ask,
-                })))
-            }
-            w::Owner::Family(family) => {
-                let digest = sign_in::digest(&keyed.request).expose().try_into().expect("32-byte digest");
-                Request::Application(crate::ToApplication::Request {
-                    reply_to: ReplyTo::new(exchange),
-                    sign_in,
-                    key: keyed.key,
-                    family: family.number(),
-                    version: keyed.version,
-                    record: keyed.request,
-                    digest,
-                })
-            }
-        };
-        self.pending
-            .exchanges
-            .insert(exchange, Waiting::Ask { sign_in, family, version: keyed.version, amendment })
-            .expect("get released slot");
-        out.push(request);
-    }
     #[must_use]
     #[expect(clippy::manual_map, reason = "step code matches optional deadlines without closures")]
     pub fn next_deadline(&self) -> Option<Time> {
@@ -806,3 +738,6 @@ fn expired(link: Option<&Link>, now: Time) -> bool {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+#[path = "request.rs"]
+mod request;

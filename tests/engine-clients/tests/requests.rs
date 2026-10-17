@@ -6,9 +6,6 @@ use skein_lib::{
     Writer,
     base64::{self, Alphabet},
 };
-fn signed_in(peer: &mut Peer) -> Box<[u8]> {
-    bearer(peer, fixtures::FIRST_SIGN_IN, fixtures::FIRST_PERSON)
-}
 fn bearer(peer: &mut Peer, sign_in: u64, person: u64) -> Box<[u8]> {
     let link = peer.printed_link();
     let exchange = peer.post_link(&link);
@@ -38,7 +35,7 @@ fn request() -> Box<[u8]> {
 #[test]
 fn a_native_keyed_request_reaches_the_core_after_its_bearer_is_checked() {
     let mut peer = Peer::started(&fixtures::settings());
-    let bearer = signed_in(&mut peer);
+    let bearer = fixtures::signed_in(&mut peer);
     peer.post(b"/jig/v1/request", request(), Some(&bearer));
     let Some(core::Event::People(people::Event::Ask { sign_in, key, ask, .. })) = peer.take_core() else {
         panic!("authenticated ask");
@@ -51,7 +48,7 @@ fn a_native_keyed_request_reaches_the_core_after_its_bearer_is_checked() {
 #[test]
 fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
     let mut peer = Peer::started(&fixtures::settings());
-    let bearer = signed_in(&mut peer);
+    let bearer = fixtures::signed_in(&mut peer);
     let socket = peer.post(b"/jig/v1/request", request(), Some(&bearer));
     let Some(core::Event::People(people::Event::Ask { reply_to, .. })) = peer.take_core() else {
         panic!("ask");
@@ -59,9 +56,9 @@ fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
     assert_eq!(peer.answered(socket), None);
     peer.answer_request(reply_to, people::Reply::Outcome(people::Outcome::Started { task: 8 }));
     let limits = fixtures::limits().wire;
-    let record = w::Answer::decode(&limits, &mut skein_lib::Reader::new(peer.answered(socket).expect("answer")))
+    let record = w::KeyedAnswer::decode(&limits, &mut skein_lib::Reader::new(peer.answered(socket).expect("answer")))
         .expect("wire answer");
-    let w::Answer::FinalAnswer(answer) = record else {
+    let w::KeyedAnswer::FinalAnswer(answer) = record else {
         panic!("final answer");
     };
     assert_eq!(answer.owner(), &w::Owner::Jig);
@@ -158,8 +155,8 @@ fn route_real_core(peer: &mut Peer, world: &mut jig_core_world::effects::World) 
 }
 fn final_answer(peer: &Peer, socket: skein_lib::Token) -> w::Final {
     let limits = fixtures::limits().wire;
-    let w::Answer::FinalAnswer(answer) =
-        w::Answer::decode(&limits, &mut skein_lib::Reader::new(peer.answered(socket).expect("http answer")))
+    let w::KeyedAnswer::FinalAnswer(answer) =
+        w::KeyedAnswer::decode(&limits, &mut skein_lib::Reader::new(peer.answered(socket).expect("http answer")))
             .expect("answer")
     else {
         panic!("final")

@@ -8,6 +8,8 @@ use skein_lib::Reader;
 use skein_lib::{Duration, List, Queue, Time, stream::Down};
 use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
+const DEPLOYMENT_READY: Duration = Duration::from_secs(1);
+const DEPLOYMENT: u32 = 0;
 const SECOND_CLIENT: ClientId = ClientId(1);
 const CLIENT: ClientId = ClientId(0);
 /// Checks revisions from the documents the application was told changed.
@@ -307,6 +309,53 @@ impl Story {
             &mut self.engine.out,
         )
         .expect("bounded replacement");
+    }
+    #[must_use]
+    pub fn live_deployment(seed: u64) -> Self {
+        let mut limits = fixtures::owner_limits();
+        limits.core.people.projects = 2;
+        let mut story = Self::bounded(seed, &limits);
+        story.sign_in();
+        assert!(story.run_until(|s| s.client.link().state == Link::Live, DEPLOYMENT_READY));
+        story.grant_deployment_role();
+        story
+    }
+    fn grant_deployment_role(&mut self) {
+        self.engine.driver.world.send(jig_test_domain::Event::Core(jig_domain_core::Event::People(
+            jig_domain_people::Event::Roles {
+                project: DEPLOYMENT,
+                holdings: Box::new([jig_domain_people::Holding {
+                    person: fixtures::FIRST_OWNER,
+                    role: jig_domain_people::Role::Owner,
+                }]),
+            },
+        )));
+    }
+    pub fn restart_serving(&mut self, served: List<jig_protocol_engine_clients::Served>) {
+        self.restart_engine(Duration::ZERO);
+        let mut settings = fixtures::settings(self.engine.limits.core.documents.rows);
+        settings.served = served;
+        while self.engine.out.pop().is_some() {}
+        self.engine.component =
+            jig_protocol_engine_clients::Component::new(settings, &self.engine.env, &mut self.engine.out)
+                .expect("bounded served replacement");
+    }
+    #[must_use]
+    pub fn application_asks(&self) -> Vec<jig_domain_people::Ask> {
+        self.engine
+            .driver
+            .world
+            .store
+            .rows
+            .values()
+            .filter_map(|row| match row {
+                jig_test_domain::Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Answer {
+                    ask,
+                    ..
+                })) if matches!(ask.as_ref(), jig_domain_people::Ask::Application { .. }) => Some(ask.as_ref().clone()),
+                jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
+            })
+            .collect()
     }
     pub fn serve_jig(&mut self, version: u32) {
         self.net.cut_all();

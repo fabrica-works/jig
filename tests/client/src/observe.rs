@@ -34,7 +34,7 @@ pub fn sent(request: &Request) -> Option<Sent> {
     };
     let (card, revision, words) = match ask {
         jig_client::Ask::Jig(ask) => return Some(jig_sent(*attempt, *k, ask)),
-        jig_client::Ask::Family(record) => {
+        jig_client::Ask::Family { record, .. } => {
             let ask = crate::test::family_request(record);
             let family::Ask::Touch { project, item, revision, .. } = ask else {
                 unreachable!("decoded optional request")

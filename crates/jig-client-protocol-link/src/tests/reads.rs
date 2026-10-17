@@ -36,11 +36,20 @@ fn a_read_body_names_jigs_wire_and_keeps_its_read() {
 }
 #[test]
 fn a_family_read_body_keeps_its_opaque_owner_record() {
-    let record = translate::reads::owned(Readable::Family(fixtures::family_read()), &fixtures::limits().wire).unwrap();
+    let record = translate::reads::owned(
+        Readable::Family {
+            scope: jig_client_domain::contract::Scope::Project(1),
+            window: jig_client_domain::contract::Window { rows: 3, after: None },
+            record: fixtures::family_read(),
+        },
+        &fixtures::limits().wire,
+    )
+    .unwrap();
     let w::Owner::Family(owner) = record.owner() else { panic!("family owner") };
     assert_eq!(owner.number(), 19);
     assert_eq!(record.version(), 23);
-    assert_eq!(record.record(), &[255, 0, 1]);
+    let family = w::FamilyRecord::decode(&fixtures::limits().wire, &mut Reader::new(record.record())).unwrap();
+    assert_eq!(family.record(), &[255, 0, 1]);
 }
 #[test]
 fn each_wire_none_keeps_its_reason() {

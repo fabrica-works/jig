@@ -28,7 +28,7 @@ pub(crate) enum Waiting {
 #[derive(Debug)]
 pub(crate) enum Answer {
     SignedIn(w::SignedIn),
-    Service(w::Answer),
+    Service(w::KeyedAnswer),
 }
 #[derive(Debug)]
 pub(crate) struct Pending {

@@ -308,7 +308,9 @@ impl App for Ops {
             if *keyed.owner() == w::Owner::Jig {
                 return jig_client_protocol_world::observe::client_sent(request);
             }
-            let ask = domain::wire::ask_value(keyed.request()).expect("whole environment ask");
+            let request = w::FamilyRequest::decode(&w::CEILINGS, &mut skein_lib::Reader::new(keyed.request()))
+                .expect("family request");
+            let ask = domain::wire::ask_value(request.record()).expect("whole environment ask");
             return Some(infrastructure_sent(*exchange, *keyed.key(), &ask));
         }
         let Request::Client {
@@ -319,7 +321,7 @@ impl App for Ops {
         };
         let ask = match request {
             jig_client::Ask::Jig(value) => domain::Ask::Jig(value.clone()),
-            jig_client::Ask::Family(record) => {
+            jig_client::Ask::Family { record, .. } => {
                 domain::Ask::Infrastructure(domain::wire::ask_value(&record.bytes).expect("whole environment ask"))
             }
         };

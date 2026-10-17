@@ -41,7 +41,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     jig_client_protocol_wire::v8::check_limits(&limits.wire).ok()?;
     let body = u32::try_from(limits.http.body).ok()?;
     let answer = core::cmp::max(
-        jig_client_protocol_wire::v8::Answer::worst_case_bytes(&limits.wire)?,
+        jig_client_protocol_wire::v8::KeyedAnswer::worst_case_bytes(&limits.wire)?,
         jig_client_protocol_wire::v8::ReadAnswer::worst_case_bytes(&limits.wire)?,
     );
     let each = skein_http::server::worst_case(&limits.http)?

@@ -112,7 +112,7 @@ fn envelope(envelope: Envelope) -> RequestEnvelope {
         Envelope::SignedOut => RequestEnvelope::SignedOut,
     }
 }
-fn scope(subject: &Subject) -> ApplicationScope {
+fn subject_scope(subject: &Subject) -> ApplicationScope {
     match subject {
         Subject::Observability(obs::Subject { scope: obs::Scope::Project(project), .. })
         | Subject::Infrastructure(infra::Subject { scope: infra::Scope::Project(project), .. }) => {
@@ -124,18 +124,18 @@ fn scope(subject: &Subject) -> ApplicationScope {
         }
     }
 }
-fn family_subject(record: &jig_client::Family) -> (Channel, Subject) {
+fn family_subject(record: &jig_client::Family, scope: jig_client::contract::Scope) -> (Channel, Subject) {
     match record.family {
         1 => (
             Channel::Observability,
             Subject::Observability(
-                domain::wire::observability::subject_value(&record.bytes).expect("whole incident subject"),
+                domain::wire::observability::subject_value(&record.bytes, scope).expect("whole incident subject"),
             ),
         ),
         2 => (
             Channel::Infrastructure,
             Subject::Infrastructure(
-                domain::wire::infrastructure::subject_value(&record.bytes).expect("whole environment subject"),
+                domain::wire::infrastructure::subject_value(&record.bytes, scope).expect("whole environment subject"),
             ),
         ),
         _ => panic!("declared family"),
@@ -174,7 +174,8 @@ fn end(channel: Channel, local: Token, why: WatchEnd) -> Event {
             end: match why {
                 WatchEnd::Closed => obs::WatchEnd::Closed,
                 WatchEnd::SignedOut => obs::WatchEnd::SignedOut,
-                WatchEnd::Dropped
+                WatchEnd::NotServed
+                | WatchEnd::Dropped
                 | WatchEnd::Unknown
                 | WatchEnd::NotAllowed
                 | WatchEnd::Busy
@@ -187,7 +188,8 @@ fn end(channel: Channel, local: Token, why: WatchEnd) -> Event {
             end: match why {
                 WatchEnd::Closed => infra::WatchEnd::Closed,
                 WatchEnd::SignedOut => infra::WatchEnd::SignedOut,
-                WatchEnd::Dropped
+                WatchEnd::NotServed
+                | WatchEnd::Dropped
                 | WatchEnd::Unknown
                 | WatchEnd::NotAllowed
                 | WatchEnd::Busy
@@ -212,7 +214,7 @@ impl Front<Ops> for Scripted {
             jig_client::Down::Send { attempt, key, request } => {
                 let channel = match &request {
                     jig_client::Ask::Jig(_) => Channel::Jig,
-                    jig_client::Ask::Family(_) => Channel::Infrastructure,
+                    jig_client::Ask::Family { .. } => Channel::Infrastructure,
                 };
                 let attempt = self.open(client, attempt, channel);
                 self.last_attempt = Some(attempt);
@@ -220,7 +222,7 @@ impl Front<Ops> for Scripted {
                     jig_client::Ask::Jig(ask) => {
                         self.engine.send(now, wall, party, key, attempt, *ask).expect("jig send admitted");
                     }
-                    jig_client::Ask::Family(record) => {
+                    jig_client::Ask::Family { record, .. } => {
                         let ask = domain::wire::ask_value(&record.bytes).expect("whole infrastructure request");
                         let infra::Ask::MoveEnd { project, environment, revision, until } = &ask else {
                             panic!("native environments use joint front")
@@ -271,19 +273,19 @@ impl Front<Ops> for Scripted {
                     self.engine.close(now, token);
                 }
             }
-            jig_client::Down::Read { read, what: jig_client::Readable::Family(record) } => {
-                let (channel, subject) = family_subject(&record);
+            jig_client::Down::Read { read, what: jig_client::Readable::Family { scope, record, .. } } => {
+                let (channel, subject) = family_subject(&record, scope);
                 let token = self.open(client, read, channel);
                 self.engine
-                    .read_scoped_application(now, party, token, record.family, scope(&subject), &subject)
+                    .read_scoped_application(now, party, token, record.family, subject_scope(&subject), &subject)
                     .expect("family read admitted");
             }
-            jig_client::Down::Open { watch, subject: jig_client::Watchable::Family(record) } => {
-                let (channel, subject) = family_subject(&record);
+            jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { scope, record, .. } } => {
+                let (channel, subject) = family_subject(&record, scope);
                 let token = self.open(client, watch, channel);
                 self.last_watch = Some(token);
                 self.engine
-                    .open_scoped_application(now, party, token, record.family, scope(&subject), subject)
+                    .open_scoped_application(now, party, token, record.family, subject_scope(&subject), subject)
                     .expect("family watch admitted");
             }
             jig_client::Down::Save { .. } | jig_client::Down::Erase { .. } => panic!("stores remain shell duties"),

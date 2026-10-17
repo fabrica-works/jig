@@ -568,3 +568,13 @@ fn take_pattern(r: &mut skein_lib::Reader<'_>) -> Option<notes::Pattern> {
     }
     Some(notes::Pattern { segments: segments.into_boxed(), last: take_last(r)? })
 }
+
+/// Decode one document continuation carried by a family window.
+pub(crate) fn decode_window(bytes: &[u8]) -> Option<documents::Cursor> {
+    let mut reader = skein_lib::Reader::new(bytes);
+    let cursor = take_document_cursor(&mut reader)?;
+    if !reader.is_empty() {
+        return None;
+    }
+    Some(cursor)
+}

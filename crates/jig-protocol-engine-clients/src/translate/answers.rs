@@ -4,10 +4,10 @@ use alloc::boxed::Box;
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
-pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::Answer, w::Problem> {
+pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::KeyedAnswer, w::Problem> {
     let final_answer = match reply {
         p::Reply::Outcome(p::Outcome::Again(why)) | p::Reply::Again(why) => return Ok(again(*why)),
-        p::Reply::Outcome(p::Outcome::SignedOut) | p::Reply::SignedOut => return Ok(w::Answer::SignedOut),
+        p::Reply::Outcome(p::Outcome::SignedOut) | p::Reply::SignedOut => return Ok(w::KeyedAnswer::SignedOut),
         p::Reply::Outcome(p::Outcome::Refused(why)) | p::Reply::Refused(why) => {
             w::Final::Refused(w::Refused::new(limits, w::RefusedParts { refusal: refusals::refusal(*why, limits)? })?)
         }
@@ -30,7 +30,11 @@ pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::Answer, 
     final_answer.encode(&mut out).expect("measured final answer");
     owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits)
 }
-pub(crate) fn service(party: u64, credential: skein_lib::Secret, limits: &w::Limits) -> Result<w::Answer, w::Problem> {
+pub(crate) fn service(
+    party: u64,
+    credential: skein_lib::Secret,
+    limits: &w::Limits,
+) -> Result<w::KeyedAnswer, w::Problem> {
     let what = w::Made::Service(w::MadeService::new(limits, w::MadeServiceParts { party, credential })?);
     let outcome = w::Outcome::Made(w::OutcomeMade::new(limits, w::OutcomeMadeParts { what })?);
     let answer = w::Final::Done(w::Done::new(limits, w::DoneParts { outcome })?);
@@ -43,13 +47,13 @@ pub(crate) fn owned(
     version: u32,
     record: Box<[u8]>,
     limits: &w::Limits,
-) -> Result<w::Answer, w::Problem> {
-    Ok(w::Answer::FinalAnswer(w::Owned::new(limits, w::OwnedParts { owner, version, record })?))
+) -> Result<w::KeyedAnswer, w::Problem> {
+    Ok(w::KeyedAnswer::FinalAnswer(w::Owned::new(limits, w::OwnedParts { owner, version, record })?))
 }
-fn again(value: p::Again) -> w::Answer {
+fn again(value: p::Again) -> w::KeyedAnswer {
     match value {
-        p::Again::Busy => w::Answer::Busy,
-        p::Again::NotReady => w::Answer::NotReady,
+        p::Again::Busy => w::KeyedAnswer::Busy,
+        p::Again::NotReady => w::KeyedAnswer::NotReady,
     }
 }
 fn problem() -> w::Problem {
@@ -216,7 +220,7 @@ pub(crate) fn amend_answer(
     reply: &p::Reply,
     kept: Option<&p::Ask>,
     limits: &w::Limits,
-) -> Result<w::Answer, w::Problem> {
+) -> Result<w::KeyedAnswer, w::Problem> {
     if let (
         Some(p::Ask::Propose { action: p::Action::Amend { task, .. }, .. }),
         p::Reply::Outcome(p::Outcome::Proposed { proposal, .. }),

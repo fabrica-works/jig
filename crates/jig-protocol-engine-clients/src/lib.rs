@@ -7,6 +7,7 @@ mod component;
 mod connection;
 pub mod limits;
 mod routes;
+mod served;
 mod sign_in;
 mod stream;
 pub use boundary::*;

@@ -1,7 +1,6 @@
 //! Watch exchanges and released stream outputs (protocol/client.md, 4 and 7).
 use super::{Box, Component, Env, Limits, Queue, Request, Token, Waiting, core, routes, w};
 use crate::{
-    ToApplication,
     routes::Route,
     stream::{self, Stream, Taken, Watch},
     translate::watches as translate,
@@ -182,46 +181,17 @@ impl Component {
             w::Owner::Family(value) => Some(value.number()),
         };
         if !self.serves(family, subject.version) {
-            self.connections.get_mut(&self.owner(exchange).expect("exchange owner")).expect("connection").respond(
-                400,
-                Box::new([]),
-                &env.limits,
-            );
+            let answer =
+                w::OpenAnswer::NotServed(crate::served::not_served(&self.settings, subject.owner, &env.limits.wire));
+            self.respond(env, exchange, routes::encoded_open(&answer));
             return;
         }
         let watcher = self.name();
-        let mut project = 0;
-        let mut rows = self.settings.rows;
-        let request = match subject.owner {
-            w::Owner::Jig => {
-                let value = translate::decode(&subject.record, &env.limits.wire);
-                let event = match value {
-                    Some(value) => translate::watch(watcher, sign_in, value, rows),
-                    None => None,
-                };
-                let Some(event) = event else {
-                    self.respond(
-                        env,
-                        exchange,
-                        routes::open_answer(Some(core::WatchRefusal::Unknown), &env.limits.wire),
-                    );
-                    return;
-                };
-                if let core::Event::Watch { subject, window, .. } = &event {
-                    rows = window.rows;
-                    if let core::documents::Watched::Goals { project: number } = subject {
-                        project = *number;
-                    }
-                }
-                Request::Core(Box::new(event))
-            }
-            w::Owner::Family(value) => Request::Application(ToApplication::Watch {
-                watcher,
-                sign_in,
-                family: value.number(),
-                version: subject.version,
-                record: subject.record,
-            }),
+        let version = subject.version;
+        let Some(opening) = crate::served::watch(subject, watcher, sign_in, self.settings.rows, &env.limits.wire)
+        else {
+            self.respond(env, exchange, routes::open_answer(Some(core::WatchRefusal::Unknown), &env.limits.wire));
+            return;
         };
         self.streams
             .get_mut(&owner)
@@ -232,9 +202,9 @@ impl Component {
                 Watch {
                     name: open.watch,
                     family,
-                    version: subject.version,
-                    project,
-                    rows,
+                    version,
+                    project: opening.project,
+                    rows: opening.rows,
                     opening: Some(exchange),
                     closing: None,
                     unwatch: false,
@@ -251,7 +221,7 @@ impl Component {
             .exchanges
             .insert(exchange, Waiting::Watch { sign_in, watcher, opening: true })
             .expect("admitted exchange");
-        self.admit_watch(env, owner, watcher, request, out);
+        self.admit_watch(env, owner, watcher, opening.request, out);
     }
     fn admit_watch(
         &mut self,

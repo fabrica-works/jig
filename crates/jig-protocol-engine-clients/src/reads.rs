@@ -60,7 +60,9 @@ impl Component {
             w::Owner::Family(value) => Some(value.number()),
         };
         if !self.serves(family, record.version) {
-            self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+            let answer =
+                w::ReadAnswer::NotServed(crate::served::not_served(&self.settings, record.owner, &env.limits.wire));
+            self.respond(env, exchange, routes::encoded_read(&answer));
             return;
         }
         let request = match record.owner {
@@ -81,6 +83,15 @@ impl Component {
                 request
             }
             w::Owner::Family(value) => {
+                let Ok(body) = w::FamilyRecord::decode(&env.limits.wire, &mut Reader::new(&record.record)) else {
+                    self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                    return;
+                };
+                let Some(window) = crate::served::window(body.window()) else {
+                    self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                    return;
+                };
+                let scope = crate::served::scope(body.scope());
                 let family = value.number();
                 self.pending
                     .exchanges
@@ -91,7 +102,9 @@ impl Component {
                     sign_in,
                     family,
                     version: record.version,
-                    record: record.record,
+                    scope,
+                    window,
+                    record: body.into_parts().record,
                 })
             }
         };

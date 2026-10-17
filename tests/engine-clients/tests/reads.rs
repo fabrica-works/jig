@@ -1,21 +1,7 @@
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use jig_engine_clients_world::fixtures::{self, Peer};
-use skein_lib::{
-    Reader, Writer,
-    base64::{self, Alphabet},
-};
-fn signed_in(peer: &mut Peer) -> Box<[u8]> {
-    let link = peer.printed_link();
-    let exchange = peer.post_link(&link);
-    peer.answer_signed_in(fixtures::FIRST_SIGN_IN, fixtures::FIRST_PERSON);
-    peer.answer_kept(fixtures::FIRST_SIGN_IN);
-    let answer = peer.sign_in_answer(exchange);
-    let mut out = Writer::new(61);
-    out.put(b"Bearer ").expect("prefix");
-    base64::encode(Alphabet::Url, answer.token().expose(), &mut out).expect("bearer");
-    out.finish()
-}
+use skein_lib::{Reader, Writer};
 fn read() -> Box<[u8]> {
     let limits = fixtures::limits().wire;
     let value = w::Owned::new(&limits, w::OwnedParts { owner: w::Owner::Jig, version: 8, record: Box::new([0]) })
@@ -27,7 +13,7 @@ fn read() -> Box<[u8]> {
 #[test]
 fn a_native_read_waits_for_its_released_answer() {
     let mut peer = Peer::started(&fixtures::settings());
-    let bearer = signed_in(&mut peer);
+    let bearer = fixtures::signed_in(&mut peer);
     let socket = peer.post(b"/jig/v1/read", read(), Some(&bearer));
     let Some(core::Event::Read { reply, sign_in, read }) = peer.take_core() else { panic!("authenticated read") };
     assert_eq!(sign_in, fixtures::FIRST_SIGN_IN);
@@ -42,4 +28,23 @@ fn a_native_read_waits_for_its_released_answer() {
         w::ReadAnswer::decode(&limits, &mut Reader::new(peer.answered(socket).expect("read answer"))),
         Ok(expected)
     );
+}
+
+#[test]
+fn a_family_read_hands_its_scope_and_window_to_the_application() {
+    use jig_protocol_engine_clients::{Served, ToApplication};
+    let mut settings = fixtures::settings();
+    settings.served = skein_lib::List::with_capacity(2);
+    settings.served.push(Served { family: None, first: 8, last: 8 }).expect("jig");
+    settings.served.push(Served { family: Some(1), first: 1, last: 1 }).expect("family");
+    let mut peer = Peer::started(&settings);
+    let bearer = fixtures::signed_in(&mut peer);
+    let record = fixtures::family_read(w::Scope::Own, fixtures::window(3));
+    peer.post(b"/jig/v1/read", record, Some(&bearer));
+    let Some(ToApplication::Read { scope, window, family, .. }) = peer.take_application() else {
+        panic!("family read")
+    };
+    assert_eq!(family, 1);
+    assert_eq!(scope, jig_domain_people::ApplicationScope::Own);
+    assert_eq!(window, core::documents::Window { rows: 3, after: None });
 }

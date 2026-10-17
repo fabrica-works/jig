@@ -73,6 +73,7 @@ pub enum ToApplication {
         key: [u8; 16],
         family: u16,
         version: u32,
+        scope: people::ApplicationScope,
         record: Box<[u8]>,
         digest: [u8; 32],
     },
@@ -81,6 +82,8 @@ pub enum ToApplication {
         sign_in: u64,
         family: u16,
         version: u32,
+        scope: people::ApplicationScope,
+        window: jig_domain_core::documents::Window,
         record: Box<[u8]>,
     },
     Watch {
@@ -88,6 +91,8 @@ pub enum ToApplication {
         sign_in: u64,
         family: u16,
         version: u32,
+        scope: people::ApplicationScope,
+        window: jig_domain_core::documents::Window,
         record: Box<[u8]>,
     },
 }

@@ -70,6 +70,19 @@ pub fn decode_tree(value: &Cursor, task: u64, window: u32, limit: u32) -> Option
     Some(value)
 }
 
+/// A family's window carries one bounded document continuation.
+pub(crate) fn decode_window(value: &Cursor, limit: u32) -> Option<documents::Cursor> {
+    if !value.value.fits(limit) {
+        return None;
+    }
+    let mut reader = Reader { bytes: value.value.bytes() };
+    let value = take_document_cursor(&mut reader)?;
+    if !reader.bytes.is_empty() {
+        return None;
+    }
+    Some(value)
+}
+
 /// The read owner admits positions; this boundary preserves the exact query namespace.
 #[must_use]
 pub fn belongs_to(value: &reads::Cursor, expected: &reads::Scope) -> bool {

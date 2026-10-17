@@ -26,9 +26,15 @@ fn a_refusal_with_its_facts_round_trips_unchanged() {
 
 fn each_answer_kind_round_trips_unchanged() {
     let limits = fixtures::limits();
-    for answer in [Answer::FinalAnswer(fixtures::owned()), Answer::Busy, Answer::NotReady, Answer::SignedOut] {
-        let bytes = fixtures::encoded(&answer, Answer::measure, Answer::encode);
-        assert_eq!(Answer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer));
+    for answer in [
+        KeyedAnswer::NotServed(fixtures::not_served()),
+        KeyedAnswer::FinalAnswer(fixtures::owned()),
+        KeyedAnswer::Busy,
+        KeyedAnswer::NotReady,
+        KeyedAnswer::SignedOut,
+    ] {
+        let bytes = fixtures::encoded(&answer, KeyedAnswer::measure, KeyedAnswer::encode);
+        assert_eq!(KeyedAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer));
     }
 }
 
@@ -321,6 +327,11 @@ fn a_sign_out_not_ready_round_trips_unchanged() {
 #[test]
 fn wire_values_round_trip_unchanged() {
     table([
+        ("version_not_served_is_tag_zero_of_each_answer", version_not_served_is_tag_zero_of_each_answer),
+        (
+            "a_family_record_round_trips_with_its_scope_and_window",
+            a_family_record_round_trips_with_its_scope_and_window,
+        ),
         ("an_owned_record_keeps_its_owners_version", an_owned_record_keeps_its_owners_version),
         ("a_refusal_with_its_facts_round_trips_unchanged", a_refusal_with_its_facts_round_trips_unchanged),
         ("each_answer_kind_round_trips_unchanged", each_answer_kind_round_trips_unchanged),
@@ -363,4 +374,33 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+fn version_not_served_is_tag_zero_of_each_answer() {
+    let refusal = fixtures::not_served();
+    let values = [
+        fixtures::encoded(&KeyedAnswer::NotServed(refusal.clone()), KeyedAnswer::measure, KeyedAnswer::encode),
+        fixtures::encoded(&ReadAnswer::NotServed(refusal.clone()), ReadAnswer::measure, ReadAnswer::encode),
+        fixtures::encoded(&OpenAnswer::NotServed(refusal.clone()), OpenAnswer::measure, OpenAnswer::encode),
+        fixtures::encoded(&WatchEnd::NotServed(refusal), WatchEnd::measure, WatchEnd::encode),
+    ];
+    for bytes in values {
+        assert_eq!(bytes.first(), Some(&0));
+    }
+}
+const FAMILY_PROJECT: u32 = 7;
+fn a_family_record_round_trips_with_its_scope_and_window() {
+    let limits = fixtures::limits();
+    for scope in [
+        Scope::Own,
+        Scope::Deployment,
+        Scope::Project(ScopeProject::new(&limits, ScopeProjectParts { value: FAMILY_PROJECT }).expect("project")),
+    ] {
+        let after = Some(Cursor::new(&limits, CursorParts { value: Box::from([1, 2, 3]) }).expect("cursor"));
+        let window = Window::new(&limits, WindowParts { rows: 3, after }).expect("window");
+        let record = FamilyRecord::new(&limits, FamilyRecordParts { scope, window, record: Box::from([255, 0]) })
+            .expect("record");
+        let bytes = fixtures::encoded(&record, FamilyRecord::measure, FamilyRecord::encode);
+        assert_eq!(FamilyRecord::decode(&limits, &mut Reader::new(&bytes)), Ok(record));
+    }
 }

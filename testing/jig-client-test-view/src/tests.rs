@@ -747,7 +747,10 @@ fn complete_application_object_uses_its_own_zero_value_form_and_exact_terminal_f
         if let Request::Client {
             request:
                 jig_client::Request::Down {
-                    down: jig_client::Down::Send { attempt: number, request: jig_client::Ask::Family(ask), .. },
+                    down:
+                        jig_client::Down::Send {
+                            attempt: number, request: jig_client::Ask::Family { record: ask, .. }, ..
+                        },
                 },
         } = send
         {

@@ -325,7 +325,7 @@ impl Fixture {
                     down:
                         Down::Save { .. }
                         | Down::Erase { .. }
-                        | Down::Open { subject: Watchable::Family(_), .. }
+                        | Down::Open { subject: Watchable::Family { .. }, .. }
                         | Down::Continue { .. },
                 } => {}
             }

@@ -80,3 +80,38 @@ pub fn frame_document(needs: u32) -> jig_domain_core::documents::Document {
         cut: false,
     })
 }
+
+#[must_use]
+pub fn signed_in(peer: &mut Peer) -> Box<[u8]> {
+    let link = peer.printed_link();
+    let exchange = peer.post_link(&link);
+    peer.answer_signed_in(FIRST_SIGN_IN, FIRST_PERSON);
+    peer.answer_kept(FIRST_SIGN_IN);
+    let answer = peer.sign_in_answer(exchange);
+    let mut out = skein_lib::Writer::new(61);
+    out.put(b"Bearer ").expect("prefix");
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, answer.token().expose(), &mut out).expect("bearer");
+    out.finish()
+}
+#[must_use]
+pub fn window(rows: u32) -> jig_client_protocol_wire::v8::Window {
+    use jig_client_protocol_wire::v8 as w;
+    w::Window::new(&limits().wire, w::WindowParts { rows, after: None }).expect("bounded window")
+}
+#[must_use]
+pub fn family_read(
+    scope: jig_client_protocol_wire::v8::Scope,
+    window: jig_client_protocol_wire::v8::Window,
+) -> Box<[u8]> {
+    use jig_client_protocol_wire::v8 as w;
+    let record = w::FamilyRecord::new(&limits().wire, w::FamilyRecordParts { scope, window, record: Box::new([255]) })
+        .expect("family record");
+    let mut bytes = skein_lib::Writer::new(usize::try_from(record.measure()).expect("record size"));
+    record.encode(&mut bytes).expect("measured record");
+    let owner = w::Owner::Family(w::Family::new(&limits().wire, w::FamilyParts { number: 1 }).expect("family"));
+    let record =
+        w::Owned::new(&limits().wire, w::OwnedParts { owner, version: 1, record: bytes.finish() }).expect("owned");
+    let mut bytes = skein_lib::Writer::new(usize::try_from(record.measure()).expect("record size"));
+    record.encode(&mut bytes).expect("measured record");
+    bytes.finish()
+}

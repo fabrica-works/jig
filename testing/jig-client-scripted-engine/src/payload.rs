@@ -1177,7 +1177,8 @@ impl Payload for WatchEvent {
 impl Payload for WatchEnd {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Closed
+            Self::NotServed
+            | Self::Closed
             | Self::Dropped
             | Self::Unknown
             | Self::NotAllowed

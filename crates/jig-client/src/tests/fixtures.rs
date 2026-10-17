@@ -204,7 +204,7 @@ pub fn saved(requests: &[Request]) -> List<Record> {
     }
     records
 }
-pub fn answer(value: &w::Answer) -> Box<[u8]> {
+pub fn answer(value: &w::KeyedAnswer) -> Box<[u8]> {
     let mut out = Writer::new(usize::try_from(value.measure()).unwrap());
     value.encode(&mut out).unwrap();
     out.finish()
@@ -290,7 +290,7 @@ pub struct SigningExchanges {
 impl Client {
     pub fn signed_out_by(&mut self, terminal: SigningTerminal, exchanges: &SigningExchanges) {
         let (exchange, message) = match terminal {
-            SigningTerminal::Request => (exchanges.request, answer(&w::Answer::SignedOut)),
+            SigningTerminal::Request => (exchanges.request, answer(&w::KeyedAnswer::SignedOut)),
             SigningTerminal::Read => {
                 let record = w::ReadAnswer::None(
                     w::ReadAnswerNone::new(&w::CEILINGS, w::ReadAnswerNoneParts { value: w::ReadNone::SignedOut })

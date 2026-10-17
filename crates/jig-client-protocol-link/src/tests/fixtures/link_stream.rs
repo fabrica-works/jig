@@ -7,7 +7,11 @@ pub fn frame_subject() -> Watchable {
     Watchable::Jig(c::Subject::Frame)
 }
 pub fn family_subject() -> Watchable {
-    Watchable::Family(family_read())
+    Watchable::Family {
+        scope: jig_client_domain::contract::Scope::Project(1),
+        window: jig_client_domain::contract::Window { rows: 3, after: None },
+        record: family_read(),
+    }
 }
 pub fn hello_event(heartbeat: Duration) -> Box<[u8]> {
     let lim = limits().wire;
@@ -257,4 +261,12 @@ impl Harness {
         }
         panic!("no run opening")
     }
+}
+
+pub fn not_served() -> w::NotServed {
+    let lim = limits().wire;
+    let owner = w::Owner::Family(w::Family::new(&lim, w::FamilyParts { number: 19 }).unwrap());
+    let mut served = List::with_capacity(1);
+    served.push(w::Served::new(&lim, w::ServedParts { owner: owner.clone(), first: 24, last: 24 }).unwrap()).unwrap();
+    w::NotServed::new(&lim, w::NotServedParts { owner, served }).unwrap()
 }

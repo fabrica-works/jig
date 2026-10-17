@@ -48,7 +48,7 @@ pub mod infrastructure {
         Ok(record)
     }
 
-    /// Encode a scoped subject for a watch or read.
+    /// Encode a subject kind for a watch or read.
     #[must_use]
     pub fn subject(value: &w::InfrastructureSubjectRecord) -> Box<[u8]> {
         let mut writer = Writer::new(usize::try_from(value.measure()).expect("bounded subject"));
@@ -110,7 +110,7 @@ pub mod infrastructure {
 pub mod observability {
     use super::{Box, Reader, Undecodable, Writer, w};
 
-    /// Encode a scoped incident, alert or panel subject.
+    /// Encode an incident, alert or panel subject kind.
     #[must_use]
     pub fn subject(value: &w::ObservabilitySubjectRecord) -> Box<[u8]> {
         let mut writer = Writer::new(usize::try_from(value.measure()).expect("bounded subject"));

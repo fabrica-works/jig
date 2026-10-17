@@ -214,6 +214,7 @@ fn terminal(transport: &mut Transport, watcher: Token, end: client::WatchEnd) ->
             let end = match end {
                 client::WatchEnd::Closed => family::WatchEnd::Closed,
                 client::WatchEnd::Dropped => family::WatchEnd::Dropped,
+                client::WatchEnd::NotServed => family::WatchEnd::Unsupported,
                 client::WatchEnd::Unknown => family::WatchEnd::Unknown,
                 client::WatchEnd::NotAllowed => family::WatchEnd::NotAllowed,
                 client::WatchEnd::SignedOut => family::WatchEnd::SignedOut,

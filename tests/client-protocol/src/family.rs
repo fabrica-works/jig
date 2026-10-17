@@ -71,6 +71,7 @@ pub fn end(value: jig_client_domain::contract::WatchEnd) -> first::WatchEnd {
     match value {
         w::Closed => first::WatchEnd::Closed,
         w::Dropped => first::WatchEnd::Dropped,
+        w::NotServed => first::WatchEnd::Unsupported,
         w::Unknown => first::WatchEnd::Unknown,
         w::SignedOut => first::WatchEnd::SignedOut,
         w::NotAllowed => first::WatchEnd::NotAllowed,

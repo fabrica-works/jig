@@ -21,15 +21,14 @@ record OwnerTaskCapacityCauseWriters { limit: u32 }
 enum OwnerTaskCapacityCause { tasks: OwnerTaskCapacityCauseTasks, creation_flights: OwnerTaskCapacityCauseCreationFlights, resource_reports: OwnerTaskCapacityCauseResourceReports, project_tasks: OwnerTaskCapacityCauseProjectTasks, tree: OwnerTaskCapacityCauseTree, delegates: OwnerTaskCapacityCauseDelegates, inbox: OwnerTaskCapacityCauseInbox, holdings: OwnerTaskCapacityCauseHoldings, hold_waiters: OwnerTaskCapacityCauseHoldWaiters, proposals: OwnerTaskCapacityCauseProposals, references: OwnerTaskCapacityCauseReferences, subscriptions: OwnerTaskCapacityCauseSubscriptions, funders: OwnerTaskCapacityCauseFunders, writers: OwnerTaskCapacityCauseWriters }
 record OwnerTaskCapacityRequest { project: option u32 by: OwnerRequester action: OwnerTaskCapacityAction cause: OwnerTaskCapacityCause }
 record OwnerTaskCapacityRefusal { request: OwnerTaskCapacityRequest at: u64 }
-enum WatchEnd { closed, unknown, not_allowed, busy, subject_ended, signed_out, stopping }
+enum WatchEnd { not_served: NotServed, closed, unknown, not_allowed, busy, subject_ended, signed_out, stopping }
 enum WatchRefusal { unknown, not_allowed, busy, signed_out }
 record Open { stream: fixed 16 watch: u64 subject: Owned }
 record OpenAnswerRefused { why: WatchRefusal }
-enum OpenAnswer { admitted, refused: OpenAnswerRefused }
+enum OpenAnswer { not_served: NotServed, admitted, refused: OpenAnswerRefused }
 record WatchClose { stream: fixed 16 watch: u64 }
 enum CloseAnswer { closed, signed_out }
 record Gone { stream: fixed 16 }
-record Served { owner: Owner first: u32 last: u32 }
 record Hello { stream: fixed 16 served: list 16 Served heartbeat: duration }
 record Delivery { watch: u64 document: Owned }
 record Ended { watch: u64 why: WatchEnd }
@@ -45,7 +44,7 @@ record OwnerAccount { number: u32 generation: option u64 state: OwnerAccountStat
 record OwnerDeployment { store: StoreFill hosts: bytes 16777216 attempts: bytes 16777216 accounts: bytes 16777216 tasks: OwnerCapacity workers: OwnerCapacity attempts_capacity: OwnerCapacity waiting_attempts: u32 proposals: OwnerCapacity projects: list 32 OwnerProjectCapacity grace_bound: duration hello_refusals: list 32 OwnerHelloRefusalLine hosts_forgotten: u64 hello_refusals_forgotten: u64 person_room_refusals: list 32 OwnerPersonCapacityRefusal person_room_refusals_forgotten: u64 person_answer_retention: duration task_room_refusals: list 32 OwnerTaskCapacityRefusal task_room_refusals_forgotten: u64 cut: bool connectors: list 32 u16 connectors_cut: bool }
 # Small store (protocol/client.md, 10); TableEntry.request has Keyed.request's ceiling.
 versioned record Kept { store_version: u16 record: bytes 65536 }
-record TableEntry { asker: u32 number: u64 key: fixed 16 scope: u64 first_sent: option u64 owner: Owner version: u32 request: bytes 1048576 }
+record TableEntry { asker: u32 number: u64 key: fixed 16 scope: u64 first_sent: option u64 owner: Owner version: u32 request: bytes 1114240 }
 
 # A read value preserves the contract variant as well as its existing document (ruling 208).
 enum ReadValue { owner_project: OwnerProject, historical: boxed OwnerHistorical, frame: Frame, task: Task, proposal: Proposal, owner_proposal: OwnerProposal, escalation: Escalation, owner_escalation: OwnerEscalation, question: Question, person_task: PersonTask, owner_person_task: OwnerPersonTask, result: ResultDocument, ended: ObjectPage, owner_ended: OwnerEndedPage, history: HistoryPage, activity: ActivityPage, inbox: InboxPage, owner_inbox: OwnerInboxPage, conversations: ConversationPage, goals: GoalPage, spend: SpendPage, owner_spend: OwnerSpendPage, project: Project, notes: NotePage, deployment: Deployment, owner_deployment: OwnerDeployment }

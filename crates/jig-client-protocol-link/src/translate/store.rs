@@ -212,10 +212,10 @@ pub fn table(value: &RequestRecord<jig_client_domain::Held>, limits: &Limits) ->
             record.encode(&mut writer).expect("measured ask");
             (w::Owner::Jig, wire::VERSION, writer.finish())
         }
-        Ask::Family(value) => (
+        Ask::Family { scope, record: value } => (
             w::Owner::Family(w::Family::new(&limits.wire, w::FamilyParts { number: value.family })?),
             value.version,
-            bytes::copy_of(&value.bytes),
+            super::envelope::request(*scope, value, &limits.wire)?,
         ),
     };
     let first_sent = match value.first_sent {
@@ -253,11 +253,10 @@ pub fn restore_table(
             }
             Ask::Jig(Box::new(restore_ask(ask, limits)?))
         }
-        w::Owner::Family(owner) => Ask::Family(Family {
-            family: owner.number(),
-            version: value.version(),
-            bytes: bytes::copy_of(value.request()),
-        }),
+        w::Owner::Family(owner) => {
+            let (scope, bytes) = super::envelope::restore(value.request(), &limits.wire)?;
+            Ask::Family { scope, record: Family { family: owner.number(), version: value.version(), bytes } }
+        }
     };
     let first_sent = match value.first_sent() {
         Some(value) => Some(Wall::from_nanos(*value)),

@@ -129,7 +129,7 @@ impl Domain {
                 let mut found = None;
                 for (id, w) in &self.watches {
                     let same = match &w.subject {
-                        Watchable::Family(f) => f.family == family,
+                        Watchable::Family { record: f, .. } => f.family == family,
                         Watchable::Jig(_) => false,
                     };
                     if !w.closing && same {
@@ -142,7 +142,7 @@ impl Domain {
         }
     }
     pub(crate) fn watch(&mut self, env: &Env<Limits>, handle: Handle, subject: Watchable, out: &mut Queue<Request>) {
-        if let Watchable::Family(record) = &subject {
+        if let Watchable::Family { record, .. } = &subject {
             self.family(record);
         }
         let previous = match self.document(handle) {
@@ -166,7 +166,7 @@ impl Domain {
             return;
         }
         self.unwatch(handle, out);
-        if let Watchable::Family(record) = &subject
+        if let Watchable::Family { record, .. } = &subject
             && !self.family(record).served
         {
             self.handles

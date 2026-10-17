@@ -53,7 +53,10 @@ impl Wire {
                     w::Owner::Family(owner) => family(jig_client::Family {
                         family: owner.number(),
                         version: record.version(),
-                        bytes: record.record().into(),
+                        bytes: w::FamilyRecord::decode(&w::CEILINGS, &mut Reader::new(record.record()))
+                            .expect("family read envelope")
+                            .into_parts()
+                            .record,
                     })
                     .map(|record| jig_client_world::test::family_subject(&record, true)),
                 };
@@ -67,7 +70,10 @@ impl Wire {
                     && let Some(record) = family(jig_client::Family {
                         family: owner.number(),
                         version: open.subject().version(),
-                        bytes: open.subject().record().into(),
+                        bytes: w::FamilyRecord::decode(&w::CEILINGS, &mut Reader::new(open.subject().record()))
+                            .expect("family subject envelope")
+                            .into_parts()
+                            .record,
                     })
                 {
                     let subject = jig_client_world::test::family_subject(&record, false);
@@ -113,13 +119,13 @@ impl Wire {
         let Event::Reply { exchange, message } = event else { return Vec::new() };
         match self.exchanges.get(exchange) {
             Some(Kind::Request) => {
-                match w::Answer::decode(&w::CEILINGS, &mut Reader::new(message)).expect("answer bytes") {
-                    w::Answer::FinalAnswer(value) if matches!(value.owner(), w::Owner::Family(_)) => {
+                match w::KeyedAnswer::decode(&w::CEILINGS, &mut Reader::new(message)).expect("answer bytes") {
+                    w::KeyedAnswer::FinalAnswer(value) if matches!(value.owner(), w::Owner::Family(_)) => {
                         vec![Receipt::Answer { attempt: *exchange, final_answer: true, words: None }]
                     }
-                    w::Answer::FinalAnswer(_) => Vec::new(),
-                    w::Answer::SignedOut => vec![Receipt::Parked],
-                    w::Answer::Busy | w::Answer::NotReady => {
+                    w::KeyedAnswer::FinalAnswer(_) => Vec::new(),
+                    w::KeyedAnswer::NotServed(_) | w::KeyedAnswer::SignedOut => vec![Receipt::Parked],
+                    w::KeyedAnswer::Busy | w::KeyedAnswer::NotReady => {
                         vec![Receipt::Answer { attempt: *exchange, final_answer: false, words: None }]
                     }
                 }
@@ -146,7 +152,7 @@ impl Wire {
         match event {
             Event::Reply { exchange, message } => match self.exchanges.remove(exchange) {
                 Some(Kind::Request) => {
-                    let answer = w::Answer::decode(&w::CEILINGS, &mut Reader::new(message)).expect("answer bytes");
+                    let answer = w::KeyedAnswer::decode(&w::CEILINGS, &mut Reader::new(message)).expect("answer bytes");
                     translate::answers::answer(answer, &limits)
                         .map_or_else(|_| vec![], |answer| vec![Received::Answer { attempt: *exchange, answer }])
                 }
@@ -162,7 +168,7 @@ impl Wire {
                         w::ReadAnswer::None(value) => vec![Received::Read(jig_client::contract::ReadResult::None(
                             translate::reads::none(value.value()),
                         ))],
-                        w::ReadAnswer::Value(_) => vec![],
+                        w::ReadAnswer::NotServed(_) | w::ReadAnswer::Value(_) => vec![],
                     }
                 }
                 Some(Kind::SignIn) => {

@@ -122,6 +122,8 @@ pub enum WatchEvent {
 /// The one terminal of an open watch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WatchEnd {
+    /// Its owner version is not served.
+    NotServed,
     /// Closed by the client.
     Closed,
     /// Its connection failed.

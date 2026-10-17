@@ -300,3 +300,12 @@ fn a_malformed_stream_record_drops_the_stream_and_is_reported() {
     assert!(harness.has(&Request::Fact { fact: Fact::UndecodableEvent }));
     assert!(harness.has(&Request::CloseStream));
 }
+
+#[test]
+fn a_watch_ended_not_served_ends_its_handle_naming_why() {
+    let mut h = fixtures::Harness::streaming(fixtures::family_subject());
+    let (_, name) = h.opening();
+    h.stream_record(&fixtures::ending(name, w::WatchEnd::NotServed(fixtures::not_served())));
+    assert_eq!(h.ended(fixtures::WATCH), Some(c::WatchEnd::NotServed));
+    assert!(h.has(&Request::Hello { family: Some(19), versions: Some(c::VersionRange { first: 24, last: 24 }) }));
+}

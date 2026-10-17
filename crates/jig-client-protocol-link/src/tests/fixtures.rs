@@ -40,7 +40,7 @@ pub fn limits() -> Limits {
 pub fn start_chat() -> c::Ask {
     c::Ask::StartChat { project: 7, words: c::Text::new(Box::from(b"hello".as_slice()), 32).expect("fixture text") }
 }
-pub fn encoded_answer(value: &w::Answer) -> Box<[u8]> {
+pub fn encoded_answer(value: &w::KeyedAnswer) -> Box<[u8]> {
     let mut out = Writer::new(usize::try_from(value.measure()).unwrap());
     value.encode(&mut out).unwrap();
     out.finish()
@@ -51,7 +51,7 @@ pub fn final_answer(value: w::Final) -> Box<[u8]> {
     let owned =
         w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 8, record: bytes.finish() })
             .unwrap();
-    encoded_answer(&w::Answer::FinalAnswer(owned))
+    encoded_answer(&w::KeyedAnswer::FinalAnswer(owned))
 }
 pub fn answer_done_chat(task: u64) -> Box<[u8]> {
     let lim = limits().wire;
@@ -70,16 +70,16 @@ pub fn answer_done_service(credential: &[u8]) -> Box<[u8]> {
     final_answer(w::Final::Done(w::Done::new(&lim, w::DoneParts { outcome: w::Outcome::Made(made) }).unwrap()))
 }
 pub fn answer_busy() -> Box<[u8]> {
-    encoded_answer(&w::Answer::Busy)
+    encoded_answer(&w::KeyedAnswer::Busy)
 }
 pub fn answer_signed_out() -> Box<[u8]> {
-    encoded_answer(&w::Answer::SignedOut)
+    encoded_answer(&w::KeyedAnswer::SignedOut)
 }
 pub fn malformed_final() -> Box<[u8]> {
     let owned =
         w::Owned::new(&limits().wire, w::OwnedParts { owner: w::Owner::Jig, version: 8, record: Box::from([255]) })
             .unwrap();
-    encoded_answer(&w::Answer::FinalAnswer(owned))
+    encoded_answer(&w::KeyedAnswer::FinalAnswer(owned))
 }
 pub struct Harness {
     pub link: Link,
@@ -274,4 +274,15 @@ pub fn signed_in(party: u64, token: &[u8; 40]) -> Box<[u8]> {
     let mut writer = Writer::new(usize::try_from(record.measure()).unwrap());
     record.encode(&mut writer).unwrap();
     writer.finish()
+}
+
+impl Harness {
+    pub fn sending_family() -> (Self, Token) {
+        let mut harness = Self::new(&limits());
+        let ask = Ask::Family { scope: c::Scope::Own, record: family_read() };
+        harness.link.step(Time::ZERO, Event::Send { attempt: ATTEMPT, key: KEY, ask }, &mut harness.out);
+        let Some(Request::Exchange { exchange, .. }) = harness.out.iter().next() else { panic!("exchange") };
+        let exchange = *exchange;
+        (harness, exchange)
+    }
 }

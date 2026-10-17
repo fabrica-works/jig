@@ -119,3 +119,11 @@ fn an_invalid_client_limit_literal_is_refused() {
     invalid.wire.owned_record = 16_777_217;
     assert_eq!(Link::new(&invalid).expect_err("invalid link limits"), Unusable::Limits);
 }
+
+#[test]
+fn a_not_served_answer_holds_its_request_for_its_owner() {
+    let (mut h, exchange) = fixtures::Harness::sending_family();
+    h.answer(exchange, &fixtures::encoded_answer(&w::KeyedAnswer::NotServed(fixtures::not_served())));
+    assert!(h.has(&Request::Hello { family: Some(19), versions: Some(c::VersionRange { first: 24, last: 24 }) }));
+    assert_eq!(h.answered(fixtures::ATTEMPT), Some((RequestEnvelope::Again, None)));
+}

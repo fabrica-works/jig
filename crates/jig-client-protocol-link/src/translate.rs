@@ -28,4 +28,5 @@ pub mod reads;
 
 pub mod watches;
 
+pub(crate) mod envelope;
 pub mod store;

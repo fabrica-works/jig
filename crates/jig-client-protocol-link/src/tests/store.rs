@@ -63,7 +63,10 @@ fn a_table_entry_restores_family_bytes_and_their_wire_version() {
             first_sent: None,
             request: jig_client_domain::Held {
                 key: fixtures::APPLICATION_KEY,
-                request: Ask::Family(fixtures::family_read()),
+                request: Ask::Family {
+                    scope: jig_client_domain::contract::Scope::Project(1),
+                    record: fixtures::family_read(),
+                },
             },
         },
     };

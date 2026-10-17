@@ -13,6 +13,10 @@ pub fn encoded_read(value: &w::Read) -> Box<[u8]> {
     out.finish()
 }
 pub fn owned_read(owner: w::Owner, version: u32, record: Box<[u8]>) -> Box<[u8]> {
+    let record = match owner {
+        w::Owner::Jig => record,
+        w::Owner::Family(_) => family_record(record),
+    };
     let value = w::Owned::new(&env().limits.wire, w::OwnedParts { owner, version, record }).expect("read envelope");
     let mut out = Writer::new(usize::try_from(value.measure()).expect("envelope size"));
     value.encode(&mut out).expect("envelope bytes");
@@ -89,7 +93,7 @@ impl Exchange {
         let owner = w::Owner::Family(w::Family::new(&wire(), w::FamilyParts { number: 9 }).expect("family"));
         let socket = self.post_to(b"/jig/v1/read", owned_read(owner, 2, Box::from([255, 0, 1])));
         self.authenticate();
-        let Some(Request::Application(crate::ToApplication::Read { reply, sign_in, family, version, record })) =
+        let Some(Request::Application(crate::ToApplication::Read { reply, sign_in, family, version, record, .. })) =
             self.out.pop()
         else {
             panic!("application read")

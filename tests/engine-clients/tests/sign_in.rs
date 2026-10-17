@@ -61,7 +61,7 @@ fn an_unknown_bearer_is_answered_signed_out() {
         Box::new([0]),
         Some(b"Bearer AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"),
     );
-    assert_eq!(peer.answered(exchange), Some(b"\x03".as_slice()));
+    assert_eq!(peer.answered(exchange), Some(b"\x04".as_slice()));
 }
 #[test]
 fn two_tokens_drawn_in_turn_differ() {

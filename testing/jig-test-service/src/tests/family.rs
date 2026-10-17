@@ -10,6 +10,7 @@ fn request(record: Box<[u8]>) -> ToApplication {
         reply_to: ReplyTo::new(Token::new(27)),
         sign_in: 19,
         key: [23; 16],
+        scope: jig_domain_people::ApplicationScope::Project(f::PROJECT),
         family: 1,
         version: 1,
         record,

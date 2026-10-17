@@ -1,4 +1,5 @@
 use super::fixtures::{Client, OTHER, PAGE, PROJECT, project};
+use crate::contract::{Scope, Window};
 use crate::*;
 use alloc::boxed::Box;
 
@@ -67,7 +68,11 @@ fn unwatching_a_handle_drops_its_read_s_late_page() {
 #[test]
 fn a_family_read_s_page_is_its_bytes_under_its_owner() {
     let mut c = Client::started();
-    let what = Readable::Family(Family { family: FAMILY, version: 1, bytes: Box::from([1, 2]) });
+    let what = Readable::Family {
+        scope: Scope::Project(1),
+        window: Window { rows: 3, after: None },
+        record: Family { family: FAMILY, version: 1, bytes: Box::from([1, 2]) },
+    };
     c.step(Event::Read { handle: FAMILY_PAGE, read: what.clone() });
     let downs = c.downs();
     let [Down::Read { read, what: sent }] = downs.as_ref() else {

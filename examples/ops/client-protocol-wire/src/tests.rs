@@ -31,9 +31,11 @@ fn an_environment_answer_round_trips_through_its_bytes() {
 #[test]
 fn an_infrastructure_subject_round_trips_through_its_bytes() {
     let subject = fixtures::infrastructure_subject();
-    let value =
-        w::InfrastructureSubjectRecord::new(&w::CEILINGS, w::InfrastructureSubjectRecordParts { value: subject })
-            .expect("subject record");
+    let value = w::InfrastructureSubjectRecord::new(
+        &w::CEILINGS,
+        w::InfrastructureSubjectRecordParts { value: subject.into_parts().kind },
+    )
+    .expect("subject record");
     assert_eq!(infra::subject_value(&infra::subject(&value)), Ok(value));
 }
 
@@ -41,16 +43,7 @@ fn an_infrastructure_subject_round_trips_through_its_bytes() {
 fn an_observability_subject_round_trips_through_its_bytes() {
     let value = w::ObservabilitySubjectRecord::new(
         &w::CEILINGS,
-        w::ObservabilitySubjectRecordParts {
-            value: w::ObservabilitySubject::new(
-                &w::CEILINGS,
-                w::ObservabilitySubjectParts {
-                    scope: w::ObservabilityScope::Deployment,
-                    kind: w::ObservabilityKind::Deployment,
-                },
-            )
-            .expect("subject"),
-        },
+        w::ObservabilitySubjectRecordParts { value: w::ObservabilityKind::Deployment },
     )
     .expect("subject record");
     assert_eq!(obs::subject_value(&obs::subject(&value)), Ok(value));

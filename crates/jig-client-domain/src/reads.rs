@@ -9,7 +9,7 @@ impl Domain {
     pub(crate) fn read(&mut self, env: &Env<Limits>, handle: Handle, what: Readable, out: &mut Queue<Request>) {
         self.reads.remove(&handle);
         let refused = match &what {
-            Readable::Family(record) => {
+            Readable::Family { record, .. } => {
                 let owner = self.family(record);
                 (!owner.served).then_some(Readout::NotServed { family: Some(record.family), served: owner.versions })
             }

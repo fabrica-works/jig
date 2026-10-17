@@ -1,4 +1,4 @@
-use super::{Exchange, wire};
+use super::{Exchange, family_record, wire};
 use crate::{Request, stream::Stream};
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
@@ -46,8 +46,11 @@ pub fn owned_subject(value: &w::Subject) -> w::Owned {
 }
 pub fn family_subject() -> w::Owned {
     let family = w::Family::new(&wire(), w::FamilyParts { number: 9 }).expect("family");
-    w::Owned::new(&wire(), w::OwnedParts { owner: w::Owner::Family(family), version: 2, record: Box::new([77]) })
-        .expect("subject owner")
+    w::Owned::new(
+        &wire(),
+        w::OwnedParts { owner: w::Owner::Family(family), version: 2, record: family_record(Box::new([77])) },
+    )
+    .expect("subject owner")
 }
 pub fn task_subject() -> w::Subject {
     w::Subject::Task(w::SubjectTask::new(&wire(), w::SubjectTaskParts { task: 7 }).expect("task"))

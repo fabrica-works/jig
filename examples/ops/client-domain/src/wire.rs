@@ -46,16 +46,21 @@ pub mod infrastructure {
     pub fn subject(value: &d::Subject) -> Result<Box<[u8]>, Invalid> {
         let Ok(record) = w::InfrastructureSubjectRecord::new(
             &w::CEILINGS,
-            w::InfrastructureSubjectRecordParts { value: values::subject_encode(value)? },
+            w::InfrastructureSubjectRecordParts { value: values::subject_encode(value)?.into_parts().kind },
         ) else {
             return Err(Invalid);
         };
         Ok(codec::infrastructure::subject(&record))
     }
-    /// Decode a whole subject.
-    pub fn subject_value(bytes: &[u8]) -> Result<d::Subject, Invalid> {
+    /// Decode a subject kind in the scope supplied by jig.
+    pub fn subject_value(bytes: &[u8], scope: jig_client::contract::Scope) -> Result<d::Subject, Invalid> {
         let Ok(record) = codec::infrastructure::subject_value(bytes) else { return Err(Invalid) };
-        Ok(values::subject_decode(record.into_parts().value))
+        let scope = match scope {
+            jig_client::contract::Scope::Project(project) => d::Scope::Project(project),
+            jig_client::contract::Scope::Deployment => d::Scope::Deployment,
+            jig_client::contract::Scope::Own => return Err(Invalid),
+        };
+        Ok(d::Subject { scope, kind: values::kind_decode(record.into_parts().value) })
     }
     /// Encode a whole document.
     pub fn document(value: &d::Document) -> Result<Box<[u8]>, Invalid> {
@@ -118,16 +123,21 @@ pub mod observability {
     pub fn subject(value: &d::Subject) -> Result<Box<[u8]>, Invalid> {
         let Ok(record) = w::ObservabilitySubjectRecord::new(
             &w::CEILINGS,
-            w::ObservabilitySubjectRecordParts { value: values::subject_encode(value)? },
+            w::ObservabilitySubjectRecordParts { value: values::subject_encode(value)?.into_parts().kind },
         ) else {
             return Err(Invalid);
         };
         Ok(codec::observability::subject(&record))
     }
-    /// Decode a whole subject.
-    pub fn subject_value(bytes: &[u8]) -> Result<d::Subject, Invalid> {
+    /// Decode a subject kind in the scope supplied by jig.
+    pub fn subject_value(bytes: &[u8], scope: jig_client::contract::Scope) -> Result<d::Subject, Invalid> {
         let Ok(record) = codec::observability::subject_value(bytes) else { return Err(Invalid) };
-        Ok(values::subject_decode(record.into_parts().value))
+        let scope = match scope {
+            jig_client::contract::Scope::Project(project) => d::Scope::Project(project),
+            jig_client::contract::Scope::Deployment => d::Scope::Deployment,
+            jig_client::contract::Scope::Own => return Err(Invalid),
+        };
+        Ok(d::Subject { scope, kind: values::kind_decode(record.into_parts().value) })
     }
     /// Encode a whole document.
     pub fn document(value: &d::Document) -> Result<Box<[u8]>, Invalid> {

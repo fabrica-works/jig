@@ -161,6 +161,7 @@ pub struct Peer {
     next_socket: u64,
     links: Vec<Box<[u8]>>,
     core: VecDeque<core::Event>,
+    application: VecDeque<jig_protocol_engine_clients::ToApplication>,
     keep: Option<(SecretOwner, Kept)>,
     digests: BTreeMap<SecretOwner, Kept>,
     sign_ins: BTreeMap<u64, u64>,
@@ -196,6 +197,7 @@ impl Peer {
             next_socket: 100,
             links: Vec::new(),
             core: VecDeque::new(),
+            application: VecDeque::new(),
             keep: None,
             digests: BTreeMap::new(),
             sign_ins: BTreeMap::new(),
@@ -285,7 +287,7 @@ impl Peer {
                         self.providers.push_back((exchange, provider, call));
                     }
                     Request::Closed => self.closed += 1,
-                    Request::Application(_) => {}
+                    Request::Application(request) => self.application.push_back(request),
                 }
             }
             let mut ups = Vec::new();
@@ -614,5 +616,11 @@ impl Peer {
     #[must_use]
     pub fn core_record(&self) -> &str {
         self.last_core.as_deref().expect("core sign-in")
+    }
+}
+
+impl Peer {
+    pub fn take_application(&mut self) -> Option<jig_protocol_engine_clients::ToApplication> {
+        self.application.pop_front()
     }
 }

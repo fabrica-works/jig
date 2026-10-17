@@ -55,7 +55,7 @@ impl Rules {
     pub fn record(&mut self, path: &[u8], response: bool, encoded: &[u8], crossed: &[u8]) -> Result<(), Broken> {
         match (path, response) {
             (b"/jig/v1/request", false) => same!(Keyed, encoded, crossed),
-            (b"/jig/v1/request", true) => same!(Answer, encoded, crossed),
+            (b"/jig/v1/request", true) => same!(KeyedAnswer, encoded, crossed),
             (b"/jig/v1/read", false) => same!(Owned, encoded, crossed),
             (b"/jig/v1/read", true) => same!(ReadAnswer, encoded, crossed),
             _ => Self::watch_record(path, response, encoded, crossed)?,

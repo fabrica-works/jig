@@ -102,8 +102,10 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
         }
         w::Owner::Family(_) => {
             use jig_client_test_protocol_wire::v1 as family;
-            let request =
-                family::Request::decode(&family::CEILINGS, &mut Reader::new(keyed.request())).expect("family request");
+            let envelope = w::FamilyRequest::decode(&w::CEILINGS, &mut Reader::new(keyed.request()))
+                .expect("family request envelope");
+            let request = family::Request::decode(&family::CEILINGS, &mut Reader::new(envelope.record()))
+                .expect("family request");
             let subject = jig_client_test_domain::family::Subject {
                 scope: jig_client_test_domain::family::Scope::Project(request.project()),
                 kind: jig_client_test_domain::family::Kind::Item(request.value().object()),

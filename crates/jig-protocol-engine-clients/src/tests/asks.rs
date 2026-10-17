@@ -122,7 +122,7 @@ fn a_third_exchange_past_the_client_s_bound_is_busy() {
     let owner = exchange.post(body);
     exchange.authenticate();
     assert!(exchange.out.is_empty());
-    assert_eq!(exchange.response(owner), (200, b"\x01".as_slice()));
+    assert_eq!(exchange.response(owner), (200, b"\x02".as_slice()));
 }
 
 #[test]

@@ -31,7 +31,13 @@ pub(crate) fn send(
         env,
         jig_client::Event::Send {
             key: Key { asker: asker(Connector::Infrastructure), number: token.raw() ^ root.salt },
-            request: jig_client::Ask::Family(owned(Connector::Infrastructure, bytes)),
+            request: jig_client::Ask::Family {
+                scope: jig_client::contract::Scope::Project(match ask {
+                    crate::infrastructure::Ask::MoveEnd { project, .. }
+                    | crate::infrastructure::Ask::NativeMoveEnd { project, .. } => *project,
+                }),
+                record: owned(Connector::Infrastructure, bytes),
+            },
         },
         out,
     );
@@ -77,10 +83,17 @@ pub(crate) mod infrastructure {
         let event = match value {
             d::Out::Open { watch, subject } => jig_client::Event::Watch {
                 handle: handle(watch),
-                subject: jig_client::Watchable::Family(owned(
-                    Connector::Infrastructure,
-                    wire::infrastructure::subject(&subject).expect("admitted subject"),
-                )),
+                subject: jig_client::Watchable::Family {
+                    scope: match subject.scope {
+                        d::Scope::Project(project) => jig_client::contract::Scope::Project(project),
+                        d::Scope::Deployment => jig_client::contract::Scope::Deployment,
+                    },
+                    window: jig_client::contract::Window { rows: env.limits.infrastructure.rows, after: None },
+                    record: owned(
+                        Connector::Infrastructure,
+                        wire::infrastructure::subject(&subject).expect("admitted subject"),
+                    ),
+                },
             },
             d::Out::Read { read, subject } => jig_client::Event::Read {
                 handle: Handle {
@@ -90,10 +103,17 @@ pub(crate) mod infrastructure {
                         .checked_add(u64::from(env.limits.infrastructure.watches) << 32)
                         .expect("read slots follow watch slots"),
                 },
-                read: jig_client::Readable::Family(owned(
-                    Connector::Infrastructure,
-                    wire::infrastructure::subject(&subject).expect("admitted subject"),
-                )),
+                read: jig_client::Readable::Family {
+                    scope: match subject.scope {
+                        d::Scope::Project(project) => jig_client::contract::Scope::Project(project),
+                        d::Scope::Deployment => jig_client::contract::Scope::Deployment,
+                    },
+                    window: jig_client::contract::Window { rows: env.limits.infrastructure.rows, after: None },
+                    record: owned(
+                        Connector::Infrastructure,
+                        wire::infrastructure::subject(&subject).expect("admitted subject"),
+                    ),
+                },
             },
             d::Out::Close { watch } => jig_client::Event::Unwatch { handle: handle(watch) },
             value @ d::Out::Fact { .. } => {
@@ -189,10 +209,17 @@ pub(crate) mod observability {
         let event = match value {
             d::Out::Open { watch, subject } => jig_client::Event::Watch {
                 handle: handle(watch),
-                subject: jig_client::Watchable::Family(owned(
-                    Connector::Observability,
-                    wire::observability::subject(&subject).expect("admitted subject"),
-                )),
+                subject: jig_client::Watchable::Family {
+                    scope: match subject.scope {
+                        d::Scope::Project(project) => jig_client::contract::Scope::Project(project),
+                        d::Scope::Deployment => jig_client::contract::Scope::Deployment,
+                    },
+                    window: jig_client::contract::Window { rows: env.limits.observability.rows, after: None },
+                    record: owned(
+                        Connector::Observability,
+                        wire::observability::subject(&subject).expect("admitted subject"),
+                    ),
+                },
             },
             d::Out::Read { read, subject } => jig_client::Event::Read {
                 handle: Handle {
@@ -202,10 +229,17 @@ pub(crate) mod observability {
                         .checked_add(u64::from(env.limits.observability.watches) << 32)
                         .expect("read slots follow watch slots"),
                 },
-                read: jig_client::Readable::Family(owned(
-                    Connector::Observability,
-                    wire::observability::subject(&subject).expect("admitted subject"),
-                )),
+                read: jig_client::Readable::Family {
+                    scope: match subject.scope {
+                        d::Scope::Project(project) => jig_client::contract::Scope::Project(project),
+                        d::Scope::Deployment => jig_client::contract::Scope::Deployment,
+                    },
+                    window: jig_client::contract::Window { rows: env.limits.observability.rows, after: None },
+                    record: owned(
+                        Connector::Observability,
+                        wire::observability::subject(&subject).expect("admitted subject"),
+                    ),
+                },
             },
             d::Out::Close { watch } => jig_client::Event::Unwatch { handle: handle(watch) },
             value @ d::Out::Fact { .. } => {

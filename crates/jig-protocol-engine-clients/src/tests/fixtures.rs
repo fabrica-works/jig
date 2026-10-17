@@ -1,4 +1,7 @@
+#[path = "fixtures/envelope.rs"]
+mod envelope;
 use super::super::*;
+pub use envelope::*;
 use skein_lib::{Duration, List, Secret, Wall, Writer};
 pub const NUMBER: u64 = 41;
 pub fn wire() -> w::Limits {
@@ -54,6 +57,10 @@ pub fn encode_ask(ask: &w::Ask) -> Box<[u8]> {
     out.finish()
 }
 pub fn keyed(owner: w::Owner, version: u32, request: Box<[u8]>) -> Box<[u8]> {
+    let request = match owner {
+        w::Owner::Jig => request,
+        w::Owner::Family(_) => family_request(request),
+    };
     let value = w::Keyed::new(&wire(), w::KeyedParts { key: [5; 16], owner, version, request }).expect("keyed");
     let mut out = Writer::new(usize::try_from(value.measure()).expect("short keyed record"));
     value.encode(&mut out).expect("bounded keyed");
@@ -707,20 +714,23 @@ impl Exchange {
     pub fn reply(&mut self, to: ReplyTo, reply: people::Reply) {
         self.component.down(&self.env, Event::Reply { to, reply }, &mut self.out);
     }
-    pub fn answer(&self, owner: Token) -> w::Answer {
+    pub fn answer(&self, owner: Token) -> w::KeyedAnswer {
         let (status, bytes) = self.response(owner);
         assert_eq!(status, 200);
-        w::Answer::decode(&self.env.limits.wire, &mut skein_lib::Reader::new(bytes)).expect("wire answer")
+        w::KeyedAnswer::decode(&self.env.limits.wire, &mut skein_lib::Reader::new(bytes)).expect("wire answer")
     }
     pub fn final_answer(&self, owner: Token) -> w::Final {
         match self.answer(owner) {
-            w::Answer::FinalAnswer(answer) => {
+            w::KeyedAnswer::FinalAnswer(answer) => {
                 assert_eq!(answer.owner(), &w::Owner::Jig);
                 assert_eq!(answer.version(), 8);
                 w::Final::decode(&self.env.limits.wire, &mut skein_lib::Reader::new(answer.record()))
                     .expect("jig final")
             }
-            other @ (w::Answer::Busy | w::Answer::NotReady | w::Answer::SignedOut) => {
+            other @ (w::KeyedAnswer::NotServed(_)
+            | w::KeyedAnswer::Busy
+            | w::KeyedAnswer::NotReady
+            | w::KeyedAnswer::SignedOut) => {
                 panic!("expected final, got {other:?}")
             }
         }

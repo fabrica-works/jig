@@ -41,8 +41,8 @@ fn sign_out(peer: &mut Peer) -> (Token, skein_lib::ReplyTo) {
     assert_eq!(sign_in, fixtures::FIRST_SIGN_IN);
     (socket, reply_to)
 }
-fn answer(peer: &Peer, socket: Token) -> w::Answer {
-    w::Answer::decode(&fixtures::limits().wire, &mut Reader::new(peer.answered(socket).expect("answer")))
+fn answer(peer: &Peer, socket: Token) -> w::KeyedAnswer {
+    w::KeyedAnswer::decode(&fixtures::limits().wire, &mut Reader::new(peer.answered(socket).expect("answer")))
         .expect("wire answer")
 }
 fn sign_in_answer(peer: &Peer, socket: Token) -> w::SignInAnswer {
@@ -91,7 +91,7 @@ fn signing_out_erases_the_digest_and_refuses_the_token() {
         Ok(w::SignOutAnswer::SignedOut)
     );
     let retry = peer.authenticated_post(b"/jig/v1/request", Box::new([]));
-    assert_eq!(answer(&peer, retry), w::Answer::SignedOut);
+    assert_eq!(answer(&peer, retry), w::KeyedAnswer::SignedOut);
     assert!(peer.take_core().is_none());
 }
 #[test]
@@ -155,7 +155,7 @@ fn after_stop_a_new_exchange_is_answered_not_ready() {
     let mut peer = signed();
     let socket = peer.accepted_post(b"/jig/v1/request", keyed());
     peer.event(Event::Stop);
-    assert_eq!(answer(&peer, socket), w::Answer::NotReady);
+    assert_eq!(answer(&peer, socket), w::KeyedAnswer::NotReady);
     assert!(peer.take_core().is_none());
     assert_eq!(peer.socket_closes(Token::new(99)), 1);
     assert_eq!(peer.closed(), 0);
@@ -248,7 +248,7 @@ fn close_keeps_an_exchange_until_its_released_answer_is_written() {
     assert_eq!(peer.answered(socket), None);
     assert_eq!(peer.socket_closes(socket), 0);
     peer.answer_request(reply_to, people::Reply::Again(people::Again::Busy));
-    assert_eq!(answer(&peer, socket), w::Answer::Busy);
+    assert_eq!(answer(&peer, socket), w::KeyedAnswer::Busy);
     assert_eq!(peer.socket_closes(socket), 1);
     assert_eq!(peer.closed(), 1);
 }

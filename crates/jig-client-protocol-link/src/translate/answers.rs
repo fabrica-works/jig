@@ -468,10 +468,12 @@ pub(crate) fn credential(record: &w::Owned, limits: &Limits) -> Option<(u64, ske
     Some((parts.party, parts.credential))
 }
 /// Decodes one final jig answer in its owner's vocabulary.
-pub fn answer(record: w::Answer, limits: &Limits) -> Result<c::Answer, super::Undecodable> {
+pub fn answer(record: w::KeyedAnswer, limits: &Limits) -> Result<c::Answer, super::Undecodable> {
     let value = match record {
-        w::Answer::FinalAnswer(value) => value,
-        w::Answer::Busy | w::Answer::NotReady | w::Answer::SignedOut => return Err(super::Undecodable::Malformed),
+        w::KeyedAnswer::FinalAnswer(value) => value,
+        w::KeyedAnswer::NotServed(_) | w::KeyedAnswer::Busy | w::KeyedAnswer::NotReady | w::KeyedAnswer::SignedOut => {
+            return Err(super::Undecodable::Malformed);
+        }
     };
     if value.owner() != &w::Owner::Jig || value.version() != jig_client_protocol_wire::VERSION {
         return Err(super::Undecodable::Version);

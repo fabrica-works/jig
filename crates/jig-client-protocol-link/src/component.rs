@@ -122,7 +122,7 @@ impl Link {
     fn read(&mut self, _now: Time, read: Token, what: Readable, out: &mut Queue<Request>) {
         let owner = match &what {
             Readable::Jig(_) => w::Owner::Jig,
-            Readable::Family(value) => w::Owner::Family(
+            Readable::Family { record: value, .. } => w::Owner::Family(
                 w::Family::new(&self.limits.wire, w::FamilyParts { number: value.family })
                     .expect("unbounded family number"),
             ),
@@ -164,7 +164,7 @@ impl Link {
                 return;
             }
         }
-        let Ok(record) = w::Answer::decode(&self.limits.wire, &mut Reader::new(body)) else {
+        let Ok(record) = w::KeyedAnswer::decode(&self.limits.wire, &mut Reader::new(body)) else {
             out.push(Request::Fact { fact: Fact::UndecodableAnswer });
             out.push(Request::Answer {
                 attempt: attempt.token,
@@ -174,26 +174,38 @@ impl Link {
             });
             return;
         };
+        if let w::KeyedAnswer::NotServed(value) = &record {
+            translate::envelope::not_served(value, out);
+            out.push(Request::Answer {
+                attempt: attempt.token,
+                envelope: RequestEnvelope::Again,
+                answer: None,
+                why: None,
+            });
+            return;
+        }
         let why = match &record {
-            w::Answer::Busy => Some(Retry::Busy),
-            w::Answer::NotReady => Some(Retry::NotReady),
-            w::Answer::SignedOut => None,
-            w::Answer::FinalAnswer(_) => Some(Retry::Undecodable),
+            w::KeyedAnswer::Busy => Some(Retry::Busy),
+            w::KeyedAnswer::NotReady => Some(Retry::NotReady),
+            w::KeyedAnswer::SignedOut | w::KeyedAnswer::NotServed(_) => None,
+            w::KeyedAnswer::FinalAnswer(_) => Some(Retry::Undecodable),
         };
         let envelope = match record {
-            w::Answer::Busy | w::Answer::NotReady => RequestEnvelope::Again,
-            w::Answer::SignedOut => RequestEnvelope::SignedOut,
-            w::Answer::FinalAnswer(record) => {
+            w::KeyedAnswer::NotServed(_) => unreachable!("version refusal returned"),
+            w::KeyedAnswer::Busy | w::KeyedAnswer::NotReady => RequestEnvelope::Again,
+            w::KeyedAnswer::SignedOut => RequestEnvelope::SignedOut,
+            w::KeyedAnswer::FinalAnswer(record) => {
                 let credential = translate::answers::credential(&record, &self.limits);
                 let answer = if record.owner() != &attempt.owner || record.version() != attempt.version {
                     Err(translate::Undecodable::Version)
                 } else {
                     match record.owner() {
-                        w::Owner::Jig => match translate::answers::answer(w::Answer::FinalAnswer(record), &self.limits)
-                        {
-                            Ok(answer) => Ok(Answered::Jig(answer)),
-                            Err(problem) => Err(problem),
-                        },
+                        w::Owner::Jig => {
+                            match translate::answers::answer(w::KeyedAnswer::FinalAnswer(record), &self.limits) {
+                                Ok(answer) => Ok(Answered::Jig(answer)),
+                                Err(problem) => Err(problem),
+                            }
+                        }
                         w::Owner::Family(owner) => Ok(Answered::Family(Family {
                             family: owner.number(),
                             version: record.version(),
@@ -229,6 +241,17 @@ impl Link {
     }
     fn read_answer(&mut self, attempt: Attempt, body: &[u8], out: &mut Queue<Request>) {
         let result = match w::ReadAnswer::decode(&self.limits.wire, &mut Reader::new(body)) {
+            Ok(w::ReadAnswer::NotServed(value)) => {
+                translate::envelope::not_served(&value, out);
+                out.push(Request::Read {
+                    read: attempt.token,
+                    result: Readout::NotServed {
+                        family: translate::envelope::family(value.owner()),
+                        served: translate::envelope::versions(&value),
+                    },
+                });
+                return;
+            }
             Ok(w::ReadAnswer::None(record)) => {
                 if record.value() == &w::ReadNone::SignedOut {
                     self.end_sign_in(out);
@@ -296,9 +319,9 @@ fn keyed(key: RequestKey, ask: Ask, limits: &w::Limits) -> Result<w::Keyed, w::P
             record.encode(&mut writer).expect("measured ask");
             (w::Owner::Jig, wire::VERSION, writer.finish())
         }
-        Ask::Family(record) => {
+        Ask::Family { scope, record } => {
             let owner = w::Family::new(limits, w::FamilyParts { number: record.family })?;
-            (w::Owner::Family(owner), record.version, record.bytes)
+            (w::Owner::Family(owner), record.version, translate::envelope::request(scope, &record, limits)?)
         }
     };
     w::Keyed::new(limits, w::KeyedParts { key, owner, version, request })
@@ -450,6 +473,10 @@ impl Link {
         }
         match attempt.kind {
             ExchangeKind::WatchOpen { .. } => match w::OpenAnswer::decode(&self.limits.wire, &mut Reader::new(body)) {
+                Ok(w::OpenAnswer::NotServed(value)) => {
+                    translate::envelope::not_served(&value, out);
+                    self.watches.end(attempt.token, jig_client_domain::contract::WatchEnd::NotServed, out);
+                }
                 Ok(w::OpenAnswer::Admitted) => self.watches.opened(attempt.token, out),
                 Ok(w::OpenAnswer::Refused(why)) => {
                     let end = translate::watches::refused(why.why());
@@ -575,6 +602,9 @@ impl Link {
                 }
                 if let Some(watch) = self.watches.named(value.watch()) {
                     self.cancel_open(watch, value.watch(), out);
+                    if let w::WatchEnd::NotServed(value) = value.why() {
+                        translate::envelope::not_served(value, out);
+                    }
                     let end = translate::watches::ended(value.why());
                     self.watches.end(watch, end, out);
                     if end == jig_client_domain::contract::WatchEnd::SignedOut {

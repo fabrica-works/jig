@@ -28,7 +28,7 @@ fn records_1(bytes: &[u8]) {
     check!(Owner, bytes);
     check!(Keyed, bytes);
     check!(Owned, bytes);
-    check!(Answer, bytes);
+    check!(KeyedAnswer, bytes);
     check!(LinkSignIn, bytes);
     check!(SignedIn, bytes);
     check!(SignInAnswer, bytes);

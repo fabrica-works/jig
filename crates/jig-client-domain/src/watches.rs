@@ -149,6 +149,7 @@ impl Domain {
             WatchEnd::Closed | WatchEnd::SubjectEnded => Some(Why::SubjectEnded),
             WatchEnd::Unknown => Some(Why::Unknown),
             WatchEnd::NotAllowed => Some(Why::NotAllowed),
+            WatchEnd::NotServed => Some(Why::NotServed),
             WatchEnd::Busy => Some(Why::Busy),
             WatchEnd::SignedOut => Some(Why::SignedOut),
         };

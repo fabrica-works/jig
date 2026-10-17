@@ -39,7 +39,7 @@ impl Domain {
         None
     }
     pub(crate) fn send(&mut self, env: &Env<Limits>, key: Key, request: Ask, out: &mut Queue<Request>) {
-        if let Ask::Family(record) = &request {
+        if let Ask::Family { record, .. } = &request {
             self.family(record);
         }
         if let Some(held) = self.requests.get(&key) {
@@ -70,7 +70,7 @@ impl Domain {
             let request = record.request.request.clone();
             let pending = pending(record.scope, &request);
             let invalid = match &request {
-                Ask::Family(record) => !self.declared(record),
+                Ask::Family { record, .. } => !self.declared(record),
                 Ask::Jig(_) => false,
             };
             if invalid
@@ -148,7 +148,7 @@ impl Domain {
                     Some(RequestOut::Send { attempt, key, request }) => {
                         self.requests.get_mut(&request.key).expect("sending request").attempt = Some(attempt);
                         let mut refused = false;
-                        if let Ask::Family(record) = &request.request {
+                        if let Ask::Family { record, .. } = &request.request {
                             for owner in &self.owners {
                                 if owner.spoken.family == record.family && !owner.served {
                                     refused = true;
@@ -203,13 +203,13 @@ impl Domain {
 fn declared(limits: &Limits, request: &Ask) -> u64 {
     match request {
         Ask::Jig(_) => limits.ask_bytes,
-        Ask::Family(f) => u64::try_from(f.bytes.len()).expect("family bytes fit"),
+        Ask::Family { record: f, .. } => u64::try_from(f.bytes.len()).expect("family bytes fit"),
     }
 }
 fn pending(party: u64, request: &Ask) -> Pending {
     let owner = match request {
         Ask::Jig(_) => None,
-        Ask::Family(f) => Some(f.family),
+        Ask::Family { record: f, .. } => Some(f.family),
     };
     Pending { party, owner, progress: Progress::Parked }
 }

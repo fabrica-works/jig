@@ -49,7 +49,7 @@ fn signed_out_ends_each_handle_once_and_parks_each_request() {
         assert_eq!(c.machine.link().credential, None, "{terminal:?}");
         assert_eq!(c.machine.pending(STOP).unwrap().progress, Progress::Parked, "{terminal:?}");
         assert_eq!(c.machine.document(TASK).unwrap().state, State::Ended, "{terminal:?}");
-        c.step(Event::Reply { exchange: request, message: fixtures::answer(&w::Answer::SignedOut) });
+        c.step(Event::Reply { exchange: request, message: fixtures::answer(&w::KeyedAnswer::SignedOut) });
         assert!(c.requests().is_empty(), "{terminal:?}");
         c.step(Event::Reply { exchange: read, message: fixtures::unknown_read() });
         assert!(c.requests().is_empty(), "{terminal:?}");

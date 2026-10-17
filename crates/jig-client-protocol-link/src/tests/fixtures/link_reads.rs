@@ -51,7 +51,11 @@ impl Harness {
     }
     pub fn reading_family() -> (Self, Token) {
         let mut harness = Self::new(&limits());
-        let exchange = harness.read(Readable::Family(family_read()));
+        let exchange = harness.read(Readable::Family {
+            scope: jig_client_domain::contract::Scope::Project(1),
+            window: jig_client_domain::contract::Window { rows: 3, after: None },
+            record: family_read(),
+        });
         (harness, exchange)
     }
     pub fn read_answered(&self) -> Option<&Readout> {

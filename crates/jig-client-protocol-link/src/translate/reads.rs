@@ -118,9 +118,9 @@ pub fn owned(value: Readable, limits: &w::Limits) -> Result<w::Owned, w::Problem
             value.encode(&mut writer).expect("measured read");
             (w::Owner::Jig, VERSION, writer.finish())
         }
-        Readable::Family(value) => {
+        Readable::Family { scope, window, record: value } => {
             let owner = w::Family::new(limits, w::FamilyParts { number: value.family })?;
-            (w::Owner::Family(owner), value.version, value.bytes)
+            (w::Owner::Family(owner), value.version, super::envelope::record(scope, window, value, limits)?)
         }
     };
     w::Owned::new(limits, w::OwnedParts { owner, version, record })

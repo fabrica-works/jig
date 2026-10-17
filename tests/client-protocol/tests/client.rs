@@ -185,7 +185,13 @@ fn a_family_request_is_answered_as_its_owner_s_bytes() {
         revision: contract::Revision { value: 0 },
         value: 42,
     };
-    story.send(STOP, Ask::Family(jig_client_protocol_world::family::request(&request)));
+    story.send(
+        STOP,
+        Ask::Family {
+            scope: jig_client_domain::contract::Scope::Project(1),
+            record: jig_client_protocol_world::family::request(&request),
+        },
+    );
     assert!(story.run_until(|s| !s.answered(STOP).is_empty(), Duration::from_secs(1)));
     let answers = story.answered(STOP);
     let [Outcome::Answered(Answered::Family(answer))] = answers.as_slice() else {
@@ -221,4 +227,60 @@ fn an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing
             served: Some(contract::VersionRange { first: u32::MAX, last: u32::MAX }),
         }]
     );
+}
+
+const FAMILY_REQUEST: Key = Key { asker: Asker(1), number: 77 };
+const FAMILY_OBJECT: u64 = 1;
+const PROOF_WAIT: Duration = Duration::from_secs(1);
+const HELD_WAIT: Duration = Duration::from_secs(2);
+fn family_change() -> jig_client_test_domain::first::Ask {
+    jig_client_test_domain::first::Ask::ChangeObject {
+        project: PROJECT_NUMBER,
+        object: FAMILY_OBJECT,
+        revision: contract::Revision { value: 0 },
+        value: 42,
+    }
+}
+#[test]
+fn a_request_pending_across_a_restart_that_stops_serving_its_family_stays_unsent() {
+    let mut story = Story::live(fixtures::SEED);
+    story.cut_answer();
+    story.send(
+        FAMILY_REQUEST,
+        Ask::Family {
+            scope: contract::Scope::Project(PROJECT_NUMBER),
+            record: jig_client_protocol_world::family::request(&family_change()),
+        },
+    );
+    assert!(story.run_until(|s| s.made(fixtures::FIRST_OWNER) == 1, PROOF_WAIT));
+    assert_eq!(story.answered(FAMILY_REQUEST), vec![]);
+    story.restart_serving(jig_client_world::test::list([
+        jig_protocol_engine_clients::Served { family: None, first: 8, last: 8 },
+        jig_protocol_engine_clients::Served { family: Some(1), first: 2, last: 2 },
+    ]));
+    assert!(story.run_until(|s| s.client.link().state == Link::Live, PROOF_WAIT));
+    assert_eq!(story.client.pending(FAMILY_REQUEST).expect("kept request").progress, jig_client::Progress::NotServed);
+    assert_eq!(story.client.link().not_served, &[1]);
+    let exchanges = story.exchanges();
+    assert!(!story.run_until(|_| false, HELD_WAIT));
+    assert_eq!(story.exchanges(), exchanges);
+    assert_eq!(story.answered(FAMILY_REQUEST), vec![]);
+    assert_eq!(story.made(fixtures::FIRST_OWNER), 1);
+}
+#[test]
+fn a_family_request_in_the_deployment_scope_reaches_the_people_child_with_it() {
+    let mut story = Story::live_deployment(fixtures::SEED);
+    story.send(
+        FAMILY_REQUEST,
+        Ask::Family {
+            scope: contract::Scope::Deployment,
+            record: jig_client_protocol_world::family::request(&family_change()),
+        },
+    );
+    assert!(story.run_until(|s| !s.answered(FAMILY_REQUEST).is_empty(), PROOF_WAIT));
+    let asks = story.application_asks();
+    let [jig_domain_people::Ask::Application { scope, connector, .. }] = asks.as_slice() else {
+        panic!("one admitted application ask: {asks:?}")
+    };
+    assert_eq!((*scope, *connector), (jig_domain_people::ApplicationScope::Deployment, 1));
 }

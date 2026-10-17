@@ -18,7 +18,10 @@ pub(crate) fn send(root: &mut Domain, env: &Env<Limits>, token: Token, ask: &fir
         env,
         jig_client::Event::Send {
             key: Key { asker: Asker(u32::from(crate::FIRST)), number: token.raw() ^ root.salt },
-            request: jig_client::Ask::Family(owned(codec::request_record(project, value))),
+            request: jig_client::Ask::Family {
+                scope: jig_client::contract::Scope::Project(project),
+                record: owned(codec::request_record(project, value)),
+            },
         },
         out,
     );
@@ -27,7 +30,14 @@ pub(crate) fn asked(root: &mut Domain, env: &Env<Limits>, request: first::Out, o
     let event = match request {
         first::Out::Open { watch, subject } => jig_client::Event::Watch {
             handle: handle(watch),
-            subject: jig_client::Watchable::Family(owned(codec::subject(wire::subject(subject).1))),
+            subject: jig_client::Watchable::Family {
+                scope: match subject.scope {
+                    super::Scope::Project(project) => jig_client::contract::Scope::Project(project),
+                    super::Scope::Deployment => jig_client::contract::Scope::Deployment,
+                },
+                window: jig_client::contract::Window { rows: env.limits.first.rows, after: None },
+                record: owned(codec::subject(wire::subject(subject).1)),
+            },
         },
         // Slab tokens carry a 32-bit slot and a 32-bit generation.
         // Read slots follow watch slots, preserving the complete generation.
@@ -39,7 +49,14 @@ pub(crate) fn asked(root: &mut Domain, env: &Env<Limits>, request: first::Out, o
                     .checked_add(u64::from(env.limits.first.watches) << 32)
                     .expect("checked read slots follow watch slots"),
             },
-            read: jig_client::Readable::Family(owned(codec::read(wire::subject(subject).1))),
+            read: jig_client::Readable::Family {
+                scope: match subject.scope {
+                    super::Scope::Project(project) => jig_client::contract::Scope::Project(project),
+                    super::Scope::Deployment => jig_client::contract::Scope::Deployment,
+                },
+                window: jig_client::contract::Window { rows: env.limits.first.rows, after: None },
+                record: owned(codec::read(wire::subject(subject).1)),
+            },
         },
         first::Out::Close { watch } => jig_client::Event::Unwatch { handle: handle(watch) },
         value @ first::Out::Fact { .. } => {

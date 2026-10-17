@@ -23,10 +23,10 @@ pub fn moved_hold() -> w::Final {
     );
     w::Final::Refused(w::Refused::new(&wire(), w::RefusedParts { refusal: hold_refusal(reason) }).expect("refused"))
 }
-pub const SERVICE_ANSWER: [u8; 25] = [0, 0, 0, 0, 0, 8, 0, 0, 0, 15, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0];
-pub fn application_answer() -> w::Answer {
+pub const SERVICE_ANSWER: [u8; 25] = [1, 0, 0, 0, 0, 8, 0, 0, 0, 15, 0, 1, 4, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0];
+pub fn application_answer() -> w::KeyedAnswer {
     let owner = w::Owner::Family(w::Family::new(&wire(), w::FamilyParts { number: 9 }).expect("family"));
-    w::Answer::FinalAnswer(
+    w::KeyedAnswer::FinalAnswer(
         w::Owned::new(&wire(), w::OwnedParts { owner, version: 2, record: Box::from(b"outcome".as_slice()) })
             .expect("application answer"),
     )
@@ -39,10 +39,10 @@ mod lacks;
 pub use admission::*;
 pub use lacks::*;
 
-pub fn response_bounds() -> [(u32, Option<w::Answer>); 2] {
+pub fn response_bounds() -> [(u32, Option<w::KeyedAnswer>); 2] {
     let limits = w::Limits { owned_record: 512, ..wire() };
     let owner = w::Owner::Family(w::Family::new(&limits, w::FamilyParts { number: 9 }).expect("family"));
-    let answer = w::Answer::FinalAnswer(
+    let answer = w::KeyedAnswer::FinalAnswer(
         w::Owned::new(&limits, w::OwnedParts { owner, version: 2, record: Box::new([3; 257]) })
             .expect("body fits its record bound"),
     );

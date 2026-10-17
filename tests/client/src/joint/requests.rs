@@ -84,27 +84,27 @@ pub fn send(
             }
             return Ok(());
         }
-        Down::Read { read, what: Readable::Family(record) } => {
+        Down::Read { read, what: Readable::Family { scope, window, record } } => {
             let subject = crate::test::family_subject(record, true);
             let sign_in = sign_in.ok_or(Invalid::Session)?;
-            let (scope, owner) =
+            let (_, owner) =
                 jig_client_test_domain::family::wire::connector_subject(subject).map_err(Invalid::Family)?;
             let reply = driver.transport.reply_to(Reply::ApplicationRead { client, read: *read, subject });
             root::Event::ReadApplication {
                 reply,
                 sign_in,
-                scope: application_scope(scope),
+                scope: application_scope(*scope),
                 number: 1,
                 subject: owner,
-                window: core::documents::Window { rows: limits.rows, after: None },
+                window: family_window(window, limits.text)?,
             }
         }
-        Down::Open { watch, subject: Watchable::Family(record) } => {
+        Down::Open { watch, subject: Watchable::Family { scope, window, record } } => {
             let subject = crate::test::family_subject(record, false);
             let sign_in = sign_in.ok_or(Invalid::Session)?;
-            let (scope, owner) =
+            let (_, owner) =
                 jig_client_test_domain::family::wire::connector_subject(subject).map_err(Invalid::Family)?;
-            let scope = application_scope(scope);
+            let scope = application_scope(*scope);
             let watcher = driver.transport.open(client, *watch, Watched::Application { subject, scope });
             root::Event::WatchApplication {
                 watcher,
@@ -112,7 +112,7 @@ pub fn send(
                 scope,
                 number: 1,
                 subject: owner,
-                window: core::documents::Window { rows: limits.rows, after: None },
+                window: family_window(window, limits.text)?,
             }
         }
         Down::Save { .. } | Down::Erase { .. } => return Err(Invalid::Shell),
@@ -135,7 +135,7 @@ fn keyed(
             let reply_to = driver.transport.reply_to(Reply::Keyed { client, attempt, key, owner: KeyedOwner::Jig });
             root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask }))
         }
-        Ask::Family(record) => {
+        Ask::Family { scope, record } => {
             let (project, value) =
                 jig_client_test_domain::family::wire::connector_request(&crate::test::family_request(record))
                     .map_err(Invalid::Family)?;
@@ -147,25 +147,27 @@ fn keyed(
                 key,
                 owner: KeyedOwner::Application { connector: number },
             });
-            root::Event::Application {
-                reply_to,
-                sign_in,
-                key,
-                scope: ApplicationScope::Project(project),
-                number,
-                digest,
-                value,
-            }
+            root::Event::Application { reply_to, sign_in, key, scope: application_scope(*scope), number, digest, value }
         }
     })
 }
 
-fn application_scope(value: jig_test_connector::ClientScope) -> ApplicationScope {
+fn application_scope(value: jig_client::contract::Scope) -> ApplicationScope {
     match value {
-        jig_test_connector::ClientScope::Project(project) => ApplicationScope::Project(project),
-        jig_test_connector::ClientScope::Deployment => ApplicationScope::Deployment,
-        jig_test_connector::ClientScope::Own => ApplicationScope::Own,
+        jig_client::contract::Scope::Project(project) => ApplicationScope::Project(project),
+        jig_client::contract::Scope::Deployment => ApplicationScope::Deployment,
+        jig_client::contract::Scope::Own => ApplicationScope::Own,
     }
+}
+
+fn family_window(value: &jig_client::contract::Window, limit: u32) -> Result<core::documents::Window, Invalid> {
+    let after = match &value.after {
+        None => None,
+        Some(cursor) => {
+            Some(wire::cursor::decode_window(cursor, limit).ok_or(Invalid::Read(wire::reads::Invalid::Cursor))?)
+        }
+    };
+    Ok(core::documents::Window { rows: value.rows, after })
 }
 
 /// Canonical fixed-field application encoding, independent of Debug formatting.

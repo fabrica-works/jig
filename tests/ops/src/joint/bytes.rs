@@ -93,10 +93,10 @@ impl Side {
             Event::Reply { exchange, message } => {
                 if self.family_requests.remove(exchange).is_some() {
                     let value =
-                        w::Answer::decode(&w::CEILINGS, &mut Reader::new(message)).expect("whole family answer");
+                        w::KeyedAnswer::decode(&w::CEILINGS, &mut Reader::new(message)).expect("whole family answer");
                     receipts.push(Receipt::Answer {
                         attempt: *exchange,
-                        final_answer: matches!(value, w::Answer::FinalAnswer(_)),
+                        final_answer: matches!(value, w::KeyedAnswer::FinalAnswer(_)),
                         words: None,
                     });
                 }
@@ -429,33 +429,31 @@ impl Bytes {
     }
     fn application(&mut self, joint: &mut Joint, request: clients::ToApplication) {
         let event = match request {
-            clients::ToApplication::Request { reply_to, sign_in, key, family, record, digest, .. } => {
+            clients::ToApplication::Request { reply_to, sign_in, key, family, scope, record, digest, .. } => {
                 assert_eq!(family, 2);
                 joint.engine.peers.application_bytes.push((key, record.clone()));
                 let ask = d::wire::ask_value(&record).expect("whole infrastructure request bytes");
-                let (project, value, _) = super::infrastructure::ask(ask).expect("native infrastructure request");
+                let jig_domain_people::ApplicationScope::Project(project) = scope else {
+                    self.event(clients::Event::Application(FromApplication::Undecodable { to: reply_to }));
+                    return;
+                };
+                let (_, value, _) = super::infrastructure::ask(ask).expect("native infrastructure request");
                 root::Event::Application { reply_to, sign_in, key, project, value, digest }
             }
-            clients::ToApplication::Read { reply, sign_in, family, record, .. } => {
-                let subject = subject(family, &record);
+            clients::ToApplication::Read { reply, sign_in, family, record, scope, .. } => {
+                let subject = subject(family, &record, scope);
                 let (scope, owner) = subject_route(subject.clone()).expect("whole owner read");
                 let token = reply.into_token();
                 self.reads.insert(token, subject);
                 let reply = skein_lib::ReplyTo::new(token);
                 root::Event::ReadApplication { reply, sign_in, scope, subject: owner }
             }
-            clients::ToApplication::Watch { watcher, sign_in, family, record, .. } => {
-                let subject = subject(family, &record);
+            clients::ToApplication::Watch { watcher, sign_in, family, record, scope, window, .. } => {
+                let subject = subject(family, &record, scope);
                 let (scope, owner) = subject_route(subject.clone()).expect("whole owner watch");
                 self.subjects.insert(watcher, subject);
                 self.pending_admissions.push(watcher);
-                root::Event::WatchApplication {
-                    watcher,
-                    sign_in,
-                    scope,
-                    subject: owner,
-                    window: core::documents::Window { rows: joint.limits.jig.rows, after: None },
-                }
+                root::Event::WatchApplication { watcher, sign_in, scope, subject: owner, window }
             }
         };
         joint.send_event(event);
@@ -567,11 +565,18 @@ impl Bytes {
         self.cut(until);
     }
 }
-fn subject(family: u16, bytes: &[u8]) -> Subject {
+fn subject(family: u16, bytes: &[u8], scope: jig_domain_people::ApplicationScope) -> Subject {
+    let scope = match scope {
+        jig_domain_people::ApplicationScope::Project(project) => jig_client::contract::Scope::Project(project),
+        jig_domain_people::ApplicationScope::Deployment => jig_client::contract::Scope::Deployment,
+        jig_domain_people::ApplicationScope::Own => jig_client::contract::Scope::Own,
+    };
     match family {
-        1 => Subject::Observability(d::wire::observability::subject_value(bytes).expect("whole observability subject")),
+        1 => Subject::Observability(
+            d::wire::observability::subject_value(bytes, scope).expect("whole observability subject"),
+        ),
         2 => Subject::Infrastructure(
-            d::wire::infrastructure::subject_value(bytes).expect("whole infrastructure subject"),
+            d::wire::infrastructure::subject_value(bytes, scope).expect("whole infrastructure subject"),
         ),
         _ => panic!("declared family"),
     }

@@ -63,10 +63,10 @@ pub fn owned(value: Watchable, limits: &w::Limits) -> Result<w::Owned, w::Proble
             value.encode(&mut writer).expect("measured subject");
             (w::Owner::Jig, VERSION, writer.finish())
         }
-        Watchable::Family(value) => (
+        Watchable::Family { scope, window, record: value } => (
             w::Owner::Family(w::Family::new(limits, w::FamilyParts { number: value.family })?),
             value.version,
-            value.bytes,
+            super::envelope::record(scope, window, value, limits)?,
         ),
     };
     w::Owned::new(limits, w::OwnedParts { owner, version, record })
@@ -83,6 +83,7 @@ pub fn refused(value: &w::WatchRefusal) -> c::WatchEnd {
 #[must_use]
 pub fn ended(value: &w::WatchEnd) -> c::WatchEnd {
     match value {
+        w::WatchEnd::NotServed(_) => c::WatchEnd::NotServed,
         w::WatchEnd::Closed => c::WatchEnd::Closed,
         w::WatchEnd::Unknown => c::WatchEnd::Unknown,
         w::WatchEnd::NotAllowed => c::WatchEnd::NotAllowed,

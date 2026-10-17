@@ -211,7 +211,7 @@ fn family_read(rows: &[Request]) -> Token {
             Request::Client {
                 request:
                     jig_client::Request::Down {
-                        down: jig_client::Down::Read { read, what: jig_client::Readable::Family(_) },
+                        down: jig_client::Down::Read { read, what: jig_client::Readable::Family { .. } },
                     },
             } => Some(*read),
             _ => None,
@@ -224,7 +224,7 @@ fn family_watch(rows: &[Request]) -> Token {
             Request::Client {
                 request:
                     jig_client::Request::Down {
-                        down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Family(_) },
+                        down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } },
                     },
             } => Some(*watch),
             _ => None,
@@ -304,7 +304,7 @@ fn a_jig_page_routes_every_part_kind_and_forgets_its_generation() {
                 Request::Client {
                     request:
                         jig_client::Request::Down {
-                            down: jig_client::Down::Read { what: jig_client::Readable::Family(_), .. },
+                            down: jig_client::Down::Read { what: jig_client::Readable::Family { .. }, .. },
                         },
                 } => true,
                 _ => false,
@@ -426,7 +426,7 @@ fn family_touch_refuses_a_moved_revision_and_final_answers_stay_with_the_family(
     let Request::Client {
         request:
             jig_client::Request::Down {
-                down: jig_client::Down::Send { attempt, request: jig_client::Ask::Family(ask), .. },
+                down: jig_client::Down::Send { attempt, request: jig_client::Ask::Family { record: ask, .. }, .. },
             },
     } = &rows[1]
     else {
@@ -503,7 +503,9 @@ fn panel_parameters_are_the_familys_revision_naming_request() {
     );
     let Request::Client {
         request:
-            jig_client::Request::Down { down: jig_client::Down::Send { request: jig_client::Ask::Family(ask), .. } },
+            jig_client::Request::Down {
+                down: jig_client::Down::Send { request: jig_client::Ask::Family { record: ask, .. }, .. },
+            },
     } = &rows[1]
     else {
         panic!("family parameters request")
@@ -738,7 +740,9 @@ fn a_raw_entrance_refusal_finishes_the_original_family_request_once_with_its_fac
     let Request::Save { .. } = &rows[0] else { panic!("retention precedes send") };
     let Request::Client {
         request:
-            jig_client::Request::Down { down: jig_client::Down::Send { attempt, request: jig_client::Ask::Family(_), .. } },
+            jig_client::Request::Down {
+                down: jig_client::Down::Send { attempt, request: jig_client::Ask::Family { .. }, .. },
+            },
     } = &rows[1]
     else {
         panic!("family request")
@@ -852,7 +856,7 @@ fn outbox_entries_route_as_scoped_numeric_subjects_independently_of_effect_propo
             Request::Client {
                 request:
                     jig_client::Request::Down {
-                        down: jig_client::Down::Read { what: jig_client::Readable::Family(record), .. },
+                        down: jig_client::Down::Read { what: jig_client::Readable::Family { record, .. }, .. },
                     },
             } =>
                 record.bytes
@@ -914,18 +918,21 @@ fn actual_application_object_form_keeps_explicit_zero_observed_revision_and_orig
             }),
         },
     );
-    let (attempt, ask) = sent
-        .iter()
-        .find_map(|request| match request {
-            Request::Client {
-                request:
-                    jig_client::Request::Down {
-                        down: jig_client::Down::Send { attempt, request: jig_client::Ask::Family(ask), .. },
-                    },
-            } => Some((*attempt, ask)),
-            _ => None,
-        })
-        .expect("one keyed complete application request");
+    let (attempt, ask) =
+        sent.iter()
+            .find_map(|request| match request {
+                Request::Client {
+                    request:
+                        jig_client::Request::Down {
+                            down:
+                                jig_client::Down::Send {
+                                    attempt, request: jig_client::Ask::Family { record: ask, .. }, ..
+                                },
+                        },
+                } => Some((*attempt, ask)),
+                _ => None,
+            })
+            .expect("one keyed complete application request");
     assert_eq!(
         ask,
         &family_request(crate::family::Ask::ChangeObject {
@@ -1053,7 +1060,9 @@ fn whole_owner_parts_require_original_inner_identity_and_keep_unversioned_snapsh
         for request in taken(&mut root) {
             if let Request::Client {
                 request:
-                    jig_client::Request::Down { down: jig_client::Down::Send { request: jig_client::Ask::Family(_), .. } },
+                    jig_client::Request::Down {
+                        down: jig_client::Down::Send { request: jig_client::Ask::Family { .. }, .. },
+                    },
             } = request
             {
                 panic!("an unversioned snapshot must not submit an Object form");

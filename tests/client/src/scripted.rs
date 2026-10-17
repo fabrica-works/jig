@@ -220,10 +220,11 @@ fn envelope(value: Envelope) -> RequestEnvelope {
         Envelope::SignedOut => RequestEnvelope::SignedOut,
     }
 }
-fn scope(value: family::Scope) -> engine::ApplicationScope {
+fn family_scope(value: jig_client::contract::Scope) -> engine::ApplicationScope {
     match value {
-        family::Scope::Project(p) => engine::ApplicationScope::Project(p),
-        family::Scope::Deployment => engine::ApplicationScope::Deployment,
+        jig_client::contract::Scope::Project(p) => engine::ApplicationScope::Project(p),
+        jig_client::contract::Scope::Deployment => engine::ApplicationScope::Deployment,
+        jig_client::contract::Scope::Own => panic!("this scripted family offers project and deployment scopes"),
     }
 }
 impl Scripted {
@@ -250,15 +251,15 @@ impl Scripted {
         let Request::Client { request: jig_client::Request::Down { down } } = request else { return request };
         let down = match down {
             Down::Send { attempt, key, request } => {
-                let first = matches!(&request, Ask::Family(_));
+                let first = matches!(&request, Ask::Family { .. });
                 Down::Send { attempt: self.transport(client, attempt, first, true), key, request }
             }
             Down::Read { read, what } => {
-                let first = matches!(&what, Readable::Family(_));
+                let first = matches!(&what, Readable::Family { .. });
                 Down::Read { read: self.transport(client, read, first, true), what }
             }
             Down::Open { watch, subject } => {
-                let first = matches!(&subject, Watchable::Family(_));
+                let first = matches!(&subject, Watchable::Family { .. });
                 let watch = self.transport(client, watch, first, true);
                 self.watch_routes.insert(watch);
                 Down::Open { watch, subject }
@@ -300,10 +301,10 @@ impl Front<Test> for Scripted {
                     Ask::Jig(ask) => {
                         self.engine.send(now, wall, party, key, attempt, *ask).expect("jig send fits");
                     }
-                    Ask::Family(record) => {
+                    Ask::Family { scope, record } => {
                         let ask = crate::test::family_request(&record);
-                        let project = match &ask {
-                            family::Ask::Touch { project, .. } | family::Ask::ChangeObject { project, .. } => *project,
+                        let jig_client::contract::Scope::Project(project) = scope else {
+                            panic!("scripted family requests name a project")
                         };
                         let digest: [u8; 32] = Sha256::digest(format!("{ask:?}").as_bytes()).into();
                         self.engine
@@ -357,17 +358,17 @@ impl Front<Test> for Scripted {
                 | Subject::Deployment => unreachable!("only runs continue"),
             },
             Down::Close { watch } => self.engine.close(now, watch),
-            Down::Read { read, what: Readable::Family(record) } => {
+            Down::Read { read, what: Readable::Family { scope, record, .. } } => {
                 let subject = crate::test::family_subject(&record, true);
                 self.engine
-                    .read_scoped_application(now, party, read, 1, scope(subject.scope), &subject)
+                    .read_scoped_application(now, party, read, 1, family_scope(scope), &subject)
                     .expect("family read fits");
             }
-            Down::Open { watch, subject: Watchable::Family(record) } => {
+            Down::Open { watch, subject: Watchable::Family { scope, record, .. } } => {
                 let subject = crate::test::family_subject(&record, false);
                 self.last_watch = Some(watch);
                 self.engine
-                    .open_scoped_application(now, party, watch, 1, scope(subject.scope), subject)
+                    .open_scoped_application(now, party, watch, 1, family_scope(scope), subject)
                     .expect("family watch fits");
             }
             Down::Save { .. } | Down::Erase { .. } => unreachable!("the shell keeps records"),
@@ -718,6 +719,7 @@ impl Scripted {
                         WatchEnd::Closed => family::WatchEnd::Closed,
                         WatchEnd::SignedOut => family::WatchEnd::SignedOut,
                         WatchEnd::Dropped => family::WatchEnd::Dropped,
+                        WatchEnd::NotServed => family::WatchEnd::Unsupported,
                         WatchEnd::Unknown => family::WatchEnd::Unknown,
                         WatchEnd::NotAllowed => family::WatchEnd::NotAllowed,
                         WatchEnd::Busy => family::WatchEnd::Busy,

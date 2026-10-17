@@ -366,13 +366,21 @@ fn application_read(engine: &crate::Engine) -> Box<[u8]> {
     use jig_client_protocol_wire::v8 as w;
     let limits = &engine.clients.as_ref().expect("clients").env.limits.wire;
     let owner = w::Owner::Family(w::Family::new(limits, w::FamilyParts { number: 1 }).expect("test family"));
-    let record = w::Owned::new(
+    let window = w::Window::new(limits, w::WindowParts { rows: 2, after: None }).expect("window");
+    let value = w::FamilyRecord::new(
         limits,
-        w::OwnedParts {
-            owner,
-            version: jig_client_test_protocol_wire::VERSION,
+        w::FamilyRecordParts {
+            scope: w::Scope::Deployment,
+            window,
             record: jig_client_test_protocol_wire::codec::read(&jig_test_connector::ClientSubject::Deployment),
         },
+    )
+    .expect("family record");
+    let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("record bytes"));
+    value.encode(&mut writer).expect("measured family record");
+    let record = w::Owned::new(
+        limits,
+        w::OwnedParts { owner, version: jig_client_test_protocol_wire::VERSION, record: writer.finish() },
     )
     .expect("test owned read");
     let mut writer = skein_lib::Writer::new(usize::try_from(record.measure()).expect("read bytes"));

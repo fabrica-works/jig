@@ -39,7 +39,7 @@ fn every_watch_subject_preserves_its_identity_and_window() {
 fn an_application_watch_keeps_its_owner_and_rejects_foreign_deliveries() {
     let (mut world, stream) = stream_world();
     let owner = world.open_record(stream, 17, fixtures::family_subject());
-    let Some(Request::Application(ToApplication::Watch { watcher, sign_in, family, version, record })) =
+    let Some(Request::Application(ToApplication::Watch { watcher, sign_in, family, version, record, .. })) =
         world.out.pop()
     else {
         panic!("family watch");

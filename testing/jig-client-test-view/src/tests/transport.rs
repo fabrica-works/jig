@@ -40,10 +40,11 @@ fn step(root: &mut Domain, event: Event, limits: &jig_client_test_domain::Limits
         // Preserve these tests' owner-level observations while exercising encoded transport work.
         let request = match request {
             Request::Client {
-                request: jig_client::Request::Down { down: Down::Read { read, what: Readable::Family(record) } },
+                request: jig_client::Request::Down { down: Down::Read { read, what: Readable::Family { record, .. } } },
             } => Request::First(first::Out::Read { read, subject: subject(&record, true) }),
             Request::Client {
-                request: jig_client::Request::Down { down: Down::Open { watch, subject: Watchable::Family(record) } },
+                request:
+                    jig_client::Request::Down { down: Down::Open { watch, subject: Watchable::Family { record, .. } } },
             } => Request::First(first::Out::Open { watch, subject: subject(&record, false) }),
             Request::Client { request: jig_client::Request::Down { down: Down::Close { watch } } } => {
                 Request::First(first::Out::Close { watch })

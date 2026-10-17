@@ -29,8 +29,8 @@ fn a_moved_hold_is_refused_with_its_facts() {
 fn again_busy_is_answered_busy_and_not_kept() {
     let mut exchange = Exchange::new();
     for (reply, expected) in [
-        (p::Reply::Again(p::Again::Busy), w::Answer::Busy),
-        (p::Reply::Outcome(p::Outcome::Again(p::Again::NotReady)), w::Answer::NotReady),
+        (p::Reply::Again(p::Again::Busy), w::KeyedAnswer::Busy),
+        (p::Reply::Outcome(p::Outcome::Again(p::Again::NotReady)), w::KeyedAnswer::NotReady),
     ] {
         let (owner, to) = exchange.ask();
         exchange.reply(to, reply);
@@ -45,14 +45,14 @@ fn an_ended_sign_in_is_answered_signed_out() {
     let mut exchange = Exchange::new();
     let (owner, to) = exchange.ask();
     exchange.component.down(&exchange.env, Event::SignInEnded { sign_in: f::NUMBER }, &mut exchange.out);
-    assert_eq!(exchange.answer(owner), w::Answer::SignedOut);
+    assert_eq!(exchange.answer(owner), w::KeyedAnswer::SignedOut);
     let Some(Request::Secrets(SecretsRequest::Erase { owner: secret_owner })) = exchange.out.pop() else {
         panic!("erase digest");
     };
     assert_eq!(secret_owner, crate::SecretOwner::SignIn(41));
     assert!(exchange.component.pending.exchanges.is_empty());
     exchange.reply(to, p::Reply::Outcome(p::Outcome::Started { task: 8 }));
-    assert_eq!(exchange.answer(owner), w::Answer::SignedOut);
+    assert_eq!(exchange.answer(owner), w::KeyedAnswer::SignedOut);
     assert!(exchange.out.is_empty());
 }
 #[test]
@@ -93,12 +93,15 @@ fn owner_outcomes_keep_every_supplied_fact() {
 fn translated(reply: &p::Reply, limits: &w::Limits) -> w::Final {
     let record = crate::translate::answers::answer(reply, limits).expect("translated answer");
     match record {
-        w::Answer::FinalAnswer(value) => {
+        w::KeyedAnswer::FinalAnswer(value) => {
             assert_eq!(value.owner(), &w::Owner::Jig);
             assert_eq!(value.version(), 8);
             w::Final::decode(limits, &mut Reader::new(value.record())).expect("jig answer")
         }
-        other @ (w::Answer::Busy | w::Answer::NotReady | w::Answer::SignedOut) => {
+        other @ (w::KeyedAnswer::NotServed(_)
+        | w::KeyedAnswer::Busy
+        | w::KeyedAnswer::NotReady
+        | w::KeyedAnswer::SignedOut) => {
             panic!("expected final, got {other:?}")
         }
     }
@@ -157,7 +160,7 @@ fn done_ending_round_trips(limits: &w::Limits) {
     )
     .expect("owned final");
     assert_eq!(
-        jig_client_protocol_link::translate::answers::answer(w::Answer::FinalAnswer(owned), &f::client_limits()),
+        jig_client_protocol_link::translate::answers::answer(w::KeyedAnswer::FinalAnswer(owned), &f::client_limits()),
         Ok(jig_client_domain::contract::Answer::Refused(jig_client_domain::contract::Refusal::Ended {
             how: jig_client_domain::contract::Ending::Done
         }))
@@ -231,7 +234,7 @@ fn an_absent_sign_in_is_answered_signed_out_without_a_saved_answer() {
     for reply in [p::Reply::SignedOut, p::Reply::Outcome(p::Outcome::SignedOut)] {
         let (owner, to) = exchange.ask();
         exchange.reply(to, reply);
-        assert_eq!(exchange.answer(owner), w::Answer::SignedOut);
+        assert_eq!(exchange.answer(owner), w::KeyedAnswer::SignedOut);
         assert!(exchange.component.pending.exchanges.is_empty());
         assert!(exchange.out.is_empty());
         exchange.component.connections.remove(&owner);
@@ -244,4 +247,39 @@ fn a_sparse_ending_past_its_piece_bound_is_refused() {
         crate::translate::refusals::refusal(p::Refusal::Ended { how: p::Ending::Done }, &limits),
         Err(w::Problem { path: w::Path::EndingRows, reason: skein_codec::Reason::Bound })
     );
+}
+
+const UNSERVED_VERSION: u32 = 9;
+const REFUSED_WATCH: u64 = 71;
+#[test]
+fn a_keyed_request_outside_its_owners_range_is_answered_not_served() {
+    let mut exchange = Exchange::new();
+    let owner = exchange.post(f::keyed(w::Owner::Jig, UNSERVED_VERSION, Box::new([255])));
+    exchange.authenticate();
+    assert_eq!(exchange.answer(owner), w::KeyedAnswer::NotServed(f::not_served(w::Owner::Jig)));
+    assert!(exchange.out.is_empty());
+}
+#[test]
+fn a_read_outside_its_owners_range_names_the_served_ranges() {
+    let mut exchange = Exchange::new();
+    let owner = exchange.post_to(b"/jig/v1/read", f::owned_read(w::Owner::Jig, UNSERVED_VERSION, Box::new([255])));
+    exchange.authenticate();
+    assert_eq!(exchange.read_answer(owner), w::ReadAnswer::NotServed(f::not_served(w::Owner::Jig)));
+    assert!(exchange.out.is_empty());
+}
+#[test]
+fn an_opening_outside_its_owners_range_is_answered_not_served() {
+    let mut exchange = Exchange::new();
+    let stream = exchange.open_stream();
+    let subject = w::Owned::new(
+        &f::wire(),
+        w::OwnedParts { owner: w::Owner::Jig, version: UNSERVED_VERSION, record: Box::new([255]) },
+    )
+    .expect("opaque subject");
+    let owner = exchange.open_record(stream, REFUSED_WATCH, subject);
+    assert_eq!(
+        w::OpenAnswer::decode(&f::wire(), &mut Reader::new(exchange.response(owner).1)),
+        Ok(w::OpenAnswer::NotServed(f::not_served(w::Owner::Jig)))
+    );
+    assert!(exchange.out.is_empty());
 }

@@ -110,7 +110,7 @@ fn observed(row: d::Request, watches: &mut alloc::collections::BTreeMap<Token, u
                 key,
                 ask: match request {
                     jig_client::Ask::Jig(value) => d::Ask::Jig(value),
-                    jig_client::Ask::Family(value) => {
+                    jig_client::Ask::Family { record: value, .. } => {
                         d::Ask::Infrastructure(d::wire::ask_value(&value.bytes).expect("whole family ask"))
                     }
                 },
@@ -125,27 +125,28 @@ fn observed(row: d::Request, watches: &mut alloc::collections::BTreeMap<Token, u
                 Some(2) => Request::Infrastructure(infra::Out::Close { watch }),
                 Some(_) | None => Request::Jig(JigOut::Close { watch }),
             },
-            Down::Read { read, what: jig_client::Readable::Family(record) } => match record.family {
+            Down::Read { read, what: jig_client::Readable::Family { scope, record, .. } } => match record.family {
                 1 => Request::Observability(obs::Out::Read {
                     read,
-                    subject: d::wire::observability::subject_value(&record.bytes).expect("incident subject"),
+                    subject: d::wire::observability::subject_value(&record.bytes, scope).expect("incident subject"),
                 }),
                 2 => Request::Infrastructure(infra::Out::Read {
                     read,
-                    subject: d::wire::infrastructure::subject_value(&record.bytes).expect("environment subject"),
+                    subject: d::wire::infrastructure::subject_value(&record.bytes, scope).expect("environment subject"),
                 }),
                 _ => panic!("declared family"),
             },
-            Down::Open { watch, subject: jig_client::Watchable::Family(record) } => {
+            Down::Open { watch, subject: jig_client::Watchable::Family { scope, record, .. } } => {
                 watches.insert(watch, record.family);
                 match record.family {
                     1 => Request::Observability(obs::Out::Open {
                         watch,
-                        subject: d::wire::observability::subject_value(&record.bytes).expect("incident subject"),
+                        subject: d::wire::observability::subject_value(&record.bytes, scope).expect("incident subject"),
                     }),
                     2 => Request::Infrastructure(infra::Out::Open {
                         watch,
-                        subject: d::wire::infrastructure::subject_value(&record.bytes).expect("environment subject"),
+                        subject: d::wire::infrastructure::subject_value(&record.bytes, scope)
+                            .expect("environment subject"),
                     }),
                     _ => panic!("declared family"),
                 }

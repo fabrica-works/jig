@@ -145,7 +145,7 @@ record ObservabilityNativeValueIncident { incident: ObservabilityNativeIncident 
 record ObservabilityNativeValueProject { project: u32 services: list 128 ObservabilityNativeServiceState incidents: list 128 ObservabilityNativeIncident }
 enum ObservabilityNativeValue { service: ObservabilityNativeValueService, alert: ObservabilityNativeValueAlert, outbox: ObservabilityNativeValueOutbox, deployment: ObservabilityNativeValueDeployment, incident: ObservabilityNativeValueIncident, project: ObservabilityNativeValueProject }
 record ObservabilityNativeDocument { subject: ObservabilitySubject value: ObservabilityNativeValue }
-versioned record ObservabilitySubjectRecord { value: ObservabilitySubject }
+versioned record ObservabilitySubjectRecord { value: ObservabilityKind }
 record InfrastructureKindNativeEnvironment { value: InfrastructureNativeEnvironment }
 record InfrastructureKindNativeEnvironments { pool: option InfrastructureNativePool }
 enum InfrastructureKind { environments: InfrastructureKindEnvironments, environment: InfrastructureKindEnvironment, native_environment: InfrastructureKindNativeEnvironment, native_environments: InfrastructureKindNativeEnvironments, panel: InfrastructureKindPanel, result: InfrastructureKindResult, effect: InfrastructureKindEffect, owner_effect: InfrastructureKindOwnerEffect, outbox: InfrastructureKindOutbox, hold: InfrastructureKindHold, project: InfrastructureKindProject, deployment }
@@ -169,7 +169,7 @@ record ObservabilityEffect { entry: u64 task: u64 project: option u32 alert: u64
 record ObservabilityDocumentNative { value: ObservabilityNativeDocument }
 versioned record InfrastructureAskRecord { value: InfrastructureAsk }
 versioned record InfrastructureAnswerRecord { value: InfrastructureAnswer }
-versioned record InfrastructureSubjectRecord { value: InfrastructureSubject }
+versioned record InfrastructureSubjectRecord { value: InfrastructureKind }
 record InfrastructureEnvironment { project: u32 number: u64 pool: u32 name: bytes 4096 revision: u64 created_by: InfrastructureCreation ready_at: option u64 ready: option bool cost: option u64 observed_until: option u64 end: option InfrastructureEnd }
 record InfrastructureResourceFactEnvironment { value: option InfrastructureEnvironment }
 enum InfrastructureResourceFact { service: InfrastructureResourceFactService, environment: InfrastructureResourceFactEnvironment, pool: InfrastructureResourceFactPool, quota: InfrastructureResourceFactQuota }

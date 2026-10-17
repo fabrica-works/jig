@@ -44,7 +44,7 @@ pub(crate) fn refused(_limits: &w::Limits) -> Box<[u8]> {
     out.finish()
 }
 pub(crate) fn signed_out(_limits: &w::Limits) -> Box<[u8]> {
-    let answer = w::Answer::SignedOut;
+    let answer = w::KeyedAnswer::SignedOut;
     let mut out = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
     answer.encode(&mut out).expect("signed out fits");
     out.finish()
@@ -57,7 +57,7 @@ pub(crate) fn signed_in(_limits: &w::Limits, answer: w::SignedIn) -> Box<[u8]> {
 }
 
 pub(crate) fn busy() -> Box<[u8]> {
-    let answer = w::Answer::Busy;
+    let answer = w::KeyedAnswer::Busy;
     let mut out = skein_lib::Writer::new(1);
     answer.encode(&mut out).expect("busy fits");
     out.finish()
@@ -125,7 +125,7 @@ pub(crate) fn sign_out_answer() -> Box<[u8]> {
 
 pub(crate) fn not_ready() -> Box<[u8]> {
     let mut out = skein_lib::Writer::new(1);
-    w::Answer::NotReady.encode(&mut out).expect("not ready fits");
+    w::KeyedAnswer::NotReady.encode(&mut out).expect("not ready fits");
     out.finish()
 }
 
@@ -152,4 +152,22 @@ pub(crate) fn stopped(route: Route) -> Option<Box<[u8]>> {
         | Route::Stream
         | Route::Missing => None,
     }
+}
+
+pub(crate) fn encoded(answer: &w::KeyedAnswer) -> Box<[u8]> {
+    let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+    answer.encode(&mut writer).expect("measured answer");
+    writer.finish()
+}
+
+pub(crate) fn encoded_read(answer: &w::ReadAnswer) -> Box<[u8]> {
+    let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+    answer.encode(&mut writer).expect("measured answer");
+    writer.finish()
+}
+
+pub(crate) fn encoded_open(answer: &w::OpenAnswer) -> Box<[u8]> {
+    let mut writer = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+    answer.encode(&mut writer).expect("measured answer");
+    writer.finish()
 }

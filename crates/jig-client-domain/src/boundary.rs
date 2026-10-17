@@ -16,17 +16,17 @@ pub struct Family {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
     Jig(Box<contract::Ask>),
-    Family(Family),
+    Family { scope: contract::Scope, record: Family },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Readable {
     Jig(contract::Read),
-    Family(Family),
+    Family { scope: contract::Scope, window: contract::Window, record: Family },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Watchable {
     Jig(contract::Subject),
-    Family(Family),
+    Family { scope: contract::Scope, window: contract::Window, record: Family },
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Readout {

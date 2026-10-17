@@ -1076,7 +1076,7 @@ fn native_environment_names_request_revision_and_whole_width_end_survive_the_cli
         match request {
             Request::Save { record: crate::store::Record::Unlinked(record) } => {
                 crate::wire::ask_value(match &record.request.request {
-                    jig_client::Ask::Family(value) => &value.bytes,
+                    jig_client::Ask::Family { record: value, .. } => &value.bytes,
                     jig_client::Ask::Jig(_) => panic!("family ask"),
                 })
                 .unwrap()
