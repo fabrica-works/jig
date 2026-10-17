@@ -256,7 +256,10 @@ fn test_connector_vocabulary_and_client_value_kit_keep_their_exact_roles() {
     let all = manifests();
     for (name, expected) in [
         ("jig-test-connector", vec!["skein-lib"]),
-        ("jig-client-test-kit", vec!["jig-client-test-domain", "jig-test-connector", "skein-lib"]),
+        (
+            "jig-client-test-kit",
+            vec!["jig-client", "jig-client-test-domain", "jig-test-connector", "skein-lib", "skein-ui"],
+        ),
     ] {
         let selected: Vec<_> = all.iter().filter(|manifest| manifest.name.as_deref() == Some(name)).collect();
         assert_eq!(selected.len(), 1, "one exact {name} role");

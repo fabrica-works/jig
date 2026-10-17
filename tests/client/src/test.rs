@@ -118,7 +118,7 @@ pub fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
 
 // Checked immutable books and envelopes are shared by every equal fixture.
 type Books = (jig_client_view::words::Words, view::words::Words);
-fn phrasebooks(limits: &domain::Limits) -> &'static Books {
+pub(crate) fn phrasebooks(limits: &domain::Limits) -> &'static Books {
     static BOOKS: OnceLock<Mutex<BTreeMap<(u32, u32), &'static Books>>> = OnceLock::new();
     let mut books = BOOKS.get_or_init(|| Mutex::new(BTreeMap::new())).lock().expect("fixture books lock");
     books.entry((limits.jig.text, limits.first.text)).or_insert_with(|| {
@@ -340,6 +340,22 @@ impl App for Test {
     }
     fn seen(tree: &Tree) -> Vec<crate::harness::Seen> {
         crate::observe::seen(tree)
+    }
+    fn decision(request: &Request) -> Option<&Ask> {
+        match request {
+            Request::Client {
+                request:
+                    jig_client::Request::Down { down: jig_client::Down::Send { request: jig_client::Ask::Jig(ask), .. } },
+            } => Some(ask),
+            Request::Save { .. }
+            | Request::Erase { .. }
+            | Request::Client { .. }
+            | Request::First(_)
+            | Request::Show { .. }
+            | Request::SignIn { .. }
+            | Request::SignOut
+            | Request::Fact { .. } => None,
+        }
     }
     fn sent(request: &Request) -> Option<Sent> {
         crate::observe::sent(request)

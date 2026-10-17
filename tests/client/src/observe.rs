@@ -115,6 +115,11 @@ fn task(t: &Task) -> Receipt {
     Receipt::Card { key: key(ObjectKey::Task(t.chip.task)), revisions }
 }
 fn read(v: &ReadValue) -> Vec<Receipt> {
+    let mut receipts = read_cards(v);
+    receipts.push(Receipt::Document { value: Box::new(v.clone()) });
+    receipts
+}
+fn read_cards(v: &ReadValue) -> Vec<Receipt> {
     match v {
         ReadValue::Task(t) => vec![task(t)],
         ReadValue::Me(f) => frame(f, None),
@@ -234,8 +239,13 @@ pub fn up_received(up: &jig_client::Up) -> Vec<Receipt> {
         }
         Up::Served { served: false, .. } => vec![Receipt::OutOfDate],
         Up::ReadDone { result: Readout::Jig(ReadResult::Value(value)), .. } => read(value),
-        Up::Watched { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => vec![task(value)],
+        Up::Watched { event: WatchEvent::Delivered(Delivery::Task(value)), .. } => {
+            read(&ReadValue::Task(value.clone()))
+        }
         Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Me(value)) } => frame(value, Some(*watch)),
+        Up::Watched { event: WatchEvent::Delivered(Delivery::OwnerProposal(value)), .. } => {
+            read(&ReadValue::OwnerProposal(value.clone()))
+        }
         Up::WatchEnded { watch, end } => {
             let mut receipts = vec![Receipt::WatchEnded { watch: *watch }];
             if *end == WatchEnd::SignedOut {

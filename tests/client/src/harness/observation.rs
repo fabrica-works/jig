@@ -46,6 +46,8 @@ pub struct Sent {
 /// Facts in a delivered shell callback, before the root consumes it.
 #[derive(Clone, Debug)]
 pub enum Receipt {
+    /// A complete jig document delivered before the application consumes it.
+    Document { value: Box<jig_client::contract::ReadValue> },
     /// The document revision available to a card in the next build.
     Card { key: CardKey, revisions: Vec<(u16, u64)> },
     /// A wire attempt ended; only final answers meet the request deadline.
@@ -84,6 +86,13 @@ pub enum Observed {
 /// One boundary observation made by the loop.
 #[derive(Clone, Debug)]
 pub enum Observation {
+    /// A jig decision leaving the shell, with the tree the person acted on.
+    Decision {
+        client: ClientId,
+        key: jig_client::Key,
+        ask: Box<jig_client::contract::Ask>,
+        scene: Option<jig_client_test_kit::check::Scene>,
+    },
     /// The shell is sending a person's sign-out to its front.
     SignOutAsked { client: ClientId },
     /// Admit a tab/device to link expectations.

@@ -41,6 +41,10 @@ pub trait App: Sized {
     fn seen(tree: &Tree) -> Vec<Seen>;
     /// Translate a keyed wire request without reading root state.
     fn sent(request: &Self::Request) -> Option<Sent>;
+    /// The jig request crossing the public wire boundary, when this application reports one.
+    fn decision(_request: &Self::Request) -> Option<&jig_client::contract::Ask> {
+        None
+    }
     /// Translate delivered documents and answers before the callback.
     fn received(event: &Self::Event) -> Vec<Receipt>;
     /// The enclosing card a person acted on, from the public tree alone.

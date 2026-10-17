@@ -1,6 +1,7 @@
 //! Tabs retain records and history; epochs discard old deliveries. Each callback
 //! writes its store, dispatches wire duties, then applies and checks patches
 //! (client/domain/testing.md, 4; client/domain/view.md, 11).
+mod decisions;
 use super::{App, CardKey, Duty, Fault, Front, FrontFault, Observation, StoreWrite};
 use crate::model::Model;
 use skein_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
@@ -98,6 +99,8 @@ struct Client<A: App> {
     navigation: u64,
     delivery: Time,
     acted_card: Option<CardKey>,
+    acted_scene: Option<jig_client_test_kit::check::Scene>,
+    decisions: std::collections::BTreeSet<[u8; 16]>,
     text_shell: Option<TextShell>,
 }
 enum PersonKind<A: App> {
@@ -239,6 +242,8 @@ impl<A: App, F: Front<A>> World<A, F> {
             navigation: 0,
             delivery: self.now,
             acted_card: None,
+            acted_scene: None,
+            decisions: std::collections::BTreeSet::new(),
             text_shell: None,
         });
         self.observe(Observation::Client { client: id });
@@ -348,6 +353,8 @@ impl<A: App, F: Front<A>> World<A, F> {
     }
     /// Reports a platform act and mirrors a local field edit before diffing.
     pub fn act(&mut self, id: ClientId, node: NodeId, act: Act) {
+        self.clients[id.0].acted_scene =
+            Some(jig_client_test_kit::check::scene(A::tree(&self.clients[id.0].view), node));
         if let Some(card) = A::card(A::tree(&self.clients[id.0].view), node) {
             self.clients[id.0].acted_card = Some(card);
         }
@@ -598,6 +605,7 @@ impl<A: App, F: Front<A>> World<A, F> {
                     );
                 }
             } else {
+                self.decision(id, &request, true);
                 if let Some(mut sent) = A::sent(&request).or_else(|| self.front.sent(&request)) {
                     if self.clients[id.0].acted_card.is_some() {
                         sent.card.clone_from(&self.clients[id.0].acted_card);

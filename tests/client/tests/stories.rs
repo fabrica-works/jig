@@ -74,6 +74,46 @@ fn a_held_chat_is_released() {
     }
 }
 
+const CHECK_PARTY: u64 = 7;
+const HELD_TASK: u64 = 9;
+const RELEASE_ATTEMPT: skein_lib::Token = skein_lib::Token::new(9000);
+const RELEASE_KEY: [u8; 16] = [91; 16];
+const DELIVERED_HOLD: jig_client::contract::Revision = jig_client::contract::Revision { value: 4 };
+const UNDELIVERED_HOLD: jig_client::contract::Revision = jig_client::contract::Revision { value: 99 };
+fn raw_release(revision: jig_client::contract::Revision) {
+    let mut world = stories::held_chat(11);
+    let client = world.client(CHECK_PARTY, stories::chat());
+    world.person(client, vec![Step::See { find: Find::named(Role::Button, b"Release"), within: WITHIN }]);
+    world.run(Until::Done);
+    world.send_raw(
+        client,
+        jig_client_test_domain::Request::Client {
+            request: jig_client::Request::Down {
+                down: jig_client::Down::Send {
+                    attempt: RELEASE_ATTEMPT,
+                    key: RELEASE_KEY,
+                    request: jig_client::Ask::Jig(Box::new(jig_client::contract::Ask::Release {
+                        project: 1,
+                        task: HELD_TASK,
+                        revision,
+                        again: None,
+                    })),
+                },
+            },
+        },
+    );
+    assert_eq!(world.run(Until::Done).verdict, skein_world::domain::Verdict::Passed);
+}
+#[test]
+#[should_panic(expected = "jig's check: a decision names a revision never delivered")]
+fn jig_s_check_fails_a_release_naming_a_revision_never_delivered() {
+    raw_release(UNDELIVERED_HOLD);
+}
+#[test]
+fn jig_s_check_passes_a_release_naming_the_delivered_revision() {
+    raw_release(DELIVERED_HOLD);
+}
+
 #[test]
 fn a_proposal_accepted_in_the_inbox_leaves_its_chat_too() {
     for seed in [13, 14] {
