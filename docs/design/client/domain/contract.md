@@ -625,8 +625,12 @@ unsent, for its owner's version (section 8).
     pool that funds it, after;
   - *releasing a held task:* what lifting its hold does: the task judged
     afresh, a run started again, or an uncertain effect made again;
-  - *cancelling:* what ends: the tasks of its tree by phase, the live
-    runs, the pending proposals, the effects pending and settling;
+  - *cancelling:* what ends: the live tasks below the task, counted by
+    phase; and, of the task and those below it, the live runs (each
+    attempt claimed whose answer its task has not heard) and the pending
+    proposals (each a task made that no holder has decided). Its effects
+    are its connectors' (5.1): each withdraws the entries not yet sent and
+    settles those in flight, and the document counts none of them;
   - *moving a task:* the reservation that moves to the party's pool.
 - **The confirmation is the application's.** jig holds the revision,
   the "once" and admission below the API; whether and how a person

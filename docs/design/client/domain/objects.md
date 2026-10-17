@@ -406,11 +406,13 @@ will do:
 - **Release:** a held task, by its reason (section 5).
 - **Cancel:** a `Cancel`; ends the task and its subtree, deepest first.
   Before it is sent, the card says what it ends, as the task's document
-  gives it: the tasks below that it cancels, counted by phase; the live
-  runs; the proposals withdrawn; and, by name, the connectors whose
-  effects will be dropped, if not yet made, or settle, if in flight. The
-  core never counts a connector's effects (section 3): which, and how
-  many, each connector's panel says.
+  gives it (`contract.md`, 5.4): the tasks below that it cancels,
+  counted by phase; the live runs; the proposals withdrawn; and, in
+  jig's words, that effects not yet made are withdrawn and those in
+  flight settle. The core never counts a connector's effects, and its
+  closing asks every connector to settle the tree's (section 3;
+  `../../domain/connectors.md`, 4.2): which, and how many, each
+  connector's panel says.
 - **Close,** for a chat: asks it to finish and cancels it if it has not
   within a grace. A chat with live delegates asks first what becomes of
   each: cancelled, or made the person's, funded from their pool from

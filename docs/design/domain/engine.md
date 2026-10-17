@@ -1005,8 +1005,9 @@ section 3):
 - **A decision's effect is data,** made from the core's state as the
   document is made (`../client/domain/contract.md`, 5.4): what accepting
   a proposal grants and costs, and the pool after; what a release does;
-  what a cancel ends, by phase, runs, proposals and effects; the
-  reservation a move takes. Confirming a decision is the application's;
+  what a cancel ends, its tasks by phase, its live runs and its pending
+  proposals, never its connectors' effects; the reservation a move
+  takes. Confirming a decision is the application's;
   the core gives the facts it shows, and takes the decision naming the
   revision its party was shown (`../client/domain/contract.md`, 5.2).
 
