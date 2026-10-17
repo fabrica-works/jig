@@ -565,12 +565,11 @@ pub fn part(
     builder: &mut Builder,
     side: &infrastructure::Side,
     part: &Part,
-    generation: u32,
     words: &Words,
     jig_words: &jig_client_view::words::Words,
     bindings: &mut Bindings,
 ) {
-    if !side.contains(part, generation) {
+    if !side.contains(part) {
         words.status(builder, Word::Unshowable, &[]);
         return;
     }

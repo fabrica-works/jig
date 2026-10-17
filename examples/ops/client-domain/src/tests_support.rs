@@ -21,7 +21,7 @@ pub enum Request {
     Infrastructure(infra::Out),
     Observability(obs::Out),
     Show { address: d::Address, replace: bool },
-    SignIn { provider: u16, back: d::Address },
+    SignIn { provider: u16 },
     SignOut,
     Fact { fact: d::Fact },
 }
@@ -130,7 +130,7 @@ fn observed(row: d::Request, watches: &mut alloc::collections::BTreeMap<Token, u
         d::Request::Infrastructure(value) => Request::Infrastructure(value),
         d::Request::Observability(value) => Request::Observability(value),
         d::Request::Show { address, replace } => Request::Show { address, replace },
-        d::Request::SignIn { provider, back } => Request::SignIn { provider, back },
+        d::Request::SignIn { provider } => Request::SignIn { provider },
         d::Request::SignOut | d::Request::Client { request: jig_client::Request::SignOut } => Request::SignOut,
         d::Request::Fact { fact } => Request::Fact { fact },
         d::Request::Client { .. } => panic!("unlinked fixture"),
@@ -159,8 +159,8 @@ fn up(up: Up) -> d::Event {
 }
 fn callbacks(event: d::Event) -> Vec<d::Event> {
     match event {
-        d::Event::Jig(jig_client_view::Event::Hello { served }) => Vec::from([
-            up(Up::Served { served, versions: None }),
+        d::Event::Client { event: jig_client::Event::Up { up: Up::Served { served, versions } } } => Vec::from([
+            up(Up::Served { served, versions }),
             up(Up::FamilyServed {
                 family: 1,
                 versions: Some(jig_client::contract::VersionRange { first: 1, last: 1 }),
@@ -170,11 +170,7 @@ fn callbacks(event: d::Event) -> Vec<d::Event> {
                 versions: Some(jig_client::contract::VersionRange { first: 1, last: 1 }),
             }),
         ]),
-        d::Event::Jig(jig_client_view::Event::Watch { watch, event }) => Vec::from([up(Up::Watched { watch, event })]),
-        d::Event::Jig(jig_client_view::Event::Ended { watch, end }) => Vec::from([up(Up::WatchEnded { watch, end })]),
-        d::Event::Jig(jig_client_view::Event::Read { read, result }) => {
-            Vec::from([up(Up::ReadDone { read, result: jig_client::Readout::Jig(result) })])
-        }
+
         d::Event::Infrastructure(infra::Event::Read { read, result }) => {
             Vec::from([up(Up::ReadDone { read, result: infra_read(result) })])
         }

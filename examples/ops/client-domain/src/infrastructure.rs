@@ -5,7 +5,7 @@
 //! Entry points: step handles one event; fire retries dropped watches; reclaim frees terminals.
 //! | Event | State change | Requests |
 //! | Went/Show | acquire scoped demand | Read, Open |
-//! | Read/Delivered | validate whole document, retain newest revision | `ShowObjects` |
+//! | Read/Delivered | validate whole document, retain newest revision | `Named` |
 //! | Left/PartsLeft | release demand, retain close obligation | Close |
 //! | Dropped | schedule bounded retry | later Open |
 //! | Closed/Unknown | retire watch; unknown hides supplied facts | replacement Read/Open |
@@ -15,8 +15,9 @@ pub mod native;
 use alloc::boxed::Box;
 pub use documents::{Answer, Ask};
 pub use documents::{Document, Kind, ReadResult, Scope, Subject, WatchEnd, WatchEvent};
+use jig_client::Link;
 use jig_client::contract::{Part, Revision};
-use jig_client_view::{frame::me::FrameShown, link::Link};
+use jig_client_view::frame::me::FrameShown;
 use skein_lib::{Env, Id, List, Map, Queue, RequestProgress, Slab, Time, Token};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Address {
@@ -77,8 +78,8 @@ pub enum Fact {
 }
 #[derive(Debug)]
 pub enum Event {
-    Show { part: Part, generation: u32, scope: Scope },
-    PartsLeft { generation: u32 },
+    Show { part: Part, scope: Scope },
+    PartsLeft,
     Went { address: Address },
     Left,
     Act { act: Act },
@@ -99,8 +100,7 @@ pub enum Request {
     Save { record: Record },
     Send { request: Token, scope: u64, ask: Ask },
     Out(Out),
-    ShowObjects { objects: List<jig_client::contract::ObjectKey> },
-    ObjectsLeft,
+    Named { objects: List<jig_client::contract::ObjectKey>, sections: List<jig_client_view::page::Section> },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -143,7 +143,6 @@ pub struct Object {
 #[derive(Debug)]
 struct Held {
     part: Part,
-    generation: u32,
     subject: Option<Subject>,
 }
 #[derive(Debug)]
@@ -245,9 +244,9 @@ impl Side {
         None
     }
     #[must_use]
-    pub fn contains(&self, part: &Part, generation: u32) -> bool {
+    pub fn contains(&self, part: &Part) -> bool {
         for held in &self.parts {
-            if &held.part == part && held.generation == generation {
+            if &held.part == part {
                 return true;
             }
         }
@@ -263,16 +262,16 @@ pub const fn shown(side: &Side) -> u64 {
 }
 pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Show { part, generation, scope } => {
+        Event::Show { part, scope } => {
             if !part_fits(&part, env.limits.segments, env.limits.text) {
                 full(out);
                 return;
             }
-            if side.contains(&part, generation) {
+            if side.contains(&part) {
                 return;
             }
             let subject = documents::subject(&part, scope);
-            if side.parts.push(Held { part, generation, subject: subject.clone() }).is_err() {
+            if side.parts.push(Held { part, subject: subject.clone() }).is_err() {
                 full(out);
                 return;
             }
@@ -281,13 +280,8 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
             }
             side.changed();
         }
-        Event::PartsLeft { generation } => {
-            let old = core::mem::replace(&mut side.parts, List::with_capacity(env.limits.parts));
-            for held in old.into_boxed() {
-                if held.generation != generation {
-                    assert!(side.parts.push(held).is_ok(), "remaining parts fit");
-                }
-            }
+        Event::PartsLeft => {
+            side.parts.clear();
             prune(side, out);
             side.changed();
         }
@@ -306,7 +300,7 @@ pub fn step(side: &mut Side, env: &Env<Limits>, event: Event, out: &mut Queue<Re
         }
         Event::Left => {
             side.address = None;
-            out.push(Request::ObjectsLeft);
+            out.push(Request::Named { objects: List::with_capacity(0), sections: List::with_capacity(0) });
             prune(side, out);
             side.changed();
         }
@@ -504,7 +498,8 @@ fn received(side: &mut Side, env: &Env<Limits>, subject: Subject, document: Docu
     if side.page() == Some(id) {
         let object = side.objects.get(id).expect("page object exists");
         match &object.value {
-            Value::Known(document) => out.push(Request::ShowObjects { objects: document.objects(env.limits.rows) }),
+            Value::Known(document) => out
+                .push(Request::Named { objects: document.objects(env.limits.rows), sections: List::with_capacity(0) }),
             Value::Loading | Value::Unknown => {}
         }
     }

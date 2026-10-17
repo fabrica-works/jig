@@ -5,7 +5,7 @@ use skein_lib::{Env, Queue, Rng, Time};
 /// The three children and their shared durable client.
 #[derive(Debug)]
 pub struct Domain {
-    pub(crate) jig: jig_client_view::Domain,
+    pub(crate) jig: jig_client_view::Ui,
     pub(crate) infrastructure: infrastructure::Side,
     pub(crate) observability: crate::observability::Side,
     pub(crate) client: jig_client::Client,
@@ -30,7 +30,13 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
     }
     .expect("checked client capacities");
     Domain {
-        jig: jig_client_view::Domain::new(&limits.jig),
+        jig: jig_client_view::Ui::new(
+            &limits.jig,
+            jig_client_view::page::navigation::Navigation::new(limits.jig.navigation_entries),
+            jig_client_view::address::Address::Inbox { project: None },
+            jig_client_view::page::Arrangement::none(),
+        )
+        .expect("root's UI configuration is valid"),
         infrastructure: infrastructure::Side::new(&limits.infrastructure, rng.next_u64()),
         observability: crate::observability::Side::new(&limits.observability, rng.next_u64()),
         client,
@@ -45,7 +51,7 @@ impl Domain {
     }
 
     #[must_use]
-    pub const fn jig(&self) -> &jig_client_view::Domain {
+    pub const fn jig(&self) -> &jig_client_view::Ui {
         &self.jig
     }
     #[must_use]
@@ -62,7 +68,7 @@ pub fn step(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<
 }
 pub fn fire(root: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut child = Queue::with_capacity(jig_client_view::max_out(&env.limits.jig));
-    jig_client_view::fire(&mut root.jig, &route::jig_env(env), &mut child);
+    root.jig.fire(env.now, env.wall, &root.client, &mut child);
     route::route_jig(root, env, &mut child, out);
     let mut child = Queue::with_capacity(infrastructure::max_out(&env.limits.infrastructure));
     infrastructure::fire(
@@ -115,13 +121,6 @@ pub fn shown(root: &Domain) -> u64 {
         .expect("infrastructure shown count fits")
         .checked_add(crate::observability::shown(&root.observability))
         .expect("observability shown count fits")
-}
-/// Installs application-configured provider words before Start (client.md, 12).
-pub fn provider(
-    root: &mut Domain,
-    provider: jig_client_view::signin::Provider,
-) -> Result<(), jig_client_view::signin::Provider> {
-    root.jig.provider(provider)
 }
 
 /// Installs the application's navigation before Start; the jig child validates its bound.

@@ -20,7 +20,7 @@ const JIG: jig_client_view::Limits = jig_client_view::Limits {
     save_delay: Duration::from_secs(1),
     intents: 2,
     fields: 4,
-    providers: 2,
+
     objects: 3,
     sources: 8,
     reads: 4,
@@ -98,7 +98,10 @@ fn ready() -> Domain {
             _ => None,
         })
         .unwrap();
-    drive(&mut root, Event::Jig(jig_client_view::Event::Hello { served: true }));
+    drive(
+        &mut root,
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } } },
+    );
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
     let frame = Frame {
         party: FrameParty {
@@ -119,10 +122,11 @@ fn ready() -> Domain {
     };
     drive(
         &mut root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) },
+            },
+        },
     );
     root
 }
@@ -328,17 +332,21 @@ fn public_effect_fragments_keep_equal_task_and_party_makers_separate() {
     }
     let rows = drive(
         &mut root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
-                hosts: List::with_capacity(0),
-                accounts: List::with_capacity(0),
-                capacity: List::with_capacity(0),
-                proposals: 0,
-                refusals: List::with_capacity(0),
-                parts,
-            }))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                        hosts: List::with_capacity(0),
+                        accounts: List::with_capacity(0),
+                        capacity: List::with_capacity(0),
+                        proposals: 0,
+                        refusals: List::with_capacity(0),
+                        parts,
+                    }))),
+                },
+            },
+        },
     );
     for proposer in makers {
         let expected = infrastructure::Subject {
@@ -525,10 +533,11 @@ fn arranged_task_view(section: jig_client_view::address::TaskSection) -> View {
     document.context.as_mut().expect("task context").impact.tasks.waiting = 1;
     drive(
         &mut root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+            },
+        },
     );
     let mut view = small_view();
     let mut patches = Queue::with_capacity(view.limits().tree.patches);
@@ -648,10 +657,11 @@ fn incident_plan_page(native: bool) -> Domain {
     document.context.as_mut().unwrap().impact.tasks.waiting = 1;
     drive(
         &mut root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Task(Box::new(document))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Task(Box::new(document))) },
+            },
+        },
     );
     root
 }
@@ -733,38 +743,20 @@ fn an_incident_with_a_proposal_and_an_infrastructure_panel_fills_both_slot_passe
                 Read::Proposal { proposal: key } => ReadValue::Proposal(Box::new(proposal(key))),
                 _ => continue,
             };
-            let parts =
-                drive(&mut root, Event::Jig(jig_client_view::Event::Read { read, result: ReadResult::Value(value) }));
+            let parts = drive(
+                &mut root,
+                Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::ReadDone {
+                            read,
+                            result: jig_client::Readout::Jig(ReadResult::Value(value)),
+                        },
+                    },
+                },
+            );
             for r in parts {
                 if let Request::Infrastructure(infrastructure::Out::Read { read, subject }) = r {
-                    use infrastructure::documents::{Panel, PartDocument, Phase, Procedure, Service};
-                    let doc = PartDocument {
-                        subject,
-                        revision: Revision { value: 1 },
-                        panel: Some(Panel {
-                            task: 9,
-                            procedure: Procedure::Remediate {
-                                service: Service {
-                                    environment: Box::from(*b"production"),
-                                    name: Box::from(*b"checkout"),
-                                },
-                                operation: 17,
-                                deadline: Wall::EPOCH,
-                            },
-                            phase: Phase::WaitingCondition,
-                        }),
-                        description: None,
-                        effect: None,
-                        resources: List::with_capacity(2),
-                        effects: List::with_capacity(2),
-                        drift: List::with_capacity(2),
-                        environments: List::with_capacity(2),
-                        pools: List::with_capacity(2),
-                        backend: None,
-                        made: None,
-                        proposal_limit: None,
-                        staged_limit: None,
-                    };
+                    let doc = waiting_remediation_panel(subject);
                     drive(
                         &mut root,
                         Event::Infrastructure(infrastructure::Event::Read {
@@ -1069,17 +1061,21 @@ fn actual_outbox_entries_render_from_their_explicit_scope_and_keep_proposal_keys
         parts.push(Part::Outbox { connector: 2, scope, entry: 17 }).unwrap();
         let rows = drive(
             &mut root,
-            Event::Jig(jig_client_view::Event::Watch {
-                watch,
-                event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
-                    hosts: List::with_capacity(0),
-                    accounts: List::with_capacity(0),
-                    capacity: List::with_capacity(0),
-                    proposals: 0,
-                    refusals: List::with_capacity(0),
-                    parts,
-                }))),
-            }),
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch,
+                        event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                            hosts: List::with_capacity(0),
+                            accounts: List::with_capacity(0),
+                            capacity: List::with_capacity(0),
+                            proposals: 0,
+                            refusals: List::with_capacity(0),
+                            parts,
+                        }))),
+                    },
+                },
+            },
         );
         let (read, subject) = rows
             .iter()
@@ -1163,15 +1159,11 @@ fn outbox_document(subject: infrastructure::Subject) -> infrastructure::Document
 }
 
 #[test]
-#[expect(
-    clippy::too_many_lines,
-    reason = "one public slot lifecycle covers both connector fragment owners and whole opaque paths"
-)]
 fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenations_in_both_connectors() {
     let domain_limits = limits();
     let (jig_words, obs_words, infra_words) = phrasebooks();
     let envelope = Limits::of(&domain_limits, &jig_words, &obs_words, &infra_words).unwrap().tree;
-    // A finite public fragment tree, borrowing the actual checked byte/depth envelope.
+    // A finite public fragment tree, borrowing the checked byte/depth envelope.
     let mut tree_limits = envelope;
     tree_limits.nodes = 64;
     tree_limits.slots = 8;
@@ -1200,28 +1192,20 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
                 observability::step(
                     &mut obs,
                     &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: domain_limits.observability },
-                    observability::Event::Show {
-                        part: part.clone(),
-                        generation: 11,
-                        scope: observability::Scope::Project(1),
-                    },
+                    observability::Event::Show { part: part.clone(), scope: observability::Scope::Project(1) },
                     &mut out,
                 );
-                assert!(obs.contains(&part, 11));
+                assert!(obs.contains(&part));
                 assert!(out.is_empty());
             } else {
                 let mut out = Queue::with_capacity(infrastructure::max_out(&domain_limits.infrastructure));
                 infrastructure::step(
                     &mut infra,
                     &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: domain_limits.infrastructure },
-                    infrastructure::Event::Show {
-                        part: part.clone(),
-                        generation: 11,
-                        scope: infrastructure::Scope::Project(1),
-                    },
+                    infrastructure::Event::Show { part: part.clone(), scope: infrastructure::Scope::Project(1) },
                     &mut out,
                 );
-                assert!(infra.contains(&part, 11));
+                assert!(infra.contains(&part));
                 assert!(out.is_empty());
             }
             jig_client_view::cards::common::part(&mut builder, &part, &jig_words, &mut jig_bindings);
@@ -1236,10 +1220,10 @@ fn resource_slots_preserve_whole_opaque_segments_and_distinct_equal_concatenatio
         assert_eq!(jig_bindings.part(slot.reference.token), Some(part));
         let mut fragment = skein_ui::Builder::new(&tree_limits);
         if slot.reference.owner == ((jig_client_view::Owner::Application { number: 1 }).opaque()) {
-            crate::observability::part(&mut fragment, &obs, part, 11, &obs_words, &mut obs_bindings);
+            crate::observability::part(&mut fragment, &obs, part, &obs_words, &mut obs_bindings);
         } else {
             assert_eq!(slot.reference.owner, (jig_client_view::Owner::Application { number: 2 }).opaque());
-            crate::infrastructure::part(&mut fragment, &infra, part, 11, &infra_words, &jig_words, &mut infra_bindings);
+            crate::infrastructure::part(&mut fragment, &infra, part, &infra_words, &jig_words, &mut infra_bindings);
         }
         builder.splice(slot.id, fragment);
     }
@@ -1286,17 +1270,21 @@ fn deployment_read(root: &mut Domain, connector: u16) -> Request {
         .unwrap();
     let rows = drive(
         root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
-                hosts: list([]),
-                accounts: list([]),
-                capacity: list([]),
-                proposals: 0,
-                refusals: list([]),
-                parts: list([Part::Deployment { connector }]),
-            }))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched {
+                    watch,
+                    event: WatchEvent::Delivered(Delivery::Deployment(Box::new(Deployment {
+                        hosts: list([]),
+                        accounts: list([]),
+                        capacity: list([]),
+                        proposals: 0,
+                        refusals: list([]),
+                        parts: list([Part::Deployment { connector }]),
+                    }))),
+                },
+            },
+        },
     );
     rows.into_iter()
         .find_map(|request| match request {
@@ -1561,32 +1549,24 @@ fn native_effect_slots_load_infrastructure_without_loading_a_maker_effect_and_ke
                 observability::step(
                     &mut side,
                     &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: domain_limits.observability },
-                    observability::Event::Show {
-                        part: part.clone(),
-                        generation: 9,
-                        scope: observability::Scope::Project(0),
-                    },
+                    observability::Event::Show { part: part.clone(), scope: observability::Scope::Project(0) },
                     &mut out,
                 );
-                assert!(side.contains(&part, 9));
+                assert!(side.contains(&part));
                 assert!(out.is_empty());
-                crate::observability::part(&mut builder, &side, &part, 9, &obs_words, &mut bindings);
+                crate::observability::part(&mut builder, &side, &part, &obs_words, &mut bindings);
             } else {
                 let mut side = infrastructure::Side::new(&domain_limits.infrastructure, 85);
                 let mut out = Queue::with_capacity(infrastructure::max_out(&domain_limits.infrastructure));
                 infrastructure::step(
                     &mut side,
                     &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: domain_limits.infrastructure },
-                    infrastructure::Event::Show {
-                        part: part.clone(),
-                        generation: 9,
-                        scope: infrastructure::Scope::Project(0),
-                    },
+                    infrastructure::Event::Show { part: part.clone(), scope: infrastructure::Scope::Project(0) },
                     &mut out,
                 );
-                assert!(side.contains(&part, 9));
+                assert!(side.contains(&part));
                 assert!(out.is_empty());
-                crate::infrastructure::part(&mut builder, &side, &part, 9, &infra_words, &jig_words, &mut bindings);
+                crate::infrastructure::part(&mut builder, &side, &part, &infra_words, &jig_words, &mut bindings);
             }
             builder.close();
             let tree = builder.finish();
@@ -1616,9 +1596,9 @@ fn native_effect_facts_have_distinct_proposal_and_state_labels() {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.infrastructure };
     let mut out = Queue::with_capacity(infrastructure::max_out(&limits.infrastructure));
     for event in [
-        infrastructure::Event::Link { link: jig_client_view::link::Link::Live },
+        infrastructure::Event::Link { link: jig_client::Link::Live },
         infrastructure::Event::Confirmed { party: Some(1) },
-        infrastructure::Event::Show { part: part.clone(), generation: 9, scope: infrastructure::Scope::Project(0) },
+        infrastructure::Event::Show { part: part.clone(), scope: infrastructure::Scope::Project(0) },
     ] {
         infrastructure::step(&mut side, &env, event, &mut out);
     }
@@ -1663,7 +1643,7 @@ fn native_effect_facts_have_distinct_proposal_and_state_labels() {
     let mut builder = skein_ui::Builder::new(&tree_limits);
     builder.open(skein_ui::Role::Page);
     let mut bindings = crate::bindings::Bindings::new(tree_limits.bindings, limits.infrastructure.text, 2);
-    crate::infrastructure::part(&mut builder, &side, &part, 9, &words, &jig_words, &mut bindings);
+    crate::infrastructure::part(&mut builder, &side, &part, &words, &jig_words, &mut bindings);
     builder.close();
     let tree = builder.finish();
     let text: Vec<_> = tree.nodes().iter().flat_map(|node| node.text.iter()).map(|run| run.text.as_ref()).collect();
@@ -1751,4 +1731,32 @@ fn native_environment_form_uses_the_supplied_request_revision_and_keeps_whole_wi
             value: u64::MAX - 1
         }))
     );
+}
+
+fn waiting_remediation_panel(subject: infrastructure::documents::Subject) -> infrastructure::documents::PartDocument {
+    use infrastructure::documents::{Panel, PartDocument, Phase, Procedure, Service};
+    PartDocument {
+        subject,
+        revision: Revision { value: 1 },
+        panel: Some(Panel {
+            task: 9,
+            procedure: Procedure::Remediate {
+                service: Service { environment: Box::from(*b"production"), name: Box::from(*b"checkout") },
+                operation: 17,
+                deadline: Wall::EPOCH,
+            },
+            phase: Phase::WaitingCondition,
+        }),
+        description: None,
+        effect: None,
+        resources: List::with_capacity(2),
+        effects: List::with_capacity(2),
+        drift: List::with_capacity(2),
+        environments: List::with_capacity(2),
+        pools: List::with_capacity(2),
+        backend: None,
+        made: None,
+        proposal_limit: None,
+        staged_limit: None,
+    }
 }

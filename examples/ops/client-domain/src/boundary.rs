@@ -22,6 +22,7 @@ pub enum Answered {
 /// A view act routed exhaustively to its child.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
+    SignIn,
     Jig(jig_client_view::action::Act),
     Infrastructure(infrastructure::Act),
     Observability(crate::observability::Act),
@@ -47,7 +48,6 @@ pub enum JigOut {
 /// Bounded routing and child facts for the shell to observe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fact {
-    Jig(jig_client_view::facts::Fact),
     PartsFull,
     InvalidRecord,
     UnknownConnector,
@@ -62,7 +62,7 @@ pub enum Request {
     Infrastructure(infrastructure::Out),
     Observability(crate::observability::Out),
     Show { address: Address, replace: bool },
-    SignIn { provider: u16, back: Address },
+    SignIn { provider: u16 },
     SignOut,
     Fact { fact: Fact },
 }

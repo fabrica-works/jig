@@ -91,9 +91,15 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     view.infrastructure.begin();
     let mut builder = view.render.builder();
     builder.open(Role::Page);
-    if let Some(task) = arranged_task(root.jig()) {
-        task_page(&mut builder, root.jig(), task, &view.words, &mut view.jig);
-    } else if !jig_client_view::jig(&mut builder, root.jig(), observability::NAV, &view.words, &mut view.jig) {
+    if let Some(task) = arranged_task(&root.jig().borrow(root.client())) {
+        task_page(&mut builder, &root.jig().borrow(root.client()), task, &view.words, &mut view.jig);
+    } else if !jig_client_view::jig(
+        &mut builder,
+        &root.jig().borrow(root.client()),
+        observability::NAV,
+        &view.words,
+        &mut view.jig,
+    ) {
         builder.open(Role::Main);
         if root.observability().address().is_some() {
             observability::page(&mut builder, root.observability(), &view.observability_words, &mut view.observability);
@@ -107,12 +113,24 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
             );
         }
         builder.close();
-        jig_client_view::after_page(&mut builder, root.jig(), &view.words, &mut view.jig);
+        jig_client_view::after_page(&mut builder, &root.jig().borrow(root.client()), &view.words, &mut view.jig);
     }
     builder.close();
     for pass in 0..2 {
         for slot in builder.slots(pass) {
             let mut fragment = Builder::new(&view.limits.tree);
+            if slot.reference == jig_client_view::signin::SLOT {
+                let label = view
+                    .words
+                    .say(jig_client_view::phrases::jig::JigPhrase::SignInWith, &[jig_client_view::words::name(b"Ops")]);
+                fragment.open(Role::Button);
+                fragment.name(&label);
+                fragment.bind(view.observability.insert(bindings::Meaning::Action(Action::SignIn)));
+                fragment.text(skein_ui::Run::Plain, &label);
+                fragment.close();
+                builder.splice(slot.id, fragment);
+                continue;
+            }
             let filled = match Owner::from_opaque(slot.reference.owner) {
                 Some(Owner::Jig) => {
                     let key = match view.observability.object(slot.reference.token) {
@@ -123,7 +141,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                         Some(key) => match root.jig().objects().find(key) {
                             Some(id) => jig_client_view::cards::card(
                                 &mut fragment,
-                                root.jig(),
+                                &root.jig().borrow(root.client()),
                                 id,
                                 &jig_client_view::cards::Place::Elsewhere,
                                 &view.words,
@@ -134,7 +152,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                         None => match view.observability.section(slot.reference.token) {
                             Some(section) => jig_client_view::sections::section(
                                 &mut fragment,
-                                root.jig(),
+                                &root.jig().borrow(root.client()),
                                 &view.words,
                                 &mut view.jig,
                                 section,
@@ -167,7 +185,6 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                                         &mut fragment,
                                         root.observability(),
                                         part,
-                                        root.jig().generation(),
                                         &view.observability_words,
                                         &mut view.observability,
                                     );
@@ -183,7 +200,6 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                                 &mut fragment,
                                 root.infrastructure(),
                                 &part,
-                                root.jig().generation(),
                                 &view.infrastructure_words,
                                 &view.words,
                                 &mut view.infrastructure,
@@ -206,7 +222,7 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
     view.render.finish(builder, shown, out);
 }
 
-fn arranged_task(client: &jig_client_view::Domain) -> Option<u64> {
+fn arranged_task(client: &jig_client_view::Borrowed<'_>) -> Option<u64> {
     use jig_client_view::{address::Address, page::Page};
     match client.page() {
         Page::Work { address, .. } => match address {
@@ -224,7 +240,7 @@ fn arranged_task(client: &jig_client_view::Domain) -> Option<u64> {
 // The application's arrangement keeps jig's outline and its whole sections (pages.md, 12.3).
 fn task_page(
     b: &mut Builder,
-    client: &jig_client_view::Domain,
+    client: &jig_client_view::Borrowed<'_>,
     task: u64,
     words: &jig_client_view::words::Words,
     bindings: &mut JigBindings,

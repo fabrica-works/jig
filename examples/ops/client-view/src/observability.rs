@@ -223,15 +223,8 @@ fn document_view(builder: &mut Builder, document: &Document, words: &Words, bind
         }
     }
 }
-pub fn part(
-    builder: &mut Builder,
-    side: &observability::Side,
-    part: &Part,
-    generation: u32,
-    words: &Words,
-    bindings: &mut Bindings,
-) {
-    if !side.contains(part, generation) {
+pub fn part(builder: &mut Builder, side: &observability::Side, part: &Part, words: &Words, bindings: &mut Bindings) {
+    if !side.contains(part) {
         words.status(builder, Word::Unshowable, &[]);
         return;
     }

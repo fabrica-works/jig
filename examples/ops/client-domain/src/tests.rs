@@ -11,8 +11,9 @@ use crate as support_domain;
 #[path = "tests_support.rs"]
 mod support;
 use crate::{Address, Answered, Ask, Event, Limits, infrastructure};
+use jig_client::Link;
 use jig_client::contract::{self, Delivery, DocumentText, Frame, FrameParty, HeldRole, Needs, PartyKind, WatchEvent};
-use jig_client_view::{boundary::Offset, link::Link};
+use jig_client_view::boundary::Offset;
 use skein_lib::{Duration, Env, List, Queue, RequestEnvelope, Time, Token, Wall};
 use support::{Domain, JigOut, Request, new, step, take};
 const JIG: jig_client_view::Limits = jig_client_view::Limits {
@@ -23,7 +24,7 @@ const JIG: jig_client_view::Limits = jig_client_view::Limits {
     save_delay: Duration::from_secs(1),
     intents: 2,
     fields: 4,
-    providers: 2,
+
     objects: 2,
     sources: 8,
     reads: 4,
@@ -110,7 +111,10 @@ fn start(root: &mut Domain, kept: List<crate::store::Record>) -> Token {
         .unwrap()
 }
 fn confirm(root: &mut Domain, watch: Token, party: u64) {
-    drive(root, Event::Jig(jig_client_view::Event::Hello { served: true }));
+    drive(
+        root,
+        Event::Client { event: jig_client::Event::Up { up: jig_client::Up::Served { served: true, versions: None } } },
+    );
     // Explicit synthetic identity and empty offers, supplied independently of the party's display name.
     let frame = Frame {
         party: FrameParty {
@@ -131,10 +135,11 @@ fn confirm(root: &mut Domain, watch: Token, party: u64) {
     };
     drive(
         root,
-        Event::Jig(jig_client_view::Event::Watch {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))),
-        }),
+        Event::Client {
+            event: jig_client::Event::Up {
+                up: jig_client::Up::Watched { watch, event: WatchEvent::Delivered(Delivery::Frame(Box::new(frame))) },
+            },
+        },
     );
 }
 fn ready(seed: u64) -> Domain {
@@ -408,17 +413,21 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
         let expected = parts.clone();
         let rows = drive(
             &mut root,
-            Event::Jig(jig_client_view::Event::Watch {
-                watch,
-                event: WatchEvent::Delivered(Delivery::Deployment(Box::new(contract::Deployment {
-                    hosts: List::with_capacity(0),
-                    accounts: List::with_capacity(0),
-                    capacity: List::with_capacity(0),
-                    proposals: 0,
-                    refusals: List::with_capacity(0),
-                    parts,
-                }))),
-            }),
+            Event::Client {
+                event: jig_client::Event::Up {
+                    up: jig_client::Up::Watched {
+                        watch,
+                        event: WatchEvent::Delivered(Delivery::Deployment(Box::new(contract::Deployment {
+                            hosts: List::with_capacity(0),
+                            accounts: List::with_capacity(0),
+                            capacity: List::with_capacity(0),
+                            proposals: 0,
+                            refusals: List::with_capacity(0),
+                            parts,
+                        }))),
+                    },
+                },
+            },
         );
         assert_eq!(
             rows.iter()
@@ -430,14 +439,14 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
                 .count(),
             6
         );
-        let generation = root.jig().generation();
+
         for part in &expected {
             match connector {
                 jig_ops_domain_connectors::Connector::Infrastructure => {
-                    assert!(root.infrastructure().contains(part, generation));
+                    assert!(root.infrastructure().contains(part));
                 }
                 jig_ops_domain_connectors::Connector::Observability => {
-                    assert!(root.observability().contains(part, generation));
+                    assert!(root.observability().contains(part));
                 }
             }
         }
@@ -484,10 +493,10 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
         for part in &expected {
             match connector {
                 jig_ops_domain_connectors::Connector::Infrastructure => {
-                    assert!(!root.infrastructure().contains(part, generation));
+                    assert!(!root.infrastructure().contains(part));
                 }
                 jig_ops_domain_connectors::Connector::Observability => {
-                    assert!(!root.observability().contains(part, generation));
+                    assert!(!root.observability().contains(part));
                 }
             }
         }
@@ -872,12 +881,11 @@ fn resource_parts_bound_allocated_segments_and_whole_segment_bytes_in_both_conne
                     &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.observability },
                     crate::observability::Event::Show {
                         part: part.clone(),
-                        generation: 11,
                         scope: crate::observability::Scope::Project(1),
                     },
                     &mut out,
                 );
-                assert_eq!(side.contains(&part, 11), accepted);
+                assert_eq!(side.contains(&part), accepted);
                 if accepted {
                     assert!(out.is_empty());
                 } else {
@@ -894,14 +902,10 @@ fn resource_parts_bound_allocated_segments_and_whole_segment_bytes_in_both_conne
                 infrastructure::step(
                     &mut side,
                     &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.infrastructure },
-                    infrastructure::Event::Show {
-                        part: part.clone(),
-                        generation: 11,
-                        scope: infrastructure::Scope::Project(1),
-                    },
+                    infrastructure::Event::Show { part: part.clone(), scope: infrastructure::Scope::Project(1) },
                     &mut out,
                 );
-                assert_eq!(side.contains(&part, 11), accepted);
+                assert_eq!(side.contains(&part), accepted);
                 if accepted {
                     assert!(out.is_empty());
                 } else {
@@ -958,23 +962,14 @@ fn native_effect_parts_keep_connector_numbers_separate_from_maker_subjects() {
             infrastructure::step(
                 &mut infra,
                 &infra_env,
-                infrastructure::Event::Show {
-                    part: native.clone(),
-                    generation: 9,
-                    scope: infrastructure::Scope::Deployment,
-                },
+                infrastructure::Event::Show { part: native.clone(), scope: infrastructure::Scope::Deployment },
                 &mut infra_out,
             );
-            assert!(infra.contains(&native, 9));
+            assert!(infra.contains(&native));
             assert!(infra.part(&native).is_none());
             assert!(infra_out.is_empty());
-            infrastructure::step(
-                &mut infra,
-                &infra_env,
-                infrastructure::Event::PartsLeft { generation: 9 },
-                &mut infra_out,
-            );
-            assert!(!infra.contains(&native, 9));
+            infrastructure::step(&mut infra, &infra_env, infrastructure::Event::PartsLeft, &mut infra_out);
+            assert!(!infra.contains(&native));
             assert!(infra_out.is_empty());
             let mut side = obs::Side::new(&limits.observability, 83);
             let mut out = Queue::with_capacity(obs::max_out(&limits.observability));
@@ -982,14 +977,14 @@ fn native_effect_parts_keep_connector_numbers_separate_from_maker_subjects() {
             obs::step(
                 &mut side,
                 &side_env,
-                obs::Event::Show { part: native.clone(), generation: 9, scope: obs::Scope::Deployment },
+                obs::Event::Show { part: native.clone(), scope: obs::Scope::Deployment },
                 &mut out,
             );
-            assert!(side.contains(&native, 9));
+            assert!(side.contains(&native));
             assert!(side.part(&native).is_none());
             assert!(out.is_empty());
-            obs::step(&mut side, &side_env, obs::Event::PartsLeft { generation: 9 }, &mut out);
-            assert!(!side.contains(&native, 9));
+            obs::step(&mut side, &side_env, obs::Event::PartsLeft, &mut out);
+            assert!(!side.contains(&native));
             assert!(out.is_empty());
         }
     }

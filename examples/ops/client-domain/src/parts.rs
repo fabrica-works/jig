@@ -7,7 +7,6 @@ pub(crate) fn show(
     root: &mut Domain,
     env: &Env<Limits>,
     part: Part,
-    generation: u32,
     scope: jig_client::contract::PartScope,
     out: &mut Queue<Request>,
 ) {
@@ -18,7 +17,6 @@ pub(crate) fn show(
             env,
             infrastructure::Event::Show {
                 part,
-                generation,
                 scope: match scope {
                     jig_client::contract::PartScope::Project(project) => infrastructure::Scope::Project(project),
                     jig_client::contract::PartScope::Deployment => infrastructure::Scope::Deployment,
@@ -32,7 +30,6 @@ pub(crate) fn show(
                 env,
                 observability::Event::Show {
                     part,
-                    generation,
                     scope: match scope {
                         jig_client::contract::PartScope::Project(project) => observability::Scope::Project(project),
                         jig_client::contract::PartScope::Deployment => observability::Scope::Deployment,

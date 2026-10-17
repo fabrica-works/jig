@@ -1,4 +1,4 @@
-//! Routing assertions on the root's actual client requests, without observations.
+//! Routing assertions on the root's client requests, without observations.
 use super::{contract, env, infrastructure, limits, load_environment, ready, until};
 use crate::{Action, Event, Request};
 use jig_client::{Asker, Handle, Key};
