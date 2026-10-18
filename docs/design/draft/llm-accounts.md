@@ -465,8 +465,10 @@ built after the first build.
 - **The driver** (`oauth.md`, section 6): accounts added and removed
   while it runs, within its limit; sign-out; the owner's store as
   keeper.
-- **A lock on a private record** (`io.md`, 5.3), for an application
-  whose several processes share one record, as smith's product's do.
+- **A kept record read again before a refresh,** when its owner asks
+  (`oauth.md`, 6.4), for an application whose several processes share
+  one record, as smith's product's do, each refresh under a lock its
+  owner takes with io's `Lock` on a directory (`io.md`, section 5).
 - **Its fakes:** the fake issuer speaks a registration that issues its
   client id, and the fake LLM peer the public route, keys and a plan's
   errors.
@@ -489,8 +491,8 @@ built after the first build.
 - **Its product** signs in to ChatGPT under its own name, its `openai`
   preset carrying smith's registration (its `shell.md`, section 7);
   serializes its records' refreshes across its own processes, each
-  refresh under the record's lock, the record read again once the lock
-  is held; takes keys from its settings or the environment; runs Claude
+  refresh under a lock beside the record, the record read again once
+  the lock is held (smith's `draft/accounts.md`, 2.6); takes keys from its settings or the environment; runs Claude
   Code with its own configuration directories; and borrows nothing. Its
   live tests and benchmarks run on its own sign-ins and Claude Code
   directories, in a credentials directory the developer signs in once,
@@ -528,7 +530,7 @@ built after the first build.
 
 - **skein:** `llm.md` (sections 1, 2, 2.5, 4.6, 4.7), `llm-connection.md`
   (credentials, sections 1 and 4), `oauth.md` (sections 1, 2, 4 and 6),
-  `io.md`, 5.3 (a private record's lock), `fake-llm.md`.
+  `fake-llm.md`.
 - **smith:** `protocol/agent.md`, 1 and 4 (the program's backend; an
   endpoint names no account), `protocol/hosts.md`, 3 and 5.4 (the
   program's check; `borrow` removed), `protocol/channel.md`, 4, 5 and 6
