@@ -391,7 +391,7 @@ fn inbox(words: &Words) {
             updates: Count { value: u32::MAX, limited: true },
             more: true,
             results_seen: 0,
-            replies_seen: list([ReplyPosition { chat: 8, through: 0 }, ReplyPosition { chat: 9, through: 0 }]),
+            replies_seen: list([ReadPosition { task: 8, through: 0 }, ReadPosition { task: 9, through: 0 }]),
         })),
     );
     for request in &out {
@@ -720,7 +720,7 @@ fn fill_inbox(d: &mut Fixture, watch: jig_client::Handle) {
             updates: Count { value: u32::MAX, limited: true },
             more: true,
             results_seen: 0,
-            replies_seen: list([ReplyPosition { chat: 8, through: 0 }, ReplyPosition { chat: 9, through: 0 }]),
+            replies_seen: list([ReadPosition { task: 8, through: 0 }, ReadPosition { task: 9, through: 0 }]),
         })),
     );
 }

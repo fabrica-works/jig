@@ -21,7 +21,7 @@ pub struct Truth {
     pub notes: BTreeMap<u64, Note>,
     pub sources: Vec<Source>,
     pub results_seen: BTreeMap<u64, u64>,
-    pub replies_seen: BTreeMap<u64, Vec<jig_client_domain::contract::ReplyPosition>>,
+    pub replies_seen: BTreeMap<u64, Vec<jig_client_domain::contract::ReadPosition>>,
     pub trees: BTreeMap<u64, Tree>,
 }
 
@@ -55,7 +55,7 @@ pub enum Change {
     /// Replace the authoritative subtree, including folded counts.
     Tree(Tree),
     /// Replace committed inbox read positions for a party.
-    Seen { party: u64, results: u64, replies: Vec<jig_client_domain::contract::ReplyPosition> },
+    Seen { party: u64, results: u64, replies: Vec<jig_client_domain::contract::ReadPosition> },
 }
 impl Change {
     pub(crate) fn validate(&self, bounds: &Bounds) -> core::result::Result<(), Invalid> {
@@ -283,8 +283,6 @@ pub(crate) fn identity(value: &ReadValue) -> Option<ObjectKey> {
         | ReadValue::Activity(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
-        | ReadValue::Conversations(_)
-        | ReadValue::Goals(_)
         | ReadValue::Spend(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::OwnerSpend(_)
@@ -315,8 +313,6 @@ fn document_project(value: &ReadValue) -> Option<u32> {
         | ReadValue::Activity(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
-        | ReadValue::Conversations(_)
-        | ReadValue::Goals(_)
         | ReadValue::Spend(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::OwnerSpend(_)

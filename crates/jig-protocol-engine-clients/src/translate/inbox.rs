@@ -31,10 +31,9 @@ pub fn object(value: d::InboxObject, limits: &w::Limits) -> Result<w::OwnerInbox
             w::OwnerInboxObjectEscalationParts { revision },
         )?),
         d::InboxObject::PersonTask => w::OwnerInboxObject::PersonTask,
-        d::InboxObject::Reply { message } => w::OwnerInboxObject::Reply(w::OwnerInboxObjectReply::new(
-            limits,
-            w::OwnerInboxObjectReplyParts { message },
-        )?),
+        d::InboxObject::Reply { message } => {
+            w::OwnerInboxObject::Turn(w::OwnerInboxObjectTurn::new(limits, w::OwnerInboxObjectTurnParts { message })?)
+        }
         d::InboxObject::Result { position } => w::OwnerInboxObject::Result(w::OwnerInboxObjectResult::new(
             limits,
             w::OwnerInboxObjectResultParts { position },
@@ -65,7 +64,7 @@ pub fn entry(value: &d::InboxEntry, limits: &w::Limits) -> Result<w::OwnerInboxE
         limits,
         w::OwnerInboxEntryParts {
             reply: match &value.reply {
-                Some(item) => Some(live::conversation(item, limits)?),
+                Some(item) => Some(super::queries::line(item, limits)?),
                 None => None,
             },
             task: task::link(&value.task, limits)?,

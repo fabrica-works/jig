@@ -1,4 +1,4 @@
-use super::{limits, owner_chip_records, w, wire_text};
+use super::{limits, owner_chip_records, w};
 use skein_lib::{Duration, List, Writer};
 fn rows<T>(items: impl IntoIterator<Item = T>) -> List<T> {
     let items: Vec<_> = items.into_iter().collect();
@@ -100,44 +100,8 @@ pub fn run_writing_record() -> w::RunState {
     .expect("literal")
 }
 #[must_use]
-pub fn conversation_line_record() -> w::ConversationLine {
-    let l = limits();
-    let mut text = wire_text("é".as_bytes()).into_parts();
-    text.cut = true;
-    w::ConversationLine::new(
-        &l,
-        w::ConversationLineParts {
-            chip: live_chip_record(),
-            project: 7,
-            first_words: w::DocumentText::new(&l, text).expect("literal"),
-            unread: Some(w::Count::new(&l, w::CountParts { value: 17, limited: true }).expect("literal")),
-            cached_replies: 19,
-            seen: 11,
-            last_reply: 13,
-            delegates: 23,
-            budget: live_budget_record(),
-            runtime: None,
-            changed: None,
-        },
-    )
-    .expect("literal")
-}
-#[must_use]
 pub fn live_cursor_record() -> w::Cursor {
     w::Cursor::new(&limits(), w::CursorParts { value: Box::from([255, 0, 3]) }).expect("opaque literal")
-}
-#[must_use]
-pub fn conversations_rows_record() -> w::Conversations {
-    let row = conversation_line_record();
-    w::Conversations::new(
-        &limits(),
-        w::ConversationsParts {
-            rows: pieces([encoded(row.measure(), |w| row.encode(w))]),
-            more: true,
-            after: live_cursor_record(),
-        },
-    )
-    .expect("literal")
 }
 #[must_use]
 pub fn phases_record() -> w::OwnerPhaseCounts {
@@ -159,30 +123,9 @@ pub fn phases_record() -> w::OwnerPhaseCounts {
     .expect("literal")
 }
 #[must_use]
-pub fn goals_rows_record() -> w::Goals {
+pub fn task_line_record() -> w::TaskLine {
     let l = limits();
-    let row = w::GoalLine::new(
-        &l,
-        w::GoalLineParts {
-            chip: live_chip_record(),
-            priority: 11,
-            progress: phases_record(),
-            budget: live_budget_record(),
-            held_below: 13,
-            changed: None,
-        },
-    )
-    .expect("literal");
-    w::Goals::new(
-        &l,
-        w::GoalsParts { project: 7, rows: pieces([encoded(row.measure(), |w| row.encode(w))]), more: true },
-    )
-    .expect("literal")
-}
-#[must_use]
-pub fn tasks_rows_record() -> w::Tasks {
-    let l = limits();
-    let row = w::TaskLine::new(
+    w::TaskLine::new(
         &l,
         w::TaskLineParts {
             chip: live_chip_record(),
@@ -207,7 +150,12 @@ pub fn tasks_rows_record() -> w::Tasks {
             changed: 29,
         },
     )
-    .expect("literal");
+    .expect("literal")
+}
+#[must_use]
+pub fn tasks_rows_record() -> w::Tasks {
+    let l = limits();
+    let row = task_line_record();
     w::Tasks::new(&l, w::TasksParts { rows: pieces([encoded(row.measure(), |w| row.encode(w))]), more: true })
         .expect("literal")
 }
@@ -278,8 +226,8 @@ pub fn live_inbox_cursor_record() -> w::OwnerInboxCursor {
             &l,
             w::OwnerInboxCursorInboxParts {
                 task: 7,
-                object: w::OwnerInboxObject::Reply(
-                    w::OwnerInboxObjectReply::new(&l, w::OwnerInboxObjectReplyParts { message: 11 }).expect("literal"),
+                object: w::OwnerInboxObject::Turn(
+                    w::OwnerInboxObjectTurn::new(&l, w::OwnerInboxObjectTurnParts { message: 11 }).expect("literal"),
                 ),
                 at: Some(13),
             },
@@ -307,11 +255,11 @@ pub fn inbox_both_groups_record() -> w::OwnerInbox {
     let update = w::OwnerInboxEntry::new(
         &l,
         w::OwnerInboxEntryParts {
-            reply: Some(conversation_line_record()),
+            reply: Some(task_line_record()),
             task: stored_link_record(),
             project: Some(7),
-            object: w::OwnerInboxObject::Reply(
-                w::OwnerInboxObjectReply::new(&l, w::OwnerInboxObjectReplyParts { message: 11 }).expect("literal"),
+            object: w::OwnerInboxObject::Turn(
+                w::OwnerInboxObjectTurn::new(&l, w::OwnerInboxObjectTurnParts { message: 11 }).expect("literal"),
             ),
             activity: Some(17),
             at: Some(13),

@@ -24,9 +24,7 @@ pub fn delivery_values(limits: &Limits) -> List<(&'static str, DeliveryValue)> {
     value!(values, limits, Chips, Chips, 4);
     value!(values, limits, Inbox, Inbox, 38);
     value!(values, limits, OwnerInbox, OwnerInbox, 36);
-    value!(values, limits, Goals, Goals, 9);
     value!(values, limits, Tasks, Tasks, 5);
-    value!(values, limits, Conversations, Conversations, 9);
     value!(values, limits, Run, RunText, 39);
     value!(values, limits, RunState, RunState, 15);
     value!(values, limits, Deployment, Deployment, 24);

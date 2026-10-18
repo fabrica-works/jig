@@ -61,36 +61,6 @@ pub(super) fn inbox_pieces(
     }
     pieces(&encoded, bound, path)
 }
-pub(super) fn conversation_pieces(
-    rows: &List<w::ConversationLine>,
-    bound: u32,
-    path: w::Path,
-) -> Result<Box<[u8]>, w::Problem> {
-    let mut size = 0;
-    for row in rows {
-        size = charge(size, row.measure(), bound, path)?;
-    }
-    let mut encoded = List::with_capacity(rows.len());
-    for row in rows {
-        let mut out = Writer::new(usize::try_from(row.measure()).expect("u32 measure fits usize"));
-        row.encode(&mut out).or(Err(w::Problem { path, reason: skein_codec::Reason::Bound }))?;
-        encoded.push(out.finish()).expect("selected rows fit");
-    }
-    pieces(&encoded, bound, path)
-}
-pub(super) fn goal_pieces(rows: &List<w::GoalLine>, bound: u32, path: w::Path) -> Result<Box<[u8]>, w::Problem> {
-    let mut size = 0;
-    for row in rows {
-        size = charge(size, row.measure(), bound, path)?;
-    }
-    let mut encoded = List::with_capacity(rows.len());
-    for row in rows {
-        let mut out = Writer::new(usize::try_from(row.measure()).expect("u32 measure fits usize"));
-        row.encode(&mut out).or(Err(w::Problem { path, reason: skein_codec::Reason::Bound }))?;
-        encoded.push(out.finish()).expect("selected rows fit");
-    }
-    pieces(&encoded, bound, path)
-}
 pub(super) fn ended_pieces(
     rows: &List<w::OwnerEndedDelegate>,
     bound: u32,

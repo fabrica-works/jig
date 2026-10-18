@@ -641,6 +641,41 @@ fn all_chip_phases(words: &crate::words::Words) {
     }
 }
 
+fn dependency_reply(dependency: Chip) -> TaskLine {
+    TaskLine {
+        chip: dependency,
+        project: 4,
+        requester: OwnerRequester::Person(1),
+        tracked: None,
+        label: 1,
+        flags: TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead },
+        changed: Wall::EPOCH,
+        last_activity: Wall::EPOCH,
+        ended_at: None,
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
+            left: 0,
+            funder: Funder::Pool { project: 4, person: 1, period: 3 },
+            deadline: None,
+        },
+        waits_on: WaitsOn::Nothing,
+        phases: OwnerPhaseCounts {
+            waiting: 0,
+            idle: 0,
+            starting: 0,
+            running: 0,
+            backing_off: 0,
+            closing: 0,
+            held: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+        conversation: Some(ConversationRead { seen: 5, unread: Count { value: 2, limited: false } }),
+    }
+}
+
 fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     let (mut d, frame) = start();
     let out = drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(document()))) });
@@ -662,24 +697,7 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     dependency.title = DocumentText::complete(text(b"Live dependency"));
     dependency.phase = Phase::Running;
     *dependency.details = ChipPhase::Running { attempt: 2, since: Wall::EPOCH, tool: Some(text(b"actual tool")) };
-    let conversation = ConversationLine {
-        cached_replies: 0,
-        chip: dependency,
-        project: 4,
-        first_words: DocumentText::complete(text(b"whole first reply")),
-        unread: Some(Count { value: 2, limited: false }),
-        seen: 5,
-        last_reply: 7,
-        changed: Some(Wall::EPOCH),
-        runtime: Some(Runtime::Running { attempt: 2, since: Wall::EPOCH, tool: Some(text(b"actual tool")) }),
-        delegates: 0,
-        budget: OwnerBudget {
-            numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
-            left: 0,
-            funder: Funder::Pool { project: 4, person: 1, period: 3 },
-            deadline: None,
-        },
-    };
+    let conversation = dependency_reply(dependency);
     drive(
         &mut d,
         Watched {
@@ -709,7 +727,6 @@ fn live_reply_and_dependency_chips(words: &crate::words::Words) {
     let mut bindings = JigBindings::new(64, CLIENT.text);
     let tree = render(&d, id, words, &mut bindings);
     assert!(contains(&tree, b"Live dependency"));
-    assert!(contains(&tree, b"whole first reply"));
     let link = tree
         .nodes()
         .iter()

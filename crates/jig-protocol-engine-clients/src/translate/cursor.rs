@@ -173,21 +173,6 @@ fn put_cursor(w: &mut Writer, value: &reads::Cursor) -> Option<()> {
                 None => w.byte(0)?,
             }
         }
-        reads::Cursor::ConversationsBefore { before } => {
-            w.byte(2)?;
-            put_position(w, before)?;
-        }
-        reads::Cursor::ConversationsLiveBefore { before } => {
-            w.byte(3)?;
-            match before {
-                Some(value) => {
-                    w.byte(1)?;
-                    put_document_cursor(w, value)?;
-                }
-                None => w.byte(0)?,
-            }
-        }
-        reads::Cursor::ConversationsStart => w.byte(4)?,
     }
     Some(())
 }
@@ -212,16 +197,6 @@ fn take_cursor(r: &mut skein_lib::Reader<'_>) -> Option<reads::Cursor> {
             };
             reads::Cursor::Store { scope, after }
         }
-        2 => reads::Cursor::ConversationsBefore { before: take_position(r)? },
-        3 => {
-            let before = match r.u8()? {
-                0 => None,
-                1 => Some(take_document_cursor(r)?),
-                _ => return None,
-            };
-            reads::Cursor::ConversationsLiveBefore { before }
-        }
-        4 => reads::Cursor::ConversationsStart,
         _ => return None,
     })
 }
@@ -282,16 +257,9 @@ fn put_scope(w: &mut Writer, value: &reads::Scope) -> Option<()> {
             put_group(w, *group)?;
             put_filter(w, filter)?;
         }
-        reads::Scope::Conversations => {
-            w.byte(12)?;
-        }
         reads::Scope::Tasks { query } => {
             w.byte(17)?;
             put_query(w, query)?;
-        }
-        reads::Scope::Goals { project } => {
-            w.byte(13)?;
-            w.u32(*project)?;
         }
         reads::Scope::Notes { project } => {
             w.byte(14)?;
@@ -323,8 +291,6 @@ fn take_scope(r: &mut skein_lib::Reader<'_>) -> Option<reads::Scope> {
         9 => reads::Scope::History { task: u64(r)?, subtree: boolean(r)? },
         10 => reads::Scope::Activity { task: u64(r)? },
         11 => reads::Scope::Inbox { group: take_group(r)?, filter: take_filter(r)? },
-        12 => reads::Scope::Conversations,
-        13 => reads::Scope::Goals { project: u32(r)? },
         14 => reads::Scope::Notes { project: u32(r)? },
         15 => reads::Scope::ScopedNotes { scope: take_note_scope(r)?, description: optional_blob(r)? },
         16 => reads::Scope::Spend { project: u32(r)? },

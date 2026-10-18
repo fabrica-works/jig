@@ -108,8 +108,6 @@ pub(crate) fn forget(
             update.key(),
             index.key(),
             tasks::Key::Result { party, position: owner.result_position },
-            tasks::Key::ConversationNewest { party, task: tasks::Newest::of(owner.task) },
-            tasks::Key::ConversationOldest { party, task: owner.task },
         ] {
             out.push(crate::Request::Write(crate::Write::Erase(crate::Key::Tasks(key))));
         }

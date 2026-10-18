@@ -84,9 +84,7 @@ mod hold_origin;
 mod holds;
 mod inbox;
 mod index;
-pub use index::{
-    Conversation, Edge, EndedByParty, EndedByProject, Endings, GoalRow, Newest, ResultRow, Update, UpdateObject,
-};
+pub use index::{Edge, EndedByParty, EndedByProject, Endings, Newest, ResultRow, Update, UpdateObject};
 mod limits;
 mod moving;
 mod owned;

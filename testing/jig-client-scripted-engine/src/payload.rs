@@ -5,21 +5,20 @@ use core::mem::size_of;
 use jig_client_domain::contract::{
     Account, ActKind, ActiveRun, Activity, ActivityLine, ActivityPage, Actor, AddressChange, Admission, AdmissionLimit,
     Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Bytes, Call, Capacity, Charter, Chip,
-    ChipPhase, Closing, ClosingStage, ConversationLine, ConversationPage, Conversations, Count, CreateProcedure,
-    CurrentCall, CurrentHold, Cursor, Decider, Decision, Delivery, Deployment, Disposal, DisposalIssue,
-    DocumentSpecification, DocumentText, EndedGroup, Ending, Escalation, Executor, FailureClass, FieldRule,
-    GoalExecutor, GoalLine, GoalPage, Goals, Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine, HistoryPage,
-    Hold, HoldCategory, HoldFailure, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage,
-    Lacking, Limit, LiveCall, LiveDelegate, Made, Me, MeParty, MeProject, Message, Moved, Needs, Note, NoteAuthor,
-    NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OfferedCharters, OptionLine, Outcome, OwnerChipPhase,
-    Parameter, ParameterDocument, Part, PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask,
-    Phase, PhaseCounts, Policy, Pool, Priority, Project, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer,
-    ProvisionalTurnName, Question, Read, ReadNone, ReadResult, ReadValue, Recipient, Recurring, Refusal, ReplyPosition,
-    Result, ResultContract, ResultField, ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding,
-    RunObservation, RunStage, RunState, RunText, RunWork, Runtime, SeenThrough, Speaker, Specification,
-    SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskContext, TaskHold,
-    TaskLine, TaskPage, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange,
-    WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    ChipPhase, Closing, ClosingStage, Count, CreateProcedure, CurrentCall, CurrentHold, Cursor, Decider, Decision,
+    Delivery, Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, EndedGroup, Ending, Escalation,
+    Executor, FailureClass, FieldRule, GoalExecutor, Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine,
+    HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup,
+    InboxPage, Lacking, Limit, LiveCall, LiveDelegate, Made, Me, MeParty, MeProject, Message, Moved, Needs, Note,
+    NoteAuthor, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OfferedCharters, OptionLine, Outcome,
+    OwnerChipPhase, Parameter, ParameterDocument, Part, PartScope, Party, PartyKind, Passed, PersonAnswer,
+    PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project, Proposal, ProposalAction,
+    ProposalKey, ProposedTask, Proposer, ProvisionalTurnName, Question, Read, ReadNone, ReadPosition, ReadResult,
+    ReadValue, Recipient, Recurring, Refusal, Result, ResultContract, ResultField, ResultValue, RetryNotice, Revision,
+    RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage, RunState, RunText, RunWork, Runtime, SeenThrough,
+    Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task,
+    TaskContext, TaskHold, TaskLine, TaskPage, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName,
+    Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
 };
 use skein_lib::{Duration, List, Token, Wall};
 
@@ -749,23 +748,7 @@ impl Payload for InboxGroup {
 }
 fields!(InboxEntry { reply, lineage, goal, recipient, stall, object, project, group, position, at });
 fields!(Inbox { entries, needs, updates, results_seen, replies_seen, more });
-fields!(ReplyPosition { chat, through });
-fields!(ConversationLine {
-    cached_replies,
-    runtime,
-    delegates,
-    budget,
-    chip,
-    project,
-    first_words,
-    unread,
-    seen,
-    last_reply,
-    changed
-});
-fields!(Conversations { rows, more, after });
-fields!(GoalLine { changed, chip, priority, progress, budget, held_below });
-fields!(Goals { project, rows, more });
+fields!(ReadPosition { task, through });
 fields!(Project {
     period,
     spend_lines,
@@ -951,10 +934,7 @@ impl Payload for Read {
             Self::Inbox { group: _, project, kind, goal, after } => {
                 sum(&[project.heap(bounds), kind.heap(bounds), goal.heap(bounds), after.heap(bounds)])
             }
-            Self::Conversations { after } => sum(&[after.heap(bounds)]),
-            Self::Goals { project, after } | Self::Spend { project, after } => {
-                sum(&[project.heap(bounds), after.heap(bounds)])
-            }
+            Self::Spend { project, after } => sum(&[project.heap(bounds), after.heap(bounds)]),
             Self::Project { project } => sum(&[project.heap(bounds)]),
             Self::Notes { scope, description, after } => {
                 sum(&[scope.heap(bounds), description.heap(bounds), after.heap(bounds)])
@@ -963,11 +943,9 @@ impl Payload for Read {
     }
 }
 fields!(ObjectPage { cut, rows, before, after });
-fields!(ConversationPage { cut, rows, before, after });
 fields!(ActivityPage { cut, rows, before, after });
 fields!(HistoryPage { cut, rows, before, after });
 fields!(InboxPage { cut, rows, before, after });
-fields!(GoalPage { cut, rows, before, after });
 fields!(NotePage { cut, rows, before, after });
 impl Payload for ReadValue {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
@@ -991,8 +969,6 @@ impl Payload for ReadValue {
             Self::Activity(value0) => sum(&[value0.heap(bounds)]),
             Self::Inbox(value0) => sum(&[value0.heap(bounds)]),
             Self::OwnerInbox(value0) => sum(&[value0.heap(bounds)]),
-            Self::Conversations(value0) => sum(&[value0.heap(bounds)]),
-            Self::Goals(value0) => sum(&[value0.heap(bounds)]),
             Self::Spend(value0) => sum(&[value0.heap(bounds)]),
             Self::OwnerSpend(value) => value.heap(bounds),
             Self::Project(value0) => sum(&[value0.heap(bounds)]),
@@ -1121,12 +1097,11 @@ fields!(VersionRange { first, last });
 impl Payload for Subject {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Me | Self::Conversations | Self::Deployment => Some(0),
+            Self::Me | Self::Deployment => Some(0),
             Self::Task { task } => sum(&[task.heap(bounds)]),
             Self::Tree { task, window } => sum(&[task.heap(bounds), window.heap(bounds)]),
             Self::Chips { tasks } => sum(&[tasks.heap(bounds)]),
             Self::Inbox { window } => sum(&[window.heap(bounds)]),
-            Self::Goals { project } => sum(&[project.heap(bounds)]),
             Self::Tasks { query, window } => sum(&[query.heap(bounds), window.heap(bounds)]),
             Self::Run { task, turn, offset } => sum(&[task.heap(bounds), turn.heap(bounds), offset.heap(bounds)]),
         }
@@ -1144,9 +1119,7 @@ impl Payload for Delivery {
             Self::Chips(value0) => sum(&[value0.heap(bounds)]),
             Self::Inbox(value0) => sum(&[value0.heap(bounds)]),
             Self::OwnerInbox(value0) => sum(&[value0.heap(bounds)]),
-            Self::Goals(value0) => sum(&[value0.heap(bounds)]),
             Self::Tasks(value0) => sum(&[value0.heap(bounds)]),
-            Self::Conversations(value0) => sum(&[value0.heap(bounds)]),
             Self::Run(value0) => sum(&[value0.heap(bounds)]),
             Self::RunState(value0) => sum(&[value0.heap(bounds)]),
             Self::Deployment(value0) => sum(&[value0.heap(bounds)]),

@@ -167,10 +167,7 @@ pub(super) fn subject(core: &Core, limits: &Limits, party: u64, subject: &Subjec
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
-        | Subject::Goals { .. }
         | Subject::Query { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
         | Subject::PersonTask { .. }
@@ -323,10 +320,7 @@ fn effect(core: &Core, limits: &Limits, act: Act, subject: &Subject) -> Option<a
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
-        | Subject::Goals { .. }
-        | Subject::Tasks { .. }
         | Subject::Query { .. }
-        | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }

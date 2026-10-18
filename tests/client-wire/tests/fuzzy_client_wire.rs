@@ -458,8 +458,6 @@ fn records_10(bytes: &[u8]) {
     check!(ReadHistory, bytes);
     check!(ReadActivity, bytes);
     check!(ReadInbox, bytes);
-    check!(ReadConversations, bytes);
-    check!(ReadGoals, bytes);
     check!(ReadSpend, bytes);
     check!(ReadProject, bytes);
     check!(ReadNotes, bytes);
@@ -634,16 +632,12 @@ fn records_14(bytes: &[u8]) {
     check!(RuntimeHeld, bytes);
     check!(Runtime, bytes);
     check!(Count, bytes);
-    check!(ConversationLine, bytes);
     check!(InboxEntry, bytes);
     check!(InboxPage, bytes);
 }
 
 fn records_15(bytes: &[u8]) {
-    check!(ConversationPage, bytes);
     check!(OwnerPhaseCounts, bytes);
-    check!(GoalLine, bytes);
-    check!(GoalPage, bytes);
     check!(Budget, bytes);
     check!(Pool, bytes);
     check!(TaskSpend, bytes);
@@ -660,7 +654,7 @@ fn records_15(bytes: &[u8]) {
     check!(OwnerInboxObjectQuestion, bytes);
     check!(OwnerInboxObjectProposal, bytes);
     check!(OwnerInboxObjectEscalation, bytes);
-    check!(OwnerInboxObjectReply, bytes);
+    check!(OwnerInboxObjectTurn, bytes);
     check!(OwnerInboxObjectResult, bytes);
     check!(OwnerInboxObject, bytes);
     check!(OwnerInboxCursorNumber, bytes);

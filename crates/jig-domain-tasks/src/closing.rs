@@ -341,11 +341,6 @@ fn end_task(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue
     domain.alarms.cancel(number);
     domain.grace_alarms.cancel(number);
     out.push(Request::Erase { key: Key::Live(number) });
-    if ended.tracked.is_some() {
-        out.push(Request::Save {
-            record: Stored::Goal(crate::GoalRow { project: ended.project, task: number, endings }),
-        });
-    }
     if let Party::Person(party) = requester {
         out.push(Request::Save {
             record: Stored::EndedByParty(crate::EndedByParty {

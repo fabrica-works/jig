@@ -539,7 +539,7 @@ mod tests {
         front.bind(ClientId(0), 7, identity(b"seven"));
         front.bind(ClientId(1), 8, identity(b"eight"));
         let native = Token::new(u64::MAX);
-        let what = Read::Goals {
+        let what = Read::Spend {
             project: u32::MAX,
             after: Some(
                 jig_client_domain::contract::Cursor::new(Box::from(UTF8_TEXTS[0]), 2).expect("whole opaque cursor"),
@@ -557,7 +557,7 @@ mod tests {
         assert_eq!(front.take_reply(first), None);
         assert_eq!(
             what,
-            Read::Goals {
+            Read::Spend {
                 project: u32::MAX,
                 after: Some(
                     jig_client_domain::contract::Cursor::new(Box::from(UTF8_TEXTS[0]), 2)

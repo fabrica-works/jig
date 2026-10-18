@@ -7,8 +7,6 @@ pub use owner::*;
 pub fn limits() -> w::Limits {
     w::Limits {
         document_text_bytes: 32,
-        conversations_rows: 4096,
-        goals_rows: 4096,
         tasks_rows: 4096,
         owner_tree_rows: 4096,
         owner_tree_row_dependencies: 4096,

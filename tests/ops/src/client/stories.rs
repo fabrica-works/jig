@@ -429,27 +429,6 @@ pub fn environment_world(seed: u64) -> ClientWorld {
                 key: ObjectKey::Proposal(p.key),
                 value: ReadValue::Proposal(Box::new(p.clone())),
             },
-            jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
-                party: 7,
-                read: Read::Conversations { after: None },
-                rows: jig_client_scripted_engine::Rows::Conversations(vec![ConversationLine {
-                    chip: {
-                        let mut chip = task().chip;
-                        chip.title = DocumentText::complete(text(b"Q staging chat"));
-                        chip
-                    },
-                    project: 1,
-                    runtime: Some(Runtime::Idle),
-                    delegates: 0,
-                    budget: task().budget,
-                    first_words: DocumentText::complete(text(b"staging for one week")),
-                    unread: Some(Count { value: 0, limited: false }),
-                    cached_replies: 0,
-                    seen: 0,
-                    last_reply: 0,
-                    changed: Some(Wall::EPOCH),
-                }]),
-            }),
         ],
     };
     let accept = jig_client_scripted_engine::Rule {

@@ -109,7 +109,6 @@ pub fn tasks_key(rng: &mut Rng) -> jig_domain_tasks::Key {
         5 => Key::PersonProposal(number(rng)),
         6 => Key::Ended(number(rng)),
         13 => Key::Result { party: number(rng), position: number(rng) },
-        14 => Key::ConversationNewest { party: number(rng), task: Newest::of(number(rng)) },
         17 => Key::EndedDelegate { requester: number(rng), task: number(rng) },
         19 => Key::EndedByParty {
             party: number(rng),
@@ -124,8 +123,6 @@ pub fn tasks_key(rng: &mut Rng) -> jig_domain_tasks::Key {
             task: number(rng),
         },
         18 => Key::Delegate { requester: number(rng), task: number(rng) },
-        16 => Key::Goal { project: narrow(rng), task: Newest::of(number(rng)) },
-        15 => Key::ConversationOldest { party: number(rng), task: number(rng) },
         7 => Key::ClosedLedger(funder(rng)),
         8 => Key::DecidedProposal(number(rng)),
         9 => Key::History { task: number(rng), revision: number(rng) },

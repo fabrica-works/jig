@@ -2,11 +2,10 @@
 //! `contract.md`, 5 and 7.1). Entries are bounded cache views;
 //! needs count all live task projections across the party's projects. Reply
 //! read positions and stored inbox rows are supplied by their owners.
-use super::{BudgetLine, Chip, Count, Cursor, Missing, Proposer, TaskLink, Window};
+use super::{Count, Cursor, Missing, Proposer, TaskLine, TaskLink, Window};
 use crate::{Core, Limits};
 use alloc::boxed::Box;
 use jig_domain_people as people;
-use jig_domain_tasks as tasks;
 use skein_lib::{List, Map, Wall};
 
 /// The object one inbox row opens; its own document carries content and acts.
@@ -22,7 +21,7 @@ pub enum InboxObject {
 /// One owner-supplied inbox reference, with a chat header when it is a reply.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct InboxEntry {
-    pub reply: Option<Box<ConversationLine>>,
+    pub reply: Option<Box<TaskLine>>,
     pub task: TaskLink,
     pub project: Option<u32>,
     pub object: InboxObject,
@@ -47,24 +46,6 @@ pub struct Inbox {
     pub updates_time_complete: bool,
     /// None is unsupplied; Some carries complete roots for each emitted row.
     pub selection: Option<List<super::InboxSelection>>,
-}
-/// One directly requested chat, with committed reply positions.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct ConversationLine {
-    pub chip: Chip,
-    pub project: u32,
-    pub first_words: super::Text,
-    pub seen: u64,
-    pub last_reply: u64,
-    pub replies_unread: Option<Count>,
-    pub cached_replies: u32,
-    pub delegates: u32,
-    pub budget: BudgetLine,
-}
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Conversations {
-    pub lines: List<ConversationLine>,
-    pub next: Option<Cursor>,
 }
 
 pub(super) fn line_bound(limits: &Limits) -> usize {
@@ -145,20 +126,18 @@ fn reply_activity(core: &Core, task: u64, object: InboxObject) -> Option<u64> {
     }
 }
 
-fn archived_conversation(core: &Core, limits: &Limits, party: u64, task: u64) -> Option<ConversationLine> {
+fn archived_conversation(core: &Core, limits: &Limits, party: u64, task: u64) -> Option<TaskLine> {
     let archive = core.archived_chats.get(&task)?;
     if archive.party != party || core.people.role(party, archive.project).is_none() {
         return None;
     }
     let mut line = archive.line.as_ref()?.clone();
-    line.seen = core.people.chat_seen(party, task)?;
-    let unread = line.last_reply.saturating_sub(line.seen);
+    let conversation = line.conversation.as_mut()?;
+    conversation.seen = core.people.chat_seen(party, task)?;
+    let unread = archive.last_reply.saturating_sub(conversation.seen);
     let capped = u32::try_from(unread.min(u64::from(limits.people.inbox_entries))).expect("bounded unread");
-    line.replies_unread = Some(if unread > u64::from(limits.people.inbox_entries) {
-        Count::AtLeast(capped)
-    } else {
-        Count::Known(capped)
-    });
+    conversation.unread =
+        if unread > u64::from(limits.people.inbox_entries) { Count::AtLeast(capped) } else { Count::Known(capped) };
     Some(line)
 }
 
@@ -168,12 +147,12 @@ fn inbox_reply(
     party: u64,
     task: u64,
     chat: bool,
-) -> Result<Option<Box<ConversationLine>>, Missing> {
+) -> Result<Option<Box<TaskLine>>, Missing> {
     if !chat {
         return Ok(None);
     }
     match core.tasks.task(task) {
-        Some(row) => Ok(Some(Box::new(conversation_from_row(core, limits, party, row, None)?))),
+        Some(row) => Ok(Some(Box::new(super::task_line(core, limits, party, row, None)?))),
         None => match archived_conversation(core, limits, party, task) {
             Some(line) => Ok(Some(Box::new(line))),
             None => Ok(None),
@@ -287,66 +266,4 @@ pub(super) fn inbox(core: &Core, limits: &Limits, party: u64, window: &Window) -
         updates_time_complete: true,
         selection: Some(selection),
     })
-}
-/// One authentic chat header, used by both the list and reply inbox entries.
-pub fn conversation_from_row(
-    core: &Core,
-    limits: &Limits,
-    party: u64,
-    row: &tasks::TaskRecord,
-    seen: Option<u64>,
-) -> Result<ConversationLine, Missing> {
-    if core.conversation_requester(row) != Some(party) || core.people.role(party, row.project).is_none() {
-        return Err(Missing::NotAllowed);
-    }
-    let seen = seen.unwrap_or(core.people.chat_seen(party, row.number).ok_or(Missing::Unknown)?);
-    let unread = row.last_reply.saturating_sub(seen);
-    let count = u32::try_from(unread.min(u64::from(limits.people.inbox_entries))).expect("capped replies");
-    Ok(ConversationLine {
-        chip: super::small::chip_with_core(core, limits, row)?,
-        project: row.project,
-        first_words: super::small::text(&row.spec.words, limits.documents.text_bytes),
-        seen,
-        last_reply: row.last_reply,
-        replies_unread: Some(if unread > u64::from(limits.people.inbox_entries) {
-            Count::AtLeast(count)
-        } else {
-            Count::Known(count)
-        }),
-        cached_replies: u32::try_from(row.replies.len()).expect("bounded reply hints"),
-        delegates: u32::try_from(row.delegates.len()).expect("bounded delegates"),
-        budget: super::task_tree::budget(row),
-    })
-}
-
-pub(super) fn conversations(
-    core: &Core,
-    limits: &Limits,
-    party: u64,
-    window: &Window,
-) -> Result<Conversations, Missing> {
-    let after = match window.after {
-        Some(Cursor::Number { number }) => number,
-        Some(Cursor::Inbox { .. }) => return Err(Missing::Unknown),
-        None => 0,
-    };
-    let mut lines = List::with_capacity(window.rows);
-    let mut next = None;
-    let mut more = false;
-    for row in core.tasks.view_tasks().as_ref() {
-        if row.number <= after {
-            continue;
-        }
-        let row = core.tasks.task(row.number).expect("live task view");
-        if core.conversation_requester(row) != Some(party) || core.people.role(party, row.project).is_none() {
-            continue;
-        }
-        if lines.room() == 0 {
-            more = true;
-            break;
-        }
-        lines.push(conversation_from_row(core, limits, party, row, None)?).expect("bounded conversation rows");
-        next = Some(Cursor::Number { number: row.number });
-    }
-    Ok(Conversations { lines, next: if more { next } else { None } })
 }

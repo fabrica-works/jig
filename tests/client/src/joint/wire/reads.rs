@@ -44,12 +44,6 @@ pub fn read(value: &client::Read, cursor_bytes: u32) -> Result<reads::Read, Inva
             filter: reads::Filter { project: *project, goal: *goal },
             from: cursor(after.as_ref(), cursor_bytes)?,
         },
-        client::Read::Conversations { after } => {
-            reads::Read::Conversations { from: cursor(after.as_ref(), cursor_bytes)? }
-        }
-        client::Read::Goals { project, after } => {
-            reads::Read::Goals { project: *project, from: cursor(after.as_ref(), cursor_bytes)? }
-        }
         client::Read::Spend { project, after } => {
             reads::Read::Spend { project: *project, from: cursor(after.as_ref(), cursor_bytes)? }
         }
@@ -161,20 +155,20 @@ mod tests {
 
     #[test]
     fn read_translation_keeps_opaque_cursor_identity_full_width_makers_and_supplied_empty_note_search() {
-        let retained = reads::Cursor::Store { scope: reads::Scope::Goals { project: u32::MAX }, after: None };
+        let retained = reads::Cursor::Store { scope: reads::Scope::Spend { project: u32::MAX }, after: None };
         let encoded = super::super::cursor::encode(&retained, 1024).expect("the complete supplied fixture is admitted");
         assert_eq!(
-            read(&client::Read::Goals { project: u32::MAX, after: Some(encoded.clone()) }, 1024)
+            read(&client::Read::Spend { project: u32::MAX, after: Some(encoded.clone()) }, 1024)
                 .expect("the complete supplied fixture is admitted"),
-            reads::Read::Goals { project: u32::MAX, from: Some(retained) }
+            reads::Read::Spend { project: u32::MAX, from: Some(retained) }
         );
         let malformed =
             client::Cursor::new(Box::from(UTF8_TEXTS[0]), 1024).expect("the complete supplied fixture is admitted");
-        assert_eq!(read(&client::Read::Conversations { after: Some(malformed) }, 1024), Err(Invalid::Cursor));
+        assert_eq!(read(&client::Read::Spend { project: 0, after: Some(malformed) }, 1024), Err(Invalid::Cursor));
         assert_eq!(
-            read(&client::Read::Conversations { after: None }, 1024)
+            read(&client::Read::Spend { project: 0, after: None }, 1024)
                 .expect("the complete supplied fixture is admitted"),
-            reads::Read::Conversations { from: None }
+            reads::Read::Spend { project: 0, from: None }
         );
         for proposer in [client::Proposer::Task(u64::MAX), client::Proposer::Party(u64::MAX)] {
             assert_eq!(

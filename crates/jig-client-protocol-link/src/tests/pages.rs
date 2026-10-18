@@ -12,18 +12,6 @@ fn a_inbox_page_record_becomes_its_literal_contract_value() {
         Ok(fixtures::read_value_inbox_page())
     );
 }
-fn a_conversation_page_record_becomes_its_literal_contract_value() {
-    assert_eq!(
-        translate::pages::conversation_page(fixtures::read_wire_conversation_page(), &fixtures::limits()),
-        Ok(fixtures::read_value_conversation_page())
-    );
-}
-fn a_goal_page_record_becomes_its_literal_contract_value() {
-    assert_eq!(
-        translate::pages::goal_page(fixtures::read_wire_goal_page(), &fixtures::limits()),
-        Ok(fixtures::read_value_goal_page())
-    );
-}
 fn a_spend_page_record_becomes_its_literal_contract_value() {
     assert_eq!(
         translate::pages::spend_page(fixtures::read_wire_spend_page(), &fixtures::limits()),
@@ -276,14 +264,6 @@ fn page_and_object_records_become_their_literal_contract_values() {
         (
             "a_inbox_page_record_becomes_its_literal_contract_value",
             a_inbox_page_record_becomes_its_literal_contract_value,
-        ),
-        (
-            "a_conversation_page_record_becomes_its_literal_contract_value",
-            a_conversation_page_record_becomes_its_literal_contract_value,
-        ),
-        (
-            "a_goal_page_record_becomes_its_literal_contract_value",
-            a_goal_page_record_becomes_its_literal_contract_value,
         ),
         (
             "a_spend_page_record_becomes_its_literal_contract_value",

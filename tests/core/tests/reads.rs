@@ -160,11 +160,6 @@ fn five_independent_read_stories_fit_the_shared_process_budget() {
 }
 
 #[test]
-fn conversation_owner_replay_keeps_every_retained_page_after_durability_and_restart() {
-    jig_core_world::stories::reads::conversation_owner_replay_keeps_every_retained_page_after_durability_and_restart();
-}
-
-#[test]
 fn updates_page_from_the_index_newest_first_after_restart() {
     let mut world = world(780);
     let task = world.assigned.as_ref().expect("chat").task;
@@ -253,96 +248,6 @@ fn the_results_group_pages_results_only_from_the_index() {
     assert_eq!(value.rows.len(), 1);
     let reads::PageRow::Inbox(entry) = value.rows.get(0).expect("result") else { panic!("inbox result") };
     assert!(matches!(entry.object, documents::InboxObject::Result { .. }));
-}
-
-fn ended_chats(world: &mut jig_core_world::effects::World) -> Vec<u64> {
-    let mut chats = Vec::new();
-    for number in 0..3 {
-        if number != 0 {
-            request(world, 80 + number, people::Ask::StartChat { project: 1, words: b"next".as_slice().into() });
-        }
-        chats.push(world.assigned.as_ref().expect("chat").task);
-        world.end(
-            tasks::End::Finished {
-                result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
-                cancel_delegates: false,
-            },
-            0,
-        );
-    }
-    chats
-}
-fn conversation_numbers(answer: &reads::Answer) -> Vec<u64> {
-    let reads::Answer::Page(page) = answer else { panic!("conversation page") };
-    page.rows
-        .iter()
-        .map(|row| {
-            let reads::PageRow::Conversation(row) = row else { panic!("conversation") };
-            row.chip.number
-        })
-        .collect()
-}
-#[test]
-fn conversations_page_both_ways_from_the_index() {
-    let mut world = world(783);
-    let chats = ended_chats(&mut world);
-    world.restart(783, false);
-    ask(
-        &mut world,
-        740,
-        reads::Read::Conversations {
-            from: Some(reads::Cursor::Store { scope: reads::Scope::Conversations, after: None }),
-        },
-    );
-    assert_eq!(conversation_numbers(latest(&world)), [chats[2], chats[1]]);
-    let reads::Answer::Page(first) = latest(&world) else { panic!("first page") };
-    let from = first.next.clone();
-    ask(&mut world, 741, reads::Read::Conversations { from });
-    assert_eq!(conversation_numbers(latest(&world)), [chats[0]]);
-    let reads::Answer::Page(last) = latest(&world) else { panic!("last page") };
-    let from = last.before.clone();
-    ask(&mut world, 742, reads::Read::Conversations { from });
-    assert_eq!(conversation_numbers(latest(&world)), [chats[2], chats[1]]);
-}
-#[test]
-fn a_forgotten_chat_leaves_both_conversation_families() {
-    let mut world = jig_core_world::stories::reads::forgettable_world(784);
-    let task = world.assigned.as_ref().expect("chat").task;
-    world.turn(1, 1, None, b"reply");
-    world.end(
-        tasks::End::Finished {
-            result: tasks::TaskResult::Report { words: b"done".as_slice().into() },
-            cancel_delegates: false,
-        },
-        1,
-    );
-    let newest =
-        root::Key::Core(core::Key::Tasks(tasks::Key::ConversationNewest { party: 1, task: tasks::Newest::of(task) }));
-    let oldest = root::Key::Core(core::Key::Tasks(tasks::Key::ConversationOldest { party: 1, task }));
-    assert!(world.store.rows.contains_key(&newest));
-    assert!(world.store.rows.contains_key(&oldest));
-    let through = result_position(&world, task);
-    request(&mut world, 91, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
-    request(&mut world, 92, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
-    assert!(!world.store.rows.contains_key(&newest));
-    assert!(!world.store.rows.contains_key(&oldest));
-    ask(
-        &mut world,
-        743,
-        reads::Read::Conversations {
-            from: Some(reads::Cursor::Store { scope: reads::Scope::Conversations, after: None }),
-        },
-    );
-    assert_eq!(conversation_numbers(latest(&world)), []);
-}
-
-fn result_position(world: &jig_core_world::effects::World, task: u64) -> u64 {
-    let root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row))) =
-        &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))]
-    else {
-        panic!("ended chat")
-    };
-    row.result_position
 }
 
 fn a_read_after_the_sign_in_ended_is_answered_signed_out() {
@@ -585,55 +490,6 @@ fn live_task(world: &jig_core_world::effects::World, task: u64) -> &tasks::TaskR
     row
 }
 
-fn finish_goal(world: &mut jig_core_world::effects::World, key: u8, delegate: bool) -> u64 {
-    request(world, key, jig_core_world::stories::offers::goal(300));
-    let goal = chat_task(world);
-    if delegate {
-        world.delegate();
-        world.observed(13);
-        let child = world.procedure.expect("goal delegate");
-        assert!(world.erase(root::Key::Core(core::Key::Tasks(tasks::Key::Ended(child)))).is_some());
-        let message = live_task(world, goal).inbox.last().expect("delegate result").number;
-        take_message(world, goal, 1, message);
-    }
-    finish_chat(world, goal);
-    goal
-}
-fn ended_goals(world: &mut jig_core_world::effects::World) -> Vec<(u64, documents::PhaseCounts)> {
-    let mut from = None;
-    let mut goals = Vec::new();
-    for page in 0..5 {
-        ask(world, 920 + page, reads::Read::Goals { project: 1, from: from.take() });
-        let reads::Answer::Page(rows) = latest(world) else { panic!("goals page: {:?}", latest(world)) };
-        for row in &rows.rows {
-            let reads::PageRow::Goal(goal) = row else { panic!("goal") };
-            goals.push((goal.chip.number, goal.phases));
-        }
-        from.clone_from(&rows.next);
-        if from.is_none() {
-            break;
-        }
-    }
-    goals
-}
-#[test]
-fn goals_page_newest_first_with_counts_from_the_index() {
-    let mut world = world(799);
-    let chat = chat_task(&world);
-    finish_chat(&mut world, chat);
-    let oldest = finish_goal(&mut world, 121, true);
-    let middle = finish_goal(&mut world, 122, false);
-    let newest = finish_goal(&mut world, 123, false);
-    assert_eq!(
-        ended_goals(&mut world),
-        [
-            (newest, documents::PhaseCounts { done: 1, ..documents::PhaseCounts::ZERO }),
-            (middle, documents::PhaseCounts { done: 1, ..documents::PhaseCounts::ZERO }),
-            (oldest, documents::PhaseCounts { done: 2, ..documents::PhaseCounts::ZERO }),
-        ]
-    );
-}
-
 fn ended_delegate_world(seed: u64) -> (jig_core_world::effects::World, u64, u64) {
     let mut world = world(seed);
     let chat = chat_task(&world);
@@ -690,9 +546,7 @@ fn subtree_history(world: &mut jig_core_world::effects::World, task: u64) -> Vec
                 reads::PageRow::EndedDelegate(_)
                 | reads::PageRow::Activity { .. }
                 | reads::PageRow::Inbox(_)
-                | reads::PageRow::Conversation(_)
                 | reads::PageRow::Line(_)
-                | reads::PageRow::Goal(_)
                 | reads::PageRow::Note(_)
                 | reads::PageRow::Spend(_) => panic!("history family"),
             }

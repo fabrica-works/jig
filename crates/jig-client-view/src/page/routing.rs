@@ -328,7 +328,7 @@ pub(crate) fn delivery(
 ) {
     let source = Source::Watch(watch);
     match value {
-        Delivery::Me(_) | Delivery::OwnerProject(_) | Delivery::Conversations(_) | Delivery::Goals(_) => {}
+        Delivery::Me(_) | Delivery::OwnerProject(_) => {}
         Delivery::Run(_) | Delivery::RunState(_) => crate::activity::routing::text(domain, env, watch, out, lent),
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
@@ -476,8 +476,6 @@ pub(crate) fn read_result(
         | Read::PersonTask { .. }
         | Read::Result { .. }
         | Read::Activity { .. }
-        | Read::Conversations { .. }
-        | Read::Goals { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Deployment => false,
@@ -532,12 +530,7 @@ fn read_value(
     lent: &jig_client::Client,
 ) {
     match value {
-        ReadValue::Goals(_)
-        | ReadValue::Conversations(_)
-        | ReadValue::Me(_)
-        | ReadValue::OwnerInbox(_)
-        | ReadValue::OwnerEnded(_)
-        | ReadValue::OwnerSpend(_) => {}
+        ReadValue::Me(_) | ReadValue::OwnerInbox(_) | ReadValue::OwnerEnded(_) | ReadValue::OwnerSpend(_) => {}
         ReadValue::OwnerProject(value) => crate::page::project::owner_document(domain, value),
         ReadValue::Notes(page) => crate::page::project::notes::page(domain, source, *page),
         ReadValue::Spend(page) => crate::page::project::spend(domain, *page),
@@ -668,8 +661,6 @@ fn owner_project_read_valid(domain: &Ui, token: Token, result: &ReadResult) -> b
             | ReadValue::Activity(_)
             | ReadValue::Inbox(_)
             | ReadValue::OwnerInbox(_)
-            | ReadValue::Conversations(_)
-            | ReadValue::Goals(_)
             | ReadValue::Spend(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
@@ -695,8 +686,6 @@ fn owner_project_read_valid(domain: &Ui, token: Token, result: &ReadResult) -> b
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Inbox { .. }
-        | Read::Conversations { .. }
-        | Read::Goals { .. }
         | Read::Spend { .. }
         | Read::Notes { .. }
         | Read::Deployment => false,
@@ -724,8 +713,6 @@ fn owner_inbox_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, r
             | ReadValue::History(_)
             | ReadValue::Activity(_)
             | ReadValue::Inbox(_)
-            | ReadValue::Conversations(_)
-            | ReadValue::Goals(_)
             | ReadValue::Spend(_)
             | ReadValue::OwnerEnded(_)
             | ReadValue::OwnerSpend(_)
@@ -753,8 +740,6 @@ fn owner_inbox_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, r
         | Read::Ended { .. }
         | Read::History { .. }
         | Read::Activity { .. }
-        | Read::Conversations { .. }
-        | Read::Goals { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
@@ -813,8 +798,6 @@ fn received_value(
             | Read::History { .. }
             | Read::Activity { .. }
             | Read::Inbox { .. }
-            | Read::Conversations { .. }
-            | Read::Goals { .. }
             | Read::Spend { .. }
             | Read::Notes { .. }
             | Read::Deployment => {}
@@ -838,8 +821,6 @@ fn received_value(
                 | Read::Ended { .. }
                 | Read::History { .. }
                 | Read::Activity { .. }
-                | Read::Conversations { .. }
-                | Read::Goals { .. }
                 | Read::Spend { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
@@ -866,8 +847,6 @@ fn received_value(
         | ReadValue::History(_)
         | ReadValue::Activity(_)
         | ReadValue::Inbox(_)
-        | ReadValue::Conversations(_)
-        | ReadValue::Goals(_)
         | ReadValue::Spend(_)
         | ReadValue::Project(_)
         | ReadValue::Notes(_)
@@ -897,9 +876,7 @@ fn owner_tree_delivery(
         | Subject::Task { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
-        | Subject::Goals { .. }
         | Subject::Tasks { .. }
-        | Subject::Conversations
         | Subject::Run { .. }
         | Subject::Deployment => return,
     }
@@ -963,8 +940,6 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
                 | Read::History { .. }
                 | Read::Activity { .. }
                 | Read::Inbox { .. }
-                | Read::Conversations { .. }
-                | Read::Goals { .. }
                 | Read::Spend { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
@@ -994,8 +969,6 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
                 | Read::History { .. }
                 | Read::Activity { .. }
                 | Read::Inbox { .. }
-                | Read::Conversations { .. }
-                | Read::Goals { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
                 | Read::Deployment => return false,
@@ -1030,8 +1003,6 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
         | ReadValue::Activity(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
-        | ReadValue::Conversations(_)
-        | ReadValue::Goals(_)
         | ReadValue::Spend(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
@@ -1077,8 +1048,6 @@ fn owner_escalation_read_valid(domain: &Ui, token: Token, result: &ReadResult, l
             | ReadValue::Activity(_)
             | ReadValue::Inbox(_)
             | ReadValue::OwnerInbox(_)
-            | ReadValue::Conversations(_)
-            | ReadValue::Goals(_)
             | ReadValue::Spend(_)
             | ReadValue::OwnerSpend(_)
             | ReadValue::Project(_)
@@ -1104,8 +1073,6 @@ fn owner_escalation_read_valid(domain: &Ui, token: Token, result: &ReadResult, l
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Inbox { .. }
-        | Read::Conversations { .. }
-        | Read::Goals { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Notes { .. }

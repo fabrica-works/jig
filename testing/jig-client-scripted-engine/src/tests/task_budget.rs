@@ -14,7 +14,7 @@ fn whole_budget_fits<T: Payload + Clone + PartialEq + core::fmt::Debug>(row: &T)
 }
 
 #[test]
-fn current_budget_parent_payloads_price_whole_task_conversation_and_goal_facts_without_recomputing_them() {
+fn current_budget_parent_payloads_price_task_and_line_facts_whole() {
     for funder in [
         Funder::Task(u64::MAX),
         Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX },
@@ -31,119 +31,45 @@ fn current_budget_parent_payloads_price_whole_task_conversation_and_goal_facts_w
             let mut row = task();
             row.budget = budget.clone();
             whole_budget_fits(&row);
-            let conversation = ConversationLine {
-                cached_replies: 0,
-                chip: row.chip.clone(),
+            let conversation = TaskLine {
+                chip: {
+                    let mut chip = row.chip.clone();
+                    chip.title = DocumentText::complete(text(b"first"));
+                    chip
+                },
                 project: row.project,
-                first_words: DocumentText::complete(text(b"first")),
-                unread: Some(Count { value: 0, limited: false }),
-                seen: 0,
-                last_reply: 0,
-                changed: Some(Wall::EPOCH),
-                runtime: Some(row.context.as_ref().expect("supplied task context").runtime.clone()),
-                delegates: 0,
+                requester: jig_client_domain::contract::OwnerRequester::Person(1),
+                tracked: None,
+                label: 1,
+                flags: jig_client_domain::contract::TaskFlags {
+                    conversation: true,
+                    listed: false,
+                    retention: jig_client_domain::contract::Retention::ForgottenOnceRead,
+                },
+                changed: Wall::EPOCH,
+                last_activity: Wall::EPOCH,
+                ended_at: None,
                 budget: budget.clone(),
-            };
-            whole_budget_fits(&conversation);
-            let goal = GoalLine {
-                chip: row.chip,
-                priority: u32::MAX,
-                progress: OwnerPhaseCounts {
-                    waiting: row.context.as_ref().expect("supplied task context").impact.tasks.waiting,
-                    running: row.context.as_ref().expect("supplied task context").impact.tasks.running,
-                    held: row.context.as_ref().expect("supplied task context").impact.tasks.held,
-                    closing: row.context.as_ref().expect("supplied task context").impact.tasks.closing,
-                    done: row.context.as_ref().expect("supplied task context").impact.tasks.done,
-                    failed: row.context.as_ref().expect("supplied task context").impact.tasks.failed,
-                    cancelled: row.context.as_ref().expect("supplied task context").impact.tasks.cancelled,
+                waits_on: jig_client_domain::contract::WaitsOn::Nothing,
+                phases: jig_client_domain::contract::OwnerPhaseCounts {
+                    waiting: 0,
                     idle: 0,
                     starting: 0,
+                    running: 0,
                     backing_off: 0,
+                    closing: 0,
+                    held: 0,
+                    done: 0,
+                    failed: 0,
+                    cancelled: 0,
                 },
-                budget,
-                held_below: u32::MAX,
-                changed: Some(Wall::EPOCH),
+                held_below: 0,
+                conversation: Some(jig_client_domain::contract::ConversationRead {
+                    seen: 0,
+                    unread: Count { value: 0, limited: false },
+                }),
             };
-            whole_budget_fits(&goal);
+            whole_budget_fits(&conversation);
         }
     }
 }
-
-#[test]
-fn owner_row_parent_admission_prices_full_text_optional_runtime_and_allocated_window_without_trimming() {
-    let mut nested = List::with_capacity(2);
-    nested.push(u64::MAX).unwrap();
-    let row = ConversationLine {
-        chip: task().chip,
-        project: u32::MAX,
-        first_words: DocumentText { bytes: text(UTF8_TEXTS[0]), cut: true },
-        unread: Some(Count { value: u32::MAX, limited: true }),
-        cached_replies: u32::MAX,
-        delegates: u32::MAX,
-        seen: u64::MAX,
-        last_reply: u64::MAX,
-        runtime: Some(Runtime::Waiting { dependencies: nested, hold: None }),
-        changed: Some(Wall::from_nanos(u64::MAX)),
-        budget: task().budget,
-    };
-    whole_budget_fits(&row);
-    let bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
-    let mut absent = row.clone();
-    absent.runtime = None;
-    absent.changed = None;
-    absent.unread = None;
-    assert_eq!(row.heap(&bounds).unwrap() - absent.heap(&bounds).unwrap(), List::<u64>::worst_case(2).unwrap());
-    whole_budget_fits(&absent);
-    for capacity in [1, 2] {
-        let mut rows = List::with_capacity(capacity);
-        rows.push(row.clone()).unwrap();
-        let page = ReadValue::Conversations(Box::new(ConversationPage {
-            rows,
-            cut: true,
-            before: None,
-            after: Some(Cursor::new(Box::from(UTF8_TEXTS[1]), 1024).expect("bounded opaque cursor")),
-        }));
-        whole_budget_fits(&page);
-        let mut too_short = bounds;
-        too_short.text = 31;
-        assert!(!payload::fits(&page, &too_short));
-    }
-}
-
-#[test]
-fn owner_goal_payload_admits_all_independent_full_width_stages_and_whole_budget_at_exact_bound() {
-    let row = GoalLine {
-        chip: task().chip,
-        priority: u32::MAX,
-        held_below: u32::MAX,
-        changed: None,
-        progress: OwnerPhaseCounts {
-            waiting: u32::MAX,
-            idle: u32::MAX,
-            starting: u32::MAX,
-            running: u32::MAX,
-            backing_off: u32::MAX,
-            closing: u32::MAX,
-            held: u32::MAX,
-            done: u32::MAX,
-            failed: u32::MAX,
-            cancelled: u32::MAX,
-        },
-        budget: OwnerBudget {
-            numbers: OwnerNumbers { budget: u64::MAX, spent: u64::MAX, spent_below: u64::MAX, reserved: u64::MAX },
-            left: u64::MAX,
-            funder: Funder::Recurring { project: u32::MAX, task: u64::MAX, period: u64::MAX },
-            deadline: Some(Wall::from_nanos(u64::MAX)),
-        },
-    };
-    whole_budget_fits(&row);
-    let page = ReadValue::Goals(Box::new(GoalPage {
-        rows: list(vec![row]),
-        cut: true,
-        before: None,
-        after: Some(Cursor::new(Box::from(UTF8_TEXTS[2]), 1024).expect("bounded opaque cursor")),
-    }));
-    whole_budget_fits(&page);
-}
-
-const UTF8_TEXTS: [&[u8]; 3] = [&[b'~'; 32], b"\x7e\0opaque", b"\x7e\0opaque-goal"];

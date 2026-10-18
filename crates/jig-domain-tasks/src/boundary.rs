@@ -1042,9 +1042,6 @@ pub enum Stored {
     /// One party's durable update index.
     Update(crate::Update),
     Result(crate::ResultRow),
-    ConversationNewest(crate::Conversation),
-    ConversationOldest(crate::Conversation),
-    Goal(crate::GoalRow),
     EndedByParty(crate::EndedByParty),
     EndedByProject(crate::EndedByProject),
     EndedDelegate(crate::Edge),
@@ -1097,12 +1094,7 @@ impl Stored {
             Stored::EndedByProject(row) => row.key(),
             Stored::EndedDelegate(row) => Key::EndedDelegate { requester: row.requester, task: row.task },
             Stored::Delegate(row) => Key::Delegate { requester: row.requester, task: row.task },
-            Stored::Goal(row) => Key::Goal { project: row.project, task: crate::Newest::of(row.task) },
             Stored::Result(row) => Key::Result { party: row.party, position: row.position },
-            Stored::ConversationNewest(row) => {
-                Key::ConversationNewest { party: row.party, task: crate::Newest::of(row.task) }
-            }
-            Stored::ConversationOldest(row) => Key::ConversationOldest { party: row.party, task: row.task },
             Stored::PersonProposal(row) => Key::PersonProposal(row.number),
             Stored::DecidedProposal(row) => Key::DecidedProposal(row.number),
             Stored::ClosedLedger(row) => Key::ClosedLedger(row.funder),

@@ -98,13 +98,6 @@ fn each_index_row_reads_back() {
             object: domain::UpdateObject::Proposal { proposal: domain::Newest::of(43) },
         }),
         domain::Stored::Result(domain::ResultRow { party: 31, position: 43, task: 17 }),
-        domain::Stored::ConversationNewest(domain::Conversation { party: 31, task: 17 }),
-        domain::Stored::ConversationOldest(domain::Conversation { party: 31, task: 17 }),
-        domain::Stored::Goal(domain::GoalRow {
-            project: 3,
-            task: 17,
-            endings: domain::Endings { done: u32::MAX, failed: 3, cancelled: 5 },
-        }),
         domain::Stored::EndedDelegate(domain::Edge { requester: 17, task: 19 }),
         domain::Stored::Delegate(domain::Edge { requester: 17, task: 19 }),
         domain::Stored::EndedByParty(domain::EndedByParty {

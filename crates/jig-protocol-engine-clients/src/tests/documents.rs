@@ -104,24 +104,6 @@ fn a_deployment_document_becomes_its_record() {
         Ok(jig_client_test_records::deployment_rows_record())
     );
 }
-fn conversations_keep_their_rows_more_and_opaque_cursor() {
-    let limits = fixtures::wire_limits();
-    assert_eq!(
-        translate::live::conversations(
-            &fixtures::conversations(),
-            jig_client_test_records::live_cursor_record(),
-            &limits
-        ),
-        Ok(jig_client_test_records::conversations_rows_record())
-    );
-}
-fn goals_keep_all_ten_phase_counts_and_budget() {
-    let limits = fixtures::wire_limits();
-    assert_eq!(
-        translate::live::goals(7, &fixtures::goals(), &limits),
-        Ok(jig_client_test_records::goals_rows_record())
-    );
-}
 fn a_lines_document_becomes_its_tasks_rows_record() {
     let limits = fixtures::wire_limits();
     assert_eq!(
@@ -167,8 +149,6 @@ fn documents_become_their_literal_records() {
         ("a_run_text_keeps_its_turn_retry_and_offsets", a_run_text_keeps_its_turn_retry_and_offsets),
         ("an_inbox_with_both_groups_becomes_its_record", an_inbox_with_both_groups_becomes_its_record),
         ("a_deployment_document_becomes_its_record", a_deployment_document_becomes_its_record),
-        ("conversations_keep_their_rows_more_and_opaque_cursor", conversations_keep_their_rows_more_and_opaque_cursor),
-        ("goals_keep_all_ten_phase_counts_and_budget", goals_keep_all_ten_phase_counts_and_budget),
         ("a_lines_document_becomes_its_tasks_rows_record", a_lines_document_becomes_its_tasks_rows_record),
         (
             "a_tree_keeps_its_rows_folds_dependencies_and_opaque_cursor",

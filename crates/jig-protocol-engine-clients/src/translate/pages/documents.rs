@@ -1,6 +1,6 @@
 #![expect(clippy::manual_map, reason = "step code carries optional owner facts without closures")]
 //! Each original page's whole owner rows (protocol/client.md, 3).
-use super::super::{activity, chips, history, inbox, live, objects, w};
+use super::super::{activity, chips, history, inbox, objects, w};
 use super::rows;
 use alloc::boxed::Box;
 use jig_domain_core::reads;
@@ -22,9 +22,7 @@ pub(super) fn activity(
             | reads::PageRow::History(_)
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Inbox(_)
-            | reads::PageRow::Conversation(_)
             | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
         };
@@ -72,9 +70,7 @@ pub(super) fn history(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
-            | reads::PageRow::Conversation(_)
             | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
         })
@@ -111,9 +107,7 @@ pub(super) fn inbox(
             | reads::PageRow::History(_)
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
-            | reads::PageRow::Conversation(_)
             | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
         };
@@ -140,88 +134,6 @@ pub(super) fn inbox(
     )?))
 }
 
-pub(super) fn conversations(
-    page: &reads::Page,
-    before: Option<w::Cursor>,
-    after: Option<w::Cursor>,
-    limits: &w::Limits,
-) -> Result<w::ReadValue, w::Problem> {
-    let invalid = w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag };
-
-    let mut rows = List::with_capacity(page.rows.len());
-    for row in &page.rows {
-        let value = match row {
-            reads::PageRow::Conversation(value) => value,
-            reads::PageRow::EndedDelegate(_)
-            | reads::PageRow::History(_)
-            | reads::PageRow::Milestone(_)
-            | reads::PageRow::Activity { .. }
-            | reads::PageRow::Inbox(_)
-            | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
-            | reads::PageRow::Note(_)
-            | reads::PageRow::Spend(_) => return Err(invalid),
-        };
-        rows.push(live::conversation(value, limits)?).expect("selected rows fit");
-    }
-    Ok(w::ReadValue::Conversations(w::ConversationPage::new(
-        limits,
-        w::ConversationPageParts {
-            cut: page.cut,
-            rows: rows::conversation_pieces(
-                &rows,
-                limits.conversation_page_rows.min(w::CEILINGS.conversation_page_rows),
-                w::Path::ConversationPageRows,
-            )?,
-            before,
-            after,
-        },
-    )?))
-}
-
-pub(super) fn goals(
-    project: u32,
-    page: &reads::Page,
-    before: Option<w::Cursor>,
-    after: Option<w::Cursor>,
-    limits: &w::Limits,
-) -> Result<w::ReadValue, w::Problem> {
-    let invalid = w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag };
-
-    let mut rows = List::with_capacity(page.rows.len());
-    for row in &page.rows {
-        let value = match row {
-            reads::PageRow::Goal(value) => value,
-            reads::PageRow::Line(_)
-            | reads::PageRow::EndedDelegate(_)
-            | reads::PageRow::History(_)
-            | reads::PageRow::Milestone(_)
-            | reads::PageRow::Activity { .. }
-            | reads::PageRow::Inbox(_)
-            | reads::PageRow::Conversation(_)
-            | reads::PageRow::Note(_)
-            | reads::PageRow::Spend(_) => return Err(invalid),
-        };
-        if value.chip.details.project != project {
-            return Err(invalid);
-        }
-        rows.push(live::goal(value, limits)?).expect("selected rows fit");
-    }
-    Ok(w::ReadValue::Goals(w::GoalPage::new(
-        limits,
-        w::GoalPageParts {
-            cut: page.cut,
-            rows: rows::goal_pieces(
-                &rows,
-                limits.goal_page_rows.min(w::CEILINGS.goal_page_rows),
-                w::Path::GoalPageRows,
-            )?,
-            before,
-            after,
-        },
-    )?))
-}
-
 pub(super) fn ended(
     page: &reads::Page,
     before: Option<w::Cursor>,
@@ -238,9 +150,7 @@ pub(super) fn ended(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
-            | reads::PageRow::Conversation(_)
             | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
         };
@@ -293,9 +203,7 @@ pub(super) fn spend(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
-            | reads::PageRow::Conversation(_)
             | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_) => return Err(invalid),
         };
         let same_project = match value.funder {
@@ -332,9 +240,7 @@ pub(super) fn notes(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
-            | reads::PageRow::Conversation(_)
             | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
         };
         rows.push(rows::note(value, limits)?).expect("selected rows fit");

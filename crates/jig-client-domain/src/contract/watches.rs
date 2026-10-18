@@ -1,7 +1,7 @@
 //! Level-triggered subjects and one-terminal watches; client/domain/contract.md, 7.
 //! Deliveries replace the previous document. Run text alone is offset based and
 //! provisional, and never resets text belonging to an earlier turn.
-use super::{Chip, Conversations, CurrentCall, Deployment, Goals, Inbox, LiveCall, Me, Task, Text, Tree, TurnName};
+use super::{Chip, CurrentCall, Deployment, Inbox, LiveCall, Me, Task, Text, Tree, TurnName};
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
 /// A live subject followed by one unkeyed watch.
@@ -17,12 +17,8 @@ pub enum Subject {
     Chips { tasks: List<u64> },
     /// Party inbox across projects.
     Inbox { window: u32 },
-    /// Project live goals.
-    Goals { project: u32 },
     /// Filtered live tasks in one project.
     Tasks { query: super::TaskQuery, window: u32 },
-    /// Party live chats.
-    Conversations,
     /// A task run text from the client offset.
     Run { task: u64, turn: Option<ProvisionalTurnName>, offset: u32 },
     /// Deployment capacity.
@@ -50,12 +46,8 @@ pub enum Delivery {
     Inbox(Box<Inbox>),
     /// Whole exact owner Inbox, preserving both allocated groups.
     OwnerInbox(Box<super::OwnerInbox>),
-    /// The live goals.
-    Goals(Box<Goals>),
     /// Filtered live project tasks.
     Tasks(Box<super::Tasks>),
-    /// The live chats.
-    Conversations(Box<Conversations>),
     /// Provisional run text.
     Run(Box<RunText>),
     /// Whole current run, including a call independent of provisional writing.

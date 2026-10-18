@@ -195,8 +195,12 @@ pub fn a_backward_wall_correction_keeps_reply_paging_whole_after_restart() {
             let reads::PageRow::Inbox(entry) = row else { panic!("reply row") };
             let documents::InboxObject::Reply { message } = entry.object else { panic!("reply ordinal") };
             let conversation = entry.reply.as_ref().expect("whole committed conversation");
-            assert_eq!(conversation.last_reply, 5, "the ordinal is independent of the retained prefix");
-            assert_eq!(conversation.seen, 0);
+            assert_eq!(
+                conversation.conversation.expect("read position").unread,
+                documents::Count::AtLeast(2),
+                "unread count respects the retained bound"
+            );
+            assert_eq!(conversation.conversation.expect("read position").seen, 0);
             found.push((entry.at.expect("reply wall time"), message, entry.activity.expect("immutable load position")));
         }
         from.clone_from(&value.next);
@@ -333,109 +337,5 @@ pub fn result_and_reply_filters_page_their_own_retained_updates() {
         let mut expected = tasks.clone();
         expected.reverse();
         assert_eq!(found, expected, "each kind contains every retained update exactly once");
-    }
-}
-
-/// A live document issues the stored start even when every live row fits.
-pub fn conversation_owner_replay_keeps_every_retained_page_after_durability_and_restart() {
-    use crate::watches;
-    let mut world = world(769);
-    let mut ended = Vec::new();
-    for number in 0..5 {
-        if number != 0 {
-            request(
-                &mut world,
-                40 + number,
-                people::Ask::StartChat { project: 1, words: b"retained chat".as_slice().into() },
-            );
-        }
-        ended.push(world.assigned.as_ref().expect("assigned chat").task);
-        world.end(
-            tasks::End::Finished {
-                result: tasks::TaskResult::Report { words: b"complete result".as_slice().into() },
-                cancel_delegates: false,
-            },
-            0,
-        );
-    }
-    ended.reverse();
-    let prerequisite = world.store.applied + 1;
-    world.store.fault(crate::Fault::Hold { commits: 1 });
-    world.cut = Some(crate::effects::Cut::Submitted(prerequisite));
-    request(&mut world, 50, people::Ask::StartChat { project: 1, words: b"current live chat".as_slice().into() });
-    assert_eq!(world.reached_cut, Some(crate::effects::Cut::Submitted(prerequisite)));
-    assert!(world.store.applied < prerequisite);
-    world.watches = Some(watches::Parties::new(769, prerequisite, false, world.sign_in.expect("signed in")));
-    world.send(root::Event::Core(core::Event::Watch {
-        watcher: Token::new(60),
-        sign_in: world.sign_in.expect("signed in"),
-        subject: documents::Watched::Conversations,
-        window: documents::Window { rows: 2, after: None },
-    }));
-    assert!(world.watches.as_ref().expect("watcher").deliveries.is_empty());
-    let committed = world.store.release_held().expect("actual durable completion");
-    assert_eq!(committed, prerequisite);
-    world.send(root::Event::Committed { number: committed, fill: 0 });
-    let documents::Document::Conversations(value) = watches::latest(&world, 60) else {
-        panic!("conversation document")
-    };
-    assert_eq!(value.lines.len(), 1);
-    assert_eq!(value.next, None, "there are no more live rows");
-    let live = value.lines.get(0).expect("whole current row").chip.number;
-    let start = reads::conversations_cursor(value);
-    assert_eq!(start, reads::Cursor::Store { scope: reads::Scope::Conversations, after: None });
-    for replay in 0..3 {
-        if replay == 2 {
-            world.restart(769, false);
-        }
-        let mut from = Some(start.clone());
-        let mut found = Vec::new();
-        let mut page_counts = Vec::new();
-        for page in 0..10 {
-            ask(&mut world, 400 + replay * 20 + page, reads::Read::Conversations { from: from.take() });
-            let reads::Answer::Page(value) = latest(&world) else { panic!("retained conversation page") };
-            assert!(value.rows.len() <= 2);
-            assert!(!value.cut);
-            page_counts.push(value.rows.len());
-            for row in &value.rows {
-                let reads::PageRow::Conversation(value) = row else { panic!("conversation row") };
-                assert_eq!(value.project, 1);
-                assert_eq!(value.chip.details.project, 1);
-                assert!(value.chip.details.ended_at.is_some());
-                found.push(value.chip.number);
-            }
-            from.clone_from(&value.next);
-            if from.is_none() {
-                break;
-            }
-        }
-        assert_eq!(found, ended, "original descending owner order survives replay and restart");
-        assert_eq!(page_counts, [2, 2, 1]);
-        assert_eq!(from, None, "last page says there is none");
-        let reads::Answer::Page(last) = latest(&world) else { panic!("last retained page") };
-        let mut before = last.before.clone();
-        let mut prefixes = Vec::new();
-        for page in 0..10 {
-            let Some(cursor) = before.take() else { break };
-            ask(&mut world, 500 + replay * 20 + page, reads::Read::Conversations { from: Some(cursor) });
-            let reads::Answer::Page(value) = latest(&world) else { panic!("opposite owner page") };
-            assert!(value.rows.len() <= 2);
-            let ids: Vec<_> = value
-                .rows
-                .iter()
-                .map(|row| {
-                    let reads::PageRow::Conversation(row) = row else { panic!("conversation row") };
-                    row.chip.number
-                })
-                .collect();
-            prefixes.push(ids);
-            before.clone_from(&value.before);
-        }
-        assert_eq!(
-            prefixes,
-            [ended[2..4].to_vec(), ended[..2].to_vec(), vec![live]],
-            "past pages recover their exact preceding slices and displaced live prefix"
-        );
-        assert_eq!(before, None);
     }
 }

@@ -1,8 +1,8 @@
 //! One-terminal reads, bounded pages and opaque cursors; client/domain/contract.md, 6.
 //! A cursor is never decoded by the client. Live watches may overlap retained read pages.
 use super::{
-    ActivityLine, Bytes, ConversationLine, Deployment, Escalation, GoalLine, HistoryRow, InboxEntry, InboxGroup, Me,
-    Note, NoteScope, PersonTask, Project, Proposal, ProposalKey, Question, Result, Task, Text,
+    ActivityLine, Bytes, Deployment, Escalation, HistoryRow, InboxEntry, InboxGroup, Me, Note, NoteScope, PersonTask,
+    Project, Proposal, ProposalKey, Question, Result, Task, Text,
 };
 use alloc::boxed::Box;
 use skein_lib::List;
@@ -73,10 +73,6 @@ pub enum Read {
         goal: Option<u64>,
         after: Option<Cursor>,
     },
-    /// Party conversations.
-    Conversations { after: Option<Cursor> },
-    /// Project goals, live then ended from the start of one list.
-    Goals { project: u32, after: Option<Cursor> },
     /// Project spend by period, with an opaque continuation.
     Spend { project: u32, after: Option<Cursor> },
     /// One project.
@@ -93,16 +89,6 @@ pub struct ObjectPage {
     /// The source page is incomplete, independent of row loss and continuations.
     pub cut: bool,
     pub rows: List<Result>,
-    pub before: Option<Cursor>,
-    pub after: Option<Cursor>,
-}
-
-/// A bounded page with opaque cursors at both ends.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ConversationPage {
-    /// The source page is incomplete, independent of row loss and continuations.
-    pub cut: bool,
-    pub rows: List<ConversationLine>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
 }
@@ -133,16 +119,6 @@ pub struct InboxPage {
     /// The source page is incomplete, independent of row loss and continuations.
     pub cut: bool,
     pub rows: List<InboxEntry>,
-    pub before: Option<Cursor>,
-    pub after: Option<Cursor>,
-}
-
-/// A bounded page with opaque cursors at both ends.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct GoalPage {
-    /// The source page is incomplete, independent of row loss and continuations.
-    pub cut: bool,
-    pub rows: List<GoalLine>,
     pub before: Option<Cursor>,
     pub after: Option<Cursor>,
 }
@@ -198,10 +174,6 @@ pub enum ReadValue {
     Inbox(Box<InboxPage>),
     /// Exact owner Inbox rows selected under the original query.
     OwnerInbox(Box<super::OwnerInboxPage>),
-    /// Conversations.
-    Conversations(Box<ConversationPage>),
-    /// Goals.
-    Goals(Box<GoalPage>),
     /// Project spend periods.
     Spend(Box<SpendPage>),
     /// Retained whole funding records without inferred ledger facts.

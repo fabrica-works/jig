@@ -311,19 +311,18 @@ fn assert_ended_position(world: &mut World, task: u64, through: u64, unread: u32
             .rows
             .contains_key(&root::Key::Core(core::Key::People(people::Key::ReadChat { task, party: PARTY })))
     );
-    jig_core_world::reads::ask(
-        world,
-        VIEW,
-        core::reads::Read::Conversations {
-            from: Some(core::reads::Cursor::Store { scope: core::reads::Scope::Conversations, after: None }),
-        },
-    );
-    let core::reads::Answer::Page(page) = jig_core_world::reads::latest(world) else { panic!("conversation page") };
-    let core::reads::PageRow::Conversation(line) = page.rows.iter().next().expect("conversation row") else {
-        panic!("conversation line")
+    let query = core::documents::TaskQuery {
+        phase: Some(core::documents::PhaseClass::Ended),
+        order: core::documents::QueryOrder::Ended,
+        ..jig_core_world::fixtures::OWN_TASKS
     };
-    assert_eq!(line.seen, through);
-    assert_eq!(line.replies_unread, Some(core::documents::Count::Known(unread)));
+    jig_core_world::reads::ask(world, VIEW, core::reads::Read::Tasks { query, live: None, ended: None });
+    let core::reads::Answer::Tasks(page) = jig_core_world::reads::latest(world) else { panic!("task page") };
+    let core::reads::EndedGroup::Rows { rows, .. } = &page.ended else { panic!("ended tasks") };
+    let line = rows.iter().next().expect("task row");
+    let position = line.conversation.expect("read position");
+    assert_eq!(position.seen, through);
+    assert_eq!(position.unread, core::documents::Count::Known(unread));
 }
 #[test]
 fn an_ended_chats_read_position_is_read_back_after_a_restart() {

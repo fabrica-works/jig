@@ -61,22 +61,6 @@ pub(crate) fn read(value: w::Read) -> Option<reads::Read> {
             };
             reads::Read::Inbox { group, filter: reads::Filter { project: parts.project, goal: parts.goal }, from }
         }
-        w::Read::Conversations(value) => {
-            let parts = value.into_parts();
-            let from = match parts.after {
-                Some(value) => Some(cursor::decode(value.value())?),
-                None => None,
-            };
-            reads::Read::Conversations { from }
-        }
-        w::Read::Goals(value) => {
-            let parts = value.into_parts();
-            let from = match parts.after {
-                Some(value) => Some(cursor::decode(value.value())?),
-                None => None,
-            };
-            reads::Read::Goals { project: parts.project, from }
-        }
         w::Read::Spend(value) => {
             let parts = value.into_parts();
             let from = match parts.after {

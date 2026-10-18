@@ -182,16 +182,6 @@ pub fn deployment() -> c::Deployment {
         parts: List::with_capacity(0),
     }
 }
-pub fn conversations_record() -> w::Conversations {
-    jig_client_test_records::conversations_record()
-}
-pub fn conversations() -> c::Conversations {
-    c::Conversations {
-        rows: List::with_capacity(0),
-        more: false,
-        after: c::Cursor::new(Box::from(b"".as_slice()), 1024).expect("bounded opaque cursor"),
-    }
-}
 pub fn inbox_record() -> w::Inbox {
     let lim = limits().wire;
     w::Inbox::new(
@@ -217,12 +207,6 @@ pub fn inbox() -> c::Inbox {
         replies_seen: List::with_capacity(0),
         more: false,
     }
-}
-pub fn goals_record() -> w::Goals {
-    jig_client_test_records::goals_record()
-}
-pub fn goals() -> c::Goals {
-    c::Goals { project: 7, rows: List::with_capacity(0), more: false }
 }
 pub fn tasks_record() -> w::Tasks {
     jig_client_test_records::tasks_record()
@@ -337,17 +321,6 @@ pub fn run_text_one_past_text_limit() -> w::RunText {
     w::RunText::new(&w::CEILINGS, parts).unwrap()
 }
 
-pub fn conversations_with_cursor() -> w::Conversations {
-    let lim = limits().wire;
-    let mut parts = conversations_record().into_parts();
-    parts.after = w::Cursor::new(&lim, w::CursorParts { value: Box::from(UTF8_TEXTS[0]) }).unwrap();
-    w::Conversations::new(&lim, parts).unwrap()
-}
-pub fn conversations_cursor_expected() -> c::Conversations {
-    let mut value = conversations();
-    value.after = c::Cursor::new(Box::from(UTF8_TEXTS[0]), 1024).unwrap();
-    value
-}
 pub fn raw_live_call() -> w::LiveCall {
     let lim = limits().wire;
     let identity = w::CallIdentity::new(
@@ -405,8 +378,6 @@ pub fn decoded_live_call_expected() -> c::LiveCall {
         parts: List::with_capacity(0),
     })
 }
-
-const UTF8_TEXTS: [&[u8]; 1] = [&[b'~'; 40]];
 
 pub fn task_with_resource_path(count: u32) -> w::Task {
     let mut wire = limits().wire;

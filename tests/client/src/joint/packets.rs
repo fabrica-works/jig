@@ -94,18 +94,6 @@ pub fn document(
             }
             wire::documents::run_delivery(value, limits)
         }
-        jig_domain_core::documents::Document::Conversations(value) => {
-            if subject != client::Subject::Conversations {
-                return Err(Invalid::OwnerRoute);
-            }
-            wire::documents::conversations_delivery(value, limits)
-        }
-        jig_domain_core::documents::Document::Goals(value) => {
-            let client::Subject::Goals { project } = subject else {
-                return Err(Invalid::OwnerRoute);
-            };
-            wire::documents::goals_delivery(project, value, limits)
-        }
         jig_domain_core::documents::Document::Lines(value) => {
             let client::Subject::Tasks { query, .. } = subject else {
                 return Err(Invalid::OwnerRoute);
@@ -138,7 +126,6 @@ pub fn document(
         | jig_domain_core::documents::Document::PersonTask(_)
         | jig_domain_core::documents::Document::Result(_)
         | jig_domain_core::documents::Document::Project(_)
-        | jig_domain_core::documents::Document::Tasks(_)
         | jig_domain_core::documents::Document::Note(_) => return Err(Invalid::PendingDocument),
     }
     .map_err(Invalid::Document)?;
@@ -647,75 +634,6 @@ mod tests {
         assert!(transport.taken(ClientId(1), native).is_none());
     }
 
-    #[test]
-    fn live_list_documents_keep_the_original_tab_watch_and_only_normal_taken_after_whole_admission() {
-        let mut transport = transport();
-        let native = Token::new(u64::MAX);
-        let conversations = transport.open(ClientId(0), native, Watched::Jig(client::Subject::Conversations));
-        let goals = transport.open(ClientId(1), native, Watched::Jig(client::Subject::Goals { project: u32::MAX }));
-        let source = jig_domain_core::documents::Document::Conversations(jig_domain_core::documents::Conversations {
-            lines: skein_lib::List::with_capacity(3),
-            next: Some(jig_domain_core::documents::Cursor::Number { number: u64::MAX }),
-        });
-        let limits = Limits { rows: 4, ..crate::test::limits().jig };
-        assert!(matches!(document(&mut transport, goals, &source, &limits), Err(Invalid::OwnerRoute)));
-        assert!(matches!(
-            document(&mut transport, conversations, &source, &Limits { document_bytes: 0, ..limits }),
-            Err(Invalid::Document(wire::documents::Invalid::Payload))
-        ));
-        assert!(transport.taken(ClientId(0), native).is_none());
-        let Incoming::Callback {
-            client: ClientId(0),
-            event:
-                Event::Client {
-                    event:
-                        jig_client::Event::Up {
-                            up:
-                                jig_client::Up::Watched {
-                                    watch,
-                                    event: client::WatchEvent::Delivered(client::Delivery::Conversations(value)),
-                                },
-                        },
-                },
-        } = document(&mut transport, conversations, &source, &limits).expect("original whole list")
-        else {
-            panic!("original chats")
-        };
-        assert_eq!(watch, native);
-        assert!(value.more);
-        assert_eq!(value.rows.capacity(), 3);
-        assert!(transport.taken(ClientId(1), native).is_none());
-        assert!(
-            matches!(transport.taken(ClientId(0), native), Some(jig_domain_core::Event::Delivered { watcher }) if watcher == conversations)
-        );
-        assert!(transport.taken(ClientId(0), native).is_none());
-        let source = jig_domain_core::documents::Document::Goals(jig_domain_core::documents::Goals {
-            lines: skein_lib::List::with_capacity(3),
-            next: None,
-        });
-        let Incoming::Callback {
-            client: ClientId(1),
-            event:
-                Event::Client {
-                    event:
-                        jig_client::Event::Up {
-                            up:
-                                jig_client::Up::Watched {
-                                    watch,
-                                    event: client::WatchEvent::Delivered(client::Delivery::Goals(value)),
-                                },
-                        },
-                },
-        } = document(&mut transport, goals, &source, &limits).expect("original whole goals")
-        else {
-            panic!("original goals")
-        };
-        assert_eq!((watch, value.project, value.more), (native, u32::MAX, false));
-        assert_eq!(value.rows.capacity(), 3);
-        assert!(
-            matches!(transport.taken(ClientId(1), native), Some(jig_domain_core::Event::Delivered { watcher }) if watcher == goals)
-        );
-    }
     #[test]
     fn normal_tasks_check_the_original_query_before_opening_the_exact_tab_flight() {
         let mut transport = transport();

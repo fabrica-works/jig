@@ -87,10 +87,6 @@ pub enum Scope {
     Activity { task: u64 },
     /// One filtered inbox group in its semantic order.
     Inbox { group: Group, filter: Filter },
-    /// Ended conversations, newest task first after all live conversations.
-    Conversations,
-    /// Ended goals after all live goals.
-    Goals { project: u32 },
     /// Notes selected by their owning project.
     Notes { project: u32 },
     /// Exact notes owner scope and optional byte substring of its descriptions.
@@ -116,12 +112,6 @@ pub enum Cursor {
     Live { scope: Scope, after: documents::Cursor, store_after: Option<Position> },
     /// Exclusive owner key; `None` starts the stored portion after live rows.
     Store { scope: Scope, after: Option<Position> },
-    /// Preceding stored conversations, before this examined owner key.
-    ConversationsBefore { before: Position },
-    /// Earlier live conversations; absent position starts from the live tail.
-    ConversationsLiveBefore { before: Option<documents::Cursor> },
-    /// The original conversation list, beginning with its live rows.
-    ConversationsStart,
 }
 
 /// One document or bounded page, without a request key.
@@ -166,10 +156,6 @@ pub enum Read {
     Activity { task: u64, before: Option<Cursor> },
     /// One filtered inbox group.
     Inbox { group: Group, filter: Filter, from: Option<Cursor> },
-    /// Live conversations followed by retained ended ones.
-    Conversations { from: Option<Cursor> },
-    /// Live project goals followed by retained ended ones.
-    Goals { project: u32, from: Option<Cursor> },
     /// A project's current resources, policy and funding.
     Project { project: u32 },
     /// Project notes from their owning child's rows.
@@ -299,10 +285,6 @@ pub enum PageRow {
     Activity { line: tasks::ActivityLine, turn: Option<PageTurn> },
     /// One waiting object or unread update.
     Inbox(documents::InboxEntry),
-    /// One directly requested conversation.
-    Conversation(documents::ConversationLine),
-    /// One tracked goal.
-    Goal(documents::GoalLine),
     /// One loaded note.
     Note(documents::Note),
     /// Historical period accounting, never inferred from live roots.
@@ -379,13 +361,10 @@ pub(crate) fn row_owner(row: &Row) -> Option<&tasks::TaskRecord> {
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
-            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_)
@@ -425,13 +404,10 @@ pub(crate) fn row_visible(core: &Core, party: u64, row: &Row) -> bool {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
-            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_),
         ) => match row_owner(row) {

@@ -28,19 +28,8 @@ fn a_tree_keeps_every_supplied_field() {
     assert_eq!(documents::tree(fixtures::tree_record(), &fixtures::limits()), Ok(fixtures::tree()));
 }
 
-fn a_conversations_keeps_every_supplied_field() {
-    assert_eq!(
-        documents::conversations(fixtures::conversations_record(), &fixtures::limits()),
-        Ok(fixtures::conversations())
-    );
-}
-
 fn a_inbox_keeps_every_supplied_field() {
     assert_eq!(documents::inbox(fixtures::inbox_record(), &fixtures::limits()), Ok(fixtures::inbox()));
-}
-
-fn a_goals_keeps_every_supplied_field() {
-    assert_eq!(documents::goals(fixtures::goals_record(), &fixtures::limits()), Ok(fixtures::goals()));
 }
 
 fn a_tasks_keeps_every_supplied_field() {
@@ -132,13 +121,6 @@ fn an_account_later_keeps_its_optional_wall() {
 }
 
 #[test]
-fn a_conversations_cursor_keeps_bytes_beyond_the_text_bound() {
-    assert_eq!(
-        documents::conversations(fixtures::conversations_with_cursor(), &fixtures::limits()),
-        Ok(fixtures::conversations_cursor_expected())
-    );
-}
-#[test]
 fn a_raw_live_call_keeps_its_provider_retry_and_start() {
     assert_eq!(live::live_call(fixtures::raw_live_call(), &fixtures::limits()), Ok(fixtures::raw_live_call_expected()));
 }
@@ -177,9 +159,7 @@ fn documents_keep_every_supplied_field() {
     table([
         ("a_task_keeps_every_supplied_field", a_task_keeps_every_supplied_field),
         ("a_tree_keeps_every_supplied_field", a_tree_keeps_every_supplied_field),
-        ("a_conversations_keeps_every_supplied_field", a_conversations_keeps_every_supplied_field),
         ("a_inbox_keeps_every_supplied_field", a_inbox_keeps_every_supplied_field),
-        ("a_goals_keeps_every_supplied_field", a_goals_keeps_every_supplied_field),
         ("a_tasks_keeps_every_supplied_field", a_tasks_keeps_every_supplied_field),
         ("a_deployment_keeps_every_supplied_field", a_deployment_keeps_every_supplied_field),
         ("a_owner_deployment_keeps_every_supplied_field", a_owner_deployment_keeps_every_supplied_field),

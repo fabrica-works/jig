@@ -285,14 +285,6 @@ pub(crate) fn uses(section: Section, subject: &jig_client::contract::Subject) ->
                 false
             }
         },
-        Subject::Conversations => match section {
-            Section::Conversations { .. } => true,
-            Section::Inbox { .. } | Section::Task { .. } | Section::Project { .. } | Section::Deployment => false,
-        },
-        Subject::Goals { project } => {
-            section == Section::Project { project: *project, section: ProjectSection::Overview }
-                || section == Section::Project { project: *project, section: ProjectSection::Goals }
-        }
         Subject::Tasks { query, .. } => match section {
             Section::Conversations { project } => {
                 query.project == project && query.requester.is_some() && query.label.is_some()
@@ -384,14 +376,6 @@ pub(crate) fn context_read(domain: &mut Ui, what: &jig_client::contract::Read) {
         }
         Read::Ended { task, .. } => Some(Section::Task { task: *task, section: TaskSection::Plan }),
         Read::Inbox { group, project, .. } => Some(Section::Inbox { group: *group, project: *project }),
-        Read::Conversations { .. } => {
-            let Some(project) = domain.shown_conversations() else {
-                domain.section_context = 0;
-                return;
-            };
-            Some(Section::Conversations { project })
-        }
-        Read::Goals { project, .. } => Some(Section::Project { project: *project, section: ProjectSection::Goals }),
         Read::Spend { project, .. } => Some(Section::Project { project: *project, section: ProjectSection::Spend }),
         Read::Notes { .. } => {
             let Some(project) = domain.shown_project() else {

@@ -49,32 +49,18 @@ pub(crate) fn section(
             match section {
                 ProjectSection::Overview => {
                     if let Some(me) = domain.frame(lent).document
-                        && jig_client::shapes::template(me, project, jig_client::shapes::GOAL).is_some()
+                        && crate::queries::goal_template(me, project).is_some()
                     {
-                        open_once(
-                            domain,
-                            Subject::Tasks { query: crate::queries::goals(project), window: env.limits.rows },
-                            owner,
-                            out,
-                        );
+                        open_goals(domain, project, env.limits.rows, owner, out);
                     }
                     open_once(domain, Subject::Inbox { window: env.limits.rows }, owner, out);
                     domain.inbox.filter = super::inbox::Filter { project: Some(project), kind: None, goal: None };
                 }
                 ProjectSection::Goals => {
                     if let Some(me) = domain.frame(lent).document
-                        && jig_client::shapes::template(me, project, jig_client::shapes::GOAL).is_some()
+                        && let Some(template) = crate::queries::goal_template(me, project)
                     {
-                        open_once(
-                            domain,
-                            Subject::Tasks { query: crate::queries::goals(project), window: env.limits.rows },
-                            owner,
-                            out,
-                        );
-                    }
-                    if let Some(me) = domain.frame(lent).document
-                        && let Some(template) = jig_client::shapes::template(me, project, jig_client::shapes::GOAL)
-                    {
+                        open_goals(domain, project, env.limits.rows, owner, out);
                         project::ask(
                             domain,
                             project::GOALS_READ,
@@ -115,4 +101,8 @@ pub(crate) fn section(
             open_once(domain, Subject::Deployment, owner, out);
         }
     }
+}
+
+fn open_goals(domain: &mut Ui, project: u32, rows: u32, owner: Owner, out: &mut Queue<Request>) {
+    open_once(domain, Subject::Tasks { query: crate::queries::goals(project), window: rows }, owner, out);
 }

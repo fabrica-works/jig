@@ -290,38 +290,50 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
             | ReadValue::Activity(_)
             | ReadValue::Inbox(_)
             | ReadValue::OwnerInbox(_)
-            | ReadValue::Conversations(_)
             | ReadValue::Spend(_)
             | ReadValue::OwnerSpend(_)
-            | ReadValue::Goals(_)
             | ReadValue::Project(_)
             | ReadValue::Notes(_)
             | ReadValue::Deployment(_)
             | ReadValue::OwnerDeployment(_) => unreachable!(),
         }
     }
-    let line = ConversationLine {
-        cached_replies: 0,
-        runtime: Some(Runtime::Idle),
-        delegates: 0,
+    let line = TaskLine {
+        chip: chip(9),
+        project: 1,
+        requester: OwnerRequester::Person(1),
+        tracked: None,
+        label: 1,
+        flags: TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead },
+        changed: Wall::EPOCH,
+        last_activity: Wall::EPOCH,
+        ended_at: None,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
             left: 0,
             funder: Funder::Pool { project: 1, person: 7, period: 3 },
             deadline: None,
         },
-        chip: chip(9),
-        project: 1,
-        first_words: DocumentText::complete(text(b"first words")),
-        unread: Some(Count { value: 2, limited: false }),
-        seen: 5,
-        last_reply: 7,
-        changed: Some(Wall::EPOCH),
+        waits_on: WaitsOn::Nothing,
+        phases: OwnerPhaseCounts {
+            waiting: 0,
+            idle: 0,
+            starting: 0,
+            running: 0,
+            backing_off: 0,
+            closing: 0,
+            held: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+        conversation: Some(ConversationRead { seen: 5, unread: Count { value: 2, limited: false } }),
     };
     let id = domain.objects.reply(Source::Window { number: 1 }, line).unwrap();
     let projected = domain.objects().get(id).unwrap();
     let reply = projected.reply.as_ref().unwrap();
-    assert_eq!(reply.first_words.bytes(), b"first words");
+    assert_eq!(reply.first_words.bytes(), b"title");
     assert_eq!(reply.first_unread, 6);
     assert!(domain.objects.name(ObjectKey::Task(10), Source::Window { number: 1 }).is_none());
 }

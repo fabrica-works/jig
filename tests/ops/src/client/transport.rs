@@ -510,9 +510,7 @@ fn run_position(subject: &jig_client_domain::contract::Subject) -> SubjectRun {
         | jig_client_domain::contract::Subject::Tree { .. }
         | jig_client_domain::contract::Subject::Chips { .. }
         | jig_client_domain::contract::Subject::Inbox { .. }
-        | jig_client_domain::contract::Subject::Goals { .. }
         | jig_client_domain::contract::Subject::Tasks { .. }
-        | jig_client_domain::contract::Subject::Conversations
         | jig_client_domain::contract::Subject::Deployment => unreachable!("only run watches continue"),
     }
 }
@@ -552,8 +550,6 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerPersonTask(_)
                 | ReadValue::OwnerEscalation(_)
-                | ReadValue::Conversations(_)
-                | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
                 | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
@@ -587,8 +583,6 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::OwnerProposal(_)
                 | ReadValue::OwnerPersonTask(_)
                 | ReadValue::OwnerEscalation(_)
-                | ReadValue::Conversations(_)
-                | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
                 | ReadValue::OwnerSpend(_)
                 | ReadValue::Project(_)
@@ -627,8 +621,6 @@ impl Scripted {
             | Read::History { .. }
             | Read::Activity { .. }
             | Read::Inbox { .. }
-            | Read::Conversations { .. }
-            | Read::Goals { .. }
             | Read::Spend { .. }
             | Read::Project { .. }
             | Read::Notes { .. }

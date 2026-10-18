@@ -9,7 +9,7 @@ use super::{Chip, Cursor, Missing, Proposer, Text, Window};
 use crate::{Core, Limits};
 use alloc::boxed::Box;
 use jig_domain_tasks as tasks;
-use skein_lib::{List, Map, Wall};
+use skein_lib::{List, Wall};
 
 pub use tasks::{Part, PartKey, PartKind};
 
@@ -301,23 +301,6 @@ pub struct Tree {
     pub rows: List<TreeRow>,
     pub folded: List<FoldedCount>,
     pub held_below: u32,
-    pub next: Option<Cursor>,
-}
-
-/// One live goal and its whole plan's progress, allotment and held count.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct GoalLine {
-    pub chip: Chip,
-    pub priority: u32,
-    pub phases: PhaseCounts,
-    pub budget: BudgetLine,
-    pub held_below: u32,
-}
-
-/// A page of goals ordered by priority and stable task number.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct Goals {
-    pub lines: List<GoalLine>,
     pub next: Option<Cursor>,
 }
 
@@ -878,91 +861,6 @@ pub(super) fn tree(core: &Core, limits: &Limits, party: u64, number: u64, window
     })
 }
 
-pub(super) fn goals(core: &Core, limits: &Limits, party: u64, project: u32, window: &Window) -> Result<Goals, Missing> {
-    if core.people.role(party, project).is_none() {
-        return Err(Missing::NotAllowed);
-    }
-    let mut order = Map::with_capacity(limits.tasks.tasks);
-    for candidate in core.tasks.view_tasks().as_ref() {
-        if candidate.project == project
-            && let Some(priority) = candidate.tracked
-        {
-            order.insert((priority, candidate.number), candidate.number).expect("bounded live goals");
-        }
-    }
-    let mut lines = List::with_capacity(window.rows);
-    let mut taking = window.after.is_none();
-    let mut last = None;
-    let mut more = false;
-    for (_, number) in &order {
-        if !taking {
-            if window.after == Some(Cursor::Number { number: *number }) {
-                taking = true;
-            }
-            continue;
-        }
-        if lines.room() == 0 {
-            more = true;
-            break;
-        }
-        let row = super::small::visible(core, party, *number)?;
-        let mut phases = PhaseCounts::ZERO;
-        let mut held_below = 0_u32;
-        match core.projections.get(number) {
-            Some(projection) => {
-                for task in &projection.plan {
-                    phases.add(&task.phase);
-                    if task.number != *number {
-                        match task.phase {
-                            tasks::Phase::Held { .. } => {
-                                held_below = held_below.checked_add(1).expect("bounded held census");
-                            }
-                            tasks::Phase::Waiting
-                            | tasks::Phase::Active(_)
-                            | tasks::Phase::Closing(_)
-                            | tasks::Phase::Ended(_) => {}
-                        }
-                    }
-                }
-            }
-            None => {
-                // During an uncompleted root decision, only live state exists.
-                for candidate in core.tasks.view_tasks().as_ref() {
-                    if descendant(core, candidate.number, *number, limits.tasks.depth) {
-                        let task = core.tasks.task(candidate.number).expect("indexed live task");
-                        phases.add(&task.phase);
-                        if candidate.number != *number {
-                            match task.phase {
-                                tasks::Phase::Held { .. } => {
-                                    held_below = held_below.checked_add(1).expect("bounded held census");
-                                }
-                                tasks::Phase::Waiting
-                                | tasks::Phase::Active(_)
-                                | tasks::Phase::Closing(_)
-                                | tasks::Phase::Ended(_) => {}
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        lines
-            .push(GoalLine {
-                chip: super::small::chip(core, limits, party, *number)?,
-                priority: row.tracked.expect("ordered goal"),
-                phases,
-                budget: budget(row),
-                held_below,
-            })
-            .expect("goal window room checked");
-        last = Some(Cursor::Number { number: *number });
-    }
-    if !taking {
-        return Err(Missing::Unknown);
-    }
-    Ok(Goals { lines, next: if more { last } else { None } })
-}
-
 pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     let text = u64::from(limits.text_bytes);
     let lines = u64::from(limits.lines);
@@ -1004,8 +902,7 @@ pub(super) fn overview_worst_case(limits: &super::DocumentLimits) -> Option<u64>
             rows.checked_mul(chip.checked_add(references)?.checked_add(List::<ProposalRef>::worst_case(1)?)?)?,
         )?
         .checked_add(List::<FoldedCount>::worst_case(1)?)?;
-    let goals = List::<GoalLine>::worst_case(limits.rows)?.checked_add(rows.checked_mul(chip)?)?;
-    Some(task.max(tree).max(goals))
+    Some(task.max(tree))
 }
 
 pub(super) fn grant_worst_case(limits: &super::DocumentLimits) -> Option<u64> {

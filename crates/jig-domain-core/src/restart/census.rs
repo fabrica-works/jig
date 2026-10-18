@@ -43,9 +43,6 @@ impl Census {
                 | tasks::Key::Milestone { .. }
                 | tasks::Key::Activity { .. }
                 | tasks::Key::Update { .. }
-                | tasks::Key::ConversationOldest { .. }
-                | tasks::Key::ConversationNewest { .. }
-                | tasks::Key::Goal { .. }
                 | tasks::Key::EndedByParty { .. }
                 | tasks::Key::EndedByProject { .. }
                 | tasks::Key::EndedDelegate { .. }

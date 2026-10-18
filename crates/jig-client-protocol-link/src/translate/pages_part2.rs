@@ -1,6 +1,6 @@
 //! Whole pages and single documents (protocol/client.md, 3 and 6).
 use super::{
-    Box, Limits, List, Reader, Wall, c, conversation_line_piece, cursor_fields, history_line_fields, inbox_entry_piece,
+    Box, Limits, List, Reader, Wall, c, cursor_fields, history_line_fields, inbox_entry_piece,
     owner_authority_document_fields, owner_chip_ending_fields, owner_history_change_fields,
     owner_message_proposal_kind_fields, owner_retained_action_fields, piece_problem, specification_document_fields,
     too_large, w,
@@ -238,26 +238,6 @@ pub(crate) fn inbox_page_fields(value: &w::InboxPage, limits: &Limits) -> Result
     Ok(c::InboxPage {
         cut: value.cut(),
         rows: inbox_entry_piece(value.rows(), limits, limits.client.rows)?,
-        before: opt0,
-        after: opt1,
-    })
-}
-
-pub(crate) fn conversation_page_fields(
-    value: &w::ConversationPage,
-    limits: &Limits,
-) -> Result<c::ConversationPage, w::Problem> {
-    let opt0 = match value.before() {
-        Some(item) => Some(cursor_fields(item, limits)?),
-        None => None,
-    };
-    let opt1 = match value.after() {
-        Some(item) => Some(cursor_fields(item, limits)?),
-        None => None,
-    };
-    Ok(c::ConversationPage {
-        cut: value.cut(),
-        rows: conversation_line_piece(value.rows(), limits, limits.client.rows)?,
         before: opt0,
         after: opt1,
     })

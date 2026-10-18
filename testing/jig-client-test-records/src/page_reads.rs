@@ -17,23 +17,6 @@ pub fn read_wire_inbox_page() -> w::InboxPage {
 }
 
 #[must_use]
-pub fn read_wire_conversation_page() -> w::ConversationPage {
-    let lim = w::CEILINGS;
-    w::ConversationPage::new(
-        &lim,
-        w::ConversationPageParts { cut: false, rows: Box::from([]), before: None, after: None },
-    )
-    .expect("literal fixture fits")
-}
-
-#[must_use]
-pub fn read_wire_goal_page() -> w::GoalPage {
-    let lim = w::CEILINGS;
-    w::GoalPage::new(&lim, w::GoalPageParts { cut: false, rows: Box::from([]), before: None, after: None })
-        .expect("literal fixture fits")
-}
-
-#[must_use]
 pub fn read_wire_spend_page() -> w::SpendPage {
     let lim = w::CEILINGS;
     w::SpendPage::new(&lim, w::SpendPageParts { cut: false, rows: Box::from([]), before: None, after: None })

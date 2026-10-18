@@ -1,8 +1,8 @@
 //! One in-flight document and a dirty mark per watch; contract.md, 7.
 use crate::{Engine, Invalid, Rows, Up, payload, reads::list};
 use jig_client_domain::contract::{
-    Call, Conversations, Delivery, Goals, Inbox, LiveCall, ObjectKey, OwnerRequester, Phase, ProvisionalTurnName, Read,
-    ReadValue, RunState, RunText, Subject, Tasks, Text, TurnName, WatchEnd, WatchEvent,
+    Call, Delivery, Inbox, LiveCall, ObjectKey, OwnerRequester, Phase, ProvisionalTurnName, Read, ReadValue, RunState,
+    RunText, Subject, Tasks, Text, TurnName, WatchEnd, WatchEvent,
 };
 use skein_lib::{Time, Token, Wall};
 
@@ -177,9 +177,6 @@ impl<A: crate::Application> Engine<A> {
         let tasks: Vec<u64> = match subject {
             Subject::Task { task } | Subject::Tree { task, .. } | Subject::Run { task, .. } => vec![*task],
             Subject::Chips { tasks } => tasks.iter().copied().collect(),
-            Subject::Goals { project } => {
-                return (!self.truth.visible(party, *project)).then_some(hidden);
-            }
             Subject::Tasks { query, .. } => {
                 if matches!(query.requester, Some(OwnerRequester::Deployment { .. })) {
                     return Some(WatchEnd::Unknown);
@@ -190,7 +187,7 @@ impl<A: crate::Application> Engine<A> {
                 };
             }
             Subject::Me => return (!self.truth.frames.contains_key(&party)).then_some(hidden),
-            Subject::Inbox { .. } | Subject::Conversations => return None,
+            Subject::Inbox { .. } => return None,
             Subject::Deployment => return (!self.read_visible(party, &Read::Deployment)).then_some(hidden),
         };
         for task in tasks {
@@ -259,32 +256,8 @@ impl<A: crate::Application> Engine<A> {
                     more: count < entries.len(),
                 }))
             }
-            Subject::Goals { project } => {
-                let Rows::Goals(rows) = self.rows_for(party, &Read::Goals { project: *project, after: None }) else {
-                    unreachable!("goal rows");
-                };
-                let rows: Vec<_> = rows.into_iter().filter(|line| !ended(line.chip.phase)).collect();
-                let count = rows.len().min(self.bounds.rows as usize);
-                Delivery::Goals(Box::new(Goals {
-                    project: *project,
-                    rows: list(&rows[..count]),
-                    more: count < rows.len(),
-                }))
-            }
-            Subject::Conversations => {
-                let Rows::Conversations(rows) = self.rows_for(party, &Read::Conversations { after: None }) else {
-                    unreachable!("conversation rows");
-                };
-                let live: Vec<_> = rows.into_iter().filter(|line| !ended(line.chip.phase)).collect();
-                let count = live.len().min(self.bounds.rows as usize);
-                Delivery::Conversations(Box::new(Conversations {
-                    rows: list(&live[..count]),
-                    more: count < live.len(),
-                    after: self.conversations_cursor(party),
-                }))
-            }
             Subject::Tasks { query, window } => {
-                let rows = self.task_lines(party, query)?;
+                let rows = self.task_lines(party, query);
                 let count = rows.len().min((*window).min(self.bounds.rows) as usize);
                 Delivery::Tasks(Box::new(Tasks { rows: list(&rows[..count]), more: count < rows.len() }))
             }
@@ -327,19 +300,7 @@ impl<A: crate::Application> Engine<A> {
                     }
                     doc.more = true;
                 }
-                Delivery::Goals(doc) => {
-                    if !shorten(&mut doc.rows) {
-                        return Err(WatchEnd::Busy);
-                    }
-                    doc.more = true;
-                }
                 Delivery::Tasks(doc) => {
-                    if !shorten(&mut doc.rows) {
-                        return Err(WatchEnd::Busy);
-                    }
-                    doc.more = true;
-                }
-                Delivery::Conversations(doc) => {
                     if !shorten(&mut doc.rows) {
                         return Err(WatchEnd::Busy);
                     }

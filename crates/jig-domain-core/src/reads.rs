@@ -25,8 +25,6 @@ pub mod ended;
 pub mod indexed;
 mod rows;
 pub use rows::row_key;
-mod cursors;
-pub use cursors::conversations_cursor;
 
 use crate::documents::{self, DocumentClock, Missing, Subject, Window};
 use crate::{Core, Held, Limits, Request, Requests};
@@ -59,10 +57,6 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
             Key::Tasks(TaskKey::EndedDelegate { requester, .. }) => requester == task,
             Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
         },
-        Scope::Goals { project } => match key {
-            Key::Tasks(TaskKey::Goal { project: owner, .. }) => owner == project,
-            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
-        },
         Scope::Spend { project } => match key {
             Key::Tasks(
                 TaskKey::Ledger(Funder::Period { project: owner, .. })
@@ -85,12 +79,6 @@ pub fn admits(party: u64, scope: &Scope, key: &crate::Key) -> bool {
         },
         Scope::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. } => match key {
             Key::Tasks(TaskKey::Update { party: owner, .. }) => *owner == party,
-            Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
-        },
-        Scope::Conversations => match key {
-            Key::Tasks(
-                TaskKey::ConversationNewest { party: owner, .. } | TaskKey::ConversationOldest { party: owner, .. },
-            ) => *owner == party,
             Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
         },
         Scope::Tasks { .. }
@@ -137,9 +125,7 @@ pub(crate) fn scope(read: &Read) -> Option<Scope> {
         Read::History { task, subtree, .. } => Some(Scope::History { task: *task, subtree: *subtree }),
         Read::Activity { task, .. } => Some(Scope::Activity { task: *task }),
         Read::Inbox { group, filter, .. } => Some(Scope::Inbox { group: *group, filter: *filter }),
-        Read::Conversations { .. } => Some(Scope::Conversations),
         Read::Tasks { query, .. } => Some(Scope::Tasks { query: *query }),
-        Read::Goals { project, .. } => Some(Scope::Goals { project: *project }),
         Read::Notes { project, .. } => Some(Scope::Notes { project: *project }),
         Read::ScopedNotes { scope, description, .. } => {
             Some(Scope::ScopedNotes { scope: scope.clone(), description: description.clone() })
@@ -154,9 +140,7 @@ fn cursor(read: &Read) -> Option<&Cursor> {
         Read::EndedDelegates { from, .. }
         | Read::History { from, .. }
         | Read::Inbox { from, .. }
-        | Read::Conversations { from }
         | Read::Tasks { ended: from, .. }
-        | Read::Goals { from, .. }
         | Read::Notes { from, .. }
         | Read::ScopedNotes { from, .. }
         | Read::Spend { from, .. } => from.as_ref(),
@@ -188,9 +172,7 @@ fn subject(read: &Read, party: u64) -> Option<Subject> {
         Read::Project { project } => Some(Subject::Project { project: *project }),
         Read::Deployment => Some(Subject::Deployment),
         Read::Inbox { .. } => Some(Subject::Inbox { party }),
-        Read::Conversations { .. } => Some(Subject::Conversations { party }),
         Read::Tasks { query, .. } => Some(Subject::Query { query: *query }),
-        Read::Goals { project, .. } => Some(Subject::Goals { project: *project }),
         Read::Application { .. }
         | Read::EndedDelegates { .. }
         | Read::History { .. }
@@ -205,7 +187,7 @@ fn subject(read: &Read, party: u64) -> Option<Subject> {
 
 fn backwards(scope: &Scope) -> bool {
     match scope {
-        Scope::Activity { .. } | Scope::Conversations | Scope::Escalation { .. } | Scope::Proposal { .. } => true,
+        Scope::Activity { .. } | Scope::Escalation { .. } | Scope::Proposal { .. } => true,
         Scope::Task { .. }
         | Scope::Question { .. }
         | Scope::PersonTask { .. }
@@ -220,7 +202,6 @@ fn backwards(scope: &Scope) -> bool {
         }
         | Scope::Inbox { group: Group::Updates | Group::Results | Group::Replies, .. }
         | Scope::Tasks { .. }
-        | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
         | Scope::Spend { .. } => false,
@@ -249,9 +230,7 @@ fn refused_application(reply: ReplyTo, read: &Read, why: Why) -> Requests {
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Inbox { .. }
-        | Read::Conversations { .. }
         | Read::Tasks { .. }
-        | Read::Goals { .. }
         | Read::Notes { .. }
         | Read::ScopedNotes { .. }
         | Read::Spend { .. }
@@ -294,9 +273,7 @@ pub(crate) fn start(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in:
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Inbox { .. }
-        | Read::Conversations { .. }
         | Read::Tasks { .. }
-        | Read::Goals { .. }
         | Read::Notes { .. }
         | Read::ScopedNotes { .. }
         | Read::Spend { .. }
@@ -330,9 +307,7 @@ fn bounded_query(read: &Read, limits: &Limits) -> bool {
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Inbox { .. }
-        | Read::Conversations { .. }
         | Read::Tasks { .. }
-        | Read::Goals { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
         | Read::Spend { .. }
@@ -345,23 +320,16 @@ struct ReadStart {
     after_live: Option<documents::Cursor>,
     after_store: Option<Position>,
     stored: bool,
-    live_before: Option<documents::Cursor>,
-    reverse_live: bool,
 }
 
 fn read_start(read: &Read, party: u64) -> Option<ReadStart> {
     if let Read::Tasks { ended: Some(cursor), .. } = read {
         match cursor {
             Cursor::Store { .. } => {}
-            Cursor::Live { .. }
-            | Cursor::ConversationsStart
-            | Cursor::ConversationsBefore { .. }
-            | Cursor::ConversationsLiveBefore { .. } => return None,
+            Cursor::Live { .. } => return None,
         }
     }
     let target = scope(read);
-    let mut live_before = None;
-    let mut reverse_live = false;
     let mut after_live = None;
     let mut after_store = None;
     let mut stored = false;
@@ -374,21 +342,6 @@ fn read_start(read: &Read, party: u64) -> Option<ReadStart> {
             after_live = Some(*after);
             after_store.clone_from(store_after);
         }
-        Some(Cursor::ConversationsBefore { before }) => {
-            if target != Some(Scope::Conversations) {
-                return None;
-            }
-            stored = true;
-            after_store = Some(before.clone());
-        }
-        Some(Cursor::ConversationsLiveBefore { before }) => {
-            if target != Some(Scope::Conversations) {
-                return None;
-            }
-            live_before = *before;
-            reverse_live = true;
-        }
-        Some(Cursor::ConversationsStart) if target != Some(Scope::Conversations) => return None,
         Some(Cursor::Store { scope, after }) => {
             if Some(scope) != target.as_ref() {
                 return None;
@@ -396,9 +349,9 @@ fn read_start(read: &Read, party: u64) -> Option<ReadStart> {
             stored = true;
             after_store.clone_from(after);
         }
-        Some(Cursor::ConversationsStart) | None => {}
+        None => {}
     }
-    Some(ReadStart { after_live, after_store, stored, live_before, reverse_live })
+    Some(ReadStart { after_live, after_store, stored })
 }
 
 fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, party: u64, read: Read) -> Requests {
@@ -422,10 +375,7 @@ fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, p
     {
         return terminal(reply, Answer::Tasks(tasks.take().expect("task page")));
     }
-    if start.reverse_live {
-        return terminal(reply, cursors::live_before(core, env, party, start.live_before.as_ref()));
-    }
-    let ReadStart { after_live, after_store, stored, live_before: _, reverse_live: _ } = start;
+    let ReadStart { after_live, after_store, stored } = start;
     if let Some(position) = &after_store
         && match &target {
             Some(scope) => !rows::position_allowed(scope, position),
@@ -470,14 +420,7 @@ fn start_jig(core: &mut Core, env: &Env<Limits>, reply: ReplyTo, sign_in: u64, p
     let range = Range {
         party,
         backwards: match cursor(&read) {
-            Some(Cursor::ConversationsBefore { .. }) => false,
-            Some(
-                Cursor::ConversationsLiveBefore { .. }
-                | Cursor::ConversationsStart
-                | Cursor::Live { .. }
-                | Cursor::Store { .. },
-            )
-            | None => backwards(&scope),
+            Some(Cursor::Live { .. } | Cursor::Store { .. }) | None => backwards(&scope),
         },
         scope,
         after: after_store,

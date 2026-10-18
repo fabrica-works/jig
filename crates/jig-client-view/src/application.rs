@@ -132,9 +132,7 @@ pub(crate) fn delivery(
         | Delivery::Task(_)
         | Delivery::Tree(_)
         | Delivery::OwnerTree(_)
-        | Delivery::Goals(_)
         | Delivery::Tasks(_)
-        | Delivery::Conversations(_)
         | Delivery::Run(_)
         | Delivery::RunState(_)
         | Delivery::Deployment(_)
@@ -192,8 +190,6 @@ pub(crate) fn read_result(
                 | ReadValue::Activity(_)
                 | ReadValue::Inbox(_)
                 | ReadValue::OwnerInbox(_)
-                | ReadValue::Conversations(_)
-                | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
                 | ReadValue::OwnerEnded(_)
                 | ReadValue::OwnerSpend(_)
@@ -223,8 +219,6 @@ fn key(what: &Read) -> Option<ObjectKey> {
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Inbox { .. }
-        | Read::Conversations { .. }
-        | Read::Goals { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Notes { .. }

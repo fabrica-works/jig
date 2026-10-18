@@ -57,13 +57,6 @@ impl Update {
     }
 }
 
-/// An ended chat kept in both conversation orders until it is forgotten.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Conversation {
-    pub party: u64,
-    pub task: u64,
-}
-
 /// Logical store `key` for task state or financial history, with no byte encoding performed
 /// in this child. (domain/tasks.md, section 2).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -112,18 +105,6 @@ pub enum Key {
         party: u64,
         position: u64,
     },
-    ConversationNewest {
-        party: u64,
-        task: Newest,
-    },
-    ConversationOldest {
-        party: u64,
-        task: u64,
-    },
-    Goal {
-        project: u32,
-        task: Newest,
-    },
     EndedDelegate {
         requester: u64,
         task: u64,
@@ -167,9 +148,6 @@ impl Key {
             | Self::Activity { .. }
             | Self::Update { .. }
             | Self::Result { .. }
-            | Self::ConversationNewest { .. }
-            | Self::ConversationOldest { .. }
-            | Self::Goal { .. }
             | Self::EndedByParty { .. }
             | Self::EndedByProject { .. }
             | Self::EndedDelegate { .. }
@@ -209,14 +187,6 @@ impl Endings {
         *count = count.saturating_add(1);
         self
     }
-}
-
-/// An ended tracked goal, with its own and its descendants' outcomes.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct GoalRow {
-    pub project: u32,
-    pub task: u64,
-    pub endings: Endings,
 }
 
 /// A requester-to-delegate edge retained until adoption (store.md 7.3).

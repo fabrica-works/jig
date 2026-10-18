@@ -265,19 +265,48 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
             changes: vec![
                 jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                     party: 7,
-                    read: Read::Conversations { after: None },
-                    rows: jig_client_scripted_engine::Rows::Conversations(vec![ConversationLine {
-                        cached_replies: 0,
-                        runtime: Some(task.context.as_ref().expect("supplied task context").runtime.clone()),
-                        delegates: 0,
-                        budget: task.budget.clone(),
-                        chip: task.chip.clone(),
+                    read: Read::Tasks {
+                        query: jig_client_view::queries::conversations(7, 1, None),
+                        live: None,
+                        ended: None,
+                    },
+                    rows: jig_client_scripted_engine::Rows::Tasks(vec![TaskLine {
+                        chip: {
+                            let mut chip = task.chip.clone();
+                            chip.title = DocumentText::complete(text(b"Hello"));
+                            chip
+                        },
                         project: 1,
-                        first_words: DocumentText::complete(text(b"Hello")),
-                        unread: Some(Count { value: 0, limited: false }),
-                        seen: 0,
-                        last_reply: 0,
-                        changed: Some(Wall::EPOCH),
+                        requester: jig_client_domain::contract::OwnerRequester::Person(1),
+                        tracked: None,
+                        label: 1,
+                        flags: jig_client_domain::contract::TaskFlags {
+                            conversation: true,
+                            listed: false,
+                            retention: jig_client_domain::contract::Retention::ForgottenOnceRead,
+                        },
+                        changed: Wall::EPOCH,
+                        last_activity: Wall::EPOCH,
+                        ended_at: None,
+                        budget: task.budget.clone(),
+                        waits_on: jig_client_domain::contract::WaitsOn::Nothing,
+                        phases: jig_client_domain::contract::OwnerPhaseCounts {
+                            waiting: 0,
+                            idle: 0,
+                            starting: 0,
+                            running: 0,
+                            backing_off: 0,
+                            closing: 0,
+                            held: 0,
+                            done: 0,
+                            failed: 0,
+                            cancelled: 0,
+                        },
+                        held_below: 0,
+                        conversation: Some(jig_client_domain::contract::ConversationRead {
+                            seen: 0,
+                            unread: Count { value: 0, limited: false },
+                        }),
                     }]),
                 }),
                 jig_client_scripted_engine::Change::Object {

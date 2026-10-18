@@ -424,26 +424,37 @@ fn full_frame_notices(words: &crate::words::Words, sized: &Limits) {
 }
 fn full_replies_notices(d: &mut Fixture, inbox: jig_client::Handle, words: &crate::words::Words, sized: &Limits) {
     let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
-    let reply = ConversationLine {
-        cached_replies: 0,
+    let reply = TaskLine {
         chip: full_chip(8),
         project: 4,
-        first_words: DocumentText::complete(full_text()),
-        unread: Some(Count { value: 2, limited: false }),
-        seen: 1,
-        last_reply: 3,
-        changed: Some(Wall::EPOCH),
-        runtime: Some(Runtime::Waiting {
-            dependencies: list([9, 10]),
-            hold: Some(Part::Resource { connector: 2, path: full_path() }),
-        }),
-        delegates: 0,
+        requester: OwnerRequester::Person(1),
+        tracked: None,
+        label: 1,
+        flags: TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead },
+        changed: Wall::EPOCH,
+        last_activity: Wall::EPOCH,
+        ended_at: None,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 10, spent: 10, spent_below: 0, reserved: 0 },
             left: 0,
             funder: Funder::Pool { project: 4, person: 1, period: 3 },
             deadline: None,
         },
+        waits_on: WaitsOn::Nothing,
+        phases: OwnerPhaseCounts {
+            waiting: 0,
+            idle: 0,
+            starting: 0,
+            running: 0,
+            backing_off: 0,
+            closing: 0,
+            held: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+        conversation: Some(ConversationRead { seen: 1, unread: Count { value: 2, limited: false } }),
     };
     let entry = InboxEntry {
         reply: Some(Box::new(reply)),

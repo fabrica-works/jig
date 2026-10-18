@@ -2,9 +2,9 @@
 use super::{held_chat, proposal_world, task, text};
 use crate::{Scripted, Test, World, test};
 use jig_client_domain::contract::{
-    self as c, Actor, ConversationLine, Count, DocumentText, Ending, Executor, InboxEntry, InboxGroup, InboxReadGroup,
-    Needs, ObjectKey, OwnerEscalation, OwnerRequester, PersonContract, PersonTask, Phase, Question, Read, ReadValue,
-    Recipient, ResultValue, Revision, Runtime,
+    self as c, Actor, Count, DocumentText, Ending, Executor, InboxEntry, InboxGroup, InboxReadGroup, Needs, ObjectKey,
+    OwnerEscalation, OwnerRequester, PersonContract, PersonTask, Phase, Question, Read, ReadValue, Recipient,
+    ResultValue, Revision, TaskLine,
 };
 use jig_client_scripted_engine::{Change, Rows, Source};
 use skein_lib::{Time, Wall};
@@ -30,7 +30,7 @@ pub fn inbox() -> World<Test, Scripted> {
     rows(&mut world, &reply);
     world
 }
-fn cards(world: &mut World<Test, Scripted>) -> ConversationLine {
+fn cards(world: &mut World<Test, Scripted>) -> TaskLine {
     let ReadValue::Task(held) = held_chat(91).front().engine.truth().objects[&ObjectKey::Task(9)].clone() else {
         panic!("held fixture is a task")
     };
@@ -93,21 +93,46 @@ fn cards(world: &mut World<Test, Scripted>) -> ConversationLine {
             .act(Time::ZERO, Wall::EPOCH, Change::Object { project: 1, key, value })
             .expect("golden object fits");
     }
-    ConversationLine {
-        runtime: Some(Runtime::Idle),
-        delegates: 0,
-        budget: task.budget,
-        chip: task.chip,
+    TaskLine {
+        chip: {
+            let mut chip = task.chip;
+            chip.title = DocumentText::complete(text(b"Hello"));
+            chip
+        },
         project: 1,
-        first_words: DocumentText::complete(text(b"Hello")),
-        unread: Some(Count { value: 1, limited: false }),
-        cached_replies: 1,
-        seen: 0,
-        last_reply: 1,
-        changed: Some(Wall::EPOCH),
+        requester: jig_client_domain::contract::OwnerRequester::Person(1),
+        tracked: None,
+        label: 1,
+        flags: jig_client_domain::contract::TaskFlags {
+            conversation: true,
+            listed: false,
+            retention: jig_client_domain::contract::Retention::ForgottenOnceRead,
+        },
+        changed: Wall::EPOCH,
+        last_activity: Wall::EPOCH,
+        ended_at: None,
+        budget: task.budget,
+        waits_on: jig_client_domain::contract::WaitsOn::Nothing,
+        phases: jig_client_domain::contract::OwnerPhaseCounts {
+            waiting: 0,
+            idle: 0,
+            starting: 0,
+            running: 0,
+            backing_off: 0,
+            closing: 0,
+            held: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+        conversation: Some(jig_client_domain::contract::ConversationRead {
+            seen: 0,
+            unread: Count { value: 1, limited: false },
+        }),
     }
 }
-fn rows(world: &mut World<Test, Scripted>, reply: &ConversationLine) {
+fn rows(world: &mut World<Test, Scripted>, reply: &TaskLine) {
     for group in [InboxReadGroup::Needs, InboxReadGroup::Updates] {
         let rows = [
             (InboxGroup::Questions, ObjectKey::Question { task: 9, message: 1 }),

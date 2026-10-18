@@ -240,15 +240,7 @@ fn read_value_cases_last(cases: &mut skein_lib::List<(w::ReadValue, c::ReadValue
             c::ReadValue::OwnerInbox(Box::new(read_value_owner_inbox_page())),
         ))
         .unwrap();
-    cases
-        .push((
-            w::ReadValue::Conversations(read_wire_conversation_page()),
-            c::ReadValue::Conversations(Box::new(read_value_conversation_page())),
-        ))
-        .unwrap();
-    cases
-        .push((w::ReadValue::Goals(read_wire_goal_page()), c::ReadValue::Goals(Box::new(read_value_goal_page()))))
-        .unwrap();
+
     cases
         .push((w::ReadValue::Spend(read_wire_spend_page()), c::ReadValue::Spend(Box::new(read_value_spend_page()))))
         .unwrap();

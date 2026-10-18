@@ -815,13 +815,10 @@ impl World {
                 | Stored::Milestone(_)
                 | Stored::History(_)
                 | Stored::Result(_)
-                | Stored::ConversationNewest(_)
-                | Stored::Goal(_)
                 | Stored::EndedByParty(_)
                 | Stored::EndedByProject(_)
                 | Stored::EndedDelegate(_)
                 | Stored::Delegate(_)
-                | Stored::ConversationOldest(_)
                 | Stored::Update(_)
                 | Stored::PersonProposal(_) => {}
             }
@@ -848,13 +845,10 @@ impl World {
             Stored::Ended(_)
             | Stored::Writer(_)
             | Stored::Result(_)
-            | Stored::ConversationNewest(_)
-            | Stored::Goal(_)
             | Stored::EndedByParty(_)
             | Stored::EndedByProject(_)
             | Stored::EndedDelegate(_)
             | Stored::Delegate(_)
-            | Stored::ConversationOldest(_)
             | Stored::Update(_)
             | Stored::Pool(_)
             | Stored::ClosedLedger(_)
@@ -894,13 +888,10 @@ impl World {
                 | Key::Activity { .. }
                 | Key::History { .. }
                 | Key::Result { .. }
-                | Key::ConversationNewest { .. }
-                | Key::Goal { .. }
                 | Key::EndedByParty { .. }
                 | Key::EndedByProject { .. }
                 | Key::EndedDelegate { .. }
                 | Key::Delegate { .. }
-                | Key::ConversationOldest { .. }
                 | Key::Update { .. }
                 | Key::PersonProposal(_) => None,
             })
@@ -962,13 +953,10 @@ impl World {
                 Stored::Ledger(_)
                 | Stored::Writer(_)
                 | Stored::Result(_)
-                | Stored::ConversationNewest(_)
-                | Stored::Goal(_)
                 | Stored::EndedByParty(_)
                 | Stored::EndedByProject(_)
                 | Stored::EndedDelegate(_)
                 | Stored::Delegate(_)
-                | Stored::ConversationOldest(_)
                 | Stored::Update(_)
                 | Stored::Pool(_)
                 | Stored::ClosedLedger(_)
@@ -1247,13 +1235,10 @@ fn live_row(record: &Stored) -> Option<&jig_domain_tasks::TaskRecord> {
         | Stored::Milestone(_)
         | Stored::Activity(_)
         | Stored::Result(_)
-        | Stored::ConversationNewest(_)
-        | Stored::Goal(_)
         | Stored::EndedByParty(_)
         | Stored::EndedByProject(_)
         | Stored::EndedDelegate(_)
         | Stored::Delegate(_)
-        | Stored::ConversationOldest(_)
         | Stored::Update(_)
         | Stored::ClosedLedger(_)
         | Stored::DecidedProposal(_) => None,

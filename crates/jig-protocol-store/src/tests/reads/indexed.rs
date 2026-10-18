@@ -93,27 +93,6 @@ fn subtree_range() -> reads::Range {
     fixtures::read(ALICE, reads::Scope::History { task: GOAL, subtree: true })
 }
 
-fn conversations_store() -> Store {
-    let mut store = fixtures::opened();
-    for task in [GOAL, CHILD, GRANDCHILD] {
-        keep(
-            &mut store,
-            &[
-                owner_at(task, task, PROJECT),
-                fixtures::conversation(ALICE, task),
-                fixtures::conversation_index(ALICE, task),
-            ],
-        );
-    }
-    store
-}
-
-fn conversations_range() -> reads::Range {
-    let mut range = fixtures::read(ALICE, reads::Scope::Conversations);
-    range.backwards = true;
-    range
-}
-
 #[test]
 fn ended_delegates_read_their_requesters_index() {
     let mut store = fixtures::opened();
@@ -192,37 +171,11 @@ fn an_inbox_filter_keeps_one_projects_rows() {
 }
 
 #[test]
-fn conversations_read_newest_first_from_the_index() {
-    let mut store = conversations_store();
-    let (rows, next) = page(load(&mut store, conversations_range()));
-    assert_eq!(
-        values(&rows).as_ref(),
-        [
-            fixtures::conversation(ALICE, GRANDCHILD),
-            fixtures::conversation(ALICE, CHILD),
-            fixtures::conversation(ALICE, GOAL)
-        ]
-    );
+fn ended_tasks_read_newest_first_from_the_index() {
+    let mut store = ended_store();
+    let (rows, next) = page(load(&mut store, ended_range()));
+    assert_eq!(values(&rows).as_ref(), [ended_party(GRANDCHILD), ended_party(CHILD), ended_party(GOAL)]);
     assert_eq!(owner_numbers(&rows).as_ref(), [GRANDCHILD, CHILD, GOAL]);
-    assert_eq!(next, None);
-}
-
-#[test]
-fn ended_goals_read_newest_first_with_their_counts() {
-    let mut store = fixtures::opened();
-    let counts = tasks::Endings { done: 2, failed: 3, cancelled: 4 };
-    for task in [GOAL, CHILD] {
-        keep(&mut store, &[owner_at(task, task, PROJECT), fixtures::goal_row(PROJECT, task, counts)]);
-    }
-    let (rows, next) = page(load(&mut store, fixtures::read(ALICE, reads::Scope::Goals { project: PROJECT })));
-    assert_eq!(
-        values(&rows).as_ref(),
-        [fixtures::goal_row(PROJECT, CHILD, counts), fixtures::goal_row(PROJECT, GOAL, counts)]
-    );
-    assert_eq!(owner_numbers(&rows).as_ref(), [CHILD, GOAL]);
-    for row in &rows {
-        assert!(row.linked.is_empty());
-    }
     assert_eq!(next, None);
 }
 
@@ -269,17 +222,17 @@ fn an_inbox_page_that_skipped_rows_goes_on_from_the_last_examined() {
 
 #[test]
 fn a_page_that_returned_none_within_its_bound_is_cut_not_ended() {
-    let mut store = conversations_store();
+    let mut store = ended_store();
     let number = store.stores.store.last().checked_add(1).expect("next fixture commit");
     fixtures::committed(
         &mut store,
         Box::new([fixtures::header(number), crate::Write::Erase(core::Key::Tasks(tasks::Key::Ended(GRANDCHILD)))]),
     );
-    let mut range = conversations_range();
+    let mut range = ended_range();
     range.rows = 1;
     let (rows, next) = page(load(&mut store, range.clone()));
     assert!(rows.is_empty());
-    assert_eq!(next, Some(position(fixtures::conversation(ALICE, GRANDCHILD))));
+    assert_eq!(next, Some(position(ended_party(GRANDCHILD))));
     range.after = next;
     let (rows, _next) = page(load(&mut store, range));
     assert_eq!(owner_numbers(&rows).as_ref(), [CHILD]);
@@ -301,22 +254,22 @@ fn a_subtree_history_page_moves_from_one_task_to_the_next() {
 
 #[test]
 fn an_index_join_cut_keeps_its_accepted_prefix() {
-    let mut store = conversations_store();
+    let mut store = ended_store();
     store.limits.joins = 3;
-    let (rows, next) = page(load(&mut store, conversations_range()));
+    let (rows, next) = page(load(&mut store, ended_range()));
     assert_eq!(owner_numbers(&rows).as_ref(), [GRANDCHILD]);
-    assert_eq!(next, Some(position(fixtures::conversation(ALICE, GRANDCHILD))));
+    assert_eq!(next, Some(position(ended_party(GRANDCHILD))));
 }
 
 #[test]
 fn an_index_byte_cut_keeps_its_accepted_prefix() {
-    let mut store = conversations_store();
-    let (rows, _next) = page(load(&mut store, conversations_range()));
-    let mut range = conversations_range();
+    let mut store = ended_store();
+    let (rows, _next) = page(load(&mut store, ended_range()));
+    let mut range = ended_range();
     range.bytes = rows.first().unwrap().owned_bytes().unwrap();
     let (rows, next) = page(load(&mut store, range));
     assert_eq!(owner_numbers(&rows).as_ref(), [GRANDCHILD]);
-    assert_eq!(next, Some(position(fixtures::conversation(ALICE, GRANDCHILD))));
+    assert_eq!(next, Some(position(ended_party(GRANDCHILD))));
 }
 
 #[test]
@@ -328,20 +281,6 @@ fn inbox_goal_filters_select_on_the_joined_ancestry() {
     filter.goal = Some(GOAL);
     let (rows, next) = page(load(&mut store, range));
     assert_eq!(owner_numbers(&rows).as_ref(), [CHILD, GOAL]);
-    assert_eq!(next, None);
-}
-
-#[test]
-fn conversations_before_reads_the_oldest_family_for_its_direction() {
-    let mut store = conversations_store();
-    let mut range = conversations_range();
-    range.backwards = false;
-    range.after = Some(position(fixtures::conversation_index(ALICE, GOAL)));
-    let (rows, next) = page(load(&mut store, range));
-    assert_eq!(
-        values(&rows).as_ref(),
-        [fixtures::conversation_index(ALICE, CHILD), fixtures::conversation_index(ALICE, GRANDCHILD)]
-    );
     assert_eq!(next, None);
 }
 
@@ -461,4 +400,27 @@ fn an_ended_query_joins_its_requesters_position_for_another_reader() {
     assert_eq!(owner_numbers(&rows).as_ref(), [GRANDCHILD, GOAL]);
     assert_eq!(rows[1].ended_read, Some(2));
     assert_eq!(next, None);
+}
+
+fn ended_store() -> Store {
+    let mut store = fixtures::opened();
+    for task in [GOAL, CHILD, GRANDCHILD] {
+        keep(&mut store, &[owner_at(task, task, PROJECT), ended_party(task)]);
+    }
+    store
+}
+
+fn ended_range() -> reads::Range {
+    let mut range = fixtures::read(ALICE, reads::Scope::Tasks { query: task_query() });
+    range.backwards = true;
+    range
+}
+
+fn ended_party(task: u64) -> core::Record {
+    core::Record::Tasks(tasks::Stored::EndedByParty(tasks::EndedByParty {
+        party: ALICE,
+        label: 2,
+        ended_at: skein_lib::Wall::from_nanos(task),
+        task,
+    }))
 }

@@ -1,7 +1,7 @@
 //! Whole Inbox owner facts and parallel original selection context
 //! (client/domain/contract.md, 5–7). Neither row membership nor ancestry is
 //! reconstructed here; native reads retain their original query separately.
-use super::{owner, reads, results, rows};
+use super::{owner, reads, results};
 use jig_client_domain::contract as client;
 use jig_client_view::Limits;
 use jig_domain_core::documents;
@@ -37,7 +37,7 @@ pub fn cursor(value: documents::Cursor) -> client::OwnerInboxCursor {
 /// Refuses a whole linked chip or optional reply above the receiving bounds.
 pub fn entry(value: &documents::InboxEntry, limits: &Limits) -> Result<client::OwnerInboxEntry, owner::Invalid> {
     Ok(client::OwnerInboxEntry {
-        reply: value.reply.as_ref().map(|value| rows::conversation(value, limits).map(Box::new)).transpose()?,
+        reply: value.reply.as_ref().map(|value| super::queries::line(value, limits).map(Box::new)).transpose()?,
         task: results::link(&value.task, limits)?,
         project: value.project,
         object: object(value.object),
@@ -127,7 +127,7 @@ pub(crate) mod tests {
             goals.push(0).expect("original root");
             selection.push(documents::InboxSelection { cursor, goals }).expect("context");
             let value = documents::InboxEntry {
-                reply: if index == 5 { Some(Box::new(rows::tests::conversation_source())) } else { None },
+                reply: if index == 5 { Some(Box::new(super::super::rows::tests::task_source())) } else { None },
                 task: documents::TaskLink::Stored { number: u64::MAX, status: None },
                 project: None,
                 object,
@@ -185,10 +185,9 @@ pub(crate) mod tests {
             assert_eq!(value.goals.iter().copied().collect::<Vec<_>>(), vec![u64::MAX, 0]);
         }
         let reply = copied.updates.get(0).expect("reply row").reply.as_ref().expect("whole reply");
-        assert!(reply.first_words.cut);
-        assert_eq!(reply.first_words.bytes.bytes(), UTF8_WORDS);
-        assert_eq!((&reply.runtime, reply.changed, reply.unread), (&None, None, None));
-        assert_eq!((reply.cached_replies, reply.seen, reply.last_reply), (u32::MAX, u64::MAX, 0));
+        assert!(reply.chip.title.cut);
+        assert_eq!(reply.chip.title.bytes.bytes(), UTF8_WORDS);
+        assert_eq!(reply.conversation, None);
         assert_eq!(
             reply.budget,
             owner::budget(

@@ -126,9 +126,7 @@ pub(crate) mod tests {
             | reads::Scope::History { .. }
             | reads::Scope::Activity { .. }
             | reads::Scope::Inbox { .. }
-            | reads::Scope::Conversations
             | reads::Scope::Tasks { .. }
-            | reads::Scope::Goals { .. }
             | reads::Scope::Notes { .. }
             | reads::Scope::ScopedNotes { .. } => panic!("one of the two historical scopes"),
         };
@@ -300,10 +298,10 @@ pub(crate) mod tests {
         assert_eq!(translate(source, &Limits { rows: 7, ..l }), Err(Invalid::Owner(owner::Invalid::TooLarge)));
         assert_eq!(translate(source, &Limits { text: 1, ..l }), Err(Invalid::Cursor));
         let mut wrong = source.clone();
-        wrong.before = Some(reads::Cursor::ConversationsStart);
+        wrong.before = Some(reads::Cursor::Store { scope: reads::Scope::Activity { task: 0 }, after: None });
         assert_eq!(translate(&wrong, &l), Err(Invalid::Identity));
         wrong = source.clone();
-        wrong.next = Some(reads::Cursor::ConversationsStart);
+        wrong.next = Some(reads::Cursor::Store { scope: reads::Scope::Activity { task: 0 }, after: None });
         assert_eq!(translate(&wrong, &l), Err(Invalid::Identity));
         wrong = source.clone();
         *wrong.rows.get_mut(0).expect("first selected row") = reads::PageRow::Spend(tasks::FundingRecord {

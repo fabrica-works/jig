@@ -46,8 +46,6 @@ fn retained(source: reads::Page, what: &client::Read, wrong: client::Read) {
         | client::Read::History { .. }
         | client::Read::Activity { .. }
         | client::Read::Inbox { .. }
-        | client::Read::Conversations { .. }
-        | client::Read::Goals { .. }
         | client::Read::Project { .. }
         | client::Read::Notes { .. }
         | client::Read::Deployment => panic!("one of the two original histories"),

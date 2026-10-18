@@ -1,24 +1,8 @@
 //! Whole pages and single documents (protocol/client.md, 3 and 6).
 use super::{
-    Limits, List, Reader, Wall, budget_fields, c, chip_fields, cursor_fields, goal_line_piece, offered_piece,
-    piece_problem, result_fields, too_large, w,
+    Limits, List, Reader, Wall, budget_fields, c, chip_fields, cursor_fields, offered_piece, piece_problem,
+    result_fields, too_large, w,
 };
-pub(crate) fn goal_page_fields(value: &w::GoalPage, limits: &Limits) -> Result<c::GoalPage, w::Problem> {
-    let opt0 = match value.before() {
-        Some(item) => Some(cursor_fields(item, limits)?),
-        None => None,
-    };
-    let opt1 = match value.after() {
-        Some(item) => Some(cursor_fields(item, limits)?),
-        None => None,
-    };
-    Ok(c::GoalPage {
-        cut: value.cut(),
-        rows: goal_line_piece(value.rows(), limits, limits.client.rows)?,
-        before: opt0,
-        after: opt1,
-    })
-}
 
 pub(crate) fn pool_fields(value: &w::Pool, limits: &Limits) -> c::Pool {
     c::Pool { party: value.party(), period: value.period(), budget: budget_fields(value.budget(), limits) }

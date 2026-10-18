@@ -128,13 +128,10 @@ fn facts(rows: &BTreeMap<root::Key, root::Record>) -> (BTreeSet<CardKey>, WordIm
                 | tasks::Stored::Ledger(_)
                 | tasks::Stored::Writer(_)
                 | tasks::Stored::Result(_)
-                | tasks::Stored::ConversationNewest(_)
-                | tasks::Stored::Goal(_)
                 | tasks::Stored::EndedByParty(_)
                 | tasks::Stored::EndedByProject(_)
                 | tasks::Stored::EndedDelegate(_)
                 | tasks::Stored::Delegate(_)
-                | tasks::Stored::ConversationOldest(_)
                 | tasks::Stored::Update(_)
                 | tasks::Stored::Pool(_)
                 | tasks::Stored::ClosedLedger(_) => {}

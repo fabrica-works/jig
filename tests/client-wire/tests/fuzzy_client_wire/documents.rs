@@ -35,10 +35,8 @@ fn records_1(bytes: &[u8]) {
     check!(Task, bytes);
     check!(TreeNode, bytes);
     check!(Tree, bytes);
-    check!(ReplyPosition, bytes);
+    check!(ReadPosition, bytes);
     check!(Inbox, bytes);
-    check!(Conversations, bytes);
-    check!(Goals, bytes);
     check!(TaskQuery, bytes);
     check!(WaitsOn, bytes);
     check!(ConversationRead, bytes);
@@ -127,7 +125,6 @@ fn records_3(bytes: &[u8]) {
     check!(SubjectTree, bytes);
     check!(SubjectChips, bytes);
     check!(SubjectInbox, bytes);
-    check!(SubjectGoals, bytes);
     check!(SubjectTasks, bytes);
     check!(SubjectRun, bytes);
 }

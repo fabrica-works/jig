@@ -48,8 +48,6 @@ pub fn read_with_codec(
                 client::Read::Notes { scope, description, .. } => {
                     wire::pages::notes_page(scope, description.as_ref(), value, limits)
                 }
-                client::Read::Conversations { .. } => wire::pages::conversations_page(value, limits),
-                client::Read::Goals { project, .. } => wire::pages::goals_page(*project, value, limits),
                 client::Read::Inbox { .. } => wire::pages::inbox_page(what, value, limits),
                 client::Read::History { task, subtree, .. } => {
                     wire::pages::history_page(*task, *subtree, value, limits)
@@ -112,12 +110,9 @@ pub fn read_with_codec(
             documents::Document::Chips(_)
             | documents::Document::Run(_)
             | documents::Document::Tree(_)
-            | documents::Document::Goals(_)
             | documents::Document::Lines(_)
-            | documents::Document::Tasks(_)
             | documents::Document::Note(_)
-            | documents::Document::Inbox(_)
-            | documents::Document::Conversations(_) => return Err(Invalid::PendingValue),
+            | documents::Document::Inbox(_) => return Err(Invalid::PendingValue),
         },
         reads::Answer::Historical(value) => {
             client::ReadResult::Value(wire::historical::read(what, value, limits).map_err(Invalid::Historical)?)

@@ -5,7 +5,7 @@ use skein_lib::List;
 use crate::payload::{self, Payload};
 use core::mem::size_of;
 
-fn page_values(capacity: u32, cut: bool) -> [ReadValue; 8] {
+fn page_values(capacity: u32, cut: bool) -> [ReadValue; 6] {
     let before = Some(Cursor::new(Box::from(UTF8_TEXTS[0]), 1024).expect("bounded opaque cursor"));
     let after = Some(Cursor::new(Box::from(b"after/opaque".as_slice()), 1024).expect("bounded opaque cursor"));
     [
@@ -28,18 +28,6 @@ fn page_values(capacity: u32, cut: bool) -> [ReadValue; 8] {
             after: after.clone(),
         })),
         ReadValue::Inbox(Box::new(InboxPage {
-            cut,
-            rows: List::with_capacity(capacity),
-            before: before.clone(),
-            after: after.clone(),
-        })),
-        ReadValue::Conversations(Box::new(ConversationPage {
-            cut,
-            rows: List::with_capacity(capacity),
-            before: before.clone(),
-            after: after.clone(),
-        })),
-        ReadValue::Goals(Box::new(GoalPage {
             cut,
             rows: List::with_capacity(capacity),
             before: before.clone(),

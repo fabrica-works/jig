@@ -34,22 +34,6 @@ pub fn writing() -> v::Writing {
 pub fn run_writing() -> d::Run {
     d::Run { task: 7, attempt: Some(31), committed_turn: 2, writing: Some(writing()), call: Some(current_call()) }
 }
-pub fn conversation() -> d::ConversationLine {
-    d::ConversationLine {
-        chip: chip(),
-        project: 7,
-        first_words: d::Text { bytes: Box::from("é".as_bytes()), cut: true },
-        seen: 11,
-        last_reply: 13,
-        replies_unread: Some(d::Count::AtLeast(17)),
-        cached_replies: 19,
-        delegates: 23,
-        budget: budget(),
-    }
-}
-pub fn conversations() -> d::Conversations {
-    d::Conversations { lines: list([conversation()]), next: Some(d::Cursor::Number { number: 7 }) }
-}
 pub fn phase_counts() -> d::PhaseCounts {
     d::PhaseCounts {
         waiting: 1,
@@ -62,18 +46,6 @@ pub fn phase_counts() -> d::PhaseCounts {
         done: 8,
         failed: 9,
         cancelled: 10,
-    }
-}
-pub fn goals() -> d::Goals {
-    d::Goals {
-        lines: list([d::GoalLine {
-            chip: chip(),
-            priority: 11,
-            phases: phase_counts(),
-            budget: budget(),
-            held_below: 13,
-        }]),
-        next: Some(d::Cursor::Number { number: 7 }),
     }
 }
 pub fn tasks_document() -> d::Lines {
@@ -130,7 +102,7 @@ pub fn inbox_cursor() -> d::Cursor {
 }
 pub fn inbox_entry() -> d::InboxEntry {
     d::InboxEntry {
-        reply: Some(Box::new(conversation())),
+        reply: Some(Box::new(tasks_document().lines.get(0).expect("fixture line").clone())),
         task: d::TaskLink::Stored { number: 7, status: Some(t::Status::Failed) },
         project: Some(7),
         object: d::InboxObject::Reply { message: 11 },

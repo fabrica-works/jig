@@ -4,7 +4,6 @@ use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use std::collections::BTreeMap;
 mod delegates;
-mod goals;
 pub(super) type Store = jig_fake_store::Store<root::Key, root::Record>;
 fn owner(store: &Store, number: u64) -> Option<&tasks::TaskRecord> {
     for kind in [tasks::Key::Live(number), tasks::Key::Ended(number)] {
@@ -72,20 +71,6 @@ fn joined_row(
         linked: linked.into_values().collect(),
         inbox: None,
     }
-}
-
-fn conversation_row(store: &Store, range: &reads::Range, value: &core::Record) -> Option<reads::Row> {
-    let conversation = match value {
-        core::Record::Tasks(tasks::Stored::ConversationNewest(row)) if range.backwards => row,
-        core::Record::Tasks(tasks::Stored::ConversationOldest(row)) if !range.backwards => row,
-        core::Record::Core(_) | core::Record::Tasks(_) | core::Record::People(_) | core::Record::Notes(_) => {
-            return None;
-        }
-    };
-    if conversation.party != range.party {
-        return None;
-    }
-    Some(row(store, value, owner(store, conversation.task)?))
 }
 
 fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Option<reads::Row> {
@@ -162,8 +147,6 @@ fn candidate(store: &Store, range: &reads::Range, value: &core::Record) -> Optio
             })
         }
         reads::Scope::EndedDelegates { task } => delegates::candidate(store, *task, value),
-        reads::Scope::Goals { project } => goals::candidate(store, *project, value),
-        reads::Scope::Conversations => conversation_row(store, range, value),
         reads::Scope::Turn { task, attempt, turn } => {
             let core::Record::Core(core::CoreRecord::Turn(line)) = value else { return None };
             if line.task != *task || line.attempt != *attempt || line.turn != *turn {
@@ -235,9 +218,7 @@ fn point(store: &Store, scope: &reads::Scope) -> Option<reads::Row> {
         | reads::Scope::History { .. }
         | reads::Scope::Activity { .. }
         | reads::Scope::Inbox { .. }
-        | reads::Scope::Conversations
         | reads::Scope::Tasks { .. }
-        | reads::Scope::Goals { .. }
         | reads::Scope::Notes { .. }
         | reads::Scope::ScopedNotes { .. }
         | reads::Scope::Spend { .. } => return None,
@@ -308,7 +289,7 @@ fn bounded_page(range: &reads::Range, rows: Vec<reads::Row>) -> reads::Loaded {
         .into_iter()
         .filter(|(position, _)| match &range.after {
             Some(after) => {
-                if range.backwards && range.scope != reads::Scope::Conversations {
+                if range.backwards {
                     position < after
                 } else {
                     position > after
@@ -317,7 +298,7 @@ fn bounded_page(range: &reads::Range, rows: Vec<reads::Row>) -> reads::Loaded {
             None => true,
         })
         .collect();
-    if range.backwards && range.scope != reads::Scope::Conversations {
+    if range.backwards {
         candidates.reverse();
     }
     let mut rows = Vec::new();
@@ -366,17 +347,6 @@ fn index_bounds(range: &reads::Range) -> Option<(root::Key, root::Key)> {
             ))
         }
         reads::Scope::EndedDelegates { task } => Some(delegates::bounds(task, true)),
-        reads::Scope::Goals { project } => Some(goals::bounds(project)),
-        reads::Scope::Conversations => {
-            let key = |number| {
-                root::Key::Core(core::Key::Tasks(if range.backwards {
-                    tasks::Key::ConversationNewest { party: range.party, task: tasks::Newest::from_raw(number) }
-                } else {
-                    tasks::Key::ConversationOldest { party: range.party, task: number }
-                }))
-            };
-            Some((key(0), key(u64::MAX)))
-        }
         reads::Scope::Task { .. }
         | reads::Scope::Proposal { .. }
         | reads::Scope::Escalation { .. }

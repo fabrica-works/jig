@@ -58,14 +58,6 @@ pub fn read(read: &c::Read, limits: &w::Limits) -> Result<w::Read, w::Problem> {
                 after: cursor(after.as_ref(), limits)?,
             },
         )?),
-        c::Read::Conversations { after } => w::Read::Conversations(w::ReadConversations::new(
-            limits,
-            w::ReadConversationsParts { after: cursor(after.as_ref(), limits)? },
-        )?),
-        c::Read::Goals { project, after } => w::Read::Goals(w::ReadGoals::new(
-            limits,
-            w::ReadGoalsParts { project: *project, after: cursor(after.as_ref(), limits)? },
-        )?),
         c::Read::Spend { project, after } => w::Read::Spend(w::ReadSpend::new(
             limits,
             w::ReadSpendParts { project: *project, after: cursor(after.as_ref(), limits)? },
@@ -190,10 +182,6 @@ pub fn value(bytes: &[u8], limits: &Limits) -> Result<c::ReadValue, Undecodable>
         w::ReadValue::OwnerInbox(record) => {
             c::ReadValue::OwnerInbox(Box::new(pages::owner_inbox_page(record, limits)?))
         }
-        w::ReadValue::Conversations(record) => {
-            c::ReadValue::Conversations(Box::new(pages::conversation_page(record, limits)?))
-        }
-        w::ReadValue::Goals(record) => c::ReadValue::Goals(Box::new(pages::goal_page(record, limits)?)),
         w::ReadValue::Spend(record) => c::ReadValue::Spend(Box::new(pages::spend_page(record, limits)?)),
         w::ReadValue::OwnerSpend(record) => {
             c::ReadValue::OwnerSpend(Box::new(pages::owner_spend_page(record, limits)?))

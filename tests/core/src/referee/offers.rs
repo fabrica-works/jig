@@ -80,9 +80,7 @@ impl Referee {
             | Document::Chips(_)
             | Document::Run(_)
             | Document::Tree(_)
-            | Document::Goals(_)
             | Document::Lines(_)
-            | Document::Tasks(_)
             | Document::Proposal(_)
             | Document::Question(_)
             | Document::PersonTask(_)
@@ -90,7 +88,6 @@ impl Referee {
             | Document::Project(_)
             | Document::Note(_)
             | Document::Inbox(_)
-            | Document::Conversations(_)
             | Document::Deployment(_) => None,
         };
         self.documents.insert(number, Received { party, subject, at: self.made, offers: offers.clone(), task });
@@ -177,19 +174,14 @@ fn offers(value: &Document) -> Option<&List<Offered>> {
         | Document::Chips(_)
         | Document::Run(_)
         | Document::Tree(_)
-        | Document::Goals(_)
         | Document::Lines(_)
-        | Document::Tasks(_)
         | Document::Inbox(_)
-        | Document::Conversations(_)
         | Document::Deployment(_) => return None,
     })
 }
 
 fn fits(received: &Subject, request: &Subject) -> bool {
     received == request
-        || matches!((received, request),
-        (Subject::Project { project: a }, Subject::Goals { project: b }) if a == b)
 }
 fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
     Some(match ask {
@@ -225,7 +217,7 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
         people::Ask::Cancel { task, .. } => (Act::Cancel, Subject::Task { task: *task }),
         people::Ask::Close { chat, .. } => (Act::Close, Subject::Task { task: *chat }),
         people::Ask::Move { task, .. } => (Act::Move, Subject::Task { task: *task }),
-        people::Ask::Prioritise { project, .. } => (Act::Prioritise, Subject::Goals { project: *project }),
+        people::Ask::Prioritise { project, .. } => (Act::Prioritise, Subject::Project { project: *project }),
         people::Ask::MarkSeen { seen: people::Seen::Chat { task, .. } } => (Act::Seen, Subject::Task { task: *task }),
         people::Ask::EditNote { name, change, .. } => (
             match &**change {
@@ -268,9 +260,7 @@ fn read_subject(read: &core::reads::Read) -> Option<Subject> {
         | core::reads::Read::History { .. }
         | core::reads::Read::Activity { .. }
         | core::reads::Read::Inbox { .. }
-        | core::reads::Read::Conversations { .. }
         | core::reads::Read::Tasks { .. }
-        | core::reads::Read::Goals { .. }
         | core::reads::Read::Notes { .. }
         | core::reads::Read::ScopedNotes { .. }
         | core::reads::Read::Spend { .. } => None,

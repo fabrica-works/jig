@@ -156,8 +156,6 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.runtime_backing_off_reason = client.text;
     wire.inbox_entry_lineage = u32::try_from(client.document_bytes).ok()?;
     wire.inbox_page_rows = u32::try_from(client.document_bytes).ok()?;
-    wire.conversation_page_rows = u32::try_from(client.document_bytes).ok()?;
-    wire.goal_page_rows = u32::try_from(client.document_bytes).ok()?;
     wire.spend_period_pools = client.rows;
     wire.spend_period_tasks = u32::try_from(client.document_bytes).ok()?;
     wire.spend_page_rows = u32::try_from(client.document_bytes).ok()?;

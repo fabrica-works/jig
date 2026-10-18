@@ -235,7 +235,7 @@ impl Parties {
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row)))) => {
                     query_subject(&consumer.subject, row)
                         || task_subject(&consumer.subject, row.number)
-                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project } | Subject::Tasks { project, .. }) if *project == row.project)
+                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project }) if *project == row.project)
                         || match row.requester {
                             tasks::Party::Person(party) => party_subject(&consumer.subject, party),
                             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => false,
@@ -244,7 +244,7 @@ impl Parties {
                 root::Write::Save(root::Record::Core(core::Record::Tasks(tasks::Stored::Ended(row)))) => {
                     query_subject(&consumer.subject, row)
                         || task_subject(&consumer.subject, row.number)
-                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project } | Subject::Tasks { project, .. }) if *project == row.project)
+                        || matches!(&consumer.subject, Watched::Jig(Subject::Project { project }) if *project == row.project)
                         || match row.requester {
                             tasks::Party::Person(party) => party_subject(&consumer.subject, party),
                             tasks::Party::Task(_) | tasks::Party::Deployment { .. } => false,
@@ -338,18 +338,11 @@ impl Parties {
                     Document::Escalation(row) => {
                         self.task_projects.insert(row.task.chip.number, row.task.project);
                     }
-                    Document::Tasks(value) => {
-                        for line in &value.rows {
-                            self.task_projects.insert(line.chip.number, value.project);
-                        }
-                    }
                     Document::Lines(_)
                     | Document::Frame(_)
                     | Document::Tree(_)
                     | Document::Chips(_)
                     | Document::Inbox(_)
-                    | Document::Goals(_)
-                    | Document::Conversations(_)
                     | Document::Run(_)
                     | Document::Deployment(_)
                     | Document::Question(_)
@@ -450,10 +443,7 @@ fn task_subject(watched: &Watched, task: u64) -> bool {
         Subject::Chips { tasks } => tasks.as_slice().contains(&task),
         Subject::Frame { .. }
         | Subject::Inbox { .. }
-        | Subject::Goals { .. }
         | Subject::Query { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
         | Subject::Deployment
         | Subject::Proposal { proposer: core::documents::Proposer::Party(_), .. }
         | Subject::Project { .. }
@@ -472,9 +462,7 @@ fn project_subject(
         return false;
     };
     match subject {
-        Subject::Project { project: owned }
-        | Subject::Goals { project: owned }
-        | Subject::Tasks { project: owned, .. } => *owned == project,
+        Subject::Project { project: owned } => *owned == project,
         Subject::Query { query } => query.project == Some(project),
         Subject::Note { .. } => true,
         Subject::Task { task }
@@ -491,11 +479,7 @@ fn project_subject(
             proposals.get(number) == Some(&project)
         }
         Subject::Chips { tasks: watched } => watched.iter().any(|task| tasks.get(task) == Some(&project)),
-        Subject::Frame { .. }
-        | Subject::Inbox { .. }
-        | Subject::Conversations { .. }
-        | Subject::Deployment
-        | Subject::Application { .. } => false,
+        Subject::Frame { .. } | Subject::Inbox { .. } | Subject::Deployment | Subject::Application { .. } => false,
     }
 }
 
@@ -522,10 +506,7 @@ fn party_subject(watched: &Watched, party: u64) -> bool {
         | Subject::Tree { .. }
         | Subject::Run { .. }
         | Subject::Chips { .. }
-        | Subject::Goals { .. }
         | Subject::Query { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }
         | Subject::Escalation { .. }
@@ -614,10 +595,7 @@ pub(crate) fn named_subject(value: &core::documents::Watched, party: u64) -> Sub
         W::Tree { task } => Subject::Tree { task: *task },
         W::Chips { tasks } => Subject::Chips { tasks: tasks.clone() },
         W::Inbox => Subject::Inbox { party },
-        W::Goals { project } => Subject::Goals { project: *project },
-        W::Tasks { project, filter } => Subject::Tasks { project: *project, filter: *filter },
         W::Query { query } => Subject::Query { query: *query },
-        W::Conversations => Subject::Conversations { party },
         W::Run { task } => Subject::Run { task: *task },
         W::Deployment => Subject::Deployment,
     }

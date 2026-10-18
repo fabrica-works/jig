@@ -215,13 +215,11 @@ record AnswerLine { task: u64 position: u64 }
 record QuestionLine { message: u64 line: u64 answer: option AnswerLine }
 record ProposalRow { proposal: u64 revision: u64 }
 record Endings { done: u32 failed: u32 cancelled: u32 }
-record GoalRow { project: u32 task: u64 endings: Endings }
 record ReplyObject { message: u64 activity: u64 }
 record ProposalUpdate { proposal: u64 }
 enum UpdateObject { result, reply: ReplyObject, proposal: ProposalUpdate }
 record Update { party: u64 at: u64 task: u64 object: UpdateObject }
 record ResultRow { party: u64 position: u64 task: u64 }
-record Conversation { party: u64 task: u64 }
 record Edge { requester: u64 task: u64 }
 record TranscriptState { ever_turned: bool }
 record TaskHistory {
@@ -305,7 +303,7 @@ record TaskOutcome {
 record TaskRecord { history: TaskHistory run: TaskRun definition: TaskDefinition interests: TaskInterests outcome: TaskOutcome }
 record EndedByParty { party: u64 label: u32 ended_at: u64 task: u64 }
 record EndedByProject { project: u32 label: u32 ended_at: u64 task: u64 }
-enum Value { ledger: FundingRecord, closed_ledger: FundingRecord, writer: WriterSlot, pool: PoolSlots, history: boxed History, milestone: Milestone, person_proposal: PersonProposal, decided_proposal: PersonProposal, activity: ActivityLine, live: TaskRecord, ended: TaskRecord, stub: Stub, update: Update, result: ResultRow, conversation_newest: Conversation, conversation_oldest: Conversation, goal: GoalRow, ended_delegate: Edge, delegate: Edge, ended_by_party: EndedByParty, ended_by_project: EndedByProject }
+enum Value { ledger: FundingRecord, closed_ledger: FundingRecord, writer: WriterSlot, pool: PoolSlots, history: boxed History, milestone: Milestone, person_proposal: PersonProposal, decided_proposal: PersonProposal, activity: ActivityLine, live: TaskRecord, ended: TaskRecord, stub: Stub, update: Update, result: ResultRow, ended_delegate: Edge, delegate: Edge, ended_by_party: EndedByParty, ended_by_project: EndedByProject }
 versioned record Row { value: Value }
 record CapacityActionBatch { first: option u64 members: u32 }
 record CapacityActionProposal { number: u64 }

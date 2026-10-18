@@ -12,14 +12,6 @@ pub fn read_value_inbox_page() -> c::InboxPage {
     c::InboxPage { cut: false, rows: List::with_capacity(0), before: None, after: None }
 }
 
-pub fn read_value_conversation_page() -> c::ConversationPage {
-    c::ConversationPage { cut: false, rows: List::with_capacity(0), before: None, after: None }
-}
-
-pub fn read_value_goal_page() -> c::GoalPage {
-    c::GoalPage { cut: false, rows: List::with_capacity(0), before: None, after: None }
-}
-
 pub fn read_value_spend_page() -> c::SpendPage {
     c::SpendPage { cut: false, rows: List::with_capacity(0), before: None, after: None }
 }

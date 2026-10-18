@@ -114,7 +114,6 @@ impl Exchange {
 }
 pub fn cursors() -> Box<[(&'static str, reads::Cursor)]> {
     use jig_domain_core::{Key, documents as d};
-    use jig_domain_people as p;
     let position =
         reads::Position::Owner(Key::Tasks(jig_domain_tasks::Key::Activity { task: u64::MAX, position: u64::MAX }));
     let scopes = cursor_scopes();
@@ -134,38 +133,19 @@ pub fn cursors() -> Box<[(&'static str, reads::Cursor)]> {
     }
     inbox_cursors(&mut rows);
     note_cursors(&mut rows);
-    for row in [
-        ("StoreNone", reads::Cursor::Store { scope: reads::Scope::Conversations, after: None }),
-        (
-            "LiveNone",
-            reads::Cursor::Live {
-                scope: reads::Scope::Conversations,
-                after: d::Cursor::Number { number: 7 },
-                store_after: None,
-            },
-        ),
-        ("ConversationsBefore", reads::Cursor::ConversationsBefore { before: position }),
-        (
-            "ConversationsLiveBefore",
-            reads::Cursor::ConversationsLiveBefore {
-                before: Some(d::Cursor::Inbox { task: 7, object: d::InboxObject::PersonTask, at: None }),
-            },
-        ),
-        ("ConversationsLiveStart", reads::Cursor::ConversationsLiveBefore { before: None }),
-        ("ConversationsStart", reads::Cursor::ConversationsStart),
-        (
-            "PeopleKey",
-            reads::Cursor::ConversationsBefore {
-                before: reads::Position::Owner(Key::People(p::Key::SignIn(u64::MAX))),
-            },
-        ),
-    ] {
-        rows.push(row).expect("cursor fixture room");
-    }
+    rows.push((
+        "LiveNone",
+        reads::Cursor::Live {
+            scope: reads::Scope::Activity { task: 7 },
+            after: d::Cursor::Number { number: 7 },
+            store_after: None,
+        },
+    ))
+    .expect("cursor fixture room");
     rows.into_boxed()
 }
 
-fn cursor_scopes() -> [(&'static str, reads::Scope); 19] {
+fn cursor_scopes() -> [(&'static str, reads::Scope); 17] {
     use jig_domain_notes as notes;
     use jig_domain_people as p;
     [
@@ -181,8 +161,6 @@ fn cursor_scopes() -> [(&'static str, reads::Scope); 19] {
         ("EndedDelegates", reads::Scope::EndedDelegates { task: u64::MAX }),
         ("History", reads::Scope::History { task: u64::MAX, subtree: true }),
         ("Activity", reads::Scope::Activity { task: u64::MAX }),
-        ("Conversations", reads::Scope::Conversations),
-        ("Goals", reads::Scope::Goals { project: u32::MAX }),
         ("Notes", reads::Scope::Notes { project: u32::MAX }),
         ("ScopedNotesAbsent", reads::Scope::ScopedNotes { scope: notes::Scope::Deployment, description: None }),
         (

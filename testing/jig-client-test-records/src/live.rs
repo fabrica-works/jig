@@ -46,24 +46,6 @@ pub fn current_call_record() -> w::CurrentCall {
     .expect("literal fixture fits")
 }
 #[must_use]
-pub fn conversations_record() -> w::Conversations {
-    let lim = limits();
-    w::Conversations::new(
-        &lim,
-        w::ConversationsParts {
-            rows: Box::from([]),
-            more: false,
-            after: w::Cursor::new(&lim, w::CursorParts { value: Box::from([]) }).expect("literal fixture fits"),
-        },
-    )
-    .expect("literal fixture fits")
-}
-#[must_use]
-pub fn goals_record() -> w::Goals {
-    let lim = limits();
-    w::Goals::new(&lim, w::GoalsParts { project: 7, rows: Box::from([]), more: false }).expect("literal fixture fits")
-}
-#[must_use]
 pub fn tasks_record() -> w::Tasks {
     let lim = limits();
     w::Tasks::new(&lim, w::TasksParts { rows: Box::from([]), more: false }).expect("literal fixture fits")

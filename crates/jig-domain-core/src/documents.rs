@@ -26,7 +26,7 @@ mod chip_phase;
 mod endings;
 pub use chip_phase::{ChipDetails, ChipObservation, ChipWork};
 mod inbox_deployment;
-pub use inbox_deployment::{ConversationLine, Conversations, Inbox, InboxEntry, InboxObject, conversation_from_row};
+pub use inbox_deployment::{Inbox, InboxEntry, InboxObject};
 mod deployment;
 pub use deployment::{
     Account, AccountState, Capacity, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun, ProjectCapacity,
@@ -38,8 +38,6 @@ pub use inbox_selection::{InboxSelection, inbox_selection_worst_case};
 mod objects;
 mod offers;
 mod project_note;
-mod project_tasks;
-pub use project_tasks::{ProjectTaskLine, TaskFilter, TaskPhase, Tasks};
 mod task_lines;
 pub use task_lines::{ConversationRead, TaskLine, task_line};
 pub mod task_query;
@@ -59,9 +57,9 @@ mod live_delegates;
 pub use live_delegates::LiveDelegate;
 mod task_tree;
 pub use task_tree::{
-    AuthorityLine, BudgetLine, ContractLine, Ending, EscalationState, FoldedCount, GoalLine, Goals, GrantLine,
-    HoldLine, NoteScope, Parameter, Part, PartKey, PartKind, PatternEnd, PhaseCounts, PriorPhase, ProposalRef,
-    ResourceLine, ResultValue, Task, TaskLink, Tree, TreeRow, task_from_row,
+    AuthorityLine, BudgetLine, ContractLine, Ending, EscalationState, FoldedCount, GrantLine, HoldLine, NoteScope,
+    Parameter, Part, PartKey, PartKind, PatternEnd, PhaseCounts, PriorPhase, ProposalRef, ResourceLine, ResultValue,
+    Task, TaskLink, Tree, TreeRow, task_from_row,
 };
 
 pub use crate::waits::WaitsOn;
@@ -131,14 +129,9 @@ pub enum Subject {
     Chips { tasks: List<u64> },
     /// The party's waiting objects and unread updates.
     Inbox { party: u64 },
-    /// A project's live goals.
-    Goals { project: u32 },
     /// Filtered live tasks in one project, newest change first.
-    Tasks { project: u32, filter: TaskFilter },
     /// A fixed task query, independent of any application shape.
     Query { query: TaskQuery },
-    /// The party's live chats.
-    Conversations { party: u64 },
     /// A task's current attempt.
     Run { task: u64 },
     /// Hosts, accounts and capacity.
@@ -169,10 +162,7 @@ pub enum Watched {
     Tree { task: u64 },
     Chips { tasks: List<u64> },
     Inbox,
-    Goals { project: u32 },
-    Tasks { project: u32, filter: TaskFilter },
     Query { query: TaskQuery },
-    Conversations,
     Run { task: u64 },
     Deployment,
 }
@@ -307,10 +297,7 @@ pub enum Document {
     Task(Box<Task>),
     /// A bounded live subtree with folds.
     Tree(Tree),
-    /// Live goals in priority order.
-    Goals(Goals),
     /// A filtered live project task list.
-    Tasks(Tasks),
     /// A query window over live tasks.
     Lines(Lines),
     /// A pending immutable proposal.
@@ -329,8 +316,6 @@ pub enum Document {
     Note(Note),
     /// Party-only bounded waiting and unread groups.
     Inbox(Inbox),
-    /// Party-only directly requested live chats.
-    Conversations(Conversations),
     /// Fleet placement, accounts and finite capacities.
     Deployment(Box<Deployment>),
 }
@@ -372,25 +357,12 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
             let tree = task_tree::tree(core, limits, party, *task, window)?;
             Ok(Document::Tree(tree))
         }
-        Subject::Goals { project } => {
-            let goals = task_tree::goals(core, limits, party, *project, window)?;
-            Ok(Document::Goals(goals))
-        }
-        Subject::Tasks { project, filter } => {
-            Ok(Document::Tasks(project_tasks::make(core, limits, party, *project, filter, window)?))
-        }
         Subject::Query { query } => Ok(Document::Lines(lines(core, limits, party, query, window)?)),
         Subject::Inbox { party: owner } => {
             if *owner != party {
                 return Err(Missing::NotAllowed);
             }
             Ok(Document::Inbox(inbox_deployment::inbox(core, limits, party, window)?))
-        }
-        Subject::Conversations { party: owner } => {
-            if *owner != party {
-                return Err(Missing::NotAllowed);
-            }
-            Ok(Document::Conversations(inbox_deployment::conversations(core, limits, party, window)?))
         }
         Subject::Deployment => Ok(Document::Deployment(Box::new(deployment::deployment(core, limits, party, None)?))),
         Subject::Proposal { proposer, number } => {
@@ -444,7 +416,6 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
             .max(frame)
             .max(u64::from(limits.text_bytes).checked_mul(3)?)
             .max(task_tree::worst_case(limits)?)
-            .max(project_tasks::worst_case(limits)?)
             .max(task_query::worst_case(limits)?)
             .max(objects::worst_case(limits)?)
             .max(project_note::worst_case(limits)?)
@@ -468,7 +439,6 @@ pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
     Some(
         deployment::scratch_worst_case(limits)?
             .max(List::<crate::Template>::worst_case(limits.templates)?)
-            .max(project_tasks::scratch_worst_case(limits)?)
             .max(task_query::scratch_worst_case(limits)?.checked_add(waits)?),
     )
 }

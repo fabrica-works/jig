@@ -16,9 +16,7 @@ fn subtree(scope: &Scope) -> bool {
         | Scope::History { subtree: false, .. }
         | Scope::Activity { .. }
         | Scope::Inbox { .. }
-        | Scope::Conversations
         | Scope::Tasks { .. }
-        | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
         | Scope::Spend { .. } => false,
@@ -51,7 +49,7 @@ pub(super) fn later(range: &Range, previous: Option<&Position>, key: &Position) 
             None => history_task(key).is_some(),
         };
     }
-    super::later(previous, key, range.backwards && range.scope != Scope::Conversations)
+    super::later(previous, key, range.backwards)
 }
 
 pub(super) fn examined(range: &Range, previous: Option<&Position>, next: &Position) -> bool {
@@ -62,9 +60,6 @@ pub(super) fn examined(range: &Range, previous: Option<&Position>, next: &Positi
         Position::Owner(
             Key::Tasks(
                 tasks::Key::Update { .. }
-                | tasks::Key::ConversationNewest { .. }
-                | tasks::Key::ConversationOldest { .. }
-                | tasks::Key::Goal { .. }
                 | tasks::Key::EndedByParty { .. }
                 | tasks::Key::EndedByProject { .. }
                 | tasks::Key::EndedDelegate { .. },

@@ -265,16 +265,21 @@ pub(crate) fn open_chat(
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
-    let mut through = None;
+    let mut through: Option<u64> = None;
     for entry in &domain.borrow(lent).inbox().rows {
         if entry.group() == InboxGroup::Replies
             && entry.card_key() == ObjectKey::Task(task)
             && let Some(line) = entry.reply()
             && line.chip.task == task
             && Some(line.project) == entry.project()
-            && line.last_reply > line.seen
+            && let Some(position) = entry.turn_position()
+            && let Some(conversation) = line.conversation
+            && position > conversation.seen
         {
-            through = Some(line.last_reply);
+            through = Some(match through {
+                Some(previous) => previous.max(position),
+                None => position,
+            });
         }
     }
     if let Some(through) = through {

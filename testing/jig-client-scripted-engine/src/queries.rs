@@ -89,7 +89,7 @@ pub(crate) fn order(rows: &mut [TaskLine], order: QueryOrder) {
     });
 }
 impl<A: crate::Application> crate::Engine<A> {
-    pub(crate) fn task_lines(&self, party: u64, query: &TaskQuery) -> Result<Vec<TaskLine>, c::WatchEnd> {
+    pub(crate) fn task_lines(&self, party: u64, query: &TaskQuery) -> Vec<TaskLine> {
         use c::ReadValue;
         let mut rows = Vec::new();
         for doc in self.truth.objects.values() {
@@ -108,24 +108,27 @@ impl<A: crate::Application> crate::Engine<A> {
                         None
                     }
                 });
-                rows.push(crate::queries::line(task, subtree, self.conversation_read(task)?));
+                rows.push(crate::queries::line(task, subtree, self.conversation_read(task)));
             }
         }
         crate::queries::order(&mut rows, query.order);
-        Ok(rows)
+        rows
     }
-    pub(crate) fn conversation_read(&self, task: &Task) -> Result<Option<c::ConversationRead>, c::WatchEnd> {
-        let c::OwnerRequester::Person(requester) = task.requester else { return Ok(None) };
+    pub(crate) fn conversation_read(&self, task: &Task) -> Option<c::ConversationRead> {
+        let c::OwnerRequester::Person(requester) = task.requester else { return None };
         if !task.flags.conversation {
-            return Ok(None);
+            return None;
         }
-        let crate::Rows::Conversations(rows) = self.rows_for(requester, &c::Read::Conversations { after: None }) else {
-            unreachable!("conversation rows")
-        };
-        let Some(row) = rows.iter().find(|row| row.chip.task == task.chip.task) else {
-            return Ok(Some(c::ConversationRead { seen: 0, unread: c::Count { value: 0, limited: false } }));
-        };
-        let unread = row.unread.ok_or(c::WatchEnd::Unknown)?;
-        Ok(Some(c::ConversationRead { seen: row.seen, unread }))
+        for source in &self.truth.sources {
+            if source.party != requester {
+                continue;
+            }
+            if let crate::Rows::Tasks(rows) = &source.rows
+                && let Some(row) = rows.iter().find(|row| row.chip.task == task.chip.task)
+            {
+                return row.conversation;
+            }
+        }
+        Some(c::ConversationRead { seen: 0, unread: c::Count { value: 0, limited: false } })
     }
 }

@@ -22,14 +22,10 @@ pub fn subject(value: &c::Subject, limits: &w::Limits) -> Result<w::Subject, w::
         c::Subject::Inbox { window } => {
             w::Subject::Inbox(w::SubjectInbox::new(limits, w::SubjectInboxParts { window: *window })?)
         }
-        c::Subject::Goals { project } => {
-            w::Subject::Goals(w::SubjectGoals::new(limits, w::SubjectGoalsParts { project: *project })?)
-        }
         c::Subject::Tasks { query, window } => w::Subject::Tasks(w::SubjectTasks::new(
             limits,
             w::SubjectTasksParts { query: super::queries::query(*query, limits)?, window: *window },
         )?),
-        c::Subject::Conversations => w::Subject::Conversations,
         c::Subject::Run { task, turn, offset } => {
             let turn = match turn {
                 Some(turn) => Some(w::ProvisionalTurnName::new(
@@ -107,11 +103,7 @@ pub fn delivery(bytes: &[u8], limits: &Limits) -> Result<c::Delivery, Undecodabl
         w::DeliveryValue::OwnerTree(value) => c::Delivery::OwnerTree(Box::new(owner_tree(value, limits)?)),
         w::DeliveryValue::Inbox(value) => c::Delivery::Inbox(Box::new(documents::inbox(value, limits)?)),
         w::DeliveryValue::OwnerInbox(value) => c::Delivery::OwnerInbox(Box::new(owner_inbox(value, limits)?)),
-        w::DeliveryValue::Goals(value) => c::Delivery::Goals(Box::new(documents::goals(value, limits)?)),
         w::DeliveryValue::Tasks(value) => c::Delivery::Tasks(Box::new(documents::tasks(value, limits)?)),
-        w::DeliveryValue::Conversations(value) => {
-            c::Delivery::Conversations(Box::new(documents::conversations(value, limits)?))
-        }
         w::DeliveryValue::Run(value) => c::Delivery::Run(Box::new(live::run_text(value, limits)?)),
         w::DeliveryValue::RunState(value) => c::Delivery::RunState(Box::new(live::run_state(value, limits)?)),
         w::DeliveryValue::Deployment(value) => c::Delivery::Deployment(Box::new(documents::deployment(value, limits)?)),

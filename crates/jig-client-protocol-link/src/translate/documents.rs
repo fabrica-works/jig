@@ -106,22 +106,6 @@ pub fn tree(record: w::Tree, limits: &Limits) -> Result<c::Tree, Undecodable> {
     }
 }
 
-pub fn conversations(record: w::Conversations, limits: &Limits) -> Result<c::Conversations, Undecodable> {
-    if crate::limits::worst_case(limits).is_none() || u64::from(record.measure()) > limits.client.document_bytes {
-        return Err(Undecodable::TooLarge);
-    }
-    let checked = receiving(limits)?;
-    let limits = &checked;
-    let record = match w::Conversations::new(&limits.wire, record.into_parts()) {
-        Ok(value) => value,
-        Err(problem) => return Err(classify(problem)),
-    };
-    match conversations_fields(&record, limits) {
-        Ok(value) => Ok(value),
-        Err(problem) => Err(classify(problem)),
-    }
-}
-
 pub fn inbox(record: w::Inbox, limits: &Limits) -> Result<c::Inbox, Undecodable> {
     if crate::limits::worst_case(limits).is_none() || u64::from(record.measure()) > limits.client.document_bytes {
         return Err(Undecodable::TooLarge);
@@ -133,22 +117,6 @@ pub fn inbox(record: w::Inbox, limits: &Limits) -> Result<c::Inbox, Undecodable>
         Err(problem) => return Err(classify(problem)),
     };
     match inbox_fields(&record, limits) {
-        Ok(value) => Ok(value),
-        Err(problem) => Err(classify(problem)),
-    }
-}
-
-pub fn goals(record: w::Goals, limits: &Limits) -> Result<c::Goals, Undecodable> {
-    if crate::limits::worst_case(limits).is_none() || u64::from(record.measure()) > limits.client.document_bytes {
-        return Err(Undecodable::TooLarge);
-    }
-    let checked = receiving(limits)?;
-    let limits = &checked;
-    let record = match w::Goals::new(&limits.wire, record.into_parts()) {
-        Ok(value) => value,
-        Err(problem) => return Err(classify(problem)),
-    };
-    match goals_fields(&record, limits) {
         Ok(value) => Ok(value),
         Err(problem) => Err(classify(problem)),
     }
@@ -254,7 +222,6 @@ fn receiving_part0(checked: &mut Limits, limits: &Limits) {
     checked.wire.chip_phase_waiting_fields_dependencies = limits.client.rows;
     checked.wire.closing_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.closing_fields_connectors_some = limits.client.rows;
-    checked.wire.conversations_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.current_call_tool = limits.client.text;
     checked.wire.current_call_input = limits.client.text;
     checked.wire.decision_left_held_reason = limits.client.text;
@@ -274,7 +241,6 @@ fn receiving_part0(checked: &mut Limits, limits: &Limits) {
     checked.wire.escalation_trail = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.escalation_acts = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.me_charters = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
-    checked.wire.goals_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.held_runtime_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.hold_spend = limits.client.rows;
     checked.wire.hold_reason_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");

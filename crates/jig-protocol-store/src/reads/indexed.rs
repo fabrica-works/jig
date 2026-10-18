@@ -7,18 +7,14 @@ use jig_domain_tasks as tasks;
 use skein_kv::Range;
 use skein_lib::List;
 
-fn owner_number(key: &core::Key) -> Result<(u64, bool), Failure> {
+fn owner_number(key: &core::Key) -> Result<u64, Failure> {
     match key {
         core::Key::Tasks(
             tasks::Key::EndedDelegate { task, .. }
-            | tasks::Key::ConversationOldest { task, .. }
             | tasks::Key::EndedByParty { task, .. }
             | tasks::Key::EndedByProject { task, .. },
-        ) => Ok((*task, false)),
-        core::Key::Tasks(tasks::Key::Update { task, .. } | tasks::Key::ConversationNewest { task, .. }) => {
-            Ok((task.value(), false))
-        }
-        core::Key::Tasks(tasks::Key::Goal { task, .. }) => Ok((task.value(), true)),
+        ) => Ok(*task),
+        core::Key::Tasks(tasks::Key::Update { task, .. }) => Ok(task.value()),
         core::Key::Tasks(
             tasks::Key::Live(_)
             | tasks::Key::Ended(_)
@@ -55,9 +51,7 @@ fn selection(scope: &reads::Scope) -> Option<(reads::Group, reads::Filter)> {
         | reads::Scope::EndedDelegates { .. }
         | reads::Scope::History { .. }
         | reads::Scope::Activity { .. }
-        | reads::Scope::Conversations
         | reads::Scope::Tasks { .. }
-        | reads::Scope::Goals { .. }
         | reads::Scope::Notes { .. }
         | reads::Scope::ScopedNotes { .. }
         | reads::Scope::Spend { .. } => None,
@@ -79,9 +73,7 @@ fn history_root(scope: &reads::Scope) -> Option<u64> {
         | reads::Scope::History { subtree: false, .. }
         | reads::Scope::Inbox { .. }
         | reads::Scope::Activity { .. }
-        | reads::Scope::Conversations
         | reads::Scope::Tasks { .. }
-        | reads::Scope::Goals { .. }
         | reads::Scope::Notes { .. }
         | reads::Scope::ScopedNotes { .. }
         | reads::Scope::Spend { .. } => None,
@@ -105,9 +97,6 @@ fn update(value: &core::Record) -> Option<tasks::Update> {
             | tasks::Stored::Milestone(_)
             | tasks::Stored::Activity(_)
             | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::ConversationOldest(_)
-            | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
@@ -136,9 +125,6 @@ fn delegate(value: &core::Record) -> Option<tasks::Edge> {
             | tasks::Stored::Milestone(_)
             | tasks::Stored::Activity(_)
             | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::ConversationOldest(_)
-            | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
@@ -210,7 +196,7 @@ fn joined(
     value: core::Record,
     spent: &mut Spent,
 ) -> Result<Option<reads::Row>, Failure> {
-    let (number, goal) = owner_number(&value.key())?;
+    let number = owner_number(&value.key())?;
     let selection = selection(&range.scope);
     if let Some((group, _filter)) = selection {
         let update = update(&value).ok_or(Failure::Corrupt)?;
@@ -229,21 +215,6 @@ fn joined(
         spent.rows = spent.rows.checked_sub(1).ok_or(Failure::Cut)?;
         return Ok(None);
     };
-    if goal {
-        let row = reads::Row {
-            value,
-            owner: Some(owner),
-            ancestors: Box::new([]),
-            related: None,
-            unjoined: None,
-            ended_read: None,
-            linked: Box::new([]),
-            inbox: None,
-        };
-        spent.bytes = spent.bytes.checked_sub(row.owned_bytes().ok_or(Failure::Corrupt)?).ok_or(Failure::Cut)?;
-        spent.rows = spent.rows.checked_sub(1).ok_or(Failure::Cut)?;
-        return Ok(Some(row));
-    }
     let mut related = None;
     let mut inbox = None;
     if let Some((_group, filter)) = selection {
@@ -342,22 +313,6 @@ pub(super) fn ended_tasks(
 
 pub(super) fn inbox(store: &mut Store, range: &reads::Range, spent: &mut Spent) -> Result<reads::Loaded, Failure> {
     let Some(selected) = intervals::scope(range.party, &range.scope) else { return Ok(empty()) };
-    family(store, range, &selected, spent)
-}
-
-pub(super) fn conversations(
-    store: &mut Store,
-    range: &reads::Range,
-    spent: &mut Spent,
-) -> Result<reads::Loaded, Failure> {
-    let selected = intervals::scope(range.party, &range.scope).ok_or(Failure::Corrupt)?;
-    let index = usize::from(!range.backwards);
-    let selected = selected.get(index..=index).ok_or(Failure::Corrupt)?;
-    family(store, range, selected, spent)
-}
-
-pub(super) fn goals(store: &mut Store, range: &reads::Range, spent: &mut Spent) -> Result<reads::Loaded, Failure> {
-    let selected = intervals::scope(range.party, &range.scope).ok_or(Failure::Corrupt)?;
     family(store, range, &selected, spent)
 }
 

@@ -45,9 +45,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
         documents::Subject::Proposal { proposer, number } => {
             allowed(proposal(core, limits, party, act, *proposer, *number))
         }
-        documents::Subject::Goals { project } | documents::Subject::Project { project } => {
-            project_admission(core, limits, party, act, *project)
-        }
+        documents::Subject::Project { project } => project_admission(core, limits, party, act, *project),
         documents::Subject::Result { task } => {
             let Some(row) = core.tasks.task(*task) else { return Admission::Refused(people::Refusal::Unknown) };
             if act == Act::Seen && core.people.role(party, row.project).is_some() {
@@ -56,9 +54,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
                 Admission::Refused(people::Refusal::NotOffered)
             }
         }
-        documents::Subject::Inbox { party: owner }
-        | documents::Subject::Conversations { party: owner }
-        | documents::Subject::Frame { party: owner } => {
+        documents::Subject::Inbox { party: owner } | documents::Subject::Frame { party: owner } => {
             if act == Act::Seen && *owner == party {
                 Admission::Allowed
             } else {
@@ -66,7 +62,6 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
             }
         }
         documents::Subject::Query { .. }
-        | documents::Subject::Tasks { .. }
         | documents::Subject::Note { .. }
         | documents::Subject::Application { .. }
         | documents::Subject::Tree { .. }

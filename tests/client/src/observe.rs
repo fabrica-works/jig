@@ -164,8 +164,6 @@ fn read_cards(v: &ReadValue) -> Vec<Receipt> {
         | ReadValue::Activity(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
-        | ReadValue::Conversations(_)
-        | ReadValue::Goals(_)
         | ReadValue::Spend(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::OwnerSpend(_)

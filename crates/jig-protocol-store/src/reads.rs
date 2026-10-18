@@ -63,9 +63,7 @@ pub(crate) fn read(store: &mut Store, owner: Token, range: Range, above: &mut Qu
         Scope::EndedDelegates { .. } => indexed::ended_delegates(store, &range, &mut spent),
         Scope::History { subtree: true, .. } => indexed::subtree_history(store, &range, &mut spent),
         Scope::Inbox { .. } => indexed::inbox(store, &range, &mut spent),
-        Scope::Conversations => indexed::conversations(store, &range, &mut spent),
         Scope::Tasks { .. } => indexed::ended_tasks(store, &range, &mut spent),
-        Scope::Goals { .. } => indexed::goals(store, &range, &mut spent),
     };
     answer(store, owner, ready(result), above);
 }

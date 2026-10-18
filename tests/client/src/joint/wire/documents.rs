@@ -126,38 +126,9 @@ pub fn chips_delivery(value: &skein_lib::List<documents::Chip>, limits: &Limits)
 }
 
 /// # Errors
-/// Refuses any whole row or allocated document above the receiving bounds.
-pub fn conversations_delivery(value: &documents::Conversations, limits: &Limits) -> Result<client::Delivery, Invalid> {
-    let value = client::Delivery::Conversations(Box::new(client::Conversations {
-        rows: owner::list(&value.lines, limits, |value| rows::conversation(value, limits)).map_err(Invalid::Owner)?,
-        more: value.next.is_some(),
-        after: cursor::encode(&jig_domain_core::reads::conversations_cursor(value), limits.text)
-            .map_err(|_| Invalid::Cursor)?,
-    }));
-    admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
-    Ok(value)
-}
-
-/// # Errors
 /// Refuses whole Inbox groups, selection allocations or document admission.
 pub fn inbox_delivery(value: &documents::Inbox, limits: &Limits) -> Result<client::Delivery, Invalid> {
     let value = client::Delivery::OwnerInbox(Box::new(inbox::document(value, limits).map_err(Invalid::Owner)?));
-    admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
-    Ok(value)
-}
-
-/// The project is the retained original watch's supplied identity, not a page default.
-/// # Errors
-/// Refuses rows from another project or any whole reserved document above bounds.
-pub fn goals_delivery(project: u32, value: &documents::Goals, limits: &Limits) -> Result<client::Delivery, Invalid> {
-    if value.lines.iter().any(|value| value.chip.details.project != project) {
-        return Err(Invalid::Identity);
-    }
-    let value = client::Delivery::Goals(Box::new(client::Goals {
-        project,
-        rows: owner::list(&value.lines, limits, |value| rows::goal(value, limits)).map_err(Invalid::Owner)?,
-        more: value.next.is_some(),
-    }));
     admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
@@ -368,11 +339,7 @@ pub(crate) mod tests {
         .expect("source descendant");
         let mut folded = List::with_capacity(4);
         folded
-            .push(documents::FoldedCount {
-                parent: u64::MAX,
-                phases: rows::tests::goal_source().phases,
-                held_below: 17,
-            })
+            .push(documents::FoldedCount { parent: u64::MAX, phases: rows::tests::phase_source(), held_below: 17 })
             .expect("source independent fold");
         folded
             .push(documents::FoldedCount { parent: 0, phases: documents::PhaseCounts::ZERO, held_below: u32::MAX })
@@ -416,7 +383,7 @@ pub(crate) mod tests {
         assert!(matches!(row.dependencies.get(1), Some(client::OwnerTaskLink::Retained { at: None, .. })));
         let fold = value.folded.get(0).expect("all ten counts");
         assert_eq!((fold.parent, fold.held_below), (u64::MAX, 17));
-        assert_eq!(fold.phases, rows::phases(rows::tests::goal_source().phases));
+        assert_eq!(fold.phases, rows::phases(rows::tests::phase_source()));
         assert_eq!(value.folded.get(1).expect("independent fold").held_below, u32::MAX);
         assert_eq!(
             cursor::decode_tree(value.next.as_ref().expect("supplied continuation"), u64::MAX, 4, limits.text),
@@ -533,73 +500,6 @@ pub(crate) mod tests {
             panic!("empty question")
         };
         assert!(value.words.bytes().is_empty());
-    }
-
-    #[test]
-    fn whole_live_list_documents_preserve_reserved_rows_more_and_absent_runtime_without_trimming() {
-        let limits = rows::tests::limits();
-        let mut lines = List::with_capacity(3);
-        lines.push(rows::tests::conversation_source()).expect("source row");
-        let source = documents::Conversations { lines, next: Some(documents::Cursor::Number { number: u64::MAX }) };
-        let client::Delivery::Conversations(value) =
-            conversations_delivery(&source, &limits).expect("whole current chats")
-        else {
-            panic!("conversations")
-        };
-        assert!(value.more);
-        assert_eq!(
-            cursor::decode(&value.after, limits.text),
-            Some(jig_domain_core::reads::conversations_cursor(&source))
-        );
-        assert_eq!(value.rows.capacity(), 3);
-        assert_eq!(value.rows.get(0).expect("row").runtime, None);
-        assert_eq!(value.rows.get(0).expect("row").changed, None);
-        assert_eq!(conversations_delivery(&source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
-        assert_eq!(
-            conversations_delivery(&source, &Limits { rows: 2, ..limits }),
-            Err(Invalid::Owner(owner::Invalid::TooLarge))
-        );
-        let mut lines = List::with_capacity(3);
-        lines.push(rows::tests::goal_source()).expect("source goal");
-        let source = documents::Goals { lines, next: None };
-        let client::Delivery::Goals(value) = goals_delivery(u32::MAX, &source, &limits).expect("whole current goals")
-        else {
-            panic!("goals")
-        };
-        assert!(!value.more);
-        assert_eq!(value.project, u32::MAX);
-        assert_eq!(value.rows.capacity(), 3);
-        assert_eq!(value.rows.get(0).expect("row").changed, None);
-        assert_eq!(goals_delivery(0, &source, &limits), Err(Invalid::Identity));
-        assert_eq!(goals_delivery(u32::MAX, &source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
-        assert_eq!(source.lines.len(), 1);
-        assert_eq!(source.lines.capacity(), 3);
-    }
-
-    #[test]
-    fn an_empty_live_conversation_snapshot_keeps_its_real_store_start_cursor_independently_of_more() {
-        let limits = rows::tests::limits();
-        let source = documents::Conversations { lines: List::with_capacity(3), next: None };
-        let client::Delivery::Conversations(value) =
-            conversations_delivery(&source, &limits).expect("empty live source")
-        else {
-            panic!("conversations")
-        };
-        assert!(!value.more);
-        assert!(value.rows.is_empty());
-        assert_eq!(value.rows.capacity(), 3);
-        assert_eq!(
-            cursor::decode(&value.after, limits.text),
-            Some(jig_domain_core::reads::Cursor::Store {
-                scope: jig_domain_core::reads::Scope::Conversations,
-                after: None
-            })
-        );
-        let exact = u32::try_from(value.after.value.bytes().len()).expect("bounded opaque bytes");
-        assert!(conversations_delivery(&source, &Limits { text: exact, ..limits }).is_ok());
-        assert_eq!(conversations_delivery(&source, &Limits { text: exact - 1, ..limits }), Err(Invalid::Cursor));
-        assert_eq!(source.next, None);
-        assert_eq!(source.lines.capacity(), 3);
     }
 
     #[test]

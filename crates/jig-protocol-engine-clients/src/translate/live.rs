@@ -1,6 +1,6 @@
 #![expect(clippy::manual_map, reason = "step code matches optional owner facts without closures")]
 //! Whole live document facts (protocol/client.md, 3 and 7).
-use super::{chips, owner, pieces, task, w};
+use super::{chips, pieces, task, w};
 use alloc::boxed::Box;
 use jig_domain_core::documents as d;
 use jig_domain_views as views;
@@ -74,45 +74,12 @@ pub fn run(value: &d::Run, limits: &w::Limits) -> Result<w::RunState, w::Problem
         },
     )
 }
-pub fn conversation(value: &d::ConversationLine, limits: &w::Limits) -> Result<w::ConversationLine, w::Problem> {
-    w::ConversationLine::new(
-        limits,
-        w::ConversationLineParts {
-            chip: chips::chip(&value.chip, limits)?,
-            project: value.project,
-            first_words: owner::text(&value.first_words, limits)?,
-            unread: match value.replies_unread {
-                Some(item) => Some(count(item, limits)?),
-                None => None,
-            },
-            cached_replies: value.cached_replies,
-            seen: value.seen,
-            last_reply: value.last_reply,
-            delegates: value.delegates,
-            budget: owner::budget(&value.budget, limits)?,
-            runtime: None,
-            changed: None,
-        },
-    )
-}
 pub fn count(value: d::Count, limits: &w::Limits) -> Result<w::Count, w::Problem> {
     let (number, limited) = match value {
         d::Count::Known(n) => (n, false),
         d::Count::AtLeast(n) => (n, true),
     };
     w::Count::new(limits, w::CountParts { value: number, limited })
-}
-pub fn conversations(
-    value: &d::Conversations,
-    after: w::Cursor,
-    limits: &w::Limits,
-) -> Result<w::Conversations, w::Problem> {
-    let mut rows = List::with_capacity(value.lines.len());
-    for row in &value.lines {
-        rows.push(conversation(row, limits)?).expect("supplied rows fit");
-    }
-    let rows = conversation_pieces(&rows, limits.conversations_rows, w::Path::ConversationsRows)?;
-    w::Conversations::new(limits, w::ConversationsParts { rows, more: value.next.is_some(), after })
 }
 pub fn phases(value: d::PhaseCounts, limits: &w::Limits) -> Result<w::OwnerPhaseCounts, w::Problem> {
     w::OwnerPhaseCounts::new(
@@ -130,27 +97,6 @@ pub fn phases(value: d::PhaseCounts, limits: &w::Limits) -> Result<w::OwnerPhase
             cancelled: value.cancelled,
         },
     )
-}
-pub fn goal(value: &d::GoalLine, limits: &w::Limits) -> Result<w::GoalLine, w::Problem> {
-    w::GoalLine::new(
-        limits,
-        w::GoalLineParts {
-            chip: chips::chip(&value.chip, limits)?,
-            priority: value.priority,
-            progress: phases(value.phases, limits)?,
-            budget: owner::budget(&value.budget, limits)?,
-            held_below: value.held_below,
-            changed: None,
-        },
-    )
-}
-pub fn goals(project: u32, value: &d::Goals, limits: &w::Limits) -> Result<w::Goals, w::Problem> {
-    let mut rows = List::with_capacity(value.lines.len());
-    for row in &value.lines {
-        rows.push(goal(row, limits)?).expect("supplied rows fit");
-    }
-    let rows = goal_pieces(&rows, limits.goals_rows, w::Path::GoalsRows)?;
-    w::Goals::new(limits, w::GoalsParts { project, rows, more: value.next.is_some() })
 }
 
 pub fn tree_row(value: &d::TreeRow, limits: &w::Limits) -> Result<w::OwnerTreeRow, w::Problem> {
@@ -200,30 +146,6 @@ pub fn tree(value: &d::Tree, next: Option<w::Cursor>, limits: &w::Limits) -> Res
         limits,
         w::OwnerTreeParts { root: chips::chip(&value.root, limits)?, rows, folded, held_below: value.held_below, next },
     )
-}
-fn conversation_pieces(rows: &List<w::ConversationLine>, bound: u32, path: w::Path) -> Result<Box<[u8]>, w::Problem> {
-    let mut encoded = List::with_capacity(rows.len());
-    for row in rows {
-        let mut out = Writer::new(usize::try_from(row.measure()).expect("u32 measure fits usize"));
-        match row.encode(&mut out) {
-            Ok(()) => (),
-            Err(_) => return Err(w::Problem { path, reason: skein_codec::Reason::Bound }),
-        }
-        encoded.push(out.finish()).expect("supplied rows fit");
-    }
-    pieces(&encoded, bound, path)
-}
-fn goal_pieces(rows: &List<w::GoalLine>, bound: u32, path: w::Path) -> Result<Box<[u8]>, w::Problem> {
-    let mut encoded = List::with_capacity(rows.len());
-    for row in rows {
-        let mut out = Writer::new(usize::try_from(row.measure()).expect("u32 measure fits usize"));
-        match row.encode(&mut out) {
-            Ok(()) => (),
-            Err(_) => return Err(w::Problem { path, reason: skein_codec::Reason::Bound }),
-        }
-        encoded.push(out.finish()).expect("supplied rows fit");
-    }
-    pieces(&encoded, bound, path)
 }
 
 fn tree_pieces(rows: &List<w::OwnerTreeRow>, bound: u32, path: w::Path) -> Result<Box<[u8]>, w::Problem> {

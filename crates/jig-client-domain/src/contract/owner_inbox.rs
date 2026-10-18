@@ -1,9 +1,7 @@
 //! Exact Inbox owner facts, separate from application supplied context.
 //! See client/domain/contract.md, 5–7 and pages.md, 3. Raw row identity is
 //! independent of a coarser card address and both continuation cursors.
-use super::{
-    ConversationLine, Count, Cursor, Inbox, InboxEntry, InboxGroup, ObjectKey, OwnerTaskLink, ProposalKey, Proposer,
-};
+use super::{Count, Cursor, Inbox, InboxEntry, InboxGroup, ObjectKey, OwnerTaskLink, ProposalKey, Proposer, TaskLine};
 use alloc::boxed::Box;
 use skein_lib::{List, Wall};
 
@@ -23,7 +21,7 @@ pub enum OwnerInboxCursor {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerInboxEntry {
-    pub reply: Option<Box<ConversationLine>>,
+    pub reply: Option<Box<TaskLine>>,
     pub task: OwnerTaskLink,
     pub project: Option<u32>,
     pub object: OwnerInboxObject,
@@ -154,10 +152,31 @@ impl InboxRow {
         }
     }
     #[must_use]
-    pub fn reply(&self) -> Option<&ConversationLine> {
+    pub fn reply(&self) -> Option<&TaskLine> {
         match self {
             Self::Entry(value) => value.reply.as_deref(),
             Self::Owner(value) => value.reply.as_deref(),
+        }
+    }
+    #[must_use]
+    pub const fn turn_position(&self) -> Option<u64> {
+        match self {
+            Self::Entry(value) => match value.group {
+                InboxGroup::Replies => Some(value.position),
+                InboxGroup::Questions
+                | InboxGroup::Proposals
+                | InboxGroup::Escalations
+                | InboxGroup::PersonTasks
+                | InboxGroup::Results => None,
+            },
+            Self::Owner(value) => match value.object {
+                OwnerInboxObject::Reply { message } => Some(message),
+                OwnerInboxObject::Question { .. }
+                | OwnerInboxObject::Proposal { .. }
+                | OwnerInboxObject::Escalation { .. }
+                | OwnerInboxObject::PersonTask
+                | OwnerInboxObject::Result { .. } => None,
+            },
         }
     }
     #[must_use]

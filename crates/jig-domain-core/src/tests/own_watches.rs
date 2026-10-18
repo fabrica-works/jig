@@ -60,11 +60,9 @@ fn frame_party(out: &[Request]) -> u64 {
 #[test]
 fn an_own_subject_names_the_sign_ins_party() {
     let (mut core, limits, sign_in, _) = signed_core();
-    for (label, subject, expected) in [
-        ("Frame", Watched::Frame, Subject::Frame { party: 1 }),
-        ("Inbox", Watched::Inbox, Subject::Inbox { party: 1 }),
-        ("Conversations", Watched::Conversations, Subject::Conversations { party: 1 }),
-    ] {
+    for (label, subject, expected) in
+        [("Frame", Watched::Frame, Subject::Frame { party: 1 }), ("Inbox", Watched::Inbox, Subject::Inbox { party: 1 })]
+    {
         let out = open(&mut core, &limits, sign_in, 30, subject);
         assert_eq!(named(&core, 30), &expected, "{label}");
         assert_eq!(out.len(), 2, "{label}");
@@ -122,9 +120,7 @@ fn an_own_subject_of_an_ended_sign_in_is_refused_signed_out() {
         &limits,
         Event::People(people::Event::SignOut { sign_in, reply_to: ReplyTo::new(Token::new(91)) }),
     ));
-    for (label, subject) in
-        [("Frame", Watched::Frame), ("Inbox", Watched::Inbox), ("Conversations", Watched::Conversations)]
-    {
+    for (label, subject) in [("Frame", Watched::Frame), ("Inbox", Watched::Inbox)] {
         let out = open(&mut core, &limits, sign_in, 30, subject);
         assert_watch_refusal(&out[0], WatchRefusal::SignedOut);
         assert!(core.view_subjects.is_empty(), "{label}");

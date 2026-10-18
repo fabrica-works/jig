@@ -55,7 +55,7 @@ pub fn family_subject() -> w::Owned {
 pub fn task_subject() -> w::Subject {
     w::Subject::Task(w::SubjectTask::new(&wire(), w::SubjectTaskParts { task: 7 }).expect("task"))
 }
-pub fn subject_cases() -> [(&'static str, w::Subject, core::documents::Watched, u32); 9] {
+pub fn subject_cases() -> [(&'static str, w::Subject, core::documents::Watched, u32); 7] {
     use core::documents as d;
     let limits = wire();
     [
@@ -66,7 +66,6 @@ pub fn subject_cases() -> [(&'static str, w::Subject, core::documents::Watched, 
             d::Watched::Inbox,
             3,
         ),
-        ("Conversations", w::Subject::Conversations, d::Watched::Conversations, 32),
         ("Task", task_subject(), d::Watched::Task { task: 7 }, 32),
         (
             "Tree",
@@ -81,12 +80,6 @@ pub fn subject_cases() -> [(&'static str, w::Subject, core::documents::Watched, 
                     .expect("chips"),
             ),
             d::Watched::Chips { tasks: skein_lib::List::with_capacity(0) },
-            32,
-        ),
-        (
-            "Goals",
-            w::Subject::Goals(w::SubjectGoals::new(&limits, w::SubjectGoalsParts { project: 3 }).expect("goals")),
-            d::Watched::Goals { project: 3 },
             32,
         ),
         (

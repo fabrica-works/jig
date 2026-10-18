@@ -1,9 +1,9 @@
 //! Retained rows and scoped opaque cursors; contract.md, 6.
 use crate::{Bounds, Engine, Invalid, Up, payload};
 use jig_client_domain::contract::{
-    ActivityLine, ActivityPage, ConversationLine, ConversationPage, Cursor, GoalLine, GoalPage, HistoryPage,
-    HistoryRow, InboxEntry, InboxGroup, InboxPage, InboxReadGroup, Note, NotePage, NoteScope, ObjectKey, ObjectPage,
-    Read, ReadNone, ReadResult, ReadValue, Result, SpendPage, SpendPeriod,
+    ActivityLine, ActivityPage, Cursor, HistoryPage, HistoryRow, InboxEntry, InboxGroup, InboxPage, InboxReadGroup,
+    Note, NotePage, NoteScope, ObjectKey, ObjectPage, Read, ReadNone, ReadResult, ReadValue, Result, SpendPage,
+    SpendPeriod,
 };
 use skein_lib::{List, Time, Token};
 
@@ -16,8 +16,6 @@ pub enum Rows {
     History(Vec<HistoryRow>),
     Activity(Vec<ActivityLine>),
     Inbox(Vec<InboxEntry>),
-    Conversations(Vec<ConversationLine>),
-    Goals(Vec<GoalLine>),
     Spend(Vec<SpendPeriod>),
     Notes(Vec<Note>),
 }
@@ -71,8 +69,6 @@ impl Rows {
             Self::History(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
             Self::Activity(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
             Self::Inbox(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
-            Self::Conversations(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
-            Self::Goals(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
             Self::Spend(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
             Self::Notes(rows) => rows.iter().all(|row| payload::fits(row, bounds)),
         };
@@ -86,8 +82,6 @@ impl Rows {
                 | (Self::History(_), Read::History { .. })
                 | (Self::Activity(_), Read::Activity { .. })
                 | (Self::Inbox(_), Read::Inbox { .. })
-                | (Self::Conversations(_), Read::Conversations { .. })
-                | (Self::Goals(_), Read::Goals { .. })
                 | (Self::Spend(_), Read::Spend { .. })
                 | (Self::Notes(_), Read::Notes { .. })
         )
@@ -99,8 +93,6 @@ impl Rows {
             Self::History(rows) => rows.len(),
             Self::Activity(rows) => rows.len(),
             Self::Inbox(rows) => rows.len(),
-            Self::Conversations(rows) => rows.len(),
-            Self::Goals(rows) => rows.len(),
             Self::Spend(rows) => rows.len(),
             Self::Notes(rows) => rows.len(),
         }
@@ -123,15 +115,6 @@ impl Rows {
             }
             Self::Inbox(rows) => {
                 ReadValue::Inbox(Box::new(InboxPage { cut: false, rows: list(&rows[start..end]), before, after }))
-            }
-            Self::Conversations(rows) => ReadValue::Conversations(Box::new(ConversationPage {
-                cut: false,
-                rows: list(&rows[start..end]),
-                before,
-                after,
-            })),
-            Self::Goals(rows) => {
-                ReadValue::Goals(Box::new(GoalPage { cut: false, rows: list(&rows[start..end]), before, after }))
             }
             Self::Spend(rows) => {
                 ReadValue::Spend(Box::new(SpendPage { cut: false, rows: list(&rows[start..end]), before, after }))
@@ -163,8 +146,6 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
         Read::Ended { after, .. }
         | Read::History { after, .. }
         | Read::Inbox { after, .. }
-        | Read::Conversations { after, .. }
-        | Read::Goals { after, .. }
         | Read::Spend { after, .. }
         | Read::Notes { after, .. } => after.take(),
         Read::Tasks { live, ended, .. } => ended.take().or_else(|| live.take()),
@@ -182,15 +163,6 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
     (read, position)
 }
 impl<A: crate::Application> Engine<A> {
-    /// The retained source is authoritative even when live rows are interleaved
-    /// with past rows. Replay it from its actual beginning, in supplied order,
-    /// through the existing party/query-scoped registry; no row key is a cursor.
-    pub(crate) fn conversations_cursor(&mut self, party: u64) -> Cursor {
-        let number = self.next_position;
-        self.positions.insert(number, Position { party, read: Read::Conversations { after: None }, index: 0 });
-        self.next_position += 1;
-        cursor(number, &self.bounds)
-    }
     /// Captures one read at the latest numbered commit. A token receives one terminal.
     pub fn read(&mut self, now: Time, sign_in: u64, token: Token, read: Read) -> core::result::Result<(), Invalid> {
         if !payload::fits(&read, &self.bounds) {
@@ -243,8 +215,6 @@ impl<A: crate::Application> Engine<A> {
             | Read::History { .. }
             | Read::Activity { .. }
             | Read::Inbox { .. }
-            | Read::Conversations { .. }
-            | Read::Goals { .. }
             | Read::Spend { .. }
             | Read::Notes { .. } => None,
         };
@@ -252,7 +222,7 @@ impl<A: crate::Application> Engine<A> {
             return self.checked_read(self.truth.objects.get(&key).cloned());
         }
         let rows = if let Read::Tasks { query, .. } = &query {
-            Rows::Tasks(self.task_lines(party, query).map_err(|_| ReadNone::Unknown)?)
+            Rows::Tasks(self.task_lines(party, query))
         } else {
             self.rows_for(party, &query)
         };
@@ -315,8 +285,6 @@ impl<A: crate::Application> Engine<A> {
     pub(crate) fn rows_for(&self, party: u64, query: &Read) -> Rows {
         let broad = if let Read::Inbox { group, .. } = query {
             Read::Inbox { group: *group, project: None, kind: None, goal: None, after: None }
-        } else if matches!(query, Read::Conversations { .. }) {
-            Read::Conversations { after: None }
         } else {
             query.clone()
         };
@@ -342,8 +310,7 @@ impl<A: crate::Application> Engine<A> {
                 match query {
                     Read::Inbox { group, project, kind, goal, .. } => *group == InboxReadGroup::of(row.group) && project.is_none_or(|p| p == row.project) && kind.is_none_or(|k| k == row.group) && goal.is_none_or(|g| row.goal == Some(g)),
                     Read::Tasks { .. } | Read::Me | Read::Task { .. } | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. }
-                    | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. }
-                    | Read::Conversations { .. } | Read::Goals { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Deployment => false,
+                    | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Deployment => false,
                 }
             }).collect();
                 rows.sort_by(|a, b| {
@@ -352,14 +319,10 @@ impl<A: crate::Application> Engine<A> {
                 });
                 Rows::Inbox(rows)
             },
-            Rows::Conversations(rows) => Rows::Conversations(rows.into_iter().filter(|row| {
-                self.truth.visible(party,row.project) && matches!(query, Read::Conversations { .. })
-            }).collect()),
             Rows::Notes(rows) => Rows::Notes(rows.into_iter().filter(|row| {
                 matches!(query, Read::Notes { scope, description, .. } if *scope == row.scope && description.as_ref().is_none_or(|needle| needle.bytes().is_empty() || row.description.bytes().windows(needle.bytes().len()).any(|window| window == needle.bytes())))
             }).collect()),
             Rows::Tasks(rows) => Rows::Tasks(rows),
-            Rows::Goals(rows) => Rows::Goals(rows),
             Rows::Ended(rows) => Rows::Ended(rows), Rows::History(rows) => Rows::History(rows),
             Rows::Activity(rows) => Rows::Activity(rows), Rows::Spend(rows) => Rows::Spend(rows),
         }
@@ -379,7 +342,7 @@ impl<A: crate::Application> Engine<A> {
             Read::Question { task, message } => Some(ObjectKey::Question { task: *task, message: *message }),
             Read::PersonTask { task } => Some(ObjectKey::PersonTask(*task)),
             Read::Result { task } => Some(ObjectKey::Result(*task)),
-            Read::Project { project } | Read::Goals { project, .. } | Read::Spend { project, .. } => {
+            Read::Project { project } | Read::Spend { project, .. } => {
                 return self.truth.visible(party, *project);
             }
             Read::Inbox { project, .. } => {
@@ -400,7 +363,7 @@ impl<A: crate::Application> Engine<A> {
                     |project| self.truth.visible(party, project),
                 );
             }
-            Read::Me | Read::Conversations { .. } => return self.truth.frames.contains_key(&party),
+            Read::Me => return self.truth.frames.contains_key(&party),
             Read::Deployment => return self.truth.frames.get(&party).is_some_and(|f| f.deployment_role.is_some()),
         };
         key.and_then(|key| self.truth.project(key)).is_some_and(|project| self.truth.visible(party, project))
@@ -413,8 +376,6 @@ fn empty(read: &Read) -> Rows {
         Read::History { .. } => Rows::History(vec![]),
         Read::Activity { .. } => Rows::Activity(vec![]),
         Read::Inbox { .. } => Rows::Inbox(vec![]),
-        Read::Conversations { .. } => Rows::Conversations(vec![]),
-        Read::Goals { .. } => Rows::Goals(vec![]),
         Read::Spend { .. } => Rows::Spend(vec![]),
         Read::Notes { .. } => Rows::Notes(vec![]),
         Read::Me

@@ -3,9 +3,9 @@
 //! List capacities and Text byte bounds are validated by the protocol before entry;
 //! the working set keeps only what its own configured limits admit.
 use super::{
-    Actor, Amendment, Authority, Count, Cursor, Decision, DocumentText, Ending, Executor, Holding, Lacking, NoteScope,
-    ObjectKey, Part, Party, Phase, Policy, ProposalKey, Proposer, Refusal, Revision, Text, TurnName, TurnRead,
-    WakePolicy,
+    Actor, Amendment, Authority, Count, Decision, DocumentText, Ending, Executor, Holding, Lacking, NoteScope,
+    ObjectKey, Part, Party, Phase, Policy, ProposalKey, Proposer, Refusal, Revision, TaskLine, Text, TurnName,
+    TurnRead, WakePolicy,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
@@ -651,7 +651,7 @@ pub enum InboxGroup {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct InboxEntry {
     /// Whole committed chat facts for a reply entry; absent for other groups.
-    pub reply: Option<Box<ConversationLine>>,
+    pub reply: Option<Box<TaskLine>>,
     pub lineage: List<Chip>,
     pub goal: Option<u64>,
     pub recipient: Option<Recipient>,
@@ -670,61 +670,15 @@ pub struct Inbox {
     pub needs: Needs,
     pub updates: Count,
     pub results_seen: u64,
-    pub replies_seen: List<ReplyPosition>,
+    pub replies_seen: List<ReadPosition>,
     pub more: bool,
 }
 
 /// The read position for one chat.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct ReplyPosition {
-    pub chat: u64,
+pub struct ReadPosition {
+    pub task: u64,
     pub through: u64,
-}
-
-/// A chat in the party conversations list.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ConversationLine {
-    pub runtime: Option<Runtime>,
-    pub delegates: u32,
-    pub budget: super::OwnerBudget,
-    pub chip: Chip,
-    pub project: u32,
-    pub first_words: DocumentText,
-    pub unread: Option<Count>,
-    /// Independently supplied cached replies, never the unread count.
-    pub cached_replies: u32,
-    pub seen: u64,
-    pub last_reply: u64,
-    pub changed: Option<Wall>,
-}
-
-/// Live chats in a bounded watch window.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Conversations {
-    pub rows: List<ConversationLine>,
-    /// Whether another live slice follows; independent from retained past.
-    pub more: bool,
-    /// Complete opaque read-owner continuation after this live snapshot.
-    pub after: Cursor,
-}
-
-/// A goal on the project board.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct GoalLine {
-    pub changed: Option<Wall>,
-    pub chip: Chip,
-    pub priority: u32,
-    pub progress: super::OwnerPhaseCounts,
-    pub budget: super::OwnerBudget,
-    pub held_below: u32,
-}
-
-/// Live goals in priority order.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Goals {
-    pub project: u32,
-    pub rows: List<GoalLine>,
-    pub more: bool,
 }
 
 /// A project, its policy, roles, spend and parts.
@@ -1072,7 +1026,7 @@ pub struct LiveDelegate {
 /// Bounded live project tasks in last-change order.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tasks {
-    pub rows: List<super::TaskLine>,
+    pub rows: List<TaskLine>,
     pub more: bool,
 }
 /// Spend attributed to one goal or chat, largest first.

@@ -222,10 +222,6 @@ pub fn result_index(party: u64, position: u64, task: u64) -> Record {
     Record::Tasks(jig_domain_tasks::Stored::Result(jig_domain_tasks::ResultRow { party, position, task }))
 }
 
-pub fn conversation_index(party: u64, task: u64) -> Record {
-    Record::Tasks(jig_domain_tasks::Stored::ConversationOldest(jig_domain_tasks::Conversation { party, task }))
-}
-
 pub fn notes_line(scope: &jig_domain_notes::Scope, name: u64) -> Record {
     let mut row = note_line();
     row.scope = scope.clone();

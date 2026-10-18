@@ -34,11 +34,9 @@ fn subject(value: &client::Subject, default_rows: u32) -> Result<(documents::Wat
         client::Subject::Tree { task, window } => (documents::Watched::Tree { task: *task }, *window),
         client::Subject::Chips { tasks } => (documents::Watched::Chips { tasks: tasks.clone() }, default_rows),
         client::Subject::Inbox { window } => (documents::Watched::Inbox, *window),
-        client::Subject::Goals { project } => (documents::Watched::Goals { project: *project }, default_rows),
         client::Subject::Tasks { query, window } => {
             (documents::Watched::Query { query: super::queries::query(query)? }, *window)
         }
-        client::Subject::Conversations => (documents::Watched::Conversations, default_rows),
         client::Subject::Run { task, turn: _, offset: _ } => (documents::Watched::Run { task: *task }, default_rows),
         client::Subject::Deployment => (documents::Watched::Deployment, default_rows),
     };
@@ -126,8 +124,6 @@ mod tests {
             ),
             ("Chips", client::Subject::Chips { tasks: chips.clone() }, documents::Watched::Chips { tasks: chips }, 5),
             ("Inbox", client::Subject::Inbox { window: 0 }, documents::Watched::Inbox, 0),
-            ("Goals", client::Subject::Goals { project: u32::MAX }, documents::Watched::Goals { project: u32::MAX }, 5),
-            ("Conversations", client::Subject::Conversations, documents::Watched::Conversations, 5),
             ("Deployment", client::Subject::Deployment, documents::Watched::Deployment, 5),
         ];
         for (label, value, expected, rows) in values {

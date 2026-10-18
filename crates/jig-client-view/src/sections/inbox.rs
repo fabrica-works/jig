@@ -214,7 +214,10 @@ fn unread(entry: &jig_client::contract::InboxEntry, results_seen: u64) -> bool {
     match entry.group {
         InboxGroup::Results => entry.position > results_seen,
         InboxGroup::Replies => match &entry.reply {
-            Some(line) => line.last_reply > line.seen,
+            Some(line) => match line.conversation {
+                Some(conversation) => conversation.unread.value > 0,
+                None => false,
+            },
             None => false,
         },
         InboxGroup::Questions | InboxGroup::Proposals | InboxGroup::Escalations | InboxGroup::PersonTasks => false,

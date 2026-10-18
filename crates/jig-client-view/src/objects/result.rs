@@ -33,10 +33,15 @@ pub struct Reply {
 impl Reply {
     /// Keeps whole words and checks the first unread position before ownership.
     #[must_use]
-    pub fn from_line(line: jig_client::contract::ConversationLine) -> Option<Self> {
-        if line.last_reply <= line.seen {
+    pub fn from_line(line: jig_client::contract::TaskLine) -> Option<Self> {
+        let conversation = line.conversation?;
+        if conversation.unread.value == 0 {
             return None;
         }
-        Some(Self { chat: line.chip.task, first_words: line.first_words, first_unread: line.seen.checked_add(1)? })
+        Some(Self {
+            chat: line.chip.task,
+            first_words: line.chip.title,
+            first_unread: conversation.seen.checked_add(1)?,
+        })
     }
 }

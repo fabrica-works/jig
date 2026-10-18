@@ -83,14 +83,8 @@ fn delivery_cases_first(cases: &mut List<(w::DeliveryValue, c::Delivery)>) {
         .unwrap();
 }
 fn delivery_cases_last(cases: &mut List<(w::DeliveryValue, c::Delivery)>) {
-    cases.push((w::DeliveryValue::Goals(goals_record()), c::Delivery::Goals(Box::new(goals())))).unwrap();
     cases.push((w::DeliveryValue::Tasks(tasks_record()), c::Delivery::Tasks(Box::new(tasks())))).unwrap();
-    cases
-        .push((
-            w::DeliveryValue::Conversations(conversations_record()),
-            c::Delivery::Conversations(Box::new(conversations())),
-        ))
-        .unwrap();
+
     cases.push((w::DeliveryValue::Run(text_record()), c::Delivery::Run(Box::new(run_text_expected())))).unwrap();
     cases.push((w::DeliveryValue::RunState(run_state_record()), c::Delivery::RunState(Box::new(run_state())))).unwrap();
     cases

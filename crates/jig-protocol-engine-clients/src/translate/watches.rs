@@ -20,11 +20,9 @@ pub(crate) fn watch(watcher: Token, sign_in: u64, value: w::Subject, rows: u32) 
     let (subject, rows) = match value {
         w::Subject::Me => (d::Watched::Frame, rows),
         w::Subject::Inbox(value) => (d::Watched::Inbox, value.window()),
-        w::Subject::Conversations => (d::Watched::Conversations, rows),
         w::Subject::Task(value) => (d::Watched::Task { task: value.task() }, rows),
         w::Subject::Tree(value) => (d::Watched::Tree { task: value.task() }, value.window()),
         w::Subject::Chips(value) => (d::Watched::Chips { tasks: value.into_parts().tasks }, rows),
-        w::Subject::Goals(value) => (d::Watched::Goals { project: value.project() }, rows),
         w::Subject::Tasks(value) => {
             let value = value.into_parts();
             (d::Watched::Query { query: super::queries::query(value.query)? }, value.window)
@@ -81,7 +79,7 @@ pub(crate) fn hello(
 }
 pub(crate) fn delivery(
     value: &d::Document,
-    project: u32,
+    _project: u32,
     rows: u32,
     limits: &w::Limits,
 ) -> Result<w::DeliveryValue, w::Problem> {
@@ -116,27 +114,11 @@ pub(crate) fn delivery(
             w::DeliveryValue::Chips(w::Chips::new(limits, w::ChipsParts { rows })?)
         }
         d::Document::Inbox(value) => w::DeliveryValue::OwnerInbox(inbox::document(value, limits)?),
-        d::Document::Goals(value) => {
-            for row in &value.lines {
-                if row.chip.details.project != project {
-                    return Err(super::problem(skein_codec::Reason::Tag));
-                }
-            }
-            w::DeliveryValue::Goals(live::goals(project, value, limits)?)
-        }
         d::Document::Lines(value) => w::DeliveryValue::Tasks(super::queries::lines(value, limits)?),
-        d::Document::Conversations(value) => {
-            let position = core::reads::conversations_cursor(value);
-            let bytes =
-                cursor::encode(&position, limits.cursor_value).ok_or(super::problem(skein_codec::Reason::Bound))?;
-            let after = w::Cursor::new(limits, w::CursorParts { value: bytes })?;
-            w::DeliveryValue::Conversations(live::conversations(value, after, limits)?)
-        }
         d::Document::Run(value) => w::DeliveryValue::RunState(live::run(value, limits)?),
         d::Document::Deployment(value) => w::DeliveryValue::OwnerDeployment(deployment::document(value, limits)?),
         d::Document::Proposal(value) => w::DeliveryValue::OwnerProposal(objects::proposal(value, limits)?),
-        d::Document::Tasks(_)
-        | d::Document::Escalation(_)
+        d::Document::Escalation(_)
         | d::Document::Question(_)
         | d::Document::PersonTask(_)
         | d::Document::Result(_)

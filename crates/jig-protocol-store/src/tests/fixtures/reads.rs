@@ -175,14 +175,6 @@ pub fn update(party: u64, at: u64, task: u64, object: tasks::UpdateObject) -> Re
     Record::Tasks(tasks::Stored::Update(tasks::Update { party, at: skein_lib::Wall::from_nanos(at), task, object }))
 }
 
-pub fn conversation(party: u64, task: u64) -> Record {
-    Record::Tasks(tasks::Stored::ConversationNewest(tasks::Conversation { party, task }))
-}
-
-pub fn goal_row(project: u32, goal: u64, endings: tasks::Endings) -> Record {
-    Record::Tasks(tasks::Stored::Goal(tasks::GoalRow { project, task: goal, endings }))
-}
-
 pub fn ended_delegate(requester: u64, task: u64) -> Record {
     Record::Tasks(tasks::Stored::EndedDelegate(tasks::Edge { requester, task }))
 }

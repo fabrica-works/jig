@@ -520,9 +520,7 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
         Subject::Tree { task: 8, window: 1 },
         Subject::Chips { tasks: list(vec![8]) },
         Subject::Inbox { window: 1 },
-        Subject::Goals { project: 1 },
         Subject::Tasks { query: query(1), window: 1 },
-        Subject::Conversations,
         Subject::Run { task: 8, turn: None, offset: 0 },
         Subject::Deployment,
     ];
@@ -530,10 +528,10 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
         engine.open(Time::ZERO, 11, Token::new(index as u64), subject).expect("subject");
     }
     let up = engine.poll(Time::ZERO);
-    assert_eq!(up.iter().filter(|event| matches!(event, Up::Watch { event: WatchEvent::Opened, .. })).count(), 10);
+    assert_eq!(up.iter().filter(|event| matches!(event, Up::Watch { event: WatchEvent::Opened, .. })).count(), 8);
     assert_eq!(
         up.iter().filter(|event| matches!(event, Up::Watch { event: WatchEvent::Delivered(_), .. })).count(),
-        9,
+        7,
         "idle run has no fabricated turn"
     );
     let mut changed = task();
@@ -563,7 +561,7 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
     engine.taken(Token::new(1));
     assert!(engine.poll(at(10_000_001)).is_empty());
     let up = engine.poll(at(1_010_000_001));
-    assert_eq!(up.iter().filter(|event| matches!(event, Up::Watch { event: WatchEvent::Alive, .. })).count(), 10);
+    assert_eq!(up.iter().filter(|event| matches!(event, Up::Watch { event: WatchEvent::Alive, .. })).count(), 8);
     engine.close(at(1_010_000_001), Token::new(1));
     engine.close(at(1_010_000_001), Token::new(1));
     assert_eq!(engine.poll(at(1_010_000_001)), vec![Up::Ended { token: Token::new(1), why: WatchEnd::Closed }]);
@@ -579,7 +577,7 @@ fn scenario_watch_subjects_coalescing_and_lifecycle() {
         )
         .expect("ended");
     let up = engine.poll(at(1_020_000_001));
-    for id in [2, 3, 8] {
+    for id in [2, 3, 6] {
         assert!(up.contains(&Up::Ended { token: Token::new(id), why: WatchEnd::SubjectEnded }));
     }
     let mut setup = live_script();
@@ -669,6 +667,64 @@ fn scenario_run_offsets_cut_names_and_activity() {
     );
     assert!(!engine.runs.contains_key(&8), "durable matching activity replaces the provisional turn");
 }
+fn page_reply(position: u64) -> InboxEntry {
+    let line = TaskLine {
+        chip: {
+            let mut chip = task().chip;
+            chip.title = DocumentText::complete(text(&[b'x'; 1100]));
+            chip
+        },
+        project: 1,
+        requester: jig_client_domain::contract::OwnerRequester::Person(1),
+        tracked: None,
+        label: 1,
+        flags: jig_client_domain::contract::TaskFlags {
+            conversation: true,
+            listed: false,
+            retention: jig_client_domain::contract::Retention::ForgottenOnceRead,
+        },
+        changed: Wall::EPOCH,
+        last_activity: Wall::EPOCH,
+        ended_at: None,
+        budget: OwnerBudget {
+            numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
+            left: 100,
+            funder: Funder::Period { project: 1, period: 3 },
+            deadline: None,
+        },
+        waits_on: jig_client_domain::contract::WaitsOn::Nothing,
+        phases: jig_client_domain::contract::OwnerPhaseCounts {
+            waiting: 0,
+            idle: 0,
+            starting: 0,
+            running: 0,
+            backing_off: 0,
+            closing: 0,
+            held: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+        conversation: Some(jig_client_domain::contract::ConversationRead {
+            seen: 0,
+            unread: Count { value: 1, limited: false },
+        }),
+    };
+    InboxEntry {
+        reply: Some(Box::new(line)),
+        lineage: list(vec![]),
+        goal: None,
+        recipient: None,
+        stall: None,
+        object: ObjectKey::Task(8),
+        project: 1,
+        group: InboxGroup::Replies,
+        position,
+        at: Wall::EPOCH,
+    }
+}
+
 fn scenario_byte_bound_pages_and_watch_windows() {
     let mut setup = live_script();
     setup.bounds.document_bytes = 3000;
@@ -702,40 +758,7 @@ fn scenario_byte_bound_pages_and_watch_windows() {
     assert!(payload::fits(value, &engine.bounds));
     let mut setup = live_script();
     setup.bounds.document_bytes = 3000;
-    let entries = (0..2)
-        .map(|position| {
-            let line = ConversationLine {
-                cached_replies: 0,
-                runtime: Some(Runtime::Idle),
-                delegates: 0,
-                budget: OwnerBudget {
-                    numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
-                    left: 100,
-                    funder: Funder::Period { project: 1, period: 3 },
-                    deadline: None,
-                },
-                chip: task().chip,
-                project: 1,
-                first_words: DocumentText::complete(text(&[b'x'; 1100])),
-                unread: Some(Count { value: 1, limited: false }),
-                seen: 0,
-                last_reply: 1,
-                changed: Some(Wall::EPOCH),
-            };
-            InboxEntry {
-                reply: Some(Box::new(line)),
-                lineage: list(vec![]),
-                goal: None,
-                recipient: None,
-                stall: None,
-                object: ObjectKey::Task(8),
-                project: 1,
-                group: InboxGroup::Replies,
-                position,
-                at: Wall::EPOCH,
-            }
-        })
-        .collect();
+    let entries = (0..2).map(page_reply).collect();
     setup.truth.sources.push(Source {
         party: 1,
         read: Read::Inbox {
@@ -812,8 +835,6 @@ fn scenario_all_read_shapes_and_reverse_activity() {
             goal: None,
             after: None,
         },
-        Read::Conversations { after: None },
-        Read::Goals { project: 1, after: None },
         Read::Spend { project: 1, after: None },
         Read::Project { project: 1 },
         Read::Notes { scope: NoteScope::Project(1), description: Some(text(b"match")), after: None },
@@ -831,23 +852,48 @@ fn scenario_all_read_shapes_and_reverse_activity() {
 }
 fn scenario_reply_identity() {
     let mut setup = live_script();
-    let line = ConversationLine {
-        cached_replies: 0,
-        runtime: Some(Runtime::Idle),
-        delegates: 0,
+    let line = TaskLine {
+        chip: {
+            let mut chip = task().chip;
+            chip.title = DocumentText::complete(text(b"whole reply"));
+            chip
+        },
+        project: 1,
+        requester: jig_client_domain::contract::OwnerRequester::Person(1),
+        tracked: None,
+        label: 1,
+        flags: jig_client_domain::contract::TaskFlags {
+            conversation: true,
+            listed: false,
+            retention: jig_client_domain::contract::Retention::ForgottenOnceRead,
+        },
+        changed: Wall::EPOCH,
+        last_activity: Wall::EPOCH,
+        ended_at: None,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
             left: 100,
             funder: Funder::Period { project: 1, period: 3 },
             deadline: None,
         },
-        chip: task().chip,
-        project: 1,
-        first_words: DocumentText::complete(text(b"whole reply")),
-        unread: Some(Count { value: 1, limited: false }),
-        seen: 0,
-        last_reply: 1,
-        changed: Some(Wall::EPOCH),
+        waits_on: jig_client_domain::contract::WaitsOn::Nothing,
+        phases: jig_client_domain::contract::OwnerPhaseCounts {
+            waiting: 0,
+            idle: 0,
+            starting: 0,
+            running: 0,
+            backing_off: 0,
+            closing: 0,
+            held: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+        conversation: Some(jig_client_domain::contract::ConversationRead {
+            seen: 0,
+            unread: Count { value: 1, limited: false },
+        }),
     };
     let entry = InboxEntry {
         reply: Some(Box::new(line)),
@@ -1506,65 +1552,6 @@ fn inbox_group_cursors_keep_exact_filters_and_whole_query_order() {
         "live watch remains unfiltered"
     );
     assert!(value.more);
-}
-
-#[test]
-fn goals_read_from_start_includes_live_and_ended_while_watch_is_live() {
-    let mut setup = live_script();
-    let goal = |number, ended| {
-        let mut chip = task().chip;
-        chip.task = number;
-        if ended {
-            chip.phase = Phase::Done;
-            chip.details = Box::new(ChipPhase::Ended { how: Ending::Done, at: Wall::EPOCH });
-        }
-        GoalLine {
-            chip,
-            priority: 1,
-            progress: OwnerPhaseCounts {
-                idle: 2,
-                starting: 2,
-                backing_off: 2,
-                waiting: 0,
-                running: 0,
-                held: 0,
-                closing: 0,
-                done: 0,
-                failed: 0,
-                cancelled: 0,
-            },
-            budget: OwnerBudget {
-                numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
-                left: 100,
-                funder: Funder::Period { project: 1, period: 3 },
-                deadline: None,
-            },
-            held_below: 0,
-            changed: Some(Wall::EPOCH),
-        }
-    };
-    setup.truth.sources.push(Source {
-        party: 1,
-        read: Read::Goals { project: 1, after: None },
-        rows: Rows::Goals(vec![goal(8, false), goal(9, true)]),
-    });
-    let mut engine = Engine::new(setup, 93).unwrap();
-    engine.read(Time::ZERO, 11, Token::new(1), Read::Goals { project: 1, after: None }).unwrap();
-    let up = engine.poll(Time::ZERO);
-    let Up::Read { terminal: ReadResult::Value(ReadValue::Goals(page)), .. } = &up[0] else {
-        panic!("one goal list from start");
-    };
-    assert_eq!(page.rows.len(), 2);
-    assert_eq!(page.rows.get(0).unwrap().chip.task, 8);
-    assert_eq!(page.rows.get(1).unwrap().chip.phase, Phase::Done);
-    engine.open(Time::ZERO, 11, Token::new(2), Subject::Goals { project: 1 }).unwrap();
-    let up = engine.poll(Time::ZERO);
-    let Up::Watch { event: WatchEvent::Delivered(Delivery::Goals(value)), .. } = &up[1] else {
-        panic!("live board");
-    };
-    assert_eq!(value.rows.len(), 1);
-    assert_eq!(value.rows.get(0).unwrap().chip.task, 8);
-    assert!(!value.more);
 }
 
 #[test]
@@ -2323,7 +2310,6 @@ mod amendment_reason;
 mod question_sender;
 mod task_ending;
 
-mod conversation_continuation;
 mod task_context;
 mod task_hold;
 mod task_resources;

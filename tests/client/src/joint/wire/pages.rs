@@ -1,6 +1,6 @@
 //! Whole retained read pages with original query identity and opaque continuation
 //! (client/domain/contract.md, 6). The supplied page loss remains independent of row and cursor facts.
-use super::{activity, cursor, history, inbox, notes, owner, rows};
+use super::{activity, cursor, history, inbox, notes, owner};
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
 use jig_client_view::Limits;
@@ -30,7 +30,7 @@ fn continuation(
     expected: &reads::Scope,
     limits: &Limits,
 ) -> Result<Option<client::Cursor>, Invalid> {
-    if page.before.is_some() && expected != &reads::Scope::Conversations {
+    if page.before.is_some() {
         return Err(Invalid::Identity);
     }
     encode_continuation(page.next.as_ref(), expected, limits)
@@ -48,58 +48,6 @@ fn encode_continuation(
             cursor::encode(value, limits.text).map_err(|_| Invalid::Cursor)
         })
         .transpose()
-}
-
-/// # Errors
-/// Refuses another query/row kind or a whole reserved envelope above bounds.
-pub fn conversations_page(page: &reads::Page, limits: &Limits) -> Result<client::ReadValue, Invalid> {
-    let after = continuation(page, &reads::Scope::Conversations, limits)?;
-    let before = encode_continuation(page.before.as_ref(), &reads::Scope::Conversations, limits)?;
-    if page.rows.capacity() > limits.rows {
-        return Err(Invalid::Owner(owner::Invalid::TooLarge));
-    }
-    let mut result = List::with_capacity(page.rows.capacity());
-    for value in &page.rows {
-        let reads::PageRow::Conversation(value) = value else {
-            return Err(Invalid::Identity);
-        };
-        result
-            .push(rows::conversation(value, limits).map_err(Invalid::Owner)?)
-            .map_err(|_| Invalid::Owner(owner::Invalid::TooLarge))?;
-    }
-    let value = client::ReadValue::Conversations(Box::new(client::ConversationPage {
-        rows: result,
-        before,
-        after,
-        cut: page.cut,
-    }));
-    admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
-    Ok(value)
-}
-
-/// # Errors
-/// Refuses another project/query/row kind or a whole reserved envelope above bounds.
-pub fn goals_page(project: u32, page: &reads::Page, limits: &Limits) -> Result<client::ReadValue, Invalid> {
-    let after = continuation(page, &reads::Scope::Goals { project }, limits)?;
-    if page.rows.capacity() > limits.rows {
-        return Err(Invalid::Owner(owner::Invalid::TooLarge));
-    }
-    let mut result = List::with_capacity(page.rows.capacity());
-    for value in &page.rows {
-        let reads::PageRow::Goal(value) = value else {
-            return Err(Invalid::Identity);
-        };
-        if value.chip.details.project != project {
-            return Err(Invalid::Identity);
-        }
-        result
-            .push(rows::goal(value, limits).map_err(Invalid::Owner)?)
-            .map_err(|_| Invalid::Owner(owner::Invalid::TooLarge))?;
-    }
-    let value =
-        client::ReadValue::Goals(Box::new(client::GoalPage { rows: result, before: None, after, cut: page.cut }));
-    admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
-    Ok(value)
 }
 
 /// Preserve already selected owner Inbox rows and their original query/context.
@@ -157,9 +105,7 @@ pub fn history_page(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
-            | reads::PageRow::Conversation(_)
             | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(Invalid::Identity),
         };
@@ -196,9 +142,7 @@ pub fn activity_page_with_codec(
             | reads::PageRow::History(_)
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Inbox(_)
-            | reads::PageRow::Conversation(_)
             | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
             | reads::PageRow::Note(_)
             | reads::PageRow::Spend(_) => return Err(Invalid::Identity),
         };
@@ -237,9 +181,7 @@ pub fn notes_page(
             | reads::PageRow::Milestone(_)
             | reads::PageRow::Activity { .. }
             | reads::PageRow::Inbox(_)
-            | reads::PageRow::Conversation(_)
             | reads::PageRow::Line(_)
-            | reads::PageRow::Goal(_)
             | reads::PageRow::Spend(_) => return Err(Invalid::Identity),
         };
         rows.push(value).map_err(|_| Invalid::Owner(owner::Invalid::TooLarge))?;
@@ -263,59 +205,6 @@ mod tests {
     use skein_lib::Wall;
     fn limits() -> Limits {
         Limits { text: 200, rows: 4, document_bytes: 100_000, ..crate::test::limits().jig }
-    }
-    #[test]
-    fn inbox_pages_retain_original_query_context_cut_and_opaque_next_without_refiltering_owner_rows() {
-        let source = inbox::tests::source();
-        let original = client::Read::Inbox {
-            group: client::InboxReadGroup::Updates,
-            project: Some(0),
-            kind: Some(client::InboxGroup::Results),
-            goal: Some(17),
-            after: None,
-        };
-        let expected = inbox::scope(&original, limits().text).expect("original owner query");
-        let mut page = reads::Page {
-            rows: List::with_capacity(8),
-            before: None,
-            next: Some(reads::Cursor::Store { scope: expected, after: None }),
-            cut: true,
-            inbox_selection: source.selection,
-        };
-        // The bounded answer is already selected by its owner; no row-local goal is invented.
-        page.rows
-            .push(reads::PageRow::Inbox(source.needs.get(0).expect("stored reference").clone()))
-            .expect("owner row");
-        let original_source = page.clone();
-        let client::ReadValue::OwnerInbox(value) =
-            inbox_page(&original, &page, &inbox::tests::limits()).expect("whole original answer")
-        else {
-            panic!("owner inbox page")
-        };
-        assert!(value.cut);
-        assert_eq!((value.rows.capacity(), value.rows.len()), (8, 1));
-        assert_eq!(value.before, None);
-        assert_eq!(cursor::decode(value.after.as_ref().expect("original query cursor"), 200), page.next);
-        assert_eq!(value.rows.get(0).expect("row").project, None);
-        assert_eq!(
-            value.selection.as_ref().expect("original retained contexts").get(0).expect("roots").goals.capacity(),
-            12
-        );
-        assert_eq!(page, original_source);
-        assert_eq!(
-            inbox_page(&original, &page, &Limits { document_bytes: 100, ..inbox::tests::limits() }),
-            Err(Invalid::Payload)
-        );
-        page.next = Some(reads::Cursor::Store {
-            scope: reads::Scope::Inbox {
-                group: reads::Group::Results,
-                filter: reads::Filter { project: Some(0), goal: Some(0) },
-            },
-            after: None,
-        });
-        assert_eq!(inbox_page(&original, &page, &inbox::tests::limits()), Err(Invalid::Identity));
-        page.next = Some(reads::Cursor::ConversationsStart);
-        assert_eq!(inbox_page(&original, &page, &inbox::tests::limits()), Err(Invalid::Identity));
     }
 
     #[test]
@@ -374,93 +263,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn conversation_pages_keep_independent_owner_edges_and_refuse_foreign_prefixes_without_consuming_rows() {
-        let before = reads::Cursor::ConversationsLiveBefore {
-            before: Some(jig_domain_core::documents::Cursor::Number { number: u64::MAX }),
-        };
-        let after = reads::Cursor::Store { scope: reads::Scope::Conversations, after: None };
-        let mut page = reads::Page {
-            rows: List::with_capacity(3),
-            before: Some(before.clone()),
-            next: Some(after.clone()),
-            cut: true,
-            inbox_selection: None,
-        };
-        page.rows.push(reads::PageRow::Conversation(rows::tests::conversation_source())).expect("whole source row");
-        let original = page.clone();
-        let client::ReadValue::Conversations(value) = conversations_page(&page, &limits()).expect("both owner edges")
-        else {
-            panic!("conversation page")
-        };
-        assert_eq!(cursor::decode(value.before.as_ref().expect("prefix"), limits().text), Some(before));
-        assert_eq!(cursor::decode(value.after.as_ref().expect("suffix"), limits().text), Some(after));
-        assert_eq!((value.rows.capacity(), value.rows.len(), value.cut), (3, 1, true));
-        assert_eq!(page, original);
-        page.before = Some(reads::Cursor::Store { scope: reads::Scope::Goals { project: 0 }, after: None });
-        assert_eq!(conversations_page(&page, &limits()), Err(Invalid::Identity));
-        page.before = original.before;
-        assert_eq!(conversations_page(&page, &Limits { text: 1, ..limits() }), Err(Invalid::Cursor));
-        assert_eq!(conversations_page(&page, &Limits { document_bytes: 0, ..limits() }), Err(Invalid::Payload));
-        page.next = Some(reads::Cursor::ConversationsStart);
-        let client::ReadValue::Conversations(value) = conversations_page(&page, &limits()).expect("owner live restart")
-        else {
-            panic!("conversation restart")
-        };
-        assert_eq!(cursor::decode(value.after.as_ref().expect("restart"), limits().text), page.next);
-        assert_eq!(goals_page(0, &page, &limits()), Err(Invalid::Identity));
-    }
-
-    #[test]
-    fn conversation_and_goal_pages_keep_owner_row_order_exact_continuations_and_true_page_loss() {
-        let mut values = List::with_capacity(3);
-        for task in [u64::MAX, 0] {
-            let mut row = rows::tests::conversation_source();
-            row.chip.number = task;
-            values.push(reads::PageRow::Conversation(row)).expect("source row");
-        }
-        let mut page = reads::Page {
-            before: None,
-            inbox_selection: None,
-            rows: values,
-            next: Some(reads::Cursor::Store { scope: reads::Scope::Conversations, after: None }),
-            cut: true,
-        };
-        let client::ReadValue::Conversations(value) = conversations_page(&page, &limits()).expect("whole page") else {
-            panic!("conversations")
-        };
-        assert!(value.cut);
-        assert_eq!((value.rows.capacity(), value.rows.len()), (3, 2));
-        assert_eq!(
-            (value.rows.get(0).expect("first").chip.task, value.rows.get(1).expect("second").chip.task),
-            (u64::MAX, 0)
-        );
-        assert_eq!(value.before, None);
-        assert_eq!(cursor::decode(value.after.as_ref().expect("continuation"), limits().text), page.next);
-        assert_eq!(
-            conversations_page(&page, &Limits { rows: 2, ..limits() }),
-            Err(Invalid::Owner(owner::Invalid::TooLarge))
-        );
-        assert_eq!(conversations_page(&page, &Limits { document_bytes: 0, ..limits() }), Err(Invalid::Payload));
-        page.next = Some(reads::Cursor::Store { scope: reads::Scope::Goals { project: u32::MAX }, after: None });
-        assert_eq!(conversations_page(&page, &limits()), Err(Invalid::Identity));
-        let mut goal_rows = List::with_capacity(3);
-        goal_rows.push(reads::PageRow::Goal(rows::tests::goal_source())).expect("source goal");
-        page.rows = goal_rows;
-        let client::ReadValue::Goals(value) = goals_page(u32::MAX, &page, &limits()).expect("whole goal page") else {
-            panic!("goals")
-        };
-        assert!(value.cut);
-        assert_eq!((value.rows.capacity(), value.rows.len()), (3, 1));
-        assert_eq!(value.rows.get(0).expect("goal").progress.cancelled, u32::MAX);
-        assert_eq!(value.rows.get(0).expect("goal").changed, None);
-        assert_eq!(cursor::decode(value.after.as_ref().expect("continuation"), limits().text), page.next);
-        assert_eq!(goals_page(0, &page, &limits()), Err(Invalid::Identity));
-        page.next = None;
-        assert_eq!(goals_page(0, &page, &limits()), Err(Invalid::Identity), "row project is independently checked");
-        assert_eq!(goals_page(u32::MAX, &page, &Limits { document_bytes: 0, ..limits() }), Err(Invalid::Payload));
-        assert_eq!(conversations_page(&page, &limits()), Err(Invalid::Identity), "wrong row kind");
-    }
     fn source() -> reads::Page {
         let mut rows = List::with_capacity(3);
         for position in [u64::MAX, 0] {

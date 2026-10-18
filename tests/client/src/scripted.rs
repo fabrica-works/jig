@@ -330,8 +330,6 @@ impl Front<Test> for Scripted {
                     | Read::History { .. }
                     | Read::Activity { .. }
                     | Read::Inbox { .. }
-                    | Read::Conversations { .. }
-                    | Read::Goals { .. }
                     | Read::Spend { .. }
                     | Read::Project { .. }
                     | Read::Notes { .. }
@@ -357,9 +355,7 @@ impl Front<Test> for Scripted {
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
-                | Subject::Goals { .. }
                 | Subject::Tasks { .. }
-                | Subject::Conversations
                 | Subject::Deployment => unreachable!("only runs continue"),
             },
             Down::Close { watch } => self.engine.close(now, watch),
@@ -575,8 +571,6 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::Activity(_)
                 | ReadValue::Inbox(_)
                 | ReadValue::OwnerInbox(_)
-                | ReadValue::Conversations(_)
-                | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
                 | ReadValue::OwnerEnded(_)
                 | ReadValue::OwnerSpend(_)
@@ -608,8 +602,6 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::Activity(_)
                 | ReadValue::Inbox(_)
                 | ReadValue::OwnerInbox(_)
-                | ReadValue::Conversations(_)
-                | ReadValue::Goals(_)
                 | ReadValue::Spend(_)
                 | ReadValue::OwnerEnded(_)
                 | ReadValue::OwnerSpend(_)

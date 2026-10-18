@@ -499,7 +499,7 @@ fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
         core.move_admit(1, Some(people::Role::Owner), 1, 2, limits.tasks.tree_tasks, limits.tasks.depth),
         Err(why)
     );
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Prioritise, &Subject::Goals { project: 1 }), Admission::Allowed);
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Prioritise, &Subject::Project { project: 1 }), Admission::Allowed);
     let event = core
         .prioritise(Token::new(90), 1, 1, Some(people::Role::Owner), Box::new([(1, 2)]), limits.tasks.tasks)
         .unwrap();

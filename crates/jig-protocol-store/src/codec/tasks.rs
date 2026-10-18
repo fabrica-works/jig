@@ -139,9 +139,6 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, 
         domain::Stored::DecidedProposal(row) => wire::Value::DecidedProposal(proposals::person_proposal(row, limits)?),
         domain::Stored::Update(row) => wire::Value::Update(index::update(row, limits)?),
         domain::Stored::Result(row) => wire::Value::Result(index::result_row(row, limits)?),
-        domain::Stored::ConversationNewest(row) => wire::Value::ConversationNewest(index::conversation(row, limits)?),
-        domain::Stored::ConversationOldest(row) => wire::Value::ConversationOldest(index::conversation(row, limits)?),
-        domain::Stored::Goal(row) => wire::Value::Goal(index::goal_row(row, limits)?),
         domain::Stored::EndedDelegate(row) => wire::Value::EndedDelegate(index::edge(row, limits)?),
         domain::Stored::EndedByParty(row) => wire::Value::EndedByParty(index::ended_by_party(row, limits)?),
         domain::Stored::EndedByProject(row) => wire::Value::EndedByProject(index::ended_by_project(row, limits)?),
@@ -163,13 +160,6 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wir
     Ok(match value {
         wire::Value::Update(row) => domain::Stored::Update(index::read_update(row, limits)?),
         wire::Value::Result(row) => domain::Stored::Result(index::read_result_row(row, limits)?),
-        wire::Value::ConversationNewest(row) => {
-            domain::Stored::ConversationNewest(index::read_conversation(row, limits)?)
-        }
-        wire::Value::ConversationOldest(row) => {
-            domain::Stored::ConversationOldest(index::read_conversation(row, limits)?)
-        }
-        wire::Value::Goal(row) => domain::Stored::Goal(index::read_goal_row(row, limits)?),
         wire::Value::EndedDelegate(row) => domain::Stored::EndedDelegate(index::read_edge(row, limits)?),
         wire::Value::EndedByParty(row) => domain::Stored::EndedByParty(index::read_ended_by_party(row)),
         wire::Value::EndedByProject(row) => domain::Stored::EndedByProject(index::read_ended_by_project(row)),

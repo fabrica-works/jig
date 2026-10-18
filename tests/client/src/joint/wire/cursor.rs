@@ -88,9 +88,6 @@ pub(crate) fn decode_window(value: &Cursor, limit: u32) -> Option<documents::Cur
 pub fn belongs_to(value: &reads::Cursor, expected: &reads::Scope) -> bool {
     match value {
         reads::Cursor::Live { scope, .. } | reads::Cursor::Store { scope, .. } => scope == expected,
-        reads::Cursor::ConversationsBefore { .. }
-        | reads::Cursor::ConversationsLiveBefore { .. }
-        | reads::Cursor::ConversationsStart => expected == &reads::Scope::Conversations,
     }
 }
 
@@ -229,15 +226,6 @@ fn put_cursor(w: &mut Writer, value: &reads::Cursor) -> Option<()> {
             put_scope(w, scope)?;
             put_option(w, after, put_position)?;
         }
-        reads::Cursor::ConversationsBefore { before } => {
-            w.byte(2)?;
-            put_position(w, before)?;
-        }
-        reads::Cursor::ConversationsLiveBefore { before } => {
-            w.byte(3)?;
-            put_option(w, before, put_document_cursor)?;
-        }
-        reads::Cursor::ConversationsStart => w.byte(4)?,
     }
     Some(())
 }
@@ -249,9 +237,6 @@ fn take_cursor(r: &mut Reader<'_>) -> Option<reads::Cursor> {
             store_after: take_option(r, take_position)?,
         },
         1 => reads::Cursor::Store { scope: take_scope(r)?, after: take_option(r, take_position)? },
-        2 => reads::Cursor::ConversationsBefore { before: take_position(r)? },
-        3 => reads::Cursor::ConversationsLiveBefore { before: take_option(r, take_document_cursor)? },
-        4 => reads::Cursor::ConversationsStart,
         _ => return None,
     })
 }
@@ -313,14 +298,7 @@ fn put_scope(w: &mut Writer, value: &reads::Scope) -> Option<()> {
             put_group(w, group)?;
             put_filter(w, filter)?;
         }
-        reads::Scope::Conversations => {
-            w.byte(12)?;
-        }
         reads::Scope::Tasks { .. } => return None,
-        reads::Scope::Goals { project } => {
-            w.byte(13)?;
-            w.u32(*project)?;
-        }
         reads::Scope::Notes { project } => {
             w.byte(14)?;
             w.u32(*project)?;
@@ -351,8 +329,6 @@ fn take_scope(r: &mut Reader<'_>) -> Option<reads::Scope> {
         9 => reads::Scope::History { task: r.u64()?, subtree: r.boolean()? },
         10 => reads::Scope::Activity { task: r.u64()? },
         11 => reads::Scope::Inbox { group: take_group(r)?, filter: take_filter(r)? },
-        12 => reads::Scope::Conversations,
-        13 => reads::Scope::Goals { project: r.u32()? },
         14 => reads::Scope::Notes { project: r.u32()? },
         15 => reads::Scope::ScopedNotes { scope: take_note_scope(r)?, description: take_option(r, take_blob)? },
         16 => reads::Scope::Spend { project: r.u32()? },
@@ -826,14 +802,7 @@ fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
         }
         tasks::Key::EndedDelegate { requester, task } => index::conversation(w, 17, *requester, *task)?,
         tasks::Key::Delegate { requester, task } => index::conversation(w, 18, *requester, *task)?,
-        tasks::Key::Goal { project, task } => {
-            w.byte(16)?;
-            w.u32(*project)?;
-            w.u64(task.raw())?;
-        }
         tasks::Key::Result { party, position } => index::conversation(w, 13, *party, *position)?,
-        tasks::Key::ConversationNewest { party, task } => index::conversation(w, 14, *party, task.raw())?,
-        tasks::Key::ConversationOldest { party, task } => index::conversation(w, 15, *party, *task)?,
         tasks::Key::Update { party, at, task, object } => index::put(w, *party, *at, *task, *object)?,
         tasks::Key::Activity { task, position } => {
             w.byte(11)?;
@@ -892,7 +861,6 @@ fn put_task_key(w: &mut Writer, value: &tasks::Key) -> Option<()> {
 fn take_task_key(r: &mut Reader<'_>) -> Option<tasks::Key> {
     Some(match r.byte()? {
         13 => tasks::Key::Result { party: r.u64()?, position: r.u64()? },
-        14 => tasks::Key::ConversationNewest { party: r.u64()?, task: tasks::Newest::from_raw(r.u64()?) },
         19 => tasks::Key::EndedByParty {
             party: r.u64()?,
             label: r.u32()?,
@@ -907,8 +875,6 @@ fn take_task_key(r: &mut Reader<'_>) -> Option<tasks::Key> {
         },
         17 => tasks::Key::EndedDelegate { requester: r.u64()?, task: r.u64()? },
         18 => tasks::Key::Delegate { requester: r.u64()?, task: r.u64()? },
-        16 => tasks::Key::Goal { project: r.u32()?, task: tasks::Newest::from_raw(r.u64()?) },
-        15 => tasks::Key::ConversationOldest { party: r.u64()?, task: r.u64()? },
         12 => index::take(r)?,
         11 => tasks::Key::Activity { task: r.u64()?, position: r.u64()? },
         5 => tasks::Key::PersonProposal(r.u64()?),
@@ -980,46 +946,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn conversation_owner_both_end_cursors_survive_reload_whole_without_reversing_or_default_positions() {
-        let position = reads::Position::Owner(Key::Core(CoreKey::Terminal { task: u64::MAX, attempt: 0 }));
-        for source in [
-            reads::Cursor::ConversationsBefore { before: position },
-            reads::Cursor::ConversationsLiveBefore { before: None },
-            reads::Cursor::ConversationsLiveBefore { before: Some(documents::Cursor::Number { number: 0 }) },
-            reads::Cursor::ConversationsLiveBefore { before: Some(documents::Cursor::Number { number: u64::MAX }) },
-            reads::Cursor::ConversationsStart,
-            reads::Cursor::Store { scope: reads::Scope::Conversations, after: None },
-        ] {
-            let encoded = encode(&source, 200).expect("whole owner continuation");
-            let length = u32::try_from(encoded.value.bytes().len()).expect("bounded cursor");
-            assert_eq!(encode(&source, length).expect("exact bound"), encoded);
-            assert_eq!(encode(&source, length - 1), Err(TooLarge));
-            let saved = Cursor::new(encoded.value.into_bytes(), length).expect("saved whole bytes");
-            assert_eq!(decode(&saved, length), Some(source.clone()));
-            assert!(belongs_to(&source, &reads::Scope::Conversations));
-            assert!(!belongs_to(&source, &reads::Scope::Goals { project: 0 }));
-            let request = jig_client_domain::contract::Read::Conversations { after: Some(saved) };
-            assert_eq!(
-                super::super::reads::read(&request, length).expect("original query"),
-                reads::Read::Conversations { from: Some(source) }
-            );
-        }
-        assert_ne!(
-            encode(&reads::Cursor::ConversationsStart, 200).expect("start"),
-            encode(&reads::Cursor::Store { scope: reads::Scope::Conversations, after: None }, 200)
-                .expect("stored start")
-        );
-        assert_ne!(
-            encode(&reads::Cursor::ConversationsLiveBefore { before: None }, 200).expect("absent"),
-            encode(
-                &reads::Cursor::ConversationsLiveBefore { before: Some(documents::Cursor::Number { number: 0 }) },
-                200
-            )
-            .expect("zero")
-        );
-    }
-
-    #[test]
     fn opaque_note_cursors_keep_literal_segments_terminal_bytes_and_whole_bounds_across_reload() {
         let scope = notes::Scope::Resources {
             project: u32::MAX,
@@ -1043,29 +969,6 @@ mod tests {
         let restored = Cursor::new(saved, length).expect("saved whole bytes");
         assert_eq!(decode(&restored, length), Some(cursor));
         assert_eq!(decode(&restored, length - 1), None);
-    }
-
-    #[test]
-    fn cursor_decoder_refuses_truncation_trailing_bytes_unknown_tags_and_oversized_segment_counts() {
-        let expected = reads::Cursor::Store { scope: reads::Scope::Conversations, after: None };
-        let bytes = vec![1, 1, 12, 0];
-        let cursor = Cursor::new(bytes.clone().into_boxed_slice(), 64).expect("short cursor");
-        assert_eq!(decode(&cursor, 64), Some(expected.clone()));
-        assert_eq!(encode(&expected, 64).expect("whole cursor").value.bytes(), bytes);
-        for length in 0..bytes.len() {
-            let cut = Cursor::new(bytes[..length].to_vec().into_boxed_slice(), 64).expect("short bytes");
-            assert_eq!(decode(&cut, 64), None);
-        }
-        for malformed in [vec![1, 1, 12, 0, 0], vec![2, 1, 12, 0], vec![1, 2], vec![1, 1, 255], vec![1, 1, 12, 2]] {
-            let value = Cursor::new(malformed.into_boxed_slice(), 64).expect("bounded malformed bytes");
-            assert_eq!(decode(&value, 64), None);
-        }
-        let mut huge_count = vec![1, 1, 15, 3];
-        huge_count.extend_from_slice(&1_u32.to_le_bytes());
-        huge_count.extend_from_slice(&2_u16.to_le_bytes());
-        huge_count.extend_from_slice(&u32::MAX.to_le_bytes());
-        let value = Cursor::new(huge_count.into_boxed_slice(), 64).expect("bounded count prefix");
-        assert_eq!(decode(&value, 64), None);
     }
 
     #[test]

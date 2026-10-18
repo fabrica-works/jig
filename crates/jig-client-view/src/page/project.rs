@@ -257,8 +257,6 @@ pub(crate) fn tasks(domain: &mut Ui, env: &Env<crate::Limits>, filter: TaskQuery
             | contract::Subject::Tree { .. }
             | contract::Subject::Chips { .. }
             | contract::Subject::Inbox { .. }
-            | contract::Subject::Goals { .. }
-            | contract::Subject::Conversations
             | contract::Subject::Run { .. }
             | contract::Subject::Deployment => {}
         }
@@ -299,7 +297,7 @@ pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Req
         };
         if let Some(cursor) = cursor
             && let Some(me) = domain.frame(lent).document
-            && let Some(template) = jig_client::shapes::template(me, project, jig_client::shapes::GOAL)
+            && let Some(template) = crate::queries::goal_template(me, project)
         {
             ask(
                 domain,

@@ -700,88 +700,6 @@ fn documents_task_carries_overview_lineage_and_the_hold_reason() {
 }
 
 #[test]
-fn documents_goal_progress_counts_every_phase_including_ended_plan_rows() {
-    let (mut core, limits) = make_tree();
-    let phases = [
-        tasks::Phase::Waiting,
-        tasks::Phase::Active(tasks::Active::Idle),
-        tasks::Phase::Active(tasks::Active::Due),
-        tasks::Phase::Active(tasks::Active::Running { attempt: 1 }),
-        tasks::Phase::Active(tasks::Active::BackingOff { until: Wall::EPOCH }),
-        tasks::Phase::Closing(tasks::Closing {
-            stage: tasks::Stage::Delegates,
-            ending: tasks::Ending::Failed { reason: Box::new([]) },
-        }),
-        tasks::Phase::Held { was: tasks::Was::Waiting, why: tasks::Hold::Budget, source: None },
-        tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: Box::new([]) })),
-        tasks::Phase::Ended(tasks::Ending::Failed { reason: Box::new([]) }),
-        tasks::Phase::Ended(tasks::Ending::Cancelled {
-            reason: Box::new([]),
-            result: None,
-            by: tasks::Party::Person(1),
-            at: Wall::EPOCH,
-        }),
-    ];
-    let mut prototype = core.tasks.task(2).unwrap().clone();
-    let mut out = Queue::with_capacity(room_max(&limits).unwrap().writes);
-    for (index, phase) in phases.into_iter().enumerate() {
-        prototype.number = u64::try_from(index).unwrap() + 2;
-        prototype.phase = phase;
-        projections::save(&mut core, &limits, &prototype, &mut out);
-        while out.pop().is_some() {}
-    }
-    let Document::Goals(goals) = make(&core, &limits, 1, &Subject::Goals { project: 1 }, &window()).unwrap() else {
-        panic!()
-    };
-    let line = goals.lines.get(0).unwrap();
-    assert_eq!(
-        line.phases,
-        PhaseCounts {
-            waiting: 1,
-            idle: 1,
-            starting: 2,
-            running: 1,
-            backing_off: 1,
-            closing: 1,
-            held: 1,
-            done: 1,
-            failed: 1,
-            cancelled: 1
-        }
-    );
-    assert_eq!(line.held_below, 1);
-    assert_eq!(line.budget.numbers.reserved, 30);
-    assert_eq!(line.budget.left, 70);
-}
-
-#[test]
-fn documents_goals_follow_priority_and_resume_at_the_named_cursor() {
-    let (mut core, limits) = make_tree();
-    let goal = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, Some(2));
-    send_task(
-        &mut core,
-        &limits,
-        tasks::Event::Make {
-            reply_to: ReplyTo::new(Token::new(1)),
-            creator: tasks::Party::Person(1),
-            batch: Box::new([goal]),
-        },
-    );
-    let Document::Goals(goals) = make(&core, &limits, 1, &Subject::Goals { project: 1 }, &window()).unwrap() else {
-        panic!()
-    };
-    assert_eq!(goals.lines.get(0).unwrap().chip.number, 5);
-    assert_eq!(goals.next, Some(Cursor::Number { number: 5 }));
-    let Document::Goals(next) =
-        make(&core, &limits, 1, &Subject::Goals { project: 1 }, &Window { rows: 1, after: goals.next }).unwrap()
-    else {
-        panic!()
-    };
-    assert_eq!(next.lines.get(0).unwrap().chip.number, 1);
-    assert_eq!(next.next, None);
-}
-
-#[test]
 fn documents_part_keys_are_preserved_or_refused_whole() {
     let (mut core, mut limits) = tree_core();
     let mut row = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, None);
@@ -1611,30 +1529,6 @@ fn documents_cached_inbox_results_preserve_positions_project_and_time() {
     assert_eq!(inbox.cached_updates, Count::Known(2));
 }
 #[test]
-fn documents_conversations_show_chats_and_exclude_goals() {
-    let (mut core, limits) = make_tree();
-    let mut row = new_row(&core, 5, tasks::Funder::Period { project: 1, period: 1 }, None);
-    row.flags.conversation = true;
-    send_task(
-        &mut core,
-        &limits,
-        tasks::Event::Make {
-            reply_to: ReplyTo::new(Token::new(110)),
-            creator: tasks::Party::Person(1),
-            batch: Box::new([row]),
-        },
-    );
-    let Document::Conversations(conversations) =
-        make(&core, &limits, 1, &Subject::Conversations { party: 1 }, &window()).unwrap()
-    else {
-        panic!()
-    };
-    assert_eq!(conversations.lines.len(), 1);
-    assert_eq!(conversations.lines.get(0).unwrap().chip.number, 5);
-    assert_eq!(conversations.lines.get(0).unwrap().budget.numbers.budget, 100);
-    assert_eq!(conversations.lines.get(0).unwrap().replies_unread, Some(Count::Known(0)));
-}
-#[test]
 fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_clock() {
     let (mut core, mut limits) = make_tree();
     limits.people.projects = 2;
@@ -1828,19 +1722,27 @@ fn watch_outputs(core: &mut Core, limits: &Limits, event: Event) -> Box<[Request
     }
 }
 
-fn watch_subjects() -> [(&'static str, Watched, Subject); 10] {
+fn watch_subjects() -> [(&'static str, Watched, Subject); 8] {
     let mut chips = List::with_capacity(1);
     chips.push(1).unwrap();
-    let filter = TaskFilter { phase: None, executor: None, goal: None, asked_by_me: false };
+    let query = TaskQuery {
+        project: Some(1),
+        requester: None,
+        root: None,
+        parent: None,
+        label: None,
+        phase: None,
+        executor: None,
+        tracked: None,
+        order: QueryOrder::Changed,
+    };
     [
         ("Frame", Watched::Frame, Subject::Frame { party: 1 }),
         ("Task", Watched::Task { task: 1 }, Subject::Task { task: 1 }),
         ("Tree", Watched::Tree { task: 1 }, Subject::Tree { task: 1 }),
         ("Chips", Watched::Chips { tasks: chips.clone() }, Subject::Chips { tasks: chips }),
         ("Inbox", Watched::Inbox, Subject::Inbox { party: 1 }),
-        ("Goals", Watched::Goals { project: 1 }, Subject::Goals { project: 1 }),
-        ("Tasks", Watched::Tasks { project: 1, filter }, Subject::Tasks { project: 1, filter }),
-        ("Conversations", Watched::Conversations, Subject::Conversations { party: 1 }),
+        ("Tasks", Watched::Query { query }, Subject::Query { query }),
         ("Run", Watched::Run { task: 1 }, Subject::Run { task: 1 }),
         ("Deployment", Watched::Deployment, Subject::Deployment),
     ]
@@ -1869,13 +1771,11 @@ fn an_unkeyed_watch_on_each_subject_makes_its_first_document_as_a_held_output() 
 fn watch_admission_checks_each_subjects_project_or_owner() {
     for (label, subject, _) in watch_subjects() {
         match subject {
-            Watched::Frame | Watched::Inbox | Watched::Conversations => continue,
+            Watched::Frame | Watched::Inbox => continue,
             Watched::Task { .. }
             | Watched::Tree { .. }
             | Watched::Chips { .. }
-            | Watched::Goals { .. }
             | Watched::Query { .. }
-            | Watched::Tasks { .. }
             | Watched::Run { .. }
             | Watched::Deployment
             | Watched::Application { .. } => {}
@@ -1976,7 +1876,7 @@ fn finish_watch_outputs(core: &mut Core, limits: &Limits) -> Box<[Request]> {
 }
 
 #[test]
-fn one_task_change_marks_its_task_every_tree_goals_and_named_chips_once() {
+fn one_task_change_marks_trees_queries_and_named_chips_once() {
     let (mut core, mut limits) = make_tree();
     let (authenticated, auth_limits) = watch_core();
     core.people = authenticated.people;
@@ -1988,7 +1888,19 @@ fn one_task_change_marks_its_task_every_tree_goals_and_named_chips_once() {
         Watched::Task { task: 2 },
         Watched::Tree { task: 2 },
         Watched::Tree { task: 1 },
-        Watched::Goals { project: 1 },
+        Watched::Query {
+            query: TaskQuery {
+                project: Some(1),
+                requester: None,
+                root: None,
+                parent: None,
+                label: None,
+                phase: None,
+                executor: None,
+                tracked: Some(true),
+                order: QueryOrder::Priority,
+            },
+        },
         Watched::Chips { tasks: chips },
     ];
     for (index, subject) in subjects.into_iter().enumerate() {
@@ -2880,8 +2792,6 @@ mod document_offers;
 mod last_batch;
 mod periods;
 
-mod project_tasks;
-
 mod frame_deployment_role;
 mod frame_facts;
 mod project_baselines;
@@ -2974,7 +2884,6 @@ fn verdict_documents_preserve_machine_field_rules_and_values_whole() {
 mod engine_timers;
 mod sign_ins;
 
-mod conversation_cursor;
 mod fill;
 mod inbox_selection;
 mod restore_admission;

@@ -40,20 +40,6 @@ fn one_partys_updates_sort_before_the_next_partys() {
 }
 
 #[test]
-fn a_newer_conversation_sorts_first_in_the_newest_family() {
-    let older = Key::ConversationNewest { party: 7, task: Newest::of(20) };
-    let newer = Key::ConversationNewest { party: 7, task: Newest::of(30) };
-    assert!(newer < older);
-}
-
-#[test]
-fn a_newer_goal_sorts_first_within_its_project() {
-    let older = Key::Goal { project: 1, task: Newest::of(20) };
-    let newer = Key::Goal { project: 1, task: Newest::of(30) };
-    assert!(newer < older);
-}
-
-#[test]
 fn lifetime_ending_counts_saturate() {
     let mut counts = crate::Endings { done: u32::MAX, failed: u32::MAX - 1, cancelled: u32::MAX - 1 };
     counts.add(crate::Endings { done: 1, failed: 2, cancelled: 2 });

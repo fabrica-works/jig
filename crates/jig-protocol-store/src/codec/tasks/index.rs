@@ -61,17 +61,6 @@ pub fn read_endings(source: wire::Endings, _limits: &wire::Limits) -> Result<dom
     Ok(domain::Endings { done, failed, cancelled })
 }
 
-/// Translate `GoalRow` to its durable record.
-pub fn goal_row(source: &domain::GoalRow, limits: &wire::Limits) -> Result<wire::GoalRow, wire::Problem> {
-    let domain::GoalRow { project, task, endings: counts } = source;
-    wire::GoalRow::new(limits, wire::GoalRowParts { project: *project, task: *task, endings: endings(counts, limits)? })
-}
-/// Read `GoalRow` from its durable record.
-pub fn read_goal_row(source: wire::GoalRow, limits: &wire::Limits) -> Result<domain::GoalRow, wire::Problem> {
-    let wire::GoalRowParts { project, task, endings } = source.into_parts();
-    Ok(domain::GoalRow { project, task, endings: read_endings(endings, limits)? })
-}
-
 /// Translate `UpdateObject` to its durable value.
 pub fn update_object(
     source: &domain::UpdateObject,
@@ -129,20 +118,6 @@ pub fn result_row(source: &domain::ResultRow, limits: &wire::Limits) -> Result<w
 pub fn read_result_row(source: wire::ResultRow, _limits: &wire::Limits) -> Result<domain::ResultRow, wire::Problem> {
     let wire::ResultRowParts { party, position, task } = source.into_parts();
     Ok(domain::ResultRow { party, position, task })
-}
-
-/// Translate `Conversation` to its durable record.
-pub fn conversation(source: &domain::Conversation, limits: &wire::Limits) -> Result<wire::Conversation, wire::Problem> {
-    let domain::Conversation { party, task } = source;
-    wire::Conversation::new(limits, wire::ConversationParts { party: *party, task: *task })
-}
-/// Read `Conversation` from its durable record.
-pub fn read_conversation(
-    source: wire::Conversation,
-    _limits: &wire::Limits,
-) -> Result<domain::Conversation, wire::Problem> {
-    let wire::ConversationParts { party, task } = source.into_parts();
-    Ok(domain::Conversation { party, task })
 }
 
 /// Translate `Edge` to its durable record.

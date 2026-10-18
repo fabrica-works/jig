@@ -13,12 +13,6 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, at: skein_lib::Wall, out
                 }
                 tasks::Party::Task(_) | tasks::Party::Deployment { .. } => {}
             }
-            if let Some(party) = core.conversation_requester(task) {
-                let row = tasks::Conversation { party, task: task.number };
-                for record in [tasks::Stored::ConversationNewest(row), tasks::Stored::ConversationOldest(row)] {
-                    out.push(Request::Write(Write::Save(Record::Tasks(record))));
-                }
-            }
             match task.requester {
                 tasks::Party::Person(party) => Some(tasks::Update {
                     party,
@@ -68,13 +62,10 @@ pub(crate) fn save(core: &Core, record: &tasks::Stored, at: skein_lib::Wall, out
             })
         }
         tasks::Stored::Result(_)
-        | tasks::Stored::ConversationNewest(_)
-        | tasks::Stored::Goal(_)
         | tasks::Stored::EndedByParty(_)
         | tasks::Stored::EndedByProject(_)
         | tasks::Stored::EndedDelegate(_)
         | tasks::Stored::Delegate(_)
-        | tasks::Stored::ConversationOldest(_)
         | tasks::Stored::Update(_)
         | tasks::Stored::Live(_)
         | tasks::Stored::History(_)

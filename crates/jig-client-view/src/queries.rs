@@ -43,6 +43,10 @@ pub const fn goals(project: u32) -> TaskQuery {
         order: QueryOrder::Priority,
     }
 }
+/// The project's offered goal template, shared by list and page guards.
+pub(crate) fn goal_template(me: &jig_client::contract::Me, project: u32) -> Option<&jig_client::contract::Template> {
+    jig_client::shapes::template(me, project, jig_client::shapes::GOAL)
+}
 /// The project's ended tasks of its goal template, latest first.
 #[must_use]
 pub const fn ended_goals(project: u32, goal_label: u32) -> TaskQuery {

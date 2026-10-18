@@ -687,16 +687,16 @@ pub const DEPLOYMENT: [u8; 16] = [7; 16];
 mod reads;
 mod store;
 pub use reads::{
-    CHILD, GOAL, GRANDCHILD, activity_line, answer_line, conversation, delegate, ended_delegate, ended_of,
-    escalation_decision, goal_row, history_with_proposal, hold_milestone, ledger_period, notes_entry_in, notified_line,
-    person_proposal, proposal_decision, question_line, read, terminal, update, with_hold, with_links,
-    with_proposal_rows, with_question_lines,
+    CHILD, GOAL, GRANDCHILD, activity_line, answer_line, delegate, ended_delegate, ended_of, escalation_decision,
+    history_with_proposal, hold_milestone, ledger_period, notes_entry_in, notified_line, person_proposal,
+    proposal_decision, question_line, read, terminal, update, with_hold, with_links, with_proposal_rows,
+    with_question_lines,
 };
 pub use store::{
     ALICE, ENDED, LIVE, OTHER_DEPLOYMENT, PROJECT, ROOT, answer, below, call, codec_limits, commit, committed,
-    conversation_index, directory, ended_task, env, format_put, get_kv, header, header_put, header_record, history,
-    live_task, notes_entry, notes_line, opened, opened_with_budget, over, person, plant, result_index, run, run_proof,
-    save, sign_in_secret, stores, turn, window_turn,
+    directory, ended_task, env, format_put, get_kv, header, header_put, header_record, history, live_task, notes_entry,
+    notes_line, opened, opened_with_budget, over, person, plant, result_index, run, run_proof, save, sign_in_secret,
+    stores, turn, window_turn,
 };
 
 pub use store::limits as store_limits;

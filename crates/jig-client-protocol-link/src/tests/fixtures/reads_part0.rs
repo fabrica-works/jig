@@ -8,14 +8,6 @@ pub fn read_wire_inbox_page() -> w::InboxPage {
     jig_client_test_records::read_wire_inbox_page()
 }
 
-pub fn read_wire_conversation_page() -> w::ConversationPage {
-    jig_client_test_records::read_wire_conversation_page()
-}
-
-pub fn read_wire_goal_page() -> w::GoalPage {
-    jig_client_test_records::read_wire_goal_page()
-}
-
 pub fn read_wire_spend_page() -> w::SpendPage {
     jig_client_test_records::read_wire_spend_page()
 }

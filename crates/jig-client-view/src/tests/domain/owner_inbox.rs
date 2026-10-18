@@ -217,28 +217,42 @@ fn owner_inbox_live_goal_context_is_explicitly_pending_and_bounded_read_membersh
     assert!(page.goal_context_pending);
 }
 #[test]
-fn reply_preview_preserves_runtime_and_activity_apart_from_seen() {
+fn reply_preview_preserves_task_title_activity_and_read_position() {
     let (mut domain, watch, out) = begin();
     super::pages::finish_initial_inbox_reads(&mut domain, &out);
-    let line = ConversationLine {
+    let line = TaskLine {
         chip: super::objects::chip(8),
         project: 1,
-        first_words: DocumentText::complete(super::objects::text(b"full preview")),
-        changed: None,
-        runtime: None,
-        unread: None,
-        last_reply: 9,
-        seen: 4,
-        delegates: 0,
-        cached_replies: u32::MAX,
+        requester: OwnerRequester::Person(1),
+        tracked: None,
+        label: 1,
+        flags: TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead },
+        changed: Wall::EPOCH,
+        last_activity: Wall::EPOCH,
+        ended_at: None,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 0, spent: 0, spent_below: 0, reserved: 0 },
             left: 0,
             funder: Funder::Period { project: 1, period: 0 },
             deadline: None,
         },
+        waits_on: WaitsOn::Nothing,
+        phases: OwnerPhaseCounts {
+            waiting: 0,
+            idle: 0,
+            starting: 0,
+            running: 0,
+            backing_off: 0,
+            closing: 0,
+            held: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+        conversation: Some(ConversationRead { seen: 4, unread: Count { value: 5, limited: false } }),
     };
-    let mut row = entry(8, OwnerInboxObject::Reply { message: u64::MAX });
+    let mut row = entry(8, OwnerInboxObject::Reply { message: 9 });
     row.reply = Some(Box::new(line.clone()));
     row.project = Some(1);
     row.activity = Some(0);
@@ -254,7 +268,7 @@ fn reply_preview_preserves_runtime_and_activity_apart_from_seen() {
     let projected = domain.objects().get(id).unwrap();
     let reply = projected.reply.as_ref().unwrap();
     assert_eq!(reply.first_unread, 5);
-    assert_eq!(reply.first_words, line.first_words);
+    assert_eq!(reply.first_words, line.chip.title);
     assert_eq!(domain.inbox().rows.get(0), Some(&InboxRow::Owner(Box::new(row))));
     let out = drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::OpenChat { task: 8 } });
     assert!(out.iter().any(|r| match r {

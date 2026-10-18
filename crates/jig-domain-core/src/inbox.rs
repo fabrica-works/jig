@@ -68,7 +68,8 @@ pub(crate) struct ArchivedChat {
     pub(crate) project: u32,
     pub(crate) at: Option<skein_lib::Wall>,
     pub(crate) chip: crate::documents::Chip,
-    pub(crate) line: Option<crate::documents::ConversationLine>,
+    pub(crate) line: Option<crate::documents::TaskLine>,
+    pub(crate) last_reply: u64,
 }
 
 pub(crate) fn reply_refs(limits: &Limits, row: &tasks::TaskRecord, party: u64) -> Box<[people::ReplyRef]> {
@@ -122,18 +123,29 @@ impl Core {
         if self.people.role(party, row.project).is_none() {
             return;
         }
+        let seen = match seen {
+            Some(through) => Some(through),
+            None => self.people.chat_seen(party, row.number),
+        };
         let line = if self.conversation_requester(row) == Some(party) && row.last_reply > 0 {
-            Some(
-                crate::documents::conversation_from_row(self, limits, party, row, seen)
-                    .expect("authorized archive owner"),
-            )
+            Some(crate::documents::task_line(self, limits, party, row, seen).expect("authorized archive owner"))
         } else {
             None
         };
         let chip = crate::documents::chip_from_row(limits, row).expect("ended chip has no whole resource paths");
         assert!(
             self.archived_chats
-                .insert(row.number, ArchivedChat { party, project: row.project, at: row.ended_at, chip, line })
+                .insert(
+                    row.number,
+                    ArchivedChat {
+                        party,
+                        project: row.project,
+                        at: row.ended_at,
+                        chip,
+                        line,
+                        last_reply: row.last_reply
+                    }
+                )
                 .is_ok(),
             "one temporary archive slot beyond the bounded prefix"
         );

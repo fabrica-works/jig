@@ -111,12 +111,9 @@ pub fn document(answer: &reads::Answer, limits: &w::Limits) -> Result<w::ReadVal
             d::Document::Chips(_)
             | d::Document::Run(_)
             | d::Document::Tree(_)
-            | d::Document::Goals(_)
             | d::Document::Lines(_)
-            | d::Document::Tasks(_)
             | d::Document::Note(_)
-            | d::Document::Inbox(_)
-            | d::Document::Conversations(_) => {
+            | d::Document::Inbox(_) => {
                 return Err(w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag });
             }
         },

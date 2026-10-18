@@ -81,28 +81,6 @@ pub(crate) fn restore(core: &mut Core, limits: &Limits, rows: Box<[tasks::TaskRe
     }
 }
 
-/// Restore a conversation's requester and their durable read position.
-pub(crate) fn restore_conversation_seen(core: &mut Core, limits: &Limits, party: u64, task: u64, through: u64) {
-    let identity = core.people.identity(party).expect("requester fixture").clone();
-    let project = core.tasks.task(task).expect("conversation fixture").project;
-    core.people = people::Domain::new(&limits.people, Box::new([]), core.settings.deployment_provider);
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
-    let mut out = Queue::with_capacity(people::max_out(&limits.people));
-    for record in [
-        people::Stored::Person { number: party, identity },
-        people::Stored::Roles {
-            project,
-            holdings: Box::new([people::Holding { person: party, role: people::Role::Owner }]),
-        },
-        people::Stored::ReadChat { party, task, through },
-    ] {
-        people::step(&mut core.people, &env, people::Event::Restore { record }, &mut out);
-        while out.pop().is_some() {}
-    }
-    people::step(&mut core.people, &env, people::Event::Restored, &mut out);
-    assert!(core.people.ready());
-}
-
 /// An ended report whose result and two replies can be marked read.
 pub(crate) fn ended_report(number: u64, requester: tasks::Party) -> tasks::TaskRecord {
     let (mut core, limits) = tree_core();

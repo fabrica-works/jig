@@ -21,9 +21,7 @@ fn note_project(scope: &notes::Scope) -> u32 {
 pub(super) fn scope_allowed(core: &Core, party: u64, scope: &Scope) -> bool {
     match scope {
         Scope::Tasks { query } => documents::task_query::admission(core, party, query).is_ok(),
-        Scope::Goals { project } | Scope::Notes { project } | Scope::Spend { project } => {
-            core.people.role(party, *project).is_some()
-        }
+        Scope::Notes { project } | Scope::Spend { project } => core.people.role(party, *project).is_some(),
         Scope::ScopedNotes { scope, .. } => core.people.role(party, note_project(scope)).is_some(),
         Scope::Inbox { filter, .. } => match filter.project {
             Some(project) => core.people.role(party, project).is_some(),
@@ -43,7 +41,7 @@ pub(super) fn scope_allowed(core: &Core, party: u64, scope: &Scope) -> bool {
             Some(row) => core.people.role(party, row.project).is_some(),
             None => true,
         },
-        Scope::Proposal { proposer: Proposer::Party(_), .. } | Scope::Conversations => true,
+        Scope::Proposal { proposer: Proposer::Party(_), .. } => true,
     }
 }
 
@@ -116,9 +114,7 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
             | Read::EndedDelegates { .. }
             | Read::History { .. }
             | Read::Activity { .. }
-            | Read::Conversations { .. }
             | Read::Tasks { .. }
-            | Read::Goals { .. }
             | Read::Project { .. }
             | Read::Notes { .. }
             | Read::ScopedNotes { .. }
@@ -136,10 +132,7 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
         | Document::Question(_)
         | Document::PersonTask(_)
         | Document::Result(_)
-        | Document::Conversations(_)
-        | Document::Goals(_)
         | Document::Lines(_)
-        | Document::Tasks(_)
         | Document::Project(_)
         | Document::Note(_)
         | Document::Deployment(_) => false,
@@ -150,7 +143,7 @@ pub(super) fn needs_store(read: &Read, document: &Document) -> bool {
 #[expect(clippy::too_many_lines, reason = "the exhaustive live-to-store seam keeps each document family visible")]
 pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, document: Document) -> Answer {
     let mut rows = List::with_capacity(limits.documents.rows);
-    let (page_scope, next) = match document {
+    match document {
         Document::Inbox(value) => {
             let (group, filter) = match read {
                 Read::Inbox { group, filter, .. } => (group, filter),
@@ -166,9 +159,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
                 | Read::EndedDelegates { .. }
                 | Read::History { .. }
                 | Read::Activity { .. }
-                | Read::Conversations { .. }
                 | Read::Tasks { .. }
-                | Read::Goals { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
                 | Read::ScopedNotes { .. }
@@ -206,13 +197,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
                         Some((cursor, activity)) => super::indexed::inbox_position(party, *group, cursor, activity),
                         None => match super::cursor(read) {
                             Some(Cursor::Live { store_after, .. }) => store_after.clone(),
-                            Some(
-                                Cursor::Store { .. }
-                                | Cursor::ConversationsBefore { .. }
-                                | Cursor::ConversationsLiveBefore { .. }
-                                | Cursor::ConversationsStart,
-                            )
-                            | None => None,
+                            Some(Cursor::Store { .. }) | None => None,
                         },
                     },
                     after: match last {
@@ -225,19 +210,13 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
                         Some((cursor, activity)) => super::indexed::inbox_position(party, *group, cursor, activity),
                         None => match super::cursor(read) {
                             Some(Cursor::Live { store_after, .. }) => store_after.clone(),
-                            Some(
-                                Cursor::Store { .. }
-                                | Cursor::ConversationsBefore { .. }
-                                | Cursor::ConversationsLiveBefore { .. }
-                                | Cursor::ConversationsStart,
-                            )
-                            | None => None,
+                            Some(Cursor::Store { .. }) | None => None,
                         },
                     };
                     Some(Cursor::Store { scope, after })
                 }
             };
-            return Answer::Page(Box::new(Page {
+            Answer::Page(Box::new(Page {
                 rows,
                 before: None,
                 next,
@@ -246,15 +225,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
                     Some(_) => Some(selection),
                     None => None,
                 },
-            }));
-        }
-        Document::Conversations(value) => {
-            let next = super::conversations_cursor(&value);
-            let before = super::cursors::live_prefix(read, &value);
-            for row in value.lines.into_boxed() {
-                rows.push(PageRow::Conversation(row)).expect("live conversations fit");
-            }
-            return Answer::Page(Box::new(Page { rows, before, next: Some(next), cut: false, inbox_selection: None }));
+            }))
         }
         Document::Lines(value) => {
             for row in value.lines.into_boxed() {
@@ -266,37 +237,7 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
                 }
                 None => None,
             };
-            return Answer::Page(Box::new(Page { rows, before: None, next, cut: false, inbox_selection: None }));
-        }
-        Document::Goals(value) => {
-            let project = match read {
-                Read::Goals { project, .. } => project,
-                Read::Tasks { .. }
-                | Read::Frame
-                | Read::Task { .. }
-                | Read::Proposal { .. }
-                | Read::Escalation { .. }
-                | Read::Question { .. }
-                | Read::PersonTask { .. }
-                | Read::Result { .. }
-                | Read::Reply { .. }
-                | Read::Turn { .. }
-                | Read::EndedDelegates { .. }
-                | Read::History { .. }
-                | Read::Activity { .. }
-                | Read::Inbox { .. }
-                | Read::Conversations { .. }
-                | Read::Project { .. }
-                | Read::Notes { .. }
-                | Read::ScopedNotes { .. }
-                | Read::Spend { .. }
-                | Read::Deployment
-                | Read::Application { .. } => unreachable!("goal subject comes from goal read"),
-            };
-            for row in value.lines.into_boxed() {
-                rows.push(PageRow::Goal(row)).expect("live goals fit");
-            }
-            (Scope::Goals { project: *project }, value.next)
+            Answer::Page(Box::new(Page { rows, before: None, next, cut: false, inbox_selection: None }))
         }
         document @ (Document::Frame(_)
         | Document::Chips(_)
@@ -309,15 +250,9 @@ pub(super) fn live_page(core: &Core, limits: &Limits, party: u64, read: &Read, d
         | Document::PersonTask(_)
         | Document::Result(_)
         | Document::Project(_)
-        | Document::Tasks(_)
         | Document::Note(_)
-        | Document::Deployment(_)) => return Answer::Document(Box::new(document)),
-    };
-    let next = match next {
-        Some(after) => Cursor::Live { scope: page_scope, after, store_after: None },
-        None => Cursor::Store { scope: page_scope, after: None },
-    };
-    Answer::Page(Box::new(Page { rows, before: None, next: Some(next), cut: false, inbox_selection: None }))
+        | Document::Deployment(_)) => Answer::Document(Box::new(document)),
+    }
 }
 
 /// Stable address supplied by the owning record, never by a client row number.
@@ -365,9 +300,7 @@ fn is_page(scope: &Scope) -> bool {
         | Scope::History { .. }
         | Scope::Activity { .. }
         | Scope::Inbox { .. }
-        | Scope::Conversations
         | Scope::Tasks { .. }
-        | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
         | Scope::Spend { .. } => true,
@@ -413,7 +346,7 @@ pub(super) fn from_store(
     core: &Core,
     limits: &Limits,
     range: &Range,
-    mut raw: Box<[Row]>,
+    raw: Box<[Row]>,
     next: Option<Position>,
 ) -> Answer {
     if raw.len() > usize::try_from(range.rows).expect("row bound fits") {
@@ -455,17 +388,16 @@ pub(super) fn from_store(
     {
         return Answer::None(Why::Unknown);
     }
-    let (before, next) = super::cursors::stored_edges(core, limits, range, &raw, next);
-    if range.scope == Scope::Conversations && !range.backwards {
-        raw.reverse();
-    }
     let mut page = Page {
         rows: List::with_capacity(range.rows),
-        before,
-        next,
+        before: None,
+        next: None,
         cut: false,
         inbox_selection: inbox_contexts(&range.scope, range.rows),
     };
+    if let Some(after) = next {
+        page.next = Some(Cursor::Store { scope: range.scope.clone(), after: Some(after) });
+    }
     for row in raw {
         if !row_visible(core, range.party, &row) {
             continue;
@@ -588,9 +520,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | Scope::History { .. }
                 | Scope::Activity { .. }
                 | Scope::Inbox { .. }
-                | Scope::Conversations
                 | Scope::Tasks { .. }
-                | Scope::Goals { .. }
                 | Scope::Notes { .. }
                 | Scope::ScopedNotes { .. }
                 | Scope::Spend { .. } => unreachable!("task object scope"),
@@ -662,13 +592,10 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 | tasks::Stored::Ledger(_)
                 | tasks::Stored::Writer(_)
                 | tasks::Stored::Result(_)
-                | tasks::Stored::ConversationNewest(_)
-                | tasks::Stored::Goal(_)
                 | tasks::Stored::EndedByParty(_)
                 | tasks::Stored::EndedByProject(_)
                 | tasks::Stored::EndedDelegate(_)
                 | tasks::Stored::Delegate(_)
-                | tasks::Stored::ConversationOldest(_)
                 | tasks::Stored::Update(_)
                 | tasks::Stored::Pool(_)
                 | tasks::Stored::ClosedLedger(_),
@@ -829,9 +756,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
         | Scope::History { .. }
         | Scope::Activity { .. }
         | Scope::Inbox { .. }
-        | Scope::Conversations
         | Scope::Tasks { .. }
-        | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
         | Scope::Spend { .. } => Ok(None),
@@ -867,13 +792,10 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
                     | tasks::Stored::Ledger(_)
                     | tasks::Stored::Writer(_)
                     | tasks::Stored::Result(_)
-                    | tasks::Stored::ConversationNewest(_)
-                    | tasks::Stored::Goal(_)
                     | tasks::Stored::EndedByParty(_)
                     | tasks::Stored::EndedByProject(_)
                     | tasks::Stored::EndedDelegate(_)
                     | tasks::Stored::Delegate(_)
-                    | tasks::Stored::ConversationOldest(_)
                     | tasks::Stored::Update(_)
                     | tasks::Stored::Pool(_)
                     | tasks::Stored::ClosedLedger(_)
@@ -938,8 +860,6 @@ fn page_row(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Opt
             }
         }
         Scope::Tasks { query } => super::ended::line(core, limits, range.party, query, &row),
-        Scope::Goals { project } => super::indexed::goal_row(core, limits, *project, &row),
-        Scope::Conversations => super::indexed::conversation_row(core, limits, range, &row),
         Scope::Inbox { group, filter } => inbox_row(core, limits, range.party, *group, *filter, row),
         Scope::Task { .. }
         | Scope::Proposal { .. }
@@ -966,9 +886,7 @@ fn inbox_contexts(scope: &Scope, rows: u32) -> Option<List<documents::InboxSelec
         | Scope::EndedDelegates { .. }
         | Scope::History { .. }
         | Scope::Activity { .. }
-        | Scope::Conversations
         | Scope::Tasks { .. }
-        | Scope::Goals { .. }
         | Scope::Notes { .. }
         | Scope::ScopedNotes { .. }
         | Scope::Spend { .. } => None,
@@ -994,13 +912,10 @@ fn inbox_selection_row(limits: &Limits, row: &Row) -> Result<Option<documents::I
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
-            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_),
@@ -1046,13 +961,10 @@ fn inbox_row(
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
-            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_),
@@ -1239,7 +1151,7 @@ fn reply_update(
             {
                 return Ok(None);
             }
-            (*reply, Some(Box::new(documents::conversation_from_row(core, limits, party, owner, row.ended_read)?)))
+            (*reply, Some(Box::new(documents::task_line(core, limits, party, owner, row.ended_read)?)))
         }
         tasks::Line::Notified { recipient: tasks::Party::Person(recipient), word } if *recipient == party => {
             if word.number <= core.people.results_seen(party).unwrap_or(0) {
@@ -1306,13 +1218,10 @@ fn milestone_record(record: &Record) -> Option<&tasks::Milestone> {
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
-            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_)
@@ -1337,13 +1246,10 @@ fn activity_record(record: &Record) -> Option<&tasks::ActivityLine> {
             | tasks::Stored::Ledger(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
-            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::ClosedLedger(_)
@@ -1411,13 +1317,10 @@ fn ledger(record: &Record) -> Option<&tasks::FundingRecord> {
             | tasks::Stored::Stub(_)
             | tasks::Stored::Writer(_)
             | tasks::Stored::Result(_)
-            | tasks::Stored::ConversationNewest(_)
-            | tasks::Stored::Goal(_)
             | tasks::Stored::EndedByParty(_)
             | tasks::Stored::EndedByProject(_)
             | tasks::Stored::EndedDelegate(_)
             | tasks::Stored::Delegate(_)
-            | tasks::Stored::ConversationOldest(_)
             | tasks::Stored::Update(_)
             | tasks::Stored::Pool(_)
             | tasks::Stored::DecidedProposal(_),
@@ -1459,9 +1362,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
             | Scope::EndedDelegates { .. }
             | Scope::History { .. }
             | Scope::Activity { .. }
-            | Scope::Conversations
             | Scope::Tasks { .. }
-            | Scope::Goals { .. }
             | Scope::Notes { .. }
             | Scope::ScopedNotes { .. }
             | Scope::Spend { .. } => false,
@@ -1495,12 +1396,7 @@ pub(super) fn position_allowed(scope: &Scope, position: &Position) -> bool {
                     | KeyKind::Ledger(_)
                     | KeyKind::Unsupported => false,
                 },
-                Scope::Conversations => super::indexed::conversation_position(position, true).is_some(),
                 Scope::Tasks { query } => super::ended::position(query, key),
-                Scope::Goals { project } => match key {
-                    Key::Tasks(tasks::Key::Goal { project: owner, .. }) => owner == project,
-                    Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
-                },
                 Scope::EndedDelegates { task } => match key {
                     Key::Tasks(tasks::Key::EndedDelegate { requester, .. }) => requester == task,
                     Key::Tasks(_) | Key::Core(_) | Key::People(_) | Key::Notes(_) => false,
@@ -1553,13 +1449,10 @@ fn key_kind(key: &Key) -> KeyKind {
             | tasks::Key::Writer(_)
             | tasks::Key::Pool(_)
             | tasks::Key::Result { .. }
-            | tasks::Key::ConversationNewest { .. }
-            | tasks::Key::Goal { .. }
             | tasks::Key::EndedByParty { .. }
             | tasks::Key::EndedByProject { .. }
             | tasks::Key::EndedDelegate { .. }
             | tasks::Key::Delegate { .. }
-            | tasks::Key::ConversationOldest { .. }
             | tasks::Key::Update { .. } => KeyKind::Unsupported,
         },
         Key::Core(value) => match value {

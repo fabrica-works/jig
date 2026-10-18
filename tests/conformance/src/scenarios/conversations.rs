@@ -141,16 +141,14 @@ pub(super) fn check_ending(world: &World) -> Result<(), Violation> {
             root::Key::Core(
                 core::Key::Tasks(
                     tasks::Key::Ended(task)
-                    | tasks::Key::ConversationOldest { task, .. }
                     | tasks::Key::EndedByParty { task, .. }
                     | tasks::Key::EndedByProject { task, .. },
                 )
                 | core::Key::People(people::Key::ReadChat { task, .. } | people::Key::EndedRead { task, .. }),
             ) => *task != forgotten,
-            root::Key::Core(core::Key::Tasks(
-                tasks::Key::Update { task, object: tasks::UpdateObject::Result, .. }
-                | tasks::Key::ConversationNewest { task, .. },
-            )) => task.value() != forgotten,
+            root::Key::Core(core::Key::Tasks(tasks::Key::Update {
+                task, object: tasks::UpdateObject::Result, ..
+            })) => task.value() != forgotten,
             root::Key::Core(_) | root::Key::Connector { .. } => true,
         }),
         "forgettable conversation left an owner, result update, index or read position",

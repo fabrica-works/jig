@@ -61,13 +61,10 @@ pub fn stored_bytes(record: &Stored) -> Option<u64> {
         }
         Stored::Live(task) | Stored::Ended(task) => task_bytes(task),
         Stored::Result(_)
-        | Stored::ConversationNewest(_)
-        | Stored::Goal(_)
         | Stored::EndedByParty(_)
         | Stored::EndedByProject(_)
         | Stored::EndedDelegate(_)
         | Stored::Delegate(_)
-        | Stored::ConversationOldest(_)
         | Stored::Update(_)
         | Stored::Stub(_)
         | Stored::Ledger(_)

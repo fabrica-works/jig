@@ -60,7 +60,7 @@ pub(crate) fn request(
         people::Ask::Cancel { task, .. } => (Act::Cancel, documents::Subject::Task { task: *task }),
         people::Ask::Close { chat, .. } => (Act::Close, documents::Subject::Task { task: *chat }),
         people::Ask::Move { task, .. } => (Act::Move, documents::Subject::Task { task: *task }),
-        people::Ask::Prioritise { .. } => (Act::Prioritise, documents::Subject::Goals { project }),
+        people::Ask::Prioritise { .. } => (Act::Prioritise, documents::Subject::Project { project }),
         people::Ask::MarkSeen { seen } => match seen {
             people::Seen::Results { .. } => (Act::Seen, documents::Subject::Inbox { party: person }),
             people::Seen::Chat { task, .. } => (Act::Seen, documents::Subject::Task { task: *task }),
@@ -147,10 +147,7 @@ pub(crate) fn request(
         | documents::Subject::Tree { .. }
         | documents::Subject::Chips { .. }
         | documents::Subject::Inbox { .. }
-        | documents::Subject::Goals { .. }
         | documents::Subject::Query { .. }
-        | documents::Subject::Tasks { .. }
-        | documents::Subject::Conversations { .. }
         | documents::Subject::Run { .. }
         | documents::Subject::Deployment
         | documents::Subject::Proposal { .. }

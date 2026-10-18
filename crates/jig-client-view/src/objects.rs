@@ -424,7 +424,7 @@ impl Objects {
         Some(id)
     }
     /// Attaches a chat's reply navigation without replacing its task facts or card.
-    pub fn reply(&mut self, source: Source, line: jig_client::contract::ConversationLine) -> Option<Id<Object>> {
+    pub fn reply(&mut self, source: Source, line: jig_client::contract::TaskLine) -> Option<Id<Object>> {
         let key = ObjectKey::Task(line.chip.task);
         let Some(reply) = result::Reply::from_line(line) else {
             if let Some(id) = self.find(key) {
@@ -491,14 +491,6 @@ fn delivered_name(value: &jig_client::contract::Delivery, key: ObjectKey) -> Opt
         | Delivery::RunState(_)
         | Delivery::Deployment(_)
         | Delivery::OwnerDeployment(_) => None,
-        Delivery::Conversations(chats) => {
-            for row in &chats.rows {
-                if key == ObjectKey::Task(row.chip.task) {
-                    return Some(true);
-                }
-            }
-            Some(false)
-        }
         Delivery::Task(task) => {
             if key == ObjectKey::Task(task.chip.task) {
                 return Some(true);
@@ -574,24 +566,11 @@ fn delivered_name(value: &jig_client::contract::Delivery, key: ObjectKey) -> Opt
             }
             Some(false)
         }
-        Delivery::Goals(goals) => {
-            for row in &goals.rows {
-                if key == ObjectKey::Task(row.chip.task) {
-                    return Some(true);
-                }
-            }
-            Some(false)
-        }
     }
 }
 /// Protects disappearing cards before the source replacement prunes its names.
 pub(crate) fn dropping(domain: &mut crate::Ui, watch: jig_client::Handle, value: &jig_client::contract::Delivery) {
     match value {
-        jig_client::contract::Delivery::Conversations(_) => {
-            if !domain.conversation_rows.edges.reaches(jig_client::thread::window::End::Before) {
-                return;
-            }
-        }
         jig_client::contract::Delivery::Me(_)
         | jig_client::contract::Delivery::Run(_)
         | jig_client::contract::Delivery::RunState(_)
@@ -605,7 +584,6 @@ pub(crate) fn dropping(domain: &mut crate::Ui, watch: jig_client::Handle, value:
         | jig_client::contract::Delivery::Chips(_)
         | jig_client::contract::Delivery::Inbox(_)
         | jig_client::contract::Delivery::OwnerInbox(_)
-        | jig_client::contract::Delivery::Goals(_)
         | jig_client::contract::Delivery::Tasks(_) => {}
     }
     let source = Source::Watch(watch);
@@ -698,9 +676,7 @@ fn read_key(what: &jig_client::contract::Read) -> Option<ObjectKey> {
         | Read::History { .. }
         | Read::Activity { .. }
         | Read::Inbox { .. }
-        | Read::Conversations { .. }
         | Read::Spend { .. }
-        | Read::Goals { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
         | Read::Deployment => None,
@@ -909,8 +885,6 @@ pub(crate) fn historical_read(
             | ReadValue::Activity(_)
             | ReadValue::Inbox(_)
             | ReadValue::OwnerInbox(_)
-            | ReadValue::Conversations(_)
-            | ReadValue::Goals(_)
             | ReadValue::Spend(_)
             | ReadValue::OwnerSpend(_)
             | ReadValue::OwnerEnded(_)
@@ -948,12 +922,10 @@ fn read_body(key: ObjectKey, value: jig_client::contract::ReadValue) -> Option<B
         | ReadValue::OwnerInbox(_)
         | ReadValue::Activity(_)
         | ReadValue::History(_)
-        | ReadValue::Conversations(_)
         | ReadValue::Ended(_)
         | ReadValue::Spend(_)
         | ReadValue::OwnerEnded(_)
         | ReadValue::OwnerSpend(_)
-        | ReadValue::Goals(_)
         | ReadValue::OwnerProject(_)
         | ReadValue::Project(_)
         | ReadValue::Deployment(_)
@@ -1128,8 +1100,6 @@ pub(crate) fn contexts(value: &jig_client::contract::Delivery, capacity: u32) ->
         | jig_client::contract::Delivery::Tree(_)
         | jig_client::contract::Delivery::OwnerTree(_)
         | jig_client::contract::Delivery::Chips(_)
-        | jig_client::contract::Delivery::Goals(_)
-        | jig_client::contract::Delivery::Conversations(_)
         | jig_client::contract::Delivery::Run(_)
         | jig_client::contract::Delivery::RunState(_)
         | jig_client::contract::Delivery::Deployment(_)

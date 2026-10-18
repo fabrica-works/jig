@@ -242,14 +242,6 @@ fn body(value: &Delivery, key: ObjectKey) -> Option<Body> {
             }
             None
         }
-        (Delivery::Goals(goals), ObjectKey::Task(number)) => {
-            for row in &goals.rows {
-                if row.chip.task == number {
-                    return Some(Body::Chip(row.chip.clone()));
-                }
-            }
-            None
-        }
         (Delivery::Tasks(tasks), ObjectKey::Task(number)) => {
             for row in &tasks.rows {
                 if row.chip.task == number {

@@ -1,4 +1,4 @@
-use jig_domain_tasks::{Amendment, Control, End, Endings, Event, Key, Newest, Party, Stored, TaskResult, Tracking};
+use jig_domain_tasks::{Amendment, Control, End, Endings, Event, Party, TaskResult, Tracking};
 use jig_tasks_world::{LIMITS, World, task};
 
 fn finish(world: &mut World, number: u64, result: TaskResult) {
@@ -24,20 +24,6 @@ fn subtree() -> World {
     });
     world.settle(4);
     world
-}
-
-#[test]
-fn a_goal_ending_saves_its_subtrees_phase_counts() {
-    let mut world = subtree();
-    finish(&mut world, 1, TaskResult::Report { words: Box::new([]) });
-    assert_eq!(
-        world.records.get(&Key::Goal { project: 1, task: Newest::of(1) }),
-        Some(&Stored::Goal(jig_domain_tasks::GoalRow {
-            project: 1,
-            task: 1,
-            endings: Endings { done: 2, failed: 1, cancelled: 1 }
-        }))
-    );
 }
 
 #[test]

@@ -1,7 +1,7 @@
 //! Whole pages and single documents (protocol/client.md, 3 and 6).
 use super::{
-    Box, Limits, List, Reader, Wall, c, chip_fields, conversation_line_fields, cursor_fields, owner_chip_ending_fields,
-    owner_task_link_fields, piece_problem, result_piece, too_large, w,
+    Box, Limits, List, Reader, Wall, c, chip_fields, cursor_fields, owner_chip_ending_fields, owner_task_link_fields,
+    piece_problem, result_piece, too_large, w,
 };
 pub(crate) fn object_page_fields(value: &w::ObjectPage, limits: &Limits) -> Result<c::ObjectPage, w::Problem> {
     let opt0 = match value.before() {
@@ -98,7 +98,7 @@ pub(crate) fn owner_inbox_object_fields(value: &w::OwnerInboxObject, limits: &Li
         },
         w::OwnerInboxObject::Escalation(row) => c::OwnerInboxObject::Escalation { revision: row.revision() },
         w::OwnerInboxObject::PersonTask => c::OwnerInboxObject::PersonTask,
-        w::OwnerInboxObject::Reply(row) => c::OwnerInboxObject::Reply { message: row.message() },
+        w::OwnerInboxObject::Turn(row) => c::OwnerInboxObject::Reply { message: row.message() },
         w::OwnerInboxObject::Result(row) => c::OwnerInboxObject::Result { position: row.position() },
     }
 }
@@ -174,7 +174,7 @@ pub(crate) fn owner_inbox_entry_fields(
     limits: &Limits,
 ) -> Result<c::OwnerInboxEntry, w::Problem> {
     let opt0 = match value.reply() {
-        Some(item) => Some(Box::new(conversation_line_fields(item, limits)?)),
+        Some(item) => Some(Box::new(crate::translate::queries::line(item, limits)?)),
         None => None,
     };
     let opt1 = match value.project() {

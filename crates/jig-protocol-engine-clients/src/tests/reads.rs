@@ -47,8 +47,8 @@ fn a_cursor_that_does_not_decode_is_answered_unknown() {
     {
         let mut exchange = f::read_exchange();
         let after = w::Cursor::new(&limits, w::CursorParts { value: bytes.into() }).expect(label);
-        let value = w::Read::Goals(
-            w::ReadGoals::new(&limits, w::ReadGoalsParts { project: 3, after: Some(after) }).expect(label),
+        let value = w::Read::Spend(
+            w::ReadSpend::new(&limits, w::ReadSpendParts { project: 3, after: Some(after) }).expect(label),
         );
         let owner = exchange.post_to(b"/jig/v1/read", f::owned_read(w::Owner::Jig, 8, f::encoded_read(&value)));
         exchange.authenticate();
@@ -57,6 +57,7 @@ fn a_cursor_that_does_not_decode_is_answered_unknown() {
         assert!(exchange.component.pending.exchanges.is_empty(), "{label}");
     }
 }
+
 #[test]
 fn a_read_signed_out_is_answered_signed_out() {
     for label in ["core answer", "ended pending sign-in", "absent digest"] {

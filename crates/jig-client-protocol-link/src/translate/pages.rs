@@ -1,10 +1,9 @@
 //! Whole pages and single documents (protocol/client.md, 3 and 6).
 use super::documents::{
-    budget_fields, chip_fields, classify, conversation_line_fields, conversation_line_piece, cursor_fields,
-    ending_fields, field_rule_fields, goal_line_piece, hold_fields, inbox_entry_piece, object_key_fields,
-    offered_piece, owner_authority_document_fields, owner_authority_fields, owner_chip_ending_fields,
-    owner_task_link_fields, part_piece, passed_piece, proposed_task_piece, recurring_piece, result_fields,
-    specification_document_fields, task_contract_document_fields, task_fields,
+    budget_fields, chip_fields, classify, cursor_fields, ending_fields, field_rule_fields, hold_fields,
+    inbox_entry_piece, object_key_fields, offered_piece, owner_authority_document_fields, owner_authority_fields,
+    owner_chip_ending_fields, owner_task_link_fields, part_piece, passed_piece, proposed_task_piece, recurring_piece,
+    result_fields, specification_document_fields, task_contract_document_fields, task_fields,
 };
 use super::{Undecodable, piece_problem, too_large};
 use crate::Limits;
@@ -49,15 +48,12 @@ fn receiving_part0(checked: &mut Limits, limits: &Limits) {
     checked.wire.call_identity_id = limits.client.text;
     checked.wire.chip_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.closing_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
-    checked.wire.conversation_page_rows =
-        u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.document_specification_parameters = limits.client.rows;
     checked.wire.document_specification_inputs = limits.client.rows;
     checked.wire.document_text_bytes = limits.client.text;
     checked.wire.ending_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.escalation_trail = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.escalation_acts = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
-    checked.wire.goal_page_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.held_runtime_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.history_page_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.hold_spend = limits.client.rows;
@@ -229,38 +225,6 @@ pub fn inbox_page(record: w::InboxPage, limits: &Limits) -> Result<c::InboxPage,
         Err(problem) => return Err(classify(problem)),
     };
     match inbox_page_fields(&record, limits) {
-        Ok(value) => Ok(value),
-        Err(problem) => Err(classify(problem)),
-    }
-}
-
-pub fn conversation_page(record: w::ConversationPage, limits: &Limits) -> Result<c::ConversationPage, Undecodable> {
-    if crate::limits::worst_case(limits).is_none() || u64::from(record.measure()) > limits.client.document_bytes {
-        return Err(Undecodable::TooLarge);
-    }
-    let checked = receiving(limits)?;
-    let limits = &checked;
-    let record = match w::ConversationPage::new(&limits.wire, record.into_parts()) {
-        Ok(value) => value,
-        Err(problem) => return Err(classify(problem)),
-    };
-    match conversation_page_fields(&record, limits) {
-        Ok(value) => Ok(value),
-        Err(problem) => Err(classify(problem)),
-    }
-}
-
-pub fn goal_page(record: w::GoalPage, limits: &Limits) -> Result<c::GoalPage, Undecodable> {
-    if crate::limits::worst_case(limits).is_none() || u64::from(record.measure()) > limits.client.document_bytes {
-        return Err(Undecodable::TooLarge);
-    }
-    let checked = receiving(limits)?;
-    let limits = &checked;
-    let record = match w::GoalPage::new(&limits.wire, record.into_parts()) {
-        Ok(value) => value,
-        Err(problem) => return Err(classify(problem)),
-    };
-    match goal_page_fields(&record, limits) {
         Ok(value) => Ok(value),
         Err(problem) => Err(classify(problem)),
     }

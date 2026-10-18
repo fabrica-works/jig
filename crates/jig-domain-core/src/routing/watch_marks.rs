@@ -23,15 +23,11 @@ impl Core {
         for (_, binding) in &self.view_subjects {
             let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
             let touched = match subject {
-                Subject::Frame { party: owner }
-                | Subject::Inbox { party: owner }
-                | Subject::Conversations { party: owner } => *owner == party,
+                Subject::Frame { party: owner } | Subject::Inbox { party: owner } => *owner == party,
                 Subject::Task { .. }
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
-                | Subject::Goals { .. }
                 | Subject::Query { .. }
-                | Subject::Tasks { .. }
                 | Subject::Run { .. }
                 | Subject::Deployment
                 | Subject::Proposal { .. }
@@ -60,10 +56,7 @@ impl Core {
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
-                | Subject::Goals { .. }
                 | Subject::Query { .. }
-                | Subject::Tasks { .. }
-                | Subject::Conversations { .. }
                 | Subject::Run { .. }
                 | Subject::Proposal { .. }
                 | Subject::Escalation { .. }
@@ -91,10 +84,7 @@ impl Core {
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
-                | Subject::Goals { .. }
                 | Subject::Query { .. }
-                | Subject::Tasks { .. }
-                | Subject::Conversations { .. }
                 | Subject::Run { .. }
                 | Subject::Proposal { .. }
                 | Subject::Escalation { .. }
@@ -129,9 +119,7 @@ impl Core {
         for (_, binding) in &self.view_subjects {
             let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
             let touched = match subject {
-                Subject::Project { project: owned }
-                | Subject::Goals { project: owned }
-                | Subject::Tasks { project: owned, .. } => *owned == project,
+                Subject::Project { project: owned } => *owned == project,
                 // Store-only note names do not retain their scope in this core.
                 Subject::Query { query } => query.project == Some(project),
                 Subject::Note { .. } => true,
@@ -162,11 +150,9 @@ impl Core {
                     }
                     touched
                 }
-                Subject::Frame { .. }
-                | Subject::Inbox { .. }
-                | Subject::Conversations { .. }
-                | Subject::Deployment
-                | Subject::Application { .. } => false,
+                Subject::Frame { .. } | Subject::Inbox { .. } | Subject::Deployment | Subject::Application { .. } => {
+                    false
+                }
             };
             if touched {
                 let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
@@ -195,12 +181,6 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             tasks::Party::Person(_) | tasks::Party::Deployment { .. } => break,
         };
     }
-    let goal = core.goal_of(row).is_some();
-    let root = match core.tasks.task(row.root) {
-        Some(root) => root,
-        None => row,
-    };
-    let owner = core.conversation_requester(root);
     for (_, binding) in &core.view_subjects {
         let subject = &core.view_names.get(binding.subject).expect("bound subject").subject;
         let touched = match subject {
@@ -211,7 +191,7 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             | Subject::PersonTask { task }
             | Subject::Result { task }
             | Subject::Proposal { proposer: Proposer::Task(task), .. } => *task == row.number,
-            Subject::Project { project } | Subject::Tasks { project, .. } => *project == row.project,
+            Subject::Project { project } => *project == row.project,
             Subject::Query { query } => {
                 let mut matches = documents::task_query::may_touch(query, row);
                 for number in &trees {
@@ -222,8 +202,6 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
                 matches
             }
             Subject::Chips { tasks } => tasks.as_slice().contains(&row.number),
-            Subject::Goals { project } => *project == row.project && goal,
-            Subject::Conversations { party } => owner == Some(*party),
             Subject::Inbox { party } => core.people.role(*party, row.project).is_some(),
             Subject::Frame { .. }
             | Subject::Deployment
@@ -446,9 +424,6 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
             }
             None
         }
-        Subject::Goals { project } | Subject::Tasks { project, .. } => {
-            if core.people.role(binding.party, *project).is_some() { None } else { Some(views::End::NotAllowed) }
-        }
         Subject::Query { query } => match documents::task_query::admission(core, binding.party, query) {
             Ok(()) => None,
             Err(_) => Some(views::End::NotAllowed),
@@ -460,7 +435,7 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
                 Some(views::End::NotAllowed)
             }
         }
-        Subject::Frame { .. } | Subject::Inbox { .. } | Subject::Conversations { .. } => None,
+        Subject::Frame { .. } | Subject::Inbox { .. } => None,
         Subject::Proposal { .. }
         | Subject::Escalation { .. }
         | Subject::Question { .. }

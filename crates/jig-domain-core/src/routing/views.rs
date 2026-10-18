@@ -120,10 +120,7 @@ fn refused_subject(watcher: Token, subject: &Subject, why: WatchRefusal) -> Requ
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
-        | Subject::Goals { .. }
         | Subject::Query { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }
@@ -151,10 +148,7 @@ pub(super) fn open(
         | Watched::Tree { .. }
         | Watched::Chips { .. }
         | Watched::Inbox
-        | Watched::Goals { .. }
         | Watched::Query { .. }
-        | Watched::Tasks { .. }
-        | Watched::Conversations
         | Watched::Deployment
         | Watched::Application { .. } => None,
     };
@@ -200,10 +194,7 @@ fn open_follow(
             | Watched::Tree { .. }
             | Watched::Chips { .. }
             | Watched::Inbox
-            | Watched::Goals { .. }
             | Watched::Query { .. }
-            | Watched::Tasks { .. }
-            | Watched::Conversations
             | Watched::Run { .. }
             | Watched::Deployment => refused(watcher, WatchRefusal::SignedOut),
         };
@@ -227,10 +218,7 @@ fn open_follow(
         | Subject::Task { .. }
         | Subject::Tree { .. }
         | Subject::Inbox { .. }
-        | Subject::Goals { .. }
         | Subject::Query { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }
@@ -296,10 +284,7 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
-        | Subject::Goals { .. }
         | Subject::Query { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }
@@ -325,10 +310,7 @@ fn named_subject(subject: Watched, party: u64) -> Subject {
         Watched::Tree { task } => Subject::Tree { task },
         Watched::Chips { tasks } => Subject::Chips { tasks },
         Watched::Inbox => Subject::Inbox { party },
-        Watched::Goals { project } => Subject::Goals { project },
-        Watched::Tasks { project, filter } => Subject::Tasks { project, filter },
         Watched::Query { query } => Subject::Query { query },
-        Watched::Conversations => Subject::Conversations { party },
         Watched::Run { task } => Subject::Run { task },
         Watched::Deployment => Subject::Deployment,
     }
@@ -349,10 +331,7 @@ fn application_subject(
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
-        | Subject::Goals { .. }
         | Subject::Query { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }
@@ -378,10 +357,7 @@ pub(super) fn marked(core: &mut Core, connector: u16, subjects: List<Token>) -> 
             | Subject::Tree { .. }
             | Subject::Chips { .. }
             | Subject::Inbox { .. }
-            | Subject::Goals { .. }
             | Subject::Query { .. }
-            | Subject::Tasks { .. }
-            | Subject::Conversations { .. }
             | Subject::Run { .. }
             | Subject::Deployment
             | Subject::Proposal { .. }
@@ -442,10 +418,7 @@ fn watch_document(
         | Subject::Task { .. }
         | Subject::Tree { .. }
         | Subject::Inbox { .. }
-        | Subject::Goals { .. }
         | Subject::Query { .. }
-        | Subject::Tasks { .. }
-        | Subject::Conversations { .. }
         | Subject::Run { .. }
         | Subject::Deployment
         | Subject::Proposal { .. }
@@ -557,10 +530,7 @@ fn changed_run(core: &mut Core, env: &Env<Limits>, run: Token, out: &mut Queue<R
             | Subject::Tree { .. }
             | Subject::Chips { .. }
             | Subject::Inbox { .. }
-            | Subject::Goals { .. }
             | Subject::Query { .. }
-            | Subject::Tasks { .. }
-            | Subject::Conversations { .. }
             | Subject::Run { .. }
             | Subject::Deployment
             | Subject::Proposal { .. }

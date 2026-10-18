@@ -51,13 +51,10 @@ pub(crate) fn watch(
         w::Owner::Jig => {
             let value = translate::watches::decode(&subject.record, limits)?;
             let event = translate::watches::watch(watcher, sign_in, value, rows)?;
-            let mut project = 0;
+            let project = 0;
             let mut rows = rows;
-            if let jig_domain_core::Event::Watch { subject, window, .. } = &event {
+            if let jig_domain_core::Event::Watch { window, .. } = &event {
                 rows = window.rows;
-                if let documents::Watched::Goals { project: number } = subject {
-                    project = *number;
-                }
             }
             Some(Opening { request: crate::Request::Core(Box::new(event)), project, rows })
         }

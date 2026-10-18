@@ -300,9 +300,8 @@ fn inbox_delivery(domain: &mut Fixture, page: jig_client::Handle, entries: List<
         Watched { watch: page, event: WatchEvent::Delivered(Delivery::Inbox(Box::new(inbox(entries)))) },
     )
 }
-fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
-    ConversationLine {
-        cached_replies: 0,
+fn list_entry(task: u64, phase: Phase, changed: u64) -> TaskLine {
+    TaskLine {
         chip: Chip {
             task,
             title: DocumentText::complete(text(b"held checkout")),
@@ -311,19 +310,34 @@ fn list_entry(task: u64, phase: Phase, changed: u64) -> ConversationLine {
             details: Box::new(super::objects::phase_details(phase)),
         },
         project: 1,
-        first_words: DocumentText::complete(text(b"help checkout")),
-        unread: Some(Count { value: 1, limited: false }),
-        seen: 2,
-        last_reply: 3,
-        changed: Some(skein_lib::Wall::from_nanos(changed)),
-        runtime: Some(Runtime::WaitingForWords { attempt: 1, since: skein_lib::Wall::EPOCH }),
-        delegates: 2,
+        requester: OwnerRequester::Person(1),
+        tracked: None,
+        label: 1,
+        flags: TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead },
+        changed: skein_lib::Wall::from_nanos(changed),
+        last_activity: skein_lib::Wall::EPOCH,
+        ended_at: None,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 20, spent: 5, spent_below: 1, reserved: 2 },
             left: 12,
             funder: Funder::Pool { project: 1, person: 7, period: 3 },
             deadline: None,
         },
+        waits_on: WaitsOn::Nothing,
+        phases: OwnerPhaseCounts {
+            waiting: 0,
+            idle: 0,
+            starting: 0,
+            running: 0,
+            backing_off: 0,
+            closing: 0,
+            held: 0,
+            done: 0,
+            failed: 0,
+            cancelled: 0,
+        },
+        held_below: 0,
+        conversation: Some(ConversationRead { seen: 2, unread: Count { value: 1, limited: false } }),
     }
 }
 fn inbox_orders_both_groups_filters_context_and_removes_role_entries_for_every_holder() {
@@ -1268,9 +1282,11 @@ pub(super) fn read_named(requests: &[Request], expected: &Read) -> jig_client::H
 fn reply_entry(task: u64, seen: u64, last: u64) -> InboxEntry {
     let mut row = entry(task, InboxGroup::Replies, last);
     let mut line = list_entry(task, Phase::Idle, last);
-    line.seen = seen;
-    line.last_reply = last;
-    line.unread = Some(Count { value: u32::try_from(last.saturating_sub(seen)).unwrap(), limited: false });
+    line.conversation = Some(ConversationRead {
+        seen,
+        unread: Count { value: u32::try_from(last.saturating_sub(seen)).unwrap(), limited: false },
+    });
+    row.position = last;
     row.reply = Some(Box::new(line));
     row
 }
@@ -1288,7 +1304,7 @@ fn inbox_reply_receipts_keep_whole_chat_facts_shared_task_documents_and_seen_req
     let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
     let object = domain.objects().get(id).unwrap();
     assert_eq!(object.project, Some(1));
-    assert_eq!(object.reply.as_ref().unwrap().first_words.bytes(), b"help checkout");
+    assert_eq!(object.reply.as_ref().unwrap().first_words.bytes(), b"held checkout");
     assert_eq!(object.reply.as_ref().unwrap().first_unread, 5);
     let Some(Body::Chip(chip)) = &object.body else {
         panic!("whole committed chat chip");

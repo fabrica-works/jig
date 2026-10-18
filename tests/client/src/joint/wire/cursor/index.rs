@@ -47,24 +47,3 @@ pub(super) fn conversation(w: &mut Writer, tag: u8, party: u64, task: u64) -> Op
     w.u64(party)?;
     w.u64(task)
 }
-
-#[cfg(test)]
-mod tests {
-    use jig_domain_core::{Key, reads};
-    use jig_domain_tasks::{self as tasks, Newest};
-
-    #[test]
-    fn conversation_index_keys_round_trip_in_their_original_family() {
-        for key in [
-            tasks::Key::ConversationNewest { party: u64::MAX, task: Newest::of(0) },
-            tasks::Key::ConversationOldest { party: 0, task: u64::MAX },
-        ] {
-            let source = reads::Cursor::Store {
-                scope: reads::Scope::Conversations,
-                after: Some(reads::Position::Owner(Key::Tasks(key))),
-            };
-            let encoded = super::super::encode(&source, 200).expect("conversation key cursor");
-            assert_eq!(super::super::decode(&encoded, 200), Some(source));
-        }
-    }
-}

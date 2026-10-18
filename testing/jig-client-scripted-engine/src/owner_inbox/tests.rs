@@ -25,18 +25,40 @@ fn budget() -> OwnerBudget {
 }
 fn row() -> OwnerInboxEntry {
     OwnerInboxEntry {
-        reply: Some(Box::new(ConversationLine {
-            chip: chip(),
+        reply: Some(Box::new(TaskLine {
+            chip: {
+                let mut chip = chip();
+                chip.title = doc(UTF8_TEXTS[0]);
+                chip
+            },
             project: 0,
-            first_words: doc(UTF8_TEXTS[0]),
-            runtime: None,
-            delegates: 0,
+            requester: jig_client_domain::contract::OwnerRequester::Person(1),
+            tracked: None,
+            label: 1,
+            flags: jig_client_domain::contract::TaskFlags {
+                conversation: true,
+                listed: false,
+                retention: jig_client_domain::contract::Retention::ForgottenOnceRead,
+            },
+            changed: Wall::EPOCH,
+            last_activity: Wall::EPOCH,
+            ended_at: None,
             budget: budget(),
-            unread: None,
-            cached_replies: u32::MAX,
-            seen: 4,
-            last_reply: 9,
-            changed: None,
+            waits_on: jig_client_domain::contract::WaitsOn::Nothing,
+            phases: jig_client_domain::contract::OwnerPhaseCounts {
+                waiting: 0,
+                idle: 0,
+                starting: 0,
+                running: 0,
+                backing_off: 0,
+                closing: 0,
+                held: 0,
+                done: 0,
+                failed: 0,
+                cancelled: 0,
+            },
+            held_below: 0,
+            conversation: None,
         })),
         task: OwnerTaskLink::Retained { chip: chip(), at: None },
         project: Some(0),
@@ -77,9 +99,9 @@ fn owner_inbox_recursive_reserved_groups_reply_and_link_boxes_fit_exact_and_refu
     let expected = u64::try_from(size_of::<OwnerInbox>()).unwrap()
         + List::<OwnerInboxEntry>::worst_case(3).unwrap() * 2
         + chip_heap
-        + u64::try_from(size_of::<ConversationLine>()).unwrap()
+        + u64::try_from(size_of::<TaskLine>()).unwrap()
         + chip_heap
-        + 8;
+        + 4;
     assert_eq!(bytes(&source, &bounds()), Some(expected));
     for (amount, admitted) in [(expected - 1, false), (expected, true), (expected + 1, true)] {
         let b = Bounds { document_bytes: amount, ..bounds() };

@@ -105,13 +105,12 @@ fn each_fixed_scope_holds_the_keys_it_admits_and_no_others() {
     }
 }
 
-fn fixed_scopes() -> [jig_domain_core::reads::Scope; 14] {
+fn fixed_scopes() -> [jig_domain_core::reads::Scope; 13] {
     use jig_domain_core::reads::Scope;
     [
         Scope::Proposal { proposer: jig_domain_people::Proposer::Party(1), proposal: 1 },
         Scope::Proposal { proposer: jig_domain_people::Proposer::Party(2), proposal: 1 },
         Scope::Spend { project: 1 },
-        Scope::Goals { project: 1 },
         Scope::EndedDelegates { task: 1 },
         Scope::Task { task: 1 },
         Scope::PersonTask { task: 1 },
@@ -130,9 +129,9 @@ fn inbox_scope(group: jig_domain_core::reads::Group) -> jig_domain_core::reads::
     Scope::Inbox { group, filter: Filter { project: Some(1), goal: Some(1) } }
 }
 
-fn indexed_scopes() -> [jig_domain_core::reads::Scope; 4] {
-    use jig_domain_core::reads::{Group, Scope};
-    [inbox_scope(Group::Updates), inbox_scope(Group::Results), inbox_scope(Group::Replies), Scope::Conversations]
+fn indexed_scopes() -> [jig_domain_core::reads::Scope; 3] {
+    use jig_domain_core::reads::Group;
+    [inbox_scope(Group::Updates), inbox_scope(Group::Results), inbox_scope(Group::Replies)]
 }
 
 fn indexed_mapping(
@@ -153,10 +152,6 @@ fn each_indexed_scope_holds_the_keys_it_admits_and_no_others() {
             let mapping = indexed_mapping(party, scope.clone());
             mappings.push(mapping).expect("party, project and requester mappings fit");
         }
-    }
-    for project in [0, 1, u32::MAX] {
-        let mapping = indexed_mapping(1, reads::Scope::Goals { project });
-        mappings.push(mapping).expect("party, project and requester mappings fit");
     }
     for requester in [0, 1, u64::MAX] {
         let mapping = indexed_mapping(1, reads::Scope::EndedDelegates { task: requester });
