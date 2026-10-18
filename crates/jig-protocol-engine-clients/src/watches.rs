@@ -104,7 +104,6 @@ impl Component {
             Route::Stream
             | Route::Link
             | Route::Service
-            | Route::Provider(_)
             | Route::SignOut
             | Route::Read
             | Route::Request
@@ -249,7 +248,6 @@ impl Component {
                 | Waiting::Read { sign_in, .. }
                 | Waiting::ApplicationRead { sign_in, .. } => Some(*sign_in),
                 Waiting::Core
-                | Waiting::Provider { .. }
                 | Waiting::SignOut { .. }
                 | Waiting::Keep { .. }
                 | Waiting::Get { .. }

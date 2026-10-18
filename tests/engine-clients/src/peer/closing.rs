@@ -1,6 +1,5 @@
-//! The scripted provider, secrets erase fence, and component's terminal.
+//! Application mints, secrets erase fence, and component's terminal.
 use super::{Event, Exchange, ExchangeState, Peer, SecretOwner, SecretsAnswer, Token, fixtures};
-use jig_protocol_engine_clients::ProviderCall;
 impl Peer {
     pub(super) fn close_socket(&mut self, entity: Token, state: ExchangeState) {
         *self.close_counts.entry(entity).or_default() += 1;
@@ -41,8 +40,18 @@ impl Peer {
     pub fn has_digest(&self, sign_in: u64) -> bool {
         self.digests.contains_key(&SecretOwner::SignIn(sign_in))
     }
-    pub fn take_provider(&mut self) -> Option<(Token, u16, ProviderCall)> {
-        self.providers.pop_front()
+    pub fn mint(&mut self, identity: jig_domain_people::Identity) -> Token {
+        let exchange = Token::new(self.next_mint);
+        self.next_mint += 1;
+        self.mint_identity = Some(identity.clone());
+        self.event(Event::Mint { exchange, identity });
+        exchange
+    }
+    pub fn minted(&mut self, exchange: Token) -> Option<(skein_lib::Secret, skein_lib::Wall)> {
+        self.mints.remove(&exchange).map(|answer| answer.expect("minted credential"))
+    }
+    pub fn mint_refusal(&mut self, exchange: Token) -> Option<jig_protocol_engine_clients::MintRefusal> {
+        self.mints.remove(&exchange).map(|answer| answer.expect_err("mint refused"))
     }
     #[must_use]
     pub fn closed(&self) -> usize {

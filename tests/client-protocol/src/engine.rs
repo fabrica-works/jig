@@ -75,7 +75,7 @@ impl Engine {
     pub fn request(&mut self, request: Request) -> Option<skein_io::Request> {
         match request {
             Request::Io(request) => return Some(request),
-            Request::Link { link } => self.link = link,
+            Request::Link { secret } => self.link = crate::fixtures::printed(&secret),
             Request::Secrets(request) => {
                 let answer = match request {
                     SecretsRequest::Keep { owner, value } => {
@@ -104,7 +104,9 @@ impl Engine {
                     Err(event) => self.event(*event),
                 }
             }
-            Request::Provider { .. } => panic!("the world uses the printed link provider"),
+            Request::Minted { .. } | Request::MintRefused { .. } => {
+                panic!("the world asks for no application sign-ins")
+            }
             Request::Closed => {}
         }
         None

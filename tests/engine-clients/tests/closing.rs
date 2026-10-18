@@ -2,8 +2,8 @@ use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_engine_clients_world::fixtures::{self, Peer};
-use jig_protocol_engine_clients::{Event, Settings, Verdict};
-use skein_lib::{List, Reader, Token, Writer};
+use jig_protocol_engine_clients::{Event, MintRefusal, Settings};
+use skein_lib::{Reader, Token, Writer};
 fn signed() -> Peer {
     Peer::signed_in(&fixtures::settings(), fixtures::FIRST_SIGN_IN)
 }
@@ -12,26 +12,6 @@ fn watched() -> (Peer, [u8; 16], Token) {
     let stream = peer.open_stream();
     let watcher = peer.open_watch(stream, &fixtures::me_subject());
     (peer, stream, watcher)
-}
-fn provider() -> Peer {
-    let mut providers = List::with_capacity(1);
-    providers.push(9).expect("one provider");
-    Peer::started(&Settings { providers, ..fixtures::settings() })
-}
-fn provider_identity() -> people::Identity {
-    people::Identity {
-        key: people::IdentityKey { provider: 9, subject: Box::from(b"person".as_slice()) },
-        login: Box::from(b"person".as_slice()),
-        name: Box::from(b"Person".as_slice()),
-    }
-}
-fn provider_exchange(peer: &mut Peer) -> (Token, Token) {
-    let socket = peer.post(b"/jig/v1/sign-in/provider/9", Box::from(b"proof".as_slice()), None);
-    let (exchange, provider, call) = peer.take_provider().expect("provider call");
-    assert_eq!(provider, 9);
-    assert_eq!(call.target.as_ref(), b"/jig/v1/sign-in/provider/9");
-    assert_eq!(call.body.as_ref(), b"proof");
-    (socket, exchange)
 }
 fn sign_out(peer: &mut Peer) -> (Token, skein_lib::ReplyTo) {
     let socket = peer.authenticated_post(b"/jig/v1/sign-out", Box::new([]));
@@ -44,10 +24,6 @@ fn sign_out(peer: &mut Peer) -> (Token, skein_lib::ReplyTo) {
 fn answer(peer: &Peer, socket: Token) -> w::KeyedAnswer {
     w::KeyedAnswer::decode(&fixtures::limits().wire, &mut Reader::new(peer.answered(socket).expect("answer")))
         .expect("wire answer")
-}
-fn sign_in_answer(peer: &Peer, socket: Token) -> w::SignInAnswer {
-    w::SignInAnswer::decode(&fixtures::limits().wire, &mut Reader::new(peer.answered(socket).expect("answer")))
-        .expect("wire sign-in answer")
 }
 fn end(watch: u64, why: w::WatchEnd) -> w::StreamEvent {
     w::StreamEvent::Ended(w::Ended::new(&fixtures::limits().wire, w::EndedParts { watch, why }).expect("ending"))
@@ -103,53 +79,6 @@ fn a_sign_in_whose_record_is_erased_ends_its_stream() {
     assert!(peer.stream_closed(stream));
     assert!(peer.unwatched(watcher));
     assert_eq!(peer.socket_closes(peer.stream_socket(stream)), 1);
-}
-#[test]
-fn a_provider_identity_signs_in_as_the_link_does() {
-    let mut peer = provider();
-    let (socket, exchange) = provider_exchange(&mut peer);
-    let identity = provider_identity();
-    peer.event(Event::Provider { exchange, verdict: Verdict::Identity(identity.clone()) });
-    let Some(core::Event::SignIn { reply_to, identity: found }) = peer.take_core() else { panic!("sign-in") };
-    assert_eq!(found, identity);
-    peer.answer_request(
-        reply_to,
-        people::Reply::SignedIn {
-            person: fixtures::FIRST_PERSON,
-            sign_in: fixtures::FIRST_SIGN_IN,
-            expires: fixtures::expires(),
-        },
-    );
-    assert_eq!(peer.answered(socket), None, "before digest durability");
-    peer.answer_kept(fixtures::FIRST_SIGN_IN);
-    let signed = peer.sign_in_answer(socket);
-    assert_eq!(signed.party(), fixtures::FIRST_PERSON);
-    assert_eq!(signed.expires(), fixtures::expires().as_nanos());
-    assert_eq!(signed.token().expose().len(), 40);
-}
-#[test]
-fn a_provider_refusal_signs_nobody_in() {
-    let mut peer = provider();
-    let (socket, exchange) = provider_exchange(&mut peer);
-    peer.event(Event::Provider { exchange, verdict: Verdict::Refused });
-    assert_eq!(sign_in_answer(&peer, socket), w::SignInAnswer::Refused);
-    assert!(peer.take_core().is_none());
-    assert_eq!(peer.digest_kept(), None);
-}
-#[test]
-fn an_unconfigured_provider_is_not_routed() {
-    let mut peer = provider();
-    for (label, path) in [
-        ("unknown", b"/jig/v1/sign-in/provider/8".as_slice()),
-        ("overflow", b"/jig/v1/sign-in/provider/65536"),
-        ("non-number", b"/jig/v1/sign-in/provider/no"),
-        ("empty", b"/jig/v1/sign-in/provider/"),
-    ] {
-        let socket = peer.post(path, Box::new([]), None);
-        assert_eq!(peer.status(socket), Some(404), "{label}");
-        assert!(peer.take_provider().is_none(), "{label}");
-        assert!(peer.take_core().is_none(), "{label}");
-    }
 }
 #[test]
 fn after_stop_a_new_exchange_is_answered_not_ready() {
@@ -305,22 +234,21 @@ fn after_stop_a_sign_in_and_a_sign_out_are_answered_not_ready() {
     assert!(peer.take_core().is_none());
 }
 #[test]
-fn after_stop_an_application_provider_is_answered_not_ready() {
-    let mut peer = provider();
-    let socket = peer.accepted_post(b"/jig/v1/sign-in/provider/9", Box::from(b"proof".as_slice()));
+fn after_stop_a_mint_is_refused_not_ready() {
+    let mut peer = Peer::started(&fixtures::settings());
     peer.event(Event::Stop);
-    assert_eq!(sign_in_answer(&peer, socket), w::SignInAnswer::NotReady);
-    assert!(peer.take_provider().is_none());
+    let exchange = peer.mint(fixtures::application_person());
+    assert_eq!(peer.mint_refusal(exchange), Some(MintRefusal::NotReady));
     assert!(peer.take_core().is_none());
     assert_eq!(peer.digest_kept(), None);
 }
 #[test]
-fn after_stop_a_pending_provider_identity_commits_nothing() {
-    let mut peer = provider();
-    let (socket, exchange) = provider_exchange(&mut peer);
+fn after_stop_a_pending_mint_commits_nothing() {
+    let mut peer = Peer::started(&fixtures::settings());
+    let exchange = peer.mint(fixtures::application_person());
     peer.event(Event::Stop);
-    peer.event(Event::Provider { exchange, verdict: Verdict::Identity(provider_identity()) });
-    assert_eq!(sign_in_answer(&peer, socket), w::SignInAnswer::NotReady);
+    peer.answer_signed_in(fixtures::FIRST_SIGN_IN, fixtures::FIRST_PERSON);
+    assert_eq!(peer.mint_refusal(exchange), Some(MintRefusal::NotReady));
     assert!(peer.take_core().is_none());
     assert_eq!(peer.digest_kept(), None);
 }

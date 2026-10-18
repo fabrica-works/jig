@@ -261,6 +261,7 @@ pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_eng
     identity_bytes: 1024,
     families: 32,
     providers: 32,
+    mints: 4,
     exchanges: 8,
     exchanges_per_client: 2,
     http: skein_http::server::Limits { head: 4096, headers: 32, body: 65536, read: 16384, response: 1024, send: 16384 },

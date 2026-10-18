@@ -38,6 +38,7 @@ fn the_listener_opens_before_the_restart_begins() {
 #[test]
 fn the_printed_link_reaches_the_caller_once() {
     let mut service = started(true);
+    listening(f::engine(&mut service));
     f::turn(&mut service);
     let link = service.links().pop().expect("printed link");
     assert!(link.starts_with(b"http://127.0.0.1:7100/jig/v1/sign-in/link?secret="));
@@ -496,4 +497,14 @@ fn decisions_open(engine: &mut crate::Engine) {
     }
     assert!(engine.domain.ready(), "real store restore and root restart completed");
     assert_eq!(engine.end, None);
+}
+
+#[test]
+fn the_printed_url_carries_the_secret_the_component_gave() {
+    let listener = ::core::net::SocketAddr::new(::core::net::IpAddr::from([127, 0, 0, 1]), 7100);
+    let secret = skein_lib::Secret::new(Box::new([0; 32]));
+    assert_eq!(
+        crate::clients::printed(listener, &secret).as_ref(),
+        b"http://127.0.0.1:7100/jig/v1/sign-in/link?secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    );
 }

@@ -75,6 +75,7 @@ pub fn engine_limits() -> Limits {
         identity_bytes: 32,
         families: 2,
         providers: 1,
+        mints: 4,
         exchanges: 8,
         exchanges_per_client: 4,
         http: skein_http::server::Limits {
@@ -176,3 +177,17 @@ pub use queries::{
     FIRST_QUERY_TASK, SECOND_QUERY_TASK, person_batch_config, person_tasks, query_limits, task_lines, task_query,
     tracked_amendment, tracked_rows, tracked_tasks,
 };
+
+#[must_use]
+pub fn printed(secret: &skein_lib::Secret) -> Box<[u8]> {
+    const PREFIX: &[u8] = b"http://127.0.0.1:8080/jig/v1/sign-in/link?secret=";
+    let encoded = skein_lib::base64::encoded_len(
+        skein_lib::base64::Alphabet::Url,
+        u32::try_from(secret.expose().len()).expect("short secret"),
+    )
+    .expect("encoded secret");
+    let mut bytes = skein_lib::Writer::new(PREFIX.len() + usize::try_from(encoded).expect("u32 fits"));
+    bytes.put(PREFIX).expect("prefix fits");
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, secret.expose(), &mut bytes).expect("secret fits");
+    bytes.finish()
+}

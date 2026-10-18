@@ -1,5 +1,5 @@
 //! One live link, fresh bearer tokens, and durable digest admission (client.md, 8).
-use crate::{Kept, SecretOwner, Settings, routes::Route};
+use crate::{Kept, SecretOwner, routes::Route};
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v8 as w;
 use skein_lib::{
@@ -14,7 +14,6 @@ pub(crate) struct Link {
 #[derive(Debug)]
 pub(crate) enum Waiting {
     Core,
-    Provider { provider: u16 },
     SignOut { sign_in: u64, committed: bool },
     Watch { sign_in: u64, watcher: Token, opening: bool },
     Keep { sign_in: u64, owner: SecretOwner, answer: Answer },
@@ -28,38 +27,18 @@ pub(crate) enum Waiting {
 #[derive(Debug)]
 pub(crate) enum Answer {
     SignedIn(w::SignedIn),
+    Minted { credential: Secret, expires: skein_lib::Wall },
     Service(w::KeyedAnswer),
 }
 #[derive(Debug)]
 pub(crate) struct Pending {
     pub exchanges: Map<Token, Waiting>,
+    pub mints: Map<Token, Token>,
 }
 pub(crate) fn draw(rng: &mut CryptoRng) -> Secret {
     let mut bytes = [0; 32];
     rng.fill(&mut bytes);
     Secret::new(Box::new(bytes))
-}
-pub(crate) fn printed(settings: &Settings, secret: &Secret) -> Option<Box<[u8]>> {
-    let address = settings.listener.socket()?;
-    let host = address_text(address)?;
-    let encoded = url(secret.expose());
-    let parts: [&[u8]; 4] = [b"http://", &host, b"/jig/v1/sign-in/link?secret=", &encoded];
-    let mut length = 0_usize;
-    for part in parts {
-        length = length.checked_add(part.len())?;
-    }
-    let mut out = Writer::new(length);
-    for part in parts {
-        out.put(part).ok()?;
-    }
-    Some(out.finish())
-}
-pub(crate) fn url(bytes: &[u8]) -> Box<[u8]> {
-    let length = base64::encoded_len(Alphabet::Url, u32::try_from(bytes.len()).expect("short secret"))
-        .expect("short encoded secret");
-    let mut out = Writer::new(usize::try_from(length).expect("u32 fits"));
-    base64::encode(Alphabet::Url, bytes, &mut out).expect("measured base64");
-    out.finish()
 }
 pub(crate) fn token(rng: &mut CryptoRng, number: u64) -> Secret {
     let mut out = Writer::new(40);
@@ -97,27 +76,4 @@ pub(crate) fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
         different |= a ^ b;
     }
     different == 0
-}
-
-fn address_text(address: core::net::SocketAddr) -> Option<Box<[u8]>> {
-    let mut text = skein_lib::Intake::with_capacity(64);
-    match address.ip() {
-        core::net::IpAddr::V4(ip) => {
-            for (at, octet) in ip.octets().iter().enumerate() {
-                if at != 0 {
-                    text.append(b".").ok()?;
-                }
-                text.append(skein_lib::Decimal::of(u64::from(*octet)).as_bytes()).ok()?;
-            }
-        }
-        core::net::IpAddr::V6(ip) => {
-            if !ip.is_loopback() {
-                return None;
-            }
-            text.append(b"[::1]").ok()?;
-        }
-    }
-    text.append(b":").ok()?;
-    text.append(skein_lib::Decimal::of(u64::from(address.port())).as_bytes()).ok()?;
-    text.meet(skein_lib::stream::Read::Fill(text.len()))
 }

@@ -11,6 +11,7 @@ pub struct Limits {
     pub families: u32,
     pub providers: u32,
     pub exchanges: u32,
+    pub mints: u32,
     pub exchanges_per_client: u32,
     pub http: skein_http::server::Limits,
     pub wire: jig_client_protocol_wire::v8::Limits,
@@ -31,6 +32,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.watches_per_stream == 0
         || limits.queued_bytes < 128
         || limits.queued_bytes.checked_add(32).is_none()
+        || limits.mints == 0
         || limits.exchanges == 0
         || limits.exchanges_per_client == 0
         || limits.link_span == Duration::ZERO
@@ -79,5 +81,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                     .checked_add(Queue::<skein_lib::stream::Down>::worst_case(2)?)?,
             )?,
         )?
+        .checked_add(Map::<Token, Token>::worst_case(limits.mints)?)?
         .checked_add(256)
 }

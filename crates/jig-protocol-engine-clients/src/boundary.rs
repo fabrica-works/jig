@@ -47,9 +47,9 @@ pub enum Event {
     },
     Application(FromApplication),
     Secrets(SecretsAnswer),
-    Provider {
+    Mint {
         exchange: Token,
-        verdict: Verdict,
+        identity: people::Identity,
     },
     Stop,
     Close,
@@ -61,8 +61,9 @@ pub enum Request {
     Core(Box<core::Event>),
     Application(ToApplication),
     Secrets(SecretsRequest),
-    Provider { exchange: Token, provider: u16, call: ProviderCall },
-    Link { link: Box<[u8]> },
+    Minted { exchange: Token, credential: Secret, expires: Wall },
+    MintRefused { exchange: Token, why: MintRefusal },
+    Link { secret: Secret },
     Closed,
 }
 #[derive(Debug)]
@@ -126,15 +127,13 @@ pub struct Kept {
     pub digest: Secret,
     pub expires: Wall,
 }
-#[derive(Debug)]
-pub struct ProviderCall {
-    pub target: Box<[u8]>,
-    pub body: Box<[u8]>,
-}
-#[derive(Debug)]
-pub enum Verdict {
-    Identity(people::Identity),
-    Refused,
+/// Why an application's mint made no credential (protocol/client.md, 8).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MintRefusal {
+    NotApplication,
+    Bound,
+    NotReady,
+    Busy,
 }
 #[derive(Clone, Debug)]
 pub struct Settings {
@@ -145,6 +144,7 @@ pub struct Settings {
     /// Default watch window from the receiving core's document limits.
     pub rows: u32,
     pub served: List<Served>,
+    /// Providers of kind application, whose verified identities Mint accepts.
     pub providers: List<u16>,
     pub seed: Secret,
     pub stream: u64,

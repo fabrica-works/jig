@@ -398,7 +398,7 @@ impl Bytes {
                     self.event(clients::Event::Io(event));
                 }
             }
-            clients::Request::Link { link } => self.link = link,
+            clients::Request::Link { secret } => self.link = jig_client_protocol_world::fixtures::printed(&secret),
             clients::Request::Secrets(request) => {
                 let answer = match request {
                     SecretsRequest::Keep { owner, value } => {
@@ -423,7 +423,9 @@ impl Bytes {
                 }
             }
             clients::Request::Application(request) => self.application(joint, request),
-            clients::Request::Provider { .. } => panic!("Ops fixture uses its printed sign-in link"),
+            clients::Request::Minted { .. } | clients::Request::MintRefused { .. } => {
+                panic!("Ops fixture mints no sign-ins")
+            }
             clients::Request::Closed => {}
         }
     }

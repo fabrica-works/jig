@@ -15,6 +15,8 @@ const PREFIX: u64 = 4_u64 << 60;
 #[derive(Debug)]
 pub(super) struct Clients {
     component: kit::Component,
+    listener: Option<::core::net::SocketAddr>,
+    secret: Option<skein_lib::Secret>,
     pub(super) env: Env<kit::Limits>,
     out: Queue<kit::Request>,
     pub(super) io: Queue<io::Request>,
@@ -42,8 +44,7 @@ pub(super) enum Routed {
     Application(kit::ToApplication),
     Secrets(kit::SecretsRequest),
     Io(io::Request),
-    Link(Box<[u8]>),
-    Refused(kit::Event),
+    Link(skein_lib::Secret),
     Closed,
 }
 pub(super) fn to_root(request: kit::Request) -> Routed {
@@ -52,9 +53,9 @@ pub(super) fn to_root(request: kit::Request) -> Routed {
         kit::Request::Application(value) => Routed::Application(value),
         kit::Request::Secrets(value) => Routed::Secrets(value),
         kit::Request::Io(value) => Routed::Io(tag(value)),
-        kit::Request::Link { link } => Routed::Link(link),
-        kit::Request::Provider { exchange, .. } => {
-            Routed::Refused(kit::Event::Provider { exchange, verdict: kit::Verdict::Refused })
+        kit::Request::Link { secret } => Routed::Link(secret),
+        kit::Request::Minted { .. } | kit::Request::MintRefused { .. } => {
+            unreachable!("the test service mints no application sign-ins")
         }
         kit::Request::Closed => Routed::Closed,
     }
@@ -69,13 +70,16 @@ impl Clients {
         let config::Address::Addr(listener) = config.clients.listener else {
             return Err(invalid(What::Form));
         };
+        let mut providers = List::with_capacity(u32::try_from(config.providers.len()).expect("bounded providers"));
         let mut link_provider = None;
         let mut deployment_provider = 0;
         for provider in &config.providers {
             match provider.kind {
                 config::ProviderKind::Link => link_provider = Some(provider.number),
                 config::ProviderKind::Deployment => deployment_provider = provider.number,
-                config::ProviderKind::Application => {}
+                config::ProviderKind::Application => {
+                    providers.push(provider.number).expect("provider count");
+                }
             }
         }
         let link = if config.clients.link {
@@ -117,7 +121,7 @@ impl Clients {
             heartbeat: config.clients.heartbeat,
             rows: config.limits.core.documents.rows,
             served,
-            providers: List::with_capacity(0),
+            providers,
             seed: seeds.crypto.clone(),
             stream: seeds.seed,
         };
@@ -126,6 +130,8 @@ impl Clients {
         let component = kit::Component::new(settings, &env, &mut out).or(Err(invalid(What::Bound)))?;
         Ok(Self {
             component,
+            listener: None,
+            secret: None,
             env,
             out,
             io: Queue::with_capacity(room),
@@ -142,6 +148,13 @@ impl Clients {
             durable: 0,
             writes: config.limits.journal.writes,
         })
+    }
+    fn print_link(&mut self) {
+        if let Some(listener) = self.listener
+            && let Some(secret) = self.secret.take()
+        {
+            self.links.push(printed(listener, &secret));
+        }
     }
     pub fn room(&self, batch: u32) -> bool {
         let count = batch.checked_mul(kit::MAX_OUT_DOWN).expect("client routing room");
@@ -176,7 +189,11 @@ impl Clients {
     pub fn up(&mut self, event: io::Event) -> bool {
         let event = untag(event);
         match &event {
-            io::Event::Listening { .. } => self.opened = true,
+            io::Event::Listening { addr, .. } => {
+                self.opened = true;
+                self.listener = addr.socket();
+                self.print_link();
+            }
             io::Event::Failed { owner, .. } if *owner == Token::new(0) => return false,
             io::Event::Accepted { .. }
             | io::Event::Connecting { .. }
@@ -214,14 +231,16 @@ impl Clients {
             }
             match to_root(self.out.pop().expect("client requests")) {
                 Routed::Io(value) => self.io.push(value),
-                Routed::Link(value) => self.links.push(value),
+                Routed::Link(value) => {
+                    self.secret = Some(value);
+                    self.print_link();
+                }
                 Routed::Secrets(value) => self.secrets.push(value),
                 Routed::Root(value) => self.root(*value, events),
                 Routed::Application(value) => match family::to_root(value, bound, rows) {
                     Ok(value) => self.root(value, events),
                     Err(value) => self.down(*value),
                 },
-                Routed::Refused(value) => self.down(value),
                 Routed::Closed => self.closed = true,
             }
         }
@@ -558,4 +577,53 @@ fn kept(value: skein_lib::Secret) -> Option<kit::Kept> {
     }
     let expires = u64::from_be_bytes(bytes.get(..8)?.try_into().ok()?);
     Some(kit::Kept { digest: skein_lib::Secret::new(Box::from(bytes.get(8..)?)), expires: Wall::from_nanos(expires) })
+}
+pub(super) fn printed(address: ::core::net::SocketAddr, secret: &skein_lib::Secret) -> Box<[u8]> {
+    let host = address_text(address).expect("bound listener address");
+    let encoded = kit_url(secret.expose());
+    let parts: [&[u8]; 4] = [b"http://", &host, b"/jig/v1/sign-in/link?secret=", &encoded];
+    let mut length = 0_usize;
+    for part in parts {
+        length = length.checked_add(part.len()).expect("short printed URL");
+    }
+    let mut out = skein_lib::Writer::new(length);
+    for part in parts {
+        out.put(part).expect("measured URL");
+    }
+    out.finish()
+}
+
+fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
+    use ::core;
+    let mut text = skein_lib::Intake::with_capacity(64);
+    match address.ip() {
+        core::net::IpAddr::V4(ip) => {
+            for (at, octet) in ip.octets().iter().enumerate() {
+                if at != 0 {
+                    text.append(b".").ok()?;
+                }
+                text.append(skein_lib::Decimal::of(u64::from(*octet)).as_bytes()).ok()?;
+            }
+        }
+        core::net::IpAddr::V6(ip) => {
+            if !ip.is_loopback() {
+                return None;
+            }
+            text.append(b"[::1]").ok()?;
+        }
+    }
+    text.append(b":").ok()?;
+    text.append(skein_lib::Decimal::of(u64::from(address.port())).as_bytes()).ok()?;
+    text.meet(skein_lib::stream::Read::Fill(text.len()))
+}
+
+fn kit_url(bytes: &[u8]) -> Box<[u8]> {
+    let length = skein_lib::base64::encoded_len(
+        skein_lib::base64::Alphabet::Url,
+        u32::try_from(bytes.len()).expect("short secret"),
+    )
+    .expect("encoded secret");
+    let mut out = skein_lib::Writer::new(usize::try_from(length).expect("u32 fits"));
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, bytes, &mut out).expect("short secret");
+    out.finish()
 }

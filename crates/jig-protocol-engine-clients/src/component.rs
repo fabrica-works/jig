@@ -16,6 +16,8 @@ use skein_lib::{
 };
 #[path = "closing.rs"]
 mod closing;
+#[path = "mint.rs"]
+mod mint;
 #[path = "reads.rs"]
 mod reads;
 #[path = "services.rs"]
@@ -82,6 +84,7 @@ impl Component {
             listener: None,
             connections: Map::with_capacity(env.limits.connections),
             pending: Pending {
+                mints: Map::with_capacity(env.limits.mints),
                 exchanges: Map::with_capacity(
                     env.limits.exchanges.checked_add(env.limits.connections).expect("checked pending capacity"),
                 ),
@@ -93,11 +96,7 @@ impl Component {
             listener_closing: false,
         };
         out.push(Request::Io(skein_io::Request::Listen { owner: LISTENER, addr: value.settings.listener }));
-        if let Some(addr) = value.settings.listener.socket()
-            && addr.port() != 0
-        {
-            value.fresh_link(env, out);
-        }
+        value.fresh_link(env, out);
         Ok(value)
     }
     fn name(&mut self) -> Token {
@@ -110,16 +109,21 @@ impl Component {
             return;
         }
         let secret = sign_in::draw(&mut self.rng);
-        let link = sign_in::printed(&self.settings, &secret).expect("checked loopback listener");
-        self.link = Some(Link { secret, until: env.now.saturating_add(env.limits.link_span) });
-        out.push(Request::Link { link });
+        self.link = Some(Link { secret: secret.clone(), until: env.now.saturating_add(env.limits.link_span) });
+        out.push(Request::Link { secret });
     }
     pub fn down(&mut self, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
         assert!(!self.closed(), "the owner sends nothing after Closed");
         match event {
             Event::Io(event) => self.io(env, event, out),
             Event::Reply { to, reply } => self.reply(env, to.into_token(), reply, out),
-            Event::SignInRefused { to } => self.refused(env, to.into_token()),
+            Event::SignInRefused { to } => {
+                let exchange = to.into_token();
+                let why = if self.stopping() { crate::MintRefusal::NotReady } else { crate::MintRefusal::Bound };
+                if !self.mint_refused(exchange, why, out) {
+                    self.refused(env, exchange);
+                }
+            }
             Event::Secrets(answer) => self.secrets(env, answer, out),
             Event::Application(crate::FromApplication::Undecodable { to }) => {
                 let exchange = to.into_token();
@@ -149,7 +153,7 @@ impl Component {
             Event::Application(crate::FromApplication::Delivery { watcher, family, record }) => {
                 self.application_delivery(env, watcher, family, record);
             }
-            Event::Provider { exchange, verdict } => self.provider(env, exchange, verdict, out),
+            Event::Mint { exchange, identity } => self.mint(env, exchange, identity, out),
         }
     }
     fn io(&mut self, env: &Env<Limits>, event: skein_io::Event, out: &mut Queue<Request>) {
@@ -218,6 +222,11 @@ impl Component {
     /// Advances one queued HTTP transition, bounding each invocation's output.
     pub fn up(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
         if self.aborting() {
+            if let Some((name, _)) = self.pending.mints.first() {
+                let name = *name;
+                self.mint_refused(name, crate::MintRefusal::NotReady, out);
+                return true;
+            }
             if self.stream_up(env, out) {
                 return true;
             }
@@ -247,7 +256,6 @@ impl Component {
                     break;
                 }
                 Waiting::Core
-                | Waiting::Provider { .. }
                 | Waiting::SignOut { .. }
                 | Waiting::Watch { .. }
                 | Waiting::Get { .. }
@@ -267,10 +275,9 @@ impl Component {
                     }
                     Route::Request => self.request(env, exchange, sign_in, &body, out),
                     Route::SignOut => self.sign_out(env, exchange, sign_in, &body, out),
-                    Route::Link | Route::Service | Route::Provider(_) | Route::Missing => {}
+                    Route::Link | Route::Service | Route::Missing => {}
                 },
                 Waiting::Core
-                | Waiting::Provider { .. }
                 | Waiting::SignOut { .. }
                 | Waiting::Watch { .. }
                 | Waiting::Get { .. }
@@ -316,7 +323,6 @@ impl Component {
                     Route::Missing => connection.respond(404, Box::new([]), &env.limits),
                     Route::Link
                     | Route::Service
-                    | Route::Provider(_)
                     | Route::SignOut
                     | Route::Request
                     | Route::Read
@@ -421,7 +427,6 @@ impl Component {
                     identity: self.settings.link.as_ref().expect("link enabled").clone(),
                 })));
             }
-            Route::Provider(provider) => self.provider_call(env, exchange, provider, connection, body, out),
             Route::Service
             | Route::SignOut
             | Route::Request
@@ -477,44 +482,9 @@ impl Component {
                     }
                 }
             },
-            Waiting::Core => match reply {
-                people::Reply::SignedIn { person, sign_in, expires } => {
-                    let token = sign_in::token(&mut self.rng, sign_in);
-                    let digest = sign_in::digest(token.expose());
-                    let answer = w::SignedIn::new(
-                        &env.limits.wire,
-                        w::SignedInParts { token, party: person, expires: expires.as_nanos() },
-                    )
-                    .expect("40-byte token admitted");
-                    self.pending
-                        .exchanges
-                        .insert(
-                            exchange,
-                            Waiting::Keep {
-                                sign_in,
-                                owner: SecretOwner::SignIn(sign_in),
-                                answer: sign_in::Answer::SignedIn(answer),
-                            },
-                        )
-                        .expect("same slot");
-                    out.push(Request::Secrets(SecretsRequest::Keep {
-                        owner: SecretOwner::SignIn(sign_in),
-                        value: Kept { digest, expires },
-                    }));
-                }
-                people::Reply::Again(people::Again::NotReady) => {
-                    self.respond(env, exchange, routes::sign_in_not_ready());
-                }
-                people::Reply::SignedOut
-                | people::Reply::Outcome(_)
-                | people::Reply::Again(_)
-                | people::Reply::Refused(_) => {
-                    self.respond(env, exchange, routes::refused(&env.limits.wire));
-                }
-            },
+            Waiting::Core => self.sign_in_reply(env, exchange, reply, out),
             Waiting::Ask { .. } => self.ask_reply(env, exchange, reply, out, waiting),
-            Waiting::Provider { .. }
-            | Waiting::Watch { .. }
+            Waiting::Watch { .. }
             | Waiting::Read { .. }
             | Waiting::ApplicationRead { .. }
             | Waiting::Keep { .. }
@@ -594,7 +564,6 @@ impl Component {
                 self.answer(env, exchange, answer, out);
             }
             Waiting::Core
-            | Waiting::Provider { .. }
             | Waiting::SignOut { .. }
             | Waiting::Watch { .. }
             | Waiting::Keep { .. }
@@ -641,7 +610,6 @@ impl Component {
         for (_, waiting) in &self.pending.exchanges {
             match waiting {
                 Waiting::Core
-                | Waiting::Provider { .. }
                 | Waiting::SignOut { .. }
                 | Waiting::Watch { .. }
                 | Waiting::Keep { .. }

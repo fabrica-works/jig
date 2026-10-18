@@ -36,3 +36,25 @@ fn stopping_keeps_the_printed_link_live_and_unspent() {
     assert_eq!(live.until, until);
     assert!(out.is_empty(), "no core event, keep, or replacement link");
 }
+
+#[test]
+fn a_mint_past_the_mints_in_flight_is_refused_busy() {
+    const FIRST: Token = Token::new(100);
+    const NEXT: Token = Token::new(101);
+    let mut env = fixtures::env();
+    env.limits.mints = 1;
+    env.limits.providers = 1;
+    let mut settings = fixtures::linked_settings();
+    let identity = settings.link.clone().expect("identity");
+    settings.providers = skein_lib::List::with_capacity(1);
+    settings.providers.push(identity.key.provider).expect("provider");
+    let mut out = Queue::with_capacity(8);
+    let mut component = Component::new(settings, &env, &mut out).expect("start");
+    out = Queue::with_capacity(8);
+    component.down(&env, Event::Mint { exchange: FIRST, identity: identity.clone() }, &mut out);
+    let Some(Request::Core(_)) = out.pop() else { panic!("first mint admitted") };
+    component.down(&env, Event::Mint { exchange: NEXT, identity }, &mut out);
+    let Some(Request::MintRefused { exchange, why }) = out.pop() else { panic!("busy mint") };
+    assert_eq!((exchange, why), (NEXT, crate::MintRefusal::Busy));
+    assert!(out.is_empty());
+}

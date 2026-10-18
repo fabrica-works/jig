@@ -1,5 +1,5 @@
 use super::fixtures::{self as f, Exchange};
-use crate::{Request, connection::Connection, sign_in};
+use crate::{Request, connection::Connection};
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
@@ -13,7 +13,7 @@ fn chunked(exchange: &mut Exchange) -> Connection {
     let owner = exchange.component.name();
     let mut connection = Connection::new(owner, &exchange.env.limits, exchange.env.now);
     connection.requests.pop();
-    let token = sign_in::url(&exchange.token);
+    let token = f::url(&exchange.token);
     let mut bearer = Writer::new(token.len().checked_add(7).expect("bearer size"));
     bearer.put(b"Bearer ").expect("prefix");
     bearer.put(&token).expect("token");

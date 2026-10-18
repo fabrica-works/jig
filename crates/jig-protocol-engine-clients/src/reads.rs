@@ -31,7 +31,6 @@ impl Component {
                     active = active.saturating_add(1);
                 }
                 Waiting::Core
-                | Waiting::Provider { .. }
                 | Waiting::SignOut { .. }
                 | Waiting::Watch { .. }
                 | Waiting::Keep { .. }
@@ -139,7 +138,6 @@ impl Component {
                 }
             },
             Waiting::Core
-            | Waiting::Provider { .. }
             | Waiting::SignOut { .. }
             | Waiting::Watch { .. }
             | Waiting::Keep { .. }
@@ -174,7 +172,6 @@ impl Component {
                 self.read_response(env, exchange, answer, out);
             }
             Waiting::Core
-            | Waiting::Provider { .. }
             | Waiting::SignOut { .. }
             | Waiting::Watch { .. }
             | Waiting::Keep { .. }

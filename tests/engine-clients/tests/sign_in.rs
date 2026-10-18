@@ -1,6 +1,6 @@
 use jig_client_protocol_wire::v8 as w;
 use jig_engine_clients_world::fixtures::{self, Peer};
-use jig_protocol_engine_clients::{Component, Unusable};
+use jig_protocol_engine_clients::{Component, Event, MintRefusal, Unusable};
 use skein_lib::{Env, Queue, Time, Wall};
 fn peer() -> Peer {
     Peer::started(&fixtures::settings())
@@ -96,4 +96,48 @@ fn no_core_event_holds_a_token_or_digest() {
         peer.core_record(),
         "SignIn { reply_to: ReplyTo(Token(2)), identity: Identity { key: IdentityKey { provider: 0, subject: [111, 119, 110, 101, 114] }, login: [111, 119, 110, 101, 114], name: [79, 119, 110, 101, 114] } }"
     );
+}
+
+#[test]
+fn a_mint_for_an_application_provider_signs_in_as_the_link_does() {
+    let mut peer = peer();
+    let exchange = peer.mint(fixtures::application_person());
+    peer.answer_signed_in(fixtures::FIRST_SIGN_IN, fixtures::FIRST_PERSON);
+    assert!(peer.minted(exchange).is_none(), "before digest durability");
+    peer.answer_kept(fixtures::FIRST_SIGN_IN);
+    let (credential, expires) = peer.minted(exchange).expect("minted");
+    assert_eq!(u64::from_be_bytes(credential.expose()[..8].try_into().expect("number")), fixtures::FIRST_SIGN_IN);
+    assert_eq!(expires, fixtures::expires());
+    assert_eq!(credential.expose().len(), 40);
+}
+fn assert_mint_refused(identity: jig_domain_people::Identity, why: MintRefusal) {
+    let mut peer = peer();
+    let exchange = peer.mint(identity);
+    assert_eq!(peer.mint_refusal(exchange), Some(why));
+    assert!(peer.take_core().is_none());
+    assert_eq!(peer.digest_kept(), None);
+}
+#[test]
+fn a_mint_with_a_login_that_is_not_utf8_is_refused_as_bound() {
+    let identity = jig_domain_people::Identity { login: Box::new([255]), ..fixtures::application_person() };
+    assert_mint_refused(identity, MintRefusal::Bound);
+}
+#[test]
+fn a_mint_for_the_link_s_provider_is_refused_as_not_application() {
+    assert_mint_refused(fixtures::first_owner(), MintRefusal::NotApplication);
+}
+#[test]
+fn a_mint_with_a_name_past_its_bound_is_refused_as_bound() {
+    let identity =
+        jig_domain_people::Identity { name: vec![b'x'; 1025].into_boxed_slice(), ..fixtures::application_person() };
+    assert_mint_refused(identity, MintRefusal::Bound);
+}
+#[test]
+fn a_mint_the_people_child_answers_busy_is_refused_busy() {
+    let mut peer = peer();
+    let exchange = peer.mint(fixtures::application_person());
+    let Some(jig_domain_core::Event::SignIn { reply_to, .. }) = peer.take_core() else { panic!("sign-in") };
+    peer.event(Event::Reply { to: reply_to, reply: jig_domain_people::Reply::Again(jig_domain_people::Again::Busy) });
+    assert_eq!(peer.mint_refusal(exchange), Some(MintRefusal::Busy));
+    assert_eq!(peer.digest_kept(), None);
 }

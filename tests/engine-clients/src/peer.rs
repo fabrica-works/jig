@@ -175,7 +175,9 @@ pub struct Peer {
     in_flight: BTreeSet<Token>,
     changed: BTreeMap<Token, core::documents::Document>,
     unwatching: BTreeSet<Token>,
-    providers: VecDeque<(Token, u16, jig_protocol_engine_clients::ProviderCall)>,
+    mints: BTreeMap<Token, Result<(skein_lib::Secret, Wall), jig_protocol_engine_clients::MintRefusal>>,
+    mint_identity: Option<people::Identity>,
+    next_mint: u64,
     closed: usize,
     close_counts: BTreeMap<Token, usize>,
     hold_erases: bool,
@@ -211,7 +213,9 @@ impl Peer {
             in_flight: BTreeSet::new(),
             changed: BTreeMap::new(),
             unwatching: BTreeSet::new(),
-            providers: VecDeque::new(),
+            mints: BTreeMap::new(),
+            mint_identity: None,
+            next_mint: 1,
             closed: 0,
             close_counts: BTreeMap::new(),
             hold_erases: false,
@@ -282,9 +286,12 @@ impl Peer {
                             self.erase_one();
                         }
                     }
-                    Request::Link { link } => self.links.push(link),
-                    Request::Provider { exchange, provider, call } => {
-                        self.providers.push_back((exchange, provider, call));
+                    Request::Link { secret } => self.links.push(fixtures::printed(&secret)),
+                    Request::Minted { exchange, credential, expires } => {
+                        self.mints.insert(exchange, Ok((credential, expires)));
+                    }
+                    Request::MintRefused { exchange, why } => {
+                        self.mints.insert(exchange, Err(why));
                     }
                     Request::Closed => self.closed += 1,
                     Request::Application(request) => self.application.push_back(request),
@@ -551,7 +558,7 @@ impl Peer {
         // The assertion first checks the variant; destructuring reads its public vocabulary.
         assert!(matches!(event, core::Event::SignIn { .. }));
         if let core::Event::SignIn { reply_to, identity } = event {
-            assert_eq!(identity, fixtures::first_owner());
+            assert_eq!(identity, self.mint_identity.take().unwrap_or_else(fixtures::first_owner));
             reply_to
         } else {
             panic!("expected sign-in")

@@ -5,7 +5,6 @@ use jig_client_protocol_wire::v8 as w;
 pub(crate) enum Route {
     Link,
     Service,
-    Provider(u16),
     SignOut,
     Request,
     Read,
@@ -21,9 +20,6 @@ pub(crate) fn route(call: &skein_http::server::Call) -> Route {
     }
     if call.method != skein_http::Method::Post {
         return Route::Missing;
-    }
-    if let Some(provider) = provider(&call.target) {
-        return Route::Provider(provider);
     }
     match call.target.as_ref() {
         b"/jig/v1/sign-in/link" => Route::Link,
@@ -97,26 +93,12 @@ pub(crate) fn unauthenticated(route: Route, limits: &w::Limits) -> Box<[u8]> {
         Route::Watch => open_answer(Some(jig_domain_core::WatchRefusal::SignedOut), limits),
         Route::Unwatch => close_answer(true),
         Route::Gone | Route::Stream | Route::Missing => Box::new([]),
-        Route::Link | Route::Service | Route::Provider(_) => refused(limits),
+        Route::Link | Route::Service => refused(limits),
         Route::SignOut => sign_out_answer(),
         Route::Request => signed_out(limits),
     }
 }
 
-fn provider(target: &[u8]) -> Option<u16> {
-    let digits = target.strip_prefix(b"/jig/v1/sign-in/provider/")?;
-    if digits.is_empty() {
-        return None;
-    }
-    let mut number = 0_u16;
-    for digit in digits {
-        if *digit < b'0' || *digit > b'9' {
-            return None;
-        }
-        number = number.checked_mul(10)?.checked_add(u16::from(digit.checked_sub(b'0')?))?;
-    }
-    Some(number)
-}
 pub(crate) fn sign_out_answer() -> Box<[u8]> {
     let mut out = skein_lib::Writer::new(1);
     w::SignOutAnswer::SignedOut.encode(&mut out).expect("signed out fits");
@@ -144,13 +126,7 @@ pub(crate) fn stopped(route: Route) -> Option<Box<[u8]>> {
         Route::Link | Route::Service => Some(sign_in_not_ready()),
         Route::SignOut => Some(sign_out_not_ready()),
         Route::Request => Some(not_ready()),
-        Route::Provider(_)
-        | Route::Read
-        | Route::Watch
-        | Route::Unwatch
-        | Route::Gone
-        | Route::Stream
-        | Route::Missing => None,
+        Route::Read | Route::Watch | Route::Unwatch | Route::Gone | Route::Stream | Route::Missing => None,
     }
 }
 

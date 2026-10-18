@@ -25,6 +25,10 @@ impl Component {
                         Answer::SignedIn(value) => {
                             self.respond(env, exchange, routes::signed_in(&env.limits.wire, value));
                         }
+                        Answer::Minted { credential, expires } => {
+                            let exchange = self.pending.mints.remove(&exchange).expect("mint owner");
+                            out.push(Request::Minted { exchange, credential, expires });
+                        }
                         Answer::Service(value) => {
                             self.answer(env, exchange, Ok(value), out);
                             self.replayed(env, owner, out);
@@ -41,7 +45,6 @@ impl Component {
                             Waiting::Get { owner, .. } => Some(*owner),
                             Waiting::Made { party, .. } => Some(SecretOwner::Service(*party)),
                             Waiting::Core
-                            | Waiting::Provider { .. }
                             | Waiting::SignOut { .. }
                             | Waiting::Watch { .. }
                             | Waiting::Keep { .. }
@@ -81,7 +84,6 @@ impl Component {
                             self.made(env, exchange, sign_in, party, value.as_ref(), out);
                         }
                         Waiting::Core
-                        | Waiting::Provider { .. }
                         | Waiting::SignOut { .. }
                         | Waiting::Watch { .. }
                         | Waiting::Keep { .. }

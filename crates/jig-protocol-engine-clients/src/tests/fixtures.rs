@@ -48,6 +48,7 @@ pub fn env() -> Env<Limits> {
             identity_bytes: 64,
             families: 2,
             providers: 0,
+            mints: 2,
             exchanges: 4,
             exchanges_per_client: 2,
             http: http::Limits { head: 512, headers: 4, body: 256, read: 32, response: 256, send: 32 },
@@ -134,7 +135,7 @@ impl Exchange {
         let owner = self.component.name();
         let mut connection = Connection::new(owner, &self.env.limits, self.env.now);
         connection.requests.pop();
-        let encoded = sign_in::url(&self.token);
+        let encoded = url(&self.token);
         let mut bearer = Writer::new(encoded.len().checked_add(7).expect("bearer size"));
         bearer.put(b"Bearer ").expect("prefix");
         bearer.put(&encoded).expect("token");
@@ -715,4 +716,15 @@ pub fn final_record(record: w::KeyedAnswer, limits: &w::Limits) -> w::Final {
             panic!("expected final, got {other:?}")
         }
     }
+}
+
+pub fn url(bytes: &[u8]) -> Box<[u8]> {
+    let length = skein_lib::base64::encoded_len(
+        skein_lib::base64::Alphabet::Url,
+        u32::try_from(bytes.len()).expect("short secret"),
+    )
+    .expect("encoded secret");
+    let mut out = Writer::new(usize::try_from(length).expect("u32 fits"));
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, bytes, &mut out).expect("measured base64");
+    out.finish()
 }

@@ -6,6 +6,7 @@ pub use receiving::signed_small_core;
 use skein_lib::{Duration, List, Secret};
 pub const FIRST_SIGN_IN: u64 = 41;
 pub const FIRST_PERSON: u64 = 7;
+pub const APPLICATION_PROVIDER: u16 = 5;
 #[must_use]
 pub fn first_owner() -> Identity {
     Identity {
@@ -18,6 +19,8 @@ pub fn first_owner() -> Identity {
 pub fn settings() -> Settings {
     let mut served = List::with_capacity(1);
     served.push(Served { family: None, first: 8, last: 8 }).expect("one range");
+    let mut providers = List::with_capacity(1);
+    providers.push(APPLICATION_PROVIDER).expect("application provider");
     Settings {
         deployment_provider: 2,
         listener: skein_io::Addr::Ip("127.0.0.1:8080".parse().expect("loopback")),
@@ -25,7 +28,7 @@ pub fn settings() -> Settings {
         heartbeat: Duration::from_secs(5),
         rows: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.documents.rows,
         served,
-        providers: List::with_capacity(0),
+        providers,
         seed: Secret::new(Box::new([7; 32])),
         stream: 31,
     }
@@ -40,6 +43,7 @@ pub fn limits() -> Limits {
         identity_bytes: 1024,
         families: 32,
         providers: 32,
+        mints: 4,
         exchanges: 4,
         exchanges_per_client: 2,
         http: skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 256, response: 1024, send: 32 },
@@ -112,5 +116,28 @@ pub fn family_read(
         w::Owned::new(&limits().wire, w::OwnedParts { owner, version: 1, record: bytes.finish() }).expect("owned");
     let mut bytes = skein_lib::Writer::new(usize::try_from(record.measure()).expect("record size"));
     record.encode(&mut bytes).expect("measured record");
+    bytes.finish()
+}
+
+#[must_use]
+pub fn application_person() -> Identity {
+    Identity {
+        key: IdentityKey { provider: APPLICATION_PROVIDER, subject: Box::from(b"person".as_slice()) },
+        login: Box::from(b"person".as_slice()),
+        name: Box::from(b"Person".as_slice()),
+    }
+}
+
+#[must_use]
+pub fn printed(secret: &skein_lib::Secret) -> Box<[u8]> {
+    const PREFIX: &[u8] = b"http://127.0.0.1:8080/jig/v1/sign-in/link?secret=";
+    let encoded = skein_lib::base64::encoded_len(
+        skein_lib::base64::Alphabet::Url,
+        u32::try_from(secret.expose().len()).expect("short secret"),
+    )
+    .expect("encoded secret");
+    let mut bytes = skein_lib::Writer::new(PREFIX.len() + usize::try_from(encoded).expect("u32 fits"));
+    bytes.put(PREFIX).expect("prefix fits");
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, secret.expose(), &mut bytes).expect("secret fits");
     bytes.finish()
 }

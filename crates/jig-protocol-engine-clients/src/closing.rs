@@ -1,10 +1,8 @@
-//! Signing out, providers, and component draining (protocol/client.md, 8).
+//! Signing out, mints, and component draining (protocol/client.md, 8).
 use super::{
-    Box, Component, Connection, Env, Limits, Queue, ReplyTo, Request, SecretOwner, SecretsRequest, Token, Waiting,
-    core, routes, w,
+    Box, Component, Env, Limits, Queue, ReplyTo, Request, SecretOwner, SecretsRequest, Token, Waiting, core, routes, w,
 };
 use crate::routes::Route;
-use crate::{ProviderCall, Verdict};
 use skein_lib::{Map, Reader};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Phase {
@@ -49,7 +47,6 @@ impl Component {
                         break;
                     }
                     Waiting::Core
-                    | Waiting::Provider { .. }
                     | Waiting::SignOut { .. }
                     | Waiting::Watch { .. }
                     | Waiting::Keep { .. }
@@ -66,7 +63,9 @@ impl Component {
             };
             match self.pending.exchanges.remove(&exchange).expect("ended exchange") {
                 Waiting::Keep { .. } | Waiting::Made { .. } => {
-                    self.respond(env, exchange, routes::refused(&env.limits.wire));
+                    if !self.mint_refused(exchange, crate::MintRefusal::Bound, out) {
+                        self.respond(env, exchange, routes::refused(&env.limits.wire));
+                    }
                 }
                 Waiting::Read { .. }
                 | Waiting::ApplicationRead { .. }
@@ -92,7 +91,7 @@ impl Component {
                         .insert(exchange, Waiting::SignOut { sign_in, committed: true })
                         .expect("same sign-out slot");
                 }
-                Waiting::Core | Waiting::Provider { .. } => {}
+                Waiting::Core => {}
             }
         }
         self.end_streams(Some(sign_in));
@@ -149,7 +148,6 @@ impl Component {
                         break;
                     }
                     Waiting::Core
-                    | Waiting::Provider { .. }
                     | Waiting::SignOut { .. }
                     | Waiting::Watch { .. }
                     | Waiting::Keep { .. }
@@ -164,90 +162,6 @@ impl Component {
             let Some(exchange) = found else { break };
             self.pending.exchanges.remove(&exchange);
             self.respond(env, exchange, routes::sign_out_answer());
-        }
-    }
-    pub(super) fn provider_call(
-        &mut self,
-        env: &Env<Limits>,
-        exchange: Token,
-        provider: u16,
-        connection: &mut Connection,
-        body: Box<[u8]>,
-        out: &mut Queue<Request>,
-    ) {
-        let mut configured = false;
-        for number in &self.settings.providers {
-            if *number == provider {
-                configured = true;
-            }
-        }
-        if !configured {
-            connection.respond(404, Box::new([]), &env.limits);
-            return;
-        }
-        if self.stopping() {
-            connection.respond(200, routes::sign_in_not_ready(), &env.limits);
-            return;
-        }
-        if self.admitted() >= env.limits.exchanges {
-            connection.respond(200, routes::refused(&env.limits.wire), &env.limits);
-            return;
-        }
-        self.pending.exchanges.insert(exchange, Waiting::Provider { provider }).expect("admitted provider");
-        let target = connection.call.as_ref().expect("provider call retained").target.clone();
-        out.push(Request::Provider { exchange, provider, call: ProviderCall { target, body } });
-    }
-    pub(super) fn provider(&mut self, env: &Env<Limits>, exchange: Token, verdict: Verdict, out: &mut Queue<Request>) {
-        let Some(waiting) = self.pending.exchanges.remove(&exchange) else { return };
-        match waiting {
-            Waiting::Provider { provider } => self.provider_verdict(env, exchange, provider, verdict, out),
-            Waiting::Core
-            | Waiting::SignOut { .. }
-            | Waiting::Watch { .. }
-            | Waiting::Keep { .. }
-            | Waiting::Get { .. }
-            | Waiting::Made { .. }
-            | Waiting::Read { .. }
-            | Waiting::ApplicationRead { .. }
-            | Waiting::Ask { .. }
-            | Waiting::Checked { .. } => {
-                self.pending.exchanges.insert(exchange, waiting).expect("same unrelated slot");
-            }
-        }
-    }
-    fn provider_verdict(
-        &mut self,
-        env: &Env<Limits>,
-        exchange: Token,
-        provider: u16,
-        verdict: Verdict,
-        out: &mut Queue<Request>,
-    ) {
-        if self.stopping() {
-            self.respond(env, exchange, routes::sign_in_not_ready());
-            return;
-        }
-        match verdict {
-            Verdict::Identity(identity) => {
-                let length = identity.key.subject.len().checked_add(identity.login.len());
-                let length = match length {
-                    Some(length) => length.checked_add(identity.name.len()),
-                    None => None,
-                };
-                let Some(length) = length else {
-                    self.respond(env, exchange, routes::refused(&env.limits.wire));
-                    return;
-                };
-                if identity.key.provider != provider
-                    || length > usize::try_from(env.limits.identity_bytes).expect("u32 fits")
-                {
-                    self.respond(env, exchange, routes::refused(&env.limits.wire));
-                    return;
-                }
-                self.pending.exchanges.insert(exchange, Waiting::Core).expect("same provider slot");
-                out.push(Request::Core(Box::new(core::Event::SignIn { reply_to: ReplyTo::new(exchange), identity })));
-            }
-            Verdict::Refused => self.respond(env, exchange, routes::refused(&env.limits.wire)),
         }
     }
     pub(super) fn close_listener(&mut self, out: &mut Queue<Request>) {
@@ -283,6 +197,7 @@ impl Component {
             && self.listener.is_none()
             && self.connections.is_empty()
             && self.streams.is_empty()
+            && self.pending.mints.is_empty()
     }
     pub(super) fn close_up(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
         if !self.closing() {
