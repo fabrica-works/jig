@@ -74,13 +74,11 @@ fn invalid(what: What) -> Problems {
 impl Clients {
     pub fn new(
         config: &config::Engine,
+        listener: io::Addr,
         seeds: &Seeds,
         room: u32,
         transport: &crate::server::Limits,
     ) -> Result<Self, Problems> {
-        let config::Address::Addr(listener) = config.clients.listener else {
-            return Err(invalid(What::Form));
-        };
         let mut providers = List::with_capacity(u32::try_from(config.providers.len()).expect("bounded providers"));
         let mut link_provider = None;
         let mut deployment_provider = 0;

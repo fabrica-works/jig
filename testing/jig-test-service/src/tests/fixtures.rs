@@ -51,7 +51,6 @@ const ENGINE: &[u8] = br#"{
 {"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 32}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null}
 ],
 "clients": {
-"listener": {"socket": "127.0.0.1:7100"},
 "heartbeat_ms": 10000,
 "link": true
 },
@@ -83,7 +82,7 @@ pub fn engine_document() -> Box<[u8]> {
     join(&[
         b"{\"engine\":",
         ENGINE,
-        br#", "application":{"credential":"app.secret","connectors":[
+        br#", "application":{"server":{"listener":{"socket":"127.0.0.1:7100"}},"credential":"app.secret","connectors":[
     {"prefix":["one"],"resources":[]},{"prefix":["two"],"resources":[]}]},"service":{"components":[]}}"#,
     ])
 }
@@ -626,8 +625,8 @@ pub fn combined_document() -> Box<[u8]> {
     let document = with(&engine_document(), b"\"service\":", &join(&[workers, b",\"service\":"]));
     let document = with(
         &document,
-        br#""application":{"credential":"#,
-        br#""application":{"workers":[{"root":"agent-root"}],"credential":"#,
+        br#""application":{"server":{"listener":{"socket":"127.0.0.1:7100"}},"credential":"#,
+        br#""application":{"server":{"listener":{"socket":"127.0.0.1:7100"}},"workers":[{"root":"agent-root"}],"credential":"#,
     );
     with(&document, br#""socket":"127.0.0.1:7200""#, br#""in_process":"workers""#)
 }
@@ -702,3 +701,21 @@ pub fn chat(project: u32, words: &[u8]) -> jig_domain_people::Ask {
 
 pub(super) mod server;
 pub use server::{accepted, calls, listening, server, server_bytes, server_call, server_drain, server_response};
+
+pub fn path(segments: &[&[u8]]) -> jig_protocol_config::Path {
+    let mut path = jig_protocol_config::Path::root();
+    for segment in segments {
+        path = path.member(segment);
+    }
+    path
+}
+pub fn paths(problems: &jig_protocol_config::Problems) -> Box<[jig_protocol_config::Path]> {
+    let mut paths = List::with_capacity(problems.problems.len());
+    for problem in &problems.problems {
+        paths.push(problem.path.clone()).expect("problem count");
+    }
+    paths.into_boxed()
+}
+pub fn with_server_listener(listener: &[u8]) -> Box<[u8]> {
+    with(&engine_document(), br#"{"socket":"127.0.0.1:7100"}"#, listener)
+}

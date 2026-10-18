@@ -57,7 +57,7 @@ pub fn configuration(directory: &Path) {
     value["application"]["workers"] = worker["application"]["workers"].clone();
     value["service"]["components"] = serde_json::json!(["accounts", "workers", "clients"]);
     value["engine"]["hosts"]["listener"] = serde_json::json!([{"in_process":"workers"}]);
-    value["engine"]["clients"]["listener"] = serde_json::json!({"socket":"127.0.0.1:0"});
+    value["application"]["server"]["listener"] = serde_json::json!({"socket":"127.0.0.1:0"});
     value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":"127.0.0.1:34443"});
     value["engine"]["limits"]["overrides"]["core.load_slots"] = 8.into();
     value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();

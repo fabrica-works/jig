@@ -50,14 +50,6 @@ fn a_handed_in_file_reads_its_token_and_lapse() {
     assert_eq!(record.lapses, skein_lib::Wall::from_nanos(2_000_000_000));
     assert_eq!(record.account_id.as_deref(), Some(&b"person"[..]));
 }
-fn a_clients_listener_on_a_public_address_is_refused() {
-    fixtures::refuses(
-        b"127.0.0.1:7100",
-        b"192.0.2.1:7100",
-        fixtures::path(&[b"clients", b"listener"]),
-        What::Plaintext,
-    );
-}
 #[test]
 fn a_handed_in_file_refuses_an_unknown_member() {
     let problems = handed_in(br#"{"access_token":"secret","expires_at":2,"absent":1}"#).unwrap_err();
@@ -70,7 +62,6 @@ fn hosts_configuration_problems_name_the_invalid_fields() {
         ("a_workers_listener_on_a_public_address_is_refused", a_workers_listener_on_a_public_address_is_refused),
         ("a_worker_named_twice_is_refused", a_worker_named_twice_is_refused),
         ("an_engine_member_under_hosts_is_refused_as_unknown", an_engine_member_under_hosts_is_refused_as_unknown),
-        ("a_clients_listener_on_a_public_address_is_refused", a_clients_listener_on_a_public_address_is_refused),
     ]);
 }
 

@@ -267,6 +267,7 @@ fn started(clients: bool) -> crate::Service {
         Some(
             crate::clients::Clients::new(
                 &config,
+                address(),
                 &seeds,
                 512,
                 &crate::limits::profile_limits(jig_protocol_config::Profile::Small).server,

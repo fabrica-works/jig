@@ -60,7 +60,6 @@ pub const ENGINE_SMALL: &[u8] = br#"{
 {"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 512}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null}
 ],
 "clients": {
-"listener": {"socket": "127.0.0.1:7100"},
 "heartbeat_ms": 10000,
 "link": true
 },

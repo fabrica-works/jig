@@ -43,6 +43,7 @@ pub struct Agent {
 
 #[expect(missing_debug_implementations, reason = "the service owns protocol account credentials")]
 pub struct Service {
+    bundle_directory: Option<Box<[u8]>>,
     io: Io,
     io_env: Env<io::Limits>,
     completions: Queue<Complete>,
@@ -62,6 +63,7 @@ pub struct Service {
 impl Service {
     fn new(engine: Option<Engine>, workers: List<Worker>, limits: io::Limits, bytes: u64, queue: u32) -> Self {
         Self {
+            bundle_directory: None,
             io: Io::new(&limits),
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             completions: Queue::with_capacity(queue),
@@ -85,6 +87,11 @@ impl Service {
             bytes,
             links: Queue::with_capacity(queue),
         }
+    }
+    /// The optional browser bundle directory, read by the binary before the loop.
+    #[must_use]
+    pub fn bundle_directory(&self) -> Option<&[u8]> {
+        self.bundle_directory.as_deref()
     }
     /// Adopt the deployment directory opened by the caller before driving startup.
     pub fn adopt_store(&mut self, root: Fd, effective_user: u32) -> Result<(), Fd> {

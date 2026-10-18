@@ -161,7 +161,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(crate::system::worst_case(&limits.root.connector)?.checked_mul(2)?)?
         .checked_add(Queue::<skein_io::kernel::Complete>::worst_case(queue)?)?
         .checked_add(Queue::<skein_io::kernel::Submit>::worst_case(queue)?.checked_mul(2)?)?
-        .checked_add(Queue::<skein_io::Event>::worst_case(queue)?)
+        .checked_add(Queue::<skein_io::Event>::worst_case(queue)?)?
+        .checked_add(4096)
 }
 #[must_use]
 pub fn profile_limits(name: Profile) -> Limits {

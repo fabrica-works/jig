@@ -81,7 +81,6 @@ const ENGINE: &[u8] = br#"{
 {"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 32}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null}
 ],
 "clients": {
-"listener": {"socket": "127.0.0.1:7100"},
 "heartbeat_ms": 10000,
 "link": true
 },
@@ -124,7 +123,7 @@ pub fn engine_document() -> Vec<u8> {
     let mut document = b"{\"engine\":".to_vec();
     document.extend_from_slice(ENGINE);
     document.extend_from_slice(
-        br#", "application":{"credential":"app.secret","connectors":[
+        br#", "application":{"server":{"listener":{"socket":"127.0.0.1:7100"}},"credential":"app.secret","connectors":[
         {"prefix":["one"],"resources":[]},{"prefix":["two"],"resources":[]}]},
         "service":{"components":["accounts","workers"]}}"#,
     );

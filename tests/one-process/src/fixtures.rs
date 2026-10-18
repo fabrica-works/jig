@@ -27,7 +27,7 @@ fn engine_document() -> String {
     String::from_utf8(channel::engine_document())
         .expect("engine JSON")
         .replace(r#""components":["accounts","workers"]"#, r#""components":["accounts","workers","clients"]"#)
-        .replace(r#""application":{"credential""#, r#""application":{"workers":[{"root":"agent-root"}],"credential""#)
+        .replace(r#""credential":"app.secret""#, r#""workers":[{"root":"agent-root"}],"credential":"app.secret""#)
         .replace(r#""people.sign_ins":1"#, r#""people.sign_ins":2"#)
         .replace(r#""people.projects":1"#, r#""people.projects":1,"authority.projects":1"#)
 }

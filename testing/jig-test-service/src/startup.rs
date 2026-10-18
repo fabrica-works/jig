@@ -7,6 +7,8 @@ use jig_test_domain as root;
 use skein_json::Document;
 use skein_lib::{List, bytes};
 
+type ServerConfiguration = (skein_io::Addr, Option<Box<[u8]>>);
+
 type Initial = Box<[(connector::Path, u64)]>;
 
 #[derive(Debug)]
@@ -20,6 +22,8 @@ pub(super) struct Parsed {
     accounts: bool,
     workers: bool,
     clients: bool,
+    listener: skein_io::Addr,
+    bundle: Option<Box<[u8]>>,
 }
 
 fn problem(path: Path, what: What) -> Problems {
@@ -136,18 +140,14 @@ fn parse_in(document: &Document) -> Result<Parsed, Problems> {
         return Err(problems);
     }
     let at = at.expect("required engine checked");
-    let link_enabled = link_enabled(document, at);
+    let application_path = Path::root().member(b"application");
+    let mut application = object(document, application.expect("required application checked"), &application_path)?;
+    let (listener, bundle) = server(document, &mut application, link_enabled(document, at), &mut problems)?;
     let engine = match config::engine(document, at) {
         Ok(value) => value,
         Err(found) => {
             for found in &found.problems {
                 problems.push(engine_path(&found.path), found.what);
-                if link_enabled
-                    && found.path == Path::root().member(b"clients").member(b"listener")
-                    && found.what == What::Plaintext
-                {
-                    problems.push(Path::root().member(b"engine").member(b"clients").member(b"link"), found.what);
-                }
             }
             problems.past = problems.past.saturating_add(found.past);
             return Err(problems);
@@ -163,24 +163,8 @@ fn parse_in(document: &Document) -> Result<Parsed, Problems> {
         b"standard" => Profile::Standard,
         _ => return Err(problem(path, What::Form)),
     };
-    if engine.clients.link {
-        let loopback = match &engine.clients.listener {
-            config::Address::Addr(addr) => match addr.socket() {
-                Some(addr) => addr.ip().is_loopback(),
-                None => false,
-            },
-            config::Address::Host { .. } => false,
-        };
-        if !loopback {
-            let path = Path::root().member(b"engine").member(b"clients");
-            problems.push(path.member(b"link"), What::Refers);
-            problems.push(path.member(b"listener"), What::Refers);
-            return Err(problems);
-        }
-    }
     let limits = limits::for_profile(profile, &engine.limits);
     let path = Path::root().member(b"application");
-    let mut application = object(document, application.expect("required application checked"), &path)?;
     let _workers = application.member(document, b"workers");
     let at = application.required(document, b"credential", &path, &mut problems);
     let credential = match at {
@@ -211,7 +195,54 @@ fn parse_in(document: &Document) -> Result<Parsed, Problems> {
         accounts,
         workers,
         clients,
+        listener,
+        bundle,
     })
+}
+
+/// The application's listener is loopback until a TLS server is available (service.md, 7).
+fn server(
+    document: &Document,
+    application: &mut read::Object,
+    link: bool,
+    problems: &mut Problems,
+) -> Result<ServerConfiguration, Problems> {
+    let path = Path::root().member(b"application").member(b"server");
+    let at = application.required(document, b"server", &Path::root().member(b"application"), problems);
+    let Some(at) = at else { return Err(core::mem::replace(problems, Problems::empty())) };
+    let mut fields = object(document, at, &path)?;
+    let at = fields.required(document, b"listener", &path, problems);
+    let address = match at {
+        Some(at) => config::address::read(document, at, &path.member(b"listener"), problems),
+        None => None,
+    };
+    let bundle = match fields.member(document, b"bundle") {
+        Some(at) => Some(text(document, at, 4096, &path.member(b"bundle"))?),
+        None => None,
+    };
+    fields.finish(document, &path, problems);
+    let listener = match address {
+        Some(config::Address::Addr(addr)) if loopback(&addr) => Some(addr),
+        Some(config::Address::Addr(_) | config::Address::Host { .. }) => {
+            problems.push(path.member(b"listener"), What::Plaintext);
+            if link {
+                problems.push(Path::root().member(b"engine").member(b"clients").member(b"link"), What::Plaintext);
+            }
+            None
+        }
+        None => None,
+    };
+    match listener {
+        Some(listener) if problems.is_empty() => Ok((listener, bundle)),
+        Some(_) | None => Err(core::mem::replace(problems, Problems::empty())),
+    }
+}
+
+fn loopback(addr: &skein_io::Addr) -> bool {
+    match addr.socket() {
+        Some(socket) => socket.ip().is_loopback(),
+        None => false,
+    }
 }
 
 fn indexed(path: &Path, index: usize) -> Path {
@@ -448,6 +479,7 @@ fn clients_child(parsed: &Parsed, seeds: &Seeds, max: u32) -> Result<Option<crat
     Ok(if parsed.clients {
         Some(crate::clients::Clients::new(
             &parsed.engine,
+            parsed.listener,
             seeds,
             max.checked_mul(2)
                 .expect("engine routes")
@@ -583,8 +615,11 @@ pub fn startup(
 ) -> Result<Service, Problems> {
     let document = self::document(document)?;
     let (has_engine, specs) = worker_specs_in(&document)?;
+    let mut bundle = None;
     let engine = if has_engine {
-        Some(engine_startup(parse_in(&document)?, files, agent, seeds, accounts, !specs.is_empty())?)
+        let mut parsed = parse_in(&document)?;
+        bundle = parsed.bundle.take();
+        Some(engine_startup(parsed, files, agent, seeds, accounts, !specs.is_empty())?)
     } else {
         None
     };
@@ -657,10 +692,12 @@ pub fn startup(
             return Err(problem(Path::root().member(b"engine").member(b"memory_bytes"), what));
         }
     }
-    match engine {
-        Some((engine, _, _, _)) => Ok(Service::new(Some(engine), workers, io, bytes, queue)),
-        None => Ok(Service::new(None, workers, io, bytes, queue)),
-    }
+    let mut service = match engine {
+        Some((engine, _, _, _)) => Service::new(Some(engine), workers, io, bytes, queue),
+        None => Service::new(None, workers, io, bytes, queue),
+    };
+    service.bundle_directory = bundle;
+    Ok(service)
 }
 
 #[cfg(test)]
