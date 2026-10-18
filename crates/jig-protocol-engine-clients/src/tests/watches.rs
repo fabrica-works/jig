@@ -3,6 +3,7 @@ use crate::{Event, FromApplication, Request, ToApplication, translate::watches};
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use skein_lib::{Reader, Token};
+const ENDED_WATCH: u64 = 17;
 fn stream_world() -> (fixtures::Exchange, [u8; 16]) {
     let mut world = fixtures::Exchange::new();
     let stream = world.open_stream();
@@ -163,6 +164,64 @@ fn unwatch_answers_only_after_its_released_ending() {
         w::CloseAnswer::decode(&fixtures::wire(), &mut Reader::new(world.response(owner).1)),
         Ok(w::CloseAnswer::Closed)
     );
+}
+fn ended_watch() -> (fixtures::Exchange, [u8; 16], Token) {
+    let (mut world, stream) = stream_world();
+    let (_, watcher) = request_task(&mut world, stream, ENDED_WATCH);
+    world.component.down(&world.env, Event::Admitted { watcher }, &mut world.out);
+    world.component.down(&world.env, Event::WatchEnded { watcher, why: jig_domain_views::End::Gone }, &mut world.out);
+    let owner = *world.component.streams.first().expect("stream").0;
+    (world, stream, owner)
+}
+fn closed_replies(world: &mut fixtures::Exchange, owner: Token) -> usize {
+    let mut replies = 0_usize;
+    loop {
+        while let Some(request) = world.out.pop() {
+            if let Request::Transport(crate::ToTransport::Reply { exchange, reply }) = request
+                && exchange == owner
+            {
+                let crate::Reply::Record(record) = reply else { panic!("close record") };
+                assert_eq!(
+                    w::CloseAnswer::decode(&fixtures::wire(), &mut Reader::new(&record)),
+                    Ok(w::CloseAnswer::Closed)
+                );
+                replies = replies.saturating_add(1);
+            }
+        }
+        if !world.component.up(&world.env, &mut world.out) {
+            return replies;
+        }
+    }
+}
+#[test]
+fn an_ended_watch_closes_once_when_its_stream_goes() {
+    let (mut world, stream, stream_owner) = ended_watch();
+    let owner = world.unwatch(stream, ENDED_WATCH);
+    world.component.down(
+        &world.env,
+        Event::Transport(crate::FromTransport::StreamGone { stream: stream_owner }),
+        &mut world.out,
+    );
+    assert_eq!(closed_replies(&mut world, owner), 1);
+    assert_eq!(closed_replies(&mut world, owner), 0);
+}
+#[test]
+fn an_ended_watch_closes_once_when_its_ending_leaves() {
+    let (mut world, stream, stream_owner) = ended_watch();
+    let owner = world.unwatch(stream, ENDED_WATCH);
+    world.component.down(
+        &world.env,
+        Event::Transport(crate::FromTransport::StreamTaken { stream: stream_owner }),
+        &mut world.out,
+    );
+    let replies = closed_replies(&mut world, owner);
+    world.component.down(
+        &world.env,
+        Event::Transport(crate::FromTransport::StreamTaken { stream: stream_owner }),
+        &mut world.out,
+    );
+    assert_eq!(replies + closed_replies(&mut world, owner), 1);
+    assert_eq!(closed_replies(&mut world, owner), 0);
 }
 #[test]
 fn a_run_watch_keeps_the_complete_provisional_position() {

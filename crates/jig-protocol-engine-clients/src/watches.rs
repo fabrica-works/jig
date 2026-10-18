@@ -85,6 +85,10 @@ impl Component {
                             .respond(crate::Reply::Conflict, &env.limits);
                         return;
                     }
+                    if watch.end.is_some() {
+                        self.respond(env, exchange, routes::close_answer(false));
+                        return;
+                    }
                     watch.closing = Some(exchange);
                     if !watch.unwatch {
                         watch.unwatch = true;
@@ -432,6 +436,10 @@ impl Component {
                     out.push(Request::Core(Box::new(core::Event::StreamDelivered { watcher })));
                 } else {
                     let watch = stream.watches.remove(&watcher).expect("ended watch");
+                    if let Some(exchange) = watch.closing {
+                        self.pending.exchanges.remove(&exchange);
+                        self.respond(env, exchange, routes::close_answer(false));
+                    }
                     if let Some(exchange) = watch.opening {
                         self.pending.exchanges.remove(&exchange);
                         self.respond(
