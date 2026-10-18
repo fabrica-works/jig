@@ -51,6 +51,8 @@ pub fn start() {
     let mount = window.document().expect("document").get_element_by_id("app").expect("bundle mount");
     let facts = platform::facts();
     let path = window.location().pathname().expect("path") + &window.location().search().expect("query");
+    #[cfg(debug_assertions)]
+    assert_ne!(path.split('?').next(), Some("/test/panic"), "the test address panics at start");
     let inbox = Inbox::new();
     let platform = platform::Browser::new(fetch::web::Fetch::new(9, Rc::clone(&inbox), Report::Fetch));
     let store = Store::new(b"jig.", None);
