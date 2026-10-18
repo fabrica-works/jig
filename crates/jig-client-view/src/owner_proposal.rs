@@ -3,6 +3,7 @@
 use crate::JigBindings;
 use crate::owner_proposal_words::ProposalPhrase as P;
 use crate::words::Words;
+use jig_client::words::DecisionWord as D;
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
@@ -237,14 +238,14 @@ pub fn render(
     saying(b, words, P::Funding, &[]);
     for offer in &value.funding {
         crate::proposed_task::funder(b, offer.source, words);
-        saying(b, words, P::Needed, &[Hole::Number(offer.needed)]);
+        words.decision_fact(b, D::Needed, &[Hole::Number(offer.needed)]);
         match offer.left {
-            Some(left) => saying(b, words, P::Left, &[Hole::Number(left)]),
-            None => saying(b, words, P::LeftAbsent, &[]),
+            Some(left) => words.decision_fact(b, D::Left, &[Hole::Number(left)]),
+            None => words.decision_fact(b, D::LeftAbsent, &[]),
         }
         match offer.after {
-            Some(after) => saying(b, words, P::AfterFunding, &[Hole::Number(after)]),
-            None => saying(b, words, P::AfterAbsent, &[]),
+            Some(after) => words.decision_fact(b, D::AfterFunding, &[Hole::Number(after)]),
+            None => words.decision_fact(b, D::AfterAbsent, &[]),
         }
     }
     b.close();

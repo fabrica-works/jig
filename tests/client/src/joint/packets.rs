@@ -7,10 +7,10 @@ use super::{
 };
 use crate::harness::ClientId;
 use jig_client::Answered;
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
 use jig_client_test_domain::{Event, connector_values::ConnectorLimits, family};
-use jig_client_view::Limits;
 use jig_domain_people as people;
 use jig_test_connector::ApplicationOutcome;
 use skein_lib::{RequestEnvelope, Token, Wall};
@@ -427,7 +427,7 @@ mod tests {
             let mut transport = transport();
             let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
             let Incoming::SignInAgain { client, why: actual_why } =
-                people_reply(&mut transport, to, people::Reply::Again(why), &crate::test::limits().jig)
+                people_reply(&mut transport, to, people::Reply::Again(why), &crate::test::limits().client.domain)
                     .expect("actual provider terminal")
             else {
                 panic!("provider exchange cannot manufacture a keyed final")
@@ -437,7 +437,7 @@ mod tests {
             assert_eq!(transport.sign_in(ClientId(1)), None);
             assert!(transport.reply(to).is_none());
             assert_eq!(
-                people_reply(&mut transport, to, people::Reply::Again(why), &crate::test::limits().jig).err(),
+                people_reply(&mut transport, to, people::Reply::Again(why), &crate::test::limits().client.domain).err(),
                 Some(Invalid::MissingRoute)
             );
         }
@@ -461,7 +461,7 @@ mod tests {
                 SignInFailure::Capacity => unreachable!("immediate source terminal"),
             };
             let Incoming::SignInFailed { client, failure: actual } =
-                people_reply(&mut transport, to, source, &crate::test::limits().jig)
+                people_reply(&mut transport, to, source, &crate::test::limits().client.domain)
                     .expect("whole original provider terminal")
             else {
                 panic!("provider terminal is not a keyed callback")
@@ -474,12 +474,12 @@ mod tests {
         let mut transport = transport();
         transport.signed_in(ClientId(1), u64::MAX, u64::MAX);
         let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
-        let limits = jig_client_view::Limits { document_bytes: 0, ..crate::test::limits().jig };
+        let limits = jig_client::DomainLimits { document_bytes: 0, ..crate::test::limits().client.domain };
         let source = people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         assert!(matches!(people_reply(&mut transport, to, source, &limits), Err(Invalid::Payload)));
         assert!(transport.reply(to).is_some(), "failed whole admission leaves the original exchange intact");
         let Incoming::SignInFailed { failure, .. } =
-            people_reply(&mut transport, to, source, &crate::test::limits().jig).expect("whole refusal")
+            people_reply(&mut transport, to, source, &crate::test::limits().client.domain).expect("whole refusal")
         else {
             panic!("provider refusal")
         };
@@ -661,7 +661,7 @@ mod tests {
             lines: skein_lib::List::with_capacity(3),
             next: None,
         });
-        let limits = Limits { rows: 4, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
         assert!(matches!(
             document(&mut transport, sibling, &source, &limits),
             Err(Invalid::Document(wire::documents::Invalid::Identity))
@@ -704,7 +704,7 @@ mod tests {
         let native = Token::new(u64::MAX);
         let watcher =
             transport.open(ClientId(1), native, Watched::Jig(client::Subject::Run { task: 31, turn: None, offset: 0 }));
-        let limits = crate::test::limits().jig;
+        let limits = crate::test::limits().client.domain;
         let Incoming::Callback {
             client: ClientId(1),
             event:
@@ -774,7 +774,7 @@ mod tests {
         let native = Token::new(17);
         let watcher =
             transport.open(ClientId(0), native, Watched::Jig(client::Subject::Run { task: 31, turn: None, offset: 0 }));
-        let limits = crate::test::limits().jig;
+        let limits = crate::test::limits().client.domain;
         assert!(matches!(document(&mut transport, watcher, &run(32), &limits), Err(Invalid::OwnerRoute)));
         assert!(matches!(
             document(&mut transport, watcher, &run(31), &Limits { document_bytes: 0, ..limits }),
@@ -834,13 +834,13 @@ mod tests {
                 &mut transport,
                 token,
                 people::Reply::SignedIn { person: 1, sign_in: 0, expires: Wall::EPOCH },
-                &crate::test::limits().jig
+                &crate::test::limits().client.domain
             ),
             Err(Invalid::Session)
         ));
         assert!(transport.reply(token).is_some());
         assert!(matches!(
-            people_reply(&mut transport, token, reply, &crate::test::limits().jig),
+            people_reply(&mut transport, token, reply, &crate::test::limits().client.domain),
             Ok(Incoming::Authenticated { client: ClientId(1), person: u64::MAX, expires: Wall::EPOCH })
         ));
         assert_eq!(transport.sign_in(ClientId(1)), Some(0));
@@ -875,7 +875,7 @@ mod tests {
                                 },
                         },
                 },
-        } = people_reply(&mut transport, token, people::Reply::Refused(why), &crate::test::limits().jig)
+        } = people_reply(&mut transport, token, people::Reply::Refused(why), &crate::test::limits().client.domain)
             .expect("original child")
         else {
             panic!("original application refusal");

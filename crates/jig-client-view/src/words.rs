@@ -9,7 +9,11 @@ use crate::intents::Progress;
 use crate::phrases::jig::JigPhrase;
 use alloc::boxed::Box;
 use jig_client::contract::{Actor, Decision, Ending, Executor, Made, Outcome, OwnerExecutor, ProposalKey, Proposer};
-use jig_client::{Link, contract::Phase, words::Word};
+use jig_client::{
+    Link,
+    contract::Phase,
+    words::{DecisionWord as D, Word},
+};
 use skein_lib::{Duration, Wall, bytes::copy_of};
 use skein_ui::phrases::{Hole, Phrasebook};
 use skein_ui::{Builder, Role, Run};
@@ -31,6 +35,11 @@ impl Words {
     #[must_use]
     pub fn say_word(&self, word: Word, holes: &[Hole]) -> Box<[u8]> {
         self.book.say(self.language, word.id(), holes).expect("checked word and bounded facts").text
+    }
+    /// Emit one decision fact in the selected public vocabulary.
+    pub fn decision_fact(&self, b: &mut Builder, phrase: D, holes: &[Hole]) {
+        let text = self.say_word(Word::Decision(phrase), holes);
+        b.text(Run::Plain, &text);
     }
     pub(crate) fn node_text(&self, text: u32) -> u32 {
         let phrase = match crate::phrases::jig_capacity(&self.book) {

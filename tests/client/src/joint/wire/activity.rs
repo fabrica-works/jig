@@ -1,9 +1,9 @@
 //! Immutable activity, whole admitted words and page-carried archives
 //! (client/domain/contract.md, 5 and 7; domain/engine.md, 5.4 and 7.2).
 use super::{chips, owner, results, turns};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
-use jig_client_view::Limits;
 use jig_domain_tasks as tasks;
 use skein_lib::List;
 
@@ -291,7 +291,7 @@ pub(crate) mod tests {
     use super::*;
     use skein_lib::Wall;
     fn limits() -> Limits {
-        Limits { text: 100, rows: 4, document_bytes: 100_000, ..crate::test::limits().jig }
+        Limits { text: 100, rows: 4, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
     fn source(line: tasks::Line) -> tasks::ActivityLine {
         tasks::ActivityLine { task: u64::MAX, position: 7, at: Wall::from_nanos(9), line }

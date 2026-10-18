@@ -20,8 +20,8 @@ fn a_stopped_task_s_hold_reads_in_jig_s_words() {
     let limits = PhraseLimits {
         languages: 1,
         phrases: words::PHRASES,
-        holes: 1,
-        segments: 128,
+        holes: 3,
+        segments: 256,
         text_bytes: 8192,
         hole_bytes: 32,
     };

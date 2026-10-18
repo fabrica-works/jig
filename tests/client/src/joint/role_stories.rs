@@ -6,6 +6,7 @@ use jig_fake_workers::Call;
 
 fn receiving_limits() -> jig_client_test_domain::Limits {
     let mut limits = crate::test::limits();
+    limits.client.domain.text = 128;
     limits.jig.text = 128;
     limits.jig.rows = 2;
     limits.jig.projects = 2;
@@ -17,6 +18,7 @@ fn receiving_limits() -> jig_client_test_domain::Limits {
 
 fn choice_limits() -> jig_client_test_domain::Limits {
     let mut limits = receiving_limits();
+    limits.client.domain.text = 128;
     limits.jig.text = 128;
     limits.first.text = 128;
     limits

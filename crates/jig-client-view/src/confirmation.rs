@@ -4,6 +4,7 @@ use crate::cards::{common, person, proposal};
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning, JigStyle};
+use jig_client::words::{DecisionWord as D, Word};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
@@ -59,7 +60,7 @@ pub fn confirmation(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindi
         match open.pool_left.checked_sub(open.form.budget) {
             Some(after) => words.text(
                 b,
-                JigPhrase::Funds,
+                JigPhrase::Word(Word::Decision(D::Funds)),
                 &[Hole::Amount(open.form.budget), Hole::Amount(open.pool_left), Hole::Amount(after)],
             ),
             None => {
@@ -87,7 +88,7 @@ fn begin(b: &mut Builder, words: &Words, act: JigPhrase) {
 }
 fn end(b: &mut Builder, words: &Words, bindings: &mut JigBindings, dangerous: bool, complete: bool) {
     if dangerous {
-        words.status(b, JigPhrase::Dangerous, &[]);
+        words.status(b, JigPhrase::Word(Word::Decision(D::Dangerous)), &[]);
     }
     b.open(Role::Button);
     let label = words.say(JigPhrase::Confirm, &[]);
@@ -230,7 +231,7 @@ fn action(
             if let Some(offers) = crate::acts::offers(object)
                 && let Some(Effect::Move { reservation }) = jig_client::facts::effect(offers.as_slice(), open.act)
             {
-                words.text(b, JigPhrase::TakeoverFunds, &[Hole::Amount(*reservation)]);
+                words.text(b, JigPhrase::Word(Word::Decision(D::TakeoverFunds)), &[Hole::Amount(*reservation)]);
             }
             common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
         }
@@ -348,9 +349,9 @@ fn release_object(b: &mut Builder, client: &Borrowed<'_>, object: &Object, words
         && let Some(Effect::Release(effect)) = jig_client::facts::effect(offers.as_slice(), ActKind::Release)
     {
         match effect {
-            ReleaseEffect::Judged => words.text(b, JigPhrase::ReleaseFresh, &[]),
-            ReleaseEffect::RunAgain => words.text(b, JigPhrase::ResumeRelease, &[]),
-            ReleaseEffect::Uncertain => words.text(b, JigPhrase::EngineFollowsChoice, &[]),
+            ReleaseEffect::Judged => words.text(b, JigPhrase::Word(Word::Decision(D::ReleaseFresh)), &[]),
+            ReleaseEffect::RunAgain => words.text(b, JigPhrase::Word(Word::Decision(D::ResumeRelease)), &[]),
+            ReleaseEffect::Uncertain => words.text(b, JigPhrase::Word(Word::Decision(D::EngineFollowsChoice)), &[]),
         }
     }
     match &object.body {
@@ -385,7 +386,7 @@ fn release_owner(b: &mut Builder, facts: &OwnerChipHold, words: &Words, bindings
     crate::owner_chip::hold(b, facts, words, bindings);
     words.text(b, JigPhrase::OwnerHoldRelease, &[]);
     if let jig_client::contract::HoldCategory::Uncertain { .. } = facts.reason {
-        words.text(b, JigPhrase::EngineFollowsChoice, &[]);
+        words.text(b, JigPhrase::Word(Word::Decision(D::EngineFollowsChoice)), &[]);
         crate::frame::control(
             b,
             words,
@@ -430,19 +431,23 @@ fn impact(object: &Object) -> Option<&Impact> {
 }
 /// Say each authoritative cancellation count and the reservation a takeover needs.
 pub fn impact_words(b: &mut Builder, impact: &Impact, words: &Words) {
-    words.text(b, JigPhrase::TasksWaiting, &[Hole::Number(u64::from(impact.tasks.waiting))]);
-    words.text(b, JigPhrase::TasksRunning, &[Hole::Number(u64::from(impact.tasks.running))]);
-    words.text(b, JigPhrase::TasksHeld, &[Hole::Number(u64::from(impact.tasks.held))]);
-    words.text(b, JigPhrase::TasksClosing, &[Hole::Number(u64::from(impact.tasks.closing))]);
+    words.text(b, JigPhrase::Word(Word::Decision(D::TasksWaiting)), &[Hole::Number(u64::from(impact.tasks.waiting))]);
+    words.text(b, JigPhrase::Word(Word::Decision(D::TasksRunning)), &[Hole::Number(u64::from(impact.tasks.running))]);
+    words.text(b, JigPhrase::Word(Word::Decision(D::TasksHeld)), &[Hole::Number(u64::from(impact.tasks.held))]);
+    words.text(b, JigPhrase::Word(Word::Decision(D::TasksClosing)), &[Hole::Number(u64::from(impact.tasks.closing))]);
     if impact.tasks.ended > 0 {
-        words.text(b, JigPhrase::TasksEnded, &[Hole::Number(u64::from(impact.tasks.ended))]);
+        words.text(b, JigPhrase::Word(Word::Decision(D::TasksEnded)), &[Hole::Number(u64::from(impact.tasks.ended))]);
     }
-    words.text(b, JigPhrase::TasksDone, &[Hole::Number(u64::from(impact.tasks.done))]);
-    words.text(b, JigPhrase::TasksFailed, &[Hole::Number(u64::from(impact.tasks.failed))]);
-    words.text(b, JigPhrase::TasksCancelled, &[Hole::Number(u64::from(impact.tasks.cancelled))]);
-    words.text(b, JigPhrase::LiveRuns, &[Hole::Number(u64::from(impact.live_runs))]);
-    words.text(b, JigPhrase::PendingProposals, &[Hole::Number(u64::from(impact.proposals))]);
-    words.text(b, JigPhrase::EffectsSettle, &[]);
+    words.text(b, JigPhrase::Word(Word::Decision(D::TasksDone)), &[Hole::Number(u64::from(impact.tasks.done))]);
+    words.text(b, JigPhrase::Word(Word::Decision(D::TasksFailed)), &[Hole::Number(u64::from(impact.tasks.failed))]);
+    words.text(
+        b,
+        JigPhrase::Word(Word::Decision(D::TasksCancelled)),
+        &[Hole::Number(u64::from(impact.tasks.cancelled))],
+    );
+    words.text(b, JigPhrase::Word(Word::Decision(D::LiveRuns)), &[Hole::Number(u64::from(impact.live_runs))]);
+    words.text(b, JigPhrase::Word(Word::Decision(D::PendingProposals)), &[Hole::Number(u64::from(impact.proposals))]);
+    words.text(b, JigPhrase::Word(Word::Decision(D::EffectsSettle)), &[]);
 }
 fn release(b: &mut Builder, client: &Borrowed<'_>, facts: &Hold, words: &Words, bindings: &mut JigBindings) {
     match &facts.reason {

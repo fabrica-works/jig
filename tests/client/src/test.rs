@@ -116,6 +116,36 @@ pub fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
     out
 }
 
+/// Check the public decision vocabulary supplied by an application's world.
+pub(crate) fn decision_phrasebook(language: &skein_ui::phrases::Language) -> skein_ui::phrases::Phrasebook {
+    use skein_ui::phrases::{PhraseLimits, Phrasebook, Segment};
+    let mut segments = 0;
+    let mut text_bytes = 0;
+    for phrase in &language.phrases {
+        for form in &phrase.forms {
+            segments += u32::try_from(form.segments.len()).expect("bounded world phrase");
+            for segment in &form.segments {
+                if let Segment::Text(text) = segment {
+                    text_bytes += u32::try_from(text.len()).expect("bounded world words");
+                }
+            }
+        }
+    }
+    Phrasebook::load(
+        jig_client::words::phrase_shapes(0),
+        Box::new([language.clone()]),
+        &PhraseLimits {
+            languages: 1,
+            phrases: jig_client::words::PHRASES,
+            holes: 3,
+            segments,
+            text_bytes,
+            hole_bytes: 0,
+        },
+    )
+    .expect("world's public words are complete and checked")
+}
+
 // Checked immutable books and envelopes are shared by every equal fixture.
 type Books = (jig_client_view::words::Words, view::words::Words);
 pub(crate) fn phrasebooks(limits: &domain::Limits) -> &'static Books {

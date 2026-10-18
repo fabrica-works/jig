@@ -3,6 +3,7 @@ use crate::phrases::jig::JigPhrase;
 use crate::proposed_task_words::ProposedPhrase;
 use crate::words::Words;
 use crate::{JigBindings, JigMeaning, Owner};
+use jig_client::words::{DecisionWord as D, Word};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, SlotRef};
 
@@ -34,21 +35,19 @@ pub fn executor(b: &mut Builder, value: OwnerExecutor, words: &Words) {
 }
 pub fn funder(b: &mut Builder, value: Funder, words: &Words) {
     match value {
-        Funder::Task(task) => text(b, words, ProposedPhrase::FunderTask, &[Hole::Number(task)]),
-        Funder::Pool { project, person, period } => text(
+        Funder::Task(task) => words.decision_fact(b, D::FunderTask, &[Hole::Number(task)]),
+        Funder::Pool { project, person, period } => words.decision_fact(
             b,
-            words,
-            ProposedPhrase::FunderPool,
+            D::FunderPool,
             &[Hole::Number(u64::from(project)), Hole::Number(person), Hole::Number(period)],
         ),
-        Funder::Recurring { project, task, period } => text(
+        Funder::Recurring { project, task, period } => words.decision_fact(
             b,
-            words,
-            ProposedPhrase::FunderRecurring,
+            D::FunderRecurring,
             &[Hole::Number(u64::from(project)), Hole::Number(task), Hole::Number(period)],
         ),
         Funder::Period { project, period } => {
-            text(b, words, ProposedPhrase::FunderPeriod, &[Hole::Number(u64::from(project)), Hole::Number(period)]);
+            words.decision_fact(b, D::FunderPeriod, &[Hole::Number(u64::from(project)), Hole::Number(period)]);
         }
     }
 }
@@ -62,10 +61,10 @@ pub const fn funder_nodes() -> u32 {
 pub fn funder_phrase_bytes(words: &Words) -> Option<u32> {
     let mut largest = 0;
     for phrase in [
-        ProposedPhrase::FunderTask,
-        ProposedPhrase::FunderPool,
-        ProposedPhrase::FunderRecurring,
-        ProposedPhrase::FunderPeriod,
+        Word::Decision(D::FunderTask),
+        Word::Decision(D::FunderPool),
+        Word::Decision(D::FunderRecurring),
+        Word::Decision(D::FunderPeriod),
     ] {
         largest = largest.max(words.book.capacity(phrase.id())?);
     }

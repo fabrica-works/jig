@@ -347,7 +347,7 @@ mod tests {
         inputs.push(0).expect("room");
         let selected = client::Specification { words: text(b""), parameters, inputs: inputs.clone() };
         let source = super::super::owner::tests::amendment_source();
-        let limits = jig_client_view::Limits { rows: 4, text: 128, ..crate::test::limits().jig };
+        let limits = jig_client::DomainLimits { rows: 4, text: 128, ..crate::test::limits().client.domain };
         let authority = super::super::owner::authority(&source.authority, &limits).expect("whole authority").authority;
         let wake = client::OwnerWakePolicy {
             words: client::WakeRule::Batch { count: u32::MAX, age: skein_lib::Duration::ZERO },

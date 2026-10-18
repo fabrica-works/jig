@@ -2,7 +2,7 @@ use super::*;
 use skein_lib::{List, Wall};
 
 pub(crate) fn limits() -> Limits {
-    Limits { rows: 8, text: 200, document_bytes: 1_000_000, ..crate::test::limits().jig }
+    Limits { rows: 8, text: 200, document_bytes: 1_000_000, ..crate::test::limits().client.domain }
 }
 fn raw_goal() -> tasks::New {
     tasks::New {

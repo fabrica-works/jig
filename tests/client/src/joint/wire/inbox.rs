@@ -2,8 +2,8 @@
 //! (client/domain/contract.md, 5–7). Neither row membership nor ancestry is
 //! reconstructed here; native reads retain their original query separately.
 use super::{owner, reads, results};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
-use jig_client_view::Limits;
 use jig_domain_core::documents;
 use skein_lib::List;
 
@@ -105,7 +105,7 @@ pub(crate) mod tests {
     use jig_domain_people as people;
     use skein_lib::Wall;
     pub(crate) fn limits() -> Limits {
-        Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().jig }
+        Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
     pub(crate) fn source() -> documents::Inbox {
         let objects = [

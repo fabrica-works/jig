@@ -5,10 +5,10 @@ use super::{
     transport::{Reply, Transport},
     wire,
 };
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
 #[cfg(test)]
 use jig_client_test_domain::Event;
-use jig_client_view::Limits;
 use jig_domain_core::{documents, reads};
 use skein_lib::Token;
 
@@ -490,7 +490,7 @@ mod tests {
             .reply_to(Reply::Read { client: ClientId(0), read: native, what: client::Read::Result { task: u64::MAX } })
             .into_token();
         let mut source = wire::results::tests::document();
-        let limits = Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().jig };
+        let limits = Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain };
         source.task.number = 0;
         let wrong = reads::Answer::Document(Box::new(documents::Document::Result(Box::new(source.clone()))));
         assert_eq!(read(&mut transport, to, &wrong, &limits).err(), Some(Invalid::OwnerRoute));
@@ -553,7 +553,7 @@ mod tests {
                                 up: jig_client::Up::ReadDone { read: actual, result: jig_client::Readout::Jig(result) },
                             },
                     },
-            } = read(&mut transport, to, &reads::Answer::None(why), &crate::test::limits().jig)
+            } = read(&mut transport, to, &reads::Answer::None(why), &crate::test::limits().client.domain)
                 .expect("actual terminal")
             else {
                 panic!("original native read");
@@ -562,7 +562,7 @@ mod tests {
             assert_eq!(result, client::ReadResult::None(expected));
             assert!(transport.reply(to).is_none());
             assert!(matches!(
-                read(&mut transport, to, &reads::Answer::None(why), &crate::test::limits().jig),
+                read(&mut transport, to, &reads::Answer::None(why), &crate::test::limits().client.domain),
                 Err(Invalid::MissingRoute)
             ));
         }
@@ -585,7 +585,7 @@ mod tests {
             next: None,
             cut: false,
         }));
-        let limits = Limits { rows: 2, ..crate::test::limits().jig };
+        let limits = Limits { rows: 2, ..crate::test::limits().client.domain };
         assert!(matches!(
             read(&mut transport, to, &answer, &limits),
             Err(Invalid::Page(wire::pages::Invalid::Owner(_)))
@@ -622,7 +622,7 @@ mod tests {
     fn a_scoped_note_page_consumes_only_its_original_read_after_exact_query_and_whole_admission() {
         let mut transport = transport();
         let native = Token::new(u64::MAX);
-        let limits = Limits { rows: 2, text: 200, document_bytes: 100_000, ..crate::test::limits().jig };
+        let limits = Limits { rows: 2, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain };
         let query = client::Read::Notes {
             scope: client::NoteScope::Project(u32::MAX),
             description: Some(client::Text::new(Box::new([]), limits.text).expect("explicit empty search")),

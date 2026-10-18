@@ -15,6 +15,7 @@ use crate::{
     address::{Address, Place, ProjectSection, TaskSection},
 };
 use jig_client::contract::*;
+use jig_client::words::{DecisionWord as D, Word};
 use skein_lib::{List, Token};
 
 fn cursor() -> Cursor {
@@ -329,16 +330,16 @@ fn owner_goal_rows_render_every_distinct_stage_without_generic_ended_and_keep_pu
     let selected = row_selected_words();
     let tree = build(&domain, 3, &selected).0;
     for phrase_and_count in [
-        (crate::phrases::jig::JigPhrase::TasksWaiting, u32::MAX),
+        (crate::phrases::jig::JigPhrase::Word(Word::Decision(D::TasksWaiting)), u32::MAX),
         (crate::phrases::jig::JigPhrase::TasksIdle, u32::MAX - 1),
         (crate::phrases::jig::JigPhrase::TasksStarting, u32::MAX - 2),
-        (crate::phrases::jig::JigPhrase::TasksRunning, u32::MAX - 3),
+        (crate::phrases::jig::JigPhrase::Word(Word::Decision(D::TasksRunning)), u32::MAX - 3),
         (crate::phrases::jig::JigPhrase::TasksBackingOff, u32::MAX - 4),
-        (crate::phrases::jig::JigPhrase::TasksClosing, u32::MAX - 5),
-        (crate::phrases::jig::JigPhrase::TasksHeld, u32::MAX - 6),
-        (crate::phrases::jig::JigPhrase::TasksDone, u32::MAX - 7),
-        (crate::phrases::jig::JigPhrase::TasksFailed, u32::MAX - 8),
-        (crate::phrases::jig::JigPhrase::TasksCancelled, u32::MAX - 9),
+        (crate::phrases::jig::JigPhrase::Word(Word::Decision(D::TasksClosing)), u32::MAX - 5),
+        (crate::phrases::jig::JigPhrase::Word(Word::Decision(D::TasksHeld)), u32::MAX - 6),
+        (crate::phrases::jig::JigPhrase::Word(Word::Decision(D::TasksDone)), u32::MAX - 7),
+        (crate::phrases::jig::JigPhrase::Word(Word::Decision(D::TasksFailed)), u32::MAX - 8),
+        (crate::phrases::jig::JigPhrase::Word(Word::Decision(D::TasksCancelled)), u32::MAX - 9),
     ] {
         assert!(contains(
             &tree,
@@ -347,7 +348,10 @@ fn owner_goal_rows_render_every_distinct_stage_without_generic_ended_and_keep_pu
     }
     assert!(!contains(
         &tree,
-        &selected.say(crate::phrases::jig::JigPhrase::TasksEnded, &[skein_ui::phrases::Hole::Number(1)])
+        &selected.say(
+            crate::phrases::jig::JigPhrase::Word(Word::Decision(D::TasksEnded)),
+            &[skein_ui::phrases::Hole::Number(1)]
+        )
     ));
     assert_eq!(domain.project_page().listed_goals.get(0), Some(&row));
     assert!(tree.len() <= crate::page_nodes(&super::cards::CLIENT, 0).unwrap());

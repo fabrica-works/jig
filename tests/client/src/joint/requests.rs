@@ -7,9 +7,9 @@ use super::{
     wire,
 };
 use crate::harness::ClientId;
+use jig_client::DomainLimits as Limits;
 use jig_client::{Ask, Down, Readable, Watchable};
 use jig_client_test_domain::Request;
-use jig_client_view::Limits;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_domain_people::ApplicationScope;
@@ -238,7 +238,7 @@ mod tests {
             },
         };
         assert_eq!(
-            send(&mut driver, ClientId(0), now, wall, &value, &crate::test::limits().jig),
+            send(&mut driver, ClientId(0), now, wall, &value, &crate::test::limits().client.domain),
             Err(Invalid::Session)
         );
         assert_eq!(driver.transport.watch_token(ClientId(0), Token::new(71)), None);
@@ -283,7 +283,7 @@ mod tests {
             },
         };
         driver.world.cut = Some(jig_core_world::effects::Cut::Submitted(driver.world.store.applied + 1));
-        send(&mut driver, ClientId(0), now, wall, &request, &crate::test::limits().jig)
+        send(&mut driver, ClientId(0), now, wall, &request, &crate::test::limits().client.domain)
             .expect("whole original request is routed");
         assert!(driver.world.reached_cut.is_some());
         assert!(driver.withhold_completion().expect("actual decision becomes durable").is_none());

@@ -1,7 +1,7 @@
 //! The core's query and line facts, preserved at the joint boundary.
 use super::{chips, owner, results, rows};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as c;
-use jig_client_view::Limits;
 use jig_domain_core::documents as d;
 use jig_domain_people as p;
 use jig_domain_tasks as t;

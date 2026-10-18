@@ -24,8 +24,14 @@ const HOLDS: &[(H, &[u8])] = &[
     (H::Procedure, b"Procedure needs a decision"),
 ];
 fn book(languages: Box<[Language]>) -> Phrasebook {
-    let limits =
-        PhraseLimits { languages: 2, phrases: 59, holes: 1, segments: 128, text_bytes: 8192, hole_bytes: TEXT };
+    let limits = PhraseLimits {
+        languages: 2,
+        phrases: words::PHRASES,
+        holes: 3,
+        segments: 256,
+        text_bytes: 8192,
+        hole_bytes: TEXT,
+    };
     Phrasebook::load(words::phrase_shapes(TEXT), languages, &limits).expect("bounded public words")
 }
 #[test]

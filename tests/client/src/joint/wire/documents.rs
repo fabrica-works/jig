@@ -2,9 +2,9 @@
 //! Normal Run state remains independent of provisional text and its Continue
 //! cursor. Receiving admission prices the complete envelope before it is fed.
 use super::{chips, cursor, inbox, offers, owner, queries, results, rows};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
-use jig_client_view::Limits;
 use jig_domain_core::documents;
 use jig_domain_views as views;
 
@@ -577,7 +577,7 @@ pub(crate) mod tests {
 
     #[test]
     fn complete_result_documents_keep_whole_terminal_payload_optional_clocks_metadata_and_offers() {
-        let limits = Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().jig };
+        let limits = Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain };
         for terminal in [
             documents::Ending::Done(documents::ResultValue::Report(documents::Text {
                 bytes: Box::from(UTF8_TEXTS[0]),
@@ -684,7 +684,7 @@ pub(crate) mod tests {
         let source = frame();
         let before = source.clone();
         // This fixture deliberately reserves three unfilled offer rows.
-        let limits = Limits { projects: 3, rows: 3, ..crate::test::limits().jig };
+        let limits = Limits { projects: 3, rows: 3, ..crate::test::limits().client.domain };
         let read = frame_read(&source, &limits).expect("whole frame read fits");
         let client::ReadValue::Me(read) = read else { panic!("actual Me read envelope") };
         let delivery = frame_delivery(&source, &limits).expect("whole frame watch fits");
@@ -702,7 +702,7 @@ pub(crate) mod tests {
 
     #[test]
     fn normal_run_keeps_a_whole_call_after_commit_without_writing_or_invented_clock() {
-        let limits = crate::test::limits().jig;
+        let limits = crate::test::limits().client.domain;
         for began in [None, Some(Wall::EPOCH)] {
             let source = documents::Run {
                 task: u64::MAX,
@@ -752,7 +752,7 @@ pub(crate) mod tests {
             }),
             call: Some(call(None)),
         };
-        let limits = crate::test::limits().jig;
+        let limits = crate::test::limits().client.domain;
         let translated = run_delivery(&source, &limits).expect("whole retained writing and call fit");
         let client::Delivery::RunState(translated) = translated else { panic!("normal whole Run envelope") };
         assert_eq!(translated.attempt, Some(u64::MAX));

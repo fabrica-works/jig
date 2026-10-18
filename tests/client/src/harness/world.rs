@@ -2,6 +2,8 @@
 //! writes its store, dispatches wire duties, then applies and checks patches
 //! (client/domain/testing.md, 4; client/domain/view.md, 11).
 mod decisions;
+#[cfg(test)]
+mod words_tests;
 use super::{App, CardKey, Duty, Fault, Front, FrontFault, Observation, StoreWrite};
 use crate::model::Model;
 use skein_fake_person::{Doing, Next, Person, RandomDoing, RandomPerson, Step, TreeFace};
@@ -22,6 +24,8 @@ pub struct PersonId(pub usize);
 #[derive(Clone, Debug)]
 pub struct Settings {
     pub seed: u64,
+    /// Complete public-word language, including application overrides.
+    pub words: skein_ui::phrases::Language,
     pub latency: Span,
     pub store_records: usize,
     pub iterations: u32,
@@ -40,6 +44,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             seed: 1,
+            words: jig_client::words::english(),
             latency: Span::millis(1, 3),
             store_records: 32,
             iterations: 4096,
@@ -150,10 +155,11 @@ impl<A: App, F: Front<A>> World<A, F> {
             default_heap_bound: None,
             heap_peak: 0,
             rng: Rng::new(settings.seed),
-            referee: Referee::new(super::referee::Rules::new(
+            referee: Referee::new(super::referee::Rules::with_words(
                 settings.heartbeat,
                 settings.request_within,
                 settings.link_within,
+                &settings.words,
             )),
             settings,
             front,

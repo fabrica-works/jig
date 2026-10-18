@@ -1,7 +1,7 @@
 //! Exact offered acts, holder identities and supported draft bounds (contract.md, 5.3).
 use super::{owner, refusals};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
-use jig_client_view::Limits;
 use jig_domain_core::acts;
 use skein_lib::List;
 
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn goal_offer_keeps_whole_closed_executor_choices_and_independent_direct_hard_and_pool_bounds() {
-        let limits = Limits { rows: 4, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
         let mut charters = List::with_capacity(4);
         charters.push(u32::MAX).expect("supplied charter");
         let mut procedures = List::with_capacity(4);
@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn offers_keep_allowed_proposed_and_exact_sparse_refused_judgments_without_holder_or_reason_inference() {
-        let limits = crate::test::limits().jig;
+        let limits = crate::test::limits().client.domain;
         for (source, expected) in [
             (acts::Recipient::Task(u64::MAX), client::Recipient::Task(u64::MAX)),
             (acts::Recipient::Party(0), client::Recipient::Party(0)),
@@ -271,7 +271,7 @@ mod tests {
             ceiling: Box::new(ceiling),
         };
         let before = source.clone();
-        let limits = Limits { rows: 4, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
         let actual = bounds(&source, &limits).expect("whole supplied bounded amendment");
         let client::Bounds::Amend { budget_left, grants, implications, authority, ceiling } = actual else {
             panic!("actual amendment bound")

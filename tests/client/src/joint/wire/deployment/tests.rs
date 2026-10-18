@@ -3,7 +3,7 @@ use super::*;
 use skein_lib::{Duration, List, Wall};
 
 pub(crate) fn limits() -> Limits {
-    Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().jig }
+    Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
 }
 
 fn rows<T>(capacity: u32, values: impl IntoIterator<Item = T>) -> List<T> {

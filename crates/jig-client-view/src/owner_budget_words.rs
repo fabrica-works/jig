@@ -3,6 +3,13 @@
 use crate::words::Words;
 use crate::{Owner, proposed_task_words};
 use alloc::boxed::Box;
+use jig_client::words::{self, DecisionWord as D, Word};
+const FUNDERS: [Word; 4] = [
+    Word::Decision(D::FunderTask),
+    Word::Decision(D::FunderPool),
+    Word::Decision(D::FunderRecurring),
+    Word::Decision(D::FunderPeriod),
+];
 use skein_lib::{List, bytes::copy_of};
 use skein_ui::phrases::{
     Form, HoleKind, HoleShape, Invalid, Language, Phrase, PhraseId, PhraseLimits, PhraseShape, Phrasebook, PluralClass,
@@ -129,6 +136,8 @@ pub fn standalone_phrase_count() -> u32 {
         .expect("budget phrase count fits")
         .checked_add(u32::try_from(proposed_task_words::ALL.len()).expect("part phrase count fits"))
         .expect("combined phrase count fits")
+        .checked_add(u32::try_from(FUNDERS.len()).expect("closed funder count"))
+        .expect("public funder sayings fit")
 }
 
 fn standalone_shapes() -> Box<[PhraseShape]> {
@@ -138,6 +147,9 @@ fn standalone_shapes() -> Box<[PhraseShape]> {
     }
     for shape in proposed_task_words::shapes() {
         combined.push(shape).expect("shared proposed-task shape count is closed");
+    }
+    for word in FUNDERS {
+        combined.push(word.shape(0)).expect("public funder shapes fit");
     }
     combined.into_boxed()
 }
@@ -153,6 +165,14 @@ pub fn standalone_language() -> Language {
     }
     for phrase in proposed_task_words::language().phrases {
         combined.push(phrase).expect("shared proposed-task phrase count is closed");
+    }
+    let public = words::english();
+    for word in FUNDERS {
+        for phrase in &public.phrases {
+            if phrase.id == word.id() {
+                combined.push(phrase.clone()).expect("public funder words fit");
+            }
+        }
     }
     result.phrases = combined.into_boxed();
     result

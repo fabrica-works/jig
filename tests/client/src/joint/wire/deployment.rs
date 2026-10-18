@@ -2,8 +2,8 @@
 //! Clock options, independent loss, configured order and reserved collections
 //! cross unchanged. Connector values remain their application owners' facts.
 use super::{chips, owner, refusals, results};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
-use jig_client_view::Limits;
 use jig_domain_accounts as accounts;
 use jig_domain_core::documents;
 use jig_domain_fleet as fleet;

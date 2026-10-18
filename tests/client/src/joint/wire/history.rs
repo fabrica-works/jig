@@ -2,8 +2,8 @@
 //! Source positions, revisions, stored overrides and optional clocks are copied
 //! independently; no present-day state supplies historical missing facts.
 use super::{chips, owner, results};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
-use jig_client_view::Limits;
 use jig_domain_core::documents;
 use jig_domain_tasks as tasks;
 
@@ -206,7 +206,7 @@ pub(super) mod tests {
     use super::*;
     use skein_lib::{List, Wall};
     pub(crate) fn limits() -> Limits {
-        Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().jig }
+        Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
     pub(crate) fn source() -> documents::HistoryLine {
         let before = owner::tests::amendment_source();

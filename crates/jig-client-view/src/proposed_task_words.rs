@@ -13,10 +13,6 @@ pub enum ProposedPhrase {
     ExecutorProcedure,
     ExecutorParty,
     ExecutorRole,
-    FunderTask,
-    FunderPool,
-    FunderRecurring,
-    FunderPeriod,
     ContractReport,
     ContractApproval,
     ContractVerdict,
@@ -35,15 +31,11 @@ pub enum ProposedPhrase {
     PartOutbox,
     PartHold,
 }
-pub const ALL: [ProposedPhrase; 25] = [
+pub const ALL: [ProposedPhrase; 21] = [
     ProposedPhrase::ExecutorCharter,
     ProposedPhrase::ExecutorProcedure,
     ProposedPhrase::ExecutorParty,
     ProposedPhrase::ExecutorRole,
-    ProposedPhrase::FunderTask,
-    ProposedPhrase::FunderPool,
-    ProposedPhrase::FunderRecurring,
-    ProposedPhrase::FunderPeriod,
     ProposedPhrase::ContractReport,
     ProposedPhrase::ContractApproval,
     ProposedPhrase::ContractVerdict,
@@ -70,10 +62,6 @@ impl ProposedPhrase {
             Self::ExecutorProcedure => 5001,
             Self::ExecutorParty => 5002,
             Self::ExecutorRole => 5003,
-            Self::FunderTask => 5004,
-            Self::FunderPool => 5005,
-            Self::FunderRecurring => 5006,
-            Self::FunderPeriod => 5007,
             Self::ContractReport => 5008,
             Self::ContractApproval => 5009,
             Self::ContractVerdict => 5010,
@@ -100,13 +88,12 @@ impl ProposedPhrase {
             Self::ExecutorCharter
             | Self::ExecutorParty
             | Self::ExecutorRole
-            | Self::FunderTask
             | Self::ContractReport
             | Self::FieldCap
             | Self::PartConnector
             | Self::PartNumber => 1,
-            Self::ExecutorProcedure | Self::FunderPeriod => 2,
-            Self::FunderPool | Self::FunderRecurring | Self::ContractChange | Self::VerdictChoice => 3,
+            Self::ExecutorProcedure => 2,
+            Self::ContractChange | Self::VerdictChoice => 3,
             Self::ContractApproval
             | Self::ContractVerdict
             | Self::ContractCut
@@ -155,32 +142,6 @@ pub fn language() -> Language {
             ProposedPhrase::ExecutorRole => {
                 Box::new([Segment::Text(copy_of(b"Project role ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
-            ProposedPhrase::FunderTask => Box::new([
-                Segment::Text(copy_of(b"Funded by task ")),
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-            ]),
-            ProposedPhrase::FunderPool => Box::new([
-                Segment::Text(copy_of(b"Funded by pool in project ")),
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b", person ")),
-                Segment::Hole { index: 1, kind: HoleKind::Number },
-                Segment::Text(copy_of(b", period ")),
-                Segment::Hole { index: 2, kind: HoleKind::Number },
-            ]),
-            ProposedPhrase::FunderRecurring => Box::new([
-                Segment::Text(copy_of(b"Funded by recurring task in project ")),
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b", task ")),
-                Segment::Hole { index: 1, kind: HoleKind::Number },
-                Segment::Text(copy_of(b", period ")),
-                Segment::Hole { index: 2, kind: HoleKind::Number },
-            ]),
-            ProposedPhrase::FunderPeriod => Box::new([
-                Segment::Text(copy_of(b"Funded by project period ")),
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b", period ")),
-                Segment::Hole { index: 1, kind: HoleKind::Number },
-            ]),
             ProposedPhrase::ContractReport => Box::new([
                 Segment::Text(copy_of(b"Report word byte limit ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

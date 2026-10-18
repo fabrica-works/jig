@@ -1,8 +1,8 @@
 //! Whole compact task facts (contract.md, 5.1; objects.md, 3).
 //! Metadata remains mandatory and independent of phase, observation and ending.
 use super::{owner, results};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
-use jig_client_view::Limits;
 use jig_domain_core::documents;
 use jig_domain_tasks as tasks;
 
@@ -338,7 +338,7 @@ pub(super) mod tests {
 
     #[test]
     fn supplied_hold_account_and_resource_or_outbox_origin_survive_independently() {
-        let limits = Limits { rows: 2, text: 4, ..crate::test::limits().jig };
+        let limits = Limits { rows: 2, text: 4, ..crate::test::limits().client.domain };
         let account =
             tasks::Part { connector: u16::MAX, kind: tasks::PartKind::Hold, key: tasks::PartKey::Number(u64::MAX) };
         let mut path = List::with_capacity(2);
@@ -388,7 +388,7 @@ pub(super) mod tests {
     #[test]
     fn whole_chip_keeps_mandatory_metadata_unknown_ending_title_loss_and_sparse_observation_independent() {
         let mut source = source_chip();
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
         for connectors in [None, Some(List::with_capacity(4))] {
             source.details.closing_connectors = connectors;
             let before = source.clone();
@@ -466,13 +466,13 @@ pub(super) mod tests {
         );
         let mut source = source_chip();
         source.details.retry = None;
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
         assert!(details(&source.details, &limits).expect("complete supplied metadata").retry.is_none());
     }
 
     #[test]
     fn chip_phase_and_preserved_hold_keep_named_lifecycle_address_revision_and_separate_failure_counters() {
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
         let mut dependencies = List::with_capacity(4);
         dependencies.push(u64::MAX).expect("declared room");
         assert_eq!(
@@ -540,7 +540,7 @@ pub(super) mod tests {
     fn chip_receiver_refuses_reserved_rows_raw_tool_bytes_and_inconsistent_executor_facts_without_trimming() {
         let source = source_chip();
         let before = source.clone();
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
         assert_eq!(chip(&source, &Limits { rows: 3, ..limits }), Err(owner::Invalid::TooLarge));
         assert_eq!(chip(&source, &Limits { text: 1, ..limits }), Err(owner::Invalid::TooLarge));
         let mut mismatch = source.clone();
@@ -553,7 +553,7 @@ pub(super) mod tests {
         let mut source = List::with_capacity(4);
         source.push(source_chip()).expect("supplied whole Chip fits reserved row");
         let before = source.clone();
-        let limits = Limits { rows: 4, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
         let value = super::super::documents::chips_delivery(&source, &limits).expect("whole envelope fits");
         let client::Delivery::Chips(value) = value else { panic!("named Chip envelope") };
         assert_eq!(value.capacity(), 4);

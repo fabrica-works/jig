@@ -3,6 +3,7 @@ use crate::JigBindings;
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;
 use jig_client::thread::window::{Edge, Edges};
+use jig_client::words::{DecisionWord as D, Word};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, State};
 
@@ -66,14 +67,14 @@ pub(crate) fn budget(b: &mut Builder, value: &Budget, words: &Words) {
 }
 pub(crate) fn counts(b: &mut Builder, counts: PhaseCounts, words: &Words) {
     for (phrase, count) in [
-        (JigPhrase::TasksWaiting, counts.waiting),
-        (JigPhrase::TasksRunning, counts.running),
-        (JigPhrase::TasksHeld, counts.held),
-        (JigPhrase::TasksClosing, counts.closing),
-        (JigPhrase::TasksEnded, counts.ended),
-        (JigPhrase::TasksDone, counts.done),
-        (JigPhrase::TasksFailed, counts.failed),
-        (JigPhrase::TasksCancelled, counts.cancelled),
+        (JigPhrase::Word(Word::Decision(D::TasksWaiting)), counts.waiting),
+        (JigPhrase::Word(Word::Decision(D::TasksRunning)), counts.running),
+        (JigPhrase::Word(Word::Decision(D::TasksHeld)), counts.held),
+        (JigPhrase::Word(Word::Decision(D::TasksClosing)), counts.closing),
+        (JigPhrase::Word(Word::Decision(D::TasksEnded)), counts.ended),
+        (JigPhrase::Word(Word::Decision(D::TasksDone)), counts.done),
+        (JigPhrase::Word(Word::Decision(D::TasksFailed)), counts.failed),
+        (JigPhrase::Word(Word::Decision(D::TasksCancelled)), counts.cancelled),
     ] {
         if count > 0 {
             words.text(b, phrase, &[Hole::Number(u64::from(count))]);
@@ -109,16 +110,16 @@ pub(crate) fn cursors(
 // Supplied stage counts stay distinct from the locally folded PhaseCounts.
 pub(crate) fn owner_counts(b: &mut Builder, counts: jig_client::contract::OwnerPhaseCounts, words: &Words) {
     for (phrase, count) in [
-        (JigPhrase::TasksWaiting, counts.waiting),
+        (JigPhrase::Word(Word::Decision(D::TasksWaiting)), counts.waiting),
         (JigPhrase::TasksIdle, counts.idle),
         (JigPhrase::TasksStarting, counts.starting),
-        (JigPhrase::TasksRunning, counts.running),
+        (JigPhrase::Word(Word::Decision(D::TasksRunning)), counts.running),
         (JigPhrase::TasksBackingOff, counts.backing_off),
-        (JigPhrase::TasksClosing, counts.closing),
-        (JigPhrase::TasksHeld, counts.held),
-        (JigPhrase::TasksDone, counts.done),
-        (JigPhrase::TasksFailed, counts.failed),
-        (JigPhrase::TasksCancelled, counts.cancelled),
+        (JigPhrase::Word(Word::Decision(D::TasksClosing)), counts.closing),
+        (JigPhrase::Word(Word::Decision(D::TasksHeld)), counts.held),
+        (JigPhrase::Word(Word::Decision(D::TasksDone)), counts.done),
+        (JigPhrase::Word(Word::Decision(D::TasksFailed)), counts.failed),
+        (JigPhrase::Word(Word::Decision(D::TasksCancelled)), counts.cancelled),
     ] {
         if count > 0 {
             words.text(b, phrase, &[Hole::Number(u64::from(count))]);

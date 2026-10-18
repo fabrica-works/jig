@@ -34,14 +34,9 @@ pub enum ProposalPhrase {
     Release,
     HoldAbsent,
     Funding,
-    Needed,
-    Left,
-    LeftAbsent,
-    AfterFunding,
-    AfterAbsent,
     WaitingSince,
 }
-pub const ALL: [ProposalPhrase; 31] = [
+pub const ALL: [ProposalPhrase; 26] = [
     ProposalPhrase::Proposal,
     ProposalPhrase::Number,
     ProposalPhrase::Project,
@@ -67,11 +62,6 @@ pub const ALL: [ProposalPhrase; 31] = [
     ProposalPhrase::Release,
     ProposalPhrase::HoldAbsent,
     ProposalPhrase::Funding,
-    ProposalPhrase::Needed,
-    ProposalPhrase::Left,
-    ProposalPhrase::LeftAbsent,
-    ProposalPhrase::AfterFunding,
-    ProposalPhrase::AfterAbsent,
     ProposalPhrase::WaitingSince,
 ];
 impl ProposalPhrase {
@@ -105,11 +95,6 @@ impl ProposalPhrase {
                 Self::Release => 8421,
                 Self::HoldAbsent => 8422,
                 Self::Funding => 8423,
-                Self::Needed => 8424,
-                Self::Left => 8425,
-                Self::LeftAbsent => 8426,
-                Self::AfterFunding => 8427,
-                Self::AfterAbsent => 8428,
                 Self::WaitingSince => 8429,
             },
         }
@@ -123,10 +108,7 @@ impl ProposalPhrase {
             | Self::Position
             | Self::Purpose
             | Self::ProcedureStep
-            | Self::ReleaseRevision
-            | Self::Needed
-            | Self::Left
-            | Self::AfterFunding => Some(HoleKind::Number),
+            | Self::ReleaseRevision => Some(HoleKind::Number),
             Self::WaitingSince => Some(HoleKind::Wall),
             Self::Proposal
             | Self::Reason
@@ -144,9 +126,7 @@ impl ProposalPhrase {
             | Self::Widen
             | Self::Release
             | Self::HoldAbsent
-            | Self::Funding
-            | Self::LeftAbsent
-            | Self::AfterAbsent => None,
+            | Self::Funding => None,
         }
     }
     fn label(self) -> &'static [u8] {
@@ -176,11 +156,6 @@ impl ProposalPhrase {
             Self::Release => b"Proposed release",
             Self::HoldAbsent => b"Release hold not supplied",
             Self::Funding => b"Supplied funding offers",
-            Self::Needed => b"Funding needed: ",
-            Self::Left => b"Funding left: ",
-            Self::LeftAbsent => b"Funding left not supplied",
-            Self::AfterFunding => b"Funding after: ",
-            Self::AfterAbsent => b"Funding after not supplied",
             Self::WaitingSince => b"Waiting since: ",
         }
     }
@@ -188,7 +163,7 @@ impl ProposalPhrase {
 
 #[must_use]
 pub fn shapes() -> Box<[PhraseShape]> {
-    let mut values = List::with_capacity(31);
+    let mut values = List::with_capacity(26);
     for phrase in ALL {
         let holes: Box<[HoleShape]> = match phrase.hole() {
             Some(kind) => Box::new([HoleShape { kind, bytes: 0 }]),
@@ -200,7 +175,7 @@ pub fn shapes() -> Box<[PhraseShape]> {
 }
 #[must_use]
 pub fn language() -> Language {
-    let mut values = List::with_capacity(31);
+    let mut values = List::with_capacity(26);
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase.hole() {
             Some(kind) => Box::new([Segment::Text(copy_of(phrase.label())), Segment::Hole { index: 0, kind }]),

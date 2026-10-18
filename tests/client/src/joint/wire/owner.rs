@@ -1,8 +1,8 @@
 //! Whole owner vocabulary shared by document translations (contract.md, 5).
 //! This layer copies opaque names, paths, codes and loss facts. It owns no
 //! application scope or document policy and never clips a receiving value.
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
-use jig_client_view::Limits;
 use jig_domain_core::documents;
 use jig_domain_tasks as tasks;
 use skein_lib::List;
@@ -415,7 +415,7 @@ pub(super) mod tests {
 
     #[test]
     fn amendment_snapshots_keep_absent_empty_and_cut_instructions_without_reconstructing_an_override_or_revision() {
-        let limits = Limits { text: 3, rows: 4, ..crate::test::limits().jig };
+        let limits = Limits { text: 3, rows: 4, ..crate::test::limits().client.domain };
         let contexts = [
             None,
             Some(documents::Text { bytes: Box::new([]), cut: false }),
@@ -459,7 +459,7 @@ pub(super) mod tests {
 
     #[test]
     fn amendment_snapshot_independent_loss_and_reserved_capacity_refuse_whole_values_without_trimming() {
-        let limits = Limits { text: 3, rows: 4, ..crate::test::limits().jig };
+        let limits = Limits { text: 3, rows: 4, ..crate::test::limits().client.domain };
         for (spec_loss, dependency_loss) in [(false, false), (true, false), (false, true)] {
             let mut source = amendment_source();
             source.spec.cut = spec_loss;
@@ -549,7 +549,7 @@ pub(super) mod tests {
             inputs,
             cut: false,
         };
-        let limits = Limits { text: 3, rows: 4, ..crate::test::limits().jig };
+        let limits = Limits { text: 3, rows: 4, ..crate::test::limits().client.domain };
         let actual = specification(&value, &limits).expect("the complete supplied fixture is admitted");
         assert_eq!(actual.specification.inputs.capacity(), 3);
         assert_eq!(actual.specification.inputs.as_slice(), &[u64::MAX, 0]);
@@ -591,7 +591,7 @@ pub(super) mod tests {
             segments.push(b"a/b".as_slice().into()).expect("the complete supplied fixture is admitted");
             segments.push(Box::new([255, 0])).expect("the complete supplied fixture is admitted");
             let source = tasks::Part { connector: u16::MAX, kind, key: tasks::PartKey::Path(segments) };
-            let limits = Limits { rows: 3, segments: 3, text: 3, ..crate::test::limits().jig };
+            let limits = Limits { rows: 3, segments: 3, text: 3, ..crate::test::limits().client.domain };
             let actual = part(&source, &limits).expect("the complete supplied fixture is admitted");
             assert_eq!(actual.connector, u16::MAX);
             let client::OwnerPartKey::Path(path) = actual.key else { panic!("literal segments stay a path") };
@@ -604,7 +604,7 @@ pub(super) mod tests {
     }
     #[test]
     fn owner_authority_and_verdict_wire_keep_opaque_patterns_machine_names_and_projection_cuts() {
-        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, text: 3, ..crate::test::limits().client.domain };
         let mut segments: List<Box<[u8]>> = List::with_capacity(3);
         segments.push(b"a/b".as_slice().into()).expect("the complete supplied fixture is admitted");
         segments.push(Box::new([255, 0])).expect("the complete supplied fixture is admitted");
@@ -735,7 +735,7 @@ pub(super) mod tests {
         assert!(!value.questions);
         assert!(value.answers);
         assert!(!value.timers);
-        let limits = Limits { rows: 4, ..crate::test::limits().jig };
+        let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
         let mut source = List::with_capacity(4);
         source
             .push(tasks::Subscription {
@@ -817,7 +817,7 @@ pub(super) mod tests {
             retention: skein_lib::Duration::from_nanos(u64::MAX),
             cut: true,
         };
-        let limits = Limits { projects: 7, rows: 7, text: 2, ..crate::test::limits().jig };
+        let limits = Limits { projects: 7, rows: 7, text: 2, ..crate::test::limits().client.domain };
         let translated = frame(&source, &limits).expect("the complete supplied fixture is admitted");
         assert_eq!(translated.party.number, u64::MAX);
         assert_eq!(translated.party.kind, client::PartyKind::Service);

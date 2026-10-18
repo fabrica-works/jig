@@ -4,7 +4,7 @@ use jig_domain_core::acts;
 use skein_lib::{Duration, List, Wall};
 
 pub(crate) fn limits() -> Limits {
-    Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().jig }
+    Limits { rows: 8, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain }
 }
 
 fn grant_source() -> documents::GrantLine {

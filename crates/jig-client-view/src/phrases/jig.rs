@@ -51,7 +51,6 @@ pub enum JigPhrase {
     ChipTitleCut,
     ChipDependenciesCut,
     ChipWaitingHolds,
-    TasksEnded,
     FrameProjectNumber,
     FrameLogin,
     FramePerson,
@@ -328,8 +327,6 @@ pub enum JigPhrase {
     WaitingRole,
     /// Since (0).
     Since,
-    /// Funds (0); (1) left now, (2) after.
-    Funds,
     /// From this pool.
     Pool,
     /// Why this is proposed.
@@ -492,8 +489,6 @@ pub enum JigPhrase {
     Confirm,
     /// Dismiss.
     Dismiss,
-    /// Dangerous action: review its consequences.
-    Dangerous,
     /// This will be proposed to its holder.
     WillPropose,
     /// The revision this action names changed; inspect the current facts and open it again.
@@ -548,44 +543,16 @@ pub enum JigPhrase {
     WillDeleteNote,
     /// Make a goal from these words and options.
     WillGoal,
-    /// The next run resumes its conversation; tries count again from zero.
-    ResumeRelease,
     /// Releasing carries on closing with the kept result.
     ContinueClosing,
     /// Release to wait again.
     ReleaseWait,
-    /// Release for the executor to decide afresh.
-    ReleaseFresh,
     /// Release with procedure counts reset.
     ReleaseProcedure,
     /// Make the effect again.
     RepeatEffect,
     /// Release without making the effect again; tell its executor so.
     SkipEffect,
-    /// Inspect the connector’s system facts; the engine will do as you choose.
-    EngineFollowsChoice,
-    /// (0) waiting tasks.
-    TasksWaiting,
-    /// (0) running tasks.
-    TasksRunning,
-    /// (0) held tasks.
-    TasksHeld,
-    /// (0) closing tasks.
-    TasksClosing,
-    /// (0) completed tasks.
-    TasksDone,
-    /// (0) failed tasks.
-    TasksFailed,
-    /// (0) cancelled tasks.
-    TasksCancelled,
-    /// (0) live runs.
-    LiveRuns,
-    /// (0) proposals will be withdrawn.
-    PendingProposals,
-    /// Effects not yet begun are withdrawn and begun effects settle.
-    EffectsSettle,
-    /// Takeover reserves (0) from your pool.
-    TakeoverFunds,
     /// Cancel delegate (0) and its subtree.
     DelegateCancel,
     /// Take over delegate (0), reserving (1).
@@ -1067,7 +1034,6 @@ impl JigPhrase {
             Self::ChipTitleCut => 620,
             Self::ChipDependenciesCut => 621,
             Self::ChipWaitingHolds => 622,
-            Self::TasksEnded => 623,
             Self::FrameProjectNumber => 610,
             Self::FrameLogin => 611,
             Self::FramePerson => 612,
@@ -1258,7 +1224,6 @@ impl JigPhrase {
             Self::WaitingTask => 123,
             Self::WaitingRole => 124,
             Self::Since => 125,
-            Self::Funds => 126,
             Self::Pool => 127,
             Self::ProposalWhy => 128,
             Self::OwnTasks => 129,
@@ -1340,7 +1305,6 @@ impl JigPhrase {
             Self::Confirmation => 206,
             Self::Confirm => 207,
             Self::Dismiss => 208,
-            Self::Dangerous => 209,
             Self::WillPropose => 210,
             Self::ChangedConfirmation => 211,
             Self::MissingWords => 212,
@@ -1368,25 +1332,11 @@ impl JigPhrase {
             Self::WillEditNote => 234,
             Self::WillDeleteNote => 235,
             Self::WillGoal => 236,
-            Self::ResumeRelease => 237,
             Self::ContinueClosing => 238,
             Self::ReleaseWait => 239,
-            Self::ReleaseFresh => 240,
             Self::ReleaseProcedure => 241,
             Self::RepeatEffect => 242,
             Self::SkipEffect => 243,
-            Self::EngineFollowsChoice => 244,
-            Self::TasksWaiting => 245,
-            Self::TasksRunning => 246,
-            Self::TasksHeld => 247,
-            Self::TasksClosing => 248,
-            Self::TasksDone => 249,
-            Self::TasksFailed => 250,
-            Self::TasksCancelled => 251,
-            Self::LiveRuns => 252,
-            Self::PendingProposals => 253,
-            Self::EffectsSettle => 254,
-            Self::TakeoverFunds => 256,
             Self::DelegateCancel => 257,
             Self::DelegateTake => 258,
             Self::DelegateChoices => 259,
@@ -1661,8 +1611,7 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
             ]),
-            Self::EffectsSettle
-            | Self::ActWithdraw
+            Self::ActWithdraw
             | Self::OwnerHoldRelease
             | Self::PageCut
             | Self::NoteChangedNotSupplied
@@ -1983,7 +1932,6 @@ impl JigPhrase {
             | Self::Confirmation
             | Self::Confirm
             | Self::Dismiss
-            | Self::Dangerous
             | Self::WillPropose
             | Self::ChangedConfirmation
             | Self::MissingWords
@@ -2011,14 +1959,11 @@ impl JigPhrase {
             | Self::WillEditNote
             | Self::WillDeleteNote
             | Self::WillGoal
-            | Self::ResumeRelease
             | Self::ContinueClosing
             | Self::ReleaseWait
-            | Self::ReleaseFresh
             | Self::ReleaseProcedure
             | Self::RepeatEffect
             | Self::SkipEffect
-            | Self::EngineFollowsChoice
             | Self::DelegateChoices
             | Self::WriteAndRelease
             | Self::WriteOnly
@@ -2164,16 +2109,6 @@ impl JigPhrase {
             | Self::Topic
             | Self::DependencyEnded
             | Self::LoadingDependency
-            | Self::TasksWaiting
-            | Self::TasksRunning
-            | Self::TasksHeld
-            | Self::TasksClosing
-            | Self::TasksEnded
-            | Self::TasksDone
-            | Self::TasksFailed
-            | Self::TasksCancelled
-            | Self::LiveRuns
-            | Self::PendingProposals
             | Self::DelegateCancel
             | Self::DropDependency
             | Self::Charter
@@ -2249,8 +2184,7 @@ impl JigPhrase {
             | Self::OwnSpend
             | Self::DelegateSpend
             | Self::Amount
-            | Self::Budget
-            | Self::TakeoverFunds => Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }]),
+            | Self::Budget => Box::new([HoleShape { kind: HoleKind::Amount, bytes: 0 }]),
             Self::WaitingSpan | Self::Span | Self::StallSpan | Self::ElapsedSpan => {
                 Box::new([HoleShape { kind: HoleKind::Span, bytes: 0 }])
             }
@@ -2262,11 +2196,6 @@ impl JigPhrase {
                 HoleShape { kind: HoleKind::Wall, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
                 HoleShape { kind: HoleKind::Number, bytes: 0 },
-            ]),
-            Self::Funds => Box::new([
-                HoleShape { kind: HoleKind::Amount, bytes: 0 },
-                HoleShape { kind: HoleKind::Amount, bytes: 0 },
-                HoleShape { kind: HoleKind::Amount, bytes: 0 },
             ]),
             Self::WorkTool | Self::ApprovalYes | Self::ApprovalNo => Box::new([
                 HoleShape { kind: HoleKind::Name, bytes: text },
@@ -2290,7 +2219,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 599] = [
+pub const ALL: [JigPhrase; 582] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2319,7 +2248,6 @@ pub const ALL: [JigPhrase; 599] = [
     JigPhrase::ChipTitleCut,
     JigPhrase::ChipDependenciesCut,
     JigPhrase::ChipWaitingHolds,
-    JigPhrase::TasksEnded,
     JigPhrase::FrameProjectNumber,
     JigPhrase::FrameLogin,
     JigPhrase::FramePerson,
@@ -2508,7 +2436,6 @@ pub const ALL: [JigPhrase; 599] = [
     JigPhrase::WaitingTask,
     JigPhrase::WaitingRole,
     JigPhrase::Since,
-    JigPhrase::Funds,
     JigPhrase::Pool,
     JigPhrase::ProposalWhy,
     JigPhrase::OwnTasks,
@@ -2590,7 +2517,6 @@ pub const ALL: [JigPhrase; 599] = [
     JigPhrase::Confirmation,
     JigPhrase::Confirm,
     JigPhrase::Dismiss,
-    JigPhrase::Dangerous,
     JigPhrase::WillPropose,
     JigPhrase::ChangedConfirmation,
     JigPhrase::MissingWords,
@@ -2618,25 +2544,11 @@ pub const ALL: [JigPhrase; 599] = [
     JigPhrase::WillEditNote,
     JigPhrase::WillDeleteNote,
     JigPhrase::WillGoal,
-    JigPhrase::ResumeRelease,
     JigPhrase::ContinueClosing,
     JigPhrase::ReleaseWait,
-    JigPhrase::ReleaseFresh,
     JigPhrase::ReleaseProcedure,
     JigPhrase::RepeatEffect,
     JigPhrase::SkipEffect,
-    JigPhrase::EngineFollowsChoice,
-    JigPhrase::TasksWaiting,
-    JigPhrase::TasksRunning,
-    JigPhrase::TasksHeld,
-    JigPhrase::TasksClosing,
-    JigPhrase::TasksDone,
-    JigPhrase::TasksFailed,
-    JigPhrase::TasksCancelled,
-    JigPhrase::LiveRuns,
-    JigPhrase::PendingProposals,
-    JigPhrase::EffectsSettle,
-    JigPhrase::TakeoverFunds,
     JigPhrase::DelegateCancel,
     JigPhrase::DelegateTake,
     JigPhrase::DelegateChoices,

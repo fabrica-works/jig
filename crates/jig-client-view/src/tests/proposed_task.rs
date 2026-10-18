@@ -237,7 +237,16 @@ fn selected_owner_language() -> skein_ui::phrases::Language {
     use skein_ui::phrases::Segment;
     let mut selected = english::language();
     for phrase in &mut selected.phrases {
-        if phrase.id.number >= 3000 {
+        if phrase.id.number >= 3000
+            || [
+                jig_client::words::DecisionWord::FunderTask,
+                jig_client::words::DecisionWord::FunderPool,
+                jig_client::words::DecisionWord::FunderRecurring,
+                jig_client::words::DecisionWord::FunderPeriod,
+            ]
+            .iter()
+            .any(|word| jig_client::words::Word::Decision(*word).id() == phrase.id)
+        {
             for form in &mut phrase.forms {
                 for segment in &mut form.segments {
                     match segment {

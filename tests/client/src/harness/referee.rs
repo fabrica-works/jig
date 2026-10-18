@@ -8,15 +8,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use jig_client::{
     Key,
-    contract::{
-        ActKind, AnswerOn, Ask, DecideOn, Decision, Effect, Funder, ObjectKey, Offered, Operation, ProposeAction,
-        ReadValue, ReleaseEffect,
-    },
+    contract::{ActKind, AnswerOn, Ask, DecideOn, Decision, ObjectKey, Operation, ProposeAction, ReadValue},
 };
 use jig_client_test_kit::check::{Check, Delivered, Fault, Limits, Scene};
-use jig_client_view::proposed_task_words::ProposedPhrase as FunderP;
-use jig_client_view::{owner_proposal_words::ProposalPhrase as ProposalP, phrases::jig::JigPhrase as P};
-use skein_ui::phrases::Hole;
+use skein_ui::phrases::Phrasebook;
 
 /// Named request and link obligations, independent of attempts and reloads.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -41,6 +36,7 @@ struct Pending {
 #[derive(Debug)]
 pub struct Rules {
     checks: BTreeMap<ClientId, Checks>,
+    words: Phrasebook,
     offers: offers::Offers,
     heartbeat: Duration,
     request_within: Duration,
@@ -71,7 +67,19 @@ impl Rules {
     /// Installs the world's spans; commit zero is its durable starting truth.
     #[must_use]
     pub fn new(heartbeat: Duration, request_within: Duration, link_within: Duration) -> Self {
+        Self::with_words(heartbeat, request_within, link_within, &jig_client::words::english())
+    }
+    /// Install the application's decision vocabulary.
+    #[must_use]
+    pub fn with_words(
+        heartbeat: Duration,
+        request_within: Duration,
+        link_within: Duration,
+        words: &skein_ui::phrases::Language,
+    ) -> Self {
+        let words = crate::test::decision_phrasebook(words);
         Self {
+            words,
             checks: BTreeMap::new(),
             offers: offers::Offers::default(),
             heartbeat,
@@ -352,7 +360,7 @@ impl Expectations for Rules {
                 {
                     self.offers.draft(client, key, offer);
                 }
-                let fault = self.checks.entry(client).or_default().sent(key, &ask, scene.as_ref());
+                let fault = self.checks.entry(client).or_default().sent(key, &ask, scene.as_ref(), &self.words);
                 if let Some(fault) = fault {
                     let why = match fault {
                         jig_client_test_kit::check::Fault::Undelivered { .. } => {
@@ -435,13 +443,13 @@ impl Checks {
         assert!(self.documents.contains_key(&key) || self.documents.len() < 256, "world's delivered object bound");
         self.documents.insert(key, value.clone());
     }
-    pub(super) fn sent(&mut self, key: Key, ask: &Ask, scene: Option<&Scene>) -> Option<Fault> {
+    pub(super) fn sent(&mut self, key: Key, ask: &Ask, scene: Option<&Scene>, words: &Phrasebook) -> Option<Fault> {
         if let Some(fault) = self.check.sent(key, ask) {
             return Some(fault);
         }
         if let Some(scene) = scene {
             for (object, act) in decisions(ask) {
-                let facts = self.facts(object, act);
+                let facts = self.facts(object, act, words);
                 let facts: Vec<_> = facts.iter().map(Vec::as_slice).collect();
                 if let Some(fault) = self.check.seen(key, act, scene, &facts) {
                     return Some(fault);
@@ -450,12 +458,7 @@ impl Checks {
         }
         None
     }
-    fn facts(&self, object: ObjectKey, act: ActKind) -> Vec<Vec<u8>> {
-        let words = &crate::test::phrasebooks(&crate::test::limits()).0;
-        let mut facts = Vec::new();
-        if jig_client::facts::dangerous(act) {
-            facts.push(words.say(P::Dangerous, &[]).into_vec());
-        }
+    fn facts(&self, object: ObjectKey, act: ActKind, words: &Phrasebook) -> Vec<Vec<u8>> {
         let value = self.documents.get(&object).or_else(|| match object {
             ObjectKey::Task(task) => self.documents.get(&ObjectKey::Escalation(task)),
             ObjectKey::Proposal(_)
@@ -465,109 +468,11 @@ impl Checks {
             | ObjectKey::Result(_)
             | ObjectKey::Note { .. } => None,
         });
-        if let Some(value) = value {
-            let offers = offers(value).expect("only decision documents retained");
-            if let Some(effect) = jig_client::facts::effect(offers.as_slice(), act) {
-                effect_words(*effect, words, &mut facts);
-            }
-            if act == ActKind::Accept {
-                if let ReadValue::OwnerProposal(value) = value {
-                    for offer in &value.funding {
-                        facts.push(funder_words(offer.source, words));
-                        if offer.left.is_none() {
-                            facts.push(
-                                words
-                                    .book
-                                    .say(words.language, ProposalP::LeftAbsent.id(), &[])
-                                    .expect("checked absent funding")
-                                    .text
-                                    .into_vec(),
-                            );
-                        }
-                        if offer.after.is_none() {
-                            facts.push(
-                                words
-                                    .book
-                                    .say(words.language, ProposalP::AfterAbsent.id(), &[])
-                                    .expect("checked absent funding")
-                                    .text
-                                    .into_vec(),
-                            );
-                        }
-                        for (phrase, number) in [
-                            (ProposalP::Needed, Some(offer.needed)),
-                            (ProposalP::Left, offer.left),
-                            (ProposalP::AfterFunding, offer.after),
-                        ] {
-                            if let Some(number) = number {
-                                facts.push(
-                                    words
-                                        .book
-                                        .say(words.language, phrase.id(), &[Hole::Number(number)])
-                                        .expect("checked proposal phrase")
-                                        .text
-                                        .into_vec(),
-                                );
-                            }
-                        }
-                    }
-                } else if let ReadValue::Proposal(value) = value
-                    && let Some(after) = value.funding.left.checked_sub(value.needs.budget)
-                {
-                    facts.push(
-                        words
-                            .say(
-                                P::Funds,
-                                &[
-                                    Hole::Amount(value.needs.budget),
-                                    Hole::Amount(value.funding.left),
-                                    Hole::Amount(after),
-                                ],
-                            )
-                            .into_vec(),
-                    );
-                }
-            }
-        }
-        facts
+        let facts = jig_client::facts::decision(value, act);
+        jig_client::words::decision(&facts, words, 0).into_boxed().into_vec().into_iter().map(Vec::from).collect()
     }
 }
-fn effect_words(effect: Effect, words: &jig_client_view::words::Words, out: &mut Vec<Vec<u8>>) {
-    match effect {
-        Effect::Release(effect) => out.push(
-            words
-                .say(
-                    match effect {
-                        ReleaseEffect::Judged => P::ReleaseFresh,
-                        ReleaseEffect::RunAgain => P::ResumeRelease,
-                        ReleaseEffect::Uncertain => P::EngineFollowsChoice,
-                    },
-                    &[],
-                )
-                .into_vec(),
-        ),
-        Effect::Move { reservation } => out.push(words.say(P::TakeoverFunds, &[Hole::Amount(reservation)]).into_vec()),
-        Effect::Cancel(impact) => {
-            for (phrase, number) in [
-                (P::TasksWaiting, impact.tasks.waiting),
-                (P::TasksRunning, impact.tasks.running),
-                (P::TasksHeld, impact.tasks.held),
-                (P::TasksClosing, impact.tasks.closing),
-                (P::TasksDone, impact.tasks.done),
-                (P::TasksFailed, impact.tasks.failed),
-                (P::TasksCancelled, impact.tasks.cancelled),
-                (P::LiveRuns, impact.live_runs),
-                (P::PendingProposals, impact.proposals),
-            ] {
-                out.push(words.say(phrase, &[Hole::Number(u64::from(number))]).into_vec());
-            }
-            if impact.tasks.ended > 0 {
-                out.push(words.say(P::TasksEnded, &[Hole::Number(u64::from(impact.tasks.ended))]).into_vec());
-            }
-            out.push(words.say(P::EffectsSettle, &[]).into_vec());
-        }
-    }
-}
+
 fn decision(value: &Decision) -> ActKind {
     match value {
         Decision::Accepted => ActKind::Accept,
@@ -619,47 +524,4 @@ fn decisions(ask: &Ask) -> Vec<(ObjectKey, ActKind)> {
         | Ask::MakeService { .. }
         | Ask::SetPool { .. } => Vec::new(),
     }
-}
-
-fn offers(value: &ReadValue) -> Option<&skein_lib::List<Offered>> {
-    match value {
-        ReadValue::Task(value) => Some(&value.acts),
-        ReadValue::Escalation(value) => Some(&value.acts),
-        ReadValue::OwnerEscalation(value) => Some(&value.acts),
-        ReadValue::PersonTask(value) => Some(&value.acts),
-        ReadValue::OwnerPersonTask(value) => Some(&value.acts),
-        ReadValue::Proposal(value) => Some(&value.acts),
-        ReadValue::OwnerProposal(value) => Some(&value.acts),
-        ReadValue::Me(_)
-        | ReadValue::Tasks(_)
-        | ReadValue::Historical(_)
-        | ReadValue::Question(_)
-        | ReadValue::Result(_)
-        | ReadValue::Ended(_)
-        | ReadValue::History(_)
-        | ReadValue::Activity(_)
-        | ReadValue::Inbox(_)
-        | ReadValue::OwnerInbox(_)
-        | ReadValue::Notes(_)
-        | ReadValue::Spend(_)
-        | ReadValue::OwnerEnded(_)
-        | ReadValue::OwnerSpend(_)
-        | ReadValue::OwnerProject(_)
-        | ReadValue::Project(_)
-        | ReadValue::Deployment(_)
-        | ReadValue::OwnerDeployment(_) => None,
-    }
-}
-
-fn funder_words(source: Funder, words: &jig_client_view::words::Words) -> Vec<u8> {
-    let (phrase, numbers) = match source {
-        Funder::Task(task) => (FunderP::FunderTask, vec![task]),
-        Funder::Pool { project, person, period } => (FunderP::FunderPool, vec![u64::from(project), person, period]),
-        Funder::Recurring { project, task, period } => {
-            (FunderP::FunderRecurring, vec![u64::from(project), task, period])
-        }
-        Funder::Period { project, period } => (FunderP::FunderPeriod, vec![u64::from(project), period]),
-    };
-    let holes: Vec<_> = numbers.into_iter().map(Hole::Number).collect();
-    words.book.say(words.language, phrase.id(), &holes).expect("checked funding source").text.into_vec()
 }

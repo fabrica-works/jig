@@ -194,7 +194,9 @@ fn a_worker_shutdown_stops_its_native_run() {
 fn a_message_refused_by_the_run_is_committed_with_its_next_turn() {
     use jig_channel_world::stories::MessageRefusal;
     use jig_protocol_worker_wire::MessageRefusal as Wire;
-    let recorded = run(Story::Chat).recorded.expect("native turn and finish report");
+    let mut too_large = Some(run(Story::Refusals(MessageRefusal::TooLarge)));
+    let recorded =
+        too_large.as_ref().expect("native refusal outcome").recorded.clone().expect("native turn and finish report");
     for (label, reason, expected) in [
         ("too large", MessageRefusal::TooLarge, Wire::TooLarge),
         ("full", MessageRefusal::Full, Wire::Full),
@@ -203,7 +205,7 @@ fn a_message_refused_by_the_run_is_committed_with_its_next_turn() {
         let outcome = if matches!(reason, MessageRefusal::Full | MessageRefusal::NameInUse) {
             jig_channel_world::stories::refusal(fixtures::SEED, reason, recorded.clone())
         } else {
-            run(Story::Refusals(reason))
+            too_large.take().expect("one native TooLarge case")
         };
         assert_eq!(outcome.verdict, Verdict::Passed, "{label}");
         assert!(outcome.refused_messages.contains(&expected), "{label}: {:?}", outcome.refused_messages);

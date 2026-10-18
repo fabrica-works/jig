@@ -1,7 +1,7 @@
 //! The served template and creating records in the joint world's map.
 use super::{historical_goal, offers, owner, refusals};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as c;
-use jig_client_view::Limits;
 use jig_domain_core::{Template, acts};
 use jig_domain_people as p;
 use jig_domain_tasks as t;

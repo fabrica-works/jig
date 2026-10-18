@@ -8,17 +8,20 @@ use skein_ui::phrases::{Form, Language, Phrase, PluralClass, PluralRule, Segment
 pub(super) fn language() -> Language {
     let mut phrases = List::with_capacity(u32::try_from(ALL.len()).expect("closed word count"));
     for word in ALL {
-        let (_, label, holes) = word.data();
-        let mut segments = List::with_capacity(2);
-        segments.push(Segment::Text(copy_of(label))).expect("word label fits");
-        for kind in holes {
-            segments.push(Segment::Hole { index: 0, kind: *kind }).expect("word hole fits");
-        }
+        let segments = match word {
+            Word::Decision(value) => value.segments(),
+            Word::Phase(_) | Word::Hold(_) | Word::Refusal(_) | Word::Waiting(_) | Word::Status(_) => {
+                let (_, label, holes) = word.data();
+                let mut segments = List::with_capacity(2);
+                segments.push(Segment::Text(copy_of(label))).expect("word label fits");
+                for kind in holes {
+                    segments.push(Segment::Hole { index: 0, kind: *kind }).expect("word hole fits");
+                }
+                segments.into_boxed()
+            }
+        };
         phrases
-            .push(Phrase {
-                id: word.id(),
-                forms: Box::new([Form { class: PluralClass::Other, segments: segments.into_boxed() }]),
-            })
+            .push(Phrase { id: word.id(), forms: Box::new([Form { class: PluralClass::Other, segments }]) })
             .expect("all word phrases fit");
     }
     Language {
@@ -32,6 +35,7 @@ pub(super) fn language() -> Language {
 impl Word {
     pub(super) const fn data(self) -> (u16, &'static [u8], &'static [HoleKind]) {
         match self {
+            Self::Decision(value) => value.data(),
             Self::Phase(Phase::Waiting) => (0, b"Waiting", &[]),
             Self::Phase(Phase::Idle) => (1, b"Waiting for news", &[]),
             Self::Phase(Phase::Due) => (2, b"Due to run", &[]),

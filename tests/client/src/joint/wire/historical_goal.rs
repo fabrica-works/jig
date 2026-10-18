@@ -1,7 +1,7 @@
 //! Raw retained New fields, without a clipped future-task projection.
 use super::{historical::Invalid, owner};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
-use jig_client_view::Limits;
 use jig_domain_tasks as tasks;
 use skein_lib::List;
 

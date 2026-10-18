@@ -5,6 +5,7 @@
 use crate::JigBindings;
 use crate::historical_pages_words::HistoricalPhrase as P;
 use crate::words::Words;
+use jig_client::words::{DecisionWord as D, Word};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
@@ -184,22 +185,21 @@ pub fn ended_render(
     b.close();
 }
 fn funder_name(value: Funder, words: &Words) -> Box<[u8]> {
-    use crate::proposed_task_words::ProposedPhrase;
     let saying = match value {
-        Funder::Task(task) => words.book.say(words.language, ProposedPhrase::FunderTask.id(), &[Hole::Number(task)]),
+        Funder::Task(task) => words.book.say(words.language, Word::Decision(D::FunderTask).id(), &[Hole::Number(task)]),
         Funder::Pool { project, person, period } => words.book.say(
             words.language,
-            ProposedPhrase::FunderPool.id(),
+            Word::Decision(D::FunderPool).id(),
             &[Hole::Number(u64::from(project)), Hole::Number(person), Hole::Number(period)],
         ),
         Funder::Recurring { project, task, period } => words.book.say(
             words.language,
-            ProposedPhrase::FunderRecurring.id(),
+            Word::Decision(D::FunderRecurring).id(),
             &[Hole::Number(u64::from(project)), Hole::Number(task), Hole::Number(period)],
         ),
         Funder::Period { project, period } => words.book.say(
             words.language,
-            ProposedPhrase::FunderPeriod.id(),
+            Word::Decision(D::FunderPeriod).id(),
             &[Hole::Number(u64::from(project)), Hole::Number(period)],
         ),
     };

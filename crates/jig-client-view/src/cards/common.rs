@@ -2,6 +2,7 @@
 use crate::phrases::jig::JigPhrase;
 use crate::words::{Words, name};
 use crate::{JigBindings, JigMeaning, Owner};
+use jig_client::words::{DecisionWord as D, Word};
 use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run, SlotRef};
 
@@ -209,7 +210,11 @@ pub fn authority(b: &mut Builder, facts: &Authority, words: &Words, bindings: &m
 pub fn funding(b: &mut Builder, facts: &Budget, amount: u64, words: &Words) {
     match facts.left.checked_sub(amount) {
         Some(after) => {
-            words.text(b, JigPhrase::Funds, &[Hole::Amount(amount), Hole::Amount(facts.left), Hole::Amount(after)]);
+            words.text(
+                b,
+                JigPhrase::Word(Word::Decision(D::Funds)),
+                &[Hole::Amount(amount), Hole::Amount(facts.left), Hole::Amount(after)],
+            );
         }
         None => words.text(b, JigPhrase::BudgetMissing, &[Hole::Amount(facts.left), Hole::Amount(amount)]),
     }

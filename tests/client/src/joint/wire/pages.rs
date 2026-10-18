@@ -1,9 +1,9 @@
 //! Whole retained read pages with original query identity and opaque continuation
 //! (client/domain/contract.md, 6). The supplied page loss remains independent of row and cursor facts.
 use super::{activity, cursor, history, inbox, notes, owner};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
-use jig_client_view::Limits;
 use jig_domain_core::reads;
 use skein_lib::List;
 
@@ -205,7 +205,7 @@ mod tests {
     use jig_domain_tasks as tasks;
     use skein_lib::Wall;
     fn limits() -> Limits {
-        Limits { text: 200, rows: 4, document_bytes: 100_000, ..crate::test::limits().jig }
+        Limits { text: 200, rows: 4, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
 
     #[test]

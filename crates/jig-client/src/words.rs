@@ -1,14 +1,18 @@
 //! Jig's enum phrases, overridable one by one (client/domain/client.md, 19).
+mod decision;
+mod facts;
+pub use facts::decision;
 mod english;
 use crate::{
     contract::{HoldCategory, Phase, Refusal, WaitsOn},
     facts::ChatStatus,
 };
 use alloc::boxed::Box;
+pub use decision::DecisionWord;
 use skein_lib::List;
 use skein_ui::phrases::{HoleKind, HoleShape, Language, PhraseId, PhraseShape};
 /// Phrase count, for a caller composing a bounded phrasebook.
-pub const PHRASES: u32 = 58;
+pub const PHRASES: u32 = 84;
 /// Owner of jig's public enum vocabulary.
 pub const OWNER: skein_ui::Owner = skein_ui::Owner { number: 65_537 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -18,6 +22,7 @@ pub enum Word {
     Refusal(RefusalWord),
     Waiting(WaitingWord),
     Status(StatusWord),
+    Decision(DecisionWord),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HoldWord {
@@ -146,7 +151,7 @@ impl Word {
     }
     #[must_use]
     pub fn shape(self, text: u32) -> PhraseShape {
-        let mut holes = List::with_capacity(1);
+        let mut holes = List::with_capacity(3);
         for kind in self.data().2 {
             holes
                 .push(HoleShape { kind: *kind, bytes: if *kind == HoleKind::Name { text } else { 0 } })
@@ -156,7 +161,7 @@ impl Word {
     }
 }
 /// All public words, for composing phrasebook capacities without allocation.
-pub const ALL: [Word; 58] = [
+pub const ALL: [Word; 84] = [
     Word::Phase(Phase::Waiting),
     Word::Phase(Phase::Idle),
     Word::Phase(Phase::Due),
@@ -215,6 +220,32 @@ pub const ALL: [Word; 58] = [
     Word::Status(StatusWord::Held),
     Word::Status(StatusWord::Closing),
     Word::Status(StatusWord::Ended),
+    Word::Decision(DecisionWord::Dangerous),
+    Word::Decision(DecisionWord::ReleaseFresh),
+    Word::Decision(DecisionWord::ResumeRelease),
+    Word::Decision(DecisionWord::EngineFollowsChoice),
+    Word::Decision(DecisionWord::TakeoverFunds),
+    Word::Decision(DecisionWord::TasksWaiting),
+    Word::Decision(DecisionWord::TasksRunning),
+    Word::Decision(DecisionWord::TasksHeld),
+    Word::Decision(DecisionWord::TasksClosing),
+    Word::Decision(DecisionWord::TasksDone),
+    Word::Decision(DecisionWord::TasksFailed),
+    Word::Decision(DecisionWord::TasksCancelled),
+    Word::Decision(DecisionWord::LiveRuns),
+    Word::Decision(DecisionWord::PendingProposals),
+    Word::Decision(DecisionWord::TasksEnded),
+    Word::Decision(DecisionWord::EffectsSettle),
+    Word::Decision(DecisionWord::Funds),
+    Word::Decision(DecisionWord::Needed),
+    Word::Decision(DecisionWord::Left),
+    Word::Decision(DecisionWord::LeftAbsent),
+    Word::Decision(DecisionWord::AfterFunding),
+    Word::Decision(DecisionWord::AfterAbsent),
+    Word::Decision(DecisionWord::FunderTask),
+    Word::Decision(DecisionWord::FunderPool),
+    Word::Decision(DecisionWord::FunderRecurring),
+    Word::Decision(DecisionWord::FunderPeriod),
 ];
 #[must_use]
 pub fn phrase_shapes(text: u32) -> Box<[PhraseShape]> {

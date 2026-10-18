@@ -2,9 +2,9 @@
 //! pages.md, 5.2 and 6.5). Source selection belongs to the core; this boundary
 //! retains row order, independent clocks and both original opaque edges.
 use super::{chips, cursor, owner, pages::Invalid, results};
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
 use jig_client_scripted_engine as admission;
-use jig_client_view::Limits;
 use jig_domain_core::reads;
 use jig_domain_tasks as tasks;
 use skein_lib::List;
@@ -110,7 +110,7 @@ pub(crate) mod tests {
     use skein_lib::Wall;
 
     pub(crate) fn limits() -> Limits {
-        Limits { rows: 8, text: 1024, document_bytes: 100_000, ..crate::test::limits().jig }
+        Limits { rows: 8, text: 1024, document_bytes: 100_000, ..crate::test::limits().client.domain }
     }
     fn page(scope: reads::Scope) -> reads::Page {
         let key = match scope {

@@ -1034,11 +1034,6 @@ pub fn language() -> Language {
             JigPhrase::ChipTitleCut => Box::new([Segment::Text(copy_of(b"Title is incomplete"))]),
             JigPhrase::ChipDependenciesCut => Box::new([Segment::Text(copy_of(b"More dependencies are not shown"))]),
             JigPhrase::ChipWaitingHolds => Box::new([Segment::Text(copy_of(b"Waiting for resource holds"))]),
-            JigPhrase::TasksEnded => Box::new([
-                Segment::Text(copy_of(b"Ended tasks with outcome not supplied: ")),
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-            ]),
-
             JigPhrase::WaitingParty => Box::new([
                 Segment::Text(copy_of(b"Waiting for party ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
@@ -1056,15 +1051,6 @@ pub fn language() -> Language {
             JigPhrase::Since => {
                 Box::new([Segment::Text(copy_of(b"Since ")), Segment::Hole { index: 0, kind: HoleKind::Wall }])
             }
-            JigPhrase::Funds => Box::new([
-                Segment::Text(copy_of(b"Funds ")),
-                Segment::Hole { index: 0, kind: HoleKind::Amount },
-                Segment::Text(copy_of(b"; ")),
-                Segment::Hole { index: 1, kind: HoleKind::Amount },
-                Segment::Text(copy_of(b" left now, ")),
-                Segment::Hole { index: 2, kind: HoleKind::Amount },
-                Segment::Text(copy_of(b" after")),
-            ]),
             JigPhrase::Pool => Box::new([Segment::Text(copy_of(b"From this pool"))]),
             JigPhrase::ProposalWhy => Box::new([Segment::Text(copy_of(b"Why this is proposed"))]),
             JigPhrase::OwnTasks => Box::new([Segment::Text(copy_of(b"The accepted tasks will be yours"))]),
@@ -1256,7 +1242,6 @@ pub fn language() -> Language {
             JigPhrase::Confirmation => Box::new([Segment::Text(copy_of(b"Review before confirming"))]),
             JigPhrase::Confirm => Box::new([Segment::Text(copy_of(b"Confirm"))]),
             JigPhrase::Dismiss => Box::new([Segment::Text(copy_of(b"Dismiss"))]),
-            JigPhrase::Dangerous => Box::new([Segment::Text(copy_of(b"Dangerous action: review its consequences"))]),
             JigPhrase::WillPropose => Box::new([Segment::Text(copy_of(b"This will be proposed to its holder"))]),
             JigPhrase::ChangedConfirmation => Box::new([Segment::Text(copy_of(
                 b"The revision this action names changed; inspect the current facts and open it again",
@@ -1307,64 +1292,16 @@ pub fn language() -> Language {
             JigPhrase::WillEditNote => Box::new([Segment::Text(copy_of(b"Replace the named note revision"))]),
             JigPhrase::WillDeleteNote => Box::new([Segment::Text(copy_of(b"Delete this note revision"))]),
             JigPhrase::WillGoal => Box::new([Segment::Text(copy_of(b"Make a goal from these words and options"))]),
-            JigPhrase::ResumeRelease => Box::new([Segment::Text(copy_of(
-                b"The next run resumes its conversation; tries count again from zero",
-            ))]),
             JigPhrase::ContinueClosing => {
                 Box::new([Segment::Text(copy_of(b"Releasing carries on closing with the kept result"))])
             }
             JigPhrase::ReleaseWait => Box::new([Segment::Text(copy_of(b"Release to wait again"))]),
-            JigPhrase::ReleaseFresh => Box::new([Segment::Text(copy_of(b"Release for the executor to decide afresh"))]),
             JigPhrase::ReleaseProcedure => Box::new([Segment::Text(copy_of(b"Release with procedure counts reset"))]),
             JigPhrase::RepeatEffect => Box::new([Segment::Text(copy_of(b"Make the effect again"))]),
             JigPhrase::SkipEffect => {
                 Box::new([Segment::Text(copy_of(b"Release without making the effect again; tell its executor so"))])
             }
-            JigPhrase::EngineFollowsChoice => Box::new([Segment::Text(copy_of(
-                b"Inspect the connector's system facts; the engine will do as you choose",
-            ))]),
-            JigPhrase::TasksWaiting => Box::new([
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" waiting tasks")),
-            ]),
-            JigPhrase::TasksRunning => Box::new([
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" running tasks")),
-            ]),
-            JigPhrase::TasksHeld => {
-                Box::new([Segment::Hole { index: 0, kind: HoleKind::Number }, Segment::Text(copy_of(b" held tasks"))])
-            }
-            JigPhrase::TasksClosing => Box::new([
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" closing tasks")),
-            ]),
-            JigPhrase::TasksDone => Box::new([
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" completed tasks")),
-            ]),
-            JigPhrase::TasksFailed => {
-                Box::new([Segment::Hole { index: 0, kind: HoleKind::Number }, Segment::Text(copy_of(b" failed tasks"))])
-            }
-            JigPhrase::TasksCancelled => Box::new([
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" cancelled tasks")),
-            ]),
-            JigPhrase::LiveRuns => {
-                Box::new([Segment::Hole { index: 0, kind: HoleKind::Number }, Segment::Text(copy_of(b" live runs"))])
-            }
-            JigPhrase::PendingProposals => Box::new([
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-                Segment::Text(copy_of(b" proposals will be withdrawn")),
-            ]),
-            JigPhrase::EffectsSettle => Box::new([Segment::Text(copy_of(
-                b"Effects not yet begun will be withdrawn; begun effects will settle",
-            ))]),
             JigPhrase::ActWithdraw => Box::new([Segment::Text(copy_of(b"Withdraw proposal"))]),
-            JigPhrase::TakeoverFunds => Box::new([
-                Segment::Text(copy_of(b"Takeover reserves ")),
-                Segment::Hole { index: 0, kind: HoleKind::Amount },
-                Segment::Text(copy_of(b" from your pool")),
-            ]),
             JigPhrase::DelegateCancel => Box::new([
                 Segment::Text(copy_of(b"Cancel delegate ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

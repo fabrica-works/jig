@@ -86,7 +86,7 @@ fn mixed_history_read_admits_both_owner_row_kinds_before_consuming_the_exact_ori
         next: Some(reads::Cursor::Store { scope: reads::Scope::History { task, subtree: false }, after: None }),
         cut: true,
     }));
-    let limits = Limits { rows: 4, text: 200, document_bytes: 100_000, ..crate::test::limits().jig };
+    let limits = Limits { rows: 4, text: 200, document_bytes: 100_000, ..crate::test::limits().client.domain };
     assert_eq!(
         read(&mut transport, to, &source, &Limits { document_bytes: 0, ..limits }).err(),
         Some(Invalid::Page(wire::pages::Invalid::Payload))

@@ -373,7 +373,7 @@ impl Session {
             self.disconnected(client, request);
             return Ok(());
         }
-        match requests::send(&mut self.driver, client, now, wall, &request, &self.limits.jig) {
+        match requests::send(&mut self.driver, client, now, wall, &request, &self.limits.client.domain) {
             Ok(()) => Ok(()),
             Err(requests::Invalid::Session) => {
                 if self.unsigned.contains(&client) {
@@ -503,9 +503,14 @@ impl Session {
         if self.driver.transport.reply(to).is_none() {
             return Ok(());
         }
-        let value =
-            read_packets::read_with_codec(&mut self.driver.transport, to, answer, &self.limits.jig, &self.codec)
-                .map_err(Invalid::Read)?;
+        let value = read_packets::read_with_codec(
+            &mut self.driver.transport,
+            to,
+            answer,
+            &self.limits.client.domain,
+            &self.codec,
+        )
+        .map_err(Invalid::Read)?;
         super::offered_packets::read(&mut self.card_offers, answer, &value);
         self.incoming(value, now, wall)?;
         Ok(())
@@ -594,7 +599,7 @@ impl Session {
                 if self.driver.transport.reply(to).is_none() {
                     return Ok(());
                 }
-                let value = packets::people_reply(&mut self.driver.transport, to, reply, &self.limits.jig)
+                let value = packets::people_reply(&mut self.driver.transport, to, reply, &self.limits.client.domain)
                     .map_err(Invalid::Packet)?;
                 self.incoming(value, now, wall)?;
             }
@@ -605,8 +610,9 @@ impl Session {
                 if self.driver.transport.watch(watcher).is_none() {
                     return Ok(());
                 }
-                let value = packets::document(&mut self.driver.transport, watcher, &document, &self.limits.jig)
-                    .map_err(Invalid::Packet)?;
+                let value =
+                    packets::document(&mut self.driver.transport, watcher, &document, &self.limits.client.domain)
+                        .map_err(Invalid::Packet)?;
                 self.capture_task_packet(&document, &value);
                 if self.driver.transport.is_closing(watcher) {
                     self.finish_closed_packet(watcher, now, wall);
@@ -701,7 +707,7 @@ impl Session {
                     return Ok(());
                 }
                 let source = jig_domain_views::Writing { turn, from, to, text, cut, call };
-                let value = packets::stream(&mut self.driver.transport, watcher, &source, &self.limits.jig)
+                let value = packets::stream(&mut self.driver.transport, watcher, &source, &self.limits.client.domain)
                     .map_err(Invalid::Packet)?;
                 if self.driver.transport.is_closing(watcher) {
                     self.finish_closed_packet(watcher, now, wall);
@@ -888,6 +894,10 @@ mod tests {
             wall,
         );
         let mut limits = crate::test::limits();
+        limits.client.domain.rows = 32;
+        limits.client.domain.projects = 64;
+        limits.client.domain.text = 4096;
+        limits.client.domain.document_bytes = 1_048_576;
         limits.jig.rows = 32;
         limits.jig.projects = 64;
         limits.jig.roles = 64;

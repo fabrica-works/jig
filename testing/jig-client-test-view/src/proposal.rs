@@ -1,6 +1,7 @@
 //! An application-owned proposal section and dialog (client/domain/testing.md, 4).
 use crate::bindings::{Bindings, Meaning};
 use jig_client::contract::{ActKind, Effect, ObjectKey, Proposal, ProposalKey, ReleaseEffect};
+use jig_client::words::{DecisionWord as D, Word};
 use jig_client_test_domain::{
     Domain,
     first::{
@@ -86,38 +87,44 @@ fn facts(b: &mut Builder, proposal: &Proposal, kind: ActKind, words: &Words, hid
         return;
     }
     if jig_client::facts::dangerous(kind) {
-        words.status(b, P::Dangerous, &[]);
+        words.status(b, P::Word(Word::Decision(D::Dangerous)), &[]);
     }
     if let Some(effect) = jig_client::facts::effect(proposal.acts.as_slice(), kind) {
         match effect {
-            Effect::Move { reservation } => words.text(b, P::TakeoverFunds, &[Hole::Amount(*reservation)]),
+            Effect::Move { reservation } => {
+                words.text(b, P::Word(Word::Decision(D::TakeoverFunds)), &[Hole::Amount(*reservation)]);
+            }
             Effect::Release(effect) => words.text(
                 b,
                 match effect {
-                    ReleaseEffect::Judged => P::ReleaseFresh,
-                    ReleaseEffect::RunAgain => P::ResumeRelease,
-                    ReleaseEffect::Uncertain => P::EngineFollowsChoice,
+                    ReleaseEffect::Judged => P::Word(Word::Decision(D::ReleaseFresh)),
+                    ReleaseEffect::RunAgain => P::Word(Word::Decision(D::ResumeRelease)),
+                    ReleaseEffect::Uncertain => P::Word(Word::Decision(D::EngineFollowsChoice)),
                 },
                 &[],
             ),
             Effect::Cancel(impact) => {
                 for (phrase, number) in [
-                    (P::TasksWaiting, impact.tasks.waiting),
-                    (P::TasksRunning, impact.tasks.running),
-                    (P::TasksHeld, impact.tasks.held),
-                    (P::TasksClosing, impact.tasks.closing),
-                    (P::TasksDone, impact.tasks.done),
-                    (P::TasksFailed, impact.tasks.failed),
-                    (P::TasksCancelled, impact.tasks.cancelled),
-                    (P::LiveRuns, impact.live_runs),
-                    (P::PendingProposals, impact.proposals),
+                    (P::Word(Word::Decision(D::TasksWaiting)), impact.tasks.waiting),
+                    (P::Word(Word::Decision(D::TasksRunning)), impact.tasks.running),
+                    (P::Word(Word::Decision(D::TasksHeld)), impact.tasks.held),
+                    (P::Word(Word::Decision(D::TasksClosing)), impact.tasks.closing),
+                    (P::Word(Word::Decision(D::TasksDone)), impact.tasks.done),
+                    (P::Word(Word::Decision(D::TasksFailed)), impact.tasks.failed),
+                    (P::Word(Word::Decision(D::TasksCancelled)), impact.tasks.cancelled),
+                    (P::Word(Word::Decision(D::LiveRuns)), impact.live_runs),
+                    (P::Word(Word::Decision(D::PendingProposals)), impact.proposals),
                 ] {
                     words.text(b, phrase, &[Hole::Number(u64::from(number))]);
                 }
                 if impact.tasks.ended > 0 {
-                    words.text(b, P::TasksEnded, &[Hole::Number(u64::from(impact.tasks.ended))]);
+                    words.text(
+                        b,
+                        P::Word(Word::Decision(D::TasksEnded)),
+                        &[Hole::Number(u64::from(impact.tasks.ended))],
+                    );
                 }
-                words.text(b, P::EffectsSettle, &[]);
+                words.text(b, P::Word(Word::Decision(D::EffectsSettle)), &[]);
             }
         }
     }
@@ -126,7 +133,7 @@ fn facts(b: &mut Builder, proposal: &Proposal, kind: ActKind, words: &Words, hid
     {
         words.text(
             b,
-            P::Funds,
+            P::Word(Word::Decision(D::Funds)),
             &[Hole::Amount(proposal.needs.budget), Hole::Amount(proposal.funding.left), Hole::Amount(after)],
         );
     }
