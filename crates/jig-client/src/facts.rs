@@ -1,5 +1,5 @@
 //! Facts read from delivered documents (client/domain/client.md, 19;
-//! pages.md, 4; contract.md, 5.3–5.4).
+//! contract.md, 5.3–5.4).
 use crate::contract::{
     ActKind, Admission, Chip, ChipPhase, Effect, HeldRole, HoldCategory, Me, Offered, OwnerChipDetails, OwnerChipPhase,
     OwnerChipWork, RetryNotice, RunStage, WaitedFor, WaitsOn, Whom,
@@ -7,7 +7,7 @@ use crate::contract::{
 use alloc::boxed::Box;
 use skein_lib::Wall;
 
-/// A chat's status, in the precedence of pages.md, 4.
+/// A chat's status, in the precedence of client/domain/client.md, 19.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ChatStatus {
     Starting,
@@ -133,7 +133,7 @@ pub fn offer(offers: &[Offered], act: ActKind) -> Option<&Admission> {
     }
     None
 }
-/// Acts the reference UI marks dangerous (objects.md, 2).
+/// Dangerous acts, which a presentation that confirms marks so (client/domain/client.md, 19).
 #[must_use]
 pub const fn dangerous(act: ActKind) -> bool {
     match act {
