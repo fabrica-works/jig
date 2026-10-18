@@ -424,8 +424,9 @@ will do:
   outlives the task that asked for it; its budget reserved from their
   pool from then on, which the card shows, and refused if it does not
   fit, or if nobody would hold its escalations.
-- **Prioritise:** a goal's place on the board, priority-only
-  amendments in one compound request (pages.md, 6.2).
+- **Reorder:** a goal's place on the board, priority-only
+  amendments in one compound request, where the project's document
+  offers reordering (pages.md, 6.2; `contract.md`, 5.3).
 - **Chat about it:** a new chat naming the task, `shapes::chat` (pages.md,
   section 4).
 

@@ -593,6 +593,18 @@ unsent, for its owner's version (section 8).
   engine's word read, not authority computed: the engine judges again
   when the request comes, by the rule that made the offer. No read
   assesses a draft.
+- **Reordering,** in a project's document: whether the party may change
+  its tracked tasks' priorities, in one compound request of
+  priority-only amendments (3.4). It is judged by the party's role in
+  the project alone, as a change of priority is ("maintainer, for
+  tracked or priority", `../../domain/people.md`, 5.1), and the policy's
+  word on that role's amending: made or refused, never proposable, and
+  never bounded, since a priority asks no authority and names no
+  revision (5.2). Amending's offer in a task's document bounds what the
+  party may write of the task's authority and budget, not its priority,
+  so a client that moves tasks reads the project's offer, not each
+  task's: a party who may amend a task of their tree may still not
+  reorder it.
 - **Parts.** Where a jig document names an application's value, it
   carries the part's reference: its kind, its owner, and jig's key (a
   resource's path, a kind's number, a task's or a proposal's number).
@@ -925,8 +937,9 @@ Changes this design asks of `../../domain/`, adopted there with it
 11. **Revisions** of holds, specs and person tasks, in their documents
     and in the decisions that name them (5.2 lists them).
 12. **Acts offered** in each object's document, made, proposable or
-    refused, creating and amending with bounds, and a decision's effect
-    as data (5.3, 5.4).
+    refused, creating and amending with bounds, reordering in a
+    project's document by the party's role alone, and a decision's
+    effect as data (5.3, 5.4).
 13. **`me`, and the inbox across projects:** the party's entries in
     every project they hold a role in, needs counted exactly and updates
     up to a limit (`../../domain/people.md`, section 6).

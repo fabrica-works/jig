@@ -368,7 +368,10 @@ parts.
 - **Moving a goal** up or down is a request, pending like any other: one
   compound request of priority-only amendments, one for each goal whose
   priority changes, committed together. It names no revision, and the
-  first commit decides (contract.md, 3.4). The board says what priority
+  first commit decides (contract.md, 3.4). The board shows its arrows
+  where the project's document offers reordering (contract.md, 5.3),
+  read beside the board's one query: it watches no goal's document,
+  and its lines carry no acts. The board says what priority
   does: it orders what competes for one resource, as each connector
   uses it (`../../domain/core.md`, 6.2).
 - **Setting a goal** from the board, for a goal the person knows well
@@ -722,7 +725,7 @@ build its own from the reference UI's page (view.md, 18.2).
   |---|---|---|
   | the inbox's groups | `inbox`, with the section's project | its entries past the window |
   | the conversations | `tasks{query}`: the party as requester, the chat template's label, the section's project if any, live, by last activity | the same query, ended, by when they ended: the index of ended tasks by requester |
-  | a project's goals | `tasks{query}`: the project, tracked, live, by priority | the project's ended tasks of the goal template's label, by when they ended: the index of ended tasks by project |
+  | a project's goals | `tasks{query}`: the project, tracked, live, by priority | the project's ended tasks of the goal template's label, by when they ended: the index of ended tasks by project; the project's document, for its offer of reordering |
   | a project's tasks | `tasks{query}`: the project, live, by last change, the section's filters as the query's keys (phase class, executor kind, root, requester) | |
   | a task's every section | `task{n}` | |
   | its plan | `tree{root}`, the task its root | ended branches, as they open |
