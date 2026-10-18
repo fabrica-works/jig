@@ -928,7 +928,8 @@ with a person in front of a tree, are view.md's, 18.10.
     each live delegate cancelled or moved to the party, then the chat
     cancelled with the template's grace;
   - `shapes::set_goal(..)` fills the goal template, compares the draft
-    with the project's creating bounds in `me` (contract.md, 5.3), and
+    with the project's creating bounds in `me` (contract.md, 5.3), a
+    deadline given as a span within both, for the engine to judge, and
     gives one of four: *made,* a `Create`, within the first bound;
     *proposable,* a `Propose` to the roles the offer names, between the
     two bounds where the offer says so; *refused,* the offer's refusal,

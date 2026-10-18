@@ -277,6 +277,19 @@ deployment's rules       the most any project may have; requirements on effects
   proposal keeps the span until it is accepted. So a request names no
   clock of its sender's, and is the same ask each time it is sent
   (`../client/domain/contract.md`, 3.1).
+
+  Every check that judges a span against a wall, a bound's or a
+  holder's deadline, judges the wall it would make at that check's own
+  decision: the decision's wall time plus the span. A batch is judged
+  so at its admission; a proposal at its admission (the ceiling, whether
+  it could be accepted, where it waits), each time where it waits is
+  decided again, and at its acceptance, by the accepter's authority,
+  with the wall the task then keeps; and the acts a document offers, as
+  the engine judges them. So a waiting proposal's span ages: one that
+  fit its holder when proposed may not when accepted, and that
+  acceptance is answered as any beyond its accepter's authority (8.1),
+  for the holder to pass the proposal up (tasks.md, section 9), or
+  refused past the project's ceiling.
 - **When a task ends,** in the commit that ends it, its reservation is
   released: its unspent budget goes back to its funder, and what it and
   the tasks it funded spent is added to its funder's "spent by ended

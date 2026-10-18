@@ -558,7 +558,12 @@ served is held, kept and unsent, for its owner's version (client.md,
   executor is listed, its budget no larger and its deadline no later
   than the bound's (a task with no deadline being beyond any bound that
   has one), and its authority within what the party may give; a budget
-  `AsAllowed` is within it, and its answer says what it gave. Past the
+  `AsAllowed` is within it, and its answer says what it gave; a
+  deadline given as a span (3.2) is within both bounds, since no
+  presentation reads a clock: the engine judges it at the decision,
+  as the wall it then makes (`../../domain/authority.md`, section 7),
+  and answers a `Create` it puts past the first bound as beyond
+  authority, saying whether a proposal of it could be accepted. Past the
   second bound, or with an executor not listed, it is refused as not
   offered, and nothing is sent. An amendment that widens no authority is
   made. One that widens anything, even while it narrows something else,
