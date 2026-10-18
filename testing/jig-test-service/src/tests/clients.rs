@@ -46,6 +46,37 @@ fn the_printed_link_reaches_the_caller_once() {
     f::turn(&mut service);
     assert!(service.links().is_empty());
 }
+const HOST_UPTIME: Time = Time::from_nanos(600_000_000_000);
+const UNUSABLE_QUEUE_BYTES: u32 = 0;
+#[test]
+fn a_printed_link_survives_the_first_host_clock() {
+    let mut service = prepared(true);
+    service.clock(HOST_UPTIME, Wall::EPOCH);
+    let engine = ready_client(&mut service);
+    let body = link_body(engine);
+    engine.clients.as_mut().expect("clients").iterate(
+        HOST_UPTIME,
+        Wall::EPOCH,
+        &mut engine.events,
+        &engine.env.limits.connector,
+        engine.env.limits.core.documents.rows,
+    );
+    let mut peer = Peer::new(engine, b"POST", b"/jig/v1/sign-in/link", &body, None);
+    peer.pump(engine);
+    let Some(root::Event::Core(core::Event::SignIn { .. })) = engine.events.pop() else {
+        panic!("the fresh printed link must reach the root on a host already up for ten minutes")
+    };
+}
+#[test]
+fn a_refused_clients_constructor_ends_the_first_iterate() {
+    let mut service = prepared(true);
+    f::engine(&mut service).clients.as_mut().expect("clients").env.limits.queued_bytes = UNUSABLE_QUEUE_BYTES;
+    crate::iterate(&mut service, HOST_UPTIME, Wall::EPOCH);
+    let mut problems = jig_protocol_config::Problems::empty();
+    problems
+        .push(jig_protocol_config::Path::root().member(b"engine").member(b"clients"), jig_protocol_config::What::Bound);
+    assert_eq!(service.end(), Some(&crate::End::Stopped(crate::Stop::Start(problems))));
+}
 #[test]
 fn with_no_clients_member_party_outputs_go_to_the_port() {
     let mut service = started(false);
@@ -235,6 +266,11 @@ fn take_listener(engine: &mut crate::Engine) {
 }
 
 fn started(clients: bool) -> crate::Service {
+    let mut service = prepared(clients);
+    service.clock(Time::ZERO, Wall::EPOCH);
+    service
+}
+fn prepared(clients: bool) -> crate::Service {
     let (mut config, [first, second]) = crate::startup::fixture_connectors(&f::engine_document());
     let core = &mut config.limits.core;
     core.tasks.tasks = 2;

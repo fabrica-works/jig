@@ -284,9 +284,10 @@ impl Service {
         self.io_env.wall = wall;
         if let Some(engine) = &mut self.engine
             && let Some(clients) = &mut engine.clients
+            && let Err(problems) = clients.start(now, wall)
         {
-            clients.env.now = now;
-            clients.env.wall = wall;
+            engine.end = Some(End::Stopped(Stop::Start(problems)));
+            engine.clients = None;
         }
         if let Some(engine) = &mut self.engine
             && let Some(accounts) = &mut engine.accounts

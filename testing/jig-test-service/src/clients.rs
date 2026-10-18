@@ -16,7 +16,8 @@ const HOST_BYTES: u32 = 64;
 
 #[derive(Debug)]
 pub(super) struct Clients {
-    component: kit::Component,
+    component: Option<kit::Component>,
+    settings: Option<kit::Settings>,
     pub(super) server: crate::server::Server,
     mount: http::Mount,
     mount_env: Env<http::Limits>,
@@ -134,10 +135,10 @@ impl Clients {
             stream: seeds.seed,
         };
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients };
-        let mut out = Queue::with_capacity(room);
-        let component = kit::Component::new(settings, &env, &mut out).or(Err(invalid(What::Bound)))?;
+        let out = Queue::with_capacity(room);
         Ok(Self {
-            component,
+            component: None,
+            settings: Some(settings),
             server: crate::server::Server::new(listener, transport),
             mount: http::Mount::new(http_settings(), &config.limits.clients_http),
             mount_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients_http },
@@ -161,6 +162,15 @@ impl Clients {
             writes: config.limits.journal.writes,
         })
     }
+    pub fn start(&mut self, now: Time, wall: Wall) -> Result<(), Problems> {
+        self.env.now = now;
+        self.env.wall = wall;
+        if let Some(settings) = self.settings.take() {
+            self.component =
+                Some(kit::Component::new(settings, &self.env, &mut self.out).or(Err(invalid(What::Bound)))?);
+        }
+        Ok(())
+    }
     fn print_link(&mut self) {
         if let Some(listener) = self.server.listening()
             && let Some(secret) = self.secret.take()
@@ -179,7 +189,11 @@ impl Clients {
         self.server.opened()
     }
     pub fn next_deadline(&self) -> Option<Time> {
-        crate::accounts::earliest(self.component.next_deadline(), self.server.next_deadline())
+        let component = match &self.component {
+            Some(component) => component.next_deadline(),
+            None => None,
+        };
+        crate::accounts::earliest(component, self.server.next_deadline())
     }
     pub fn work_pending(&self, now: Time) -> bool {
         !self.closed
@@ -205,8 +219,10 @@ impl Clients {
         if let kit::Event::Abort = &event {
             self.server.abort(&mut self.server_out);
         }
-        if !self.component_closed {
-            self.component.down(&self.env, event, &mut self.out);
+        if !self.component_closed
+            && let Some(component) = &mut self.component
+        {
+            component.down(&self.env, event, &mut self.out);
             self.pending = true;
         }
     }
@@ -306,7 +322,7 @@ impl Clients {
             return;
         }
         if !self.component_closed {
-            self.component.fire(&self.env, &mut self.out);
+            self.component.as_mut().expect("clients started at first service clock").fire(&self.env, &mut self.out);
         }
         self.advance(events, bound, rows);
         self.pending = server_pending || !self.server_out.is_empty();
@@ -319,7 +335,8 @@ impl Clients {
             }
         }
         if !self.component_closed {
-            self.pending |= self.component.up(&self.env, &mut self.out);
+            self.pending |=
+                self.component.as_mut().expect("clients started at first service clock").up(&self.env, &mut self.out);
         }
         self.advance(events, bound, rows);
     }
