@@ -14,10 +14,12 @@ skein-lib.workspace = true
 skein-ui.workspace = true
 serde_json = "1"
 jig-client-view.workspace = true
+jig-client-domain.workspace = true
+jig-client-protocol-wire.workspace = true
+jig-client-protocol-link.workspace = true
 [dev-dependencies]
 skein-http.workspace = true
 jig-client-protocol-http.workspace = true
-jig-client-protocol-link.workspace = true
 [lints.rust]
 unsafe_code = "forbid"
 unused_must_use = "deny"

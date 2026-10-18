@@ -359,9 +359,11 @@ dependencies = [
 name = "jig-client-browser-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-domain",
  "jig-client-fake-person-browser",
  "jig-client-protocol-http",
  "jig-client-protocol-link",
+ "jig-client-protocol-wire",
  "jig-client-view",
  "serde_json",
  "skein-fake-person",
@@ -384,6 +386,7 @@ dependencies = [
 name = "jig-client-fake-person-browser"
 version = "0.0.0"
 dependencies = [
+ "base64",
  "skein-fake-person",
  "skein-fake-person-browser",
  "skein-lib",

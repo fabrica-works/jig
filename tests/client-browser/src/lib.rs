@@ -9,6 +9,7 @@ use std::{
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
+mod forgery;
 
 #[must_use]
 pub fn jig_test() -> PathBuf {
@@ -51,6 +52,18 @@ fn configuration(directory: &Path, bundle: &Path) -> serde_json::Value {
     value["service"]["components"] = serde_json::json!(["clients"]);
     value["workers"] = serde_json::json!([]);
     value["application"]["server"] = serde_json::json!({"listener":{"socket":"127.0.0.1:0"},"bundle":bundle});
+    for pointer in [
+        "/engine/rules/ceiling/delegation/kinds",
+        "/engine/projects/0/policy/ceiling/delegation/kinds",
+        "/engine/projects/0/policy/roles/0/authority/delegation/kinds",
+    ] {
+        value
+            .pointer_mut(pointer)
+            .expect("delegation kinds")
+            .as_array_mut()
+            .expect("kinds array")
+            .push(serde_json::json!({"kind":"role", "number":0}));
+    }
     absolute_paths(&mut value, directory);
     value
 }
@@ -83,6 +96,7 @@ const FILES: &[(&str, &[u8])] = &[
 ];
 pub struct Tier {
     scratch: skein_scratch::Scratch,
+    forged: Box<[u8]>,
 }
 impl Tier {
     #[must_use]
@@ -96,7 +110,16 @@ impl Tier {
         }
         let value = configuration(scratch.path(), &bundle());
         private(&scratch.path().join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
-        Self { scratch }
+        Self { scratch, forged: forgery::request() }
+    }
+    #[must_use]
+    pub fn target(&self) -> jig_client_fake_person_browser::Target<'_> {
+        jig_client_fake_person_browser::Target {
+            prefix: b"/jig",
+            page: b"/",
+            request: &self.forged,
+            done: skein_fake_person::Find::text(b"Forged"),
+        }
     }
     #[must_use]
     pub fn reserved(name: &str) -> Self {

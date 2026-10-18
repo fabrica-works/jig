@@ -6,6 +6,21 @@ use skein_lib::Duration;
 const PAGE_WAIT: Duration = Duration::from_secs(5);
 
 #[test]
+fn the_forging_page_posts_to_the_mapping_s_request_route() {
+    let target = crate::Target { prefix: b"/mapping", page: b"/", request: b"forged", done: Find::text(b"Forged") };
+    let page = crate::pages::forging(&target);
+    assert_eq!(page.path.as_ref(), b"/forging");
+    assert_eq!(page.kind.as_ref(), b"text/html");
+    assert!(page.headers.is_empty());
+    assert_eq!(page.body.as_ref(), br#"<!doctype html><title>Elsewhere</title><script>
+const body = Uint8Array.from(atob("Zm9yZ2Vk"), c => c.charCodeAt(0));
+fetch("http://{address}/mapping/v1/request", {method: "POST", mode: "no-cors", credentials: "include", headers: {"Content-Type": "text/plain"}, body}).catch(() => {});
+fetch("http://{address}/mapping/v1/request", {method: "POST", credentials: "include", headers: {"Content-Type": "application/octet-stream", "Jig-Client": "browser"}, body}).catch(() => {});
+</script>
+"#);
+}
+
+#[test]
 fn the_spent_link_story_reopens_after_seeing_live() {
     let states =
         States { live: Find::text(b"Ready"), offline: Find::text(b"Unreachable"), signed_out: Find::text(b"Enter") };
