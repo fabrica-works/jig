@@ -161,7 +161,7 @@ jig-client-world, jig-client-protocol-world, jig-client-wire-world   the client'
 | arrangement | how a page places the reference UI's primitives and an application's own nodes; jig's pages are jig's default arrangement (pages.md, 12.3) |
 | jig's primitives | the functions of the reference UI's view that build part of a tree or handle its acts: the frame's parts, the sections, the cards, the confirmation, the owed cards, the notices, jig's bindings and their decoders (view.md, section 4) |
 | jig's default arrangement | the reference UI's own arrangement of its primitives: its banner, its pages, `after_page`; a default and a reference, never mandated (pages.md, 12.3) |
-| a decision's facts | what a decision rests on (the object's state, a refusal and why, what a decision will do and whether it is dangerous): data in jig's documents (contract.md, 5.4), which the helper `facts` reads (client.md, section 19) and a presentation says, with `words` or its own words (view.md, section 4) |
+| a decision's facts | what a decision rests on (the object's state, a refusal and why, what a decision will do and whether it is dangerous): data in jig's documents (contract.md, 5.4), which the helper `facts` reads (client.md, section 19) and a presentation says, with `words` or its own words (objects.md, section 2) |
 | jig's check | the test kit's: in an application's worlds, a decision sent naming a revision no document the client delivered carried; on a tree, a deciding act made on a tree that did not show its facts; never mandated (testing.md, 6.2) |
 | outline | skein-ui's rules for the landmarks a tree keeps: each child of the page node a landmark or a dialog, exactly one main, at most one banner and one content info; jig adds none (skein's `ui.md`, section 14; view.md, 3.1) |
 | landmark | a role saying which part of a page a node is: banner, navigation, main, complementary, content info, form, search |
@@ -341,7 +341,7 @@ where each is answered.
   - *given as data:* a decision's facts, in jig's documents, which the
     helper `facts` reads (client.md, section 19) and a presentation
     says, with `words` or its own words, wherever it confirms
-    (contract.md, 5.4; view.md, section 4);
+    (contract.md, 5.4; objects.md, section 2);
   - *checked, not mandated:* jig's check, in its test kit, which the
     referee runs in jig's worlds and in an application's, never at run
     (testing.md, 6.2).

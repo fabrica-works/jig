@@ -637,7 +637,11 @@ procedure, but a mechanism of the connector's, keyed to the goal.
   closed or retargeted. It holds the task that relies on it, saying what
   changed and when, and the client shows it; nothing is written over.
 - **What is not drift:** a fact a decision reads is simply read again;
-  a change to what others own is news.
+  a change to what others own is news. To the task that holds a
+  resource to write it, a change made before its own write is a fact it
+  reads again, and it decides on what it finds (a service restarted by
+  another hand before the procedure holding it made its restart); to
+  every other task relying on the resource, the change is drift.
 - **Participating objects** are those others write too. What others
   write there is read into the inbox of the task that deals with the
   object, as news on its topic; what the application writes there is a

@@ -208,10 +208,9 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 - **Put in its taker's form where it is handed over.** The protocol
   layer that hands a value to an agent capability puts it in the form
   that capability takes: smith's LLM component takes the two as they
-  are; smith's host half takes them as one string for its agent
-  processes (smith's `protocol/channel.md`, section 6), as smith's agent
-  service reads it: the id's length in two bytes, big-endian, then the
-  id and the token. On a worker that is the worker's protocol layer,
+  are; smith's host half takes them as one byte string for its agent
+  processes, in the form smith's `protocol/channel.md`, section 6 gives.
+  On a worker that is the worker's protocol layer,
   which knows the capability it composes; the engine does not, so it
   never sends a value in an agent's form.
 - **The access tokens lent,** by account, at most the two newest

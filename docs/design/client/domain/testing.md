@@ -53,7 +53,7 @@ section 15). What is still open is listed in section 10.
 
 | Tier | Real | Faked |
 |---|---|---|
-| step tests | `jig-client`'s step and fire, by its events and its requests; its helpers, `shapes`, `facts`, `thread` and `words`; the reference UI's step and each of its view functions; its default arrangement's banner and `after_page`'s parts last, on each of jig's pages (view.md, 3.1); jig's check; the reference UI's pages printed by skein's text shell, by golden text (view.md, 15.6); its test family's drawing code, by golden scenes (view.md, 17.5) | their events, by hand |
+| step tests | `jig-client`'s step and fire, by its events and its requests; its helpers, `shapes`, `facts`, `thread` and `words`; the reference UI's step and each of its view functions; its default arrangement's banner and `after_page`'s parts last, on each of jig's pages (pages.md, 12.3); jig's check; the reference UI's pages printed by skein's text shell, by golden text (view.md, 15.6); its test family's drawing code, by golden scenes (view.md, 17.5) | their events, by hand |
 | the client's world | `jig-client`, driven through its surface by a scripted application; or jig's test application, the reference UI and its view root in front of it, with the person | the engine, scripted; the transport, played by the world; the person |
 | the joint world | the same, in front of the engine's domain, root and all | the store, hosts and systems, as the engine's worlds fake them; the transport; the person |
 | the protocol world, the real loop | with the client's protocol layer and shells (`jig-client-protocol-http`, `jig-client-shell-native`), and the engine's clients' component with the default HTTP mapping's engine end; skein's text shell's terminal in front of the native one, on skein's simulated machine (`../../protocol/client.md`, section 14) | |
@@ -283,10 +283,7 @@ application's on skein's UI kit:
   engine makes it, as it observes its commits, never from a client's
   link.
 - **The page's outline:** every tree a person saw keeps skein-ui's
-  outline (view.md, 3.1; skein's `ui.md`, section 14): the page node the
-  root, its children landmarks or dialogs, one main, at most one banner
-  and one content info, no shortcut twice, Escape only inside a dialog.
-  The referee runs `skein_ui::outline::check` on it, so an application's
+  outline (skein's `ui.md`, section 14). The referee runs `skein_ui::outline::check` on it, so an application's
   tree is held to it as jig's is. jig adds no rule: that jig's default
   arrangement keeps its banner and `after_page`'s parts last is the
   reference UI's step tests' to check (section 2).
