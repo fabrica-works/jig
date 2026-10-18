@@ -707,8 +707,14 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
         })),
     );
     let (folded, mut bindings) = build(&d, 3, &words);
-    assert!(contains(&folded, b"Selected language opens actual current input"));
-    assert!(!contains(&folded, b"Open current call input"));
+    assert!(folded.nodes().iter().any(|node| node.role == Role::Button
+        && node.name.as_deref() == Some(b"Selected language opens actual current input")));
+    assert!(
+        !folded
+            .nodes()
+            .iter()
+            .any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Open current call input"))
+    );
     let act = crate::decode(
         &mut bindings,
         named_binding(&folded, b"Selected language opens actual current input"),
@@ -717,7 +723,8 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
     .unwrap();
     drive(&mut d, Event::Act { action: act });
     let opened = build(&d, 3, &words).0;
-    assert!(contains(&opened, b"Selected language folds actual current input"));
+    assert!(opened.nodes().iter().any(|node| node.role == Role::Button
+        && node.name.as_deref() == Some(b"Selected language folds actual current input")));
     assert!(contains(&opened, b"input"));
     let limits = crate::limits::of_words(&CLIENT, &words).unwrap();
     assert!(limits.text_per_node >= words.book.capacity(LiveCallPhrase::OpenCurrentCallInput.id()).unwrap());

@@ -126,7 +126,6 @@ pub fn build(view: &mut View, root: &Domain, out: &mut Queue<Patch>) {
                 fragment.open(Role::Button);
                 fragment.name(&label);
                 fragment.bind(view.observability.insert(bindings::Meaning::Action(Action::SignIn)));
-                fragment.text(skein_ui::Run::Plain, &label);
                 fragment.close();
                 builder.splice(slot.id, fragment);
                 continue;

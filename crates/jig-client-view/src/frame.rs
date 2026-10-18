@@ -159,9 +159,9 @@ pub fn control(
     let label = words.say(phrase, holes);
     b.open(role);
     b.name(&label);
-    b.text(Run::Plain, &label);
     let binding = bindings.insert(JigMeaning::Action(action));
     if role == Role::Link {
+        b.text(Run::Plain, &label);
         b.link(binding);
     }
     b.bind(binding);
@@ -179,7 +179,6 @@ fn membership(
     let label = crate::frame_facts::project_label(words, project);
     b.open(Role::Button);
     b.name(&label);
-    b.text(Run::Plain, &label);
     if selected {
         b.state(State::Current);
     }

@@ -244,6 +244,5 @@ fn sign_in_slot(view: &mut View<'_>, fragment: &mut Builder) {
     fragment.open(Role::Button);
     fragment.name(&label);
     fragment.bind(view.first.insert(bindings::Meaning::SignIn));
-    fragment.text(skein_ui::Run::Plain, &label);
     fragment.close();
 }

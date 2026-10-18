@@ -89,17 +89,16 @@ fn scope_choice(b: &mut Builder, words: &Words, bindings: &mut JigBindings, filt
     let label = words.say(phrase, &holes);
     b.open(Role::Button);
     b.name(&label);
-    b.text(skein_ui::Run::Plain, &label);
-    if let NoteScope::Resource { pattern, .. } = &scope {
-        crate::owner_authority::pattern(b, words, pattern, text_limit);
-    }
     if scope == filter.scope {
         b.state(State::Selected);
     }
     b.bind(bindings.insert(JigMeaning::Action(Act::FilterNotes {
-        filter: NoteFilter { scope, description: filter.description.clone() },
+        filter: NoteFilter { scope: scope.clone(), description: filter.description.clone() },
     })));
     b.close();
+    if let NoteScope::Resource { pattern, .. } = &scope {
+        crate::owner_authority::pattern(b, words, pattern, text_limit);
+    }
 }
 
 #[cfg(test)]

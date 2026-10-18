@@ -29,7 +29,6 @@ pub(crate) fn tab(
     let label = words.say(phrase, &[]);
     b.open(Role::Tab);
     b.name(&label);
-    b.text(Run::Plain, &label);
     if current {
         b.state(State::Current);
     }
@@ -47,7 +46,6 @@ pub(crate) fn control(
     let label = words.say(phrase, &[]);
     b.open(Role::Button);
     b.name(&label);
-    b.text(Run::Plain, &label);
     if selected {
         b.state(State::Selected);
     }

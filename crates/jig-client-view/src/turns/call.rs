@@ -41,7 +41,6 @@ pub(super) fn call(
         .say(if open { JigPhrase::FoldCall } else { JigPhrase::OpenCall }, &[crate::words::name(call.tool.bytes())]);
     b.open(Role::Button);
     b.name(&label);
-    b.text(Run::Plain, &label);
     if open {
         b.state(State::Expanded);
     }
@@ -107,7 +106,6 @@ pub(super) fn raw(
     let label = words.book.say(words.language, phrase.id(), &[]).expect("checked live input control").text;
     b.open(Role::Button);
     b.name(&label);
-    b.text(Run::Plain, &label);
     if open {
         b.state(State::Expanded);
     }

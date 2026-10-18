@@ -92,7 +92,6 @@ fn end(b: &mut Builder, words: &Words, bindings: &mut JigBindings, dangerous: bo
     b.open(Role::Button);
     let label = words.say(JigPhrase::Confirm, &[]);
     b.name(&label);
-    b.text(Run::Plain, &label);
     b.style(JigStyle::ButtonWeight.token());
     if dangerous {
         b.style(JigStyle::Danger.token());

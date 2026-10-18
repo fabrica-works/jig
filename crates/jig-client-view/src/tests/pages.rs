@@ -148,15 +148,12 @@ fn inbox_edges(words: &crate::words::Words) {
         }
     }
     let (tree, mut bindings) = build(&d, 0, words);
-    for label in [
-        b"4294967296 need you".as_slice(),
-        b"More than 10 updates",
-        b"For the person on call",
-        b"Passes up at",
-        b"Read later",
-    ] {
+    for label in
+        [b"4294967296 need you".as_slice(), b"More than 10 updates", b"For the person on call", b"Passes up at"]
+    {
         assert!(contains(&tree, label));
     }
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Read later")));
     assert_eq!(
         crate::decode(&mut bindings, named_binding(&tree, b"Read later"), skein_ui::Act::Press),
         Some(crate::action::Act::More {
@@ -245,8 +242,8 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
         },
     );
     let (tree, mut bindings) = build(&d, 0, words);
-    assert!(contains(&tree, b"Read earlier"));
-    assert!(contains(&tree, b"Read later"));
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Read earlier")));
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Read later")));
     let act = crate::decode(&mut bindings, named_binding(&tree, b"Read earlier"), skein_ui::Act::Press).unwrap();
     let out = drive(&mut d, Event::Act { action: act });
     assert!(
@@ -407,7 +404,13 @@ fn whole_page(d: &Fixture) -> Tree {
         &mut bindings
     ));
     b.close();
-    b.finish()
+    let tree = b.finish();
+    for node in tree.nodes() {
+        if (node.role == Role::Button || node.role == Role::Tab || node.role == Role::MenuItem) && node.name.is_some() {
+            assert_eq!(node.size, 1, "named control holds a node: {node:?}");
+        }
+    }
+    tree
 }
 
 #[test]

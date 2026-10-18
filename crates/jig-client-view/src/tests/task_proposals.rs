@@ -128,7 +128,7 @@ fn a_task_activity_renders_whole_shared_proposals_without_any_decoded_call() {
     assert_eq!(cards(&tree, first), 1);
     assert_eq!(cards(&tree, second), 1);
     assert!(contains(&tree, b"whole shared reason"));
-    assert!(contains(&tree, b"Accept"));
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Accept")));
     assert_eq!(tree.nodes().iter().filter(|n| n.role == Role::Slot).count(), 2);
     let mut huge = CLIENT;
     huge.objects = u32::MAX;
@@ -286,7 +286,7 @@ fn a_task_activity_renders_the_native_whole_pending_proposal_with_its_supplied_f
     assert!(contains(&tree, b"150"));
     assert!(contains(&tree, b"250"));
     assert!(contains(&tree, b"100"));
-    assert!(contains(&tree, b"Accept"));
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Accept")));
 }
 
 fn leaving_plan(with_chat: bool) -> (Fixture, ProposalKey) {

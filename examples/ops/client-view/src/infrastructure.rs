@@ -149,7 +149,6 @@ fn form(
     builder.close();
     builder.open(Role::Button);
     builder.name(&words.say(Word::MoveEnd, &[]));
-    words.text(builder, Word::MoveEnd, &[]);
     if disabled {
         builder.state(State::Disabled);
     } else {
@@ -184,7 +183,6 @@ fn native_form(
     builder.close();
     builder.open(Role::Button);
     builder.name(&words.say(Word::MoveEnd, &[]));
-    words.text(builder, Word::MoveEnd, &[]);
     if disabled {
         builder.state(State::Disabled);
     } else {

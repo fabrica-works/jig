@@ -66,8 +66,8 @@ fn settled_note_answer(act: ActKind, cut: bool) {
     let mut bindings = JigBindings::new(256, CLIENT.text);
     let tree = render(&domain, id, words, &mut bindings);
     assert!(!contains(&tree, b"Note edited"));
-    assert!(contains(&tree, b"Edit note"));
-    assert!(contains(&tree, b"Delete note"));
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Edit note")));
+    assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Delete note")));
     let label = if act == ActKind::EditNote { b"Edit note".as_slice() } else { b"Delete note".as_slice() };
     let action = press(&tree, label, &mut bindings);
     drive(&mut domain, Event::Act { action });
@@ -108,8 +108,14 @@ fn settled_note_answer(act: ActKind, cut: bool) {
     for name in [b"Task 91".as_slice(), b"Task 18446744073709551615".as_slice()] {
         assert!(tree.nodes().iter().any(|node| node.role == Role::Link && node.name.as_deref() == Some(name)));
     }
-    assert_eq!(contains(&tree, b"Edit note"), act == ActKind::EditNote);
-    assert_eq!(contains(&tree, b"Delete note"), act == ActKind::EditNote);
+    assert_eq!(
+        tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Edit note")),
+        act == ActKind::EditNote
+    );
+    assert_eq!(
+        tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Delete note")),
+        act == ActKind::EditNote
+    );
 }
 
 #[test]

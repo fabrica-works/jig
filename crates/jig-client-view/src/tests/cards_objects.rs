@@ -391,7 +391,9 @@ fn person_contracts_and_result_values_keep_choices_slots_and_full_payloads(words
                 drive(&mut d, Event::Act { action: act });
             }
         }
-        assert!(contains(&tree, b"Cannot do it"));
+        assert!(
+            tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Cannot do it"))
+        );
     }
     let (mut result_domain, id, watch) = loaded_with_watch(ObjectKey::Result(8), ReadValue::Result(Box::new(result())));
     let mut bindings = JigBindings::new(64, CLIENT.text);

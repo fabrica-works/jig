@@ -481,7 +481,11 @@ fn owner_proposal_link_presence_and_same_keyed_card_across_contexts_keep_current
             let tree = b.finish();
             super::cards_access::check(&tree);
             assert!(has(&tree, b"Proposed release"));
-            assert!(has(&tree, b"Accept"));
+            assert!(
+                tree.nodes()
+                    .iter()
+                    .any(|node| node.role == skein_ui::Role::Button && node.name.as_deref() == Some(b"Accept"))
+            );
             let key = tree.nodes()[0].key.unwrap();
             if let Some(previous) = expected {
                 assert_eq!(key, previous);

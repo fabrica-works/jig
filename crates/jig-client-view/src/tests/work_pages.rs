@@ -297,15 +297,21 @@ fn history(words: &Words) {
         let (tree, mut bindings) = build(&d, 3, words);
         let labels: &[&[u8]] = match page {
             0 => &[b"old instruction", b"new instruction"],
-            1 => &[b"Released", b"Budget"],
+            1 => &[b"Released"],
             2 => &[b"cancel history", b"move history"],
             _ => unreachable!(),
         };
         for label in labels {
             assert!(contains(&tree, label), "{label:?}");
         }
+        if page == 1 {
+            assert!(
+                tree.nodes().iter().any(|node| node.role == Role::Tab
+                    && node.name.as_deref().is_some_and(|name| name.starts_with(b"Budget")))
+            );
+        }
         for label in [b"Read earlier".as_slice(), b"Read later"] {
-            assert!(contains(&tree, label));
+            assert!(tree.nodes().iter().any(|node| node.role == Role::Button && node.name.as_deref() == Some(label)));
         }
         assert_eq!(tree.nodes().iter().filter_map(|n| n.key).filter(|key| key.kind == 21).count(), 2);
         assert_eq!(
@@ -448,13 +454,28 @@ fn project_sections(words: &Words) {
                 assert!(tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Goal specification")));
             }
             ProjectSection::Tasks => {
-                assert!(contains(&tree, b"Tasks I asked for"));
-                assert!(contains(&tree, b"Executor active"));
+                assert!(
+                    tree.nodes()
+                        .iter()
+                        .any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Tasks I asked for"))
+                );
+                assert!(
+                    tree.nodes()
+                        .iter()
+                        .any(|node| node.role == Role::Button && node.name.as_deref() == Some(b"Executor active"))
+                );
             }
             ProjectSection::Notes => {
                 assert!(tree.nodes().iter().any(|n| n.name.as_deref() == Some(b"Search notes by description")));
-                for label in [b"whole note body".as_slice(), b"Useful correction", b"Read earlier", b"Read later"] {
+                for label in [b"whole note body".as_slice(), b"Useful correction"] {
                     assert!(contains(&tree, label));
+                }
+                for label in [b"Read earlier".as_slice(), b"Read later"] {
+                    assert!(
+                        tree.nodes()
+                            .iter()
+                            .any(|node| node.role == Role::Button && node.name.as_deref() == Some(label))
+                    );
                 }
             }
             ProjectSection::Roles => assert!(contains(&tree, b"Notifier")),

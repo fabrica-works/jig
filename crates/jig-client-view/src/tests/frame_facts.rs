@@ -255,3 +255,35 @@ fn the_needs_part_says_nothing_is_known_before_the_frame() {
     assert_eq!(shown.nodes()[at + 1].role, Role::Status);
     assert_eq!(shown.nodes()[at + 1].name.as_deref(), Some(b"Nothing known yet".as_slice()));
 }
+
+#[test]
+fn a_named_control_holds_no_node() {
+    const CONTROL: usize = 0;
+    const WORDS: usize = 1;
+    const BUTTON_NODES: u32 = 1;
+    const LINK_NODES: u32 = 2;
+    const FIRST_RUN: u32 = 0;
+    for role in [Role::Button, Role::Link] {
+        let sized = limits();
+        let mut b = Builder::new(&sized);
+        let mut bindings = JigBindings::new(sized.bindings, CLIENT.text);
+        crate::frame::control(
+            &mut b,
+            words(),
+            &mut bindings,
+            role,
+            JigPhrase::SignOut,
+            &[],
+            crate::action::Act::SignOut,
+        );
+        let tree = b.finish();
+        let control = &tree.nodes()[CONTROL];
+        assert_eq!(control.name.as_deref(), Some(b"Sign out".as_slice()), "{role:?}");
+        if role == Role::Button {
+            assert_eq!(control.size, BUTTON_NODES);
+        } else {
+            assert_eq!(control.size, LINK_NODES);
+            assert_eq!(tree.nodes()[WORDS].text.get(FIRST_RUN).unwrap().text.as_ref(), b"Sign out");
+        }
+    }
+}

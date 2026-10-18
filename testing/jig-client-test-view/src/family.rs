@@ -288,7 +288,6 @@ fn disabled(card: &Card) -> bool {
 fn button(b: &mut Builder, word: Word, action: first::Act, card: &Card, words: &Words, bindings: &mut Bindings) {
     b.open(Role::Button);
     b.name(&words.say(word, &[]));
-    words.text(b, word, &[]);
     if disabled(card) {
         b.state(State::Disabled);
     } else {

@@ -615,7 +615,6 @@ fn control(b: &mut Builder, ask: &Ask, words: &Words, bindings: &mut JigBindings
     b.open(Role::Button);
     let label = words.book.say(words.language, P::Edit.id(), &[]).expect("project edit label").text;
     b.name(&label);
-    b.text(Run::Plain, &label);
     b.bind(bindings.insert(JigMeaning::Action(owner_form::action(ask.clone()))));
     b.close();
 }
@@ -1109,7 +1108,6 @@ fn role_control(
     b.open(Role::Button);
     let label = role_label(words, role);
     b.name(&label);
-    b.text(Run::Plain, &label);
     b.bind(bindings.insert(JigMeaning::Action(action)));
     b.close();
 }
@@ -1170,7 +1168,6 @@ fn remove_control(b: &mut Builder, ask: &Ask, index: u32, words: &Words, binding
     let label =
         words.book.say(words.language, P::Remove.id(), &[Hole::Number(u64::from(index))]).expect("checked remove").text;
     b.name(&label);
-    b.text(Run::Plain, &label);
     b.bind(bindings.insert(JigMeaning::Action(owner_form::action(ask.clone()))));
     b.close();
 }

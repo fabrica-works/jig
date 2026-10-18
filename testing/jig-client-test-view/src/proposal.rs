@@ -78,7 +78,6 @@ pub(crate) fn confirmation(
 fn button(b: &mut Builder, words: &Words, phrase: P, act: Act, bindings: &mut Bindings) {
     b.open(Role::Button);
     b.name(&words.say(phrase, &[]));
-    words.text(b, phrase, &[]);
     b.bind(bindings.insert(Meaning::Action(first::Act::Proposal(act))));
     b.close();
 }
