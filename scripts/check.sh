@@ -12,7 +12,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo clippy --target wasm32-unknown-unknown \
     -p jig-client-protocol-wire -p jig-client-protocol-link \
     -p jig-client-protocol-http -p jig-client-domain -p jig-client \
-    -p jig-client-view -p jig-client-test-protocol-wire \
+    -p jig-client-view -p jig-client-shell-web -p jig-client-test-protocol-wire \
     -p jig-client-test-domain -p jig-client-test-view \
     -p jig-ops-client-protocol-wire -p jig-ops-client-domain \
     -p jig-ops-client-view -- -D warnings

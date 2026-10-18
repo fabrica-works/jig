@@ -1,0 +1,37 @@
+[package]
+name = "jig-client-shell-web"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+skein-http.workspace = true
+skein-ui.workspace = true
+skein-ui-web.workspace = true
+jig-client-protocol-http.workspace = true
+jig-client-view.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
+web-sys = { workspace = true, features = ["Window", "Document", "Location", "History", "HtmlDialogElement", "HtmlTextAreaElement", "HtmlElement", "Element", "Node", "Event", "EventTarget"] }
+
+[dev-dependencies]
+jig-client-protocol-link.workspace = true
+
+[lints.rust]
+unsafe_code = "forbid"
+elided_lifetimes_in_paths = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_panics_doc = "allow"
+wildcard_enum_match_arm = "deny"
+match_wildcard_for_single_variants = "deny"
+unwrap_used = "deny"
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+disallowed_types = "deny"
+disallowed_methods = "deny"

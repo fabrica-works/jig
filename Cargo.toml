@@ -6,6 +6,7 @@ members = [
     "tests/one-process",
     "testing/jig-test",
     "crates/jig-client-shell-native",
+    "crates/jig-client-shell-web",
     "tests/client-protocol",
     "testing/jig-client-test-records",
     "crates/jig-protocol-engine-clients",
@@ -91,6 +92,11 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+jig-client-shell-web = { path = "crates/jig-client-shell-web" }
+skein-ui-web = { git = "https://github.com/forgetic/skein.git" }
+wasm-bindgen = "=0.2.126"
+js-sys = "=0.3.103"
+web-sys = "=0.3.103"
 jig-client-domain = { path = "crates/jig-client-domain" }
 jig-client = { path = "crates/jig-client" }
 smith-local-service = { git = "https://github.com/forgetic/smith.git" }
