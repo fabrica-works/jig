@@ -615,7 +615,9 @@ unsent, for its owner's version (section 8).
 - **Times are wall times,** which the store keeps, so a document means the
   same after a restart.
 - **Bounded:** each document within its limits, in bytes and windows,
-  never in rows sized for one client's screen.
+  never in rows sized for one client's screen. A path and an authority
+  are bounded by the engine's names and authorities, not by a window's
+  rows (below).
 - **A path crosses whole.** A resource's path and a pattern are names,
   compared segment by segment (`../../domain/authority.md`, section 4),
   and the client acts on them as they are (a filter by a resource, a
@@ -624,6 +626,20 @@ unsent, for its owner's version (section 8).
   and its tasks' bounds on a name's segments): the engine never cuts
   one, nor refuses a document for one. A document's bound on its short
   lists is not a path's.
+- **An authority crosses whole.** A draft is compared with an authority,
+  and an amendment's authority (3.2, `Amend`) is drafted from the one a
+  document carries, so the client holds each as the engine does: a
+  task's authority, and each authority an offer's
+  bounds, a proposal or an amendment carries, with its grants, its
+  executors and its notes' scopes; and an amending offer's grants
+  listed and the implications it names. A document carries each list
+  whole, with as many entries as the engine admits there: grants, a
+  grants listing and notes' scopes, the most of its authority's and its
+  tasks' bounds on an authority's grants; executors, the most of its
+  authority's bound on executors and its tasks' on executor kinds;
+  implications, its authority's bound on them. The engine never cuts
+  one, nor refuses a document or an offer for one, nor marks one cut. A
+  document's bound on its short lists is not an authority's.
 - **Texts are UTF-8,** words for showing. A source's text is UTF-8 where
   it enters the engine: a party's words, refused at their request's
   entrance when they are not; an identity's login and name, refused

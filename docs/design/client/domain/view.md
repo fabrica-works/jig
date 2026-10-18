@@ -478,6 +478,15 @@ buffer, with skein-lib's decimal for numbers. What is jig's:
   last one always. Only what is shown is cut: what the view acts on (a
   filter by a resource, a draft's pattern) takes the whole path the
   client holds (client.md, section 16).
+- **A long authority is shown in part.** Each of an authority's lists
+  (its grants, its executors, its notes' scopes) and of an amending
+  offer's (its grants listed, its implications) shows its first entries,
+  in the document's order, at most the view's rows per window (18.9),
+  and, when the client holds more, the mark of a list shown in part
+  once after them, a phrase of jig's an application may override
+  ("More are held than shown"). Only what is shown is cut: what the view
+  acts on (a draft, a policy's edit) takes the whole authority the
+  client holds (client.md, section 16).
 - **A shell's own words.** The words jig's look gives the browser's
   parts (a credential shown once, the application failed) are jig's
   phrases, in the person's language (`../../protocol/browser.md`, 3.3
@@ -532,7 +541,9 @@ most bytes, and the largest page is the tree's capacity. A node's text
 holds at least the phrase before a path, the mark and one segment at its
 most bytes, so a path's node stays within it whatever its segments
 (section 7), and the client's bound on a path's segments adds nothing to
-the tree's limits. A page showing
+the tree's limits. An authority's list shows at most the rows per
+window and its mark (section 7), so the client's bound on an
+authority's entries adds nothing to them either. A page showing
 sections together counts their sum, so the limits take the arrangement:
 `limits::of` and `limits::compose` count jig's pages with the sections
 the application's `Arrangement` adds beside each place's own. A

@@ -763,6 +763,12 @@ Each is configured and part of the worst case:
   rows; the application sets it at least the most its engine admits in
   a name (contract.md, 5.3), and a document past it is refused at
   decoding (section 16);
+- an authority's entries: the most entries of one of an authority's
+  lists (its grants, its executors, its notes' scopes) or of an amending
+  offer's (its grants listed, its implications) a document may carry, a
+  bound of its own, never a window's rows; the application sets it at
+  least the most its engine admits in each of them (contract.md, 5.3),
+  and a document past it is refused at decoding (section 16);
 - bytes of a document held, of a page handed over, and of a run's
   provisional turn, each priced from the wire's worst cases at the
   client's limits (`../../protocol/client.md`, section 13);
@@ -830,7 +836,10 @@ the client's protocol designs (`../../protocol/client.md`):
   (programming-model.md, 4.4); a document past them is refused at
   decoding, as too large, never cut silently. A path is held whole,
   within the client's bound on its segments: only the view cuts what it
-  shows of a long one (view.md, section 7).
+  shows of a long one (view.md, section 7). An authority is held whole,
+  within the client's bound on its entries, and a draft is made from it
+  whole: only the view cuts what it shows of a long one (view.md,
+  section 7).
 
 ## 17. The world
 
