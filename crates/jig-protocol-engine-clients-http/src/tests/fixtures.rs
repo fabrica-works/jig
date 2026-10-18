@@ -1,5 +1,6 @@
 use super::*;
 use skein_lib::{List, Secret, Wall};
+pub const HOST: &[u8] = b"127.0.0.1:7100";
 pub const EXCHANGE: Token = Token::new(11);
 pub const OTHER: Token = Token::new(12);
 pub fn env() -> Env<Limits> {
@@ -20,8 +21,15 @@ pub fn env() -> Env<Limits> {
 pub fn mount() -> Mount {
     prefixed(b"/jig")
 }
+pub fn fresh_mount() -> Mount {
+    Mount::new(Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }, &env().limits)
+}
 pub fn prefixed(prefix: &[u8]) -> Mount {
-    Mount::new(Settings { prefix: Box::from(prefix), loopback: true }, &env().limits)
+    let mut mount = Mount::new(Settings { prefix: Box::from(prefix), loopback: true }, &env().limits);
+    let mut hosts = List::with_capacity(1);
+    hosts.push(Box::from(HOST)).expect("one host");
+    mount.down(&env(), Event::Listening { hosts }, &mut Queue::with_capacity(1));
+    mount
 }
 pub fn credential() -> Secret {
     Secret::new(Box::new([7; 40]))
@@ -33,10 +41,30 @@ pub fn bearer() -> [skein_http::Header; 1] {
     }]
 }
 pub fn head(method: Method, target: &[u8], headers: &[skein_http::Header], body: http::Body) -> http::Call {
+    let mut fields =
+        List::with_capacity(u32::try_from(headers.len()).expect("headers").checked_add(2).expect("defaults"));
+    let mut host = false;
+    let mut content = false;
+    for header in headers {
+        host |= header.name.eq_ignore_ascii_case(b"host");
+        content |= header.name.eq_ignore_ascii_case(b"content-type");
+        fields.push(header.clone()).expect("supplied header");
+    }
+    if !host {
+        fields.push(skein_http::Header { name: Box::from(b"host".as_slice()), value: Box::from(HOST) }).expect("host");
+    }
+    if method == Method::Post && !content {
+        fields
+            .push(skein_http::Header {
+                name: Box::from(b"content-type".as_slice()),
+                value: Box::from(b"application/octet-stream".as_slice()),
+            })
+            .expect("content type");
+    }
     http::Call {
         method,
         target: Box::from(target),
-        headers: Box::from(headers),
+        headers: fields.into_boxed(),
         body,
         version: skein_http::Version::Http11,
     }
@@ -202,4 +230,20 @@ pub fn signed_in(bytes: &[u8]) -> jig_client_protocol_wire::v8::SignedIn {
         panic!("signed in")
     };
     value
+}
+
+pub fn fields(fields: &[(&[u8], &[u8])]) -> Box<[skein_http::Header]> {
+    let mut headers = List::with_capacity(u32::try_from(fields.len()).expect("header count"));
+    for (name, value) in fields {
+        headers.push(skein_http::Header { name: Box::from(*name), value: Box::from(*value) }).expect("header");
+    }
+    headers.into_boxed()
+}
+pub fn names_a_cors_field(headers: &[skein_http::Header]) -> bool {
+    for header in headers {
+        if header.name.starts_with(b"access-control-") {
+            return true;
+        }
+    }
+    false
 }

@@ -72,9 +72,11 @@ impl Call {
             value: bytes::copy_of(b"application/octet-stream"),
         };
         let cache = skein_http::Header { name: bytes::copy_of(b"cache-control"), value: bytes::copy_of(b"no-store") };
+        let nosniff =
+            skein_http::Header { name: bytes::copy_of(b"x-content-type-options"), value: bytes::copy_of(b"nosniff") };
         let headers = match cookie {
-            Some(cookie) => Box::from([content, cache, cookie]),
-            None => Box::from([content, cache]),
+            Some(cookie) => Box::from([content, cache, nosniff, cookie]),
+            None => Box::from([content, cache, nosniff]),
         };
         self.requests.push(http::Request::Respond(http::Response {
             status,

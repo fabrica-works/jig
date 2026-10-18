@@ -12,6 +12,7 @@ use skein_lib::{Env, List, Map, Queue, Time, Token, Wall};
 mod translation;
 pub(super) use translation::{application, immediate, to_component};
 const PREFIX: u64 = 4_u64 << 60;
+const HOST_BYTES: u32 = 64;
 
 #[derive(Debug)]
 pub(super) struct Clients {
@@ -218,6 +219,13 @@ impl Clients {
         {
             return false;
         }
+        if let io::Event::Listening { addr, .. } = &event
+            && let Some(address) = addr.socket()
+        {
+            let mut hosts = List::with_capacity(1);
+            hosts.push(address_text(address).expect("bound listener address")).expect("one listener host");
+            self.mount.down(&self.mount_env, http::Event::Listening { hosts }, &mut self.mount_out);
+        }
         self.server.up(event, &mut self.server_out);
         self.print_link();
         self.pending = true;
@@ -371,6 +379,8 @@ pub(super) fn worst_case(
 ) -> Option<u64> {
     kit::worst_case(limits)?
         .checked_add(http::worst_case(mapping)?)?
+        // This mount owns one bound listener's textual address.
+        .checked_add(List::<Box<[u8]>>::worst_case(1)?.checked_add(u64::from(HOST_BYTES))?)?
         .checked_add(Queue::<http::Request>::worst_case(room)?)?
         .checked_add(Queue::<kit::Request>::worst_case(room)?)?
         .checked_add(Queue::<io::Request>::worst_case(room)?)?
@@ -652,7 +662,7 @@ pub(super) fn printed(address: ::core::net::SocketAddr, secret: &skein_lib::Secr
 
 fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
     use ::core;
-    let mut text = skein_lib::Intake::with_capacity(64);
+    let mut text = skein_lib::Intake::with_capacity(HOST_BYTES);
     match address.ip() {
         core::net::IpAddr::V4(ip) => {
             for (at, octet) in ip.octets().iter().enumerate() {

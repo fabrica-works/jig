@@ -44,8 +44,16 @@ struct Exchange {
 impl Exchange {
     fn new(method: skein_http::Method, target: &[u8], body: Box<[u8]>, bearer: Option<&[u8]>) -> Self {
         let limits = fixtures::client_limits();
-        let mut headers =
-            vec![skein_http::Header { name: Box::from(b"host".as_slice()), value: Box::from(b"localhost".as_slice()) }];
+        let mut headers = vec![skein_http::Header {
+            name: Box::from(b"host".as_slice()),
+            value: Box::from(fixtures::HOST.as_bytes()),
+        }];
+        if method == skein_http::Method::Post {
+            headers.push(skein_http::Header {
+                name: Box::from(b"content-type".as_slice()),
+                value: Box::from(b"application/octet-stream".as_slice()),
+            });
+        }
         if let Some(bearer) = bearer {
             headers.push(skein_http::Header { name: Box::from(b"authorization".as_slice()), value: Box::from(bearer) });
         }

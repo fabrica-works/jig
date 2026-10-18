@@ -36,6 +36,10 @@ impl Call {
                         value: bytes::copy_of(b"text/event-stream"),
                     },
                     skein_http::Header { name: bytes::copy_of(b"cache-control"), value: bytes::copy_of(b"no-store") },
+                    skein_http::Header {
+                        name: bytes::copy_of(b"x-content-type-options"),
+                        value: bytes::copy_of(b"nosniff"),
+                    },
                 ]),
                 body: http::Body::Chunked,
                 close: true,

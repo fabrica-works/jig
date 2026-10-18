@@ -81,7 +81,7 @@ impl Peer {
             method,
             b" ",
             path,
-            b" HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n",
+            b" HTTP/1.1\r\nHost: 127.0.0.1:7100\r\nConnection: close\r\nContent-Type: application/octet-stream\r\n",
             &header,
             b"Content-Length: ",
             &length,

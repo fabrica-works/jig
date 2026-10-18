@@ -52,7 +52,10 @@ impl Shell {
         let max = settings.limits.exchanges.checked_add(1).expect("connections");
         let room = max.checked_mul(64).expect("queue bound");
         Self {
-            connections: Connections::new(&settings.limits),
+            connections: Connections::new(
+                &settings.limits,
+                &settings.engine.socket().expect("HTTP engine has an IP address").to_string(),
+            ),
             files: Files::new(settings.directory, settings.limits.body_bytes),
             io: io::Io::new(&settings.io),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: settings.io },

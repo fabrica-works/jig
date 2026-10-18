@@ -27,7 +27,7 @@ struct Peer {
 impl Peer {
     fn new() -> Self {
         Self {
-            shell: Connections::new(&limits()),
+            shell: Connections::new(&limits(), "127.0.0.1:8080"),
             wire: Wire::new(1),
             up: Queue::with_capacity(256),
             below: Queue::with_capacity(256),
@@ -74,7 +74,7 @@ fn an_exchange_carries_the_bearer_token() {
     assert!(text.to_ascii_lowercase().contains(&expected.to_ascii_lowercase()), "{text}");
     assert!(text.to_ascii_lowercase().contains("content-type: application/octet-stream\r\n"));
     assert!(text.to_ascii_lowercase().contains("content-length: 3\r\n"));
-    assert!(text.to_ascii_lowercase().contains("host: localhost\r\n"));
+    assert!(text.to_ascii_lowercase().contains("host: 127.0.0.1:8080\r\n"));
     assert!(
         matches!(peer.up.pop(), Some(client::Event::Reply { exchange, message: body }) if exchange == Token::new(EXCHANGE) && body.as_ref() == b"ok")
     );
@@ -123,7 +123,7 @@ fn the_stream_s_bytes_reach_the_link_in_order() {
 }
 #[test]
 fn a_link_of_another_form_is_refused() {
-    let mut shell = Connections::new(&limits());
+    let mut shell = Connections::new(&limits(), "127.0.0.1:8080");
     for (label, text, expected) in [
         ("scheme", b"https://127.0.0.1:8080/".as_slice(), Unlinked::NotHttp),
         ("secret", b"http://127.0.0.1:8080/jig/v1/sign-in/link".as_slice(), Unlinked::NoSecret),
@@ -347,4 +347,20 @@ fn an_exchange_past_its_deadline_is_answered_lost() {
     assert_eq!(peer.shell.next_deadline(), None);
     peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
     assert!(peer.up.is_empty());
+}
+
+#[test]
+fn the_native_shell_sends_its_engine_s_address_as_host() {
+    let shell = Shell::new(Settings {
+        engine: skein_io::Addr::Ip("[::1]:7180".parse().expect("engine address")),
+        directory: Box::from(b"private".as_slice()),
+        limits: limits(),
+        io: file_io_limits(),
+    });
+    let mut peer = Peer::new();
+    peer.shell = shell.connections;
+    peer.exchange();
+    peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+    let text = std::str::from_utf8(&peer.wire.received).expect("HTTP request");
+    assert!(text.to_ascii_lowercase().contains("host: [::1]:7180\r\n"), "{text}");
 }

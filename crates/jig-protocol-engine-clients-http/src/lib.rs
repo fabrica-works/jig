@@ -5,11 +5,12 @@ extern crate alloc;
 use alloc::boxed::Box;
 use jig_protocol_engine_clients as kit;
 use skein_http::server as http;
-use skein_lib::{Env, Map, Queue, Secret, Time, Token};
+use skein_lib::{Env, List, Map, Queue, Secret, Time, Token};
 mod call;
 mod credential;
 pub use credential::{cleared, cookie};
 mod dispatch;
+mod guards;
 mod stream;
 #[derive(Debug)]
 pub struct Settings {
@@ -27,6 +28,7 @@ pub struct Limits {
 }
 #[derive(Debug)]
 pub enum Event {
+    Listening { hosts: List<Box<[u8]>> },
     Call { call: Token, head: http::Call },
     Http { call: Token, event: http::Event },
     Component(kit::ToTransport),
@@ -39,15 +41,17 @@ pub enum Request {
 #[derive(Debug)]
 pub struct Mount {
     settings: Settings,
+    hosts: List<Box<[u8]>>,
     calls: Map<Token, call::Call>,
 }
 impl Mount {
     #[must_use]
     pub fn new(settings: Settings, limits: &Limits) -> Self {
-        Self { settings, calls: Map::with_capacity(limits.calls) }
+        Self { settings, hosts: List::with_capacity(0), calls: Map::with_capacity(limits.calls) }
     }
     pub fn down(&mut self, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
         match event {
+            Event::Listening { hosts } => self.hosts = hosts,
             Event::Call { call, head } => {
                 let mut value = call::Call::new(call, &env.limits);
                 value.route = dispatch::route(&self.settings.prefix, &head);
@@ -68,14 +72,20 @@ impl Mount {
                         streams = streams.saturating_add(1);
                     }
                 }
-                if forbidden {
+                if !guards::host(&self.hosts, &head) {
+                    value.route = dispatch::Route::Missing;
+                    value.respond(421, Box::new([]), &env.limits);
+                } else if value.route == dispatch::Route::Missing {
+                    value.respond(404, Box::new([]), &env.limits);
+                } else if forbidden {
                     value.route = dispatch::Route::Missing;
                     value.respond(403, Box::new([]), &env.limits);
+                } else if !guards::content(&head) {
+                    value.route = dispatch::Route::Missing;
+                    value.respond(415, Box::new([]), &env.limits);
                 } else if value.route == dispatch::Route::Stream && streams >= env.limits.streams {
                     value.route = dispatch::Route::Missing;
                     value.respond(409, Box::new([]), &env.limits);
-                } else if value.route == dispatch::Route::Missing {
-                    value.respond(404, Box::new([]), &env.limits);
                 } else {
                     value.read(&env.limits);
                 }
@@ -147,7 +157,9 @@ pub fn claims(settings: &Settings, call: &http::Call) -> bool {
     let Some(path) = call.target.strip_prefix(settings.prefix.as_ref()) else {
         return false;
     };
-    path.starts_with(b"/") && !(call.method == skein_http::Method::Get && path.starts_with(b"/v1/sign-in/link"))
+    path.starts_with(b"/")
+        && !(call.method == skein_http::Method::Get
+            && (path == b"/v1/sign-in/link" || path.starts_with(b"/v1/sign-in/link?")))
 }
 #[must_use]
 pub fn link_path(settings: &Settings, secret: &Secret) -> Box<[u8]> {
@@ -205,4 +217,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                     .checked_add(Queue::<skein_lib::stream::Down>::worst_case(2)?)?,
             )?,
         )
+}
+
+/// The application's printed-link page adds this policy (protocol/browser.md, 12.2).
+#[must_use]
+pub fn link_page() -> skein_http::Header {
+    skein_http::Header { name: Box::from(b"referrer-policy".as_slice()), value: Box::from(b"no-referrer".as_slice()) }
 }

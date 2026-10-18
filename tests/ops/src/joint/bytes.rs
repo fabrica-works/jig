@@ -37,7 +37,7 @@ fn connections_limits() -> jig_client_shell_native::Limits {
 impl Side {
     fn new() -> Self {
         Self {
-            connections: Connections::new(&connections_limits()),
+            connections: Connections::new(&connections_limits(), fixtures::HOST),
             up: Queue::with_capacity(256),
             down: Queue::with_capacity(256),
             wire: Wire::default(),

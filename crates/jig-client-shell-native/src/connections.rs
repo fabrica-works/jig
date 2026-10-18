@@ -48,7 +48,7 @@ pub struct Connections {
 }
 impl Connections {
     #[must_use]
-    pub fn new(limits: &Limits) -> Self {
+    pub fn new(limits: &Limits, host: &str) -> Self {
         assert!(
             limits.exchanges > 0
                 && limits.body_bytes > 0
@@ -62,7 +62,7 @@ impl Connections {
             heard: Queue::with_capacity(
                 limits.http.read.checked_mul(3).and_then(|v| v.checked_add(8)).expect("bounded stream outputs"),
             ),
-            host: "localhost".to_owned(),
+            host: host.to_owned(),
             next: 1,
             exchanges: BTreeMap::new(),
             pending: VecDeque::new(),
@@ -78,7 +78,7 @@ impl Connections {
     pub fn printed(&mut self, link: &[u8]) -> Result<Secret, Unlinked> {
         let printed = mapping::printed(&self.mapping, link)?;
         let host = String::from_utf8(printed.host.into_vec()).map_err(|_| Unlinked::Address)?;
-        if self.host != "localhost" && self.host != host {
+        if self.host != host {
             return Err(Unlinked::Address);
         }
         self.host = host;

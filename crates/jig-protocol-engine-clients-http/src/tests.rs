@@ -41,7 +41,7 @@ fn a_record_the_component_cannot_read_is_written_as_400() {
 fn a_body_past_the_route_s_bound_is_413_and_reaches_nothing() {
     let mut mount = fixtures::mount();
     let mut out = Queue::with_capacity(32);
-    let mut body = skein_lib::List::with_capacity(65537);
+    let mut body = List::with_capacity(65537);
     for _ in 0_u32..65537 {
         body.push(7).expect("body");
     }
@@ -246,4 +246,84 @@ fn the_bearer_wins_when_a_cookie_also_arrives() {
             message: kit::Message::Read(Box::new([]))
         }]
     );
+}
+
+type Fields = &'static [(&'static [u8], &'static [u8])];
+const REFUSED: &[(Method, &[u8], Fields, u16)] = &[
+    (
+        Method::Post,
+        b"/jig/v1/read",
+        &[(b"host", b"evil.test:7100"), (b"content-type", b"application/octet-stream")],
+        421,
+    ),
+    (Method::Post, b"/jig/v1/read", &[(b"host", b"127.0.0.1:7100"), (b"content-type", b"text/plain")], 415),
+    (Method::Options, b"/jig/v1/read", &[(b"host", b"127.0.0.1:7100")], 404),
+];
+#[test]
+fn each_guard_refuses_with_nothing_reaching_the_component() {
+    for (method, target, headers, status) in REFUSED {
+        let mut mount = fixtures::mount();
+        let mut out = Queue::with_capacity(16);
+        let call = fixtures::call(&mut mount, &mut out, *method, target, &fixtures::fields(headers), b"");
+        for request in &out {
+            match request {
+                Request::Component(_) => panic!("refused call reached the component: {target:?} {headers:?}"),
+                Request::Http { .. } => {}
+            }
+        }
+        let (answered, _, sent) = fixtures::answered(&mut mount, &mut out, call);
+        assert_eq!((answered, fixtures::component(&mut out).len()), (*status, 0), "{target:?} {headers:?}");
+        assert!(!fixtures::names_a_cors_field(&sent), "no CORS header for {target:?}");
+        assert_eq!(fixtures::header(&sent, b"x-content-type-options"), Some(b"nosniff".as_slice()));
+        assert_eq!(fixtures::header(&sent, b"cache-control"), Some(b"no-store".as_slice()));
+    }
+}
+#[test]
+fn a_call_before_listening_is_421() {
+    let mut mount = fixtures::fresh_mount();
+    let mut out = Queue::with_capacity(16);
+    let call = fixtures::call(&mut mount, &mut out, Method::Post, b"/jig/v1/read", &[], b"");
+    let (status, _, _) = fixtures::answered(&mut mount, &mut out, call);
+    assert_eq!(status, 421);
+    assert!(fixtures::component(&mut out).is_empty());
+}
+const CLAIMED: [(&[u8], bool); 4] = [
+    (b"/jig/v1/sign-in/link", false),
+    (b"/jig/v1/sign-in/link?secret=not-spent", false),
+    (b"/outside/v1/read", false),
+    (b"/jig/v1/sign-in/link-extra", true),
+];
+#[test]
+fn a_get_of_the_link_route_is_not_claimed_and_spends_nothing() {
+    let mount = fixtures::mount();
+    for (path, expected) in CLAIMED {
+        let call = fixtures::head(Method::Get, path, &[], http::Body::None);
+        assert_eq!(claims(&mount.settings, &call), expected, "{path:?}");
+    }
+    assert!(mount.calls.is_empty());
+    let policy = link_page();
+    assert_eq!(policy.name.as_ref(), b"referrer-policy");
+    assert_eq!(policy.value.as_ref(), b"no-referrer");
+}
+const ANSWERS: [bool; 2] = [false, true];
+#[test]
+fn the_mapping_s_answers_carry_nosniff_and_no_store() {
+    for stream in ANSWERS {
+        let mut mount = fixtures::mount();
+        let mut out = Queue::with_capacity(16);
+        let (method, path): (Method, &[u8]) =
+            if stream { (Method::Get, b"/jig/v1/stream") } else { (Method::Post, b"/jig/v1/read") };
+        let call = fixtures::call(&mut mount, &mut out, method, path, &[], b"");
+        fixtures::component(&mut out);
+        if stream {
+            fixtures::streamed(&mut mount, &mut out, kit::Streamed::Heartbeat);
+        } else {
+            fixtures::reply(&mut mount, &mut out, call, kit::Reply::Record(Box::new([])));
+        }
+        let (status, _, headers) = fixtures::answered(&mut mount, &mut out, call);
+        assert_eq!(status, 200);
+        assert_eq!(fixtures::header(&headers, b"x-content-type-options"), Some(b"nosniff".as_slice()));
+        assert_eq!(fixtures::header(&headers, b"cache-control"), Some(b"no-store".as_slice()));
+        assert!(!fixtures::names_a_cors_field(&headers));
+    }
 }

@@ -72,7 +72,7 @@ impl Front {
         let limits = client::Limits { domain: fixtures::domain_limits(), exchanges: 8 };
         Self {
             client: client::Client::new(&limits, seed).expect("bounded client"),
-            connections: Connections::new(&fixtures::connections_limits()),
+            connections: Connections::new(&fixtures::connections_limits(), fixtures::HOST),
             out: Queue::with_capacity(client::max_out(&limits)),
             up: Queue::with_capacity(256),
             below: Queue::with_capacity(256),

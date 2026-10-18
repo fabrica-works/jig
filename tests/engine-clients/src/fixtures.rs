@@ -7,6 +7,7 @@ use skein_lib::{Duration, List, Secret};
 pub const FIRST_SIGN_IN: u64 = 41;
 pub const FIRST_PERSON: u64 = 7;
 pub const APPLICATION_PROVIDER: u16 = 5;
+pub const HOST: &str = "127.0.0.1:8080";
 #[must_use]
 pub fn first_owner() -> Identity {
     Identity {
@@ -172,10 +173,19 @@ pub fn http_limits() -> jig_protocol_engine_clients_http::Limits {
 }
 #[must_use]
 pub fn mount() -> jig_protocol_engine_clients_http::Mount {
-    jig_protocol_engine_clients_http::Mount::new(
+    let mut mount = jig_protocol_engine_clients_http::Mount::new(
         jig_protocol_engine_clients_http::Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true },
         &http_limits(),
-    )
+    );
+    let mut hosts = skein_lib::List::with_capacity(1);
+    hosts.push(Box::from(HOST.as_bytes())).expect("one host");
+    let env = skein_lib::Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: http_limits() };
+    mount.down(
+        &env,
+        jig_protocol_engine_clients_http::Event::Listening { hosts },
+        &mut skein_lib::Queue::with_capacity(1),
+    );
+    mount
 }
 #[must_use]
 pub fn server_http() -> skein_http::server::Limits {

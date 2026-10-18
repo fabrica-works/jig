@@ -24,7 +24,7 @@ impl Side {
     pub(super) fn new() -> Self {
         Self {
             wire: crate::native::wire::Wire::default(),
-            connections: Connections::new(&fixtures::connections_limits()),
+            connections: Connections::new(&fixtures::connections_limits(), fixtures::HOST),
             up: Queue::with_capacity(256),
             below: Queue::with_capacity(256),
             signing_link: None,
