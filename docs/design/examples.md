@@ -1,6 +1,6 @@
 # The example application
 
-Provisional, 2026-10-06, revised 2026-10-15. This is jig's example
+Provisional, 2026-10-06, revised 2026-10-18. This is jig's example
 application, `ops`: a small system for running services in production,
 on two connectors, with its agents inside its engine. It exists to be
 tested and to be copied.
@@ -39,9 +39,9 @@ What is still open is listed in section 11.
   families of its own, incidents and environments, and its server
   mounts jig's clients' component with jig's default HTTP mapping
   (section 8).
-- **Its systems are fakes** first: one fake production that both
-  connectors see. A real backend comes later, and may be the local
-  machine's own services.
+- **Its systems are fakes:** one fake production that both connectors
+  see. A real backend may be the local machine's own services
+  (section 9).
 - **It stays an example.** It is small, its systems are fakes, and no
   application imports it. An application that drives production writes
   connectors of its own.
@@ -60,11 +60,11 @@ testing/jig-ops-fake-production       jig-ops-fake-production          the fake 
 tests/ops                             jig-ops-world                    its worlds, on jig's conformance world
 ```
 
-Its service, `jig-ops-service`, with its server, its binary, `jig-ops`,
-and its browser shell, `jig-ops-client-shell-web`, come with `ops`
-standalone (9.1). Until then `ops` is its domains, its client and its
-worlds, as an application is before its protocol layer (`README.md`,
-section 11).
+`ops` standalone (9.1) adds its connectors' protocols,
+`jig-ops-protocol-observability` and `jig-ops-protocol-infrastructure`;
+its service, `jig-ops-service`, with its server; its binary, `jig-ops`;
+its browser shell, `jig-ops-client-shell-web`; and the fake
+production's own binary, `jig-ops-production`.
 
 ## 3. Its connectors
 
@@ -130,8 +130,9 @@ section 11).
 
   Each is level-triggered: it decides from the facts as they are.
 - **Drift:** someone restarts or scales a service by hand, or deletes an
-  environment `ops` made. Each is found by reading afresh, and is news
-  to the task that relies on it. Nothing is written over.
+  environment `ops` made. Each is found by reading afresh, and holds the
+  task that relies on it, saying what changed (`domain/connectors.md`,
+  section 11). Nothing is written over.
 
 ### 3.3 Between the two
 
@@ -161,6 +162,7 @@ jig-ops-domain                    the engine's root
 ├── core                          jig's core
 ├── observability                 jig-ops-domain-observability
 ├── infrastructure                jig-ops-domain-infrastructure
+├── calendar                      the deployment's funding periods (protocol/configuration.md, section 5)
 ├── host                          jig-domain-host: hosted runs on the engine's slots (domain/hosts.md, section 6)
 └── agent                         smith-inline-agent: smith's domains, one per run in flight (domain/hosts.md, 5.2)
 ```
@@ -174,7 +176,17 @@ jig-ops-domain                    the engine's root
     functions a worker's root uses between its host and smith's host
     domain;
   - the verdicts the core asks of observability on infrastructure's
-    effects (3.3).
+    effects (3.3);
+  - between the calendar and the core: each period it says.
+- **Its periods** are its calendar's, a child that keeps the
+  deployment's calendar from its configuration: a monthly period from a
+  day, at a fixed offset from UTC, a day past a short month's end being
+  its last day; the projects a period opens, each with its budget,
+  listed by the calendar's configuration, so a project not listed has no
+  period until configuration names it and the engine restarts. It arms
+  its deadline and says each period to the core with the next one's
+  start; the protocol layer only fires the deadline
+  (`protocol/configuration.md`, section 5).
 - **It is the reference root.** Its routes, its translations and its
   sum of worst cases are written to be copied, and are commented as
   such.
@@ -193,12 +205,15 @@ jig-ops-domain                    the engine's root
     environment and asks for it.
 - **Procedures:**
   - observability's **watch:** a standing task subscribed to a set of
-    services' alerts, which makes a triage task from a template for each
-    batch that wakes it, and, on a triage's verdict of incident, opens
-    the incident and makes its lead, from a lead's template beside the
-    triage's (its charter, budget and words);
+    services' alerts. For each batch of alerts that wakes it, it makes a
+    triage task from the triage's batch observability keeps for the
+    watch; on a triage's verdict of incident, it opens the incident and
+    makes its lead from the lead's batch kept beside it (each its
+    charter, budget and words). Neither is one of the configuration's
+    templates (`protocol/configuration.md`, 3.1);
   - infrastructure's **remediate, provision and tear down** (3.2);
-  - the core's **recurring** tasks.
+  - the core's **recurring** tasks, each making its recurring batch at
+    each period (`domain/tasks.md`, section 10).
 - **People:**
   - the person on call, who approves effects beyond policy and answers
     questions during an incident;
@@ -207,8 +222,9 @@ jig-ops-domain                    the engine's root
 ## 6. Its policy
 
 - **Staging:** agents' tasks may restart and scale.
-- **Production:** every effect is beyond any agent's authority, so it
-  becomes a proposal that the person on call accepts.
+- **Production:** every effect is beyond any agent's authority, and so
+  beyond its delegates': the task that wants one proposes it, for the
+  person on call to accept (`domain/tasks.md`, section 9).
 - **Money:** each team has a budget per month, spent by environments,
   and a person's pool within it.
 
@@ -237,7 +253,7 @@ P, the person on call
   makes nothing itself. W hears T2's result, as a requester hears its
   delegate's (`domain/tasks.md`, 8.1), and steps on it: it opens the
   incident from the verdict's fields and makes I, a tracked task, from
-  its lead's template, in that step, keeping in its state which incident
+  the lead's batch, in that step, keeping in its state which incident
   the step's task will lead. The core tells observability, in the same
   decision, the number I was given, and observability records I as the
   incident's lead then, durably (`domain/connectors.md`, 6.3).
@@ -247,8 +263,10 @@ P, the person on call
   made, the incident has no lead, and its page says so: nothing is
   inferred from names, order, watches or alerts' numbers.
 - **I reads** logs and metrics, and decides on a restart.
-- **The restart is in production,** beyond I's authority. It becomes a
-  proposal. It passes over W, a procedure, to P, who accepts it.
+- **The restart is in production,** beyond I's authority, and so beyond
+  R's, the remediation I delegates: R's step proposes it
+  (`domain/connectors.md`, 6.3). The proposal passes over I and W, a
+  procedure, to P, who accepts it.
 - **R holds the service,** restarts it, and waits on observability's
   health (3.3). The service recovers. R's result reaches I, which
   finishes with a report. P reads it in the client.
@@ -264,8 +282,8 @@ Q, a developer
 
 - **Q asks C** for a staging environment for a week. C plans its size
   and cost, and asks for E.
-- **E's cost** is beyond C's budget. Q accepts it, and it is funded from
-  Q's pool.
+- **E's cost** is beyond C's budget: C's `delegate` of E is refused,
+  and C proposes it. Q accepts it, and it is funded from Q's pool.
 - **E provisions:** the creation is keyed, so a restart in the middle
   finds the environment rather than creating it twice. E waits until the
   environment is ready, then tells C, which tells Q.
@@ -284,8 +302,9 @@ Q, a developer
   one slot is left. The second request waits for the slot, and is
   provisioned once the first environment is torn down.
 - **A hand on the service:** while R's proposal waits for P, someone
-  restarts the service by hand. R reads afresh, finds it healthy, and
-  finishes without restarting it.
+  restarts the service by hand. R has made no restart, so the change is
+  a fact it reads again, not drift (`domain/connectors.md`, section 11):
+  it finds the service healthy, and finishes without restarting it.
 - **An environment deleted by hand:** E's environment disappears. E is
   held and the client says why. Nothing is recreated without a decision.
 - **A pool that shrinks:** staging's quota falls from five to two while
@@ -325,9 +344,10 @@ shows, it reads through the public client.
     their requests, which ride the same client and the same request table
     as bytes under their owners' numbers;
   - `jig-ops-client-protocol-wire`, its families' wire, which its client
-    and its engine both read: incidents, alerts, environments and
-    panels, and environments' requests and their outcomes
-    (`protocol/client.md`, section 11);
+    and its engine both read: observability's and infrastructure's
+    subjects and documents (incidents, alerts, environments, panels), and
+    infrastructure's environment requests and their outcomes; an
+    application's wire as `protocol/client.md`, section 11 has it;
   - `jig-ops-client-view`, its presentation: the reference UI,
     `jig-client-view`, with its families' pages, cards and parts, on
     skein's UI kit (`client/domain/view.md`).
@@ -363,29 +383,28 @@ shows, it reads through the public client.
   P accepting a restart from an incident's page
   (`client/domain/pages.md`, section 10); Q asking for an environment in
   a chat, and accepting what it costs.
-- **Its server** is `ops`'s, in its service (9.1): it owns the clients'
-  listener and the URL space, and mounts jig's clients' component under
-  `/jig` with jig's default HTTP mapping as it is, its example guards
-  included (`protocol/browser.md`). People sign in by the printed link;
-  `ops` has no sign-in of its own.
+- **Its server** is `ops`'s, in its service, mounting jig's clients'
+  component under `/jig` with jig's default HTTP mapping as it is (9.1).
+  People sign in by the printed link; `ops` has no sign-in of its own.
 - **Its terminal** is a presentation of the same client, on skein's text
   shell, with jig's settings: its client and its presentation, printed
-  by `skein-ui-text` (skein's `ui-text.md`; `client/domain/view.md`,
-  section 15), over the native shell, `jig-client-shell-native`, and
-  the default mapping's client end, holding its credential as a bearer
-  token. Its client world plays it (`client/domain/testing.md`, section
-  4): P accepts the restart from the incident's page, typing the numbers
-  the page printed. Its loop over a real terminal comes with `ops`
-  standalone (9.1), which gives it an engine to reach.
+  by `skein-ui-text` at most once a second (skein's `ui-text.md`;
+  `client/domain/view.md`, section 15), over the native shell,
+  `jig-client-shell-native`, and the default mapping's client end,
+  holding its credential as a bearer token. Its client world plays it
+  (`client/domain/testing.md`, section 4): P accepts the restart from
+  the incident's page, typing the numbers the page printed. Its loop
+  over a real terminal is `ops` standalone's (9.1), which gives it an
+  engine to reach.
 - **Its browser:** its browser shell, `jig-ops-client-shell-web`, copied
   from jig's test application's, `jig-client-test-shell-web`: its start
-  and its loop over skein's browser parts and the reference UI's,
-  `jig-client-shell-web`, with the default mapping's client end over
-  fetch and the credential in the cookie its server sets. Its paths are
-  its own: the reference UI's places at the root, by the reference UI's
-  codec, and incidents' and environments' by its own
-  (`protocol/browser.md`, sections 3 and 9). It comes with `ops`
-  standalone too (9.1), whose server serves its page and bundle.
+  and its loop over skein's browser parts and jig's,
+  `jig-client-shell-web`, with the default mapping's client end through
+  the client's adapter over fetch, and the credential in the cookie its
+  server sets. Its paths are its own: the reference UI's places at the
+  root, by the reference UI's codec, and incidents' and environments' by
+  its own (`protocol/browser.md`, sections 3 and 9). It is `ops`
+  standalone's too (9.1), whose server serves its page and bundle.
 
 ## 9. Its systems
 
@@ -401,13 +420,12 @@ shows, it reads through the public client.
   - quotas exhausted;
   - slow provisioning;
   - drift: hands restarting and deleting.
-- **A real backend later.** On Linux, a machine's own services would do:
+- **A real backend.** On Linux, a machine's own services would do:
   - logs from journald;
   - restarts and scaling through systemd units;
   - environments as local containers.
 
-  No cloud account is needed. It comes after the protocol layers, which
-  are built on the fake production first (9.1).
+  No cloud account is needed.
 
 ### 9.1 Their APIs, and `ops` standalone
 
@@ -438,19 +456,32 @@ shows, it reads through the public client.
   own, `jig-ops-production`, on loopback beside `jig-ops` when `ops` runs
   standalone. `ops`'s systems are outside its process, as any
   application's are.
+- **Its service,** `jig-ops-service`, is the reference for an
+  application with agents in the engine and no workers, the second of
+  `domain/hosts.md`'s shapes: its `iterate` and protocol layer, with the
+  store, the accounts', smith's LLM component for its
+  `smith-inline-agent`'s runs, the host tools' translation
+  (`jig-protocol-tools`, and its connectors' own), its server with the
+  clients' component under jig's default HTTP mapping (below), and its
+  two connectors' protocols; and `jig-ops`, its `main`, reading its
+  configuration and running the loop (`protocol/service.md`, section 7).
+- **Commented to be copied,** as its root is: a new application copies
+  it, removes what its shape does not need (the LLM path and the tools,
+  without agents in the engine; the channel, without workers), and adds
+  its connectors' protocols.
 - **Its server,** in `jig-ops-service`, on a loopback address: the
   clients' listener and its URL space are `ops`'s
-  (`protocol/service.md`, section 7). It mounts jig's clients' component
+  (`protocol/service.md`, section 2). It mounts jig's clients' component
   under `/jig`, with jig's default HTTP mapping and its example guards
   as they are, and serves its browser's page and bundle at its other
-  paths, under the page's policy the reference UI's browser shell gives
-  as an example (`protocol/browser.md`, section 12). Its startup prints
-  the printed link's URL, `/jig/v1/sign-in/link?secret=…` on that
-  address, by which a person signs in, in a browser or at its terminal
-  (section 8). A browser's `GET` of it spends nothing: `ops`'s server
-  answers it with its page, with `Referrer-Policy: no-referrer`, and its
-  browser shell `POST`s the secret, as its terminal does
-  (`protocol/client.md`, 17.1; `protocol/browser.md`, section 11).
+  paths, under the reference page policy, which jig's test application's
+  server sends too (`protocol/browser.md`, 12.1). Its startup prints the
+  printed link's URL, `/jig/v1/sign-in/link?secret=…` on that address,
+  by which a person signs in, in a browser or at its terminal (section
+  8). A browser's `GET` of it spends nothing: `ops`'s server answers it
+  with its page, with `Referrer-Policy: no-referrer`, and its browser
+  shell `POST`s the secret, as its terminal does (`protocol/client.md`,
+  17.1; `protocol/browser.md`, section 11).
 
 ## 10. Its worlds
 

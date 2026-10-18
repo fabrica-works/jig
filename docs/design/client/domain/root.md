@@ -1,6 +1,6 @@
 # The application's client root
 
-Provisional, 2026-10-09, revised 2026-10-15. What an application's
+Provisional, 2026-10-09, revised 2026-10-18. What an application's
 client root is and does: the top-level domain of every client of an
 application on jig, its root domain (programming-model.md, 4.5), which
 holds jig's client, `jig-client` (client.md), as a component, beside
@@ -254,8 +254,7 @@ How jig's documents name an application's values.
   section 6).
 - **An application's streams** (its data followed from an offset,
   provisional, never committed state) are designed in the pattern of a
-  run's text (contract.md, 7.4; client.md, 8.3), and wait for an
-  application whose people follow its data as it comes.
+  run's text (contract.md, 7.4; client.md, 8.3).
 
 ## 8. The small store, composed
 
@@ -325,8 +324,7 @@ root holds `jig-client` in the client's service mode (client.md, section
 reading the documents of its handles; no presentation; `SignIn { with:
 Service(credential) }` at start; and its small store a file. The same
 promises hold: each request made once, answered once durable, and the
-service told why when refused. A service's root waits for an application
-whose services act as parties.
+service told why when refused.
 
 ## 12. The reference root
 
@@ -377,6 +375,10 @@ what the engine made durable.
   wrapping, which have one shape, are best copied, as they are, or
   generated from a short description, as for the engine's root
   (`../../domain/root.md`, section 14).
+- **An application's own child domains** (15.1): how the engine's root
+  routes an application's requests, reads and subjects to a child that
+  is not a connector, and how the people child admits them
+  (`../../domain/people.md`, 5.1).
 
 ## 15. Owners
 
@@ -387,8 +389,8 @@ what the engine made durable.
   presentation of jig's objects, a service's logic, a settings page of
   its own), which may ask the client for jig's operations, reads and
   subjects, but sends no request, read or subject of its own records to
-  the engine: one that does is an own child domain's client side, which
-  waits for the application that needs it (15.1).
+  the engine: one that does is an own child domain's client side
+  (15.1).
 - **jig takes no application number.** The reference UI's view names it
   `Owner::Jig`, and the wire names jig's records as jig's.
 - **The application numbers its owners,** each by a `u16`, in one typed
@@ -406,9 +408,9 @@ what the engine made durable.
   name, binding, slot, drawing, picture and phrase
   (`jig_client_view::Owner::Application { number }`, view.md, section
   3); an application's keyed requests, reads and subjects (contract.md,
-  3.3, 6 and 7.1), which the client carries as bytes under that number
-  and the wire tags with it (`../../protocol/client.md`, section 11);
-  and the asker of each handle and key the owner gives the client
+  3.3, 7.1 and section 6), which the client carries as bytes under that
+  number and the wire tags with it (`../../protocol/client.md`, section
+  11); and the asker of each handle and key the owner gives the client
   (client.md, section 4), which the client's small store keeps with each
   request (client.md, section 11).
 - **Never reused.** A number given to an owner is never given to
@@ -422,16 +424,17 @@ what the engine made durable.
 - **Onto skein-ui's owner, and the client's asker.** skein-ui's owner,
   `skein_ui::Owner { number: u32 }`, and the client's asker are opaque
   numbers, compared and never interpreted (skein's `ui.md`, 3.3;
-  client.md, section 4). jig's typed owner maps onto both by one total
-  function: `Application { number }` to the same number, and `Jig` to
-  65536, one past every `u16`, so jig's and an application's never
-  meet; and back by a partial one, which gives none for a number that
-  names no owner (view.md, section 3). The root routes what the client
-  hands back by an asker, and the view root what skein-ui hands back by
-  an owner (an act's binding, a slot, a drawing's kind), through that
-  partial function, then matches the typed owner whole.
+  client.md, section 4). jig's typed owner (`jig_client_view::Owner`,
+  view.md, section 3) maps onto both by one total function:
+  `Application { number }` to the same number, and `Jig` to 65536, one
+  past every `u16`, so jig's and an application's never meet; and back
+  by a partial one, which gives none for a number that names no owner.
+  The root routes what the client hands back by an asker, and the view
+  root what skein-ui hands back by an owner (an act's binding, a slot, a
+  drawing's kind), through that partial function, then matches the
+  typed owner whole.
 
-### 15.1 Later: an application's own child domains
+### 15.1 An application's own child domains
 
 An application's own child domain in the engine (`../../README.md`,
 section 4), whose families belong to no connector (a laboratory's
@@ -441,7 +444,7 @@ the client root; its families' requests, reads and subjects naming its
 number, which the engine's root routes to that child domain as it routes
 a connector's. Nothing in parts, the client, slots, bindings, styles,
 drawings or region names changes for it, and nothing in what an
-application already writes. It waits for an application with such a
-domain: the engine's root's routing of an application's requests, reads
-and subjects to a child that is not a connector, and the people child's
-admission of them (`../../domain/people.md`, 5.1), are designed then.
+application already writes. How the engine's root routes an
+application's requests, reads and subjects to a child that is not a
+connector, and how the people child admits them
+(`../../domain/people.md`, 5.1), is open (section 14).

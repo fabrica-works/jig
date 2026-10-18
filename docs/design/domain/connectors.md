@@ -1,6 +1,6 @@
 # Connectors
 
-Provisional, 2026-10-07, revised 2026-10-15. The contract an external
+Provisional, 2026-10-07, revised 2026-10-18. The contract an external
 system meets to be driven by an application on jig: what a connector is,
 what crosses between it and the core through the application's root, and
 what every connector does: resources and holds, effects and the outbox,
@@ -192,9 +192,11 @@ which it keeps. What the core gets is its **description:**
   connector's to know and to show, never counted by the core.
 - **Retries are the connector's:** a transient failure is tried again
   after a backoff, within its budget; a failure for good (forbidden, a
-  conflict, the object gone) is news for the task that asked, and holds
-  it if it was closing. A projection's or a release's failure for good is
-  news for the goal, or the closing task, it was made for.
+  conflict, the object gone) holds the task that asked, saying so
+  (tasks.md, 5.5); a procedure's task instead hears it and steps (6.2),
+  holding itself if it needs a decision (6.3). A projection's or a
+  release's failure for good is news for the goal, or the closing task,
+  it was made for.
 - **Withdrawn** when the task that asked for an entry is cancelled before
   the entry went out. An entry that went out is never withdrawn: what may
   have been made counts.
@@ -369,12 +371,10 @@ documents, beside jig's (`../client/domain/contract.md`, section 5):
 - **the scope each names:** a watch of one of its subjects, and a read
   of one of its documents, name a project, the deployment, or the
   party's own (what is the signed-in party's across projects), since the
-  core cannot read a connector's subject. The core admits them on the
-  party's sign-in and role in that scope, the party's own on the sign-in
-  alone, and on the views' limits; the connector, asked for the
-  document, judges that the subject is in that scope and what the party
-  may see of it, and answers that it is unknown, or not allowed,
-  otherwise;
+  core cannot read a connector's subject. The core admits them by that
+  scope (engine.md, section 11); the connector, asked for the document,
+  judges that the subject is in that scope and what the party may see
+  of it, and answers that it is unknown, or not allowed, otherwise;
 - **windows:** a watch of one of its subjects, and a read, carry a
   window, as jig's do; the connector makes the document within it
   (`../client/domain/contract.md`, 7.5);
@@ -416,6 +416,7 @@ number, its delegates by number, and the facts it reads. A projection
   cancel's grace, asking it to finish, comes as an amendment does
   (tasks.md, section 7);
 - when its last step was refused, with why (6.3);
+- when an effect it asked for settles, made or failed (4.2);
 - when a fact it reads changes, which its connector knows from its
   working set;
 - when a deadline its state names passes: a stall, a backoff, the end of

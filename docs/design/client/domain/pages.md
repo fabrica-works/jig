@@ -1,6 +1,6 @@
 # Pages
 
-Provisional, 2026-10-09, revised 2026-10-15. The reference UI's pages:
+Provisional, 2026-10-09, revised 2026-10-18. The reference UI's pages:
 jig's optional pages, in `jig-client-view`, for `ops` and jig's test
 application: how they are organised, what a party finds where, and what
 they do there. They are built on the public client alone (`jig-client`
@@ -109,9 +109,9 @@ Deployment       hosts, accounts, connectors, capacity
     quieter one, as `me` counts them (contract.md, 5.1);
   - the project they are in, and a way to switch;
   - going to a task by its number;
-  - whether the client is live, behind or offline (client.md, 8.2;
-    view.md, 18.2), and who is signed in, with a way to sign out
-    (view.md, 18.6);
+  - the link's state, and whether what the page shows is behind
+    (client.md, 8.2; view.md, 18.2), and who is signed in, with a way to
+    sign out (view.md, 18.6);
   - the navigation: jig's pages and the application's.
 
   In jig's default arrangement what needs the party and the link's
@@ -229,14 +229,16 @@ activity, the conversation, comes first.
   it waits on, its live delegates counted, and its spend.
 - **Starting a chat:** a project and the first words. `shapes::chat`
   fills the project's chat template into a `Create` (client.md, section
-  19): its executor the template's charter, its budget `AsAllowed`, as
-  much as the person's role and pool allow, the answer saying what was
-  given. The form says both and asks neither. A chat may also be started
-  from what it is about (a task's page, a held task's card, a goal), with
-  the thing named in its first words. Answered with the chat's number
-  once durable, its page opens with its first run due. Refused, it says
-  why: the person's pool, the project's live tasks, nobody to hold the
-  chat's escalations in the project, a limit.
+  19): its executor the template's charter, and its budget the merged
+  template's (jig's default `AsAllowed`: as much as the person's role
+  and pool allow, the answer saying what was given;
+  `../../protocol/configuration.md`, 3.1). The form says both and asks
+  neither. A chat may also be started from what it is about (a task's
+  page, a held task's card, a goal), with the thing named in its first
+  words. Answered with the chat's number once durable, its page opens
+  with its first run due. Refused, it says why: the person's pool, the
+  project's live tasks, nobody to hold the chat's escalations in the
+  project, a limit.
 - **The conversation** (objects.md, section 10): turn by turn, across
   every run the chat has had: the person's words with their state, the
   chat's replies, its work folded to a line each, its calls to the engine
@@ -244,30 +246,22 @@ activity, the conversation, comes first.
   where its runs began and ended. Long conversations read from their end,
   a page at a time.
 - **What it is doing,** always, in words: the chat's status, which the
-  helper `facts` reads from its phase, its run and what it waits on
-  (client.md, section 19), said with `words`:
+  helper `facts` reads from its phase, its run and what it waits on,
+  said with `words`. Which status applies is `facts`'s (client.md,
+  section 19); the page says:
 
-  | The chat is | The page says |
+  | The chat's status | The page says |
   |---|---|
-  | waiting to start, due, preparing or claimed; or its host preparing or starting its run | starting |
-  | running, writing | writing |
-  | running a tool | which tool, when its host names it, and for how long |
-  | running, neither writing nor in a tool its host names, or nothing reported yet | working, and for how long |
-  | waiting on the person: a question, a proposal or a person task in its tree | waiting for you, and for what |
-  | waiting on another party | waiting for them, by name |
-  | idle: its run waiting, holding its slot, or parked | parked; your words resume it |
-  | backing off | retrying, when, and why: "host lost, try 2 of 3" |
+  | starting | starting |
+  | writing | writing |
+  | a tool | which tool, when its host names it, and for how long |
+  | working | working, and for how long |
+  | waiting for you | waiting for you, and for what |
+  | waiting for them | waiting for them, by name |
+  | parked | parked; your words resume it |
+  | retrying | retrying, when, and why: "host lost, try 2 of 3" |
   | held | why, with its card |
-  | closing, then ended | closing; ended, and when |
-
-  The first row that applies, in this order: held, closing and ended,
-  each a phase that says why it waits; then a party it waits on, in any
-  active stage; then its stage, and, while its run is claimed or
-  running, what its host last reported. Writing and a tool are said only
-  on such a report, never from a run being placed
-  (`../../domain/hosts.md`, 6.5). A run that waits holds its slot only
-  until it parks, and is idle meanwhile (`../../domain/engine.md`, 7.4):
-  words wake it as they resume a parked one.
+  | closing; ended | closing; ended, and when |
 
 - **Words** may be written while it is not closing or ended: a `Message`.
   A running chat hears them at its next turn, a waiting one wakes, a
@@ -428,10 +422,10 @@ Searching by description.
 - **Spend:** the project's period, spent, reserved and left; each
   person's pool in it; where it went, by goal and chat, largest first;
   past periods, read a page at a time.
-- **Recurring tasks:** each with its template in words, its period, its
-  budget per period, its last batch and when it next runs. The engine
-  keeps no calendar: periods are the application's to say, and a period
-  says when the next begins only if its source knows
+- **Recurring tasks:** each with its recurring batch in words, its
+  period, its budget per period, its last batch and when it next runs.
+  The engine keeps no calendar: periods are the application's to say,
+  and a period says when the next begins only if its source knows
   (`../../domain/authority.md`, section 7). Where the current one said
   so, the line says when the next period begins; otherwise, that the
   task runs at the next period, with the current period and when it
@@ -473,9 +467,9 @@ restarts, they start empty.
   party may not see or that does not exist; the two are not told apart.
 - **Out of date:** while the link is out of date, the engine serving no
   version of jig's that the client speaks (client.md, 8.2; contract.md,
-  section 8): the page says so, and how to update; what is pending stays
-  in the client's small store until the client is updated (client.md,
-  section 11).
+  section 8): the page says so, and how to update. What is pending stays
+  in the client's small store (client.md, section 11); what the client
+  sends of it, and when, is client.md's, 8.2.
 - **Someone else's work:** the client restored requests kept for a
   party other than the one `me` names, and keeps them parked (client.md,
   section 11): the page says so, and keeps them hidden. The reference UI
@@ -535,8 +529,7 @@ inbox, withdrawn, with R's result saying why.
 
 - **Who may see what:** whether a member reads another's chats and
   transcripts, what an observer sees (`../../domain/people.md`,
-  section 12); deferred while the client is built for one person. Each
-  page shows what the engine lets the party read.
+  section 12). Each page shows what the engine lets the party read.
 - **Digests:** what happened while the party was away, beyond updates.
 - **A plan as a graph,** rather than "after" on each line.
 - **Comparing attempts** of one task side by side.
@@ -556,7 +549,7 @@ nothing in an application's tree but skein-ui's outline (view.md, 3.1).
 
 | Part | What it shows | Function | Region name | In jig's default |
 |---|---|---|---|---|
-| the link | whether the client is live, behind or offline (client.md, 8.2; view.md, 18.2) | `frame::link` | `jig-link` | in jig's banner |
+| the link | the link's state (starting, live, offline, signed out, out of date), and whether the page is behind (client.md, 8.2; view.md, 18.2) | `frame::link` | `jig-link` | in jig's banner |
 | what needs the party | what needs them, counted exactly, and updates unread, up to a limit, each leading to the inbox; before `me`'s first delivery, that nothing is known yet | `frame::needs` | `jig-needs` | in jig's banner |
 | who is signed in | the party, and signing out (view.md, 18.6) | `frame::party` | `jig-party` | in jig's banner |
 | the projects | the projects the party holds roles in, the one they are in marked current, each leading to its page | `frame::projects` | `jig-projects` | in jig's banner |
@@ -667,19 +660,15 @@ build its own from the reference UI's page (view.md, 18.2).
   the referee checks on every tree a person sees (testing.md, 6.3).
   jig adds no rule to it.
 - **What jig's default keeps,** which the reference UI's tests check on
-  each of jig's pages: the link, what needs the party and who is signed
-  in, in the banner, first; `after_page`'s parts last; jig's objects
-  through their cards, whole (objects.md, section 2); the pages not
-  about the work, in the main.
+  each of jig's pages (testing.md, section 2): the link, what needs the
+  party and who is signed in, in the banner, first; `after_page`'s parts
+  last; jig's objects through their cards, whole (objects.md, section
+  2); the pages not about the work, in the main.
 - **What jig offers an application presenting its objects itself:**
   - a section only where the reference UI shows it on the page:
     elsewhere, its function builds nothing, whoever calls it;
-  - jig's objects, through jig's cards, or presented by the application
-    itself from jig's documents, with the helper `facts` for what a card
-    shows (client.md, section 19), its acts bound through the reference
-    UI's binding constructors where it wants the reference UI's
-    confirmation (view.md, section 5), and jig's check, which its worlds
-    run (testing.md, 6.2);
+  - jig's objects, through jig's cards or presented by the application
+    itself (objects.md, section 2);
   - the link told, where the application shows jig's link part or its
     own presentation of the link's state (testing.md, 6.3).
 - **On its own pages,** an application shows jig's sections and cards

@@ -1,6 +1,6 @@
 # Parties
 
-Provisional, 2026-10-07, revised 2026-10-16. How people, and the
+Provisional, 2026-10-07, revised 2026-10-18. How people, and the
 services that act like them, take part: who they are and the credentials
 they sign in with, what their role in a project lets them do, the
 operations they ask of the engine and what waits for them, the
@@ -42,8 +42,8 @@ is still open is listed in section 12.
   until one acts.
 - **A chat is a template,** jig's default for talking to an agent: an
   agent's task flagged conversation and kept, filled in by the client and
-  closed by cancelling it with a grace. The engine knows the flags, never
-  the template.
+  closed by cancelling it with a grace. The task carries its flags; the
+  engine never expands or checks a template.
 - **The client knows the plumbing:** these operations, tasks as a tree,
   what waits for a party, and live runs; not the shapes of work built
   from them, which are templates and helpers above it. An application
@@ -62,13 +62,12 @@ capability. It keeps:
   until answered, a compound request as one;
 - **inboxes:** for each party with something waiting, what waits, by
   reference to the task or proposal it is, and their read positions over
-  results and over live conversations (section 6);
-- **live watches** of their `me` documents and inboxes, which the views
-  deliver as they change (engine.md, section 11).
+  results and over live conversations (section 6).
 
 It knows nothing of tasks beyond their numbers and what the core tells
 it waits for whom; every request goes to the core, which routes it to
-authority and to the tasks.
+authority and to the tasks. Parties' watches of their `me` and their
+inbox are the views child's (engine.md, section 11).
 
 ## 3. Parties and identity
 
@@ -116,8 +115,7 @@ authority and to the tasks.
 - **No acting for.** A credential is one party's own. A bot relaying a
   person's decision holds that person's credential, obtained through the
   application's sign-in, and the decision is the person's request,
-  naming the revision the bot showed them. Such a bot waits for an
-  application that needs one.
+  naming the revision the bot showed them.
 - **A party record** is made the first time an identity signs in, and
   kept.
 - **Services** are parties whose provider is the deployment: an owner
@@ -187,7 +185,7 @@ The operations as the client sends them are
 | Operation | Needs | Becomes |
 |---|---|---|
 | `Create`, a batch | member, within their role's authority and their pool (authority.md, 8.4); its dependencies and inputs within their reach, and a holder for its escalations (below) | its tasks, with their dependencies, checked whole and made at once (tasks.md, section 4), each with the fields it names (tasks.md, section 3); the party their requester and their funder; a budget given `AsAllowed` resolved, and what was given answered (authority.md, section 7) |
-| `Propose`, an action | member; a batch or an amendment beyond their authority, of a kind a role the project's policy names may accept | a proposal of theirs, waiting for that role (tasks.md, section 9), its number and to whom answered |
+| `Propose`, an action | member; a batch or an amendment beyond their authority, of a kind a role the project's policy names may accept | a proposal of theirs, waiting for that role (tasks.md, section 9), its number answered |
 | `Withdraw` | their own pending proposal | withdrawn (tasks.md, section 9) |
 | `Message` | the task in their tree, or maintainer | words in its inbox (tasks.md, 8.1), their message number answered |
 | `Amend` | the task in their tree, or maintainer, and a change within their authority; the spec's revision they saw, but for a change of priority alone; maintainer, for tracked or priority | tasks.md, section 7: its spec, instructions, authority, wake policy, a person task's address, whether it is tracked, its priority; a widened task funded from their pool (authority.md, section 7) |
@@ -211,9 +209,11 @@ The operations as the client sends them are
   section 11). Words past either are refused at admission as too large,
   saying the bound.
 - **A request refused** says why, with its facts: the role, the
-  authority it lacked and by how much, and whether a proposal could be
-  accepted, and by whom; a limit; the object's revision since; a task
-  since ended (`../client/domain/contract.md`, section 4).
+  authority it lacked and by how much, and, where their role and pool
+  decided it, whether a proposal could be accepted; a limit; the
+  object's revision since; a task since ended
+  (`../client/domain/contract.md`, section 4). Who would accept a
+  proposal is the offer's to say (`../client/domain/contract.md`, 5.3).
 - **Proposing is explicit.** A `Create` or an `Amend` beyond the party's
   authority is refused, naming what it lacked and whether a proposal
   could be accepted; it never becomes a proposal by itself, so a person
@@ -226,7 +226,7 @@ The operations as the client sends them are
   a party makes no effect, and their own authority is their role, which
   the policy sets (5.2; authority.md, section 9). Each document offers
   creating and amending as made, proposable and to whom, or refused, with
-  bounds (`../client/domain/contract.md`, 3.5), so a client knows which
+  bounds (`../client/domain/contract.md`, 5.3), so a client knows which
   before it sends anything; proposing implicitly is sugar above the
   plumbing, never the engine's.
 - **A proposal needs someone who may accept it.** A party's proposal
@@ -299,16 +299,12 @@ The operations as the client sends them are
     so a `Release` names its hold's beside words or an amendment as it
     does alone; a change of priority alone names none, and the first
     commit decides.
-  - *Bounded* by operations per request, a limit of this child's.
-    Configuration refuses a profile where it is smaller than the larger
-    of delegates per task plus one and goals per project
-    (`../protocol/configuration.md`, section 6; tasks.md, section 11), so
-    closing a conversation with every delegate disposed of, and ordering
-    every goal of a project, each fit in one request.
-  - *Its worst case:* its decision is priced as the limit times its
-    costliest operation, a cancel of a whole tree within tasks per tree,
-    and summed into the engine's worst case as every decision is
-    (`../README.md`, 6.2; engine.md, section 13).
+  - *Bounded* by operations per request, a limit of this child's, never
+    so small that closing a conversation with every delegate disposed
+    of, or ordering every goal of a project, takes more than one
+    request; configuration checks its floor
+    (`../protocol/configuration.md`, section 6).
+  - *Its worst case* is engine.md's, section 13.
 - **Requests about an application's own objects** (an environment's end
   moved, an incident's page) are the application's: its client sends
   them, its root routes them to the connector they concern, and what they
@@ -340,7 +336,7 @@ it is made, and pending proposals are judged against it when accepted
 in flight stopped cancels it. The policy's overrides of the
 application's templates (authority.md, section 6) reach only what
 clients create after them: a task keeps the values it was made with
-(section 7).
+(`../protocol/configuration.md`, 3.1).
 
 ## 6. A party's inbox
 
@@ -382,7 +378,7 @@ entry naming the task or proposal it is and its project:
     moves to the larger of the two, never back. One such mark loads at a
     time: while it does, the party's next `Seen` over that
     conversation's turns, or over results that would forget it, is
-    answered busy (`engine.md`, 5.3). Its loads are held behind the
+    answered busy (engine.md, 5.3). Its loads are held behind the
     commits before them, so a mark sent after another was decided sees
     that one's position, and no mark saves a position over a newer one,
     or saves one for a task already forgotten.
@@ -390,10 +386,9 @@ entry naming the task or proposal it is and its project:
     at once when it is forgotten once read.
 - **A task's retention class** says what becomes of it once it has ended
   (tasks.md, section 3):
-  - *kept:* its records stay until the deployment's retention horizon
-    (`../protocol/store.md`, 11.1), and for good while retention waits
-    for a deployment whose store nears its budget. jig's chat template
-    keeps, so closed conversations stay readable;
+  - *kept:* its records stay to the deployment's retention horizon, and
+    whole while none is set (`../protocol/store.md`, 11.1). jig's chat
+    template keeps, so closed conversations stay readable;
   - *forgotten once read:* once it has ended, its requester has read its
     result and, for a conversation, its turns, and no live task names it,
     its record and its read position are erased in one decision, so no
@@ -432,27 +427,19 @@ entry naming the task or proposal it is and its project:
 - **A chat is a template,** jig's default for a conversation with an
   agent, sugar over the primitives (core.md, 7.3): template 1, label 1,
   in the application's configuration, which an application keeps,
-  changes or drops (`../protocol/configuration.md`, 3.1). Filled in, it
-  is a `Create` of one task:
-  - *its executor* an agent under the charter the template names, the
-    application's charter for chats, which a project's policy may
-    override: its instructions for chats, its models, the tools it
-    gives, and a wake policy that wakes on its requester's words and on
-    its delegates' results; its wake and park are the charter's;
-  - *its spec* the party's first words, and *its contract* a report;
-  - *its authority* the creator's role, one level shallower in
-    delegation, and *its budget* `AsAllowed` (authority.md, section 7);
-  - *not tracked;* flagged *conversation* and *kept;* not *listed;*
-    label 1;
-  - *its grace:* how long the helper that closes it lets it finish.
-- **The engine never sees it.** The client fills the template, as `me`
-  serves it merged with the project's policy's overrides (authority.md,
-  section 6; `../client/domain/contract.md`, 3.6), into an ordinary
-  `Create`, which the engine checks as one written by hand (5.1). A
-  template grants nothing a `Create` could not, and a client that
-  ignores it makes only its own lists inconsistent. A task keeps the
-  values it was made with: a template changed later touches no task
-  already made.
+  changes or drops. Filled in, it is a `Create` of one agent task, its
+  spec the party's first words, flagged conversation and kept, with the
+  fields `../protocol/configuration.md`, 3.1 gives template 1. Its
+  executor is an agent under the application's charter for chats, which
+  a project's policy may override: its instructions for chats, its
+  models, the tools it gives, and a wake policy that wakes it on its
+  requester's words and on its delegates' results.
+- **The engine never expands or checks it.** The client fills the
+  template, as `me` serves it merged with the project's policy's
+  overrides (authority.md, section 6; `../client/domain/contract.md`,
+  3.6), into an ordinary `Create`, which the engine checks as one
+  written by hand (5.1; `../protocol/configuration.md`, 3.1). A client
+  that ignores it makes only its own lists inconsistent.
 - **Permissions stay primitive.** A party may hold a chat when their role
   may create with the chat charter, within its spend and depth, and their
   escalations have a holder (5.1); no permission names a template
@@ -472,7 +459,8 @@ entry naming the task or proposal it is and its project:
 - **What it waits on** is the engine's, computed with the tree and the
   inbox (tasks.md, section 3); **its status** (its phase, its run and
   what it waits on, read together) is a fact jig's helpers derive from
-  its documents, never the engine's state.
+  its documents (`../client/domain/client.md`, section 19), never the
+  engine's state.
 - **A party's chats** are a task query by requester and label 1, live
   and ended (`../client/domain/contract.md`, 6.1), each line carrying its
   unread count (section 6).
@@ -523,7 +511,8 @@ A task whose executor is a party, or a role (core.md, 3.2):
 
 ## 10. Below the domain
 
-What the clients' component, on the engine's side, owes this domain:
+What the clients' component, on the engine's side, and the client below
+its surface owe this domain:
 
 - **Requests, reads and watches,** as jig's messages and the
   application's, carried to the component by the application's
@@ -535,8 +524,10 @@ What the clients' component, on the engine's side, owes this domain:
   it ended or expired. The domain names a sign-in by its number
   (`../protocol/client.md`, section 8).
 - **Turns** carried as the bytes the domain keeps, decoded below the
-  client's surface by `jig-protocol-transcript`.
-- **Keys** for requests, made by the client, carried with each request.
+  client's surface by `jig-protocol-transcript`
+  (`../client/domain/client.md`, section 10).
+- **Keys** for requests, made by the client, carried with each request
+  (`../client/domain/client.md`, section 6).
 
 ## 11. The world
 

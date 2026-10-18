@@ -1,18 +1,18 @@
 # Testing the domain
 
-Provisional, 2026-10-07, revised 2026-10-15. How jig's domain is tested,
+Provisional, 2026-10-07, revised 2026-10-18. How jig's domain is tested,
 and how it tests an application's: the worlds of jig's own parts, the
 core's world, and the conformance world every application runs its
 domain on, with the referee that holds it to jig's promises. It applies
-skein's `testing-strategy.md` to jig's domain layer; the tiers below the
-domain (protocol, simulated, the real loop) come with jig's protocol
-layers. What is still open is listed in section 10.
+testing-strategy.md to jig's domain layer; the tiers below the domain
+(protocol, simulated, the real loop) are `../protocol/service.md`'s,
+section 8. What is still open is listed in section 10.
 
 ## 1. In one page
 
 - **Domain worlds first,** as testing-strategy.md, 2.2 has them: every
-  child domain of the core has its world, the core has its own, and both
-  hosts have theirs, all before any protocol layer exists.
+  child domain of the core has its world, the core has its own, and so
+  does the hub, none of them needing a protocol layer.
 - **The conformance world is jig's gift to applications.** It runs an
   application's whole engine domain, its root over jig's core and its
   connectors, against jig's fakes for the store, the hosts and the
@@ -272,12 +272,13 @@ missing in skein's world harness goes into skein first.
 jig's tests fit the suites' budgets (testing-strategy.md, section 8):
 the focused suite runs a few cuts and seeds per scenario, the fuzzy
 suite sweeps. jig's tests count against jig's budgets
-(`docs/development/workflow.md`); an application's conformance scenarios
-count against the application's. The stories of the plumbing (operations
-alone and compound, a grace, task queries, read positions, revisions
-named by runs and procedures) join the scenarios of the worlds they
-belong to, a few cuts each in the focused suite and swept with the rest
-in the fuzzy one: none needs a suite of its own.
+(`../../development/workflow.md`, section 2); an application's
+conformance scenarios count against the application's. The stories of
+the plumbing (operations alone and compound, a grace, task queries,
+read positions, revisions named by runs and procedures) join the
+scenarios of the worlds they belong to, a few cuts each in the focused
+suite and swept with the rest in the fuzzy one: none needs a suite of
+its own.
 
 ## 10. Open questions
 

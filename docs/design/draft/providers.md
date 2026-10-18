@@ -1,15 +1,15 @@
 # LLM providers' terms
 
-Draft, 2026-10-17. What OpenAI's and Anthropic's terms and developer
-documentation allow an application on jig to do with a person's
-subscription or API account, as read on 2026-10-17: who may sign in and
-through which flow, which endpoints a token may reach, what may be
-stored, lent or shared, and what a person must be shown. It states the
-providers' rules, not an approach of jig's, smith's or skein's. Section 4
-notes where today's designs disagree with them; section 5 lists what is
-still to settle with each provider; section 6 gives the sources.
-Providers change these rules: read them again before a design relies on
-them.
+Draft, 2026-10-17, revised 2026-10-18. What OpenAI's and Anthropic's
+terms and developer documentation allow an application on jig to do
+with a person's subscription or API account, as read on 2026-10-17: who
+may sign in and through which flow, which endpoints a token may reach,
+what may be stored, lent or shared, and what a person must be shown. It
+states the providers' rules, not an approach of jig's, smith's or
+skein's. Section 4 notes where today's designs disagree with them;
+section 5 lists what is still to settle with each provider; section 6
+gives the sources. Providers change these rules: read them again before
+a design relies on them.
 
 ## 1. In one page
 
@@ -319,10 +319,11 @@ legal and compliance page:
   route 2.1 excludes; the public route of 2.4 sends no account id and
   refuses fields 2.4 lists.
 - **smith's `shell.md`, section 7,** its `borrow` source, Codex's
-  `~/.codex/auth.json` read for its access token; and temper's live tier
-  (temper's `testing.md`, 2.7), which hands jig a borrowed Codex login's
-  token (`protocol/llm.md`, 5.4): Codex's sign-in in another client
-  (2.1).
+  `~/.codex/auth.json` read for its access token; and jig's handed-in
+  account (`../protocol/llm.md`, 5.4), which a test borrowing a login
+  read-only may fill, as the live tier of the repository downstream of
+  jig fills it with a borrowed Codex login's token: Codex's sign-in in
+  another client (2.1).
 - **skein's `llm.md`,** its Anthropic dialect: the OAuth subscription
   Messages route with its OAuth beta flag, and the archived Claude Code
   identity profile: a subscription's credentials in another product

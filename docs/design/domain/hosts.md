@@ -1,6 +1,6 @@
 # Agents and their hosts
 
-Provisional, 2026-10-07, revised 2026-10-15. Where an application's
+Provisional, 2026-10-07, revised 2026-10-18. Where an application's
 agents run, and what hosts them: the contract between the core and a
 host, the three shapes an application may take, the agent as a
 capability of two kinds, both smith's, jig's one host for runs wherever
@@ -43,19 +43,18 @@ and 8. What is still open is listed in section 12.
 - **Workspaces are the application's** (section 7): a capability of the
   root that prepares what the connectors named, saves unfinished work,
   delivers what a run hands over, and says what the run left. jig defines
-  the vocabulary; an application's checkouts of its repositories are one
-  workspace. The engine has none, by policy: it runs no commands for its
-  agents.
+  the vocabulary; what a workspace holds is the application's. The engine
+  has none, by policy: it runs no commands for its agents.
 - **Neither the core nor the hub depends on smith** (6.8). The core
   keeps turns as bytes and its charter in its own terms, which
   `jig-protocol-charter` puts into smith's (section 8); the hub carries
   smith's payloads as bytes, which its root hands out to its protocol
   layer to be decoded for the agent, or encoded from it.
 - **A run does what a party does** (section 8). The engine's host tools
-  speak the operations a party's requests make: a run's amendment and
-  release name the revision it was shown, it proposes an action beyond
-  its authority, explicitly, and it subscribes to the topics a connector
-  offers to agents.
+  that act on tasks, `introduce` aside, speak a party's operations: a
+  run's amendment and release name the revision it was shown, it
+  proposes an action beyond its authority, explicitly, and it subscribes
+  to the topics a connector offers to agents.
 - **Every message ends once** (section 9): read, refused or unread. The
   start carries the messages waiting in the task's inbox; a refusal
   travels inside the run's next turn, or its answer; a message the run
@@ -110,7 +109,7 @@ Between the core's fleet and a host, whatever its shape:
     part), and how its save went;
   - **notices,** relayed from the run's agent: a grant its provider
     rejected, an account exhausted until a time;
-  - **refusals:** busy, invalid, a duplicate.
+  - **refusals:** busy, a duplicate among them (6.1), or invalid.
 - **Fenced.** Every message names the run's task and attempt; the core
   drops what a stale attempt sends, and a host drops an attempt the core
   has finished with.
@@ -283,9 +282,8 @@ than one per shape, buys:
 
 - **On a worker, the worker dials the engine** and keeps one channel
   open, through its protocol layer. The engine never connects to a
-  worker, so a worker can run wherever it can reach the engine. It dials
-  at once, and redials with a jittered backoff that doubles up to a
-  ceiling, starting over once a channel has proved itself.
+  worker, so a worker can run wherever it can reach the engine
+  (`../protocol/channel.md`, 10.1).
 - **In the engine, the link is direct:** the engine's root connects the
   hub to the core's fleet from construction, with one hello, and it is
   never lost. A restart settles its claims at once (engine.md,
@@ -300,6 +298,25 @@ than one per shape, buys:
   hub's link as it translates a worker's (`../protocol/channel.md`,
   section 1), its hello stating the bounds of its `smith-inline-agent`'s
   configuration.
+- **The link vocabulary names only what crosses.** It names a run and an
+  attempt by their numbers, and a call, a message or a turn by the name
+  or number the run or the engine gave it, which mean the same on both
+  ends. A handle one side mints for itself (a delivery's token, a
+  request's reply handle) is not in it: an assignment is answered by its
+  run and attempt, and a root that wants a handle of its own keeps it
+  beside them.
+- **A relayed call is named by its bytes both ways,** the run's name for
+  it as its root had it encoded (`../protocol/channel.md`, section 7),
+  its answer and its cancel included. A delivery's token is the hub's own
+  handle and never leaves it, so neither a worker's link nor a root that
+  composes a hub, the engine's own included, keeps a table from names to
+  tokens.
+- **Turn busy is not in it.** The engine's answer of busy to a turn is
+  the fleet's word to what keeps the backoff below the hub, which arms no
+  timers (6.2): a worker's link, or the engine's root for its own hub, on
+  its protocol layer's timers. At the backoff's deadline it asks its root
+  for the hub's kept copy of the turn, which goes up again as any turn
+  (`../protocol/channel.md`, 5.2).
 - **The engine holds the claim.** It commits a claim before assigning a
   run, and decides what follows: commit its result, run it again on any
   host, or hold its task. The hub never retries a run and never decides
@@ -359,9 +376,9 @@ cancel, from any state ──────────────► stop ─►
 9. **Answer** the engine, exactly once (section 2). The engine decides
    what happens next, and its acknowledgement frees the slot. A start
    refused, at the entrance (step 1) or by the agent capability (6.3),
-   is answered as refused and frees what it took then: the hub keeps
-   nothing of it, and nothing acknowledges it
-   (`../protocol/channel.md`, 5.1).
+   is answered once as refused: the hub frees what it took for it at
+   once, keeps no copy and lists it at no hello, and the fleet closes it
+   as it hears it, never acknowledging it (engine.md, section 8).
 
 A run with no workspace skips preparing, saving and releasing. A cancel
 from the engine, a lost link or shutdown, or a fault of the agent, takes
@@ -458,7 +475,7 @@ Nothing decides on a fact.
   a tool begun naming its call and its tool, with the call's input within
   the views' bound, so a run's document shows the call it is making.
   smith's channel carries no content, so runs in agent processes give
-  neither until it does (below).
+  neither; what jig asks of smith for them is below.
 - **A run's text names its turn, its retry and its offset,** whatever
   its source: the turn it belongs to, by its attempt and its number
   within it (an attempt is one activation of smith's run, whose turns
@@ -466,10 +483,7 @@ Nothing decides on a fact.
   retries within the turn, each retry's text starting again at zero; and
   the offset of its first byte within that retry's text
   (`../protocol/llm.md`, section 3). The engine's views keep a run's text
-  by turn, retry and offset (engine.md, section 11): a later retry
-  replaces an earlier one's text, and since facts may be dropped, text
-  that starts past what the engine holds of its retry marks that turn's
-  text cut.
+  by turn, retry and offset (engine.md, section 11).
 - **What jig asks of smith, later:** a run's text, and a tool begun with
   its call, on smith's channel at the host's request
   (`../protocol/README.md`, section 11). Nothing above the hub changes
@@ -570,17 +584,12 @@ jig's workspace vocabulary with the hub, through the root:
 - **None in the engine,** by policy: the engine's root composes no
   workspace, and a charter whose runs need one is placed on workers only.
 
-An application's workspace may be checkouts of its repositories:
-prepare clones and checks out a starting point or a merge in progress,
-deliver commits the tree the run checked and pushes it as a
-fast-forward, save pushes to a saved-work branch. It is an example, not
-part of jig.
-
 ## 8. Charters, tools and contracts
 
 The core decides a run's charter in its own terms (engine.md, 7.1). Its
-translation into smith's charter, version 2 (smith's `domain/run.md`,
-3.1; smith's `protocol/charter.md`, section 2), is in one place,
+translation into smith's charter (smith's `domain/run.md`, 3.1; smith's
+`protocol/charter.md`, section 2; the version,
+`../protocol/README.md`, section 11), is in one place,
 `jig-protocol-charter`, a function of jig's that links smith, which the
 engine's protocol layer calls for every run, on workers and in the
 engine alike, and which reads every run's result back by the path of
@@ -607,14 +616,11 @@ host tools' calls (6.8).
   protocol layer decodes every call the fleet has admitted, from workers
   and from the engine's own hub alike, so no domain parses a call's input
   (`../protocol/channel.md`, 6.3).
-- **The engine's tools speak a party's operations** (engine.md, 7.3;
-  people.md, 5.1). Each host tool's input names what its operation
-  names, as the run was shown it:
-  - `delegate`: a batch, each task with what a party's `Create` names:
-    its executor, spec, contract, authority, budget (an amount, or
-    `AsAllowed`), deadline, wake policy, dependencies and inputs, the
-    resources it will write, whether it is tracked and its priority, its
-    label and its flags (tasks.md, section 4);
+- **The engine's tools that act on tasks, `introduce` aside, speak a
+  party's operations** (engine.md, 7.3; people.md, 5.1). Each host
+  tool's input names what its operation names, as the run was shown it:
+  - `delegate`: a batch, each task with what a party's `Create` names
+    (tasks.md, section 4);
   - `amend`: the task, its spec's revision, and the change; a change of
     priority alone names none;
   - `release`: the task, its hold's revision, and, for an effect held
@@ -626,15 +632,11 @@ host tools' calls (6.8).
     the revision as `amend` does; an effect of a kind a connector offers
     to agents; or a widening of the task's own authority;
   - `withdraw`: the proposal;
-  - `subscribe`, `unsubscribe`: a topic a connector offers to agents, a
-    referenced task's state, or a timer.
-- **A revision is shown before it is named.** A run sees a task's
-  revisions where it sees the task: its brief's section on its delegates
-  (engine.md, section 9), the messages relayed to it (section 9), and
-  the answers of `delegate` and `amend`, each rendered by this
-  translation. A call naming one that has moved is answered moved, with
-  what the task is now, rendered for the run, which decides again
-  (engine.md, 7.3).
+  - `subscribe`, `unsubscribe`, a task's own: a topic a connector offers
+    to agents, a referenced task's state, or a timer.
+- **A revision is shown before it is named** (engine.md, 7.3): this
+  translation renders each revision where the run sees it, and a call
+  answered moved with what the task is now.
 - **A connector's topics offered to agents** are declared by the
   application with its connector's host tools, each with its schema and
   description, as its offered effects are. A `subscribe` call naming one
@@ -642,11 +644,12 @@ host tools' calls (6.8).
   topic, and checked as a read is: the task's tools hold `subscribe`, and
   a read grant covers the resources the connector says the topic
   concerns (authority.md, 8.5; connectors.md, 5.3).
-- **Result contracts** become smith's (smith's `domain/run.md`, 7.1): a
-  report; a verdict, with its labels, fields and follow-ups; a delivery,
-  which the run must make through its workspace before it finishes, with
-  the fields its workspace asks for; a failure. The core judges a result
-  again as it commits it (tasks.md, 5.6).
+- **Result contracts** (tasks.md, section 3) become smith's (smith's
+  `domain/run.md`, 7.1): a report; a verdict, with its labels, fields and
+  follow-ups; a connector's result, as a delivery the run must make
+  through its workspace before it finishes, with the fields its workspace
+  asks for; a failure. The core judges a result again as it commits it
+  (tasks.md, 5.6).
 - **Budget, models, waiting:** the run's budget, its turns, spend and
   time, its spend reserved from its task at its claim, in the
   deployment's unit, and its reserve of turns and time for finishing
@@ -702,11 +705,11 @@ host tools' calls (6.8).
   wakes the task again when the run ends, as it would had it arrived
   then (tasks.md, 8.2 and 8.3). Nothing a host does drops a message.
 - **Delivery** is the workspace's: smith's `deliver` is served by the hub
-  through the application's workspace (section 7), which makes it, for
-  a workspace of checkouts, as a push. Its outcome is smith's (smith's `domain/run.md`,
-  8.2): delivered, nothing, stale, refused, failed. A delivery that was
-  made is the run's result even if the run was winding down; what it
-  left on resources reaches their connectors with the answer.
+  through the application's workspace (section 7), which makes it. Its
+  outcome is smith's (smith's `domain/run.md`, 8.2): delivered, nothing,
+  stale, refused, failed. A delivery that was made is the run's result
+  even if the run was winding down; what it left on resources reaches
+  their connectors with the answer.
 
 ## 10. Below the domain
 
@@ -719,8 +722,7 @@ host tools' calls (6.8).
   (smith's `protocol/hosts.md`, section 2). The agent may be a command of
   the application's own binary that runs smith's agent shell
   (`smith-agent-shell`).
-- **Workspaces' io:** the application's (for a workspace of checkouts,
-  its commands and its directories).
+- **Workspaces' io:** the application's.
 - **In a host's process:** `smith-inline-agent`'s LLM completions and,
   with a workspace, the machine's operations, on smith's components
   (`smith-protocol-llm`, `smith-protocol-machine`) in the protocol layer

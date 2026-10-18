@@ -1,10 +1,11 @@
 # Tasks
 
-Provisional, 2026-10-07, revised 2026-10-15. The core's tasks: what a
+Provisional, 2026-10-07, revised 2026-10-18. The core's tasks: what a
 task is, how tasks are made, how each moves from asked to ended, the
 resources it holds, what it hears and when it wakes, and how proposals
 and escalations travel the tree. It is the first primitive of core.md
-(3.1) in depth, and the hub of the core (engine.md, section 3).
+(3.1) in depth, kept by the tasks child, the center of the core
+(engine.md, section 3).
 Authority, which every action here is checked against, is authority.md;
 what an agent's run is, engine.md, section 7; a connector's procedures,
 connectors.md, section 6; what a party asks, people.md, section 5. What
@@ -12,12 +13,13 @@ is still open is listed in section 13.
 
 ## 1. In one page
 
-- **The tasks child domain is the hub.** It keeps every live task: its
-  place in the tree, its dependencies, its lifecycle, its holds, its
-  inbox, its subscriptions to other tasks and to timers, its budget's
-  numbers, and the proposals and escalations waiting for a decision. It
-  knows nothing of runs, connectors or clients: an executor is a kind and
-  an opaque reference, a connector's news a message it is handed.
+- **The tasks child domain is the center of the core.** The other
+  children serve it. It keeps every live task: its place in the tree,
+  its dependencies, its lifecycle, its holds, its inbox, its
+  subscriptions to other tasks and to timers, its budget's numbers, and
+  the proposals and escalations waiting for a decision. It knows nothing
+  of runs, connectors or clients: an executor is a kind and an opaque
+  reference, a connector's news a message it is handed.
 - **Batches, whole or not at all.** Tasks are made in batches, checked
   whole (no cycles, within the limits, within the creator's authority as
   authority.md answers) and committed at once.
@@ -47,10 +49,11 @@ is still open is listed in section 13.
 ## 2. Structure
 
 The tasks child domain is a child of the core (engine.md, section 3),
-and its hub. Its state is a slab of live tasks, a slab of pending
-proposals, their inboxes, subscriptions and holds, and the timers it
-arms. It is a step machine of its own (programming-model.md, 4.5): its
-own vocabulary, limits and world.
+and its center: it keeps every live task, and the other children serve
+it. Its state is a slab of live tasks, a slab of pending proposals,
+their inboxes, subscriptions and holds, and the timers it arms. It is a
+step machine of its own (programming-model.md, 4.5): its own
+vocabulary, limits and world.
 
 What it does not know, and how it is told:
 
@@ -126,9 +129,10 @@ it is live:
   (8.4), has it projected (connectors.md, section 8), and gives it a
   scope for notes (engine.md, section 10).
 - **Its label:** an opaque 32-bit number the application gives, through
-  a template or by hand (core.md, 7.3). jig gives it no meaning, and no
-  rule of the engine's keys on it: task queries filter on it, and the
-  indexes of ended tasks are keyed by it (`../protocol/store.md`, 4.4).
+  a template or by hand (`../protocol/configuration.md`, 3.1). jig gives
+  it no meaning, and no rule of the engine's keys on it: task queries
+  filter on it, and the indexes of ended tasks are keyed by it
+  (`../protocol/store.md`, 4.4).
 - **Its flags,** each with the engine's semantics:
   - *conversation:* its turns are entries for its requester, while that
     requester is a party, with their read position and an unread count
@@ -138,13 +142,11 @@ it is live:
     its project's lists find it. Every ended task a party requested is
     indexed by that party and its label, listed or not
     (`../protocol/store.md`, 4.4);
-  - *its retention class:* *kept*, to the deployment's retention horizon
-    (`../protocol/store.md`, 11.1), and for good while retention waits for
-    a deployment whose store nears its budget; or *forgotten once read*:
-    once it has ended, its requester, a party, has read its turns and its
-    result, and no live task names it, it is erased in one decision with
-    its read position (people.md, section 6). A task whose requester is
-    not a party is kept, whatever its class: no party reads it.
+  - *its retention class,* what becomes of it once it has ended: *kept*,
+    to the deployment's retention horizon, and whole while none is set
+    (`../protocol/store.md`, 11.1); or *forgotten once read*, erased once
+    its requester, a party, has read it. When and how is people.md,
+    section 6.
 
   The label and the flags are what a task is made as: no amendment
   changes them (section 7).
@@ -194,13 +196,9 @@ dependencies among them.
   left, or a party's role and pool (authority.md, 8.1 and 8.4).
 - **A party's root has someone to escalate to.** Every task a party
   requests is the root of a tree, whose escalations wait for that party
-  or past them (section 9). So a party becomes the requester of a task
-  (by their batch, by accepting a proposal whose tasks are to be theirs,
-  or by moving a task to themselves, section 7) only while their
-  escalations have a holder: their role decides escalations, or the
-  project's policy names a role that does. Otherwise the request is
-  refused, saying so (people.md, 5.1), as a proposal nobody may accept is
-  (section 9).
+  or past them (section 9). A party becomes a root's requester only
+  while its escalations have a holder (people.md, 5.1); otherwise the
+  request is refused, whatever authority it fits.
 - **Dependencies** name tasks in the same batch, or live tasks the
   creator reaches: for a task, its own delegates, or a task it is
   introduced to (8.5); for a party, a task in their tree, or any task of
@@ -212,16 +210,10 @@ dependencies among them.
   a new task as one of its inputs, not as a dependency, within the same
   reach.
 - **A budget as `AsAllowed`.** A creator gives each task's budget as an
-  amount, or as `AsAllowed`: as much as fits under the creator at
-  admission, within the cap the batch gives with it, if any. For a party,
-  that is what their pool has left, capped by their role's spend; for a
-  task, what it has left. At most one task of a batch gives it, resolved
-  after the batch's named amounts are counted, from what they leave; one
-  that would give nothing is refused as lacking budget. The authority
-  child resolves it as it checks the batch (authority.md, section 7, and
-  8.1), the task keeps the amount, as it would one given by hand, and the
-  batch's answer names it. A proposal names amounts, since an accepter
-  funds what it is shown (section 9).
+  amount, or, for one task of a batch, as `AsAllowed`, which the
+  authority child resolves as it checks the batch (authority.md,
+  section 7); the task keeps the amount, and the batch's answer names
+  it.
 - **Checked whole,** before anything of it exists:
   - every task well formed: a known executor kind, a charter or
     procedure the deployment has, a result contract its executor can
@@ -331,9 +323,10 @@ turn and no call, counts as not started: no try is spent on it.
 
 An active procedure task is stepped by the part of the engine that owns
 its procedure: a connector (connectors.md, section 6), or this child
-domain for the core's (section 10). The hub hears a step's decisions
-(effects asked, tasks made, amended or cancelled, proposals, messages
-up, the result) as one decision, committed with the procedure's state.
+domain for the core's (section 10). The tasks child hears a step's
+decisions (effects asked, tasks made, amended or cancelled, proposals,
+messages up, the result) as one decision, committed with the
+procedure's state.
 It steps when it is first active, when a message its policy lets through
 arrives, and whenever what it reads changes, which its owner knows
 (level-triggered).
@@ -366,7 +359,8 @@ which may amend, cancel or re-address it.
 - **Past its tries, a task is held.** So it is when its executor stalls
   past its bound, a dependency fails or is cancelled, drift breaks a
   resource it relies on (connectors.md, section 11), an effect it asked
-  for fails for good, an effect it asked for is uncertain and of a kind
+  for fails for good (a procedure's task hears it and steps instead,
+  connectors.md, 4.2), an effect it asked for is uncertain and of a kind
   that cannot be recovered (connectors.md, 4.3), its budget or its
   deadline runs out (authority.md, section 7; for an agent task, too
   little left for its next run's reserve and one completion more, with
@@ -375,8 +369,10 @@ which may amend, cancel or re-address it.
   it needs a decision. A hold keeps whatever the task had: its result
   while closing, its inbox, its attempt number.
 - **A hold is escalated** (section 9): it waits for the nearest task or
-  party above it that may decide, which it wakes. Whoever it reaches may
-  release it, amend it and release it, or cancel it (section 7).
+  party above it that may decide, which it wakes. Whoever it reaches
+  decides it: releases the task from it, leaves the task held or passes
+  it up. Releasing, amending or cancelling the held task is for those
+  section 7 names, wherever its escalation waits.
 - **A release lifts what it releases:** tries count again from it, and
   what held the task is judged afresh; a deadline still past holds it
   again, with a fresh escalation.
@@ -500,10 +496,11 @@ tasks holding it: a quota cut, a machine gone.
 ## 7. Amending, cancelling, moving
 
 - **Who may:** a task's requester, and any task above it in the tree; a
-  party whose role in the project allows it; and whoever an escalation of
-  it reached (section 9). Nobody else. A party's request, an agent's tool
-  and a procedure's step reach the same rules (people.md, 5.1;
-  engine.md, 7.3; connectors.md, 6.3).
+  party in whose tree it is, or whose role in the project allows it
+  (people.md, 5.1). Nobody else. An escalation's holder decides the
+  escalation (5.5; section 9). A party's request, an agent's tool and a
+  procedure's step reach the same rules (people.md, 5.1; engine.md, 7.3;
+  connectors.md, 6.3).
 - **What an amendment may change:** the spec and its parameters; the wake
   policy; the dependencies of a task still waiting, by removing some,
   never adding; the authority, narrowed freely and widened only within
@@ -579,19 +576,11 @@ tasks holding it: a quota cut, a machine gone.
   becomes the root of a tree of the party's, so a move needs their
   escalations to have a holder, as their batch does (section 4).
 - **Several operations, one decision.** A party's compound request
-  (people.md, 5.1) holds a list of operations on one project's tasks:
-  cancels, with a grace or not; moves; amendments, priority included;
-  releases; messages; stops. They are admitted in order, each checked as
-  it would be alone against the state those before it leave, with one
-  pool counted across them (a move's reservation and the rest), and
-  committed in one decision: all are made, or none is, and the refusal
-  names the first that failed, and why. Each names its revision where it
-  would alone. So a conversation is closed in one decision, each of its
-  live delegates cancelled or moved to its party, then itself cancelled
-  with a grace; a project's goals are reordered at once; a held task is
-  amended and released. Creating, proposing, deciding and answering are
-  requests of their own. Its operations are bounded by the people
-  child's operations per request (section 11).
+  (people.md, 5.1) cancels, moves, amends, releases, messages and stops
+  in one decision, all or none: so a conversation is closed in one
+  decision, each of its live delegates cancelled or moved to its party,
+  then itself cancelled with a grace; a project's goals are reordered at
+  once; a held task is amended and released.
 
 ## 8. Messages
 
@@ -808,13 +797,15 @@ proposed, what an action needs, and what an acceptance funds.
 
 Procedures the core owns, stepped by this child domain:
 
-- **Recurring.** A task whose procedure is a template: at each period,
-  as the period reaches the core from the application's root, it makes
-  a batch from its template, as its own delegates, within its
-  authority, its budget carved again each period from the project's
-  spend for that period (authority.md, section 7). If the last batch is
-  still live, the period passes, or the new batch waits, as the template
-  says. A recurring task ends when it is cancelled.
+- **Recurring.** A task whose procedure makes the batch it was made
+  with, its recurring batch (never one of the configuration's
+  templates, core.md, 7.3): at each period, as the period reaches the
+  core from the application's root, it makes its recurring batch as its
+  own delegates, within its authority, its budget carved again each
+  period from the project's spend for that period (authority.md,
+  section 7). If the last batch is still live, the period passes, or the
+  new batch waits, as its maker chose. A recurring task ends when it is
+  cancelled.
 
 The core has no other procedure. A static plan is a batch; waiting for
 several tasks is a dependency; anything that needs a condition over
@@ -850,14 +841,8 @@ worst case (engine.md, section 13):
 A live task is never evicted: when the deployment is full, new batches
 are refused, and the creator hears why.
 
-A compound request's operations are bounded by operations per request,
-a limit of the people child's (people.md, 5.1). Configuration refuses a
-profile where it is smaller than the larger of delegates per task plus
-one and goals per project (`../protocol/configuration.md`, section 6),
-so that closing a task and all its delegates, or reordering all of a
-project's goals, fits in one request. Its decision is priced in the
-engine's worst case as that many of its costliest operation, a cancel of
-a whole tree within tasks per tree (engine.md, section 13).
+A compound request is bounded by the people child's operations per
+request (people.md, 5.1), and its worst case is engine.md, section 13's.
 
 ## 12. The world
 

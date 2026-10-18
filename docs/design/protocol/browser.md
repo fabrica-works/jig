@@ -1,6 +1,6 @@
 # The browser's layer
 
-Provisional, 2026-10-14, revised 2026-10-15. What jig gives a browser
+Provisional, 2026-10-14, revised 2026-10-18. What jig gives a browser
 client, and where it stops: the application's server serves its pages
 and its bundle by skein's serving contract (skein's `ui-web.md`, 4.4),
 and jig serves no page, no bundle and reserves no path. jig gives the
@@ -17,7 +17,7 @@ stops. jig's messages, the clients' component and the mapping's routes
 and framing are `client.md`'s; the tree the parts map is skein's
 (skein's `ui.md`); the reference UI is `../client/domain/view.md`'s and
 `../client/domain/pages.md`'s. What is still open is listed in section
-17, and what waits in section 16.
+17, and what is not the layer's, or comes later, in section 16.
 
 ## 1. In one page
 
@@ -30,11 +30,11 @@ and framing are `client.md`'s; the tree the parts map is skein's
   `jig-client-shell-web`'s client adapter carries `jig-client`'s
   exchanges, its stream and its small store's records over skein's
   fetch, transport and small store, as `jig-client-protocol-http` maps
-  them onto HTTP (5.1; section 10; `client.md`, section 17).
+  them onto HTTP, adding the browser header to each request (5.1;
+  section 10; `client.md`, section 17).
 - **A browser's credential is a cookie** the mapping's engine end sets,
-  HTTP-only, same-site strict, scoped to the mapping's prefix, and
-  secure but on loopback; the client and the module never see it
-  (section 11).
+  HTTP-only, so the client and the module never see it (section 11; its
+  attributes, `client.md`, 17.3).
 - **Example guards,** in `jig-protocol-engine-clients-http`: a Host
   allow-list; a required header that forces a preflight, with no CORS;
   the cookie's attributes; a referrer policy on the printed link's route.
@@ -161,10 +161,10 @@ shell (3.1), copied from a reference, its client host (3.2), its look
   skein's text shell (`../client/domain/view.md`, section 15), runs the
   same host; a native shell steps the same client.
 - **Its functions,** which the browser shell calls, are skein's
-  reference's (skein's `ui-web.md`, 3.1; names the plan's): *start,*
-  *step,* *build,* the last tree, the path a link node leads to without
-  acting, the next deadline, whether closing the tab would lose
-  requests, and the language its phrasebook chose. jig's reference adds:
+  reference's (skein's `ui-web.md`, 3.1): *start,* *step,* *build,* the
+  last tree, the path a link node leads to without acting, the next
+  deadline, whether closing the tab would lose requests, and the
+  language its phrasebook chose. jig's reference adds:
   - to *start,* the printed link's secret, when the page opened at the
     link's route (section 11), with which the host signs the client in
     by the link, and otherwise by the transport's cookie;
@@ -192,7 +192,7 @@ makes it. With the reference UI, jig's part of it, which
 - **jig's prefix and names:** the prefix `jig` and the names of jig's
   style tokens and region names (section 13), from `jig-client-view`,
   under jig's owner, whose number as skein-ui's opaque owner is jig's
-  convention (`../client/domain/view.md`, section 3);
+  convention (`../client/domain/root.md`, section 15);
 - **jig's pictures,** which ship with `jig-client-shell-web`, under the
   bundle's `pictures/jig/` (4.2);
 - **jig's phrases** for the parts' own words (section 5).
@@ -303,17 +303,17 @@ and the starter. What is jig's follows.
   `pictures/<prefix>/` for its test family's owner, and `files/`.
 - **jig's one text that is not Rust** is `jig.css`. Nothing inline.
 - **Its size is a guide:** jig's test application's module, built with
-  `web`, at most 4 MiB before compression, measured when first built and
-  kept with jig's budgets (`../../development/workflow.md`). Past it,
-  what grew is reported.
+  `web`, kept with jig's budgets (`../../development/workflow.md`,
+  section 2); past it, what grew is reported.
 
 ### 4.3 The page and the starter
 
-skein's (skein's `ui-web.md`, 4.3). jig's test application's page refers
-to the digest directory by absolute path, `/bundle/<digest>/`, since its
-server answers it at every path it does not reserve, and at the printed
-link's route (section 12); it loads `skein-ui.css`, `jig.css` and then
-its own stylesheet, and its title is the application's name.
+skein's (skein's `ui-web.md`, 4.3). jig's test application's page is
+skein's bundler's, which names the digest directory by absolute path,
+`/bundle/<digest>/`, since its server answers it at every path it does
+not reserve, and at the printed link's route (section 12); it loads
+`skein-ui.css`, `jig.css` and then its own stylesheet, and its title is
+the application's name.
 
 ## 5. The loop, the application's
 
@@ -346,8 +346,7 @@ requests (5.3). Starting and a panic's restart are skein's (skein's
 skein's (skein's `ui-web.md`, 5.1), in `skein-ui-web`, and jig's two, in
 `jig-client-shell-web`. Each is ordinary Rust, usable alone, taking and
 giving plain data; jig's are built over skein's fetch, small store and
-transport, and each is usable without the other. Their module names are
-the plan's.
+transport, and each is usable without the other.
 
 - **skein's parts,** with what jig's reference gives each:
 
@@ -370,7 +369,7 @@ the plan's.
 
   | Part | Takes | Gives |
   |---|---|---|
-  | the client's adapter | the client host's transport requests of a step, as `jig-client-protocol-http` maps them: each exchange a method, a path under the prefix, headers (the browser's required header among them) and a body; the stream's request and its closing; the small store's records saved and erased; fetch's and the small store's reports on them | skein's transport's plain data: the small store's writes and removals; each exchange for fetch, same-origin, its answer read up to the client's largest record; the stream's request, each piece cut to the client's stream piece; the reports as the host's events: a response's status and body, an exchange failed, a piece of the stream, its end, the records stored or not |
+  | the client's adapter | the client host's transport requests of a step, as `jig-client-protocol-http` maps them: each exchange a method, a path under the prefix, headers and a body; the stream's request and its closing; the small store's records saved and erased; fetch's and the small store's reports on them | skein's transport's plain data: the small store's writes and removals; each exchange for fetch, same-origin, with the browser header added to its headers (section 11), its answer read up to the client's largest record; the stream's request, with the browser header, each piece cut to the client's stream piece; the reports as the host's events: a response's status and body, an exchange failed, a piece of the stream, its end, the records stored or not |
   | sign-in | the page's path and query at start; a service's credential to show; its dialog's words | the printed link's secret, read from the address, the address rewritten first; a credential shown once in a dialog of its own, never kept |
 
 - **A report** is one platform happening, as data, which each part that
@@ -543,25 +542,25 @@ data (skein's `ui-web.md`, section 10; 5.1).
 - **Exchanges** by skein's fetch: each of the client's exchanges as
   `jig-client-protocol-http` maps it, a POST of the message's record to
   its route under the prefix the application gives (`client.md`, 17.1),
-  with `Content-Type: application/octet-stream` and the browser header
-  (section 11); the adapter sends it with same-origin credentials, so
-  the cookie rides with it, and abandons it by aborting. A body is read
-  up to the client's largest record; past it, the exchange failed. The
-  response's status and body go back to the host, whose client end
-  makes them a reply, and a failure, an abandon or a body cut short a
-  loss.
+  with `Content-Type: application/octet-stream`, and the browser header,
+  which the adapter adds (section 11); the adapter sends it with
+  same-origin credentials, so the cookie rides with it, and abandons it
+  by aborting. A body is read up to the client's largest record; past
+  it, the exchange failed. The response's status and body go back to
+  the host, whose client end makes them a reply, and a failure, an
+  abandon or a body cut short a loss.
 - **The credential** rides in the cookie alone: the reference signs the
   client in by the transport (section 11), so the client sends no
   credential with an exchange. An application whose page holds a
   credential in hand sends it as a bearer, and takes on what HTTP-only
   kept from its scripts (section 19).
 - **The stream** by skein's fetch: a GET of the stream's route with the
-  browser header and same-origin credentials, its body read a piece at a
-  time, each piece cut to the client's stream piece and handed to the
-  host, whose client end cuts the server-sent events into messages
-  (`client.md`, 17.2). The next
-  read is asked by the loop after the step (5.2), so the platform paces
-  it. Its end is the stream gone.
+  browser header, which the adapter adds, and same-origin credentials,
+  its body read a piece at a time, each piece cut to the client's stream
+  piece and handed to the host, whose client end cuts the server-sent
+  events into messages (`client.md`, 17.2). The next read is asked by
+  the loop after the step (5.2), so the platform paces it. Its end is
+  the stream gone.
 - **Each load of the page is a client,** with a stream of its own
   (`client.md`, section 4): links and back and forward within the page's
   history keep it (section 9); a reload, an address typed or opened,
@@ -583,7 +582,7 @@ data (skein's `ui-web.md`, section 10; 5.1).
   name among them, both as base64 text, under the prefix the application
   gives, the reference's `jig.`; read whole at start. The reference UI's
   own records (its places and drafts) are its application's, kept beside
-  the client's through the same transport (`../client/domain/view.md`).
+  the client's through the same transport (`../client/domain/view.md`, 18.8).
   A write the platform refuses, its quota full, is a failed write. The
   restart part's key is outside the prefix (section 5).
 - **Closing a tab with requests pending** asks the platform to warn
@@ -592,18 +591,16 @@ data (skein's `ui-web.md`, section 10; 5.1).
 
 ## 11. Signing in and out
 
-The cookie and the browser header are the mapping's, set and checked by
-its engine end (12.2); the sign-in part is jig's (5.1), and the client's
-own exchanges sign in and out (`../client/domain/client.md`, section 12;
-`client.md`, section 8).
+The cookie is the mapping's, set by its engine end; the browser header
+is added by the client's adapter (5.1); the engine end checks both
+(12.2). The sign-in part is jig's (5.1), and the client's own exchanges
+sign in and out (`../client/domain/client.md`, section 12; `client.md`,
+section 8).
 
-- **The cookie:** `jig-sign-in=<the credential>; Path=<the prefix>;
-  HttpOnly; SameSite=Strict; Max-Age=<the sign-in's remaining life>`,
-  and `Secure` but on a loopback listener, since not every browser keeps
-  a secure cookie set over plaintext, loopback included. Every request
-  under the prefix carries it; the module, the client and the
-  application's client host never see it, since the client is signed
-  in by the transport.
+- **The cookie,** its attributes `client.md`, 17.3's (why: section 19):
+  every request under the prefix carries it; the module, the client and
+  the application's client host never see it, since the client is
+  signed in by the transport.
 - **The browser header,** `Jig-Client: browser`, on every request of a
   browser under the prefix, the stream's among them: one the cookie
   authenticates without it is answered `403`, with nothing done (12.2).
@@ -616,21 +613,14 @@ own exchanges sign in and out (`../client/domain/client.md`, section 12;
     and 17.1);
   - a GET of the link's route spends nothing and draws nothing: the
     mapping's engine end leaves it to the application's page, with the
-    referrer policy (12.2), and the server answers its page there. A GET
-    is the one request any other site can make the person's browser
-    send (a link, an image), with no header of its own and past every
-    guard; one that signed in, or that drew a fresh link on a refusal
-    (`client.md`, section 8), would let any page the person visits spend
-    the printed link or draw a new one, again and again, until the link
-    printed never works;
+    referrer policy (12.2), and the server answers its page there (why:
+    section 19);
   - the sign-in part reads the secret from the address's `secret` and at
     once rewrites the address to the application's home, `/` in the
-    reference, so the secret leaves the address bar and the tab's
-    history (the browser's record of visited addresses keeps it, spent
-    once signed in); the client host then signs the client in by the
-    link, whose exchange is the link route's POST, the one a native
-    client makes, with the browser header; the engine end answers it
-    signed in, the credential in the cookie and none in the body;
+    reference (why: section 19); the client host then signs the client
+    in by the link, whose exchange is the link route's POST, the one a
+    native client makes, with the browser header; the engine end answers
+    it signed in, the credential in the cookie and none in the body;
   - refused (a spent or expired secret), the application prints a fresh
     link, as for any refused link (`client.md`, section 8), and the
     client is signed out, which the reference UI shows as its sign-in
@@ -678,12 +668,8 @@ all, from the clients' listener it owns (`service.md`, section 2).
 - **Or a transport of its own,** in place of the mapping, carrying jig's
   messages to the clients' component and back (3.5, step 10).
 - **Its own routes:** its API, its sign-ins (section 11), anything else.
-- **jig's test application's server,** in `jig-test-service`
-  (`service.md`, section 7), is the example: on its clients' listener,
-  the mapping mounted at `/jig` with its guards whole, the bundle under
-  `/bundle/` from the directory its startup reads, its page at every
-  other GET and at the link's route, the reference policy (12.1) on
-  every answer, and one root file (3.5, step 5; section 15).
+- **jig's test application's server,** in `jig-test-service`, is the
+  example (`service.md`, section 7).
 - **One application per origin** is the deployment's to keep (section
   19).
 
@@ -698,10 +684,7 @@ every answer.
   origin's code (`'wasm-unsafe-eval'`); `script-src` and `style-src`
   take nothing more (skein's `ui-web.md`, section 17).
 - **The reference's,** which jig's test application's server sends, is
-  skein's starting policy, `Content-Security-Policy: default-src 'none';
-  script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src
-  'self'; font-src 'self'; connect-src 'self'; base-uri 'none';
-  form-action 'none'; frame-ancestors 'none'`, with
+  skein's starting policy (skein's `ui-web.md`, 4.4), with
   `X-Content-Type-Options: nosniff`, `Cross-Origin-Opener-Policy:
   same-origin`, `Cross-Origin-Resource-Policy: same-origin` and
   `Referrer-Policy: no-referrer`. An application copies it, and adds
@@ -723,23 +706,19 @@ The guards that protect a browser's credential belong to the transport,
 not to jig's model, so they are the application's server's. jig ships
 them as example code in its mapping's engine end,
 `jig-protocol-engine-clients-http`, on every request under the prefix,
-before any reaches the clients' component:
+before any reaches the clients' component. What each stops is section
+19's.
 
-| Guard | What it stops | What the example does |
-|---|---|---|
-| a Host allow-list | DNS rebinding: a page of another site, its name rebound to a loopback address, reaching the engine as its own origin | any `Host` off the list the application gives when it mounts the mapping answered `421`, with nothing done; the reference's list is the address its printed link names on loopback, and its certificate's name between hosts |
-| the required header, with no CORS | another origin, same-site or not, making the person's browser send a request with their cookie, or a sign-in by link | a request the cookie authenticates without `Jig-Client: browser` answered `403`, with nothing done; a POST whose `Content-Type` is not `application/octet-stream` answered `415`, with nothing done, since no form of another site can send that type; no `OPTIONS` answered and no `Access-Control-` header sent, so another origin's page can set neither, which needs a preflight |
-| the cookie's attributes | scripts reading the credential; the credential sent from another site, or reaching other routes | `HttpOnly`, `SameSite=Strict`, `Path` the prefix, `Secure` but on loopback (section 11) |
-| a referrer policy on the printed link's route | the link's secret leaking through `Referer` to another origin | `Referrer-Policy: no-referrer` added to the page the application answers at the link's route |
+| Guard | What the example does |
+|---|---|
+| a Host allow-list | any `Host` off the list the application gives when it mounts the mapping answered `421`, with nothing done; the reference's list is the address its printed link names on loopback, and its certificate's name between hosts |
+| the required header, with no CORS | a request the cookie authenticates without `Jig-Client: browser` answered `403`, with nothing done; a POST whose `Content-Type` is not `application/octet-stream` answered `415`, with nothing done; no `OPTIONS` answered and no `Access-Control-` header sent |
+| the cookie's attributes | `client.md`, 17.3's |
+| a referrer policy on the printed link's route | `Referrer-Policy: no-referrer` added to the page the application answers at the link's route |
 
 - **The page's policy** (12.1) is the fifth guard, against injected
   scripts acting as the person and a decision tricked by a frame; it is
   the application's page's, and the reference shell's example of it.
-- **Same-site is not same-origin:** on one person's machine, any local
-  server on another port of the same host is the same site, which
-  `SameSite=Strict` lets send the cookie; the required header stops it,
-  since a page of another origin cannot set it without a preflight the
-  mapping never answers.
 - **No switch:** the mapping takes the allow-list and nothing that turns
   a guard off. An application uses the mapping as it is, wraps it (a
   check of its own before it, a header added to its answers), or writes
@@ -758,12 +737,10 @@ otherwise (skein's `ui-web.md`, section 12).
   has no class of its own for acts.
 - **Every style token and region name has a name** (skein's `ui.md`,
   section 8). jig's start with `jig-`, its prefix and a hyphen: its
-  tokens `jig-card`, `jig-chip`, `jig-muted`, `jig-warning`,
-  `jig-danger`, `jig-success`, `jig-button-weight`, `jig-dense-list`,
-  `jig-provisional` (`../client/domain/view.md`, section 13); its
-  regions as `../client/domain/pages.md`, 12.1 and 12.2, list them. An
-  application's start with its owners' prefixes, which its shell gives
-  the parts as the look (3.3).
+  tokens' names are `../client/domain/view.md`'s, section 13, and its
+  regions' `../client/domain/pages.md`'s, 12.4. An application's start
+  with its owners' prefixes, which its shell gives the parts as the
+  look (3.3).
 - **jig's stylesheet,** `jig.css`, ships with `jig-client-shell-web` and
   loads after `skein-ui.css`. It places jig's regions by `data-region`,
   and the landmarks of the reference UI's default arrangement: the
@@ -802,14 +779,15 @@ otherwise (skein's `ui-web.md`, section 12).
 
 ## 15. Testing
 
-Each within jig's suites' budgets (`../../development/workflow.md`).
-skein's parts, its bundler, its face and its harness are tested in
-skein, and in a browser on skein's UI example (skein's `ui-web.md`,
-section 14); jig's tests take what is jig's.
+Each within jig's suites' budgets (`../../development/workflow.md`,
+section 2). skein's parts, its bundler, its face and its harness are
+tested in skein, and in a browser on skein's UI example (skein's
+`ui-web.md`, section 14); jig's tests take what is jig's.
 
 - **On the host,** in jig's default suites:
   - the client's adapter's pure half: the host's requests as HTTP to
     the transport's plain data (the small store's writes first, the
+    browser header on each exchange and on the stream's request, the
     bound on an answer, the stream's piece), fetch's and the small
     store's reports to the host's events, an answer past the bound
     failed;
@@ -832,8 +810,8 @@ section 14); jig's tests take what is jig's.
   skein's (section 18).
 - **The browser tier:** a suite of its own, `--profile browser`, run by
   jig's gate after it builds jig's test application's bundle with
-  skein's bundler, within a minute on the slowest machine (a rule: its
-  profile's global timeout, in `../../development/workflow.md`). Each
+  skein's bundler, within its budget (a rule: its profile's global
+  timeout, `../../development/workflow.md`, section 2). Each
   test starts one server (the application's binary; for jig, the
   reference `jig-test`, serving its bundle and the mapping at `/jig`)
   and one Chromium, and plays its stories with a person each: a browser
@@ -862,7 +840,7 @@ section 14); jig's tests take what is jig's.
   tier may call with its binary, its page's address and its mapping's
   prefix, against its own server, whether it uses jig's mapping or its
   own transport. Checked, never mandated, as jig's check is
-  (`../client/domain/testing.md`, section 6). Another origin's page is
+  (`../client/domain/testing.md`, 6.2). Another origin's page is
   served by jig's kit, in the story's own loop, as the browser kit's
   facts are served (skein's `ui-web.md`, 14.1); skein's harness opens it
   as an address the test gives, and the story names the policy
@@ -879,9 +857,9 @@ section 14); jig's tests take what is jig's.
 - **jig's tier** calls skein's stories, jig's and jig's attack stories,
   and adds: a person opens the printed link and sees their inbox, under
   the reference policy, with no trouble.
-- **jig's test application's shell takes jig's steps of 3.5 once each:**
-  its own page or skein's bundler's (the plan's choice); a root file; a
-  prefix on the reference codec in one story. An element override, a
+- **jig's test application takes skein's bundler's page** (4.3), and
+  two of 3.5's steps once each: a root file (step 5); a prefix on the
+  reference codec, in one story (step 3). An element override, a
   component and a JavaScript snippet are skein's example's (skein's
   `ui-web.md`, 14.3); jig's test application carries no snippet by
   default (section 17).
@@ -894,8 +872,7 @@ section 14); jig's tests take what is jig's.
 - **Following data as it comes** (a log tailed, a metric's latest
   points) is an application's streams (`../client/domain/contract.md`,
   7.4): a contract and engine piece, carried by skein's parts and the
-  client as any watch, with no change to them. It waits for an
-  application whose people follow its data as it comes.
+  client as any watch, with no change to them.
 - **Graphics beyond a scene** (a canvas of hundreds of thousands of
   points, three dimensions, video) are out of jig's scope: a component
   of the application's in a browser (6.1; 3.5, step 6), its own shell
@@ -906,32 +883,29 @@ section 14); jig's tests take what is jig's.
     moves into the reference UI when a second application draws the
     same;
   - *tabs of one person sharing one stream, and HTTP/2* (`client.md`,
-    section 15): wait for HTTP/2 in skein's HTTP, or for people keeping
-    many tabs open;
+    section 15);
   - *the bundle served compressed:* skein's (skein's `ui-web.md`,
     section 15), and its server's;
-  - *the browser tier in other browsers than Chromium:* waits for a bug
-    that shows only there, and comes to skein's harness first (skein's
-    `browser.md`, section 11; skein's `ui-web.md`, section 16); *a
-    press that copies text, downloads and uploads of files:* effects
-    (skein's `ui.md`, section 13), their parts skein's (skein's
-    `ui-web.md`, sections 11 and 15), for an application whose people
-    need them;
+  - *the browser tier in other browsers than Chromium,* which comes to
+    skein's harness first (skein's `browser.md`, section 11; skein's
+    `ui-web.md`, section 16); *a press that copies text, downloads and
+    uploads of files:* effects (skein's `ui.md`, section 13), their parts
+    skein's (skein's `ui-web.md`, sections 11 and 15), for an application
+    whose people need them;
   - *`ops`'s browser shell,* `jig-ops-client-shell-web`, and its server:
-    come with `ops` standalone (`../examples.md`, 9.1), which gives it
-    an engine.
+    part of `ops` standalone (`../examples.md`, 9.1), which gives it an
+    engine.
 
 ## 17. Open questions
 
-- **Right-to-left languages:** what they ask of the elements and scenes
-  waits in skein's vocabulary (skein's `ui.md`, 4.2); what they ask of
-  `jig.css` and the reference UI's phrasebook, beyond `<html lang>`,
-  waits for an application in such a language
-  (`../client/domain/view.md`, section 14).
+- **Right-to-left languages:** what they ask of `jig.css` and the
+  reference UI's phrasebook, beyond `<html lang>`
+  (`../client/domain/view.md`, section 14); what they ask of the
+  elements and scenes is skein's question (skein's `ui.md`, section 19).
 - **Media from the origin:** the bundle's closed list (skein's
-  `ui-web.md`, 4.4) has no audio or video type; one waits for media in
-  skein's vocabulary (skein's `ui.md`, 4.2) and an application serving
-  its own.
+  `ui-web.md`, 4.4) has no audio or video type, and skein's vocabulary
+  no media (skein's `ui.md`, 4.2): what an application serving its own
+  would need of both.
 - **A JavaScript snippet in jig's test application,** the user's
   decision; by default, none. skein's example carries the snippet that
   checks that the bundler and the strict policy carry an application's
@@ -959,9 +933,8 @@ section 14); jig's tests take what is jig's.
   deadline, read by the client host.
 - **`jig-client-protocol-http`** (`client.md`, 17.4) owes: a message
   as a method, a path under the prefix the application gives, headers
-  and a body, with the browser header for a browser; the stream's
-  request; the stream's server-sent events cut into messages; the
-  bound on an answer, from the client's limits.
+  and a body; the stream's request; the stream's server-sent events cut
+  into messages; the bound on an answer, from the client's limits.
 - **`jig-protocol-engine-clients-http`** owes: the example guards of
   12.2, with no switch, every POST's content type among them; the
   cookie set at a browser's sign-in, with no
@@ -1024,29 +997,19 @@ section 14); jig's tests take what is jig's.
 
 ## 19. What jig promises, and where its promise stops
 
-- **jig's promise:** a request presented with a valid credential is that
-  credential's party's, and everything after is checked below the API
-  (`../README.md`, section 6; `../client/domain/contract.md`, 5.2):
-  - a decision names the revision it saw, and a moved revision is
-    refused;
-  - a request is made once, and answered once durable, by the client's
-    request table and the engine;
-  - a document reflects only committed state;
-  - admission and authority are the engine's;
-  - a credential is its party's: jig mints, verifies, expires and
-    revokes it (`client.md`, section 8).
-- **Where it stops:**
+- **jig's promise** is `../README.md`, section 10's: a request
+  presented with a valid credential is that credential's party's, and
+  everything after is checked below the API
+  (`../client/domain/contract.md`, 5.2); jig mints, verifies, expires
+  and revokes the credential (`client.md`, section 8).
+- **Where it stops,** as `../README.md`, section 10 says what is the
+  application's:
   - *a credential not used across sites* is the application's server's
     work, as keeping it out of its logs is: jig gives example guards
     (12.2) and attack stories (section 15), to use if they suit;
   - *a deciding act confirmed, with its facts shown,* is the
-    application's: jig gives a decision's effect as data in the
-    documents, and its check, the test kit's, never mandated, finds in
-    an application's worlds a decision whose revision is in no
-    document the client delivered to the application before the
-    decision left it, and, on a tree (the reference UI's, or an application's on
-    skein's UI kit), a deciding act on a tree that did not show its
-    facts (`../client/domain/testing.md`, section 6);
+    application's, with jig's check to run if it suits
+    (`../client/domain/testing.md`, 6.2);
   - *one application per origin* is each deployment's: session storage,
     `'self'` in the policy and the cookie are per origin, so two
     applications on one origin would share the small store's storage,
@@ -1055,8 +1018,9 @@ section 14); jig's tests take what is jig's.
 
 What jig's parts hold whole, whatever value an application gives them,
 with the reason; an application that writes its own in the part's place
-(3.5, steps 9 and 10) holds the rule itself. The rules skein's parts
-and bundle hold are skein's, with their reasons (skein's `ui-web.md`, section 17): text
+(3.5, steps 9 and 10) holds the rule itself. What each guard of 12.2
+stops is this table's. The rules skein's parts and bundle hold are
+skein's, with their reasons (skein's `ui-web.md`, section 17): text
 never read as markup; scripts and styles from the origin only, nothing
 inline; the bundle's closed list of types; an element override keeping
 its node's accessible role and name; the transport's and the inbox's
@@ -1065,10 +1029,10 @@ invariants, on which the client's "once" rests (the table's last row).
 | Held | Why | Instead |
 |---|---|---|
 | the `Host` allow-list (12.2) | DNS rebinding: a page of another site, its name rebound to the loopback address, would reach the engine as its own origin; answered `421`, it reaches nothing. | the list it gives at the mount: its listener, and between hosts its certificate's name |
-| the required header, the content type and no CORS (12.2) | Cross-origin requests: a page of another origin can neither set the header nor send a body of the mapping's type (either would need a preflight the mapping never answers) nor, from another site, send the cookie (same-site strict), so it cannot act as the person. Another port of the same host is the same site, and only the header stops it. | its own transport, holding what they held |
-| the cookie's attributes (section 11) | HTTP-only keeps the credential from every script, the module's too; same-site strict, from requests another site starts; the `Path`, from every request but the mapping's. | its own sign-in, which sets the same cookie through the mapping's function |
+| the required header, the content type and no CORS (12.2) | Cross-origin requests: a page of another origin can neither set the header nor send a body of the mapping's type (either would need a preflight the mapping never answers, and no form can send that type) nor, from another site, send the cookie (same-site strict), so it can neither act as the person nor sign them in by the link. Same-site is not same-origin: on one person's machine, a local server on another port of the same host is the same site, which same-site strict lets send the cookie, and only the header stops it. | its own transport, holding what they held |
+| the cookie's attributes (`client.md`, 17.3) | HTTP-only keeps the credential from every script, the module's too; same-site strict, from requests another site starts; the `Path`, from every request but the mapping's; `Secure`, from plaintext, and left off on loopback, since not every browser keeps a secure cookie set over plaintext, loopback included. | its own sign-in, which sets the same cookie through the mapping's function |
 | the referrer policy at the link's route (12.2) | The page opened at the link's route holds the sign-in's secret in its address until the sign-in part rewrites it; a policy sending a path to another origin would send the secret with a first request to an origin the page's policy names. | `strict-origin`, the origin alone |
-| the link's route safe to GET (section 11) | A GET is the one request any other site can make the person's browser send, past every guard; one that signed in, or drew a fresh link on a refusal, would let any page the person visits spend the printed link or keep drawing new ones. | its own page at its own route, as safe |
-| the secret taken out of the address first (section 11) | Left in the address, the secret stays in the tab's history and in what the page shows or shares, after it is spent and before. | its own page at its own sign-in route |
+| the link's route safe to GET (section 11) | A GET is the one request any other site can make the person's browser send (a link, an image), with no header of its own and past every guard; one that signed in, or drew a fresh link on a refusal (`client.md`, section 8), would let any page the person visits spend the printed link or keep drawing new ones, until the link printed never works. | its own page at its own route, as safe |
+| the secret taken out of the address first (section 11) | Left in the address, the secret stays in the tab's history and in what the page shows or shares, after it is spent and before. Taken out first, it leaves the address bar and the tab's history; the browser's record of visited addresses keeps it, spent once signed in. | its own page at its own sign-in route |
 | the credential never kept (section 11) | A service's credential acts as the service; kept in a tab, it would outlive its dialog, in storage any script of the origin reads and in the session's restore. | the person copies it from the dialog, which the application's stylesheet may restyle |
-| a step's client requests through the transport (5.3) | A request that leaves before it is kept is lost or made twice after a reload. It is the client's "once" (`../client/domain/client.md`), which jig owns (`../README.md`, section 6), and which skein's transport holds for any application (skein's `ui-web.md`, section 17). | its own order for the rest of the turn (5.2); the transport replaced, the order taken with it and checked by skein's stories for a browser shell and jig's (section 15) |
+| a step's client requests through the transport (5.3) | A request that leaves before it is kept is lost or made twice after a reload. It is the client's "once" (`../client/domain/client.md`, section 6), which jig owns (`../README.md`, section 10), and which skein's transport holds for any application (skein's `ui-web.md`, section 17). | its own order for the rest of the turn (5.2); the transport replaced, the order taken with it and checked by skein's stories for a browser shell and jig's (section 15) |

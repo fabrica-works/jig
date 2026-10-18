@@ -1,6 +1,6 @@
 # The model
 
-Provisional, 2026-10-07, revised 2026-10-15. What jig's domain is
+Provisional, 2026-10-07, revised 2026-10-18. What jig's domain is
 beneath its parts: an engine core that runs work done by agents,
 procedures and people, keeps it in its own store, and drives external
 systems through an application's connectors. Every other document in
@@ -77,7 +77,7 @@ systems   what the application's connectors drive
   its hosts and its configuration, with an id made at its first start.
   The engine is the only writer of the store and the only client of
   every connector's system, so it never needs a compare-and-swap against
-  itself. Scaling out is a later problem.
+  itself. Scaling out is open (section 12).
 - **The engine decides; hosts host; agents think.** Agents reach the
   engine only through tools their host relays (hosts.md).
 - **The store is assumed.** It keeps durably what the engine gives it,
@@ -93,9 +93,7 @@ systems   what the application's connectors drive
 A unit of work someone asked for (tasks.md):
 
 - **its spec,** in words and in typed parameters, and its **result
-  contract**, which says what counts as done: a report; a verdict from a
-  closed list, with a contract per verdict; a connector's result, which
-  its procedure produces; a person's choice;
+  contract**, which says what counts as done (tasks.md, section 3);
 - **its requester:** the task, the person or the deployment that asked
   for it. Requesters link tasks into a tree, rooted at a party or at the
   deployment;
@@ -173,11 +171,12 @@ it has, and what it gives of its budget is no longer its own to spend.
 The root of every tree is the deployment's rules and the project's
 policy, which no task loosens.
 
-**Beyond its authority, a task proposes.** The action becomes a proposal
+**Beyond its authority, a task proposes.** An action beyond its
+authority is refused; it becomes a proposal when the task proposes it,
 to whoever holds the authority, up the tree: a task above it, or a
-person. They accept it, and it is made with their authority, or reject
-it, and the task hears why. Acceptance, escalation and widening a plan's
-reach are all this one mechanism.
+person (tasks.md, section 9). They accept it, and it is made with their
+authority, or reject it, and the task hears why. Acceptance, escalation
+and widening a plan's reach are all this one mechanism.
 
 ### 3.5 Connector
 
@@ -316,10 +315,9 @@ its tree, itself included; its priority is the one that orders the
 task's waits.
 
 **A goal's defaults are a template.** What a goal is made with when a
-party sets one (a charter or procedure, a report, a budget and a
-deadline given, listed and kept) is jig's goal template (7.3), which an
-application keeps, changes or drops. The engine's behaviour above turns
-on the mark, never on the template.
+party sets one is jig's goal template (`../protocol/configuration.md`,
+3.1), which an application keeps, changes or drops. The engine's
+behaviour above turns on the mark, never on the template.
 
 Any task may be tracked; most are not. A chat, a triage or a repair is
 made untracked; an incident, or "give the payments team a staging
@@ -343,8 +341,9 @@ A plan is three things, kept apart:
 So **a plan is the subtree of tasks one task has delegated.** Revising it
 is creating, amending or cancelling tasks, each with its reason, which
 the store keeps as the plan's history. Planning everything up front is
-one batch (3.1): checked whole and, beyond its creator's authority, one
-proposal for a person to accept.
+one batch (3.1): checked whole and, beyond its creator's authority,
+refused, then proposed as one, for a person to accept (tasks.md,
+section 9).
 
 ### 7.2 What a coordinator does
 
@@ -376,28 +375,19 @@ The same primitives make each of these:
    need it.
 6. **Standing.** A procedure subscribed to a topic makes tasks as news
    arrives: a watch that triages alerts.
-7. **Recurring.** A timer makes tasks from a template (tasks.md,
-   section 10).
+7. **Recurring.** At each period, a recurring task makes its recurring
+   batch, the batch it was made with (tasks.md, section 10).
 
 These are structures: what the work's tasks look like. A shape a party
 starts by name (a chat, a goal, an application's experiment or incident)
 is sugar over the primitives (section 9), in three forms:
 
 - **a template:** data, the defaults that turn "a chat with these
-  words" into a complete batch (tasks.md, section 4). Templates are
-  numbered, never renumbered, in the application's configuration
-  (`../protocol/configuration.md`, section 3). Each carries the
-  executor (a charter, or a charter or procedure the role may create
-  with, the creator's choice); the result contract; the authority, as
-  the creator's role narrowed (one level shallower in delegation, by
-  default); the budget, an amount, `AsAllowed` with an optional cap, or
-  the creator's to give; a deadline, none, a span from creation, or the
-  creator's to give; wake and park, as the charter's; tracked, with a
-  default priority; the flags; the label; and the grace its helper
-  cancels with. A project's policy may override,
-  per template, the executor, the budget and its cap, the deadline and
-  the default priority; never the flags, the label or tracked, which are
-  the shape's identity (authority.md, section 6).
+  words" into a complete batch (tasks.md, section 4). What each
+  carries, and jig's two defaults, chat (template 1) and goal
+  (template 2), which an application keeps, changes or drops, are
+  `../protocol/configuration.md`, 3.1; a project's policy overrides
+  some of its fields (authority.md, section 6);
 - **a helper:** a function composing plumbing requests, such as one that
   fills a template into a `Create`, or one that closes a conversation as
   one compound request (tasks.md, section 7);
@@ -405,35 +395,18 @@ is sugar over the primitives (section 9), in three forms:
   holds, such as a chat's status, from its phase, its run and what it
   waits on, or a conversation's thread.
 
-- **The engine never sees a template.** The client fills one into an
-  ordinary request, which the engine checks as it checks one written by
-  hand. A template grants nothing: whatever it makes, a `Create` could
-  make within the creator's authority, and permissions stay the
-  primitives' (authority.md, section 6), so no role "may use" a
+- **The engine never expands or checks a template.** The client fills
+  one into an ordinary request, which the engine checks as it checks one
+  written by hand. A template grants nothing: whatever it makes, a
+  `Create` could make within the creator's authority, and permissions
+  stay the primitives' (authority.md, section 6), so no role "may use" a
   template. A client that ignores one only makes its own lists
   inconsistent; authority and limits still hold. The engine keeps the
   configuration's templates, and each policy's overrides, only to serve
   each project's merged templates in the party's own document, `me`
-  (`../client/domain/contract.md`, 7.1).
+  (engine.md, 11.1).
 - **A task keeps the values it is made with.** A template changed later
   touches no task already made.
-- **jig's defaults** are two, which an application keeps, changes or
-  drops:
-
-| Field | chat (template 1) | goal (template 2) |
-|---|---|---|
-| executor | an agent, under the project's chat charter | a charter or a procedure the role may create with |
-| result contract | a report | a report |
-| authority | the role's, one level shallower in delegation | the role's, one level shallower, with the budget and deadline given |
-| budget | `AsAllowed` | the creator's to give, within their allotment |
-| deadline | none | the creator's to give, or none |
-| wake, park | the charter's | the charter's |
-| tracked | no | yes, with a priority |
-| conversation | yes | no |
-| listed | no | yes |
-| retention | kept | kept |
-| label | 1 | 2 |
-| grace | the template's, which closing it cancels with | none |
 
 ### 7.4 Two levels of delegation
 
@@ -445,11 +418,9 @@ An agent delegates in two ways, and chooses between them:
 - **tasks:** durable and scheduled, with an executor, a workspace and an
   authority of their own, surviving restarts.
 
-An agent reaches the engine through tools its host relays: delegate a
-batch of tasks; message; amend, cancel and release its delegates; decide
-what they propose; propose; subscribe; make an effect; read a connector;
-note and recall; wait; finish. Each is checked against its task's
-authority (engine.md, 7.3).
+An agent reaches the engine through tools its host relays, each a
+party's operation or a task's own, checked against its task's authority
+(engine.md, 7.3).
 
 ## 8. Applications and external systems
 
@@ -522,46 +493,38 @@ answers within the authority their role in a project gives them
 credential (people.md, section 3).
 
 - **A chat** is an agent's task whose requester is a party, made from
-  jig's chat template (7.3): flagged a conversation, each of their words
-  wakes it, and it resumes its transcript. It is how a person usually
-  starts work: the chat answers, delegates, or proposes a goal.
+  jig's chat template (people.md, section 7): flagged a conversation,
+  each of their words wakes it, and it resumes its transcript. It is how
+  a person usually starts work: the chat answers, delegates, or proposes
+  a goal.
 - **A party's inbox** holds what waits for them: questions from the
   tasks they asked for, proposals they may accept, held tasks escalated
   to them, tasks whose executor they are, results, and the turns of
   their conversations.
 - **The client knows the primitives,** not the shapes of work built from
   them. What a client asks of the engine, and reads from it, is jig's
-  API, and the API is *plumbing*: the primitives as operations (create a
-  batch, propose, withdraw, message a task, amend, cancel with or
-  without a grace, release, stop, move a task to oneself, decide, answer,
-  take and hand back, mark seen, and the project's own), as subjects
-  and reads (the party's own document, a task, a tree, a run, a task's
-  activity, a proposal, the inbox, a query over tasks), all in general
-  form. `jig-client` carries the plumbing, and knows no page and no
-  shape (`../README.md`, section 10).
+  API, and the API is *plumbing*: the primitives as operations, subjects
+  and reads, all in general form (`../client/domain/contract.md`,
+  sections 3, 6 and 7). `jig-client` carries the plumbing, and knows no
+  page and no shape (`../README.md`, section 10).
 - **Shapes are sugar** (7.3): templates, helpers, and facts and models.
 - **The one rule: sugar is built only from plumbing.** Whatever must be
-  atomic (several operations in one decision, tasks.md, section 7),
+  atomic (several operations in one decision, people.md, 5.1),
   whatever only the engine can compute (what a task waits on, what a
   pool has left, a budget given `AsAllowed`), and whatever the engine's
   own behaviour turns on (tracked and priority, a task's flags) is
   plumbing, in general form and never shaped. What sugar cannot be built
   from is a primitive missing, added in general form; sugar never needs
   an operation, or knowledge in the engine, of its own.
-- **jig adopts sugar** that starts in an application by three tests: a
-  second consumer uses it; it is hard to interpret consistently (what
-  "waiting for you" means, how committed turns and provisional text
-  interleave), which belongs in jig's helpers early, since each
-  application that reinvents it drifts; and its shape has settled, since
-  sugar in jig is a contract too. Correctness (revisions, once,
-  atomicity) is never sugar. Any application may refuse or redo jig's
-  sugar; the plumbing changes rarely.
+- **jig adopts sugar** an application wrote as
+  `../client/domain/client.md`, section 19 says. Correctness (revisions,
+  once, atomicity) is never sugar. Any application may refuse or redo
+  jig's sugar; the plumbing changes rarely.
 - **A party does what an agent does.** Their operations pass the same
   checks, only the source of their authority differing (authority.md,
   8.1 and 8.4), and both ask explicitly to propose (tasks.md,
-  section 9). What stays asymmetric, by design: only parties carry out
-  person tasks, stop runs, move tasks and run the project; procedures
-  decide nothing.
+  section 9). What stays asymmetric, by design, is what only parties do
+  (people.md, 5.1); procedures decide nothing.
 - **Presentation is the application's:** its screens, words, look,
   confirmations and navigation, its server and its URL space
   (`../README.md`, section 10). An application adds its own connectors' objects as
@@ -589,8 +552,9 @@ P, the person on call
 - **I is a goal,** tracked: people follow it in the client, its priority
   orders its remediations against other incidents' for the same
   service, and its notes' scope keeps what was learnt.
-- **R1 is beyond I's authority** in production, so it is a proposal. It
-  passes over W, a procedure, to P, who accepts it with P's authority.
+- **R1 is beyond I's authority** in production, so I's `delegate` is
+  refused and I proposes it (tasks.md, section 9). The proposal passes
+  over W, a procedure, to P, who accepts it with P's authority.
 - **R1 is a procedure:** it holds the service, makes the rollback, and
   waits until the service is healthy, a fact the observability connector
   judges (connectors.md, section 7).
@@ -666,7 +630,7 @@ Where these stop, above the API, the application holds:
   test kit's check, never mandated, finds in an application's worlds a
   decision whose revision was in no document the client delivered to
   the application before it was sent (`../client/domain/testing.md`,
-  section 6);
+  6.2);
 - **keeping a credential from use across sites,** as keeping it out of
   its logs is: its server's, with jig's default HTTP mapping's example
   guards and attack stories to use where they suit
@@ -675,8 +639,8 @@ Where these stop, above the API, the application holds:
 ## 12. Open questions
 
 - **Agents as identities** that serve many tasks, such as a service's
-  standing operator. The model allows them; a long-lived task serves
-  meanwhile.
+  standing operator. The model allows them; a long-lived task serves in
+  their place.
 - **Procedures written by agents,** deterministic workflows like a coding
   agent's scripts. Until they are wanted, procedures are Rust, owned by
   connectors or the core.

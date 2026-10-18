@@ -70,8 +70,8 @@ is still open is listed in section 15.
   its own, per owner, versioned, each request's stored before it leaves.
   The application keeps its own (section 10).
 - **Shells are the application's.** jig ships a native shell,
-  `jig-client-shell-native`, and its reference UI's browser parts
-  (section 12).
+  `jig-client-shell-native`, and its browser parts,
+  `jig-client-shell-web` (section 12).
 - **On one person's machine** (`README.md`, section 4) the client reaches
   the engine on a loopback address, in plaintext, and the person signs
   in by a link the application's startup prints at start (section 8).
@@ -160,12 +160,9 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   against the client's limits before they reach `jig-client-domain`: a
   document past its bytes, rows, a path's segments, an authority's
   entries or texts is refused at decoding, as too large, never cut
-  silently (`../client/domain/client.md`, section 16). The engine never
-  marks an authority cut (`../client/domain/contract.md`, 5.3): it
-  writes the wire's `cut` on an authority false, and the client refuses
-  a document that marks one cut, as too large.
-  The wire's generated worst cases price each document at the client's
-  limits.
+  silently (`../client/domain/client.md`, section 16). An authority
+  carries no cut mark (`../client/domain/contract.md`, 5.3). The wire's
+  generated worst cases price each document at the client's limits.
 - **A document's nested collections cross as pieces.** The client bounds
   a document by its bytes in all, not each list by its count times its
   largest item. So a list whose items hold lists of their own (a page's
@@ -486,7 +483,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   a time: a sign-in with a secret spent, expired or unknown is refused,
   and the component draws a fresh one, which the startup prints again.
   It is enabled by configuration (`configuration.md`, section 3,
-  clients), and only on a loopback listener.
+  clients), and only where the application's clients' listener is on
+  loopback, which its startup checks (`service.md`, section 3).
 - **A service's credential** is issued when an owner makes the service:
   the component draws it, keeps its digest in the secrets' store under
   the service's number (`store.md`, section 9), and answers the owner's
@@ -582,8 +580,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   unless the engine was updated under a client still running; reloading
   or restarting the client updates it. A client that does not come from
   the engine's application (a phone's, a command line's) may lag it.
-- **How jig is released and pinned** waits for an application outside
-  the workspace jig is built in (`../README.md`, section 14).
+- **How jig is released and pinned** is an open question
+  (`../README.md`, section 14).
 
 ## 10. The small store
 
@@ -642,10 +640,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **The client's side:** `jig-client` carries an application's records as
   bytes under their owner's number (`../client/domain/root.md`, section
   15), and the application decodes them with its wire.
-- **`ops`'s wire** (`jig-ops-client-protocol-wire`): infrastructure's
-  environment requests and their outcomes, observability's and
-  infrastructure's subjects and documents (incidents, alerts,
-  environments, panels).
+- **An application's wire,** `ops`'s for one: `../examples.md`,
+  section 8.
 
 ## 12. Shells
 
@@ -661,16 +657,17 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   none, and reads back at start for its host to give as held (section
   8); for Linux and for the worlds that make bytes real. With no
   presentation, it is a service's shell, and a one-shot command's.
-- **The reference UI's browser parts,** `jig-client-shell-web`: the
-  default mapping's client end over fetch, the printed link's sign-in,
-  and jig's look, over skein's `skein-ui-web`, for `ops` and jig's test
+- **jig's browser parts,** `jig-client-shell-web`: the client's
+  adapter, which carries the default mapping's calls over skein's
+  fetch, the printed link's sign-in, and jig's look, over skein's
+  `skein-ui-web` (`browser.md`, 5.1), for `ops` and jig's test
   application, whose browser shell is `jig-client-test-shell-web`
-  (`browser.md`). An application's own browser shell uses them,
+  (`browser.md`, 3.1). An application's own browser shell uses them,
   skein's parts alone, or neither.
 - **Its pages are served by the application's server,** through skein's
   serving contract (skein's `ui-web.md`, section 4), under its own
   policy: jig serves no page, no bundle, and reserves no path
-  (`service.md`; `browser.md`).
+  (`service.md`, section 2; `browser.md`, section 12).
 
 ## 13. Limits and the worst case
 
@@ -696,11 +693,17 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 
 ## 14. Testing
 
-Each within jig's suites' budgets (`../../development/workflow.md`).
+Each within jig's suites' budgets (`../../development/workflow.md`,
+section 2).
 
 - **Step tests** in `jig-client-protocol-wire` and each application's
   wire: generated, as skein's `codec.md`, section 6 has them; the fixed
   envelope read across versions among them.
+- **The client's wire world,** `jig-client-wire-world`: the client
+  side's generated codecs (jig's wire, the reference UI's records,
+  `ops`'s wire and jig's test family's) checked for drift against their
+  schemas, and jig's wire's decoders run over arbitrary and mutated
+  bytes in the fuzzy suite (skein's `codec.md`, section 6).
 - **The component's world,** `jig-engine-clients-world`: the component
   against a scripted transport of messages and a scripted root, with no
   HTTP: answers of every kind and none, deliveries paced by a slow
@@ -713,22 +716,22 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **The default mapping's ends,** each against a scripted peer of bytes:
   every route, the stream's events cut at random, the credential as a
   cookie and as a bearer, the printed link's route, and the example
-  guards' stories (`browser.md`).
+  guards' stories (`browser.md`, section 15).
 - **The protocol world,** `jig-client-protocol-world`: the client's
-  world's stories (`../client/domain/testing.md`) run through bytes:
-  `jig-client` over the native shell's machines and the default
+  world's stories (`../client/domain/testing.md`, section 4) run through
+  bytes: `jig-client` over the native shell's machines and the default
   mapping's client end, against the engine's root and core over
   `jig-protocol-engine-clients` and the mapping's engine end on skein's
   HTTP server, joined by in-memory streams cut at random; and the same
-  stories over an in-process transport with no HTTP. Its referee is the
-  joint world's, and adds: every record crossed decodes to what was
-  encoded; no secret reaches a domain; a slow stream never holds the
-  engine up.
+  stories over an in-process transport with no HTTP. One story puts
+  skein's text shell's terminal in front of the native client, on
+  skein's simulated machine: lines in on a pipe, pages out on another
+  (`../client/domain/view.md`, 15.6). Its referee is the joint world's,
+  and adds: every record crossed decodes to what was encoded; no secret
+  reaches a domain; a slow stream never holds the engine up.
 - **The browser tier:** the reference UI's browser shell in Chromium,
-  against jig's test application, `jig-test`, both children of skein's
-  harness's one loop, a person reading the page by role, name and text
-  through skein's face over its browser kit (skein's `ui-web.md`, 14.2;
-  skein's `browser.md`; `browser.md`, section 15).
+  against jig's test application, `jig-test` (`browser.md`, section
+  15).
 
 ## 15. Open questions
 
@@ -758,8 +761,8 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   by its issuer and its client, which an application's server would run
   on its own routes before its `Mint`, so an application whose people
   sign in through a standard server writes no flow of its own (section
-  8). It is sugar over `Mint`, and waits for a second application that
-  needs it.
+  8). It is sugar over `Mint`, which jig adopts once a second
+  application needs it (`../client/domain/client.md`, section 19).
 
 ## 16. What it owes and is owed
 
@@ -774,7 +777,7 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   sign-in flows, with `Mint` sent from its server alone (section 8); the
   printed link's URL, printed from the secret the component gives; its
   small store's storage, answering each write; and its server's guards
-  (`browser.md`).
+  (`browser.md`, 12.2).
 - **The engine's domain** is owed nothing beyond
   `../client/domain/contract.md`, section 9: sign-ins numbered by their
   commit, made for an identity the application verified, and a party
@@ -859,29 +862,35 @@ prefix; jig's test application mounts it at `/jig`.
 - **As a cookie,** for a browser: set by the engine end on a sign-in's
   answer, which then carries no credential in its body, or by the
   application's server after a `Minted`, through the engine end's
-  function that sets the same cookie; `HttpOnly`, `Secure` but on
-  loopback, `SameSite=Strict`, its `Path` the prefix, its life the
-  sign-in's, as `Max-Age`, from the sign-in's expiry, which a `Minted`
-  carries (4.2); cleared by signing out. The engine end reads it as each
-  exchange's credential.
+  function that sets the same cookie: `jig-sign-in=<the credential in
+  base64url>; Path=<the prefix>; HttpOnly; SameSite=Strict;
+  Max-Age=<the sign-in's remaining life>`, and `Secure` but on a
+  loopback listener (why each: `browser.md`, section 19). Its life is
+  the sign-in's, from the sign-in's expiry, which a `Minted` carries
+  (4.2); signing out clears it, with `Max-Age=0`. The engine end reads
+  it as each exchange's credential.
 - **As `Authorization: Bearer`,** everywhere else: the credential in
   base64url, and a service's credential on its sign-in route the same
   way.
 - **The browser header,** `Jig-Client: browser`, on every request a
-  browser makes under the prefix, the stream's `GET` among them
-  (`browser.md`, section 11). An exchange carrying it is a browser's,
-  its sign-in answered with the cookie; any other, with the credential
-  in its answer's body.
+  browser makes under the prefix, the stream's `GET` among them, added
+  by the browser's transport: in jig's browser parts, the client's
+  adapter (`browser.md`, 5.1 and section 11). The engine end checks it
+  (`browser.md`, 12.2): an exchange carrying it is a browser's, its
+  sign-in answered with the cookie; any other, with the credential in
+  its answer's body.
 
 ### 17.4 Its two ends
 
 - **`jig-client-protocol-http`,** the client end, step code for the host
   and for wasm32: an `Exchange` as a method, a path under the prefix,
-  headers (the bearer, or the browser's required header) and a body; a
-  response's status and body back as a `Reply`, or `Lost`; `OpenStream`
-  as the stream's `GET`, its body cut into messages (17.2). The native
-  shell and the reference UI's browser parts use it; an application's
-  own shell may.
+  headers (its content type, and the bearer where the client holds a
+  credential) and a body, with no browser header, which a browser's
+  transport adds (17.3); a response's status and body back as a
+  `Reply`, or `Lost`; `OpenStream` as the stream's `GET`, its body cut
+  into messages (17.2). The native shell and the reference's browser
+  client host use it (`browser.md`, 3.2); an application's own shell
+  may.
 - **`jig-protocol-engine-clients-http`,** the engine end, a component on
   skein's HTTP server: each call under its prefix routed to one of the
   component's messages, but a `GET` of the link's route, left to the
@@ -894,7 +903,8 @@ prefix; jig's test application mounts it at `/jig`.
   wraps, or replaces with its own: a `Host` allow-list; the browser's
   required header and the POSTs' content type, which force a preflight,
   with no CORS; the cookie's attributes; a referrer policy on the
-  printed link's route. What each stops, and jig's attack stories an
-  application may run against its own server, are `browser.md`'s. A
-  page's policy (its content security policy, its frames) is the
-  application's page's.
+  printed link's route. What each stops is `browser.md`'s (section
+  19), and so are jig's attack stories an application may run against
+  its own server (`browser.md`, section 15). A page's policy
+  (its content security policy, its frames) is the application's
+  page's.

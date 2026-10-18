@@ -11,9 +11,8 @@ queries and watches that bring them; an application's traffic on the
 same terms; and versions. It is to clients what `../../domain/hosts.md`,
 section 2 is to hosts: the contract both sides keep, whatever carries
 it. Its messages and their bytes are `../../protocol/client.md`'s.
-Section 9 lists what the engine's domain owes the client, as changes to
-its documents. What is still open is listed in section 11; what waits,
-in 7.4 and section 8.
+Section 9 lists what the engine's domain owes the client, and where
+`../../domain/` designs it. What is still open is listed in section 11.
 
 ## 1. In one page
 
@@ -224,13 +223,13 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
 
 - **keyed alike,** in the same key space, by the same request table in
   the client (client.md, section 6);
-- **admitted by the people child** by key, as jig's are: duplicates
-  joined, the party's sign-in checked, and, by the scope the request
-  names as a read or a subject does (7.5), their role in its project,
-  their role in the deployment, or nothing more for the party's own; a
-  key sent again with another request is told apart by a digest of the
-  request's encoding, which the protocol layer gives the domain with
-  it;
+- **admitted by the people child** (`../../domain/people.md`, 5.1) by
+  key, as jig's are: duplicates joined, the party's sign-in checked,
+  and, by the scope the request names as a read or a subject does
+  (7.5), their role in its project, their role in the deployment, or
+  nothing more for the party's own; a key sent again with another
+  request is told apart by a digest of the request's encoding, which
+  the protocol layer gives the domain with it;
 - **refused at admission with jig's refusal:** a request the people
   child refuses there (its party's role in the request's scope, a key
   sent again with another request, a limit), or one whose sign-in has
@@ -250,7 +249,7 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   keeps the outcome under that token, durably, for the retention, and
   gives it again when the request is sent again, as the core asks a
   connector for any value it does not own (`../../domain/core.md`,
-  section 5).
+  section 5; `../../domain/connectors.md`, 5.5).
 
 ### 3.4 A compound request
 
@@ -269,22 +268,18 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   `Amend`, priority included; `Release`; `Message`; `Stop`. Creating,
   proposing, withdrawing, deciding, answering, taking, handing back,
   marking seen and the project's own are requests of their own.
-- **Bounds:**
-  - one project, every operation's task in it;
-  - at most *operations per request*, a limit of the people child's,
-    refused at admission past it. The configuration's startup check
-    refuses a profile where it is smaller than the larger of *delegates
-    per task* plus one and *goals per project*
-    (`../../protocol/configuration.md`, section 6), so a conversation
-    with every delegate live can always be closed in one request, and
-    every goal of a project reordered in one.
-- **Admitted in order:** each operation is judged against what the
-  operations before it leave, as it would be alone after them; one pool
-  is counted across all of them (a move's reservation and the rest);
-  each names its revision where it would alone, and a priority-only
-  `Amend` names none, the first commit deciding. A `Release` names its
-  hold's revision beside words or an amendment as it does alone: a
-  `Message` names a task and words, and releases nothing.
+- **Admitted as the people child admits it** (`../../domain/people.md`,
+  5.1): in order, each operation as it would be alone after those
+  before it, with one pool counted across them; every operation's task
+  in the request's project; at most *operations per request*, refused
+  at admission past it as a limit (section 4), enough to close a
+  conversation with every delegate live, or reorder every goal of a
+  project, in one request (`../../protocol/configuration.md`, section
+  6).
+- **Revisions, as alone:** each operation names its revision where it
+  would alone (5.2), so a `Release` names its hold's beside words or an
+  amendment; a priority-only `Amend` names none, the first commit
+  deciding; a `Message` names a task and words, and releases nothing.
 - **Each operation's outcome: made, with a message number.** Its
   operations take consecutive message numbers, one each, in the
   request's order, and the answer names the first: the operation at
@@ -299,10 +294,7 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   requester and the reservation moved, a hold lifted) is in its task's
   documents, as after the operation alone, and a later decision names
   the revision a document gave (5.2).
-- **Its worst case:** its decision is priced as the limit times the
-  costliest operation it may hold (a cancel of a whole tree, within
-  tasks per tree), summed into the engine's worst case with the rest, as
-  every decision is (`../../README.md`, 6.2).
+- **Its worst case** is `../../domain/engine.md`, section 13's.
 - **A client never chains requests** for what the person sees as one
   act, so it never has to undo the first when the second is refused.
 
@@ -333,43 +325,11 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
 
 - **A template is a recipe for a task of one shape:** the defaults that
   turn "a chat with these words" into a complete `Create`. It is data,
-  numbered and never renumbered, in the application's configuration
-  (`../../protocol/configuration.md`, section 3, templates): a name for
-  showing; the executor (a charter, or "a charter or procedure the role
-  may create with", the creator's choice); the result contract;
-  authority, as the creator's role narrowed (one level shallower in
-  delegation, by default: its `shallower` counts the levels below the
-  role, and the authority `me` offers for creating is one level below,
-  5.3); the budget (an amount, `AsAllowed` with an
-  optional cap, or the creator's to give); a deadline (none, a span from
-  creation, or the creator's to give); wake and
-  park, which are the charter's, so its `Create` names no wake policy;
-  tracked, with a default priority; the
-  flags; the label; and the grace its helper cancels with.
-- **jig's defaults,** which an application keeps, changes or drops, and
-  beside which it adds its own:
-
-  | Field | chat (template 1) | goal (template 2) |
-  |---|---|---|
-  | executor | an agent; the project's chat charter | a charter or a procedure the role may create with |
-  | contract | a report | a report |
-  | authority | the role's, one level shallower in delegation | the role's, one level shallower, with the budget and deadline given |
-  | budget | `AsAllowed` | given, within the allotment |
-  | wake, park | the charter's | the charter's |
-  | tracked | no | yes, with a priority |
-  | conversation | yes | no |
-  | listed | no | yes |
-  | retention | kept | kept |
-  | label | 1 | 2 |
-  | cancel grace | the template's | none |
-
-- **A project's policy may override,** per template number, the
-  executor, the budget and its cap, the deadline and the default
-  priority; never the flags, the label or tracked, which are the
-  shape's identity. An override naming a template the configuration
-  does not define is refused when the policy is changed. One of the
-  default priority, on a template whose tasks are untracked, is kept
-  and has no effect: the merged template stays untracked.
+  numbered and never renumbered, in the application's configuration.
+  What each carries, jig's two defaults (chat, template 1; goal,
+  template 2), and what a project's policy may override, are
+  `../../protocol/configuration.md`'s, 3.1, with their JSON in its
+  section 10.
 - **The engine never expands or checks one.** It keeps the
   configuration's templates and each policy's overrides only to serve
   each project's merged templates in `me` (5.1). The client fills a
@@ -377,11 +337,9 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
   that request as it checks one written by hand: a template grants
   nothing, and a client that ignores one only makes its own lists
   inconsistent, while authority and limits still hold.
-- **Permissions stay primitive:** which executors a role may create
-  with, its spend, and its delegation (`../../domain/authority.md`,
-  section 6). There is no "may use template".
-- **A task keeps the values it was made with.** A template changed later
-  touches no task already made.
+- **Permissions stay primitive,** with no "may use template", and a
+  task keeps the values it was made with
+  (`../../protocol/configuration.md`, 3.1).
 
 ## 4. Answers
 
@@ -434,12 +392,10 @@ A client hears one more, which no engine sends: **no answer**, when the
 connection failed before one came; whether the engine has the request is
 unknown, and the key makes sending it again safe.
 
-The client's link gives each answer to the request table as an envelope
-it can act on without reading what is inside (client.md, section 6):
-*final* for done and refused, with the outcome decoded into its owner's
-vocabulary; *again* for busy and not ready; *lost* for no answer;
-*signed out*. A request answered version not served is held, kept and
-unsent, for its owner's version (section 8).
+How the client's link hands each answer to its request table is
+`../../protocol/client.md`'s, section 5; a request answered version not
+served is held, kept and unsent, for its owner's version (client.md,
+8.2).
 
 ## 5. Documents
 
@@ -532,7 +488,8 @@ unsent, for its owner's version (section 8).
   an escalation (releasing the task from it, leaving it held, passing it
   up) needs the escalation to wait for the party, and is refused as not
   waiting for them otherwise. Releasing, amending or cancelling the held
-  task needs the task in the party's tree, wherever its escalation waits
+  task needs the task in the party's tree, or their role in the project
+  to allow it, wherever its escalation waits
   (`../../domain/people.md`, 5.1): a release that names the hold's
   revision from before a pass up is made, not refused as moved.
 - **The revision is the promise below the presentation.** Whatever
@@ -548,8 +505,8 @@ unsent, for its owner's version (section 8).
   proposal of it could be accepted; or *refused*, and why (role,
   authority, nobody who could accept a proposal of it). An act whose
   answer depends on what the party writes is offered *bounded* (below).
-  The client offers what the document says, and the engine judges again
-  when the request comes.
+  A presentation offers what the document says, and the engine judges
+  again when the request comes.
 - **Offered with bounds.** Creating and amending are made, proposable or
   refused by what the party writes: a budget, a deadline, a grant. A
   document cannot say which for every draft, so it gives the engine's
@@ -575,24 +532,24 @@ unsent, for its owner's version (section 8).
     names none, refused as lacking authority, saying that no proposal
     could be accepted.
 
-  The client compares the draft with those facts before the request is
-  sent, and says which it will be. A task is within the first bound
-  when its executor is listed, its budget no larger and its deadline no
-  later than the bound's (a task with no deadline being beyond any bound
-  that has one), and its authority within what the party may give; a
-  budget `AsAllowed` is within it, and its answer says what it gave.
-  Past the second bound, or with an executor not listed, it is refused
-  as not offered, and the client sends nothing. An amendment that widens
-  no authority is made. One that widens anything, even while it narrows
-  something else, is judged whole: the authority it leaves the task must
-  fit the first bound, the budget it adds be no more than the party may
-  add, and each grant it adds be among those listed; past the ceiling it
-  is refused as not offered, and the client sends nothing. Between the
-  two bounds, the client sends `Propose` where the offer says
-  proposable, or says the refusal in place, sending nothing. That is the
-  engine's word read, not authority computed: the engine judges again
-  when the request comes, by the rule that made the offer. No read
-  assesses a draft.
+  A presentation, or the helper `shapes` (client.md, section 19),
+  compares the draft with those facts before the request is sent, and
+  says which it will be. A task is within the first bound when its
+  executor is listed, its budget no larger and its deadline no later
+  than the bound's (a task with no deadline being beyond any bound that
+  has one), and its authority within what the party may give; a budget
+  `AsAllowed` is within it, and its answer says what it gave. Past the
+  second bound, or with an executor not listed, it is refused as not
+  offered, and nothing is sent. An amendment that widens no authority is
+  made. One that widens anything, even while it narrows something else,
+  is judged whole: the authority it leaves the task must fit the first
+  bound, the budget it adds be no more than the party may add, and each
+  grant it adds be among those listed; past the ceiling it is refused as
+  not offered, and nothing is sent. Between the two bounds, a
+  presentation sends `Propose` where the offer says proposable, or says
+  the refusal in place, sending nothing. That is the engine's word read,
+  not authority computed: the engine judges again when the request
+  comes, by the rule that made the offer. No read assesses a draft.
 - **Reordering,** in a project's document: whether the party may change
   its tracked tasks' priorities, in one compound request of
   priority-only amendments (3.4). It is judged by the party's role in
@@ -669,13 +626,8 @@ unsent, for its owner's version (section 8).
   the "once" and admission below the API; whether and how a person
   confirms a deciding act, and which of these facts it shows, is the
   application's choice, which it makes wherever it confirms. jig's
-  reference UI keeps jig's confirmation (view.md, 18.5).
-- **jig's check,** in its test kit and never mandated, finds in an
-  application's worlds a decision whose revision was not in a document
-  the client delivered to the application before the request was sent;
-  on a tree (the reference UI's, or an application's on skein's UI
-  kit), it also finds a deciding act on a tree that did not show its
-  facts (testing.md, section 6).
+  reference UI keeps jig's confirmation (view.md, 18.5); jig's check of
+  it is testing.md's, 6.2.
 
 ## 6. Reads
 
@@ -706,6 +658,10 @@ party reads is therefore never lost by a crash.
   engine's loads are full, as busy; when the sign-in has ended, as
   signed out (client.md, section 12); in a version the engine does not
   serve, as version not served (section 8).
+- **A question's answer** is read with the question, by whoever may read
+  the question: a delegate is in its requester's project, and the
+  answer's words are those of the task the question was put to
+  (`../../domain/engine.md`, 7.2; `../../protocol/store.md`, 7.3).
 
 ### 6.1 Task queries
 
@@ -748,9 +704,9 @@ party reads is therefore never lost by a crash.
 - **Retention:** an ended task forgotten once read leaves the indexes,
   with its read position, once its requester, a party, has read its
   result and its turns, and no live task names it
-  (`../../domain/people.md`, section 6); a kept one stays to the deployment's retention horizon, which
-  waits for retention (`../../protocol/store.md`, 11.1), and until then
-  for good.
+  (`../../domain/people.md`, section 6); a kept one stays to the
+  deployment's retention horizon, and whole while none is set
+  (`../../protocol/store.md`, 11.1).
 
 ## 7. Watches
 
@@ -857,7 +813,7 @@ commit, so they leave through the journal's door (`../../README.md`,
   6.5): a run in an agent process gives neither, and its document holds
   no text and no call, while its turns reach the client as they commit.
 
-### 7.4 Later: an application's streams
+### 7.4 An application's streams
 
 An application's data that its people follow as it comes (a log
 followed, a metric's latest points) is a stream of the application's:
@@ -868,8 +824,7 @@ the journal's door (`../../README.md`, 6.3), marked provisional, and an
 application shows them marked so. It adds a kind of subject to the
 application's own and a use of the journal's door, with no change to
 7.1's subjects or 7.2's rules, and crosses on the client's one stream as
-any watch's deliveries do (`../../protocol/client.md`, section 7). It
-waits for an application whose people follow its data as it comes.
+any watch's deliveries do (`../../protocol/client.md`, section 7).
 
 ### 7.5 An application's scopes and windows
 
@@ -886,7 +841,7 @@ waits for an application whose people follow its data as it comes.
   jig's subjects do: bounded rows and bytes, at the cursor its owner
   gave, so that what the views keep per watch is a window and a mark,
   never a backlog, and every document fits the client's limits.
-- **Streams** wait (7.4); **versions** are per owner (section 8).
+- **Streams** are 7.4's; **versions** are per owner (section 8).
 
 ## 8. Versions
 
@@ -898,24 +853,21 @@ waits for an application whose people follow its data as it comes.
 - **A version not served is refused with a typed answer,** *version not
   served* (section 4), naming the owner and the ranges the engine
   serves, with nothing read, made or kept; a read and a watch in it
-  likewise. The client then sends nothing more of that owner, keeps its
-  pending requests in its small store, and tells the application, which
-  says how to update (the reference UI: pages.md, section 8); outside
-  jig's range, it sends nothing at all (client.md, 8.2). Updated, it
-  sends what it kept, under its keys.
+  likewise. What the client then does with that owner's requests, reads
+  and watches, and when it sends what it kept, is client.md's, 8.2;
+  what the application says of it is its own (the reference UI's:
+  pages.md, section 8).
 - **One jig pin.** In an application, `jig-client` and the engine come
   from one jig pin, so they agree on jig's records unless the engine was
   updated under a client still running. A change to the plumbing moves
   jig's wire version, and before a release each range is one version
   (`../../protocol/README.md`, section 7).
-- **How jig itself is released and pinned,** and how a change of jig's
-  reaches every application, waits for an application outside the
-  workspace jig is built in (`../../README.md`, section 14).
+- **How jig is released and pinned,** and how a change of jig's reaches
+  every application, is `../../README.md`'s, section 14.
 
 ## 9. What the engine's domain owes the client
 
-Changes this design asks of `../../domain/`, adopted there with it
-(`../../domain/README.md`, section 5):
+What `../../domain/` owes this contract, each designed where named:
 
 1. **The plumbing operations of 3.2 for parties:** a `Create` of a
    batch, person tasks among its executors; `Propose` of every kind of
@@ -930,15 +882,18 @@ Changes this design asks of `../../domain/`, adopted there with it
    operations per request; operations admitted in order, one pool
    counted across them, committed in one decision or refused naming the
    first that failed; done, answered with the first of the message
-   numbers its operations took, one each in order; and the tasks
-   child's limit of goals per project,
-   the live tracked tasks of one project, refused at the entrance as
-   live tasks per project are (`../../domain/tasks.md`, section 11).
+   numbers its operations took, one each in order
+   (`../../domain/people.md`, 5.1); and the tasks child's limit of
+   goals per project, the live tracked tasks of one project, refused at
+   the entrance as live tasks per project are (`../../domain/tasks.md`,
+   section 11).
 3. **Proposing explicit** (3.5): a party's create or amendment beyond
    their authority refused, saying what it lacked and whether a proposal
    of it could be accepted (section 4); a party's proposal naming the
-   party as its proposer.
-4. **A party's root has someone to escalate to** (3.2).
+   party as its proposer (`../../domain/people.md`, 5.1;
+   `../../domain/tasks.md`, section 9).
+4. **A party's root has someone to escalate to** (3.2;
+   `../../domain/people.md`, 5.1).
 5. **A task's fields** (3.2): its label, its conversation and listed
    flags, its retention class, its last activity, and what it waits on,
    computed; and `AsAllowed`, resolved at admission and answered
@@ -949,22 +904,25 @@ Changes this design asks of `../../domain/`, adopted there with it
 7. **Templates served, never expanded** (3.6): the configuration's
    templates and each policy's overrides, kept only to serve each
    project's merged templates in `me`; an override naming no template
-   refused when the policy is changed.
+   refused when the policy is changed (`../../domain/engine.md`, 11.1;
+   `../../protocol/configuration.md`, 3.1).
 8. **Credentials minted on the server's word:** a sign-in committed for
    an identity the application's server verified, its provider of kind
    application (section 2; `../../domain/people.md`, section 3).
 9. **An application's keyed requests,** admitted and kept by the people
    child as jig's are, told apart by a digest, judged as the party's when
    they ask the core for something, their outcomes kept by their
-   connector for the retention (3.3; `../../domain/connectors.md` gains
-   it).
-10. **Refusals with facts,** as section 4 lists them.
+   connector for the retention (3.3; `../../domain/people.md`, 5.1;
+   `../../domain/connectors.md`, 5.5).
+10. **Refusals with facts,** as section 4 lists them
+    (`../../domain/people.md`, 5.1).
 11. **Revisions** of holds, specs and person tasks, in their documents
-    and in the decisions that name them (5.2 lists them).
+    and in the decisions that name them (5.2 lists them;
+    `../../domain/people.md`, 5.1).
 12. **Acts offered** in each object's document, made, proposable or
     refused, creating and amending with bounds, reordering in a
     project's document by the party's role alone, and a decision's
-    effect as data (5.3, 5.4).
+    effect as data (5.3, 5.4; `../../domain/engine.md`, 11.5).
 13. **`me`, and the inbox across projects:** the party's entries in
     every project they hold a role in, needs counted exactly and updates
     up to a limit (`../../domain/people.md`, section 6).
@@ -983,10 +941,9 @@ Changes this design asks of `../../domain/`, adopted there with it
     delivery is in flight and whether its subject changed since; the
     subject's owner (the core, or a connector through the root) computes
     each document when a delivery is made, and the delivery is held as a
-    read's answer is. Older passages that describe views as a
-    best-effort stream (`../../domain/core.md`, section 11;
-    `../../README.md`, 6.3) say so too.
-17. **A watch is not a keyed request** (3.2).
+    read's answer is.
+17. **A watch is not a keyed request** (3.2; `../../domain/people.md`,
+    5.1).
 
 ## 10. Below the domain
 
@@ -1028,8 +985,11 @@ designs (`../../protocol/client.md`):
   save a client the second round trip.
 - **Windows of a large tree:** how a tree watch's window follows what a
   person opened, so that a tree of hundreds of tasks costs what is shown.
-- **Who may see what** among a project's parties, deferred while jig's
-  reference UI is built for one person (`../../domain/people.md`,
-  section 12).
+- **Who may see what** among a project's parties
+  (`../../domain/people.md`, section 12).
 - **Search** over tasks, results, notes and transcripts, which the engine
   has only over notes' descriptions.
+- **A document past its bounds:** what a read or a watch is answered
+  when the engine cannot make its document within the client's bounds:
+  bounds derived so that it cannot happen, as a path's segments are, or
+  an answer of its own.

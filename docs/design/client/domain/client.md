@@ -125,7 +125,7 @@ jig-client                        jig_client::Client: the domain and the link, c
 - **Builds:** the three crates and the helpers are step code under the
   strict subset, built for the host and for wasm32 (programming-model.md,
   section 10). Only `jig-protocol-transcript` links smith, the client's
-  only use of smith (`../../README.md`, section 9).
+  only use of smith (`../../README.md`, section 10).
 - **Its handles inside are skein-lib's:** its watches, reads and
   exchanges are `Id`s in slabs sized at startup, and what crosses to the
   transport is their tokens (programming-model.md, 4.2). A terminal is
@@ -155,7 +155,7 @@ Request, out
   to the transport:   Exchange { exchange, credential, message } | OpenStream { credential } | CloseStream | Save { records } | Erase { records }
   to the application: Link(state) | Changed { handle } | Ended { handle, why } | Page { handle, page }
                       Pending { key } | Answered { key, outcome } | Kept { key, request } | Dropped { count } | Text { handle }
-read by the application: client.document(handle), client.pending(key), client.link()
+read by the application: client.document(handle), client.text(handle), client.pending(key), client.link()
 ```
 
 - **`now` and `wall`** are the monotonic instant and the wall time, as
@@ -225,6 +225,8 @@ read by the application: client.document(handle), client.pending(key), client.li
   the application reads:
   - `client.document(handle)`: the handle's latest document, and its
     state (8.1);
+  - `client.text(handle)`: the run's text it holds for the handle, the
+    one turn being written (8.3);
   - `client.pending(key)`: the request's progress, its party and its
     owner (section 6);
   - `client.link()`: the link's state, and the credential held (8.2 and
@@ -245,9 +247,7 @@ read by the application: client.document(handle), client.pending(key), client.li
 Pages, places, navigation and the working set are the reference UI's,
 `jig-client-view`: pages.md, sections 2 and 12; objects.md, section 2;
 and view.md, 18.2 and 18.3. The client holds no object by key: it holds
-the latest document of each watch, by handle (section 8). A presentation
-that shows one object in several places holds it once, in its own
-state.
+the latest document of each watch, by handle (section 8).
 
 ### 5.1 Sections
 
@@ -268,7 +268,8 @@ handles, as every presentation does (sections 7 and 8).
   - a family's request: its owner's number, its scope, its version and
     its record's bytes (contract.md, 3.3).
 
-  The client reads none of it but its owner and its size.
+  The client reads none of it but its owner, its version and its size
+  (4.3).
 - **The key is the application's name for a request:** its asker, and a
   number the asker draws from its seed, fresh for each request it means.
   A second `Send` under a key the client holds is joined to the first
@@ -514,8 +515,8 @@ handles, as every presentation does (sections 7 and 8).
     under its keys. Updated, it sends what it kept in a version its new
     build speaks, and drops what it kept in another (section 11).
     `jig-client` and the engine come from one pin of jig in an
-    application; how jig is released and pinned waits
-    (`../../README.md`, section 14).
+    application; how jig is released and pinned is `../../README.md`'s,
+    section 14.
 - **A restart of the engine** is a moment offline, then answers by key.
   Provisional text streamed before it, never committed, is dropped when
   the next delivery comes (8.3).
@@ -554,16 +555,10 @@ handles, as every presentation does (sections 7 and 8).
 ## 9. Drafts and confirmations
 
 Drafts and the confirmation are the presentation's: the application's
-own, or the reference UI's (view.md, 18.5; objects.md, section 2). jig
-gives what a confirmation says as data: each document's revisions,
-its offers, and a decision's effect (what accepting a proposal grants
-and costs, and the pool after; what releasing does; what cancelling
-ends; contract.md, 5.4). What holds below a confirmation is the
-client's and the engine's: the revision a decision names (section 6),
-made once, and answered once durable. jig's check, in its test kit and
-never mandated, finds in an application's worlds a decision sent
-naming a revision that no document the client had delivered to the
-application carried (testing.md, 6.2).
+own, or the reference UI's (view.md, 18.5; objects.md, section 2). What
+a confirmation says is data in jig's documents (contract.md, 5.3 and
+5.4); what holds below it is the revision a decision names and the
+request table's once (section 6); jig's check is testing.md's, 6.2.
 
 ## 10. Conversations
 
@@ -675,12 +670,12 @@ for any presentation of a chat or of any agent task's activity.
 
 ## 12. Signing in
 
-- **jig owns credentials, not sign-in flows.** The engine mints,
-  verifies, expires and revokes them (`../../domain/people.md`, section
-  3). Its own ways of signing in are the printed link, a one-time secret
-  on loopback, and a service's credential. Every other way is the
-  application's sign-in, on its own routes, ending in a `Mint` its server
-  gives the clients' component (`../../protocol/client.md`, section 8).
+- **jig owns credentials, not sign-in flows** (contract.md, section 2).
+  Its own two ways of signing in are the printed link's one-time
+  secret, on loopback, and a service's credential. Every other way is
+  the application's sign-in, on its own routes, ending in a `Mint` its
+  server gives the clients' component (`../../protocol/client.md`,
+  section 8).
 - **`SignIn { with }`:**
   - *`Link(secret)`:* the printed link's secret. The client sends the
     component's sign-in with it, and holds the credential the answer
@@ -734,8 +729,7 @@ for any presentation of a chat or of any agent task's activity.
 - **A bot relaying a person's decision** holds that person's own
   credential, from the application's sign-in (`Held`), and the decision
   is the person's request, naming the revision the bot showed them: jig
-  adds no acting for another (`../../domain/people.md`, section 3). It
-  waits for an application with such a bot.
+  adds no acting for another (`../../domain/people.md`, section 3).
 - **Keys are the party's across sign-ins,** so the parked requests are
   sent again once the same party is confirmed, within the engine's
   retention.
@@ -802,9 +796,9 @@ Each is configured and part of the worst case:
   and documents are bytes under their owner's number; a part named in
   one of jig's documents is a reference (root.md, section 6).
 - **Templates:** a template is the application's data, which `me` serves
-  and a helper or the application fills into an ordinary `Create`
-  (contract.md, 3.6; `../../protocol/configuration.md`, 3.1). The client
-  sends what it is given.
+  and a helper or the application fills into an ordinary `Create` or
+  `Propose` (contract.md, 3.6; `../../protocol/configuration.md`, 3.1).
+  The client sends what it is given.
 - **The engine's internals:** tasks by number, documents by subject and
   revision, outcomes and refusals as the contract gives them. Authority
   is never computed here: what a party may do is what the engine's
@@ -863,14 +857,8 @@ family's request, read and watch as bytes; a version not served; a
 sign-out lost, then sent again; a one-shot client that sends, waits for
 the durable answer and stops.
 
-Its referee: nothing answered done before the engine made it durable;
-every request sent is made once, whatever the faults; no request the
-application sent is lost, but those answered not kept or unconfirmed;
-no request is sent before its record is stored, nor for a party not
-confirmed; every operation names a revision that a document delivered
-to the application carried; nothing beyond the client's limits is held.
-The reference UI's stories, with a person in front of a tree, are
-view.md's, 18.10.
+Its referee is testing.md's, 6.1 and 6.2; the reference UI's stories,
+with a person in front of a tree, are view.md's, 18.10.
 
 ## 18. Open questions
 
@@ -888,8 +876,9 @@ view.md's, 18.10.
   until it expires. A browser's cookie only its server clears
   (section 12).
 - **The generic half in skein:** keyed requests until durable,
-  level-triggered watches and the link may move to skein, as skein-ui
-  did. It waits for a second user that wants them.
+  level-triggered watches and the link are jig's while they have one
+  user; whether they move to skein, by a rename and a crate move, once
+  a second user wants them.
 
 ## 19. Helpers
 
@@ -906,9 +895,14 @@ view.md's, 18.10.
   - `shapes::close_chat(task, disposals)` gives one compound request:
     each live delegate cancelled or moved to the party, then the chat
     cancelled with the template's grace;
-  - `shapes::set_goal(..)` fills the goal template into a `Create`, or a
-    `Propose` where the project's offer says the creator's authority
-    does not cover it;
+  - `shapes::set_goal(..)` fills the goal template, compares the draft
+    with the project's creating bounds in `me` (contract.md, 5.3), and
+    gives one of four: *made,* a `Create`, within the first bound;
+    *proposable,* a `Propose` to the roles the offer names, between the
+    two bounds where the offer says so; *refused,* the offer's refusal,
+    between them where it says so; or *not offered,* past the second
+    bound or with an executor not listed. Refused and not offered send
+    nothing;
   - each fills what a template does not give from `me` and its own
     inputs: the authority `me` offers for creating (contract.md, 5.3),
     one level below the role, made one level shallower again for each
@@ -921,9 +915,46 @@ view.md's, 18.10.
     whose choices its document cut), a value its helper takes no input
     for (a chat's executor, budget or deadline the creator's to give),
     or a `shallower` of 0, which no task's authority may be.
-- **`facts`:** pure functions over the documents the client holds: a
-  chat's status, from its phase, its run and what it waits on; what a
-  decision will do, read from its document.
+- **`facts`:** pure functions over the documents the client holds, the
+  same for an application's own presentation as for the reference UI:
+  - *a chat's status,* from its chip's phase and its host's last report,
+    what it waits on, and `me`, for the chat's project:
+
+    | Status | The chat is |
+    |---|---|
+    | starting | waiting to start, due, preparing or claimed; or its host preparing or starting its run |
+    | writing | running, writing |
+    | a tool | running a tool its host names: which, and since when |
+    | working | running, neither writing nor in a tool its host names, or nothing reported yet; and since when |
+    | waiting for you | waiting on the signed-in party: a question, a proposal or a person task in its tree; and for what |
+    | waiting for them | waiting on another party: whom |
+    | parked | idle: its run waiting, holding its slot, or parked |
+    | retrying | backing off: until when, and why |
+    | held | held: why |
+    | closing; ended | closing; then ended, and when |
+
+    The first that applies, in this order: held, closing and ended, each
+    a phase that says why it waits; then a party it waits on, in any
+    active stage; then its stage, and, while its run is claimed or
+    running, what its host last reported. Writing and a tool are read
+    only from such a report, never from a run being placed
+    (`../../domain/hosts.md`, 6.5). A run that waits holds its slot only
+    until it parks, and is idle meanwhile (`../../domain/engine.md`,
+    7.4). The party it waits on is the signed-in one where it names
+    them, or a role `me` says they hold in the chat's project; any other
+    is another party. How each status is said is the presentation's
+    (the reference UI's: pages.md, section 4);
+  - *an act's offer and effect:* the engine's admission of the act, as
+    the document offers it (made, proposable and to whom, bounded, or
+    refused; contract.md, 5.3), and what a decision will do, where the
+    act is offered with it (contract.md, 5.4); read, never inferred;
+  - *a refusal and why:* an offer's refusal, with its facts
+    (contract.md, section 4); a request's comes with them in its answer
+    (section 6);
+  - *whether an act is dangerous:* a cancel, a proposal's rejection and
+    a note's deletion are, and no other act. A presentation that
+    confirms marks a dangerous act so (the reference UI: objects.md,
+    section 2).
 - **`thread`:** a conversation's thread (section 10).
 - **`words`:** jig's English for its enums (phases, holds, refusals, what
   a task waits on), as phrases with holes an application overrides
@@ -952,8 +983,4 @@ view.md's, 18.10.
   key.
 - **The client runs no loop of its own in any mode.** The host steps it,
   fires its deadlines and carries its requests; the modes differ in the
-  host alone.
-- **Designed here, built when needed.** A service's client and a
-  one-shot one follow from the client's shape, and wait for an
-  application whose services act as parties, or whose commands run
-  once.
+  host alone, and each follows from the client's shape.

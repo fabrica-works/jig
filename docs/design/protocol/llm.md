@@ -1,6 +1,6 @@
 # LLM calls and accounts in the engine
 
-Provisional, 2026-10-10, revised 2026-10-12. How a host that runs agents
+Provisional, 2026-10-10, revised 2026-10-18. How a host that runs agents
 in its own process makes their LLM calls, and how every engine that runs
 agents keeps its LLM accounts: the completions `smith-inline-agent`'s
 runs ask for, in the engine or on a worker whose root composes it,
@@ -116,7 +116,8 @@ engine's protocol layer
   The protocol layer asks smith's component for each completion's text
   as it arrives (smith's `protocol/events.md`, 3.5) and hands it up with
   its completion's name and offset: the run's text by turn, retry and
-  offset (`channel.md`, 6.4), best effort, never holding the run.
+  offset (`../domain/hosts.md`, 6.5), best effort, never holding the
+  run.
 - **Unauthorized and exhausted** come back to the run as smith's failures.
   The run's notices go up through the agent and the hub to the accounts
   child, as a rejected generation or an exhausted account, fenced by
@@ -232,9 +233,10 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
   redirect, writes the account's file, which the engine then loads. An
   application may ship that as a command beside its engine. A sign-in at
   a terminal serves a public client's registration only: a confidential
-  one is refused at its start, naming the account, until a provider
-  needs one. Signing an
-  account in through the client is open (section 10).
+  one, whose redirect reaches a web server (skein's `oauth.md`, 6.5), is
+  refused at its start, naming the account. Signing an account in
+  through a client, where such a redirect would arrive, is open
+  (section 10).
 - **A file that cannot be read** fails the account as unloaded, saying
   where and why; the account stays unusable until its file is replaced.
 - **A revoked account** fails as sign in again; the driver drops its dead
@@ -293,7 +295,8 @@ child's vocabulary and the driver's, both ways, exhaustive on both:
 
 ## 8. Testing
 
-Each within jig's suites' budgets (`../../development/workflow.md`).
+Each within jig's suites' budgets (`../../development/workflow.md`,
+section 2).
 
 - **The driver is skein's,** tested in skein's worlds; jig tests what it
   adds.
@@ -322,9 +325,9 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 
 - **The domain** wants every configured account, and pushes each new
   generation to every live attempt (`../domain/engine.md`, section 12).
-- **smith owes** nothing beyond what its `main` has for the first build,
-  and later an abort and a closed terminal for its LLM component
-  (`README.md`, section 11).
+- **What smith gives** serves as it is (`README.md`, section 11).
+- **What jig asks of smith, later:** an abort and a closed terminal for
+  its LLM component (`README.md`, section 11).
 - **skein owes** nothing beyond what it has: its accounts driver, LLM
   client, connection component and fake peers serve as they are.
 - **The store owes** nothing for accounts: their records are the driver's
@@ -334,8 +337,9 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 
 - **Signing an account in through a client:** an owner starting an
   account's sign-in from the deployment's page, the client showing the
-  driver's visit, and the provider's redirect reaching the engine's
-  listener; in place of a sign-in at a terminal.
+  driver's visit, and the provider's redirect reaching the application's
+  server, on its own routes, which hands it to the driver
+  (`service.md`, section 2); in place of a sign-in at a terminal.
 - **Fairness on a host's loop** (`../domain/hosts.md`, section 12):
   many `smith-inline-agent` runs' completions share one connection
   component and one loop; whether each run gets a share of each

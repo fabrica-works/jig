@@ -1,6 +1,6 @@
 # jig's protocol layer
 
-Provisional, 2026-10-10, revised 2026-10-15. The design of what lies
+Provisional, 2026-10-10, revised 2026-10-18. The design of what lies
 between jig's domains and bytes: the components an application's protocol
 layers own to carry jig's vocabularies to the store, to workers, to LLM
 providers and to clients; what an application writes around them; their
@@ -127,7 +127,7 @@ section 4. What is still open is listed in section 14.
 | smith's parent face | the vocabulary both agent capabilities speak toward their parent (`smith_host_domain::parent`; smith's `domain/host.md`, 9.4) |
 | smith's values | smith's charter, transcript, turns' bodies and results as typed values, which smith's parent face carries and its agent capabilities take and give; the hub carries them as smith's bytes |
 | an application's credential | a credential of the application's that a run's workspace needs (a token to fetch and push), named by the application's number for it and a generation; its value in the application's own table, from a source of its own (`channel.md`, section 8) |
-| the reference binary | `jig-test`, jig's test application's `main`: the template an application copies for its own (`service.md`, section 7) |
+| the reference binary | `jig-test`, jig's test application's `main`, which an application copies for its own (`service.md`, section 7) |
 
 The domain's names (`../domain/README.md`, section 4) and the client's
 (`../client/domain/README.md`, section 4) keep their meaning here; the
@@ -166,7 +166,7 @@ An application that mixes the last two has both.
   codecs and channels, with no TLS, and the workers' agents child
   processes, as between hosts (`service.md`, section 10). A client
   reaches the engine through the application's server, over TCP on
-  loopback. It is the first shape built.
+  loopback.
 
 ## 5. Components
 
@@ -186,7 +186,7 @@ An application that mixes the last two has both.
 | `jig-client-protocol-link` | component | client | jig's messages encoded and decoded, the stream's events, the small store's records; no HTTP (`client.md`, 4.3) |
 | `jig-client-protocol-http` | mapping | client | the default HTTP mapping's client end: a message as a method, a path, headers and a body; the stream's server-sent events cut into events; for the host and wasm32 (`client.md`, 17.4) |
 | `jig-protocol-transcript` | decoding | engine, client | turns' bytes into the client's vocabulary (`../client/domain/client.md`, section 10) |
-| `jig-client-shell-web`, `jig-client-shell-native` | shells' parts, a shell | client | the reference UI's browser parts over skein's `skein-ui-web`: the default mapping's client end over fetch, the printed link's sign-in, jig's look (`browser.md`, 5.1); and the native shell over skein's HTTP client, with `jig-client-protocol-http` (`client.md`, section 12) |
+| `jig-client-shell-web`, `jig-client-shell-native` | shells' parts, a shell | client | jig's browser parts over skein's `skein-ui-web`: the client's adapter over skein's fetch, the printed link's sign-in, jig's look (`browser.md`, 5.1); and the native shell over skein's HTTP client, with `jig-client-protocol-http` (`client.md`, section 12) |
 
 Beside them, smith's components, by the agent capability:
 `smith-protocol-llm`, over skein's `skein-llm-connection`, in a process
@@ -248,10 +248,10 @@ keeping: jig mints, verifies, expires and revokes them.
 - **Pre-release: one version at a time.** Each of jig's encodings has one
   current version. A reader refuses another, saying so, and nothing is
   translated (skein's `codec.md`, section 5).
-- **Upgrades come later.** Everything that crosses a boundary or outlives
-  a process carries its version, which is what an upgrade will need. Until
-  upgrades are designed, an upgrade stops the engine and its workers
-  together, and a store written by another version refuses to open.
+- **No upgrade in place.** Everything that crosses a boundary or
+  outlives a process carries its version, which an upgrade will need; an
+  upgrade stops the engine and its workers together, and a store written
+  by another version refuses to open (section 14).
 - **The channel** is versioned whole, agreed at its opening; the
   application's payloads inside it by the payload version a worker's
   credential carries (`channel.md`, 4.1 and 6.2).
@@ -274,8 +274,8 @@ keeping: jig mints, verifies, expires and revokes them.
     components from one revision of jig, so a change to jig's
     operations moves jig's wire version, and before a release every
     range is one version.
-  - *How jig itself is released and pinned* waits for an application
-    outside this workspace (`../README.md`, section 14).
+  - *How jig itself is released and pinned* is open (`../README.md`,
+    section 14).
 - **Configuration** has no version: unknown fields refuse the start
   (`configuration.md`, section 9).
 
@@ -311,16 +311,14 @@ keeping: jig mints, verifies, expires and revokes them.
 
 ## 9. The store
 
-- **jig's store is a subset of an existing design, made generic.** jig's
-  first application designed its engine's store on skein's key-value store
-  (skein's `kv.md`), embedded in the engine's process, with transcripts
-  beside it and secrets in a second store. There is no store process and
-  no wire: the store is a component of the engine's protocol layer, and
-  its bytes are its records on disk. jig takes the parts of that design
-  that are about the engine's own records (its families, their keys and
-  encoding, versions, commits and loads, transcripts, secrets, opening,
-  growth and retention), and leaves the application's families to the
-  application, which adds them beside jig's, in the same commits.
+- **jig's store is skein's key-value store in the engine** (skein's
+  `kv.md`): embedded in the engine's process, with transcripts beside it
+  and secrets in a second store. There is no store process and no wire:
+  the store is a component of the engine's protocol layer, and its bytes
+  are its records on disk. jig's part is the engine's own records (its
+  families, their keys and encoding, versions, commits and loads,
+  transcripts, secrets, opening, growth and retention); the application
+  adds its families beside jig's, in the same commits.
 - **Its design is `store.md`.** What the rest of the protocol layer
   relies on is this:
   - **commits** numbered as the journal numbers them, applied in order,
@@ -358,10 +356,9 @@ Each is generic, and says nothing about jig.
   deadline, with an environment given whole and only named directories
   writable, stopped politely, then terminated, then killed, and proved
   empty (`../domain/hosts.md`, section 10; skein's `draft/process.md`;
-  smith's `protocol/README.md`, section 9 asks the same). Until they
-  exist, each agent process, command and check runs in a process group
-  of its own, which a stop signals whole (skein's `io.md`, section 6);
-  the first shape built does not wait for them.
+  smith's `protocol/README.md`, section 9 asks the same). Without them,
+  each agent process, command and check runs in a process group of its
+  own, which a stop signals whole (skein's `io.md`, section 6).
 - **Private files read at startup:** the startup kit's
   `read_private_file`, refusing a file that is not private to the
   process's user, or reached through a link, for configuration's secrets
@@ -419,16 +416,15 @@ Each is generic, and says nothing about jig.
   fake issuer, HTTP's server and client, server-sent events.
 - **The store** needs skein-kv as it is, and io's `OpenWrite` and `Cut`
   (skein's `io.md`, section 5; `store.md`, section 15).
-- **Nothing new for the client's API.** The generic half of the client
-  (keyed requests until durable, level-triggered watches, the link,
-  generic guards) may move to skein, as skein-ui did, once a second
-  user wants it; it waits for that user.
+- **Nothing new for the client's API.** Its generic half (keyed
+  requests until durable, level-triggered watches, the link, generic
+  guards) is jig's while it has one user.
 
 ## 11. What jig needs from smith
 
-- **What smith's `main` has, for the first build:** charter v2, with each
-  model's window, output and prices with cache writes, and the budget's
-  reserve (smith's `protocol/charter.md`, section 2); transcript v3,
+- **What smith gives:** charter v2, with each model's window, output and
+  prices with cache writes, and the budget's reserve (smith's
+  `protocol/charter.md`, section 2); transcript v3,
   whose turns say whether they open a window (smith's
   `protocol/transcript.md`, section 3); channel v2, with a start's
   messages and the run's identity, messages refused at the kit's
@@ -448,15 +444,16 @@ Each is generic, and says nothing about jig.
 - **Not asked: a completion's result contract.** A protocol layer that
   runs `smith-inline-agent` keeps each slot's beside smith's LLM
   component, as smith's own local host does (`llm.md`, section 3).
-- **Later, not needed for the first build:**
+- **What jig asks of smith, later:**
   - **a run's text and its tool calls on smith's channel:** a channel
     version on which a host asks, at a run's start, for its main
     conversation's text as content, best effort and counted when
     dropped, each piece naming the turn it will be told as, its
     completion's retry and its offset; and a tool begun with its call's
-    name, its tool and its input within a bound. Until then a run in an
-    agent process shows its activity, and its words as each turn
-    commits (`channel.md`, 6.4). A conversation's presentation wants it;
+    name, its tool and its input within a bound. Without it, a run in
+    an agent process shows its activity, and its words as each turn
+    commits (`channel.md`, 6.4; `../domain/hosts.md`, 6.5). A
+    conversation's presentation wants it;
   - **closing smith's LLM component as an owner closes it:** an abort
     that ends every completion in flight, for a process that stops
     without draining (`service.md`, section 5), and a completion asked
@@ -464,49 +461,29 @@ Each is generic, and says nothing about jig.
 
 ## 12. What the domain owes
 
-The changes this design asked of jig's domain are made there; what is
-left is the code's:
+What the protocol layer relies on from jig's domain is designed there:
 
-1. **The engine stopping:** the core hears it, takes nothing that would
-   make a commit, ends its watches saying so, and says when nothing waits
-   for a commit (`../domain/engine.md`, 6.1; `service.md`, section 5).
-2. **Credential grants pushed and resent:** every new generation to every
-   live attempt of its account, and each kept or adopted attempt sent its
-   current grant (`../domain/engine.md`, sections 8 and 12).
-3. **Accounts on skein's driver:** every configured account wanted; no
-   refresh schedule, keeping or generation numbering of jig's
-   (`../domain/engine.md`, section 12; `llm.md`, section 5).
-4. **The hub's link vocabulary, whole:** section 2 of
-   `../domain/hosts.md` as one vocabulary toward the link, with the
-   agent's notices, on a worker as in the engine (`../domain/hosts.md`,
-   6.1; `channel.md`, section 1).
-5. **The client's:** reads answered signed out, a reopened run's watch
-   starting from its turn's beginning, and signing out from `me`
-   (`client.md`, section 16).
-6. **Following smith's `main`:** windows, and resuming from the current
-   one (`../domain/engine.md`, 7.2); the start's messages, refusals carried
-   with turns, and messages refused or unread kept in the inbox
-   (`../domain/tasks.md`, 8.2 and 8.3); the hello's agent bounds checked
-   (`../domain/engine.md`, section 8); smith's payloads and facts by
-   hand-out (`../domain/hosts.md`, 6.8); no run placed that smith would
-   refuse for its budget (`../domain/authority.md`, section 7).
-7. **An application's credentials,** kept beside LLM accounts and
-   granted with the assignment (`../domain/engine.md`, 12.1).
-8. **The client's API:** parties' `Create`, `Propose` and `Withdraw`;
-   compound requests within operations per request, admitted in order
-   and committed in one decision; cancel with a grace; a party's root
-   with someone to escalate to; a task's label, flags, last activity and
-   what it waits on; `AsAllowed`; goals per project; task queries, and
-   `me` with each project's merged templates; credentials minted on the
-   application's server's word (`../domain/people.md`, sections 3, 5.1
-   and 6; `../domain/tasks.md`, sections 3, 4, 7 and 11;
-   `configuration.md`, 3.1 and section 6; `client.md`, sections 4
-   and 8).
+- **the engine stopping:** `../domain/engine.md`, 6.1;
+- **credential grants pushed and resent, and accounts on skein's
+  driver:** `../domain/engine.md`, sections 8 and 12; `llm.md`, section
+  5;
+- **the hub's link vocabulary, whole, and smith's payloads and facts by
+  hand-out:** `../domain/hosts.md`, 6.1 and 6.8;
+- **what smith gives** (section 11): windows, and resuming from the
+  current one (`../domain/engine.md`, 7.2); the start's messages
+  (`../domain/engine.md`, 7.1; `../domain/hosts.md`, section 9), and
+  messages refused or unread kept in the inbox (`../domain/tasks.md`,
+  8.2 and 8.3); refusals carried with turns (`../domain/hosts.md`, 6.4);
+  the hello's agent bounds checked (`../domain/engine.md`, section 8);
+  no run placed that smith would refuse for its budget
+  (`../domain/authority.md`, section 7);
+- **an application's credentials:** `../domain/engine.md`, 12.1;
+- **the client's API:** `../domain/people.md`, sections 3, 5.1 and 6;
+  `../domain/tasks.md`, sections 3, 4, 7 and 11; `../domain/engine.md`,
+  section 11; what the domain owes the client, item by item,
+  `../client/domain/contract.md`, section 9.
 
-What the store asks of the domain (live before history, indexes for
-parties' reads and the two ended indexes, read positions over ended
-conversations, turns kept by window, fill, retention by each task's
-class, keys for single reads) is `store.md`, section 15.
+What the store asks of the domain is `store.md`, section 15.
 
 ## 13. Decisions this design takes
 
@@ -541,10 +518,10 @@ class, keys for single reads) is `store.md`, section 15.
   a live attempt's call from a stale one. One path serves both shapes:
   fenced, then handed out to be decoded, and handed back typed. A run's
   result takes the same path (`channel.md`, 6.1).
-- **A run's text keeps its contract,** by turn, retry and offset, a gap
-  marking the turn cut, from a host that drains `smith-inline-agent`'s
-  content, or from agent processes once smith's channel carries it
-  (section 11; `channel.md`, 6.4).
+- **A run's text keeps one contract,** by turn, retry and offset,
+  whatever its source (`../domain/hosts.md`, 6.5): a host that drains
+  `smith-inline-agent`'s content, or agent processes on a smith channel
+  that carries it (section 11; `channel.md`, 6.4).
 - **Agents are smith's,** both capabilities speaking smith's parent face
   (section 4); jig ships no agent crate.
 - **smith's payloads as bytes in jig, typed only in smith.** Siblings
@@ -561,9 +538,9 @@ class, keys for single reads) is `store.md`, section 15.
   on the application's server beside its clients, routed by path, so a
   deployment may expose one origin. jig owns no listener for clients,
   so the choice is the application's.
-- **A reference binary,** `jig-test`, the template an application copies
-  for its `main`, and the process layer of jig's proofs (`service.md`,
-  sections 7 and 8).
+- **A reference binary,** `jig-test`, which an application copies for
+  its `main`, and the binary jig's end-to-end and live tests run
+  (`service.md`, sections 7 and 8).
 - **Accounts on skein's accounts driver:** sign-in, refresh, records kept
   in private files before lending, tokens lent by generation, all
   skein's; the accounts child keeps only which accounts are usable and
@@ -607,9 +584,9 @@ class, keys for single reads) is `store.md`, section 15.
   routes and ends in a `Mint`, which only its server code sends, and
   which names an identity of a provider of kind application
   (`configuration.md`, section 3). jig adds no "acting for": a bot
-  relaying a person's decision holds that person's own credential, and
-  waits for an application that needs one (`../domain/people.md`,
-  section 3; `../client/domain/contract.md`, section 2).
+  relaying a person's decision holds that person's own credential
+  (`../domain/people.md`, section 3; `../client/domain/contract.md`,
+  section 2).
 - **Versions per owner, refused by type:** a message in a version the
   engine does not serve is answered *version not served*, naming the
   owner and the ranges served; `jig-client` and the engine come from
@@ -621,20 +598,22 @@ class, keys for single reads) is `store.md`, section 15.
 - **Configuration as strict JSON,** read once before the loop, composed
   per child, secrets in private files, limits by profile
   (`configuration.md`).
-- **The store on skein-kv in the engine,** jig's subset of its first
-  application's store design: one transcript file per task, the current
-  window's start kept in the map, records from schemas, another version
-  refused (`store.md`).
+- **The store on skein-kv in the engine:** one transcript file per task,
+  the current window's start kept in the map, records from schemas,
+  another version refused (`store.md`).
 - **Workers are alike:** configured the same but for their name and
   secret, keeping nothing between runs that the engine does not hand them
   again. Every credential a run needs, an LLM account's or an
   application's for its workspace's systems, is the engine's, granted
   with the assignment (`channel.md`, section 8).
-- **Upgrades later, and no rolling upgrades** (section 7).
-- **One process first** (section 4): the workers joined to the engine by
+- **No upgrade in place, and no rolling upgrades** (section 7).
+- **One process** (section 4): the workers joined to the engine by
   in-process addresses, their agents child processes, a browser on
   loopback, with no TLS.
 
 ## 14. Open questions
 
 - **Signing an LLM account in through a client** (`llm.md`, section 10).
+- **Upgrades:** in place, across a store's format: records translated
+  between versions, and rolling upgrades of the engine and its workers
+  (section 7).

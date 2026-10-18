@@ -1,6 +1,6 @@
 # jig's domain
 
-Provisional, 2026-10-07, revised 2026-10-15. The design of jig's domain
+Provisional, 2026-10-07, revised 2026-10-18. The design of jig's domain
 layer: the core an application's engine composes, the contract its
 connectors meet, what its root does, where its agents run, and how all
 of it is tested. jig as a whole, and why it is a kit, is `../README.md`;
@@ -13,8 +13,9 @@ mechanics are those of skein's `programming-model.md`.
    the owner keeping the value, projects and goals, plans and
    coordinators, applications and their systems, parties, and what jig
    promises. Read it first.
-2. **tasks.md:** the hub: tasks, batches, lifecycle, holds, inboxes and
-   wake policies, proposals and escalations.
+2. **tasks.md:** the tasks child, the center of the core: tasks,
+   batches, lifecycle, holds, inboxes and wake policies, proposals and
+   escalations.
 3. **authority.md:** what a task may do: authority as a value, budgets
    and spend, checks, proposals, requirements and their verdicts.
 4. **connectors.md:** the contract every connector meets, and what
@@ -44,7 +45,7 @@ uses for its examples.
 an application's engine
 <application>-domain            the root: the application's (root.md)
 ├── jig-domain-core             the core (engine.md)
-│   ├── jig-domain-tasks        the hub (tasks.md)
+│   ├── jig-domain-tasks        every live task, the center of the core (tasks.md)
 │   ├── jig-domain-authority    policy (authority.md)
 │   ├── jig-domain-people       parties (people.md)
 │   ├── jig-domain-fleet        hosts, placement, attempts
@@ -104,7 +105,7 @@ system.
 | journal | skein-lib's container that numbers commits and holds outputs until durable (root.md, section 4) |
 | decision | what one event changes and asks for, gathered into one commit |
 | hand-off | a question the core asks a connector within one decision, through the root |
-| the door | the journal's way out for outputs that decide nothing |
+| the door | the journal's way out for outputs that decide nothing and show nothing durable (engine.md, 4.2) |
 | project | resources with roles, homes, a policy, parties' roles, notes (core.md, 6.1) |
 | task | a unit of work someone asked for (core.md, 3.1) |
 | goal | a tracked task: a priority, projections, goals' topics, a notes scope (core.md, 6.2); jig's goal template gives its defaults |
@@ -114,9 +115,10 @@ system.
 | closing | a task settling before it ends: its run, its delegates, its effects, its releases |
 | executor | who carries a task out: an agent, a procedure, a party |
 | charter | how an agent executor is set up, and which hosts may run it |
-| result contract | what counts as done: a report, a verdict, a connector's result, a delivery, a choice, an approval |
+| result contract | what counts as done: a report, a verdict, a connector's result (made as a delivery when a run's workspace delivers, hosts.md, section 8), a choice, an approval (tasks.md, section 3) |
 | chat | jig's default template for a conversation with an agent: an agent task flagged conversation and kept, whose requester is a party (people.md, section 7) |
-| template | an application's recipe for creating a task of one shape, numbered in its configuration and overridden by a project's policy; the client fills it into a `Create`, and the engine never sees one (core.md, 7.3; people.md, section 7; `../protocol/configuration.md`, 3.1) |
+| template | an application's recipe for creating a task of one shape, numbered in its configuration and overridden by a project's policy; the client fills it into a `Create` or a `Propose`; the engine keeps the configuration's templates and each policy's overrides, serves them merged in `me`, and never expands or checks one (core.md, 7.3; `../protocol/configuration.md`, 3.1) |
+| recurring batch | the batch a recurring task was given when it was made, which it makes again at each period; not a template (tasks.md, section 10) |
 | label | an opaque number the application gives a task, through a template or by hand, which lists filter on and no engine rule reads (tasks.md, section 3) |
 | conversation, listed, retention class | a task's flags: its turns are entries for its requester, with a read position; once ended, it is indexed by its project; kept, or forgotten once read (tasks.md, section 3; people.md, section 6) |
 | last activity, waiting on | when a task last heard words, committed a turn or had a delegate end; what it waits for, computed by the engine: a party, its delegates, news, or nothing (tasks.md, section 3) |
@@ -164,14 +166,14 @@ system.
 | retry deadline | when an uncertain attempt may be tried again, committed with the attempt |
 | procedure | engine code as an executor, a connector's or the core's |
 | projection, home | what a connector writes of a goal for people to read; where, per project |
-| owned, participating | what the application writes alone; what it writes among others |
+| owned, participating | an object the application writes alone; one it writes among others: the objects behind a resource's roles (core.md, 8.2) |
 | drift | a change the application did not make to what it owns and relies on |
 | host, hub | where a run runs: the engine's own slots, or a worker; `jig-domain-host`, the one hub hosting runs on either (hosts.md, section 6) |
 | agent capability | the hub's agent, one of smith's two crates speaking smith's parent face: `smith-host-domain`, agent processes, one per run (hosts.md, 5.1); or `smith-inline-agent`, smith's domains in the host's process, the engine's hub's agent and a worker's by its root's choice (hosts.md, 5.2) |
 | smith's payloads | the charter, a resumed run's transcript, turns' bodies, call names and results: typed in smith's agent capabilities, bytes in the hub, translated by hand-out to the root's protocol layer; smith's facts are decoded the same way into jig's typed activity (hosts.md, 6.8) |
 | workspace, item | what a run works in; what a connector names for it to hold |
 | workstream | the key a workspace is cached under: the holding task's number |
-| delivery | a run's hand-over through its workspace, made by the application's workspace |
+| delivery | a run's hand-over through its workspace, made by the application's workspace (hosts.md, section 9) |
 | saved state | unfinished work a run's host saved, which the next run starts from |
 | token | a name the core holds for a value a connector keeps (core.md, section 5) |
 | conformance world | the world every application runs its domain on, with jig's referee (testing.md, section 5) |
@@ -181,7 +183,7 @@ system.
 
 ## 5. Decisions this design takes
 
-Questions `../README.md` left open, and others met while writing, with
+Questions `../README.md` left open, and others the domain meets, with
 where each is answered:
 
 - **Payloads the core orders but does not read:** the owner keeps the
@@ -280,14 +282,14 @@ where each is answered:
 - **A run's text where its host has it:** activity from every host
   carries no content; a run's text, and a tool begun with its call, come
   from a host whose agent runs in its process, and from agent processes
-  once smith's channel carries them, under the same contract (hosts.md,
-  6.5).
+  over smith's channel, which is what jig asks of smith, later, under the
+  same contract (hosts.md, 6.5; `../protocol/README.md`, section 11).
 - **Level-triggered views:** a watch delivers its subject's current
   document, one delivery in flight, changes coalesced, never queued; only
   a run's text as it is written is a stream, from an offset; an
   application's subjects are watched the same way (engine.md,
-  section 11). This and what follows are what the client's design asks
-  of the domain (`../client/domain/contract.md`, section 9).
+  section 11). This and what follows are what the domain owes the
+  client (`../client/domain/contract.md`, section 9).
 - **What a party reads is durable:** a read's answer and a watch's
   delivery wait for the last commit made before them (engine.md, 5.2).
   What marks a watch changed is named by each commit (engine.md,
@@ -318,30 +320,32 @@ where each is answered:
 - **Compound requests:** several operations under one key, admitted in
   order and committed in one decision, all or none, within operations
   per request: closing a conversation with its delegates' disposals,
-  ordering goals, an amendment that releases, words that release a
-  stopped task (people.md, 5.1). A release of an uncertain effect says
-  whether to make it again.
-- **Proposing is explicit,** for parties as for tasks: a request beyond
+  ordering goals, amending a held task and releasing it, words to a task
+  the party stopped and its release (people.md, 5.1). A release of an
+  uncertain effect says whether to make it again.
+- **Proposing is explicit,** for parties as for tasks: an act beyond
   authority is refused, naming what it lacked and whether a proposal
-  could be accepted, and a proposal is asked for (authority.md,
-  section 9; people.md, 5.1).
+  could be accepted, and becomes a proposal when its maker proposes it
+  (tasks.md, section 9; authority.md, 8.1 and section 9; people.md,
+  5.1).
 - **A party's root has someone to escalate to:** a party becomes a
-  root's requester only when their role decides escalations or the
-  project's policy names an escalation role (people.md, 5.1;
-  authority.md, 8.4).
+  root's requester only while its escalations have a holder: their role
+  decides escalations, or the project's policy names an escalation role
+  (people.md, 5.1; authority.md, 8.4).
 - **Templates are the application's, never the engine's:** numbered in
   its configuration, their defaults overridden per project by its
   policy, never their flags, label or tracking, served in `me`, and
-  filled in by the client; permissions stay primitive (people.md,
-  section 7; authority.md, section 6).
+  filled in by the client; the engine never expands or checks one, and
+  permissions stay primitive (`../protocol/configuration.md`, 3.1;
+  authority.md, section 6).
 - **`AsAllowed`,** the one piece of plumbing templates need: resolved by
   the engine at admission, the answer saying what was given
   (authority.md, section 7).
 - **Refusals with facts,** and **acts offered** in each object's
   document, so a client never computes authority; creating and amending
   are offered with bounds, made, proposable and to whom, or refused, and
-  judged again when they come (`../client/domain/contract.md`, 3.2, and
-  sections 4 and 5).
+  judged again when they come (`../client/domain/contract.md`, section 4
+  and 5.3).
 - **An application's keyed requests** kept by the people child as jig's
   are, their outcomes by their connector (people.md, 5.1;
   connectors.md, 5.5).

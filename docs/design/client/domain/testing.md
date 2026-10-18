@@ -6,9 +6,10 @@ client's world with a scripted engine, the joint world with the engine's
 domain, their referee and their faults; jig's check, which an
 application's worlds run; and the reference UI, tested as any
 presentation on skein's UI kit is, with skein's fake person on its tree.
-It applies skein's `testing-strategy.md` as `../../domain/testing.md`
-does for the engine; the tiers below the client come with the client's
-protocol layer. What is still open is listed in section 10.
+It applies `testing-strategy.md` as `../../domain/testing.md` does for
+the engine; the tiers below the client are the client's protocol's
+(`../../protocol/client.md`, section 14; `../../protocol/browser.md`,
+section 15). What is still open is listed in section 10.
 
 ## 1. In one page
 
@@ -55,7 +56,7 @@ protocol layer. What is still open is listed in section 10.
 | step tests | `jig-client`'s step and fire, by its events and its requests; its helpers, `shapes`, `facts`, `thread` and `words`; the reference UI's step and each of its view functions; its default arrangement's banner and `after_page`'s parts last, on each of jig's pages (view.md, 3.1); jig's check; the reference UI's pages printed by skein's text shell, by golden text (view.md, 15.6); its test family's drawing code, by golden scenes (view.md, 17.5) | their events, by hand |
 | the client's world | `jig-client`, driven through its surface by a scripted application; or jig's test application, the reference UI and its view root in front of it, with the person | the engine, scripted; the transport, played by the world; the person |
 | the joint world | the same, in front of the engine's domain, root and all | the store, hosts and systems, as the engine's worlds fake them; the transport; the person |
-| the protocol world, the real loop | with the client's protocol layer and shells (`jig-client-protocol-link`, `jig-client-protocol-http`, `jig-client-shell-native`), and the engine's clients' component with the default HTTP mapping's engine end; skein's text shell's terminal in front of the native one, on skein's simulated machine | |
+| the protocol world, the real loop | with the client's protocol layer and shells (`jig-client-protocol-http`, `jig-client-shell-native`), and the engine's clients' component with the default HTTP mapping's engine end; skein's text shell's terminal in front of the native one, on skein's simulated machine (`../../protocol/client.md`, section 14) | |
 | the browser tier | the application's binary and its bundle in Chromium, the person through skein's browser face and harness (section 3) | what the binary's configuration fakes |
 
 Every world runs on skein's world harness: one loop, one seed, the
@@ -79,50 +80,19 @@ runs it too. It acts on a tree, and the client has none: it plays the
 reference UI's stories in jig's worlds, and an application's stories in
 its own, wherever a presentation builds on skein's UI kit.
 
-- **What it looks for:** a target by role and words in its name, by role
-  and its whole name exactly, or by its text, within regions named
-  outermost first: "the button named Accept, in the region named
-  Proposal from I". Never by style, by position, by region name, or
-  through the presentation's state, so a story written for the
-  reference UI's pages runs on an application's arrangement of the same
-  sections.
-- **What it does,** a step at a time: go to an address; press; type into
-  a field; send, as Enter in a composer; see something, within a time;
-  see it gone, within a time; reload; pause.
-- **What it reports:** what it does next; that it waits until the tree
-  changes or a time passes; that it is done; or that it failed, at which
-  step and why ("no button named Release in the region named T7").
-- **The tree face** answers its queries on the view's tree at once, the
-  way an accessibility tree is searched, and turns its acts into the
-  acts a shell would report. It reads a drawing by its name and its
-  fallback, as a screen reader does (view.md, section 3).
-- **A random person,** for the fuzzy suite, presses any bound node but
-  a drawing (view.md, 17.3) and types any words drawn from the seed, so
-  a sweep reaches what no script names.
-- **The browser's face and its harness** are skein's, in
-  `skein-fake-person-browser` (skein's `ui-web.md`, 14.2): the person's
-  queries answered on the browser's accessibility tree, its acts made in
-  Chromium; the application's server binary and Chromium children of
-  one loop. A browser's accessibility tree makes each run of a node's
-  text a text of its own, so a story that runs in the browser tier finds
-  text by words within one run; the tree face matches a node's whole
-  text.
-- **skein's stories for a browser shell,** which an application's tier
-  calls with its binary, its bundle and its codec (skein's `ui-web.md`,
-  14.2).
-- **jig's,** in `jig-client-fake-person-browser`, on skein's face and
-  harness (`../../protocol/browser.md`, section 15): jig's stories for a
-  browser shell, which an application's browser tier calls with its own
-  binary, bundle and codec to check its wiring of `jig-client`, the
-  client's adapter and the printed link (a reload keeps a pending
-  request, which the engine makes once; the engine killed and restarted
-  shows offline, then live, where its presentation shows the link's
-  state; a spent link refused); and jig's attack stories for its
-  server, in the same crate. Another origin's page, for an attack story
-  through a browser, is served by jig's kit in the story's own loop;
-  skein's harness opens it as an address the test gives, and the story
-  expects the policy violation it causes as trouble it expects (skein's
-  `ui-web.md`, 14.2).
+- **Its queries, acts, reports, tree face, random person and browser
+  face are skein's** (skein's `ui.md`, 17.1; skein's `ui-web.md`, 14.2),
+  and so is the browser tier's harness, in `skein-fake-person-browser`.
+- **jig's stories find a target as a person would:** by role, name and
+  text, within regions named outermost first ("the button named Accept,
+  in the region named Proposal from I"); never by style, by position,
+  by region name, or through the presentation's state, so a story
+  written for the reference UI's pages runs on an application's
+  arrangement of the same sections.
+- **The browser tier's stories,** skein's for a browser shell, and
+  jig's for a browser shell and its attack stories in
+  `jig-client-fake-person-browser`, are `../../protocol/browser.md`'s,
+  section 15.
 
   An application's browser shell runs its own loop over skein's parts
   and jig's, so both kits' stories check its wiring: the order its loop
@@ -234,6 +204,9 @@ In every world, whatever stands in front of the client:
   answered, reported unknown past the engine's retention, or kept across
   a restart and reported kept; every word sent and reported answered is
   in its task's activity, or its task ended.
+- **Kept before sent, for its party:** no request is sent before its
+  record is stored, nor for a party `me` has not confirmed (client.md,
+  sections 6 and 11).
 - **Documents of what was committed:** every document the client
   delivered for a handle reflects only commits the engine made durable,
   and none after a newer one of the same subject reflects an older
@@ -371,11 +344,8 @@ a few seeds per story and each fault once, the fuzzy suite sweeps random
 people and random applications' events over random stories. At the text
 shell, the focused suite runs each story once, on one seed: in jig's
 client world, two stories, starting a chat and a held chat released; in
-an application's, those its terminal client names. The browser tier is a
-suite of its own, nextest's `--profile browser`, run by jig's gate after
-it builds jig's test application's bundle, within a minute on the
-slowest machine (a rule: its profile's global timeout, in
-`../../../development/workflow.md`).
+an application's, those its terminal client names. The browser tier's
+suite and budget are `../../protocol/browser.md`'s, section 15.
 
 ## 10. Open questions
 

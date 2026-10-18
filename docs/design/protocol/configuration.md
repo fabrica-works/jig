@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-10, revised 2026-10-16. What an engine and a worker
+Provisional, 2026-10-10, revised 2026-10-18. What an engine and a worker
 are told when they start, as far as jig defines its shape: the parts of
 `../domain/engine.md`, section 14 that are jig's, the templates an
 application defines its shapes of work with, how an application's
@@ -16,7 +16,8 @@ when configuration is read. What is still open is listed in section 9.
 - **JSON, strict.** The file is a JSON document read with skein's JSON
   reader (skein's `json.md`). Unknown fields, missing fields, values past
   their bounds and duplicate names refuse the start, saying which, as
-  smith's agent does with its own (smith's `crates/smith/README.md`).
+  smith's agent does with its own (smith's `protocol/agent.md`, section
+  4).
 - **One document per process, composed like its root.** The application's
   configuration is one object, with a member for jig's part and one for
   each of its connectors and its own children. `jig-protocol-config`
@@ -74,12 +75,12 @@ the application's main (its shell)
 
 | Member | What it gives | Used by |
 |---|---|---|
-| deployment | the deployment's directory, which holds the store, transcripts and the secrets' store; retention's horizons, which wait (`store.md`, 11.1); the seed's source, for tests | the store (`store.md`); the domain's retention; the shell |
+| deployment | the deployment's directory, which holds the store, transcripts and the secrets' store; retention's horizons (`store.md`, 11.1); the seed's source, for tests | the store (`store.md`); the domain's retention; the shell |
 | owners | the deployment's first owners, each a provider and a subject (`../domain/people.md`, section 3), each an owner of every project seeded with it | the people child, on a first start |
 | providers | the numbers and kinds that identities name (`../domain/people.md`, section 3), and nothing else: jig runs no provider's exchange. Of kind *link*, the printed link's; of kind *deployment*, exactly one, the deployment's own, for services' credentials; of kind *application*, each of the application's ways of signing in, whose identities its server verifies on its own routes and asks the clients' component to mint a credential for (`client.md`, section 8). The settings and secrets of the application's sign-in are its own members | the people child; `jig-protocol-engine-clients`, which mints a printed link's credential for the first owner it names, a service's under the deployment's provider, and a `Mint`'s only for an identity whose provider is of kind application |
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6) | authority |
 | projects | each project seeded on a first start: its number; its policy, with its spend per period, its roles (each one's authority, the spend a party in it may allot per period, the kinds of proposal it decides; `../domain/authority.md`, section 6) and its overrides of templates' defaults (3.1); its parties' roles. Its resources and homes come by adoption (below) | the core, on a first start |
-| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); its models' endpoints name one account, until a run needs several | the core; `jig-protocol-charter` |
+| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); one account, which its models' endpoints share (`../domain/engine.md`, 7.1) | the core; `jig-protocol-charter` |
 | templates | each template the application defines, numbered and never renumbered, with its defaults; jig's chat and goal among them unless the application drops them (3.1) | the core, only to serve each project's merged templates in `me` (`../client/domain/contract.md`, 5.1); the client, which fills them in |
 | hosts | the engine's own slots, if it runs agents in the engine (shape 2), and their `smith-inline-agent`'s limits; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers`; `smith-inline-agent`, through the application's startup |
 | llm | endpoints, each with the models it serves; each model's window, output and the rest of what smith's agent configuration declares of it (smith's `protocol/agent.md`, section 4), and its prices: input, cached input, output, and cache writes when priced apart; accounts, each signed in, with its registration and its token endpoint, or handed in, with the private file of its access token (`llm.md`, 5.4), and the private directory of their records (`llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
@@ -112,11 +113,8 @@ the application's main (its shell)
     request, never in configuration the core reads. The client fills a
     template's authority (the creator's role narrowed) and its budget
     into a `Create`, and the core checks them as it checks any request
-    (`../domain/authority.md`, sections 5 and 6). A budget given as
-    `AsAllowed` the core resolves at admission: as much as the creator's
-    role and pool allow, capped by the role's spend and by the cap the
-    request names, the answer saying what was given
-    (`../domain/tasks.md`, section 4; `../domain/authority.md`, section
+    (`../domain/authority.md`, sections 5 and 6), a budget given as
+    `AsAllowed` resolved at admission (`../domain/authority.md`, section
     7);
   - *the core's recurring procedure* (`../domain/tasks.md`, section 10):
     the core's own, under a number the core keeps for its procedures,
@@ -136,43 +134,55 @@ the application's main (its shell)
 
 ### 3.1 Templates
 
-- **A template is the application's definition of a shape of work:** the
+- **A template is the application's recipe for a shape of work:** the
   defaults that turn "a chat with these words" or "a goal for this"
   into a complete `Create` (`../domain/tasks.md`, section 4). An
   application's own shapes (one for `ops`'s incidents, say) and jig's
   defaults are alike.
-- **Numbered, never renumbered.** A number is the template's identity
-  across the configuration, projects' policies and clients; a template
-  dropped leaves its number unused.
-- **What each carries:**
+- **Numbered, never renumbered.** A number, above zero, is the
+  template's identity across the configuration, projects' policies and
+  clients; a template dropped leaves its number unused.
+- **What each carries,** every field required (section 10):
   - a name, for showing;
-  - the executor: a charter, by its number among the charters member's;
-    or "a charter or procedure the role may create with", the creator's
-    choice;
-  - the result contract;
-  - authority: the creator's role narrowed, by default one level
-    shallower in delegation;
-  - the budget: an amount; `AsAllowed`, with an optional cap; or the
-    creator's to give, within their allotment;
-  - a deadline: none; a span from creation; or the creator's to give;
-  - wake and park: the charter's;
-  - tracked, with a default priority;
+  - the executor: an agent under a charter the template names, by its
+    number among the charters member's; or *chosen*, a charter or
+    procedure the creator's role may create with, the creator's choice;
+  - the result contract: a report, a verdict or a connector's result,
+    each with its bounds (`../domain/tasks.md`, section 3); never an
+    approval, whose state only a procedure gives;
+  - the authority: the creator's role narrowed, by as many levels of
+    delegation as its `shallower` says;
+  - the budget: an amount; `AsAllowed`, with a cap or none
+    (`../domain/authority.md`, section 7); or *given*, the creator's,
+    within their allotment;
+  - the deadline: none; a span from creation; or *given*, the
+    creator's, or none;
+  - tracked, with a default priority, or untracked;
   - the flags: *conversation*, *listed*, and the retention class,
     *kept* or *forgotten once read* (`../domain/tasks.md`, section 3);
   - the label: an opaque 32-bit number, which jig gives no meaning;
   - the grace its helper cancels with, or none.
-- **jig's defaults,** which an application keeps, changes or drops, by
-  writing them in its `templates` member or leaving them out (section
-  10):
+
+  It names no wake policy, parameters, inputs, dependencies or
+  resources: a task filled from it wakes and parks as its executor's
+  defaults say (`../domain/tasks.md`, 8.3), and its helper names none
+  of the rest (`../client/domain/client.md`, section 19).
+- **jig's defaults** are two, which an application keeps, changes or
+  drops, by writing them in its `templates` member or leaving them out;
+  none is implied (section 10). jig's helpers find them by number:
+  template 1 is the chat they fill, template 2 the goal
+  (`../client/domain/client.md`, section 19). What the table leaves
+  unnumbered (the chat's charter, a report's bound, the chat's grace)
+  the application writes, and the start checks (below).
 
 | Field | chat (template 1) | goal (template 2) |
 |---|---|---|
-| executor | a charter the template names: the application's charter for chats | a charter or procedure the role may create with, the creator's choice |
+| name | chat | goal |
+| executor | an agent under a charter the template names: the application's charter for chats | chosen: a charter or procedure the role may create with |
 | contract | a report | a report |
-| authority | the role's, one level shallower in delegation | the role's, one level shallower |
-| budget | `AsAllowed` | the creator's, within their allotment |
-| deadline | none | the creator's, or none |
-| wake, park | the charter's | the charter's |
+| authority | the role's, one level shallower in delegation | the role's, one level shallower in delegation |
+| budget | `AsAllowed`, with no cap | given: the creator's, within their allotment |
+| deadline | none | given: the creator's, or none |
 | tracked | no | yes, with a default priority |
 | conversation | yes | no |
 | listed | no | yes |
@@ -182,21 +192,27 @@ the application's main (its shell)
 
 - **A project's policy may override,** per template number, the
   executor, the budget and its cap, the deadline and the default
-  priority (`../domain/authority.md`, section 6). Never the flags, the
-  label or tracked: they are the shape's identity, which lists and the
-  engine's behaviour key on. An override naming a template the
-  configuration does not define is refused when the policy is changed,
-  and a seeded policy's refuses the start. An override of the default
-  priority of a template whose tasks are untracked is kept, and shown
-  with the policy, but has no effect: the merged template `me` serves
-  stays untracked.
+  priority (`../domain/authority.md`, section 6), the template's own
+  standing for each it leaves `null` (section 10). Never another field,
+  and never the flags, the label or tracked: they are the shape's
+  identity, which lists and the engine's behaviour key on. An override
+  naming a template the configuration does not define is refused when
+  the policy is changed, and a seeded policy's refuses the start.
+- **Merged for `me`:** a project's merged templates are the
+  configuration's, in its order, each with that project's override
+  applied: its executor, budget and deadline where the override gives
+  them, and its priority where the template is tracked. An override of
+  the default priority of an untracked template is kept, and shown with
+  the policy, but has no effect: the merged template stays untracked.
 - **The engine never expands or checks one.** The core keeps the
   configuration's templates, and each policy's overrides, only to serve
-  each project's merged templates in `me`
-  (`../client/domain/contract.md`, 3.6 and 5.1). The client fills a
-  template into an ordinary request, which the core checks as it checks
-  one written by hand. A template grants nothing: whatever it makes, a
-  `Create` could make within the creator's authority.
+  each project's merged templates in `me` (`../domain/engine.md`, 11.1;
+  `../client/domain/contract.md`, 5.1). The client fills a template
+  into an ordinary request, which the core checks as it checks one
+  written by hand. A template grants nothing: whatever it makes, a
+  `Create` could make within the creator's authority. A recurring task
+  repeats a batch of its own, its recurring batch, never a template
+  (`../domain/tasks.md`, section 10).
 - **Permissions stay primitive:** which charters and executors a role may
   create with, its spend and its delegation (`../domain/authority.md`,
   section 6). No role is given or refused a template.
@@ -205,10 +221,14 @@ the application's main (its shell)
   override naming a template the configuration does not define at that
   start serves nothing, and the next change of that policy must leave
   it out, as above.
-- **Checked at start:** numbers unique; each charter an executor names
-  configured; each grace within the tasks child's limit on a grace's
-  span (`../domain/tasks.md`, section 11); each seeded policy's
-  overrides as above.
+- **Checked at start:** no more templates than the core's limit on them
+  (section 6); numbers unique and above zero; each name within the
+  documents' bound on a text; each charter a template's executor names
+  configured; each contract within the tasks child's bounds; each grace
+  within the tasks child's limit on a grace's span
+  (`../domain/tasks.md`, section 11); each seeded policy's overrides
+  naming configured templates, and no more of them than the limit on
+  templates.
 
 ## 4. jig's part for a worker
 
@@ -237,7 +257,7 @@ secret, and every credential its runs need comes with their assignments
   each period, or an operator's request that ends one. It is a decision,
   so it is a domain's, never the protocol layer's, which only fires the
   deadline. jig's configuration names none, and `ops`'s shows one
-  (`service.md`, section 7).
+  (`../examples.md`, section 4).
 - **The smallest source** is the reference service's: at a
   deployment's first start (section 8), before the core admits a
   party's request, its root opens one period for each configured
@@ -271,11 +291,8 @@ secret, and every credential its runs need comes with their assignments
   delegates cancelled or moved and the conversation then cancelled with
   a grace, fits one request; and so does reordering every live goal of
   a project.
-- **A compound request's worst case:** its decision is priced as
-  operations per request times the costliest operation it may hold, a
-  cancel of a whole tree within *tasks per tree*, and summed into the
-  engine's worst case with the rest, as every decision is
-  (`../README.md`, 6.2; `../domain/root.md`, section 10).
+- **A compound request's worst case** is `../domain/engine.md`, section
+  13's, summed into the engine's worst case with the rest.
 - **A template's grace** is within the tasks child's limit on a grace's
   span, or the start is refused, naming the template (3.1).
 - **The deployment's message bound** holds every kind of message a
@@ -341,6 +358,8 @@ secret, and every credential its runs need comes with their assignments
 - **Profiles' numbers,** from the first deployments' measurements.
 - **A configuration's format version,** once a deployment's configuration
   must survive a release that changes it.
+- **Accounts per run:** whether a run's models may use several
+  accounts is `../domain/engine.md`'s (section 16).
 
 ## 10. Formats an operator writes
 
@@ -375,17 +394,18 @@ secret, and every credential its runs need comes with their assignments
   `tracked`, `null` or `{"priority": n}`; `conversation` and `listed`,
   booleans; `retention`, `"kept"` or `"forgotten_once_read"`; `label`;
   and `grace_ms`, or `null`. jig's chat: `{"number": 1, "name": "chat",
-  "executor": {"charter": 1}, "contract": {"report": {"words": 512}},
+  "executor": {"charter": n}, "contract": {"report": {"words": n}},
   "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none",
   "tracked": null, "conversation": true, "listed": false, "retention":
-  "kept", "label": 1, "grace_ms": 5000}`; jig's goal: `{"number": 2,
+  "kept", "label": 1, "grace_ms": n}`; jig's goal: `{"number": 2,
   "name": "goal", "executor": "chosen", "contract": {"report":
-  {"words": 512}}, "shallower": 1, "budget": "given", "deadline":
+  {"words": n}}, "shallower": 1, "budget": "given", "deadline":
   "given", "tracked": {"priority": 1}, "conversation": false, "listed":
-  true, "retention": "kept", "label": 2, "grace_ms": null}`. jig's
-  defaults are written, never implied: the `templates` member holds
-  each template the engine has, jig's among them, and an application
-  drops one of jig's by leaving it out (3.1).
+  true, "retention": "kept", "label": 2, "grace_ms": null}`, each `n`
+  the application's (3.1). jig's defaults are written, never implied:
+  the `templates` member holds each template the engine has, jig's
+  among them, and an application drops one of jig's by leaving it out
+  (3.1).
 - **A policy's override of a template,** in its `templates` list, is one
   JSON object: `template`, its number; and `executor`, `budget`,
   `deadline` and `priority`, each in the template's form (`priority` a

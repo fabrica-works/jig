@@ -1,6 +1,6 @@
 # The engine's and the worker's services
 
-Provisional, 2026-10-10, revised 2026-10-15. What an application writes
+Provisional, 2026-10-10, revised 2026-10-18. What an application writes
 around its roots to make running processes: the protocol layer that
 composes jig's components with its own, `iterate`, which carries every
 event between io, the components and the root, and `main`, which reads
@@ -209,15 +209,9 @@ down:  released and door outputs → components → io submissions
 - **A shutdown drains,** from a signal or an operator:
   1. **The listeners stop admitting:** workers' openings refused as
      stopping, clients' requests answered not ready.
-  2. **The core hears that the engine is stopping**
-     (`../domain/engine.md`, 6.1) and from then on takes nothing that
-     would make a commit: a party's request is answered not ready; a run's
-     turn or call is answered busy, and its answer left unacknowledged,
-     so its host keeps them; a
-     connector's events and outcomes are held by the connector, as when
-     the journal is full; no run is placed and no procedure stepped. It
-     ends every watch saying the engine is stopping
-     (`../client/domain/contract.md`, 7.2).
+  2. **The core hears that the engine is stopping** and from then on
+     takes nothing that would make a commit, and ends every watch saying
+     so (`../domain/engine.md`, 6.1).
   3. **What is in flight finishes:** the commits made before are answered,
      and their held outputs released, until nothing waits for a commit,
      which the core says.
@@ -240,7 +234,7 @@ down:  released and door outputs → components → io submissions
 └── the protocol layer
     ├── jig-protocol-worker-link  the link to the engine; smith's payloads carried as bytes (channel.md)
     ├── smith-host-protocol       one channel per agent process, over its pipes; grants filled into its start
-    ├── agent processes           each in a process group of its own, a contained tree once skein has them (README.md, section 10)
+    ├── agent processes           each in a process group of its own, or a contained tree where skein gives one (README.md, section 10)
     ├── <credentials>             the application's table, filled from grants: the application's
     └── <workspace>               the workspace's io: the application's
 ```
@@ -295,9 +289,10 @@ down:  released and door outputs → components → io submissions
   guards whole, its `Host` allow-list the address its printed link
   names; and it serves jig's test application's bundle itself, as
   skein's `ui-web.md`, 4.4 says, under `/bundle/`, its page at every
-  other GET and at the printed link's route, with the reference page
-  policy (`browser.md`, 12.1). The bundle is data its startup gives it,
-  or none, which serves no browser.
+  other GET and at the printed link's route, and one root file
+  (`browser.md`, 3.5, step 5), with the reference page policy
+  (`browser.md`, 12.1). The bundle is data its startup gives it, or
+  none, which serves no browser.
 - **The reference binary, `jig-test`,** beside it: its `main` reads its
   configuration with skein's startup kit (`configuration.md`), opens the
   store on a directory, and runs the engine and one test worker in one
@@ -320,43 +315,19 @@ down:  released and door outputs → components → io submissions
   browser. Its LLM endpoint is its configuration's. Its periods are the
   smallest source's: one open
   period per configured project, at the deployment's first start
-  (`configuration.md`, section 5). It is the template an application
-  copies for its own `main`, and the process and live layers of jig's
-  proofs (section 8).
+  (`configuration.md`, section 5). An application copies it for its own
+  `main`, and jig's end-to-end and live tests run it (section 8).
 - **`ops`'s service follows them,** as the reference for an application
-  with agents in the engine and no workers.
-
-`ops`'s engine is the second of `../domain/hosts.md`'s shapes: agents in
-the engine, no workers.
-
-- **Its crates:** `jig-ops-service`, its `iterate` and protocol layer:
-  the store, the accounts', smith's LLM component for its
-  `smith-inline-agent`'s runs, the host tools' translation
-  (`jig-protocol-tools`, and its connectors' own), its server with the
-  clients' component under jig's default HTTP mapping, and its two
-  connectors' protocols to the shared production's observability and
-  infrastructure APIs; and `jig-ops`, its
-  `main`, reading its configuration and running the loop.
-- **Its periods** come from a child of its root that keeps the
-  deployment's calendar from its configuration (a monthly period, from a
-  day, at a fixed offset from UTC; a day past a short month's end is its
-  last day; the projects a period opens, each with its budget, listed by
-  the calendar's configuration, so a project not listed has no period
-  until configuration names it and the engine restarts), arms its
-  deadline, and says each period to the
-  core with the next one's start; the protocol layer only fires the
-  deadline (`configuration.md`, section 5).
-- **Commented to be copied,** as its root is: a new application copies it,
-  removes what its shape does not need (the LLM path and the tools,
-  without agents in the engine; the channel, without workers), and adds
-  its connectors' protocols.
+  with agents in the engine and no workers: its crates, its server and
+  its periods are `../examples.md`'s (sections 4 and 9.1).
 - **A worker's reference** is the reference service's test worker, which
   jig's channel world runs too (`channel.md`, section 12), since `ops`
   has none.
 
 ## 8. Testing
 
-Each within jig's suites' budgets (`../../development/workflow.md`).
+Each within jig's suites' budgets (`../../development/workflow.md`,
+section 2).
 
 - **The domain worlds** run without any of this (`../domain/testing.md`).
 - **The components' worlds** test each component alone (`channel.md`,
@@ -375,7 +346,7 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
   a shutdown. Its referee is the conformance world's, seen through bytes:
   nothing a party, a host or a system saw depended on a commit that was
   lost; and a drained shutdown ends with nothing waiting for a commit.
-- **The process layer** (development.md, 5.5): the reference binary,
+- **End to end** (testing-strategy.md, 2.9): the reference binary,
   `jig-test`, started on a scratch directory with skein's fake LLM peer
   as a process of its own on loopback (skein's `fake-llm.md`) as its
   endpoint, a person's requests answered through a native client on
@@ -402,9 +373,9 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 
 ## 10. One process
 
-The first shape built (`README.md`, section 4): an engine and its workers
-in one process, for one person's machine, development and tests, from the
-same parts as between hosts.
+For one person's machine, development and tests (`README.md`, section
+4): an engine and its workers in one process, from the same parts as
+between hosts.
 
 - **One service, one loop.** The application's `iterate` owns the
   engine's protocol layer and each worker's as children, each with its

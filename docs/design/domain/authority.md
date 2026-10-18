@@ -1,6 +1,6 @@
 # Authority
 
-Provisional, 2026-10-07, revised 2026-10-15. What a task may do, and how
+Provisional, 2026-10-07, revised 2026-10-18. What a task may do, and how
 the core holds it there: authority as a value, its order and how
 delegation narrows it, where it comes from, budgets and what is spent,
 the checks every action passes, what a proposal needs and what accepting
@@ -94,10 +94,11 @@ Authority
 
 - **Tools:** families, as an agent's charter names them (hosts.md,
   section 8): smith's own (inspecting the workspace, modifying it, the
-  shell, sub-agents), each connector's reads, and the engine's tools,
-  each its own family (delegate, message, amend and cancel, decide,
-  propose, subscribe, effect, note, recall). A procedure has no tools; its
-  authority's tools are empty.
+  shell, sub-agents), each connector's reads, and the engine's tools
+  (engine.md, 7.3), in families of their own: delegate; message, with
+  `introduce`; amend and cancel, with `release`; decide, with
+  `withdraw`; propose; subscribe, with `unsubscribe`; effect; note;
+  recall. A procedure has no tools; its authority's tools are empty.
 - **Grants:** each is a connector, a kind of effect or read that
   connector defines, and a pattern of resource names (section 4):
   "restart the services under `staging`", "create environments in the
@@ -192,15 +193,11 @@ deployment's rules       the most any project may have; requirements on effects
     escalation that passes every holder in its tree, and the party who
     requested it (tasks.md, section 9). A party becomes a root's
     requester only when their own role decides escalations or the policy
-    names this role (8.4);
-  - its overrides of the application's templates (people.md, section 7;
-    `../protocol/configuration.md`, 3.1), per template number: the
-    executor, the budget and its cap, the deadline and the default
-    priority; never the flags, the label or whether the task is tracked,
-    which are the shape's identity. A policy change whose override names
-    a template the configuration does not define is refused. The engine
-    keeps the overrides only to serve each project's merged templates in
-    `me`; no check reads them, since a template grants nothing;
+    names this role (people.md, 5.1);
+  - its overrides of the application's templates, per template number,
+    which no check reads, since a template grants nothing: what they may
+    override is `../protocol/configuration.md`, 3.1, and how `me` serves
+    them merged, engine.md, 11.1;
   - its requirements: per kind of effect and pattern of resources, what
     an effect there needs (section 10);
   - its projections' authority: the grants its goals' projections are
@@ -311,9 +308,7 @@ deployment's rules       the most any project may have; requirements on effects
   (engine.md, 4.1), and the root may say when the next begins, if its
   source knows (a deployment configured with a monthly period does).
   The core keeps that with the period's record, and a project's
-  document carries it on each recurring task's line, as when the task
-  next runs. Without it, the line says the task runs at the next
-  period, with the current period and when it began.
+  document shows it (`../client/domain/contract.md`, 5.1).
 - **Standing work renews by period.** A standing task, recurring or a
   standing procedure (connectors.md, 6.6), has its tasks and its spend
   carved again from the project's spend each period, so a watch that
@@ -394,8 +389,9 @@ budget given `AsAllowed`, if any, resolved to (section 7).
   (8.4); or, for an acceptance, the accepter's (section 9).
 - **Propose is an answer, not a proposal.** A batch answered propose is
   refused, naming what it lacked and whether a proposal could be
-  accepted, and by whom; it becomes a proposal only when its creator asks
-  for one (section 9).
+  accepted; who would accept it is the offer's to say
+  (`../client/domain/contract.md`, 5.3). It becomes a proposal only when
+  its creator asks for one (section 9).
 
 ### 8.2 Effects
 
@@ -464,17 +460,12 @@ pool has left.
   place of what a task has left. A budget given `AsAllowed` is resolved
   here, against their pool and capped by their role's spend
   (section 7).
-- **A party's root has someone to escalate to.** Every task of a party's
-  batch is a root they request. It is admitted only when its escalations
-  have a holder: the party's role decides escalations, or the project's
-  policy names an escalation role (section 6). Otherwise the request is
-  refused, saying so, whatever authority the batch fits within; the same
-  holds when a party moves a task to themselves, or accepts a proposal
-  whose tasks are to be theirs (people.md, 5.1).
-- **A compound request** is checked operation by operation, in order,
-  each against the numbers those before it leave, with one pool counted
-  across them; the first that is not allowed refuses the whole
-  (people.md, 5.1).
+- **A party's root has someone to escalate to.** A party becomes a
+  root's requester, by a batch, a move or an acceptance, only while its
+  escalations have a holder (people.md, 5.1); otherwise the request is
+  refused, whatever authority it fits.
+- **A compound request** is checked as people.md, 5.1 says: each
+  operation as it would be alone, in order.
 
 ### 8.5 Tool calls and reads
 
@@ -502,7 +493,8 @@ proposals wait and how they move is tasks.md, section 9.
   (people.md, 5.1).
 - **Proposing is explicit,** for tasks and parties alike. An action
   beyond authority is refused, naming what it lacked and whether a
-  proposal could be accepted, and by whom; it is proposed only when its
+  proposal could be accepted; who would accept it is the offer's to say
+  (`../client/domain/contract.md`, 5.3). It is proposed only when its
   proposer asks: a run's `propose` call, a procedure's step that
   proposes, a party's `Propose` (engine.md, 7.3; people.md, 5.1). Nothing
   becomes a proposal by itself, so nobody is asked by accident, but a

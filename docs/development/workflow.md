@@ -76,16 +76,17 @@ cargo nextest run --workspace --profile browser
 ```
 
 The test application's module, built once with `--profile web`, is
-3,395,581 bytes before compression, within the 4 MiB guide of
-`docs/design/protocol/browser.md`, 4.2. Reproduce its build and size with:
+3,395,581 bytes before compression. Its guide is 4 MiB before
+compression (a guide, `docs/design/protocol/browser.md`, 4.2: past it,
+what grew is reported). Reproduce its build and size with:
 
 ```sh
 heavy sh -c 'cargo build --target wasm32-unknown-unknown --profile web -p jig-client-test-shell-web && stat -c %s target/wasm32-unknown-unknown/web/jig_client_test_shell_web.wasm'
 ```
 
 Tests cost what they check, with unoptimized test builds except for the
-repository's tools, `jig-boundary` and `skein-codegen`, which are built
-optimized (testing-strategy.md, 8, "A tool is not the code under test"):
+repository's tools, `jig-boundary`, `skein-codegen` and
+`skein-ui-bundle`, which are built optimized (testing-strategy.md, 8, "A tool is not the code under test"):
 
 - **Fixtures once.** Build a phrasebook, configuration or worst-case size
   once per test process or world when it is a fixture, then share it.

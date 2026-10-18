@@ -1,6 +1,6 @@
 # The application's root
 
-Provisional, 2026-10-07, revised 2026-10-12. What an application's
+Provisional, 2026-10-07, revised 2026-10-18. What an application's
 engine root is and does: the top-level domain every application on jig
 writes, which composes jig's core with the application's connectors and
 its own child domains. It says what the root carries, the one shape
@@ -85,7 +85,7 @@ step(root, event):
         route it to the child that answers, and its answer back   (section 5)
     every write any child asked for, wrapped    → d.write
     every held output, put together             → d.hold        (section 7)
-    every output that decides nothing           → journal.now
+    every output marked now                     → journal.now
     journal.accept(d)                           → at most one commit, to the store
 
 iterate, after the step:
@@ -102,8 +102,8 @@ iterate, after the step:
 - **Every request says what it is.** The core and the connectors mark
   each request as part of the decision, held, or now (engine.md, 4.2).
   The root keeps the mark: a held output goes to `d.hold`, a now one to
-  `journal.now`. The door for outputs that decide nothing is one call,
-  so review finds every use.
+  `journal.now`. The door for outputs that decide nothing and show
+  nothing durable is one call, so review finds every use.
 - **Admission is all or nothing.** The room is reserved before the
   event reaches a child; an event the journal cannot take changes
   nothing, and its sender is answered busy, or keeps it, as engine.md,
@@ -148,22 +148,30 @@ It inspects nothing it holds. What jig asks of it:
 ## 5. Routing
 
 - **From the protocol layer:** each event goes to the child it is for:
-  the store's pages and restores to the core or to the connector whose
-  range it is; the workers' channel to the core, but for what a run's
-  answer says it left on resources, which goes to the connectors that
-  own them; a run's call to the core, or, for a connector's read or
-  effect, to that connector first (section 9); clients' requests to the
-  core, and those for an application's own objects to its children; a
-  connector's system's events and answers to that connector; a timer to
-  the child that armed it.
+  - the store's pages and restores to the core or to the connector whose
+    range it is;
+  - the workers' channel to the core, but for what a run's answer says
+    it left on resources, which goes to the connectors that own them;
+  - a run's call to the core's fleet, which fences it; the admitted call
+    is handed out to be decoded (`../protocol/channel.md`, 6.3), and its
+    typed request goes to the core, or, for a connector's read or effect,
+    to that connector first (section 9);
+  - clients' requests, reads and watches to the core; what the core
+    admits for an application's own object or subject goes, as a
+    hand-off, to the connector it names, which decides the request or
+    makes the document (`../client/domain/contract.md`, 3.3;
+    connectors.md, 5.5);
+  - a connector's system's events and answers to that connector;
+  - a timer to the child that armed it.
 - **Hand-offs between children,** within one step: what the core asks of
   a connector (describe, judge, keep, drop, gather, cut, hand over, step,
-  project, release, subscribe, restore, read afresh, settle) goes to the
-  connector the core names by number, and its answer back; what a
-  connector says up (a step's decision, news, an outcome, a pool's slots,
-  drift) goes to the core. What the core says of a procedure's step,
-  the task it made, goes to the procedure's connector in the same
-  decision, and is never dropped (connectors.md, 6.3).
+  project, release, subscribe, restore, read afresh, settle, decide a
+  party's request, make a document) goes to the connector the core
+  names by number, and its answer back; what a connector says up (a
+  step's decision, news, an outcome, a pool's slots, drift) goes to the
+  core. What the core says of a procedure's step, the task it made, goes
+  to the procedure's connector in the same decision, and is never
+  dropped (connectors.md, 6.3).
 - **To the hub inside the engine:** the core's assignments, relays and
   cancels for runs placed on the engine's own slots go to the hub, and
   what it says goes back to the core as a worker's would (hosts.md,
@@ -226,8 +234,9 @@ decided:
   was refused) and, for an effect made, the connector's part (what it
   made), kept under the call's key; the root asks again when the call is
   asked again.
-- **A read's answer** is the connector's alone, and goes out through the
-  door.
+- **A run's read's answer** is the connector's alone, and goes out
+  through the door; a party's read of a connector's document is held
+  behind the last commit made (engine.md, 5.2).
 - **A connector's result in a dependent's brief** is a section like any
   other.
 - **A token the core drops** (a brief abandoned, a call withdrawn) is
@@ -336,6 +345,6 @@ application's.
 ## 14. Open questions
 
 - **Generating the boilerplate:** whether the root's routing and
-  wrapping, which have one shape, are best copied and filled by agents,
-  as now, or generated from a short description, which the subset's
+  wrapping, which have one shape, are best copied and filled by agents
+  (section 12), or generated from a short description, which the subset's
   rules on macros would confine to a build step.

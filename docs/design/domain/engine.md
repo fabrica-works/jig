@@ -1,6 +1,6 @@
 # The core
 
-Provisional, 2026-10-07, revised 2026-10-16. What jig's core is, as a
+Provisional, 2026-10-07, revised 2026-10-18. What jig's core is, as a
 domain layer inside an application's engine: its parts and how they fit,
 what crosses between it and the application's root, how a decision
 reaches the store before anything leaves the engine, how it restarts,
@@ -18,10 +18,10 @@ is still open is listed in section 16.
   parties, and tells the application's connectors what to make, judge,
   step, project and release. It is a child of the application's root,
   and the parent of its own children.
-- **A parent and its children.** The tasks child domain is the hub;
-  authority is policy; the fleet, people, accounts, briefs, notes and
-  views are capabilities. The core routes between them and faces the
-  root (section 3).
+- **A parent and its children.** The tasks child domain is the center
+  of the core, keeping every live task; authority is policy; the fleet,
+  people, accounts, briefs, notes and views are capabilities. The core
+  routes between them and faces the root (section 3).
 - **It speaks one vocabulary to the root** (section 4): the store's
   records, the hosts', the parties', the accounts', and the connectors'
   in jig's terms. It knows connectors by number.
@@ -81,7 +81,7 @@ application root        the journal, routing, translation; faces the protocol la
 
 ```
 jig-domain-core             the core: routing among its children, runs, calls, the restart script, numbers
-├── jig-domain-tasks        the hub: tasks, batches, lifecycle, holds, inboxes, wakes, proposals
+├── jig-domain-tasks        the center of the core: tasks, batches, lifecycle, holds, inboxes, wakes, proposals
 ├── jig-domain-authority    authority's order and checks; the rules and the projects' policies
 ├── jig-domain-people       parties: identities, sign-ins, roles, requests, inboxes
 ├── jig-domain-fleet        hosts: slots, placement, attempts, relaying
@@ -96,8 +96,8 @@ own vocabulary, limits and world; a parent owns its children's state and
 routes between them; siblings share no domain types, and the core
 translates between them with small total functions.
 
-- **`tasks` is the hub:** it knows a task's lifecycle and nothing of
-  runs, connectors or clients.
+- **`tasks` is the center of the core:** it keeps every live task, and
+  knows a task's lifecycle and nothing of runs, connectors or clients.
 - **`authority` is policy:** decisions over data, keeping only the rules
   and policies in force.
 - **The others are capabilities,** each knowing its own concern: the
@@ -128,7 +128,9 @@ translates between them with small total functions.
   section 4), and feeds back what the core asked to resume after one;
 - **from hosts:** a host's hello with its slots, what it hosts and its
   agent's bounds; turns, with the messages a run refused, calls, answers
-  and facts of runs; a host lost or back;
+  and facts of runs; notices relayed from a run's agent, a grant its
+  provider rejected or an account exhausted until a time (section 12); a
+  host lost or back;
 - **from parties:** sign-ins and their ends, a credential to mint for an
   identity the application's server verified (people.md, section 3);
   keyed requests, each one operation or a compound request of several
@@ -160,9 +162,13 @@ Each request the core makes says which of three it is:
 - **held:** what must wait for the decision's commit to be durable: an
   assignment, a message relayed to a run, a cancel, an acknowledgement,
   an answer to a call or to a party, a load (so that it sees every commit
-  before it), an outbox entry to make, a resumption of the core's own;
-- **now:** what decides nothing: facts to watchers, the answer to a read,
-  a host's refusal before anything was admitted.
+  before it), an outbox entry to make, a resumption of the core's own; and
+  a party's read's answer and a watch's delivery, behind the last commit
+  made (5.2);
+- **now:** what decides nothing and shows nothing durable: a run's text
+  streamed to watchers, the answer to a run's read, a run's admitted call
+  handed out to be decoded (4.4), a host's refusal before anything was
+  admitted.
 
 The root keeps each as the core said (root.md, section 3); the journal
 releases held ones in order, and the conformance world checks that
@@ -193,7 +199,7 @@ step its last answer arrives.
 |---|---|---|
 | a run's turn | fleet (fenced) → tasks (the inbox taken) → authority (spend) → views | commit; the turn acknowledged |
 | a run's call to an engine tool | fleet → authority (the check) → tasks or notes | commit; the call answered |
-| a run's call for an effect | the connector describes it → authority, its judges asked → the connector keeps it | commit; answered when made, or past its deadline |
+| a run's call for an effect | fleet → the connector describes it → authority, its judges asked → the connector keeps it | commit; answered when made, or past its deadline |
 | a run's call for a read | fleet → authority (the grant) → the connector serves it | answered now; nothing committed |
 | a run's answer | fleet → tasks (result checked, task closing or idle; the messages it refused or left unread stay, and wake it by its policy) → authority (spend); what it left → its connectors | commit; acknowledged; effects made |
 | a procedure's step | its connector → authority (each effect, its judges; each batch) → tasks | commit; effects made; tasks started |
@@ -207,19 +213,20 @@ step its last answer arrives.
 | a project's period | authority (its spend within the policy) → tasks (the period's funding opened; recurring tasks' batches; standing allotments renewed) | commit; tasks started |
 | a timer | its child | as its child says |
 
+- **A run's call is fenced, then decoded.** The fleet admits a call only
+  from its task's live attempt; the core hands the admitted call out, and
+  the engine's protocol layer decodes its input and gives the typed
+  request back to the root, which routes it as the rows above say
+  (`../protocol/channel.md`, 6.3; root.md, section 5). No domain parses a
+  call's input.
 - **A budget given `AsAllowed`** is resolved by authority as the batch is
-  admitted, from what the creator may give then (authority.md,
-  section 7). One task of a batch at most gives it, resolved after the
-  batch's named amounts are counted, and refused as lacking budget if it
-  would give nothing (tasks.md, section 4). A pool's amount left is a
-  live number only the core holds, which no client could read and send
-  back without racing. The task keeps the amount, and the answer, a
-  party's or a run's, says what was given.
-- **A compound request is one decision** (people.md, 5.1): its operations
-  are admitted in order, each against what those before it left, and
-  committed together, so the route above runs once per operation within
-  one step of the root's, and its hand-offs are bounded by its operations
-  (section 13).
+  admitted (authority.md, section 7). A pool's amount left is a live
+  number only the core holds, which no client could read and send back
+  without racing. The task keeps the amount, and the answer, a party's or
+  a run's, says what was given.
+- **A compound request is one decision** (people.md, 5.1): the route
+  above runs once per operation, in order, within one step of the root's,
+  and its hand-offs are bounded by its operations (section 13).
 
 ## 5. Decisions and the store
 
@@ -299,16 +306,10 @@ answers to a run's reads.
   (`../client/domain/contract.md`, section 6): from live state where the
   engine holds it, loaded otherwise, and answered once the last commit
   made is durable (5.2).
-- **Ended tasks are read through the store's indexes.** An ended task is
-  loaded by its key; a list of ended tasks, a task query's ended part,
-  through one of the ended indexes (11.2): by requester, every ended task
-  a party requested; a task's ended delegates; by project, the ended
-  tasks flagged *listed*. A subtree's is read by the delegates' index,
-  task by task. A row joins its task's record, and an ended
-  conversation's read position, by point reads in the same step
-  (`../protocol/store.md`, 7.3). A filter beyond an index's prefix
-  scans its pages, which may come back cut, and the next page goes on
-  from the last row examined.
+- **Ended tasks are read through the store's indexes** (11.2): an ended
+  task by its key, a list of them through one ended index, each row
+  joined to its task's record, and an ended conversation's read position,
+  by point reads in the same step (`../protocol/store.md`, 7.3).
 
 ### 5.4 What the store keeps of the core
 
@@ -329,7 +330,7 @@ answers to a run's reads.
 | proposals: pending, and decided ones' outcome | tasks | pending ones at start |
 | transcripts: turns, with their spend and whether each opens a window | the core | to resume, from the current window's start; on demand |
 | notes | notes | indexes per scope in use; entries on demand |
-| secrets: sign-ins' digests; LLM accounts' records are kept apart, by skein's accounts driver | the protocol layer, never the domain, which names them by account and generation, or by a sign-in's number | at start, by the protocol layer |
+| secrets: minted credentials' digests, by their sign-in's number, and services' credentials' digests (`../protocol/store.md`, section 9); LLM accounts' records are kept apart, by skein's accounts driver | the protocol layer, never the domain, which names them by account and generation, or by a sign-in's or a service's number | at start, by the protocol layer |
 
 Each connector keeps its own records beside these (connectors.md,
 section 2): its outbox, procedures' states and parameters, what it made
@@ -393,13 +394,15 @@ as a script: it asks the root for one step at a time, and asks for the
 next only once the root says this one is done (root.md, section 8).
 
 1. **The core's records:** the deployment's numbers; projects, their
-   policies and parties' roles; parties' read positions over live
-   conversations, never ended ones' (11.4); live tasks with their inboxes,
-   subscriptions, holds and queues; pending proposals; the calls
-   committed since each live task's last turn; each live agent task's
-   conversation; the funders' numbers; LLM accounts. The core's limits
-   bound what is live (tasks.md, section 11), so what is loaded fits; a
-   live set past limits lowered since refuses the start, saying which.
+   policies and parties' roles; parties with a live sign-in or a role,
+   and their requests' keys within the retention; parties' read
+   positions over live conversations, never ended ones' (11.4); live
+   tasks with their inboxes, subscriptions, holds and queues; pending
+   proposals; the calls committed since each live task's last turn;
+   each live agent task's conversation; the funders' numbers; LLM
+   accounts. The core's limits bound what is live (tasks.md,
+   section 11), so what is loaded fits; a live set past limits lowered
+   since refuses the start, saying which.
 2. **Each connector's records,** connector by connector: the root loads
    that connector's live ranges and restores them into it
    (connectors.md, section 14).
@@ -478,10 +481,9 @@ When an agent task is due (tasks.md, 5.2), the core:
    (root.md, section 7):
    - its run and attempt, the core's names for them, and its
      conversation's first attempt, from which the engine's protocol layer
-     derives the run's identity (smith's `domain/host.md`, section 2): 16
-     bytes from the deployment's id, the task's number and that attempt,
-     the same for every attempt of a conversation, for the provider's
-     prompt cache, and never shared by two. No domain holds it;
+     derives the run's identity, for the provider's prompt cache, the same
+     for every attempt of a conversation and never shared by two
+     (`../protocol/channel.md`, section 7). No domain holds it;
    - its workspace: the connectors' items, and a workstream key, the
      number of the task that holds the resources written, so that the
      runs of one piece of work find their workspace cached;
@@ -501,10 +503,9 @@ When an agent task is due (tasks.md, 5.2), the core:
    - its transcript's current window, when it resumes, and the calls
      committed since its last turn;
    - its credential grants (section 12): those its models' accounts
-     need, one account per charter, which its models' endpoints share,
-     until a run needs several; and the application's credentials its
-     connectors named (12.1). Each names whose table the protocol layer
-     fills its value from.
+     need, one account per charter, which its models' endpoints share;
+     and the application's credentials its connectors named (12.1).
+     Each names whose table the protocol layer fills its value from.
 
 ### 7.2 Transcripts
 
@@ -521,6 +522,14 @@ When an agent task is due (tasks.md, 5.2), the core:
   heard and the decisions made about it, kept in the order they
   committed, so a client reads a conversation whole after its words have
   been taken from the inbox (`../client/domain/contract.md`, section 6).
+  A message is a line in the activity of the task that hears it
+  (tasks.md, 8.1): a party's answer to a question a task heard is that
+  task's own line; a task's answer to the delegate that asked is the
+  delegate's line, never repeated in the answering task's activity,
+  whose turn holds the call that sent it; a read of the question joins
+  its answer by a point read (`../protocol/store.md`, 7.3). Who may read
+  an answer is the client's contract's (`../client/domain/contract.md`,
+  section 6).
 - **Committed turn by turn.** A run sends each turn up as it ends: what
   the LLM said and the calls it made, their results, what it spent, the
   last inbox message it read, and whether it opens a window. The core
@@ -529,18 +538,17 @@ When an agent task is due (tasks.md, 5.2), the core:
   opens a window, with its task's current window starting there; then
   it acknowledges it. A host keeps each turn until it is acknowledged,
   and a run with too many unacknowledged turns waits (hosts.md, 6.4).
-  Admission is whole: the hub validates the attempt, turn and offered
-  read-through before changing its spend; a refused turn changes
-  nothing, and a duplicate accepted turn changes nothing again.
+  Admission is whole: the tasks child validates the attempt, turn and
+  offered read-through before changing its spend; a refused turn
+  changes nothing, and a duplicate accepted turn changes nothing again.
 - **The core never looks inside.** A turn is bytes of the agent's own
   conversation vocabulary, bounded, which a client's protocol layer
   renders. The core reads only its size, its spend, what it took and
   whether it opens a window, which the turn carries beside its bytes.
 - **Resuming.** A run that resumes is given its current window only,
   within the resume limit (the deployment's bound on the current
-  window's bytes, across the attempts it spans, each turn counted with
-  the four bytes of its length, as the window crosses to a host:
-  `../protocol/channel.md`, 6.1), and, as a note after
+  window's bytes, across the attempts it spans, as the window crosses to
+  a host: `../protocol/channel.md`, 6.1), and, as a note after
   it, the calls committed after its last turn, with their answers. One
   past the limit starts fresh from a brief that carries the transcript's
   tail. Earlier windows' turns stay readable by parties
@@ -682,7 +690,7 @@ The fleet child domain knows the hosts and the runs they host:
 - **Relaying:** messages and cancels down, tool calls up and their
   answers back, each call answered once; a call the fleet cannot pass up
   is answered at once, unserved, or busy while the engine stops
-  (section 6.1), never left without an answer.
+  (6.1), never left without an answer.
 - **The graces are ordered.** The engine's grace is longer than the
   longest a worker may take to stop a run it lost contact for, which the
   worker says at its hello (hosts.md, 6.6); a worker whose bound is equal
@@ -698,9 +706,9 @@ The fleet child domain knows the hosts and the runs they host:
   than the reserve's time of a charter that allows a change; a largest
   message smaller than the deployment's message bound (tasks.md, 8.2), or
   an inbox that holds fewer than a start carries; fewer turns kept
-  unacknowledged than the hub's bound. So no run is placed where smith
-  would refuse its start, and no run refuses a message as too large or
-  its start's messages as full.
+  unacknowledged than the hub's bound (hosts.md, 6.4). So no run is
+  placed where smith would refuse its start, and no run refuses a
+  message as too large or its start's messages as full.
 - **Grants follow their attempts:** each new generation of an LLM
   account or an application's credential goes to every live attempt
   that holds one (section 12), and each attempt the fleet keeps at a
@@ -710,6 +718,14 @@ The fleet child domain knows the hosts and the runs they host:
   assignment waits for its commit reaches the attempt after it.
 - **Every start and adoption ends once:** answered, lost, withdrawn (the
   core cancelled it), or refused (busy, a duplicate, or invalid).
+- **A refused start keeps nothing.** A host's answer that refuses its
+  start, at its entrance or as a start its agent refuses (hosts.md, 6.2
+  and 6.3), ends a run the host never hosted. The fleet closes the
+  attempt as it hears it, and never acknowledges it: one refused as busy
+  is placed again, as no failure; one refused as invalid ends its start,
+  refused. One lost with its channel leaves its attempt unlisted at the
+  next hello, and the start ends lost; the next attempt is refused again,
+  or placed.
 - **Restarting** (section 6): the fleet adopts the claims the store
   names, then hears that the loading is done; a run a worker lists that
   no claim adopts is cancelled once a grace has passed.
@@ -805,9 +821,8 @@ computes for them is said below (11.1 to 11.5).
   or the party's own, what is the signed-in party's across projects. The
   core admits a watch or a read of one on the party's sign-in and their
   role in that scope, the party's own on the sign-in alone, and on the
-  views' limits, as it admits jig's; the connector, asked for the
-  document, judges that the subject is in that scope and what the party
-  may see of it, and answers unknown, or not allowed, otherwise
+  views' limits, as it admits jig's; whether the subject is in that
+  scope, and what the party may see of it, is the connector's to judge
   (connectors.md, 5.5). Its watches and reads carry a window, as jig's
   do (`../client/domain/contract.md`, 7.5). Only the document, or why
   there is none, crosses back; the root only routes.
@@ -845,8 +860,11 @@ computes for them is said below (11.1 to 11.5).
 - **A run's text as it is written** is the one stream: kept per live run
   being watched, within a bound, named by the turn and the retry the host
   reports it for (hosts.md, 6.5), and delivered from the offset each
-  watcher has; never stored, and marked provisional. It decides nothing
-  and leaves at once (5.2). A committed turn reaches a client through the
+  watcher has; never stored, and marked provisional. A later retry
+  replaces an earlier one's text; text that starts past what the views
+  hold of its retry, because facts were dropped between, marks that
+  turn's text cut, as text past its bound does. It decides nothing and
+  leaves at once (5.2). A committed turn reaches a client through the
   task's activity, read (7.2).
 - **History is the store's.** What a client shows of the past (a task's
   results, its activity, a plan's revisions and why, the ended tasks a
@@ -915,9 +933,9 @@ Nothing the core decides depends on a view arriving.
   Its other keys, the root among them, filter that index's pages, which
   may come back cut, and the next page goes on from the last row
   examined. A query whose keys choose none has no ended part, and its
-  answer says so. A task forgotten once read leaves
-  its index rows in the decision that forgets it (11.4); retention erases
-  the rest with their tasks (`../protocol/store.md`, 11.1).
+  answer says so. The decision that forgets a task forgotten once read
+  erases its index rows (11.4); retention erases the rest with their
+  tasks (`../protocol/store.md`, 11.1).
 - **What a query never finds:** words in a text (`../protocol/store.md`,
   section 16); ended tasks by outcome, resource or spend; tasks by a
   procedure's parameters, which belong in the application's own records
@@ -985,14 +1003,9 @@ section 3):
     conversation or a query's ended row (5.3), so an ended conversation
     reads with what its party had read.
 - **A task's retention class** says what becomes of it once ended
-  (tasks.md, section 3): *kept,* to the deployment's retention horizon
-  (`../protocol/store.md`, 11.1), and for good while retention waits for
-  a deployment whose store nears its budget; *forgotten once read,*
-  erased once its requester, a party, has read its result and, for a
-  conversation, its turns, and no live task names it, in one decision
-  with its read position and its index rows, so no restart sees one
-  without the other, and nothing read comes back unread. A task whose
-  requester is not a party is kept, whatever its class.
+  (people.md, section 6; tasks.md, section 3 defines the flag); the
+  decision that forgets a task forgotten once read erases its read
+  position and its index rows with it.
 
 ### 11.5 What a decision would do
 
@@ -1057,7 +1070,7 @@ record.
 ### 12.1 An application's credentials
 
 A connector's workspace may need credentials of the application's own: a
-token to fetch from a system and push to it. The accounts child keeps
+token to read from a system and write to it. The accounts child keeps
 them beside LLM accounts, and lends them the same way:
 
 - **Named, never seen:** each by the application's number for it and a
@@ -1131,8 +1144,8 @@ protocol layer, which composes jig's pieces with its own:
   version per shape.
 - **Workers:** jig's channel, the engine's side: assignments, messages,
   grants, cancels, answers to relayed calls, acknowledgements down;
-  hellos, turns and answers with the messages refused, calls and facts
-  up (hosts.md, section 10).
+  hellos, turns and answers with the messages refused, calls, facts and
+  notices up (hosts.md, section 10).
 - **Connectors:** each its own protocol, the application's.
 - **Parties:** jig's messages, carried by the application's transport to
   the clients' component, which knows no transport
@@ -1235,3 +1248,4 @@ section 5).
   come and go (11.2 and 11.3).
 - **Scaling out:** one engine per deployment until it binds; the store
   being the engine's alone is what would change first.
+- **Accounts per run:** whether a run's models may use several accounts.

@@ -1,6 +1,6 @@
 # Objects and cards
 
-Provisional, 2026-10-09, revised 2026-10-15. The objects the reference
+Provisional, 2026-10-09, revised 2026-10-18. The objects the reference
 UI (`jig-client-view`) shows, each as one card wherever it appears:
 tasks as chips, proposals, escalations, questions, person tasks,
 results, refusals, the conversation; and the requests a party makes
@@ -49,10 +49,8 @@ section 13.
 
 ## 2. Cards
 
-- **Its states:** open; deciding, while a request about it is pending;
-  refused, saying why, and staying; leaving, once decided, answered,
-  withdrawn or ended, by whom and how, then gone after a linger
-  (view.md, 18.3).
+- **Its states** are the reference UI's (view.md, 18.3), shown on the
+  card wherever it is.
 - **Its place** (the inbox, a conversation, a task page, an
   application's page) changes its line of context only: in the inbox,
   its project and its task's lineage; in a conversation, nothing more.
@@ -75,46 +73,34 @@ section 13.
   - *given as data:* what a decision will do (what an acceptance grants
     and costs, and the pool after; what a release does; what a cancel
     ends) is in the object's document (contract.md, 5.4), and the helper
-    `facts` reads it, with the card's other facts (its state, a refusal
-    and why, whether the act is dangerous), for the application to show
-    where it likes (client.md, section 19);
-  - *its confirmation, the application's:* the reference UI confirms
-    every deciding act (below); an application presenting an object
-    itself confirms as it chooses;
-  - *checked, not mandated:* jig's check, which an application's worlds
-    run, finds a decision whose revision was not in a document the
-    client delivered to the application before it was sent, and, on a
-    tree, a deciding act made on a tree that did not show its facts, in
-    the open confirmation or within the acted node's nearest named
-    region (testing.md, 6.2). The referee checks jig's cards the same
-    way, wherever they show.
+    `facts` reads it, with the card's other facts (a refusal and why,
+    whether the act is dangerous), for the application to say,
+    with `words` or its own words, where it likes (client.md, section
+    19);
+  - *the application's to show:* the reference UI confirms every
+    deciding act (below); an application presenting an object itself
+    confirms as it chooses (contract.md, 5.4), and shows the rest of what
+    a card shows its own way;
+  - *checked, not mandated:* jig's check (testing.md, 6.2), which an
+    application's worlds run, never at run, finds a decision whose
+    revision no document the client delivered gave, and, on a tree, a
+    deciding act made on a tree that did not show its facts. The referee
+    checks jig's cards the same way, wherever they show.
 
   On a page of the reference UI, an application's own nodes may bind
   their acts through the reference UI's binding constructors, so they
   go through its confirmation and its intents as a card's do (view.md,
   section 5).
-- **Its revisions.** An act that decides about something that changes
-  names that thing's revision as the card showed it: a release, its
-  hold's; an amendment, the spec's; an answer, the person task's. One
-  that moved under an open confirmation is refused in place, and one that
-  moved in the engine is refused as moved (view.md, 18.5; contract.md,
-  5.2).
-- **Its confirmation** opens on any act that decides something, and says
-  what will happen, from the object's document; a dangerous act (a
-  cancel, a rejection) is marked so. It is the reference UI's: the
-  engine asks for none, and the confirmation is an application's choice
-  (contract.md, 5.4; view.md, 18.5).
+- **Its revisions:** an act names the revision of what it decides, as
+  the card showed it (view.md, 18.4; contract.md, 5.2); one that moved
+  under an open confirmation is refused in place (view.md, 18.5).
+- **Its confirmation** (view.md, 18.5) opens on any act that decides
+  something, and says what will happen, from the object's document; an
+  act `facts` marks dangerous (client.md, section 19) is marked so.
 - **Changed while read.** A card follows its object live: a proposal
   passed up, a held task's reason that changed, a person task taken by
   someone else.
-- **How it stays live.** A card follows its object through the watch of
-  the page's subject that covers it: its task's document, a tree, the
-  inbox, a task query's window, chips (contract.md, 7.1). An object no
-  watch carries whole (a proposal, an escalation, a question, a person
-  task, a result, a note) is read, and read again whenever a watch that
-  names it says it moved: its task's activity moved, its entry in the
-  inbox changed, its chip's phase changed. Once no watch names it, it is
-  read once more for how it ended (view.md, 18.3).
+- **How it stays live** is the reference UI's: view.md, 18.3.
 
 ## 3. The chip, and phases in words
 
@@ -127,7 +113,7 @@ while it shows, linking to its page.
 | waiting | waiting for T2, T3: each a chip, with its phase; or for a hold: "waiting for a slot in staging" |
 | active, an agent: idle | waiting on what its task says it waits on (a party, its delegates, news), and what would wake it, from its wake policy |
 | due, preparing, claimed | starting |
-| running | running: writing, or a tool (which, when its host names it), its attempt, for how long |
+| running | running: writing, or a tool (which, when its host names it), on its host's last report (`../../domain/hosts.md`, 6.5), and working otherwise; its attempt, for how long |
 | backing off | retrying at a time, and why: "host lost, try 2 of 3" |
 | active, a procedure | its connector's words, a part: "waiting for checkout to be healthy" |
 | active, a party | waiting for an answer from P, or from the person on call, since when |
@@ -204,10 +190,11 @@ A held task whose escalation reached the party
 - **What it had done:** its phase before the hold; its result, if it was
   closing.
 - **Where it has been:** which holders it passed, and why; or "I has it"
-  while a task above may still decide it. A party may release, amend or
-  cancel a task in their tree either way, and leave it held or pass it
-  up only while its escalation waits for them; the first commit decides
-  (contract.md, 5.2).
+  while a task above may still decide it. A party in whose tree the
+  task is, or whose role in the project allows it, may release, amend or
+  cancel it wherever its escalation waits; leaving it held or passing it
+  up is the escalation's holder's, while it waits for them; the first
+  commit decides (contract.md, 5.2; `../../domain/people.md`, 5.1).
 - **Its actions,** those that fit its reason:
   - *release,* a `Release` naming its hold's revision, saying what will
     happen ("its next run resumes its conversation; tries count again
@@ -238,8 +225,10 @@ A held task whose escalation reached the party
 
 - **Held while closing,** the card shows the result it has kept; releasing
   it carries on closing.
-- **Widening a budget** is from the task's funder: the party's pool for a
-  task they fund, the task above otherwise.
+- **Widening a budget** is funded by whoever gives it: the party's pool
+  when it is within their authority, the accepter's when it is
+  proposed; from then the giver is the task's funder
+  (`../../domain/authority.md`, section 7).
 - **A person deciding an uncertain effect** decides whether to make it
   again, which only someone who looks at the system can
   (`../../domain/connectors.md`, 4.3); the card says where to look, as
@@ -308,7 +297,8 @@ What a request asked, and why it was refused, from the refusal's facts
 
 - **the role,** or the authority it lacked, said as what was missing
   ("your pool has 12 left; this needs 40"), and whether a proposal could
-  be accepted, and, from the offer, by whom (contract.md, 4 and 5.3);
+  be accepted, and, from the offer, by whom (contract.md, section 4 and
+  5.3);
 - **a limit:** the project's live tasks, the inbox full, the chat's words
   too long, a compound request's operations past their bound;
 - **no one to escalate to:** the party would become the requester of a
@@ -321,21 +311,10 @@ What a request asked, and why it was refused, from the refusal's facts
 - **for a compound request,** the first operation that failed and why;
   nothing of the request was made.
 
-Proposing is explicit (contract.md, 3.5). A `Create` or an `Amend`
-beyond the party's authority is refused, naming what it lacked and
-whether a proposal could be accepted; the engine never makes one a
-proposal by itself. So the reference UI sends what the offer said: where
-a draft is beyond what the party may do alone but proposable, the
-confirmation says so, and to whom, and it sends a `Propose`, whose
-answer names the proposal, which then waits where the policy says
-(`../../domain/tasks.md`, section 9). Where the facts moved between the
-offer and the engine's judgement, and a `Create` or an `Amend` is
-refused for want of authority, the card says what was lacking and, where
-the refusal says a proposal could be accepted, offers to propose it,
-with a confirmation of its own. A `Propose` that nobody could accept is
-refused at admission as lacking authority, the refusal saying so
-("nobody in this project may accept this"); the form says so before
-anything is sent (view.md, 18.4).
+Proposing is explicit (contract.md, 3.5): the reference UI sends what
+the offer said, and, where a `Create` or an `Amend` is refused for want
+of authority and the refusal says a proposal could be accepted, offers
+to propose it, with a confirmation of its own (view.md, 18.4).
 
 ## 10. The conversation
 
@@ -406,7 +385,7 @@ will do:
 - **Release:** a held task, by its reason (section 5).
 - **Cancel:** a `Cancel`; ends the task and its subtree, deepest first.
   Before it is sent, the card says what it ends, as the task's document
-  gives it (`contract.md`, 5.4): the tasks below that it cancels,
+  gives it (contract.md, 5.4): the tasks below that it cancels,
   counted by phase; the live runs; the proposals withdrawn; and, in
   jig's words, that effects not yet made are withdrawn and those in
   flight settle. The core never counts a connector's effects, and its
@@ -426,7 +405,7 @@ will do:
   fit, or if nobody would hold its escalations.
 - **Reorder:** a goal's place on the board, priority-only
   amendments in one compound request, where the project's document
-  offers reordering (pages.md, 6.2; `contract.md`, 5.3).
+  offers reordering (pages.md, 6.2; contract.md, 5.3).
 - **Chat about it:** a new chat naming the task, `shapes::chat` (pages.md,
   section 4).
 
