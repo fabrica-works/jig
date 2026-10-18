@@ -1,6 +1,6 @@
 # Testing the client
 
-Provisional, 2026-10-09, revised 2026-10-17. How jig's client is tested
+Provisional, 2026-10-09, revised 2026-10-18. How jig's client is tested
 through its surface, and how a presentation on it is tested: the
 client's world with a scripted engine, the joint world with the engine's
 domain, their referee and their faults; jig's check, which an
@@ -243,6 +243,10 @@ In every world, whatever stands in front of the client:
   taken (`../../protocol/client.md`, section 7), whatever ended the
   delivery's watch meanwhile. Only the engine's restart in between
   excuses it: the restarted core holds no watch to tell.
+- **No watch left on the engine:** whenever the engine has no input left
+  to take, each watch it holds for a client is one that client has open,
+  for its application's handles or for `me` (client.md, 8.1): none it
+  closed, none of a stream it dropped, none whose opening it lost.
 - **Bounded:** the client within its limits, the heap within its worst
   case.
 
@@ -322,7 +326,7 @@ Drawn from the seed:
 
 - a watch dropped; a delivery slow;
 - the engine restarting: offline, then answers by key;
-- busy and not ready answers;
+- busy and not ready answers, a watch's and `me`'s among them;
 - no answer: a connection lost after the engine committed;
 - a request sent twice; two tabs deciding one thing; a double press,
   where there is a tree;

@@ -1,6 +1,6 @@
 # The client
 
-Provisional, 2026-10-09, revised 2026-10-17. `jig-client`: the client an
+Provisional, 2026-10-09, revised 2026-10-18. `jig-client`: the client an
 application holds, as a component, to reach jig's engine. It holds the
 link, the watches the application names by handle and the latest
 document of each, the application's keyed requests in skein-lib's
@@ -412,6 +412,17 @@ handles, as every presentation does (sections 7 and 8).
   on the engine with a name of its own, never reused, so a delivery for
   a watch it closed is dropped, even when the application has given its
   handle to another subject.
+- **Counted until the engine has ended it.** Each of the engine's
+  watches counts toward the client's limit (section 14) from the opening
+  it sends until its terminal: refused, ended on the stream, its closing
+  answered, or its stream dropped. The client closes a watch only once
+  its opening is answered: admitted, it sends the closing; refused, the
+  watch is over. A watch's opening or closing that gets no answer drops
+  the stream (8.2), whose end ends every watch on it
+  (`../../protocol/client.md`, section 7). So, but for a dropped
+  stream's watches until the engine has ended them, the engine holds no
+  watch of the client's that the client does not count, and a client
+  within its limit takes no more of the party's room (contract.md, 7.2).
 - **A `Watch` on an open handle** changes its subject or its window: the
   client opens the new one, keeps the handle's last document, marked
   behind, until the new one's first delivery, and closes the old once no
@@ -422,18 +433,23 @@ handles, as every presentation does (sections 7 and 8).
   old; *ended.* A handle that falls behind, or is live again, is told
   `Changed { handle }`, as for a newer document: level-triggered, the
   application reads both with `client.document(handle)`.
-- **Dropped is not ended.** A watch the stream lost, or one the engine
-  let go as it stopped, is opened again after a backoff, under a fresh
-  name; its handle stays, behind, and is live again at its next
-  delivery.
+- **Dropped is not ended.** A watch the stream lost, one the engine let
+  go as it stopped, or one it refused as busy, is opened again after a
+  backoff, under a fresh name; its handle stays, behind, and is live
+  again at its next delivery. Busy is the party's room full for now
+  (contract.md, 7.2): the party's other clients, or a stream this client
+  dropped whose watches the engine has not yet ended, hold the rest, and
+  it empties as their watches end.
 - **`Ended { handle, why }`** is a handle's one terminal, for what opening
-  again would not mend: the engine refused it (unknown, not allowed,
-  busy); its subject ended and left the engine; the party lost the right
-  to see it; signed out; or its owner's version not served. `Unwatch`
+  again would not mend: the engine refused it (unknown, not allowed);
+  its subject ended and left the engine; the party lost the right to see
+  it; signed out; or its owner's version not served. `Unwatch`
   ends a handle with no `Ended`.
 - **Bounded:** handles, the engine's watches, and the bytes of each
   document held (section 14). A `Watch` past them ends at once, refused
-  by the client's limit.
+  by the client's limit. One of the engine's watches is `me`'s (8.2):
+  while no watch on `me` is held, the application's take at most one
+  fewer, so that a sign-in always opens it.
 
 ### 8.2 The link
 
@@ -442,15 +458,20 @@ handles, as every presentation does (sections 7 and 8).
   `me` names the party, which the client confirms to the request table,
   so that only that party's requests are sent; and the retention of
   answers (contract.md, 3.1), from which the table cuts its retries
-  (section 6).
+  (section 6). `me` ends only with the sign-in, or when jig's version is
+  not served (below): a refusal of it, busy included, or any other end
+  of it, is opened again after a backoff, as a dropped watch (8.1), and
+  the link is offline until its next delivery.
 - **Its states,** told by `Link(state)` and read with `client.link()`:
   - *signed out:* no sign-in is live (section 12);
   - *starting:* signed in, and `me`'s first delivery has not come;
   - *live:* the stream is live, and `me` has been delivered on it;
   - *offline:* the stream dropped, or went silent past twice its
-    heartbeat (`../../protocol/client.md`, section 4). Requests wait,
-    parked, and the stream and its watches open again after backoffs
-    drawn from the seed: a first span, doubling to a most, jittered.
+    heartbeat (`../../protocol/client.md`, section 4), or `me` was
+    refused or ended on it (above). Requests wait, parked, and what
+    dropped, the stream and its watches or `me` alone, opens again after
+    backoffs drawn from the seed: a first span, doubling to a most,
+    jittered.
     `me`'s next delivery brings the link back, and with it the confirmed
     party's parked requests;
   - *out of date:* the engine serves no version of jig's that the client
@@ -734,8 +755,9 @@ for any presentation of a chat or of any agent task's activity.
 
 Each is configured and part of the worst case:
 
-- handles; the engine's watches open, `me`'s included; reads in flight;
-  exchanges in flight;
+- handles; the engine's watches open, `me`'s included, each until its
+  terminal and one kept for `me` (8.1); reads in flight; exchanges in
+  flight;
 - a path's segments: the most segments of a resource's path or a
   pattern a document may carry, a bound of its own, never a window's
   rows; the application sets it at least the most its engine admits in
@@ -839,7 +861,10 @@ view.md's, 18.10.
 ## 18. Open questions
 
 - **Several clients of one party,** such as two tabs: whether pending
-  requests should be shared between them, which they are not.
+  requests should be shared between them, which they are not; and the
+  party's room for watches on the engine (contract.md, 7.2), which they
+  share while each counts its own, so that one may find its watches
+  busy, behind until the other's end.
 - **A window's turn:** how a thread shows a turn that opens a window (a
   compaction's summary of what came before it), beside the earlier
   window's turns it summarises.

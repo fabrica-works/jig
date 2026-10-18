@@ -1,6 +1,6 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-16. jig's API: what crosses
+Provisional, 2026-10-09, revised 2026-10-18. jig's API: what crosses
 between a party's client and the engine, at the level of the two
 domains. It says who the party is; the plumbing operations a party asks,
 alone or several in one compound request, each keyed and answered once
@@ -778,7 +778,15 @@ says they moved.
   engine is stopping.
 - **Admitted** against the party's sign-in and what they may see, and the
   watches the engine allows per party and in all; past them, refused as
-  busy.
+  busy. A watch holds its place from its admission until the engine has
+  ended it: while its closing is in flight, and while its stream's end
+  or its last delivery is (`../../domain/engine.md`, section 11). A
+  deployment allows each party at least the engine's watches one client
+  opens at its limit, `me`'s included (client.md, section 14), so that a
+  party's one client within its limit never finds the party's room
+  full. Busy is the room full for now, and the client opens the watch
+  again after a backoff (client.md, 8.1), as a request refused busy is
+  sent again (section 4).
 - **An application's subject names its owner, its scope and its
   window,** as an application's read does: its owner by its number, the
   scope a project, the deployment, or the party's own (7.5). The core

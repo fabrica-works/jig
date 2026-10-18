@@ -1,6 +1,6 @@
 # The client's protocol
 
-Provisional, 2026-10-10, revised 2026-10-16. What carries jig's API
+Provisional, 2026-10-10, revised 2026-10-18. What carries jig's API
 (`../client/domain/contract.md`) as messages and bytes, whatever the
 transport: jig's messages; the clients' component's messages toward the
 application's transport and server, and the client's link toward its
@@ -206,9 +206,11 @@ the engine's messages to the client as they come.
   stream's watches it is alive at each heartbeat and each message; past
   twice the span with nothing read, it takes the stream as dropped.
 - **A dropped stream** drops every watch on it, each told so, and the
-  engine ends them as the client left. The client reopens them, and the
-  stream with them, after its backoffs (`../client/domain/client.md`,
-  8.2).
+  engine ends them as the client left; until then, each holds its place
+  in the party's room (`../client/domain/contract.md`, 7.2). The client
+  reopens them, and the stream with them, after its backoffs
+  (`../client/domain/client.md`, 8.2). A watch's opening or closing
+  that gets no answer drops the stream too (section 7).
 
 ### 4.1 jig's messages
 
@@ -379,6 +381,14 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   (`../client/domain/contract.md`, 7.2); or closing it by an exchange,
   answered once the engine has ended it. A stream that ends ends its
   watches.
+- **A closing follows its opening's answer.** Exchanges cross
+  independently, and a closing that overtook its opening would find no
+  watch, be answered closed, and leave the watch admitted after it, which
+  nothing closes but its stream's end. So the client sends a watch's
+  closing only once its opening is answered admitted, and none once it
+  is refused. An opening or a closing that gets no answer leaves the
+  client unsure what the engine holds: it drops the stream (section 4),
+  whose end ends every watch on it.
 - **Each delivery is settled once, while the engine runs.** The core
   makes a watch's next delivery, or ends the watch, only once the
   component has told it of the last one: taken, once the transport took
