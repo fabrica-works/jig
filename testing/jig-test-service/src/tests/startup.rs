@@ -81,6 +81,7 @@ fn the_server_listens_where_the_application_member_says() {
     let document = fixtures::with(&document, br#""components":[]"#, br#""components":["clients"]"#);
     let mut service =
         crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds(), None, None).expect("startup");
+    service.clock(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH);
     let engine = fixtures::engine(&mut service);
     let clients = engine.clients.as_mut().expect("clients configured");
     clients.iterate(
