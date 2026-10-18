@@ -71,7 +71,7 @@ pub fn conversation_member(forgettable: bool) -> people::Member {
         },
         dependencies: Box::new([]),
         tracked: None,
-        label: 1,
+        label: jig_client_test_records::CHAT,
         flags: people::Flags {
             conversation: true,
             listed: false,
@@ -284,11 +284,8 @@ pub fn result_and_reply_filters_page_their_own_retained_updates() {
     let mut tasks = Vec::new();
     for number in 0..3 {
         if number != 0 {
-            request(
-                &mut world,
-                40 + number,
-                people::Ask::StartChat { project: 1, words: b"next chat".as_slice().into() },
-            );
+            let next_chat = crate::fixtures::chat(&world, 1, b"next chat".as_slice().into());
+            request(&mut world, 40 + number, next_chat);
         }
         let task = world.assigned.as_ref().expect("chat").task;
         tasks.push(task);

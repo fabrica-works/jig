@@ -540,11 +540,8 @@ fn a_restart_restores_unread_results_and_chat_totals() {
     let mut chats = Vec::new();
     for number in 0..3 {
         if number != 0 {
-            jig_core_world::stories::reads::request(
-                &mut world,
-                110 + number,
-                jig_domain_people::Ask::StartChat { project: 1, words: b"next census chat".as_slice().into() },
-            );
+            let request = jig_core_world::fixtures::chat(&world, 1, b"next census chat".as_slice().into());
+            jig_core_world::stories::reads::request(&mut world, 110 + number, request);
         }
         chats.push(world.assigned.as_ref().expect("chat").task);
         world.turn(1, 1, None, b"unread reply");
@@ -648,11 +645,8 @@ fn a_restart_keeps_an_unread_goal_older_than_an_unread_chat() {
     let mut world = census_world(839);
     finish_census_task(&mut world, 0);
     let goal = census_goal(&mut world, FIRST_GOAL);
-    jig_core_world::stories::reads::request(
-        &mut world,
-        CHAT,
-        jig_domain_people::Ask::StartChat { project: 1, words: b"newer chat".as_slice().into() },
-    );
+    let request = jig_core_world::fixtures::chat(&world, 1, b"newer chat".as_slice().into());
+    jig_core_world::stories::reads::request(&mut world, CHAT, request);
     let chat = world.assigned.as_ref().expect("chat").task;
     world.turn(TURN, 1, None, b"reply");
     finish_census_task(&mut world, 1);

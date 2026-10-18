@@ -1301,18 +1301,14 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     let (configuration, limits) = amendment_world_fixture(161);
     let mut world = World::configured(161, false, configuration, limits);
     let deadline = skein_lib::Wall::from_nanos(1_000_000_000);
-    ask(
-        &mut world,
-        90,
-        jig_core_world::fixtures::propose_goal(people::Ask::SetGoal {
-            project: 1,
-            spec: b"finish before the deadline".as_slice().into(),
-            executor: jig_domain_people::GoalExecutor::Charter(1),
-            budget: 600,
-            priority: 0,
-            deadline: Some(deadline),
-        }),
+    let proposed_goal = jig_core_world::fixtures::goal(
+        &world,
+        1,
+        b"finish before the deadline".as_slice().into(),
+        people::TaskExecutor::Agent { charter: 1 },
+        jig_core_world::fixtures::Goal { budget: 600, deadline: Some(deadline), ..Default::default() },
     );
+    ask(&mut world, 90, jig_core_world::fixtures::propose_goal(proposed_goal));
     let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) =
         world.people_answers.last().copied()
     else {

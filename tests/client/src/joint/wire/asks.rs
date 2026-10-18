@@ -29,9 +29,6 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
         client::Ask::Withdraw { project, proposal } => people::Ask::Withdraw { project: *project, proposal: *proposal },
         client::Ask::Create { project, tasks } => create::ask(*project, tasks),
         client::Ask::Compound { project, operations } => compound::ask(*project, operations)?,
-        client::Ask::StartChat { project, words } => {
-            people::Ask::StartChat { project: *project, words: Box::from(words.bytes()) }
-        }
         client::Ask::Message { project, task, words } => {
             people::Ask::Say { project: *project, task: *task, words: Box::from(words.bytes()) }
         }
@@ -79,28 +76,9 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
         client::Ask::Cancel { project, task, reason, grace } => {
             people::Ask::Cancel { project: *project, task: *task, reason: Box::from(reason.bytes()), grace: *grace }
         }
-        client::Ask::Close { project, chat, disposals } => {
-            let mut result = List::with_capacity(disposals.capacity());
-            for value in disposals {
-                result.push(request_arguments::disposal(value)).expect("same whole list capacity");
-            }
-            people::Ask::Close { project: *project, chat: *chat, disposals: result }
-        }
         client::Ask::Move { project, task, reason } => {
             people::Ask::Move { project: *project, task: *task, reason: Box::from(reason.bytes()) }
         }
-        client::Ask::SetGoal { project, spec, executor, budget, priority, deadline } => people::Ask::SetGoal {
-            project: *project,
-            spec: Box::from(spec.bytes()),
-            executor: request_arguments::goal_executor(*executor),
-            budget: *budget,
-            priority: *priority,
-            deadline: *deadline,
-        },
-        client::Ask::Prioritise { project, goals } => people::Ask::Prioritise {
-            project: *project,
-            goals: goals.iter().map(|value| (value.task, value.priority)).collect(),
-        },
         client::Ask::Seen { through: seen } => people::Ask::MarkSeen { seen: request_arguments::seen(*seen) },
         client::Ask::SetPool { project, party, budget } => {
             people::Ask::SetPool { project: *project, person: *party, budget: *budget }
@@ -246,7 +224,7 @@ fn note_scope(value: &client::NoteScope, project: u32) -> Result<people::NoteSco
             }
             people::NoteScope::Project
         }
-        client::NoteScope::Goal { project: named, goal } => {
+        client::NoteScope::Task { project: named, task: goal } => {
             if *named != project {
                 return Err(Invalid::NoteProject);
             }
@@ -469,23 +447,6 @@ mod tests {
                 })
             );
         }
-        let mut disposals = List::with_capacity(5);
-        disposals.push(client::Disposal::Cancel { task: 77 }).expect("the complete supplied fixture is admitted");
-        disposals
-            .push(client::Disposal::TakeOver { task: u64::MAX })
-            .expect("the complete supplied fixture is admitted");
-        let Ok(people::Ask::Close { disposals: now, .. }) = ask(&client::Ask::Close { project: 4, chat: 8, disposals })
-        else {
-            panic!("whole close request");
-        };
-        assert_eq!(now.capacity(), 5);
-        assert_eq!(
-            now.as_slice(),
-            &[
-                people::Disposal { task: 77, keep: people::Keep::Cancel },
-                people::Disposal { task: u64::MAX, keep: people::Keep::MakeMine }
-            ]
-        );
     }
 
     #[test]
@@ -529,7 +490,7 @@ mod tests {
             ask(&client::Ask::DeleteNote {
                 project: 4,
                 note: 99,
-                scope: client::NoteScope::Goal { project: 4, goal: u64::MAX },
+                scope: client::NoteScope::Task { project: 4, task: u64::MAX },
                 revision: client::Revision { value: u64::from(u32::MAX) + 1 }
             }),
             Err(Invalid::NoteRevision)
@@ -782,7 +743,7 @@ mod tests {
             assert_eq!(request, before);
             assert_eq!(note_scope(&scope, 0), Err(Invalid::NoteProject));
         }
-        let goal = client::NoteScope::Goal { project: u32::MAX, goal: u64::MAX };
+        let goal = client::NoteScope::Task { project: u32::MAX, task: u64::MAX };
         assert_eq!(note_scope(&goal, u32::MAX), Ok(people::NoteScope::Goal { goal: u64::MAX }));
         assert_eq!(note_scope(&goal, 0), Err(Invalid::NoteProject));
     }

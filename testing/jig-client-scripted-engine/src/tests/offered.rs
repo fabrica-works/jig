@@ -17,7 +17,7 @@ fn seven() -> Task {
             ActKind::Message,
             ActKind::Amend,
             ActKind::Move,
-            ActKind::Close,
+            ActKind::Release,
             ActKind::Stop,
             ActKind::Cancel,
             ActKind::Seen,
@@ -105,7 +105,7 @@ fn seven_offers_cross_normal_task_read_and_delivery_whole_with_two_paged_rows() 
             ActKind::Message,
             ActKind::Amend,
             ActKind::Move,
-            ActKind::Close,
+            ActKind::Release,
             ActKind::Stop,
             ActKind::Cancel,
             ActKind::Seen,
@@ -153,7 +153,7 @@ fn nested() -> List<Offered> {
     list(vec![
         Offered {
             effect: None,
-            act: ActKind::SetGoal,
+            act: ActKind::Reorder,
             admission: Admission::Bounded {
                 within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
                     authority: Box::new(owner_authority()),
@@ -196,7 +196,7 @@ fn nested() -> List<Offered> {
         },
         Offered {
             effect: None,
-            act: ActKind::Close,
+            act: ActKind::Release,
             admission: Admission::Proposed { to: Recipient::Role { project: u32::MAX, role: u32::MAX } },
         },
         Offered { effect: None, act: ActKind::Seen, admission: Admission::Refused(Refusal::NotWaiting) },

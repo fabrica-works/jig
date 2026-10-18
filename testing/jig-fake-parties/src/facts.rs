@@ -4,10 +4,6 @@ use skein_lib::Wall;
 /// A final reason a keyed request was refused.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
-    Disposal {
-        task: u64,
-        issue: DisposalIssue,
-    },
     /// The held role does not permit this request here.
     Role {
         held: Option<u32>,
@@ -270,11 +266,4 @@ pub enum FailureClass {
     Lost,
     /// The result broke its contract.
     Invalid,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum DisposalIssue {
-    Missing,
-    Unknown,
-    Repeated,
 }

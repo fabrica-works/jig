@@ -51,10 +51,10 @@ fn a_party_request_is_returned_busy_with_the_journal_full() {
     let jig_test_domain::Event::Core(core::Event::People(jig_domain_people::Event::Ask { ask, .. })) = *event else {
         panic!("busy returns the same party request");
     };
-    let jig_domain_people::Ask::StartChat { words, .. } = ask else {
+    let jig_domain_people::Ask::Create { batch, .. } = ask else {
         panic!("same chat request");
     };
-    assert_eq!(words.as_ref(), b"retained");
+    assert_eq!(batch[0].words.as_ref(), b"retained");
 }
 
 #[test]
@@ -493,7 +493,14 @@ fn a_commit_reaches_the_store_and_its_answer_the_journal() {
     let number = driven.commit_asked();
     assert_eq!(driven.released_to_parties(), 0);
     driven.commit(number);
-    assert_eq!(driven.reply, Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::Started { task: 1 })));
+    assert_eq!(
+        driven.reply,
+        Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::Created {
+            first: 1,
+            last: 1,
+            given: Some(jig_domain_people::Given { task: 1, amount: 100 })
+        }))
+    );
 }
 
 #[test]

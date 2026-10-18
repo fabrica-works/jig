@@ -7,7 +7,7 @@ fn note_cards_name_the_whole_stored_attempt_and_only_render_supplied_times() {
             let note = Note {
                 number: 77,
                 revision: Revision { value: u64::MAX },
-                scope: NoteScope::Goal { project: u32::MAX, goal: u64::MAX },
+                scope: NoteScope::Task { project: u32::MAX, task: u64::MAX },
                 description: DocumentText::complete(text(b"note title")),
                 body: DocumentText { bytes: text(b"note body"), cut: true },
                 writer,

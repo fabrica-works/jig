@@ -6,13 +6,12 @@ use jig_domain_authority as authority;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::Queue;
-use skein_lib::{ReplyTo, Token, Wall};
+use skein_lib::{ReplyTo, Token};
 
 use crate::{Core, translate};
 
-/// Authorized goal creation route and its authentic funding source.
 #[derive(Debug)]
-pub struct GoalStart {
+pub struct CreateStart {
     /// Person pool charged by a direct start or later accepted proposal.
     pub source: tasks::Funder,
     /// Authority bounded to this goal's requested budget.
@@ -42,7 +41,7 @@ impl Core {
     /// Ask the task child to open a missing period or person pool before a
     /// goal starts; both requests join the same decision as the goal.
     #[must_use]
-    pub fn goal_open_pool(&self, project: u32, person: u64) -> (Option<tasks::Event>, Option<tasks::Event>) {
+    pub fn open_person_pool(&self, project: u32, person: u64) -> (Option<tasks::Event>, Option<tasks::Event>) {
         let period = tasks::Funder::Period { project, period: self.period(project) };
         let open_period = if self.tasks.funding(period).is_none() {
             Some(tasks::Event::OpenPeriod {
@@ -54,7 +53,7 @@ impl Core {
         } else {
             None
         };
-        let (pool, _) = self.goal_pool(project, person);
+        let (pool, _) = self.person_pool(project, person);
         let carve_pool = if self.tasks.funding(pool).is_none() {
             Some(tasks::Event::CarvePool {
                 reply_to: ReplyTo::new(Token::new(0)),
@@ -102,7 +101,7 @@ impl Core {
         role: people::Role,
         tasks_left: u32,
     ) -> Result<tasks::Funder, people::Refusal> {
-        let (source, numbers) = self.goal_pool(project, person);
+        let (source, numbers) = self.person_pool(project, person);
         let action = match &proposal.action {
             tasks::PersonAction::Batch(batch) => {
                 let mut members =
@@ -145,28 +144,12 @@ impl Core {
 
     /// Read the person's current pool, including their role's unopened allotment.
     #[must_use]
-    pub fn goal_pool(&self, project: u32, person: u64) -> (tasks::Funder, tasks::Numbers) {
+    pub fn person_pool(&self, project: u32, person: u64) -> (tasks::Funder, tasks::Numbers) {
         let source = tasks::Funder::Pool { project, person, period: self.period(project) };
         let numbers = match self.tasks.funding(source) {
             Some(row) => row.numbers,
             None => tasks::Numbers { budget: self.pool_budget(project, person), spent: 0, spent_below: 0, reserved: 0 },
         };
         (source, numbers)
-    }
-
-    /// Decide whether a person goal starts directly or is offered as a
-    /// proposal, before either route allocates its durable number.
-    #[expect(clippy::too_many_arguments, reason = "a goal carries its requested authority and deadline")]
-    pub fn goal_start(
-        &self,
-        project: u32,
-        person: u64,
-        role: people::Role,
-        executor: people::GoalExecutor,
-        budget: u64,
-        deadline: Option<Wall>,
-        tasks_left: u32,
-    ) -> Result<GoalStart, people::Refusal> {
-        crate::acts::bounds::goal_start(self, project, person, role, executor, budget, deadline, tasks_left)
     }
 }

@@ -55,6 +55,7 @@ pub fn proposal(value: &d::ProposalRef, limits: &w::Limits) -> Result<w::Proposa
 }
 pub fn act(value: acts::Act, _limits: &w::Limits) -> Result<w::ActKind, w::Problem> {
     Ok(match value {
+        acts::Act::Reorder => w::ActKind::Reorder,
         acts::Act::Message => w::ActKind::Message,
         acts::Act::Answer => w::ActKind::Answer,
         acts::Act::Take => w::ActKind::Take,
@@ -68,10 +69,7 @@ pub fn act(value: acts::Act, _limits: &w::Limits) -> Result<w::ActKind, w::Probl
         acts::Act::Amend => w::ActKind::Amend,
         acts::Act::Stop => w::ActKind::Stop,
         acts::Act::Cancel => w::ActKind::Cancel,
-        acts::Act::Close => w::ActKind::Close,
         acts::Act::Move => w::ActKind::MoveTask,
-        acts::Act::SetGoal => w::ActKind::SetGoal,
-        acts::Act::Prioritise => w::ActKind::Prioritise,
         acts::Act::Seen => w::ActKind::Seen,
         acts::Act::EditNote => w::ActKind::EditNote,
         acts::Act::DeleteNote => w::ActKind::DeleteNote,
@@ -101,7 +99,7 @@ pub fn recipient(value: &acts::Recipient, limits: &w::Limits) -> Result<w::Recip
 }
 pub(super) fn bounds(value: &acts::Bounds, limits: &w::Limits) -> Result<w::Bounds, w::Problem> {
     Ok(match value {
-        acts::Bounds::Goal {
+        acts::Bounds::Create {
             authority,
             pool_left,
             charters,

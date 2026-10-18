@@ -23,7 +23,11 @@ pub mod amendment;
 pub fn confirmation(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let text_limit = bindings.text_limit();
     if let Some(open) = client.confirmation() {
-        begin(b, words, common::act_phrase(open.act));
+        let title = match open.form {
+            crate::confirm::Form::Act => common::act_phrase(open.act),
+            crate::confirm::Form::CloseChat => JigPhrase::ActClose,
+        };
+        begin(b, words, title);
         if let Some(object) = client.objects().get(open.object) {
             context(b, client, &object, words, bindings);
             action(b, client, &object, open, words, bindings);
@@ -137,6 +141,15 @@ fn action(
     bindings: &mut JigBindings,
 ) {
     let text_limit = bindings.text_limit();
+    if open.form == crate::confirm::Form::CloseChat {
+        words.text(b, JigPhrase::WillClose, &[]);
+        if let Some(impact) = impact(object) {
+            impact_words(b, impact, words);
+        }
+        delegates(b, client, object, open, words, bindings);
+        common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
+        return;
+    }
     match open.act {
         ActKind::Accept => {
             words.text(b, JigPhrase::WillAccept, &[]);
@@ -213,14 +226,6 @@ fn action(
             }
             common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
         }
-        ActKind::Close => {
-            words.text(b, JigPhrase::WillClose, &[]);
-            if let Some(impact) = impact(object) {
-                impact_words(b, impact, words);
-            }
-            delegates(b, client, object, open, words, bindings);
-            common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
-        }
         ActKind::Move => {
             words.text(b, JigPhrase::WillTakeOver, &[]);
             if let Some(offers) = crate::acts::offers(object)
@@ -273,7 +278,7 @@ fn action(
                 );
             }
         }
-        ActKind::Prioritise => {
+        ActKind::Reorder => {
             words.text(b, JigPhrase::WillPrioritise, &[]);
             b.open(Role::TextField);
             b.name(&words.say(JigPhrase::PriorityField, &[]));
@@ -312,7 +317,6 @@ fn action(
         ActKind::HandBack => words.text(b, JigPhrase::WillHandBack, &[]),
         ActKind::Stop => words.text(b, JigPhrase::WillStop, &[]),
         ActKind::DeleteNote => words.text(b, JigPhrase::WillDeleteNote, &[]),
-        ActKind::SetGoal => words.text(b, JigPhrase::WillGoal, &[]),
         ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy

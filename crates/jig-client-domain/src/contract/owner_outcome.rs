@@ -37,8 +37,6 @@ pub enum OwnerOutcome {
     Created { first: u64, last: u64, given: Option<super::CreatedGiven> },
     /// Operations committed together, taking consecutive message numbers.
     Compound { project: u32, operations: u32, first_message: u64 },
-    /// A chat closed with the supplied counts of cancelled and kept delegates.
-    Closing { chat: u64, cancelled: u32, kept: u32 },
     /// A results or chat-replies position was marked seen.
     MarkedSeen { seen: SeenThrough },
     /// A note correction or deletion was committed.
@@ -47,10 +45,6 @@ pub enum OwnerOutcome {
     ServiceMade { person: u64 },
     /// The owner committed a project's adoption.
     Adopted { project: u32 },
-    /// A goal task was made.
-    GoalStarted { task: u64 },
-    /// A goal awaits a proposal decision; only the supplied number is known.
-    GoalProposed { proposal: u64 },
     /// A task was stopped for a later release or decision.
     Stopped { task: u64 },
     /// A task and its descendants were cancelled.
@@ -71,8 +65,6 @@ pub enum OwnerOutcome {
     Said { task: u64, message: u64 },
     /// A named question was answered by a message.
     QuestionAnswered { task: u64, question: u64, message: u64 },
-    /// A project's goal priorities changed together.
-    Prioritised { project: u32 },
     /// A task accepted an amendment, with the supplied release fact.
     Amended { task: u64 },
     /// A party's action awaits the supplied proposal number.
@@ -87,6 +79,4 @@ pub enum OwnerOutcome {
     PoolSet { project: u32, person: u64 },
     /// A hold revision's current or historical decision names its winner.
     EscalationDecided { task: u64, revision: Revision, by: u64, at: Wall, choice: OwnerEscalationChoice },
-    /// A chat task was started.
-    Started { task: u64 },
 }

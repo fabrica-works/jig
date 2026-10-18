@@ -8,7 +8,7 @@
 mod tests;
 
 mod facts;
-pub use facts::{Again, DisposalIssue, Ending, EndingParty, FailureClass, HoldReason, Lack, LimitKind, Moved, Refusal};
+pub use facts::{Again, Ending, EndingParty, FailureClass, HoldReason, Lack, LimitKind, Moved, Refusal};
 
 use skein_lib::{Duration, Rng, Time, Wall};
 use std::collections::VecDeque;
@@ -43,7 +43,7 @@ pub enum Keep {
     MakeMine,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Disposal {
+pub struct DelegateChoice {
     pub task: Task,
     pub keep: Keep,
 }
@@ -53,7 +53,7 @@ pub struct Disposal {
 pub enum Ask {
     Close {
         task: Task,
-        disposals: Box<[Disposal]>,
+        disposals: Box<[DelegateChoice]>,
     },
     /// Mark results read through one committed position.
     SeeResults {
@@ -401,7 +401,7 @@ impl Party {
             Ask::Close { task, disposals } => {
                 let mut resolved = Vec::with_capacity(disposals.len());
                 for disposal in disposals {
-                    resolved.push(Disposal { task: self.task(disposal.task)?, keep: disposal.keep });
+                    resolved.push(DelegateChoice { task: self.task(disposal.task)?, keep: disposal.keep });
                 }
                 Ask::Close { task: self.task(task)?, disposals: resolved.into_boxed_slice() }
             }

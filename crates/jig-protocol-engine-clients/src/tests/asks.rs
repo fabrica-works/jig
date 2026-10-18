@@ -6,11 +6,11 @@ use crate::{
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_people as p;
 #[test]
-fn a_start_chat_record_becomes_the_core_s_start_chat() {
+fn a_message_record_becomes_the_cores_say() {
     let limits = f::wire();
     assert_eq!(
         ask(f::start(&limits), &limits),
-        Ok(p::Ask::StartChat { project: 3, words: Box::from(b"hello".as_slice()) })
+        Ok(p::Ask::Say { project: 3, task: 8, words: Box::from(b"hello".as_slice()) })
     );
 }
 #[test]

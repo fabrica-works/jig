@@ -182,8 +182,9 @@ fn a_compound_naming_another_projects_task_is_refused_at_its_place() {
     let (config, limits) = jig_core_world::fixtures::two_projects(1109);
     let mut world = jig_core_world::effects::World::configured(1109, false, config, limits);
     let first = world.assigned.as_ref().expect("first chat").task;
-    request(&mut world, 13, people::Ask::StartChat { project: 2, words: b"other".as_slice().into() });
-    let people::Reply::Outcome(people::Outcome::Started { task: second }) =
+    let other_projects_chat = jig_core_world::fixtures::chat(&world, 2, b"other".as_slice().into());
+    request(&mut world, 13, other_projects_chat);
+    let people::Reply::Outcome(people::Outcome::Created { first: second, .. }) =
         *world.people_answers.last().expect("second chat")
     else {
         panic!("second project chat")

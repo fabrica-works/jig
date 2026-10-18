@@ -12,7 +12,8 @@ fn a_partys_request_after_the_stop_is_answered_not_ready() {
     let mut world = World::new(160, false);
     world.stop();
     let commits = world.store.applied;
-    request(&mut world, 55, people::Ask::StartChat { project: 1, words: b"later".as_slice().into() });
+    let later_chat = jig_core_world::fixtures::chat(&world, 1, b"later".as_slice().into());
+    request(&mut world, 55, later_chat);
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Again(people::Again::NotReady)));
     assert_eq!(world.store.applied, commits);
 }
@@ -81,7 +82,8 @@ fn no_run_is_placed_after_the_stop() {
     let commits = world.store.applied;
     world.send(root::Event::Timer(core::Timer::Tasks));
     world.send(root::Event::Timer(core::Timer::Fleet));
-    request(&mut world, 56, people::Ask::StartChat { project: 1, words: b"later".as_slice().into() });
+    let replacement_chat = jig_core_world::fixtures::chat(&world, 1, b"later".as_slice().into());
+    request(&mut world, 56, replacement_chat);
     assert_eq!(world.assignments.len(), assignments);
     assert_eq!(world.store.applied, commits);
 }

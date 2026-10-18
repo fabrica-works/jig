@@ -74,7 +74,7 @@ impl skein_world::Referee<Proc> for Referee {
                         && !self.passed
                         && let Some(up) = self.party.tick(now)
                     {
-                        engine.parties_in().push(party_event(up));
+                        engine.parties_in().push(party_event(up, &store));
                     }
                     if self.passed && !host.stopping {
                         host.stopping = true;

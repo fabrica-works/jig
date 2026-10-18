@@ -22,6 +22,10 @@ pub(super) fn create_request(
     mut creation: Creation,
 ) {
     let request = creation.request;
+    if core.fill >= env.limits.fill_mark {
+        super::refusals::pool_again(work, request, people::Again::Busy);
+        return;
+    }
     match checked(core, env, &mut creation, false) {
         Ok((members, given)) => {
             party_inputs::begin(
@@ -88,7 +92,7 @@ pub(super) fn checked(
     if proposing {
         super::propose::allowed(core, *project, delegates.into_boxed())?;
     } else {
-        let (_, pool) = core.goal_pool(*project, *person);
+        let (_, pool) = core.person_pool(*project, *person);
         let ask = authority::PersonAsk {
             project: *project,
             role: role.number(),
@@ -328,7 +332,7 @@ fn budget(core: &Core, creation: &mut Creation) -> Result<Option<(u32, u64)>, pe
                 .ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
         }
     }
-    let (_, pool) = core.goal_pool(creation.project, creation.person);
+    let (_, pool) = core.person_pool(creation.project, creation.person);
     let ask = authority::PersonAsk {
         project: creation.project,
         role: creation.role.number(),

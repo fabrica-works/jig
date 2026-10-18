@@ -217,7 +217,8 @@ fn deployment_person_actions_four_causes_all_structural_limits_and_opaque_reques
     use AdmissionLimit as L;
     use OwnerPersonCapacityAction as A;
     let actions = [
-        A::Close,
+        A::Create,
+        A::Compound,
         A::Application { connector: u16::MAX },
         A::Note { name: u64::MAX },
         A::Service,
@@ -225,14 +226,11 @@ fn deployment_person_actions_four_causes_all_structural_limits_and_opaque_reques
         A::Roles,
         A::Policy,
         A::Pool { person: u64::MAX },
-        A::Chat,
-        A::Goal,
         A::Escalation { task: u64::MAX },
         A::Proposal { proposer: Proposer::Task(u64::MAX), number: u64::MAX },
         A::Proposal { proposer: Proposer::Party(u64::MAX), number: 0 },
         A::Words { task: u64::MAX },
         A::Question { task: u64::MAX, question: u64::MAX },
-        A::Priority,
         A::Amend { task: u64::MAX },
         A::Move { task: u64::MAX },
         A::TakePerson { task: u64::MAX },
@@ -292,14 +290,17 @@ fn deployment_person_actions_four_causes_all_structural_limits_and_opaque_reques
     assert_eq!(limits.len(), 35);
     for which in limits {
         let mut value = empty();
-        value.person_room_refusals.push(person(A::Close, OwnerPersonCapacityCause::Limit { which })).unwrap();
+        value
+            .person_room_refusals
+            .push(person(A::Application { connector: u16::MAX }, OwnerPersonCapacityCause::Limit { which }))
+            .unwrap();
         round_trip(value);
     }
     for cause in
         [OwnerPersonCapacityCause::Pending { limit: u32::MAX }, OwnerPersonCapacityCause::Waiters { limit: u32::MAX }]
     {
         let mut value = empty();
-        let mut refusal = person(A::Close, cause);
+        let mut refusal = person(A::Application { connector: u16::MAX }, cause);
         refusal.project = Some(0);
         value.person_room_refusals.push(refusal).unwrap();
         round_trip(value);

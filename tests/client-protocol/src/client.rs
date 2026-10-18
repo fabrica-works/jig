@@ -412,7 +412,7 @@ impl Story {
             .values()
             .find_map(|row| match row {
                 jig_test_domain::Record::Core(jig_domain_core::Record::People(jig_domain_people::Stored::Answer {
-                    outcome: jig_domain_people::Outcome::Started { task },
+                    outcome: jig_domain_people::Outcome::Created { first: task, .. },
                     ..
                 })) => Some(*task),
                 jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,

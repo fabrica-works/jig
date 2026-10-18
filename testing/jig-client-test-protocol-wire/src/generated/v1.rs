@@ -219,8 +219,6 @@ pub enum Path {
     HoldReasonPoolLostTail,
     /// The tag of `FailureClass`.
     FailureClassTag,
-    /// The tag of `DisposalIssue`.
-    DisposalIssueTag,
     /// The tag of `EffectPhase`.
     EffectPhaseTag,
     /// The tag of `ResourceRole`.
@@ -255,12 +253,6 @@ pub enum Path {
     OutboxEntryPhase,
     /// Bytes after `OutboxEntry`.
     OutboxEntryTail,
-    /// The `task` field of `RefusalDisposal`.
-    RefusalDisposalTask,
-    /// The `issue` field of `RefusalDisposal`.
-    RefusalDisposalIssue,
-    /// Bytes after `RefusalDisposal`.
-    RefusalDisposalTail,
     /// The `lacking` field of `RefusalAuthority`.
     RefusalAuthorityLacking,
     /// The `proposable` field of `RefusalAuthority`.
@@ -1993,25 +1985,6 @@ impl FailureClass {
 
 }
 
-/// `DisposalIssue` in this codec family.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum DisposalIssue {
-    /// `missing` without a payload.
-    Missing,
-    /// `unknown` without a payload.
-    Unknown,
-    /// `repeated` without a payload.
-    Repeated,
-}
-
-impl DisposalIssue {
-    /// Checks the payload against the given limits.
-    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
-        Ok(value)
-    }
-
-}
-
 /// `EffectPhase` in this codec family.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EffectPhase {
@@ -2234,44 +2207,6 @@ impl OutboxEntry {
         self.effect.check(limits)?;
         Ok(())
     }
-}
-
-/// Movable fields of `RefusalDisposal`.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct RefusalDisposalParts {
-    /// The `task` field.
-    pub task: u64,
-    /// The `issue` field.
-    pub issue: DisposalIssue,
-}
-
-/// `RefusalDisposal` in this codec family.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct RefusalDisposal {
-    task: u64,
-    issue: DisposalIssue,
-}
-
-impl RefusalDisposal {
-    /// Makes a value within the given limits.
-    pub fn new(_limits: &Limits, parts: RefusalDisposalParts) -> Result<Self, Problem> {
-        let RefusalDisposalParts { task, issue } = parts;
-        let value = Self { task, issue };
-        Ok(value)
-    }
-
-    /// Reads the `task` field.
-    #[must_use]
-    pub fn task(&self) -> u64 { self.task }
-
-    /// Reads the `issue` field.
-    #[must_use]
-    pub fn issue(&self) -> &DisposalIssue { &self.issue }
-
-    /// Moves the fields out without copying.
-    #[must_use]
-    pub fn into_parts(self) -> RefusalDisposalParts { RefusalDisposalParts { task: self.task, issue: self.issue } }
-
 }
 
 /// Movable fields of `RefusalAuthority`.
@@ -2543,8 +2478,6 @@ impl RefusalMoved {
 /// `Refusal` in this codec family.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Refusal {
-    /// `disposal` carrying `RefusalDisposal`.
-    Disposal(RefusalDisposal),
     /// `role` carrying `RefusalRole`.
     Role(RefusalRole),
     /// `authority` carrying `RefusalAuthority`.
@@ -6111,44 +6044,6 @@ impl FailureClass {
     }
 }
 
-impl DisposalIssue {
-    /// Measures this variant's wire encoding.
-    #[must_use]
-    pub fn measure(&self) -> u32 {
-        match self {
-            Self::Missing | Self::Unknown | Self::Repeated => 1,
-        }
-    }
-
-    /// Writes this variant's tag and payload.
-    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
-        match self {
-            Self::Missing => writer.put(&[0_u8])?,
-            Self::Unknown => writer.put(&[1_u8])?,
-            Self::Repeated => writer.put(&[2_u8])?,
-        }
-        Ok(())
-    }
-
-    /// Reads a whole variant and refuses trailing bytes.
-    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        let value = Self::decode_from(limits, reader)?;
-        if !reader.is_empty() { return Err(Problem { path: Path::DisposalIssueTag, reason: skein_codec::Reason::Trailing }); }
-        Ok(value)
-    }
-
-    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        let tag = reader.u8().ok_or(Problem { path: Path::DisposalIssueTag, reason: skein_codec::Reason::Short })?;
-        let value = match tag {
-            0 => Self::Missing,
-            1 => Self::Unknown,
-            2 => Self::Repeated,
-            _ => return Err(Problem { path: Path::DisposalIssueTag, reason: skein_codec::Reason::Tag }),
-        };
-        Ok(value)
-    }
-}
-
 impl EffectPhase {
     /// Measures this variant's wire encoding.
     #[must_use]
@@ -6389,40 +6284,6 @@ impl OutboxEntry {
         let decoded_attempt = match reader.u8().ok_or(Problem { path: Path::OutboxEntryAttempt, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(Attempt::decode_from(limits, reader)?), _ => return Err(Problem { path: Path::OutboxEntryAttempt, reason: skein_codec::Reason::Tag }) };
         let decoded_phase = EffectPhase::decode_from(limits, reader)?;
         Ok(Self { number: decoded_number, task: decoded_task, key: decoded_key, effect: decoded_effect, attempt: decoded_attempt, phase: decoded_phase })
-    }
-}
-
-impl RefusalDisposal {
-    /// Measures this record's wire encoding.
-    #[must_use]
-    pub fn measure(&self) -> u32 {
-        let mut size = 0_u32;
-        size = size.checked_add(8).expect("schema ceilings fit u32");
-        let field_issue = &self.issue;
-        size = size.checked_add(field_issue.measure()).expect("schema ceilings fit u32");
-        size
-    }
-
-    /// Writes into a writer with room for the measured bytes.
-    pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
-        let field_task = &self.task;
-        writer.put(&field_task.to_be_bytes())?;
-        let field_issue = &self.issue;
-        field_issue.encode(writer)?;
-        Ok(())
-    }
-
-    /// Reads a whole record and refuses trailing bytes.
-    pub fn decode(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        let value = Self::decode_from(limits, reader)?;
-        if !reader.is_empty() { return Err(Problem { path: Path::RefusalDisposalTail, reason: skein_codec::Reason::Trailing }); }
-        Ok(value)
-    }
-
-    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
-        let decoded_task = reader.u64().ok_or(Problem { path: Path::RefusalDisposalTask, reason: skein_codec::Reason::Short })?;
-        let decoded_issue = DisposalIssue::decode_from(limits, reader)?;
-        Ok(Self { task: decoded_task, issue: decoded_issue })
     }
 }
 
@@ -6741,7 +6602,6 @@ impl Refusal {
     #[must_use]
     pub fn measure(&self) -> u32 {
         match self {
-            Self::Disposal(record) => 1_u32.checked_add(RefusalDisposal::measure(record)).expect("schema ceilings fit u32"),
             Self::Role(record) => 1_u32.checked_add(RefusalRole::measure(record)).expect("schema ceilings fit u32"),
             Self::Authority(record) => 1_u32.checked_add(RefusalAuthority::measure(record)).expect("schema ceilings fit u32"),
             Self::Limit(record) => 1_u32.checked_add(RefusalLimit::measure(record)).expect("schema ceilings fit u32"),
@@ -6755,18 +6615,17 @@ impl Refusal {
     /// Writes this variant's tag and payload.
     pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
         match self {
-            Self::Disposal(record) => { writer.put(&[0_u8])?; record.encode(writer)?; }
-            Self::Role(record) => { writer.put(&[1_u8])?; record.encode(writer)?; }
-            Self::Authority(record) => { writer.put(&[2_u8])?; record.encode(writer)?; }
-            Self::Limit(record) => { writer.put(&[3_u8])?; record.encode(writer)?; }
-            Self::Moved(record) => { writer.put(&[4_u8])?; record.encode(writer)?; }
-            Self::Ended(record) => { writer.put(&[5_u8])?; record.encode(writer)?; }
-            Self::Taken(record) => { writer.put(&[6_u8])?; record.encode(writer)?; }
-            Self::NotWaiting => writer.put(&[7_u8])?,
-            Self::NoFurther => writer.put(&[8_u8])?,
-            Self::Unknown => writer.put(&[9_u8])?,
-            Self::NotOffered => writer.put(&[10_u8])?,
-            Self::KeyConflict => writer.put(&[11_u8])?,
+            Self::Role(record) => { writer.put(&[0_u8])?; record.encode(writer)?; }
+            Self::Authority(record) => { writer.put(&[1_u8])?; record.encode(writer)?; }
+            Self::Limit(record) => { writer.put(&[2_u8])?; record.encode(writer)?; }
+            Self::Moved(record) => { writer.put(&[3_u8])?; record.encode(writer)?; }
+            Self::Ended(record) => { writer.put(&[4_u8])?; record.encode(writer)?; }
+            Self::Taken(record) => { writer.put(&[5_u8])?; record.encode(writer)?; }
+            Self::NotWaiting => writer.put(&[6_u8])?,
+            Self::NoFurther => writer.put(&[7_u8])?,
+            Self::Unknown => writer.put(&[8_u8])?,
+            Self::NotOffered => writer.put(&[9_u8])?,
+            Self::KeyConflict => writer.put(&[10_u8])?,
         }
         Ok(())
     }
@@ -6781,18 +6640,17 @@ impl Refusal {
     fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
         let tag = reader.u8().ok_or(Problem { path: Path::RefusalTag, reason: skein_codec::Reason::Short })?;
         let value = match tag {
-            0 => Self::Disposal(RefusalDisposal::decode_from(limits, reader)?),
-            1 => Self::Role(RefusalRole::decode_from(limits, reader)?),
-            2 => Self::Authority(RefusalAuthority::decode_from(limits, reader)?),
-            3 => Self::Limit(RefusalLimit::decode_from(limits, reader)?),
-            4 => Self::Moved(RefusalMoved::decode_from(limits, reader)?),
-            5 => Self::Ended(RefusalEnded::decode_from(limits, reader)?),
-            6 => Self::Taken(RefusalTaken::decode_from(limits, reader)?),
-            7 => Self::NotWaiting,
-            8 => Self::NoFurther,
-            9 => Self::Unknown,
-            10 => Self::NotOffered,
-            11 => Self::KeyConflict,
+            0 => Self::Role(RefusalRole::decode_from(limits, reader)?),
+            1 => Self::Authority(RefusalAuthority::decode_from(limits, reader)?),
+            2 => Self::Limit(RefusalLimit::decode_from(limits, reader)?),
+            3 => Self::Moved(RefusalMoved::decode_from(limits, reader)?),
+            4 => Self::Ended(RefusalEnded::decode_from(limits, reader)?),
+            5 => Self::Taken(RefusalTaken::decode_from(limits, reader)?),
+            6 => Self::NotWaiting,
+            7 => Self::NoFurther,
+            8 => Self::Unknown,
+            9 => Self::NotOffered,
+            10 => Self::KeyConflict,
             _ => return Err(Problem { path: Path::RefusalTag, reason: skein_codec::Reason::Tag }),
         };
         Ok(value)
@@ -10123,32 +9981,6 @@ impl FailureClass {
     }
 }
 
-impl DisposalIssue {
-    /// Maximum encoded bytes among variants.
-    #[must_use]
-    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if check_limits(limits).is_err() { return None; }
-        Self::worst_case_bytes_within(limits)
-    }
-
-    pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
-        let biggest = 0_u64;
-        1_u64.checked_add(biggest)
-    }
-
-    /// Maximum heap held by any decoded variant.
-    #[must_use]
-    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if check_limits(limits).is_err() { return None; }
-        Self::worst_case_heap_within(limits)
-    }
-
-    pub(crate) fn worst_case_heap_within(_limits: &Limits) -> Option<u64> {
-        let biggest = 0_u64;
-        biggest.checked_add(0)
-    }
-}
-
 impl EffectPhase {
     /// Maximum encoded bytes among variants.
     #[must_use]
@@ -10313,34 +10145,6 @@ impl OutboxEntry {
         heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
         heap = heap.checked_add(Key::worst_case_heap_within(limits)?)?.checked_add(Effect::worst_case_heap_within(limits)?)?;
         heap = heap.checked_add(Attempt::worst_case_heap_within(limits)?)?.checked_add(EffectPhase::worst_case_heap_within(limits)?)?;
-        heap.checked_add(0)
-    }
-}
-
-impl RefusalDisposal {
-    /// Maximum encoded bytes under these limits.
-    #[must_use]
-    pub fn worst_case_bytes(limits: &Limits) -> Option<u64> {
-        if check_limits(limits).is_err() { return None; }
-        Self::worst_case_bytes_within(limits)
-    }
-
-    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
-        let mut size = 0_u64;
-        size = size.checked_add(8_u64)?.checked_add(DisposalIssue::worst_case_bytes_within(limits)?)?;
-        size.checked_add(0)
-    }
-
-    /// Maximum heap held by one decoded value under these limits.
-    #[must_use]
-    pub fn worst_case_heap(limits: &Limits) -> Option<u64> {
-        if check_limits(limits).is_err() { return None; }
-        Self::worst_case_heap_within(limits)
-    }
-
-    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
-        let mut heap = 0_u64;
-        heap = heap.checked_add(0_u64)?.checked_add(DisposalIssue::worst_case_heap_within(limits)?)?;
         heap.checked_add(0)
     }
 }
@@ -10585,10 +10389,9 @@ impl Refusal {
 
     pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
         let mut biggest = 0_u64;
-        biggest = biggest.max(RefusalDisposal::worst_case_bytes_within(limits)?).max(RefusalRole::worst_case_bytes_within(limits)?);
-        biggest = biggest.max(RefusalAuthority::worst_case_bytes_within(limits)?).max(RefusalLimit::worst_case_bytes_within(limits)?);
-        biggest = biggest.max(RefusalMoved::worst_case_bytes_within(limits)?).max(RefusalEnded::worst_case_bytes_within(limits)?);
-        biggest = biggest.max(RefusalTaken::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(RefusalRole::worst_case_bytes_within(limits)?).max(RefusalAuthority::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(RefusalLimit::worst_case_bytes_within(limits)?).max(RefusalMoved::worst_case_bytes_within(limits)?);
+        biggest = biggest.max(RefusalEnded::worst_case_bytes_within(limits)?).max(RefusalTaken::worst_case_bytes_within(limits)?);
         1_u64.checked_add(biggest)
     }
 
@@ -10601,10 +10404,9 @@ impl Refusal {
 
     pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
         let mut biggest = 0_u64;
-        biggest = biggest.max(RefusalDisposal::worst_case_heap_within(limits)?).max(RefusalRole::worst_case_heap_within(limits)?);
-        biggest = biggest.max(RefusalAuthority::worst_case_heap_within(limits)?).max(RefusalLimit::worst_case_heap_within(limits)?);
-        biggest = biggest.max(RefusalMoved::worst_case_heap_within(limits)?).max(RefusalEnded::worst_case_heap_within(limits)?);
-        biggest = biggest.max(RefusalTaken::worst_case_heap_within(limits)?);
+        biggest = biggest.max(RefusalRole::worst_case_heap_within(limits)?).max(RefusalAuthority::worst_case_heap_within(limits)?);
+        biggest = biggest.max(RefusalLimit::worst_case_heap_within(limits)?).max(RefusalMoved::worst_case_heap_within(limits)?);
+        biggest = biggest.max(RefusalEnded::worst_case_heap_within(limits)?).max(RefusalTaken::worst_case_heap_within(limits)?);
         biggest.checked_add(0)
     }
 }
@@ -12332,14 +12134,12 @@ fn worst_case_bytes_0(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(HoldReasonUncertain::worst_case_bytes_within(limits)?);
     biggest = biggest.max(HoldReasonPoolLost::worst_case_bytes_within(limits)?);
     biggest = biggest.max(FailureClass::worst_case_bytes_within(limits)?);
-    biggest = biggest.max(DisposalIssue::worst_case_bytes_within(limits)?);
     biggest = biggest.max(EffectPhase::worst_case_bytes_within(limits)?);
     biggest = biggest.max(ResourceRole::worst_case_bytes_within(limits)?);
     biggest = biggest.max(ApplicationOutcomeChanged::worst_case_bytes_within(limits)?);
     biggest = biggest.max(ApplicationOutcomeMoved::worst_case_bytes_within(limits)?);
     biggest = biggest.max(ApplicationOutcomeRole::worst_case_bytes_within(limits)?);
     biggest = biggest.max(OutboxEntry::worst_case_bytes_within(limits)?);
-    biggest = biggest.max(RefusalDisposal::worst_case_bytes_within(limits)?);
     biggest = biggest.max(RefusalAuthority::worst_case_bytes_within(limits)?);
     biggest = biggest.max(RefusalLimit::worst_case_bytes_within(limits)?);
     biggest = biggest.max(RefusalEnded::worst_case_bytes_within(limits)?);
@@ -12388,12 +12188,12 @@ fn worst_case_bytes_0(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(ReadAnswer::worst_case_bytes_within(limits)?);
     biggest = biggest.max(Place::worst_case_bytes_within(limits)?);
     biggest = biggest.max(FamilyNumber::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(FamilyProject::worst_case_bytes_within(limits)?);
+    biggest = biggest.max(FamilyProposer::worst_case_bytes_within(limits)?);
     Some(biggest)
 }
 
 fn worst_case_bytes_1(limits: &Limits, mut biggest: u64) -> Option<u64> {
-    biggest = biggest.max(FamilyProject::worst_case_bytes_within(limits)?);
-    biggest = biggest.max(FamilyProposer::worst_case_bytes_within(limits)?);
     biggest = biggest.max(FamilyProposalKey::worst_case_bytes_within(limits)?);
     biggest = biggest.max(FamilyScope::worst_case_bytes_within(limits)?);
     biggest = biggest.max(FamilyKind::worst_case_bytes_within(limits)?);
@@ -12459,14 +12259,12 @@ fn worst_case_heap_0(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(HoldReasonUncertain::worst_case_heap_within(limits)?);
     biggest = biggest.max(HoldReasonPoolLost::worst_case_heap_within(limits)?);
     biggest = biggest.max(FailureClass::worst_case_heap_within(limits)?);
-    biggest = biggest.max(DisposalIssue::worst_case_heap_within(limits)?);
     biggest = biggest.max(EffectPhase::worst_case_heap_within(limits)?);
     biggest = biggest.max(ResourceRole::worst_case_heap_within(limits)?);
     biggest = biggest.max(ApplicationOutcomeChanged::worst_case_heap_within(limits)?);
     biggest = biggest.max(ApplicationOutcomeMoved::worst_case_heap_within(limits)?);
     biggest = biggest.max(ApplicationOutcomeRole::worst_case_heap_within(limits)?);
     biggest = biggest.max(OutboxEntry::worst_case_heap_within(limits)?);
-    biggest = biggest.max(RefusalDisposal::worst_case_heap_within(limits)?);
     biggest = biggest.max(RefusalAuthority::worst_case_heap_within(limits)?);
     biggest = biggest.max(RefusalLimit::worst_case_heap_within(limits)?);
     biggest = biggest.max(RefusalEnded::worst_case_heap_within(limits)?);
@@ -12515,12 +12313,12 @@ fn worst_case_heap_0(limits: &Limits, mut biggest: u64) -> Option<u64> {
     biggest = biggest.max(ReadAnswer::worst_case_heap_within(limits)?);
     biggest = biggest.max(Place::worst_case_heap_within(limits)?);
     biggest = biggest.max(FamilyNumber::worst_case_heap_within(limits)?);
+    biggest = biggest.max(FamilyProject::worst_case_heap_within(limits)?);
+    biggest = biggest.max(FamilyProposer::worst_case_heap_within(limits)?);
     Some(biggest)
 }
 
 fn worst_case_heap_1(limits: &Limits, mut biggest: u64) -> Option<u64> {
-    biggest = biggest.max(FamilyProject::worst_case_heap_within(limits)?);
-    biggest = biggest.max(FamilyProposer::worst_case_heap_within(limits)?);
     biggest = biggest.max(FamilyProposalKey::worst_case_heap_within(limits)?);
     biggest = biggest.max(FamilyScope::worst_case_heap_within(limits)?);
     biggest = biggest.max(FamilyKind::worst_case_heap_within(limits)?);
@@ -12543,7 +12341,7 @@ fn worst_case_heap_1(limits: &Limits, mut biggest: u64) -> Option<u64> {
 
 #[cfg(test)]
 mod golden_tests {
-    use super::{CEILINGS, Segment, SegmentParts, ResourcePath, ResourcePathParts, Key, KeyParts, Effect, EffectParts, Attempt, AttemptParts, ProcedureState, ProcedureStateParts, ApplicationObject, ApplicationObjectParts, RefusalRole, RefusalRoleParts, RefusalTaken, RefusalTakenParts, LackAgain, LackAgainParts, LackBudget, LackBudgetParts, LackGrant, LackGrantParts, LackDepth, LackDepthParts, LackTasks, LackTasksParts, LackRequired, LackRequiredParts, LackFailed, LackFailedParts, LackUnguarded, LackUnguardedParts, Lack, LimitKind, PartyPerson, PartyPersonParts, PartyTask, PartyTaskParts, PartyDeployment, PartyDeploymentParts, Party, EndingCancelled, EndingCancelledParts, EndingDecided, EndingDecidedParts, Ending, MovedSpec, MovedSpecParts, MovedPerson, MovedPersonParts, MovedNote, MovedNoteParts, HoldReasonDependency, HoldReasonDependencyParts, HoldReasonStoppedBy, HoldReasonStoppedByParts, HoldReasonUncertain, HoldReasonUncertainParts, HoldReasonPoolLost, HoldReasonPoolLostParts, FailureClass, DisposalIssue, EffectPhase, ResourceRole, ApplicationOutcomeChanged, ApplicationOutcomeChangedParts, ApplicationOutcomeMoved, ApplicationOutcomeMovedParts, ApplicationOutcomeRole, ApplicationOutcomeRoleParts, OutboxEntry, OutboxEntryParts, RefusalDisposal, RefusalDisposalParts, RefusalAuthority, RefusalAuthorityParts, RefusalLimit, RefusalLimitParts, RefusalEnded, RefusalEndedParts, HoldReasonFailures, HoldReasonFailuresParts, HoldReason, MovedHold, MovedHoldParts, Moved, RefusalMoved, RefusalMovedParts, Refusal, ApplicationOutcomeCoreRefused, ApplicationOutcomeCoreRefusedParts, ApplicationOutcome, ApplicationRelease, ApplicationReleaseParts, ApplicationRequest, ApplicationRequestParts, ClientSubjectObject, ClientSubjectObjectParts, ClientSubjectPanel, ClientSubjectPanelParts, ClientSubjectResult, ClientSubjectResultParts, ClientSubjectEffect, ClientSubjectEffectParts, ClientSubjectOutbox, ClientSubjectOutboxParts, ClientSubjectHold, ClientSubjectHoldParts, ClientSubjectProject, ClientSubjectProjectParts, ClientSubject, Form, Recovery, HoldMode, HoldExclusive, HoldExclusiveParts, HoldPooled, HoldPooledParts, Hold, Fact, FactParts, Description, DescriptionParts, ClientResource, ClientResourceParts, DiagnosticAvailability, ClientDocumentObject, ClientDocumentObjectParts, ClientDocumentPanel, ClientDocumentPanelParts, ClientDocumentResult, ClientDocumentResultParts, ClientDocumentEffect, ClientDocumentEffectParts, ClientDocumentOutbox, ClientDocumentOutboxParts, ClientDocumentHold, ClientDocumentHoldParts, ClientDocumentProject, ClientDocumentProjectParts, ClientDocumentDeployment, ClientDocumentDeploymentParts, ClientDocument, Request, RequestParts, Outcome, OutcomeParts, Document, DocumentParts, ReadValue, ReadValueParts, ReadResult, ReadAnswer, ReadAnswerParts, Place, PlaceParts, FamilyNumber, FamilyNumberParts, FamilyProject, FamilyProjectParts, FamilyProposer, FamilyProposalKey, FamilyProposalKeyParts, FamilyScope, FamilyKind, FamilySubject, FamilySubjectParts, Subject, SubjectParts, Read, ReadParts, ItemState, Item, ItemParts, Parameters, ParametersParts, PartDocument, PartDocumentParts, FamilyRevision, FamilyRevisionParts, FamilyConnectorDocument, FamilyConnectorDocumentParts, FamilyDocument, FamilyDocumentRecord, FamilyDocumentRecordParts, FamilyConnectorAnswer, FamilyConnectorAnswerParts, FamilyAnswer, FamilyAnswerRecord, FamilyAnswerRecordParts, Path};
+    use super::{CEILINGS, Segment, SegmentParts, ResourcePath, ResourcePathParts, Key, KeyParts, Effect, EffectParts, Attempt, AttemptParts, ProcedureState, ProcedureStateParts, ApplicationObject, ApplicationObjectParts, RefusalRole, RefusalRoleParts, RefusalTaken, RefusalTakenParts, LackAgain, LackAgainParts, LackBudget, LackBudgetParts, LackGrant, LackGrantParts, LackDepth, LackDepthParts, LackTasks, LackTasksParts, LackRequired, LackRequiredParts, LackFailed, LackFailedParts, LackUnguarded, LackUnguardedParts, Lack, LimitKind, PartyPerson, PartyPersonParts, PartyTask, PartyTaskParts, PartyDeployment, PartyDeploymentParts, Party, EndingCancelled, EndingCancelledParts, EndingDecided, EndingDecidedParts, Ending, MovedSpec, MovedSpecParts, MovedPerson, MovedPersonParts, MovedNote, MovedNoteParts, HoldReasonDependency, HoldReasonDependencyParts, HoldReasonStoppedBy, HoldReasonStoppedByParts, HoldReasonUncertain, HoldReasonUncertainParts, HoldReasonPoolLost, HoldReasonPoolLostParts, FailureClass, EffectPhase, ResourceRole, ApplicationOutcomeChanged, ApplicationOutcomeChangedParts, ApplicationOutcomeMoved, ApplicationOutcomeMovedParts, ApplicationOutcomeRole, ApplicationOutcomeRoleParts, OutboxEntry, OutboxEntryParts, RefusalAuthority, RefusalAuthorityParts, RefusalLimit, RefusalLimitParts, RefusalEnded, RefusalEndedParts, HoldReasonFailures, HoldReasonFailuresParts, HoldReason, MovedHold, MovedHoldParts, Moved, RefusalMoved, RefusalMovedParts, Refusal, ApplicationOutcomeCoreRefused, ApplicationOutcomeCoreRefusedParts, ApplicationOutcome, ApplicationRelease, ApplicationReleaseParts, ApplicationRequest, ApplicationRequestParts, ClientSubjectObject, ClientSubjectObjectParts, ClientSubjectPanel, ClientSubjectPanelParts, ClientSubjectResult, ClientSubjectResultParts, ClientSubjectEffect, ClientSubjectEffectParts, ClientSubjectOutbox, ClientSubjectOutboxParts, ClientSubjectHold, ClientSubjectHoldParts, ClientSubjectProject, ClientSubjectProjectParts, ClientSubject, Form, Recovery, HoldMode, HoldExclusive, HoldExclusiveParts, HoldPooled, HoldPooledParts, Hold, Fact, FactParts, Description, DescriptionParts, ClientResource, ClientResourceParts, DiagnosticAvailability, ClientDocumentObject, ClientDocumentObjectParts, ClientDocumentPanel, ClientDocumentPanelParts, ClientDocumentResult, ClientDocumentResultParts, ClientDocumentEffect, ClientDocumentEffectParts, ClientDocumentOutbox, ClientDocumentOutboxParts, ClientDocumentHold, ClientDocumentHoldParts, ClientDocumentProject, ClientDocumentProjectParts, ClientDocumentDeployment, ClientDocumentDeploymentParts, ClientDocument, Request, RequestParts, Outcome, OutcomeParts, Document, DocumentParts, ReadValue, ReadValueParts, ReadResult, ReadAnswer, ReadAnswerParts, Place, PlaceParts, FamilyNumber, FamilyNumberParts, FamilyProject, FamilyProjectParts, FamilyProposer, FamilyProposalKey, FamilyProposalKeyParts, FamilyScope, FamilyKind, FamilySubject, FamilySubjectParts, Subject, SubjectParts, Read, ReadParts, ItemState, Item, ItemParts, Parameters, ParametersParts, PartDocument, PartDocumentParts, FamilyRevision, FamilyRevisionParts, FamilyConnectorDocument, FamilyConnectorDocumentParts, FamilyDocument, FamilyDocumentRecord, FamilyDocumentRecordParts, FamilyConnectorAnswer, FamilyConnectorAnswerParts, FamilyAnswer, FamilyAnswerRecord, FamilyAnswerRecordParts, Path};
     use super::Limits;
 
     use alloc::boxed::Box;
@@ -12596,7 +12394,7 @@ mod golden_tests {
         };
         at && past
     }
-    static GOLDEN_0: [Case; 516] = [
+    static GOLDEN_0: [Case; 506] = [
         ("record_segment_smallest", || { let value = Segment::new(&CEILINGS, SegmentParts { bytes: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Segment::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_segment_full", || { let value = Segment::new(&CEILINGS, SegmentParts { bytes: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Segment::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_resource_path_smallest", || { let value = ResourcePath::new(&CEILINGS, ResourcePathParts { segments: skein_lib::List::with_capacity(0) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ResourcePath::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -12793,12 +12591,6 @@ mod golden_tests {
         ("enum_failure_class_lost_full", || { let value = FailureClass::Lost; let bytes: &[u8] = &[4]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FailureClass::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_failure_class_invalid_smallest", || { let value = FailureClass::Invalid; let bytes: &[u8] = &[5]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FailureClass::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_failure_class_invalid_full", || { let value = FailureClass::Invalid; let bytes: &[u8] = &[5]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FailureClass::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_disposal_issue_missing_smallest", || { let value = DisposalIssue::Missing; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, DisposalIssue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_disposal_issue_missing_full", || { let value = DisposalIssue::Missing; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, DisposalIssue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_disposal_issue_unknown_smallest", || { let value = DisposalIssue::Unknown; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, DisposalIssue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_disposal_issue_unknown_full", || { let value = DisposalIssue::Unknown; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, DisposalIssue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_disposal_issue_repeated_smallest", || { let value = DisposalIssue::Repeated; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, DisposalIssue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_disposal_issue_repeated_full", || { let value = DisposalIssue::Repeated; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, DisposalIssue::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_effect_phase_kept_smallest", || { let value = EffectPhase::Kept; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, EffectPhase::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_effect_phase_kept_full", || { let value = EffectPhase::Kept; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, EffectPhase::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_effect_phase_sent_smallest", || { let value = EffectPhase::Sent; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, EffectPhase::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -12827,8 +12619,6 @@ mod golden_tests {
         ("record_application_outcome_role_full", || { let value = ApplicationOutcomeRole::new(&CEILINGS, ApplicationOutcomeRoleParts { held: u32::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcomeRole::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_outbox_entry_smallest", || { let value = OutboxEntry::new(&CEILINGS, OutboxEntryParts { number: 0_u64, task: 0_u64, key: Key::new(&CEILINGS, KeyParts { attempt: 0_u64, completion: 0_u32, position: 0_u32, deployment: [0_u8; 16], task: 0_u64, purpose: 0_u64 }).expect("golden within ceilings"), effect: Effect::new(&CEILINGS, EffectParts { kind: 0_u16, resources: skein_lib::List::with_capacity(0), purpose: 0_u64, condition: None, target: 0_u64, state: 0_u64 }).expect("golden within ceilings"), attempt: None, phase: EffectPhase::Kept }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutboxEntry::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_outbox_entry_full", || { let value = OutboxEntry::new(&CEILINGS, OutboxEntryParts { number: u64::MAX, task: u64::MAX, key: Key::new(&CEILINGS, KeyParts { attempt: u64::MAX, completion: u32::MAX, position: u32::MAX, deployment: [165_u8; 16], task: u64::MAX, purpose: u64::MAX }).expect("golden within ceilings"), effect: Effect::new(&CEILINGS, EffectParts { kind: u16::MAX, resources: { let mut items = skein_lib::List::with_capacity(1); items.push(ResourcePath::new(&CEILINGS, ResourcePathParts { segments: { let mut items = skein_lib::List::with_capacity(1); items.push(Segment::new(&CEILINGS, SegmentParts { bytes: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")).expect("one slot"); items } }).expect("golden within ceilings")).expect("one slot"); items }, purpose: u64::MAX, condition: Some(u64::MAX), target: u64::MAX, state: u64::MAX }).expect("golden within ceilings"), attempt: Some(Attempt::new(&CEILINGS, AttemptParts { number: u32::MAX, sent: u64::MAX, deadline: u64::MAX }).expect("golden within ceilings")), phase: EffectPhase::Kept }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 3, 0, 127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutboxEntry::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_refusal_disposal_smallest", || { let value = RefusalDisposal::new(&CEILINGS, RefusalDisposalParts { task: 0_u64, issue: DisposalIssue::Missing }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RefusalDisposal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_refusal_disposal_full", || { let value = RefusalDisposal::new(&CEILINGS, RefusalDisposalParts { task: u64::MAX, issue: DisposalIssue::Missing }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RefusalDisposal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_refusal_authority_smallest", || { let value = RefusalAuthority::new(&CEILINGS, RefusalAuthorityParts { lacking: Lack::Approver, proposable: None }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RefusalAuthority::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_refusal_authority_full", || { let value = RefusalAuthority::new(&CEILINGS, RefusalAuthorityParts { lacking: Lack::Approver, proposable: Some(true) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RefusalAuthority::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_refusal_limit_smallest", || { let value = RefusalLimit::new(&CEILINGS, RefusalLimitParts { which: LimitKind::Words }).expect("golden within ceilings"); let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RefusalLimit::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -12881,32 +12671,30 @@ mod golden_tests {
         ("enum_moved_note_full", || { let value = Moved::Note(MovedNote::new(&CEILINGS, MovedNoteParts { revision: u32::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Moved::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_refusal_moved_smallest", || { let value = RefusalMoved::new(&CEILINGS, RefusalMovedParts { now: Moved::Hold(MovedHold::new(&CEILINGS, MovedHoldParts { revision: 0_u64, reason: HoldReason::Failures(HoldReasonFailures::new(&CEILINGS, HoldReasonFailuresParts { class: FailureClass::Transient }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RefusalMoved::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_refusal_moved_full", || { let value = RefusalMoved::new(&CEILINGS, RefusalMovedParts { now: Moved::Hold(MovedHold::new(&CEILINGS, MovedHoldParts { revision: u64::MAX, reason: HoldReason::Failures(HoldReasonFailures::new(&CEILINGS, HoldReasonFailuresParts { class: FailureClass::Transient }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, RefusalMoved::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_disposal_smallest", || { let value = Refusal::Disposal(RefusalDisposal::new(&CEILINGS, RefusalDisposalParts { task: 0_u64, issue: DisposalIssue::Missing }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_disposal_full", || { let value = Refusal::Disposal(RefusalDisposal::new(&CEILINGS, RefusalDisposalParts { task: u64::MAX, issue: DisposalIssue::Missing }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_role_smallest", || { let value = Refusal::Role(RefusalRole::new(&CEILINGS, RefusalRoleParts { held: None }).expect("golden within ceilings")); let bytes: &[u8] = &[1, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_role_full", || { let value = Refusal::Role(RefusalRole::new(&CEILINGS, RefusalRoleParts { held: Some(u32::MAX) }).expect("golden within ceilings")); let bytes: &[u8] = &[1, 1, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_authority_smallest", || { let value = Refusal::Authority(RefusalAuthority::new(&CEILINGS, RefusalAuthorityParts { lacking: Lack::Approver, proposable: None }).expect("golden within ceilings")); let bytes: &[u8] = &[2, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_authority_full", || { let value = Refusal::Authority(RefusalAuthority::new(&CEILINGS, RefusalAuthorityParts { lacking: Lack::Approver, proposable: Some(true) }).expect("golden within ceilings")); let bytes: &[u8] = &[2, 0, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_limit_smallest", || { let value = Refusal::Limit(RefusalLimit::new(&CEILINGS, RefusalLimitParts { which: LimitKind::Words }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_limit_full", || { let value = Refusal::Limit(RefusalLimit::new(&CEILINGS, RefusalLimitParts { which: LimitKind::Words }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_moved_smallest", || { let value = Refusal::Moved(RefusalMoved::new(&CEILINGS, RefusalMovedParts { now: Moved::Hold(MovedHold::new(&CEILINGS, MovedHoldParts { revision: 0_u64, reason: HoldReason::Failures(HoldReasonFailures::new(&CEILINGS, HoldReasonFailuresParts { class: FailureClass::Transient }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_moved_full", || { let value = Refusal::Moved(RefusalMoved::new(&CEILINGS, RefusalMovedParts { now: Moved::Hold(MovedHold::new(&CEILINGS, MovedHoldParts { revision: u64::MAX, reason: HoldReason::Failures(HoldReasonFailures::new(&CEILINGS, HoldReasonFailuresParts { class: FailureClass::Transient }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[4, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_ended_smallest", || { let value = Refusal::Ended(RefusalEnded::new(&CEILINGS, RefusalEndedParts { how: Ending::Done }).expect("golden within ceilings")); let bytes: &[u8] = &[5, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_ended_full", || { let value = Refusal::Ended(RefusalEnded::new(&CEILINGS, RefusalEndedParts { how: Ending::Done }).expect("golden within ceilings")); let bytes: &[u8] = &[5, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_taken_smallest", || { let value = Refusal::Taken(RefusalTaken::new(&CEILINGS, RefusalTakenParts { by: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[6, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_taken_full", || { let value = Refusal::Taken(RefusalTaken::new(&CEILINGS, RefusalTakenParts { by: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[6, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_not_waiting_smallest", || { let value = Refusal::NotWaiting; let bytes: &[u8] = &[7]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_not_waiting_full", || { let value = Refusal::NotWaiting; let bytes: &[u8] = &[7]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_no_further_smallest", || { let value = Refusal::NoFurther; let bytes: &[u8] = &[8]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_no_further_full", || { let value = Refusal::NoFurther; let bytes: &[u8] = &[8]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_unknown_smallest", || { let value = Refusal::Unknown; let bytes: &[u8] = &[9]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_unknown_full", || { let value = Refusal::Unknown; let bytes: &[u8] = &[9]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_not_offered_smallest", || { let value = Refusal::NotOffered; let bytes: &[u8] = &[10]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_not_offered_full", || { let value = Refusal::NotOffered; let bytes: &[u8] = &[10]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_key_conflict_smallest", || { let value = Refusal::KeyConflict; let bytes: &[u8] = &[11]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_refusal_key_conflict_full", || { let value = Refusal::KeyConflict; let bytes: &[u8] = &[11]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_application_outcome_core_refused_smallest", || { let value = ApplicationOutcomeCoreRefused::new(&CEILINGS, ApplicationOutcomeCoreRefusedParts { why: Refusal::Disposal(RefusalDisposal::new(&CEILINGS, RefusalDisposalParts { task: 0_u64, issue: DisposalIssue::Missing }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcomeCoreRefused::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_application_outcome_core_refused_full", || { let value = ApplicationOutcomeCoreRefused::new(&CEILINGS, ApplicationOutcomeCoreRefusedParts { why: Refusal::Disposal(RefusalDisposal::new(&CEILINGS, RefusalDisposalParts { task: u64::MAX, issue: DisposalIssue::Missing }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcomeCoreRefused::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_role_smallest", || { let value = Refusal::Role(RefusalRole::new(&CEILINGS, RefusalRoleParts { held: None }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_role_full", || { let value = Refusal::Role(RefusalRole::new(&CEILINGS, RefusalRoleParts { held: Some(u32::MAX) }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 1, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_authority_smallest", || { let value = Refusal::Authority(RefusalAuthority::new(&CEILINGS, RefusalAuthorityParts { lacking: Lack::Approver, proposable: None }).expect("golden within ceilings")); let bytes: &[u8] = &[1, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_authority_full", || { let value = Refusal::Authority(RefusalAuthority::new(&CEILINGS, RefusalAuthorityParts { lacking: Lack::Approver, proposable: Some(true) }).expect("golden within ceilings")); let bytes: &[u8] = &[1, 0, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_limit_smallest", || { let value = Refusal::Limit(RefusalLimit::new(&CEILINGS, RefusalLimitParts { which: LimitKind::Words }).expect("golden within ceilings")); let bytes: &[u8] = &[2, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_limit_full", || { let value = Refusal::Limit(RefusalLimit::new(&CEILINGS, RefusalLimitParts { which: LimitKind::Words }).expect("golden within ceilings")); let bytes: &[u8] = &[2, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_moved_smallest", || { let value = Refusal::Moved(RefusalMoved::new(&CEILINGS, RefusalMovedParts { now: Moved::Hold(MovedHold::new(&CEILINGS, MovedHoldParts { revision: 0_u64, reason: HoldReason::Failures(HoldReasonFailures::new(&CEILINGS, HoldReasonFailuresParts { class: FailureClass::Transient }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_moved_full", || { let value = Refusal::Moved(RefusalMoved::new(&CEILINGS, RefusalMovedParts { now: Moved::Hold(MovedHold::new(&CEILINGS, MovedHoldParts { revision: u64::MAX, reason: HoldReason::Failures(HoldReasonFailures::new(&CEILINGS, HoldReasonFailuresParts { class: FailureClass::Transient }).expect("golden within ceilings")) }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_ended_smallest", || { let value = Refusal::Ended(RefusalEnded::new(&CEILINGS, RefusalEndedParts { how: Ending::Done }).expect("golden within ceilings")); let bytes: &[u8] = &[4, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_ended_full", || { let value = Refusal::Ended(RefusalEnded::new(&CEILINGS, RefusalEndedParts { how: Ending::Done }).expect("golden within ceilings")); let bytes: &[u8] = &[4, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_taken_smallest", || { let value = Refusal::Taken(RefusalTaken::new(&CEILINGS, RefusalTakenParts { by: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[5, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_taken_full", || { let value = Refusal::Taken(RefusalTaken::new(&CEILINGS, RefusalTakenParts { by: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[5, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_not_waiting_smallest", || { let value = Refusal::NotWaiting; let bytes: &[u8] = &[6]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_not_waiting_full", || { let value = Refusal::NotWaiting; let bytes: &[u8] = &[6]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_no_further_smallest", || { let value = Refusal::NoFurther; let bytes: &[u8] = &[7]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_no_further_full", || { let value = Refusal::NoFurther; let bytes: &[u8] = &[7]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_unknown_smallest", || { let value = Refusal::Unknown; let bytes: &[u8] = &[8]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_unknown_full", || { let value = Refusal::Unknown; let bytes: &[u8] = &[8]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_not_offered_smallest", || { let value = Refusal::NotOffered; let bytes: &[u8] = &[9]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_not_offered_full", || { let value = Refusal::NotOffered; let bytes: &[u8] = &[9]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_key_conflict_smallest", || { let value = Refusal::KeyConflict; let bytes: &[u8] = &[10]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_refusal_key_conflict_full", || { let value = Refusal::KeyConflict; let bytes: &[u8] = &[10]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Refusal::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_application_outcome_core_refused_smallest", || { let value = ApplicationOutcomeCoreRefused::new(&CEILINGS, ApplicationOutcomeCoreRefusedParts { why: Refusal::Role(RefusalRole::new(&CEILINGS, RefusalRoleParts { held: None }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcomeCoreRefused::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_application_outcome_core_refused_full", || { let value = ApplicationOutcomeCoreRefused::new(&CEILINGS, ApplicationOutcomeCoreRefusedParts { why: Refusal::Role(RefusalRole::new(&CEILINGS, RefusalRoleParts { held: Some(u32::MAX) }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcomeCoreRefused::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_application_outcome_changed_smallest", || { let value = ApplicationOutcome::Changed(ApplicationOutcomeChanged::new(&CEILINGS, ApplicationOutcomeChangedParts { object: 0_u64, now: ApplicationObject::new(&CEILINGS, ApplicationObjectParts { revision: 0_u64, value: 0_u64 }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_application_outcome_changed_full", || { let value = ApplicationOutcome::Changed(ApplicationOutcomeChanged::new(&CEILINGS, ApplicationOutcomeChangedParts { object: u64::MAX, now: ApplicationObject::new(&CEILINGS, ApplicationObjectParts { revision: u64::MAX, value: u64::MAX }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_application_outcome_moved_smallest", || { let value = ApplicationOutcome::Moved(ApplicationOutcomeMoved::new(&CEILINGS, ApplicationOutcomeMovedParts { object: 0_u64, now: ApplicationObject::new(&CEILINGS, ApplicationObjectParts { revision: 0_u64, value: 0_u64 }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -12917,8 +12705,8 @@ mod golden_tests {
         ("enum_application_outcome_unknown_full", || { let value = ApplicationOutcome::Unknown; let bytes: &[u8] = &[3]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_application_outcome_exhausted_smallest", || { let value = ApplicationOutcome::Exhausted; let bytes: &[u8] = &[4]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_application_outcome_exhausted_full", || { let value = ApplicationOutcome::Exhausted; let bytes: &[u8] = &[4]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_application_outcome_core_refused_smallest", || { let value = ApplicationOutcome::CoreRefused(ApplicationOutcomeCoreRefused::new(&CEILINGS, ApplicationOutcomeCoreRefusedParts { why: Refusal::Disposal(RefusalDisposal::new(&CEILINGS, RefusalDisposalParts { task: 0_u64, issue: DisposalIssue::Missing }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_application_outcome_core_refused_full", || { let value = ApplicationOutcome::CoreRefused(ApplicationOutcomeCoreRefused::new(&CEILINGS, ApplicationOutcomeCoreRefusedParts { why: Refusal::Disposal(RefusalDisposal::new(&CEILINGS, RefusalDisposalParts { task: u64::MAX, issue: DisposalIssue::Missing }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[5, 0, 255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_application_outcome_core_refused_smallest", || { let value = ApplicationOutcome::CoreRefused(ApplicationOutcomeCoreRefused::new(&CEILINGS, ApplicationOutcomeCoreRefusedParts { why: Refusal::Role(RefusalRole::new(&CEILINGS, RefusalRoleParts { held: None }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[5, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_application_outcome_core_refused_full", || { let value = ApplicationOutcome::CoreRefused(ApplicationOutcomeCoreRefused::new(&CEILINGS, ApplicationOutcomeCoreRefusedParts { why: Refusal::Role(RefusalRole::new(&CEILINGS, RefusalRoleParts { held: Some(u32::MAX) }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[5, 0, 1, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationOutcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_application_release_smallest", || { let value = ApplicationRelease::new(&CEILINGS, ApplicationReleaseParts { task: 0_u64, revision: 0_u64, again: None }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationRelease::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_application_release_full", || { let value = ApplicationRelease::new(&CEILINGS, ApplicationReleaseParts { task: u64::MAX, revision: u64::MAX, again: Some(true) }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationRelease::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_application_request_smallest", || { let value = ApplicationRequest::new(&CEILINGS, ApplicationRequestParts { object: 0_u64, revision: 0_u64, value: None, release: None }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, ApplicationRequest::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),

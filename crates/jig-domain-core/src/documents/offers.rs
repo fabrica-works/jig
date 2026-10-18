@@ -8,7 +8,7 @@ use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::List;
 
-const MAX_ACTS: u32 = 25;
+const MAX_ACTS: u32 = 23;
 
 fn receiving_recipient(value: Recipient, limits: &DocumentLimits) -> Result<Recipient, Missing> {
     match value {
@@ -31,7 +31,7 @@ fn receiving(value: Admission, limits: &DocumentLimits) -> Result<Admission, Mis
         Admission::Proposed { to } => Admission::Proposed { to: receiving_recipient(to, limits)? },
         Admission::Bounded { within, beyond } => {
             let fits = match &within {
-                Bounds::Goal { charters, procedures, .. } => {
+                Bounds::Create { charters, procedures, .. } => {
                     charters.len() <= limits.lines && procedures.len() <= limits.lines
                 }
                 Bounds::Amend { authority, ceiling, grants, implications, .. } => {
@@ -56,7 +56,7 @@ fn list(core: &Core, limits: &Limits, party: u64, subject: &Subject, kinds: &[Ac
     let mut result = List::with_capacity(u32::try_from(kinds.len()).expect("closed act list"));
     for act in kinds {
         let value = acts::admit(core, limits, party, *act, subject);
-        if (*act == Act::SetGoal || *act == Act::Amend)
+        if *act == Act::Amend
             && value == Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority })
         {
             return Err(Missing::TooLarge);
@@ -93,9 +93,6 @@ pub(super) fn task(
         }
         kinds.push(Act::Amend).expect("task act bound");
         kinds.push(Act::Move).expect("task act bound");
-        if core.conversation_requester(row).is_some() {
-            kinds.push(Act::Close).expect("task act bound");
-        }
     }
     match row.phase {
         tasks::Phase::Held { .. } => {
@@ -128,15 +125,7 @@ pub(super) fn subject(core: &Core, limits: &Limits, party: u64, subject: &Subjec
             limits,
             party,
             subject,
-            &[
-                Act::SetGoal,
-                Act::Prioritise,
-                Act::Adopt,
-                Act::ChangePolicy,
-                Act::SetRoles,
-                Act::MakeService,
-                Act::SetPool,
-            ],
+            &[Act::Adopt, Act::Reorder, Act::ChangePolicy, Act::SetRoles, Act::MakeService, Act::SetPool],
         ),
         Subject::Proposal { proposer, .. } => {
             let kinds = if *proposer == super::Proposer::Party(party) {
@@ -230,7 +219,7 @@ pub(super) fn heap_worst_case(limits: &DocumentLimits) -> Option<u64> {
     // Amend carries the full amendment facts on a task;
     // all other object kinds carry at most one bounded act.
     let goal = List::<u32>::worst_case(1)?
-        .checked_add(List::<acts::GoalProcedure>::worst_case(limits.lines)?)?
+        .checked_add(List::<acts::CreateProcedure>::worst_case(limits.lines)?)?
         .checked_add(u64::try_from(size_of::<super::AuthorityLine>()).ok()?)?
         .checked_add(authority)?;
     List::<Offered>::worst_case(MAX_ACTS)?.checked_add(amended.max(goal).checked_add(recipient)?.checked_mul(2)?)
@@ -286,9 +275,9 @@ pub(super) fn heap_bytes(value: &List<Offered>) -> Option<u64> {
             Admission::Proposed { to } => recipient_heap(to)?,
             Admission::Bounded { within, beyond } => {
                 let inner = match within {
-                    Bounds::Goal { charters, procedures, authority, .. } => {
+                    Bounds::Create { charters, procedures, authority, .. } => {
                         List::<u32>::worst_case(charters.len().checked_add(charters.room())?)?
-                            .checked_add(List::<acts::GoalProcedure>::worst_case(
+                            .checked_add(List::<acts::CreateProcedure>::worst_case(
                                 procedures.len().checked_add(procedures.room())?,
                             )?)?
                             .checked_add(u64::try_from(size_of::<super::AuthorityLine>()).ok()?)?
@@ -388,9 +377,7 @@ fn effect(core: &Core, limits: &Limits, act: Act, subject: &Subject) -> Option<a
         | Act::LeaveHeld
         | Act::Amend
         | Act::Stop
-        | Act::Close
-        | Act::SetGoal
-        | Act::Prioritise
+        | Act::Reorder
         | Act::Seen
         | Act::EditNote
         | Act::DeleteNote

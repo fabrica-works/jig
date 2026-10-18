@@ -193,10 +193,6 @@ fn change(b: &mut Builder, value: OwnerHistoryChange, words: &Words) {
         OwnerHistoryChange::Cancelled => P::Cancelled,
         OwnerHistoryChange::Released => P::Released,
         OwnerHistoryChange::Amended => P::Amended,
-        OwnerHistoryChange::Prioritised { priority } => {
-            saying(b, words, P::Prioritised, &[Hole::Number(u64::from(priority))]);
-            return;
-        }
         OwnerHistoryChange::Moved => P::Moved,
         OwnerHistoryChange::Proposed => P::Proposed,
         OwnerHistoryChange::ProposalPassed => P::Passed,

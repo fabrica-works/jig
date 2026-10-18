@@ -543,16 +543,12 @@ pub(super) fn tag_tasks(
                         PersonTaskRoute::Compound { project, operations, first_message } => {
                             people::Outcome::Compound { project, operations, first_message }
                         }
-                        PersonTaskRoute::Close { chat, cancelled, kept } => {
-                            people::Outcome::Closing { chat, cancelled, kept }
-                        }
                         PersonTaskRoute::Take(task) => people::Outcome::PersonTaken { task },
                         PersonTaskRoute::PoolSet { project, person } => people::Outcome::PoolSet { project, person },
                         PersonTaskRoute::HandBack(task) => people::Outcome::PersonHandedBack { task },
                         PersonTaskRoute::Answer(task) => people::Outcome::PersonAnswered { task },
                         PersonTaskRoute::Cancel(task) => people::Outcome::Cancelled { task },
                         PersonTaskRoute::Release(task) => people::Outcome::Released { task },
-                        PersonTaskRoute::Prioritised(project) => people::Outcome::Prioritised { project },
                         PersonTaskRoute::Amended { task, released } => people::Outcome::Amended { task, released },
                     };
                     append_people(core, env, people::Event::Decided { request: token, outcome }, &mut out);

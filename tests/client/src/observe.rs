@@ -90,15 +90,11 @@ pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> 
         Ask::Propose { action: jig_client_domain::contract::ProposeAction::Batch { .. }, .. }
         | Ask::Withdraw { .. }
         | Ask::Create { .. }
-        | Ask::StartChat { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
-        | Ask::Close { .. }
         | Ask::Move { .. }
-        | Ask::SetGoal { .. }
-        | Ask::Prioritise { .. }
         | Ask::Seen { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetRoles { .. }
@@ -144,7 +140,7 @@ fn read_cards(v: &ReadValue) -> Vec<Receipt> {
             .rows
             .iter()
             .filter_map(|n| match &n.scope {
-                NoteScope::Project(project) | NoteScope::Resource { project, .. } | NoteScope::Goal { project, .. } => {
+                NoteScope::Project(project) | NoteScope::Resource { project, .. } | NoteScope::Task { project, .. } => {
                     Some(Receipt::Card {
                         key: key(ObjectKey::Note { project: *project, note: n.number }),
                         revisions: vec![(4, n.revision.value)],
@@ -611,8 +607,6 @@ mod tests {
             (OwnerOutcome::Said { task: u64::MAX, message: 37 }, Some((u64::MAX, 37))),
             (OwnerOutcome::Said { task: 41, message: u64::MAX }, Some((41, u64::MAX))),
             (OwnerOutcome::QuestionAnswered { task: 43, question: 47, message: 53 }, Some((43, 53))),
-            (OwnerOutcome::GoalProposed { proposal: 59 }, None),
-            (OwnerOutcome::Closing { chat: 61, cancelled: 67, kept: 71 }, None),
         ];
         for (outcome, expected) in cases {
             for envelope in [RequestEnvelope::Final, RequestEnvelope::Again, RequestEnvelope::Lost] {

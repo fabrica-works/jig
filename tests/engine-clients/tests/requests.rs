@@ -19,8 +19,8 @@ fn bearer(peer: &mut Peer, sign_in: u64, person: u64) -> Box<[u8]> {
 }
 fn request() -> Box<[u8]> {
     let limits = fixtures::limits().wire;
-    let ask = w::Ask::StartChat(
-        w::StartChat::new(&limits, w::StartChatParts { project: 3, words: Box::from(b"hello".as_slice()) })
+    let ask = w::Ask::Message(
+        w::Message::new(&limits, w::MessageParts { project: 3, task: 8, words: Box::from(b"hello".as_slice()) })
             .expect("ask"),
     );
     let mut out = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
@@ -42,7 +42,7 @@ fn a_native_keyed_request_reaches_the_core_after_its_bearer_is_checked() {
     };
     assert_eq!(sign_in, fixtures::FIRST_SIGN_IN);
     assert_eq!(key, [5; 16]);
-    assert_eq!(ask, people::Ask::StartChat { project: 3, words: Box::from(b"hello".as_slice()) });
+    assert_eq!(ask, people::Ask::Say { project: 3, task: 8, words: Box::from(b"hello".as_slice()) });
 }
 
 #[test]
@@ -54,7 +54,7 @@ fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
         panic!("ask");
     };
     assert_eq!(peer.answered(socket), None);
-    peer.answer_request(reply_to, people::Reply::Outcome(people::Outcome::Started { task: 8 }));
+    peer.answer_request(reply_to, people::Reply::Outcome(people::Outcome::Said { task: 8, message: 9 }));
     let limits = fixtures::limits().wire;
     let record = w::KeyedAnswer::decode(&limits, &mut skein_lib::Reader::new(peer.answered(socket).expect("answer")))
         .expect("wire answer");
@@ -67,8 +67,8 @@ fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
         w::OutcomeOwner::new(
             &limits,
             w::OutcomeOwnerParts {
-                value: w::OwnerOutcome::Started(
-                    w::OwnerOutcomeStarted::new(&limits, w::OwnerOutcomeStartedParts { task: 8 }).expect("started"),
+                value: w::OwnerOutcome::Said(
+                    w::OwnerOutcomeSaid::new(&limits, w::OwnerOutcomeSaidParts { task: 8, message: 9 }).expect("said"),
                 ),
             },
         )

@@ -155,7 +155,7 @@ fn reads_and_attempts_share_the_exchange_admission_bound() {
     let mut limits = fixtures::limits();
     limits.exchanges = 1;
     let mut h = fixtures::Harness::new(&limits);
-    h.send(fixtures::ATTEMPT, fixtures::KEY, fixtures::start_chat());
+    h.send(fixtures::ATTEMPT, fixtures::KEY, fixtures::message());
     h.link.step(
         Time::ZERO,
         Event::Read { read: fixtures::READ, what: Readable::Jig(fixtures::history_read()) },

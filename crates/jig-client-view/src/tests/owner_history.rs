@@ -264,12 +264,11 @@ fn saying(tree: &Tree, words: &Words, phrase: P, holes: &[Hole]) {
     assert!(has(tree, &expected.text));
 }
 #[test]
-fn owner_history_all_ten_changes_keep_category_collisions_full_width_identity_and_optional_clock() {
+fn owner_history_all_nine_changes_keep_category_collisions_full_width_identity_and_optional_clock() {
     let changes = [
         OwnerHistoryChange::Cancelled,
         OwnerHistoryChange::Released,
         OwnerHistoryChange::Amended,
-        OwnerHistoryChange::Prioritised { priority: u32::MAX },
         OwnerHistoryChange::Moved,
         OwnerHistoryChange::Proposed,
         OwnerHistoryChange::ProposalPassed,
@@ -296,7 +295,6 @@ fn owner_history_all_ten_changes_keep_category_collisions_full_width_identity_an
             OwnerHistoryChange::Cancelled => P::Cancelled,
             OwnerHistoryChange::Released => P::Released,
             OwnerHistoryChange::Amended => P::Amended,
-            OwnerHistoryChange::Prioritised { .. } => P::Prioritised,
             OwnerHistoryChange::Moved => P::Moved,
             OwnerHistoryChange::Proposed => P::Proposed,
             OwnerHistoryChange::ProposalPassed => P::Passed,
@@ -304,8 +302,7 @@ fn owner_history_all_ten_changes_keep_category_collisions_full_width_identity_an
             OwnerHistoryChange::ProposalRejected => P::Rejected,
             OwnerHistoryChange::ProposalWithdrawn => P::Withdrawn,
         };
-        let priority = [Hole::Number(u64::from(u32::MAX))];
-        saying(&tree, words, expected, if expected == P::Prioritised { &priority } else { &[] });
+        saying(&tree, words, expected, &[]);
         assert!(
             !tree.nodes().iter().any(|node| node.text.iter().any(|run| run.text.windows(9).any(|w| w == b"position:"))),
             "no history commit position invented"

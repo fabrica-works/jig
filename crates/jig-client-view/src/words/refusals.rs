@@ -1,7 +1,7 @@
 //! Durable engine categories and complete refusal facts; client/domain/contract.md, 4.
 use super::Words;
 use crate::phrases::jig::JigPhrase;
-use jig_client::contract::{AdmissionLimit, CurrentHold, DisposalIssue, HeldRole, Limit, Malformed, Moved, Refusal};
+use jig_client::contract::{AdmissionLimit, CurrentHold, HeldRole, Limit, Malformed, Moved, Refusal};
 use jig_client::words::{RefusalWord, Word};
 use skein_ui::Builder;
 use skein_ui::phrases::Hole;
@@ -23,14 +23,6 @@ impl Words {
             Refusal::Role { held } => {
                 self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Role)), &[]);
                 self.held_role(b, *held);
-            }
-            Refusal::Disposal { task, issue } => {
-                let phrase = match issue {
-                    DisposalIssue::Missing => JigPhrase::DisposalMissing,
-                    DisposalIssue::Unknown => JigPhrase::DisposalUnknown,
-                    DisposalIssue::Repeated => JigPhrase::DisposalRepeated,
-                };
-                self.text(b, phrase, &[Hole::Number(*task)]);
             }
             Refusal::Taken { by } => {
                 self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Taken)), &[Hole::Number(*by)]);
@@ -95,9 +87,6 @@ impl Words {
                 self.text(b, JigPhrase::LimitInbox, &[Hole::Number(task), Hole::Number(u64::from(limit))]);
             }
             Limit::Words { limit } => self.text(b, JigPhrase::LimitWords, &[Hole::Number(u64::from(limit))]),
-            Limit::ConversationWords { limit } => {
-                self.text(b, JigPhrase::LimitConversation, &[Hole::Number(u64::from(limit))]);
-            }
             Limit::Fields => self.text(b, JigPhrase::LimitFields, &[]),
             Limit::Records => self.text(b, JigPhrase::LimitRecords, &[]),
             Limit::Requests => self.text(b, JigPhrase::LimitRequests, &[]),

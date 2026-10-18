@@ -6,7 +6,7 @@ use crate::{
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use jig_fake_parties::{self as parties, Act, Ask, Disposal, Keep, Party, Role, Task};
+use jig_fake_parties::{self as parties, Act, Ask, DelegateChoice, Keep, Party, Role, Task};
 use jig_fake_workers::{Script, Worker};
 use jig_test_domain as root;
 use skein_lib::{Duration, ReplyTo, Token};
@@ -98,56 +98,8 @@ fn fixture_with_delegates() -> (World, root::Config, u64, [u64; 2]) {
 /// Three named obligations share one scenario setup without dropping any assertion.
 pub fn disposals_and_finish_grace() {
     let (mut world, configuration, chat, delegates) = fixture_with_delegates();
-    closing_a_chat_without_a_delegates_disposal_is_refused_and_told_which(&mut world, chat, delegates);
     a_person_closes_a_chat_keeping_one_delegate_and_cancelling_another(&mut world, chat, delegates);
     a_chat_that_does_not_finish_within_its_grace_is_cancelled(world, configuration, chat, delegates[0]);
-}
-
-fn closing_a_chat_without_a_delegates_disposal_is_refused_and_told_which(
-    world: &mut World,
-    chat: u64,
-    delegates: [u64; 2],
-) {
-    let before = world.store.rows.clone();
-    acts(
-        world,
-        2,
-        Ask::Close {
-            task: Task::Number(chat),
-            disposals: Box::new([Disposal { task: Task::Number(delegates[0]), keep: Keep::MakeMine }]),
-        },
-    );
-    assert!(
-        matches!(world.peers.as_ref().expect("close story fixture").parties[0].replies.last().expect("close story fixture").1,
-        parties::Reply::Refused(parties::Refusal::Disposal { task, issue: parties::DisposalIssue::Missing }) if task == delegates[1])
-    );
-    for number in [chat, delegates[0], delegates[1]] {
-        let key = root::Key::Core(core::Key::Tasks(tasks::Key::Live(number)));
-        assert_eq!(world.store.rows.get(&key), before.get(&key), "refused disposal left task unchanged");
-    }
-    for (key, other, issue) in
-        [(4, 999, parties::DisposalIssue::Unknown), (5, delegates[0], parties::DisposalIssue::Repeated)]
-    {
-        acts(
-            world,
-            key,
-            Ask::Close {
-                task: Task::Number(chat),
-                disposals: Box::new([
-                    Disposal { task: Task::Number(delegates[0]), keep: Keep::MakeMine },
-                    Disposal { task: Task::Number(other), keep: Keep::Cancel },
-                ]),
-            },
-        );
-        assert_eq!(
-            world.peers.as_ref().expect("peers").parties[0].replies.last().expect("refusal").1,
-            parties::Reply::Refused(parties::Refusal::Disposal { task: other, issue })
-        );
-        for number in [chat, delegates[0], delegates[1]] {
-            let key = root::Key::Core(core::Key::Tasks(tasks::Key::Live(number)));
-            assert_eq!(world.store.rows.get(&key), before.get(&key), "bad cohort left every task unchanged");
-        }
-    }
 }
 
 fn a_person_closes_a_chat_keeping_one_delegate_and_cancelling_another(
@@ -161,8 +113,8 @@ fn a_person_closes_a_chat_keeping_one_delegate_and_cancelling_another(
         Ask::Close {
             task: Task::Number(chat),
             disposals: Box::new([
-                Disposal { task: Task::Number(delegates[0]), keep: Keep::MakeMine },
-                Disposal { task: Task::Number(delegates[1]), keep: Keep::Cancel },
+                DelegateChoice { task: Task::Number(delegates[0]), keep: Keep::MakeMine },
+                DelegateChoice { task: Task::Number(delegates[1]), keep: Keep::Cancel },
             ]),
         },
     );

@@ -13,8 +13,8 @@ fn owner(value: w::OwnerOutcome) -> w::Final {
     done(w::Outcome::Owner(w::OutcomeOwner::new(&wire(), w::OutcomeOwnerParts { value }).expect("owner outcome")))
 }
 pub fn started() -> w::Final {
-    owner(w::OwnerOutcome::Started(
-        w::OwnerOutcomeStarted::new(&wire(), w::OwnerOutcomeStartedParts { task: 8 }).expect("started"),
+    owner(w::OwnerOutcome::Said(
+        w::OwnerOutcomeSaid::new(&wire(), w::OwnerOutcomeSaidParts { task: 8, message: 9 }).expect("started"),
     ))
 }
 pub fn moved_hold() -> w::Final {
@@ -25,7 +25,7 @@ pub fn moved_hold() -> w::Final {
         w::Refused::new(&wire(), w::RefusedParts { at: None, refusal: hold_refusal(reason) }).expect("refused"),
     )
 }
-pub const SERVICE_ANSWER: [u8; 25] = [1, 0, 0, 0, 0, 8, 0, 0, 0, 15, 0, 1, 3, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0];
+pub const SERVICE_ANSWER: [u8; 25] = [1, 0, 0, 0, 0, 8, 0, 0, 0, 15, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0];
 pub fn application_answer() -> w::KeyedAnswer {
     let owner = w::Owner::Family(w::Family::new(&wire(), w::FamilyParts { number: 9 }).expect("family"));
     w::KeyedAnswer::FinalAnswer(

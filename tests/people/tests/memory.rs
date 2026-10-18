@@ -62,7 +62,12 @@ impl Measured {
         let reply_to = self.to();
         let words = vec![1; usize::try_from(self.env.limits.words).expect("test values are admitted and fit")]
             .into_boxed_slice();
-        self.event(Event::Ask { reply_to, sign_in: 1, key: [key; 16], ask: Ask::StartChat { project: 1, words } })
+        self.event(Event::Ask {
+            reply_to,
+            sign_in: 1,
+            key: [key; 16],
+            ask: Ask::Create { project: 1, batch: Box::new([jig_people_world::fixtures::people_member(&words, 1)]) },
+        })
     }
 }
 
@@ -150,7 +155,7 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
             let outcome = if key == 1 {
                 Outcome::Refused(jig_domain_people::Refusal::Limit { which: jig_domain_people::LimitKind::LiveTasks })
             } else {
-                Outcome::Started { task: u64::from(key) }
+                Outcome::Created { first: u64::from(key), last: u64::from(key), given: None }
             };
             test.event(Event::Decided { request: token, outcome });
         }
@@ -167,7 +172,10 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
             assert!(test.ask(250).is_none());
         }
         for token in tokens.into_iter().flatten() {
-            test.event(Event::Decided { request: token, outcome: Outcome::Started { task: 90 } });
+            test.event(Event::Decided {
+                request: token,
+                outcome: Outcome::Created { first: 90, last: 90, given: None },
+            });
         }
         test.env.now = Time::from_nanos(limits.sign_in_lifetime.as_nanos());
         while test.domain.is_due(test.env.now) {

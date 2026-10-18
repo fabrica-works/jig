@@ -175,7 +175,7 @@ fn start_chat(world: &mut World, number: u8) {
     jig_core_world::stories::reads::request(
         world,
         number,
-        jig_domain_people::Ask::StartChat { project: 1, words: b"new chat".as_slice().into() },
+        jig_core_world::fixtures::chat(world, 1, b"new chat".as_slice().into()),
     );
 }
 
@@ -210,7 +210,7 @@ fn a_fill_below_the_mark_admits_a_chat_again() {
     assert!(
         matches!(
             world.people_answers.last(),
-            Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::Started { .. }))
+            Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::Created { .. }))
         ),
         "{:?}",
         world.people_answers.last()

@@ -78,14 +78,13 @@ fn set_goal(world: &mut World, charter: u32) {
         reply_to: ReplyTo::new(Token::new(9000)),
         sign_in: world.sign_in.expect("signed in party"),
         key: [31; 16],
-        ask: people::Ask::SetGoal {
-            project: 1,
-            spec: b"Research this goal".as_slice().into(),
-            executor: people::GoalExecutor::Charter(charter),
-            budget: 20,
-            priority: 1,
-            deadline: None,
-        },
+        ask: jig_core_world::fixtures::goal(
+            world,
+            1,
+            b"Research this goal".as_slice().into(),
+            people::TaskExecutor::Agent { charter },
+            jig_core_world::fixtures::Goal { budget: 20, priority: 1, ..Default::default() },
+        ),
     })));
 }
 
@@ -99,7 +98,7 @@ fn a_goal_on_the_second_charter_is_admitted_and_runs_it() {
         world
             .people_answers
             .iter()
-            .any(|reply| matches!(reply, people::Reply::Outcome(people::Outcome::GoalStarted { .. })))
+            .any(|reply| matches!(reply, people::Reply::Outcome(people::Outcome::Created { .. })))
     );
     let assignment = world.assigned.as_ref().expect("goal assigned");
     assert_eq!(assignment.charter, 2);

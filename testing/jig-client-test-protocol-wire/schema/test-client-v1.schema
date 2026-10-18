@@ -33,14 +33,12 @@ record HoldReasonStoppedBy { party: u64 }
 record HoldReasonUncertain { entry: u64 }
 record HoldReasonPoolLost { pool: u64 }
 enum FailureClass { transient, permanent, run, agent, lost, invalid }
-enum DisposalIssue { missing, unknown, repeated }
 enum EffectPhase { kept, sent, uncertain, retry, repeat, held }
 enum ResourceRole { owned, participating, context, unavailable }
 record ApplicationOutcomeChanged { object: u64 now: ApplicationObject }
 record ApplicationOutcomeMoved { object: u64 now: ApplicationObject }
 record ApplicationOutcomeRole { held: u32 }
 record OutboxEntry { number: u64 task: u64 key: Key effect: Effect attempt: option Attempt phase: EffectPhase }
-record RefusalDisposal { task: u64 issue: DisposalIssue }
 record RefusalAuthority { lacking: Lack proposable: option bool }
 record RefusalLimit { which: LimitKind }
 record RefusalEnded { how: Ending }
@@ -49,7 +47,7 @@ enum HoldReason { failures: HoldReasonFailures, stalled, dependency: HoldReasonD
 record MovedHold { revision: u64 reason: HoldReason }
 enum Moved { hold: MovedHold, spec: MovedSpec, person: MovedPerson, note: MovedNote }
 record RefusalMoved { now: Moved }
-enum Refusal { disposal: RefusalDisposal, role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict }
+enum Refusal { role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict }
 record ApplicationOutcomeCoreRefused { why: Refusal }
 enum ApplicationOutcome { changed: ApplicationOutcomeChanged, moved: ApplicationOutcomeMoved, role: ApplicationOutcomeRole, unknown, exhausted, core_refused: ApplicationOutcomeCoreRefused }
 record ApplicationRelease { task: u64 revision: u64 again: option bool }

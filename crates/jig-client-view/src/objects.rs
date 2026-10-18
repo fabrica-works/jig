@@ -469,17 +469,15 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
 pub fn stops_waiting(key: ObjectKey, outcome: &Outcome) -> bool {
     match crate::outcome::route(outcome) {
         crate::outcome::Route::Proposed => false,
-        crate::outcome::Route::Created { .. }
-        | crate::outcome::Route::Chat { .. }
-        | crate::outcome::Route::Goal { .. }
-        | crate::outcome::Route::Words { .. }
-        | crate::outcome::Route::Other => match key {
-            ObjectKey::Proposal(_)
-            | ObjectKey::Escalation(_)
-            | ObjectKey::Question { .. }
-            | ObjectKey::PersonTask(_) => true,
-            ObjectKey::Task(_) | ObjectKey::Result(_) | ObjectKey::Note { .. } => false,
-        },
+        crate::outcome::Route::Created { .. } | crate::outcome::Route::Words { .. } | crate::outcome::Route::Other => {
+            match key {
+                ObjectKey::Proposal(_)
+                | ObjectKey::Escalation(_)
+                | ObjectKey::Question { .. }
+                | ObjectKey::PersonTask(_) => true,
+                ObjectKey::Task(_) | ObjectKey::Result(_) | ObjectKey::Note { .. } => false,
+            }
+        }
     }
 }
 

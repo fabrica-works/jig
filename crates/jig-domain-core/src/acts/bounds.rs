@@ -19,7 +19,13 @@ pub(crate) fn recipient(core: &Core, project: u32, kind: authority::ProposalKind
     if roles.is_empty() { None } else { Some(Recipient::Roles { project, roles }) }
 }
 
-pub(crate) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held: Option<people::Role>) -> Admission {
+pub(crate) fn creating(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    project: u32,
+    held: Option<people::Role>,
+) -> Admission {
     let Some(held) = held else {
         return Admission::Refused(people::Refusal::Role { held });
     };
@@ -29,7 +35,7 @@ pub(crate) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
     if !role.requests.allows(authority::RequestKind::Create) {
         return Admission::Refused(people::Refusal::Role { held: Some(held) });
     }
-    let (_, pool) = core.goal_pool(project, party);
+    let (_, pool) = core.person_pool(project, party);
     let pool_left =
         pool.budget.saturating_sub(pool.spent.saturating_add(pool.spent_below).saturating_add(pool.reserved));
     let budget = pool_left.min(role.authority.budget.spend);
@@ -43,7 +49,7 @@ pub(crate) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
     let mut charters = List::with_capacity(limits.documents.lines);
     let canonical_deadline = earliest(role.authority.budget.deadline, maximum_deadline);
     for charter in &core.settings.charters {
-        if goal_charter(core, limits, party, project, held, charter.number) && charters.room() > 0 {
+        if creating_charter(core, limits, party, project, held, charter.number) && charters.room() > 0 {
             charters.push(charter.number).expect("bounded offered charters");
         }
     }
@@ -52,11 +58,11 @@ pub(crate) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
         for kind in &role.authority.delegation.kinds {
             let authority::Executor::Procedure(procedure) = kind else { continue };
             for &connector in &core.connectors {
-                let executor = people::GoalExecutor::Procedure { connector, code: *procedure };
+                let executor = tasks::Executor::Procedure { connector, code: *procedure };
                 let supported =
-                    goal_start(core, project, party, held, executor, 0, canonical_deadline, limits.tasks.tree_tasks)
+                    create_start(core, project, party, held, executor, 0, canonical_deadline, limits.tasks.tree_tasks)
                         .is_ok();
-                if supported && procedures.push(super::GoalProcedure { connector, code: *procedure }).is_err() {
+                if supported && procedures.push(super::CreateProcedure { connector, code: *procedure }).is_err() {
                     return Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority });
                 }
             }
@@ -66,12 +72,12 @@ pub(crate) fn goal(core: &Core, limits: &Limits, party: u64, project: u32, held:
         Some(to) => Beyond::Proposed { to },
         None => Beyond::Refused(unproposable()),
     };
-    let given = crate::task_authority(&core.chat_authority(project, party, held, limits.tasks.tree_tasks));
+    let given = crate::task_authority(&core.creating_authority(project, party, held, limits.tasks.tree_tasks));
     let Ok(authority) = crate::documents::act_authority(limits, &given) else {
         return Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority });
     };
     Admission::Bounded {
-        within: Bounds::Goal {
+        within: Bounds::Create {
             authority: Box::new(authority),
             pool_left,
             charters,
@@ -197,7 +203,7 @@ fn earliest(left: Option<Wall>, right: Option<Wall>) -> Option<Wall> {
 }
 
 /// Sample the same full goal judge for a configured charter's form fact.
-pub(crate) fn goal_charter(
+pub(crate) fn creating_charter(
     core: &Core,
     limits: &Limits,
     party: u64,
@@ -214,23 +220,23 @@ pub(crate) fn goal_charter(
         role.authority.budget.deadline,
         earliest(policy.ceiling.budget.deadline, core.authority.rules().ceiling.budget.deadline),
     );
-    goal_start(core, project, party, held, people::GoalExecutor::Charter(charter), 0, deadline, limits.tasks.tree_tasks)
+    create_start(core, project, party, held, tasks::Executor::Agent { charter }, 0, deadline, limits.tasks.tree_tasks)
         .is_ok()
 }
 
 /// The goal's one full judge, also sampled for fixed supported form facts.
 #[expect(clippy::too_many_arguments, reason = "a goal carries its requested authority and deadline")]
-pub(crate) fn goal_start(
+pub(crate) fn create_start(
     core: &Core,
     project: u32,
     person: u64,
     role: people::Role,
-    executor: people::GoalExecutor,
+    executor: tasks::Executor,
     budget: u64,
     deadline: Option<Wall>,
     tasks_left: u32,
-) -> Result<crate::GoalStart, people::Refusal> {
-    standing::role(core, project, Some(role), super::Act::SetGoal)?;
+) -> Result<crate::CreateStart, people::Refusal> {
+    standing::role(core, project, Some(role), super::Act::Amend)?;
     if !core.authority.escalations_held(project, role.number()) {
         return Err(people::Refusal::NoEscalationHolder);
     }
@@ -241,17 +247,18 @@ pub(crate) fn goal_start(
     if !role_policy.requests.allows(authority::RequestKind::Create) {
         return Err(people::Refusal::Role { held: Some(role) });
     }
-    let mut given = core.chat_authority(project, person, role, tasks_left);
+    let mut given = core.creating_authority(project, person, role, tasks_left);
     given.budget.spend = budget;
     given.budget.deadline = deadline;
     let executor = match executor {
-        people::GoalExecutor::Charter(charter) => {
+        tasks::Executor::Agent { charter } => {
             if core.charter(charter).is_none() {
                 return Err(people::Refusal::NotOffered);
             }
             authority::Executor::Charter(charter)
         }
-        people::GoalExecutor::Procedure { connector, code } => {
+        tasks::Executor::Person(_) => return Err(people::Refusal::NotOffered),
+        tasks::Executor::Procedure { connector, code } => {
             if code == 0 || !core.connectors.contains(&connector) {
                 return Err(people::Refusal::NotOffered);
             }
@@ -267,7 +274,7 @@ pub(crate) fn goal_start(
         });
     }
     let hard = !authority::at_most(&given, &policy.ceiling, &core.authority.rules().implies);
-    let (source, numbers) = core.goal_pool(project, person);
+    let (source, numbers) = core.person_pool(project, person);
     let mut findings = Queue::with_capacity(authority::max_out(core.authority.limits()).expect("authority room"));
     let ask = authority::PersonAsk {
         project,
@@ -284,7 +291,7 @@ pub(crate) fn goal_start(
     if hard || checked.answer != authority::Answer::Allow {
         return Err(core.request_refusal(&ask, checked.answer, &mut findings));
     }
-    Ok(crate::GoalStart { source, authority: given })
+    Ok(crate::CreateStart { source, authority: given })
 }
 
 /// The amendment's one full judge, used for admission and form standing.
@@ -319,7 +326,7 @@ pub(crate) fn amendment_admit_in(
     let crate::compound::PartyTask { person, project, role, task } = party;
     standing::role(core, project, role, super::Act::Amend)?;
     if amendment.tracked.is_some() {
-        standing::role(core, project, role, super::Act::Prioritise)?;
+        standing::role(core, project, role, super::Act::Reorder)?;
     }
     let Some(context) = admission.task(task) else { return Err(people::Refusal::Unknown) };
     let Some(role) = role else { return Err(people::Refusal::Role { held: None }) };

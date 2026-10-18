@@ -631,7 +631,7 @@ fn a_carried_phase_reads_back_as_its_own_family() {
 }
 
 fn a_carried_change_reads_back_as_its_own_family() {
-    let change = jig_domain_tasks::Change::Prioritised { priority: 7 };
+    let change = jig_domain_tasks::Change::Amended;
     let limits = call_limits();
     let bytes = crate::codec::tasks::carried::change(&change, &limits.tasks).expect("change within bounds");
     assert_eq!(crate::codec::tasks::carried::read_change(&bytes, &limits.tasks), Ok(change));

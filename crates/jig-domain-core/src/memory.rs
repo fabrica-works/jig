@@ -96,7 +96,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.run_bytes == 0
         || limits.call_records == 0
         || limits.call_answer_bytes == 0
-        || people::disposal_capacity(&limits.people) < limits.tasks.delegates
         || limits.tasks.inbox_messages < limits.people.inbox_entries
         || limits.people.inbox_tasks < limits.tasks.tasks.checked_mul(2)?
         || limits.people.inbox_recipients < crate::inbox::waiting_capacity(limits)?

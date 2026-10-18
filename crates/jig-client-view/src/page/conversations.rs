@@ -72,7 +72,7 @@ pub fn start(
     };
     match domain.intents.ask(
         scope,
-        Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::StartChat },
+        Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::BeginConversation },
         ask,
         out,
     ) {
@@ -147,7 +147,7 @@ pub(crate) fn answered(
     let (request, handle) = request_and_handle;
     match purpose {
         IntentPurpose::ProjectSettings => crate::page::project::owner_form::answered(domain, request, answer),
-        IntentPurpose::SetGoal => {
+        IntentPurpose::CreateGoal => {
             crate::page::project::goals::answered(domain, env, request, handle, answer, out, lent);
         }
         IntentPurpose::Seen(_) => {
@@ -162,7 +162,7 @@ pub(crate) fn answered(
             }
             domain.changed();
         }
-        IntentPurpose::StartChat => {
+        IntentPurpose::BeginConversation => {
             if domain.chats.starting != Some(request) {
                 return;
             }
@@ -170,7 +170,7 @@ pub(crate) fn answered(
             match answer {
                 Answer::Refused { refusal, .. } => domain.chats.refusal = Some(refusal),
                 Answer::Done(outcome) => match crate::outcome::route(&outcome) {
-                    crate::outcome::Route::Created { task } | crate::outcome::Route::Chat { task } => {
+                    crate::outcome::Route::Created { task } => {
                         let same = match &domain.chats.words {
                             Some(words) => match domain.fields.get(Purpose::NewChat) {
                                 Some(field) => field.text == *words,
@@ -198,8 +198,7 @@ pub(crate) fn answered(
                             );
                         }
                     }
-                    crate::outcome::Route::Goal { .. }
-                    | crate::outcome::Route::Words { .. }
+                    crate::outcome::Route::Words { .. }
                     | crate::outcome::Route::Proposed
                     | crate::outcome::Route::Other => {
                         crate::notices::kept::show(

@@ -30,20 +30,6 @@ fn person_answer(value: &w::PersonAnswer, limits: &Limits) -> Result<c::PersonAn
         w::PersonAnswer::Cannot(value) => c::PersonAnswer::Cannot { reason: text(value.reason(), limits)? },
     })
 }
-fn disposal(value: &w::Disposal) -> c::Disposal {
-    match value {
-        w::Disposal::Cancel(value) => c::Disposal::Cancel { task: value.task() },
-        w::Disposal::TakeOver(value) => c::Disposal::TakeOver { task: value.task() },
-    }
-}
-fn goal_executor(value: &w::GoalExecutor) -> c::GoalExecutor {
-    match value {
-        w::GoalExecutor::Charter(value) => c::GoalExecutor::Charter(value.value()),
-        w::GoalExecutor::Procedure(value) => {
-            c::GoalExecutor::Procedure { connector: value.connector(), code: value.code() }
-        }
-    }
-}
 fn policy_edit(value: &w::PolicyEdit, limits: &Limits) -> Result<c::PolicyEdit, w::Problem> {
     Ok(match value {
         w::PolicyEdit::Templates(value) => super::operations::restore_templates(value.overrides()),
@@ -75,14 +61,12 @@ fn policy_edit(value: &w::PolicyEdit, limits: &Limits) -> Result<c::PolicyEdit, 
 }
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
-#[expect(clippy::too_many_lines, reason = "one exhaustive translation arm per kept client ask")]
 pub(crate) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
     Ok(match value {
         w::Ask::Propose(value) => super::operations::restore_propose(&value, limits)?,
         w::Ask::Withdraw(value) => c::Ask::Withdraw { project: value.project(), proposal: value.proposal() },
         w::Ask::Create(value) => super::operations::restore_create(&value, limits)?,
         w::Ask::Compound(value) => super::compound::restore(value, limits)?,
-        w::Ask::StartChat(value) => c::Ask::StartChat { project: value.project(), words: text(value.words(), limits)? },
         w::Ask::Message(value) => {
             c::Ask::Message { project: value.project(), task: value.task(), words: text(value.words(), limits)? }
         }
@@ -138,36 +122,8 @@ pub(crate) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::P
             reason: text(value.reason(), limits)?,
             grace: *value.grace(),
         },
-        w::Ask::Close(value) => {
-            let mut disposals = List::with_capacity(value.disposals().len());
-            for row in value.disposals() {
-                disposals.push(disposal(row)).expect("reserved decoded disposals");
-            }
-            c::Ask::Close { project: value.project(), chat: value.chat(), disposals }
-        }
         w::Ask::MoveTask(value) => {
             c::Ask::Move { project: value.project(), task: value.task(), reason: text(value.reason(), limits)? }
-        }
-        w::Ask::SetGoal(value) => {
-            let deadline = match value.deadline() {
-                Some(value) => Some(Wall::from_nanos(*value)),
-                None => None,
-            };
-            c::Ask::SetGoal {
-                project: value.project(),
-                spec: text(value.spec(), limits)?,
-                executor: goal_executor(value.executor()),
-                budget: value.budget(),
-                priority: value.priority(),
-                deadline,
-            }
-        }
-        w::Ask::Prioritise(value) => {
-            let mut goals = List::with_capacity(value.goals().len());
-            for row in value.goals() {
-                goals.push(c::Priority { task: row.task(), priority: row.priority() }).expect("reserved decoded goals");
-            }
-            c::Ask::Prioritise { project: value.project(), goals }
         }
         w::Ask::Seen(value) => c::Ask::Seen { through: answers::seen(value.through(), limits) },
         w::Ask::EditNote(value) => c::Ask::EditNote {

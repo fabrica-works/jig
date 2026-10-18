@@ -14,7 +14,7 @@ use crate::{Core, Limits, documents};
 use alloc::boxed::Box;
 use jig_domain_people as people;
 pub(crate) use objects::mutable_phase;
-pub(crate) use objects::{close, escalation, person, proposal, question, write, write_in};
+pub(crate) use objects::{escalation, person, proposal, question, write, write_in};
 pub(crate) use requests::request;
 use skein_lib::{List, Wall};
 pub(crate) use standing::role;
@@ -46,14 +46,10 @@ pub enum Act {
     Stop,
     /// Cancel a subtree.
     Cancel,
-    /// Close a chat.
-    Close,
     /// Become a requester.
     Move,
-    /// Set a goal.
-    SetGoal,
-    /// Reorder goals.
-    Prioritise,
+    /// Reorder tracked work in its project.
+    Reorder,
     /// Mark updates read.
     Seen,
     /// Edit a note.
@@ -90,7 +86,7 @@ pub enum Admission {
 /// Configured connector and permitted procedure code for the existing goal form.
 /// This is an authority fact, not a connector's procedure schema or display name.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct GoalProcedure {
+pub struct CreateProcedure {
     pub connector: u16,
     pub code: u32,
 }
@@ -106,11 +102,11 @@ pub struct Creating {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Bounds {
     /// A goal's direct funding, executor and deadline choices.
-    Goal {
+    Create {
         authority: Box<documents::AuthorityLine>,
         pool_left: u64,
         charters: List<u32>,
-        procedures: List<GoalProcedure>,
+        procedures: List<CreateProcedure>,
         latest: Option<Wall>,
         budget: u64,
         maximum_budget: u64,

@@ -3,6 +3,7 @@
 //! released root outputs and durable store rows (`domain/testing.md`, 4, 7).
 use crate::Store;
 mod delegation;
+mod worker;
 use delegation::delegate;
 use jig_domain_core as core;
 use jig_domain_fleet as fleet;
@@ -23,6 +24,7 @@ pub struct Peers {
     pub parties: Vec<parties::Party>,
     pub upstream: Vec<workers::Up>,
     pub requests: Vec<parties::Up>,
+    pub creating: Option<crate::fixtures::Creating>,
     party_flights: BTreeMap<u64, usize>,
     party_marks: BTreeMap<usize, (u64, Option<u64>, parties::Role)>,
     call_hosts: BTreeMap<core::CallKey, (u64, u32)>,
@@ -38,6 +40,7 @@ impl Peers {
             parties,
             upstream: Vec::new(),
             requests: Vec::new(),
+            creating: None,
             party_flights: BTreeMap::new(),
             party_marks: BTreeMap::new(),
             call_hosts: BTreeMap::new(),
@@ -55,130 +58,6 @@ impl Peers {
         }
         for party in &mut self.parties {
             party.restart_engine();
-        }
-    }
-
-    /// Translate one host report without reading a domain's state.
-    pub fn worker_event(&mut self, up: workers::Up) -> root::Event {
-        self.upstream.push(up.clone());
-        match up {
-            workers::Up::Hello { channel, slots, stop_bound, hosting } => {
-                root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
-                    channel: Token::new(channel),
-                    hello: fleet::Hello {
-                        bounds: crate::fixtures::bounds(),
-                        slots,
-                        stop_bound,
-                        workstreams: Box::new([]),
-                        hosting: hosting
-                            .into_iter()
-                            .map(|(task, attempt, answered)| fleet::Hosted {
-                                run: Token::new(task),
-                                attempt: Token::new(attempt),
-                                phase: if answered { fleet::Phase::Answered } else { fleet::Phase::Active },
-                            })
-                            .collect(),
-                    },
-                }))
-            }
-            workers::Up::Lost { channel } => {
-                root::Event::Core(core::Event::Fleet(fleet::Event::Lost { channel: Token::new(channel) }))
-            }
-            workers::Up::Writing { channel, task, attempt } => {
-                root::Event::Core(core::Event::Fleet(fleet::Event::Observe {
-                    channel: Token::new(channel),
-                    run: Token::new(task),
-                    attempt: Token::new(attempt),
-                    report: fleet::Report::Activity(fleet::Activity::Writing),
-                }))
-            }
-            workers::Up::Text { task, attempt, turn, offset, text, .. } => {
-                root::Event::Text { task, attempt, turn, offset, text }
-            }
-            workers::Up::Turn { channel, task, attempt, turn, spent, read, body, opens_window, refused } => {
-                root::Event::Turn {
-                    channel: Token::new(channel),
-                    task,
-                    attempt,
-                    turn,
-                    cumulative: spent,
-                    read,
-                    transcript: body,
-                    opens_window,
-                    refused,
-                }
-            }
-            workers::Up::Answer { channel, task, attempt, spent, end, read, refused } => root::Event::Answer {
-                channel: Token::new(channel),
-                task,
-                attempt,
-                cumulative: spent,
-                end: end_value(end),
-                read,
-                refused,
-            },
-            workers::Up::Call { channel, task, attempt, number, call } => self.worker_call(
-                core::CallKey { task, attempt, completion: number, position: 0 },
-                channel,
-                number,
-                call,
-            ),
-        }
-    }
-
-    fn worker_call(&mut self, key: core::CallKey, channel: u64, number: u32, call: workers::Call) -> root::Event {
-        self.call_hosts.insert(key, (channel, number));
-        let to = ReplyTo::new(Token::new(channel * 100_000 + key.task * 100 + u64::from(number)));
-        match call {
-            workers::Call::Question { target, words } => root::Event::Core(core::Event::NamedAction {
-                to,
-                key,
-                action: core::NamedAction::Message { target, kind: tasks::MessageKind::Question, words },
-            }),
-            workers::Call::Delegate { words, budget } => root::Event::Core(core::Event::DelegateValidated {
-                to,
-                key,
-                batch: Box::new([delegate(words, tasks::Executor::Agent { charter: 1 }, budget)]),
-                stubs: Box::new([]),
-            }),
-            workers::Call::Opaque { name, tool, input, writes } => {
-                self.opaque.insert((key.task, key.attempt, name.clone()), (channel, number));
-                root::Event::Core(core::Event::Fleet(fleet::Event::Relay {
-                    channel: Token::new(channel),
-                    run: Token::new(key.task),
-                    attempt: Token::new(key.attempt),
-                    call: fleet::Call { name, tool, input, writes, deadline: Duration::from_secs(1) },
-                }))
-            }
-            workers::Call::ProposeGoal { words, budget, priority } => root::Event::Core(core::Event::NamedAction {
-                to,
-                key,
-                action: core::NamedAction::ProposeGoal {
-                    goal: Box::new(delegate(words, tasks::Executor::Agent { charter: 1 }, budget)),
-                    priority,
-                    reason: b"this goal needs a holder".as_slice().into(),
-                },
-            }),
-            workers::Call::Choose { role, first, second } => {
-                let mut words = first.into_vec();
-                words.extend_from_slice(b" or ");
-                words.extend_from_slice(&second);
-                let mut member =
-                    delegate(words.into_boxed_slice(), tasks::Executor::Person(tasks::PersonAddress::Role(role)), 0);
-                member.authority = authority(0, false);
-                member.contract = tasks::Contract::Verdict {
-                    choices: Box::new([
-                        tasks::Verdict { fields: Box::new([]), code: 1, words: 64, followups: 0 },
-                        tasks::Verdict { fields: Box::new([]), code: 2, words: 64, followups: 0 },
-                    ]),
-                };
-                root::Event::Core(core::Event::DelegateValidated {
-                    to,
-                    key,
-                    batch: Box::new([member]),
-                    stubs: Box::new([]),
-                })
-            }
         }
     }
 
@@ -224,15 +103,31 @@ impl Peers {
                     parties::Ask::SeeChat { task, through } => {
                         people::Ask::MarkSeen { seen: people::Seen::Chat { task: task_number(task), through } }
                     }
-                    parties::Ask::Chat { words } => people::Ask::StartChat { project, words },
-                    parties::Ask::Goal { words, budget, priority, deadline } => people::Ask::SetGoal {
+                    parties::Ask::Chat { words } => crate::fixtures::create_chat(
+                        self.creating.as_ref().expect("fixture creating authority"),
                         project,
-                        spec: words,
-                        executor: jig_domain_people::GoalExecutor::Charter(1),
-                        budget,
-                        priority,
-                        deadline,
-                    },
+                        role_number(self.parties[index].role),
+                        words,
+                    ),
+                    parties::Ask::Goal { words, budget, priority, deadline } => {
+                        let people::Ask::Create { mut batch, .. } = crate::fixtures::create_chat(
+                            self.creating.as_ref().expect("fixture creating authority"),
+                            project,
+                            role_number(self.parties[index].role),
+                            words,
+                        ) else {
+                            unreachable!()
+                        };
+                        let member = &mut batch[0];
+                        member.budget = people::Budget::Named;
+                        member.authority.spend = budget;
+                        member.authority.deadline = deadline;
+                        member.flags.conversation = false;
+                        member.flags.listed = true;
+                        member.label = jig_client_test_records::GOAL;
+                        member.tracked = Some(priority);
+                        people::Ask::Create { project, batch }
+                    }
                     parties::Ask::Say { task, words, release, .. } => say(project, task_number(task), words, release),
                     parties::Ask::Cancel { task, grace } => people::Ask::Cancel {
                         project,
@@ -244,22 +139,7 @@ impl Peers {
                     parties::Ask::Release { task, revision, again } => {
                         people::Ask::Release { project, task: task_number(task), revision, again }
                     }
-                    parties::Ask::Close { task, disposals } => {
-                        let mut values =
-                            skein_lib::List::with_capacity(u32::try_from(disposals.len()).expect("scripted disposals"));
-                        for disposal in disposals {
-                            values
-                                .push(people::Disposal {
-                                    task: task_number(disposal.task),
-                                    keep: match disposal.keep {
-                                        parties::Keep::Cancel => people::Keep::Cancel,
-                                        parties::Keep::MakeMine => people::Keep::MakeMine,
-                                    },
-                                })
-                                .expect("scripted bounded list");
-                        }
-                        people::Ask::Close { project, chat: task_number(task), disposals: values }
-                    }
+                    parties::Ask::Close { task, disposals } => closing(project, task, disposals),
                     parties::Ask::Take { task } => people::Ask::TakePerson { project, task: task_number(task) },
                     parties::Ask::Choose { task, revision, code, words } => people::Ask::AnswerPerson {
                         project,
@@ -354,7 +234,37 @@ impl Peers {
     pub fn reply(&mut self, to: ReplyTo, reply: people::Reply) {
         let number = to.into_token().raw();
         if let Some(index) = self.party_flights.remove(&number) {
-            self.parties[index].reply(number, party_reply(reply));
+            let translated = match reply {
+                people::Reply::Outcome(people::Outcome::Compound { .. }) => {
+                    match self
+                        .requests
+                        .iter()
+                        .rev()
+                        .find(|up| matches!(up, parties::Up::Request { to, .. } if *to == number))
+                    {
+                        Some(parties::Up::Request { ask: parties::Ask::Close { task, disposals }, .. }) => {
+                            parties::Reply::Closed {
+                                chat: task_number(*task),
+                                cancelled: u32::try_from(
+                                    disposals.iter().filter(|d| d.keep == parties::Keep::Cancel).count(),
+                                )
+                                .expect("bounded disposals"),
+                                kept: u32::try_from(
+                                    disposals.iter().filter(|d| d.keep == parties::Keep::MakeMine).count(),
+                                )
+                                .expect("bounded disposals"),
+                            }
+                        }
+                        _ => parties::Reply::Done,
+                    }
+                }
+                reply @ (people::Reply::SignedIn { .. }
+                | people::Reply::SignedOut
+                | people::Reply::Outcome(_)
+                | people::Reply::Refused(_)
+                | people::Reply::Again(_)) => party_reply(reply),
+            };
+            self.parties[index].reply(number, translated);
         }
     }
 
@@ -417,14 +327,9 @@ fn task_number(task: parties::Task) -> u64 {
 fn party_reply(reply: people::Reply) -> parties::Reply {
     match reply {
         people::Reply::SignedIn { person, sign_in, .. } => parties::Reply::SignedIn { person, sign_in },
-        people::Reply::Outcome(people::Outcome::Started { task } | people::Outcome::GoalStarted { task }) => {
-            parties::Reply::Started { task }
-        }
+        people::Reply::Outcome(people::Outcome::Created { first: task, .. }) => parties::Reply::Started { task },
         people::Reply::Outcome(people::Outcome::Said { task, message }) => parties::Reply::Said { task, message },
         people::Reply::Outcome(people::Outcome::Proposed { proposal, .. }) => parties::Reply::Proposed { proposal },
-        people::Reply::Outcome(people::Outcome::Closing { chat, cancelled, kept }) => {
-            parties::Reply::Closed { chat, cancelled, kept }
-        }
         people::Reply::Outcome(people::Outcome::Stopped { task } | people::Outcome::Released { task }) => {
             parties::Reply::Changed { task }
         }
@@ -566,6 +471,7 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     limits.core.people.inbox_entries = 4;
     limits.core.people.inbox_recipients = 16;
     limits.core.people.requests = 32;
+    limits.core.people.operations = 4;
     limits.core.people.amendment_bytes = 256;
     limits.core.authority.roles = 4;
     limits.core.authority.executors = 3;
@@ -623,14 +529,6 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
         people::Refusal::Limit { which } => parties::Refusal::Limit { which: party_limit(which) },
         people::Refusal::Moved { now } => parties::Refusal::Moved { now: party_moved(now) },
         people::Refusal::Ended { how } => parties::Refusal::Ended { how: party_ending(how) },
-        people::Refusal::Disposal { task, issue } => parties::Refusal::Disposal {
-            task,
-            issue: match issue {
-                people::DisposalIssue::Missing => parties::DisposalIssue::Missing,
-                people::DisposalIssue::Unknown => parties::DisposalIssue::Unknown,
-                people::DisposalIssue::Repeated => parties::DisposalIssue::Repeated,
-            },
-        },
         people::Refusal::Taken { by } => parties::Refusal::Taken { by },
         people::Refusal::NotWellFormed { why: people::Malformed::Cycle, .. } => {
             parties::Refusal::Limit { which: parties::LimitKind::Cycle }
@@ -801,4 +699,26 @@ fn say(project: u32, task: u64, words: Box<[u8]>, release: Option<u64>) -> peopl
         }
         None => people::Ask::Say { project, task, words },
     }
+}
+
+fn closing(project: u32, task: parties::Task, disposals: Box<[parties::DelegateChoice]>) -> people::Ask {
+    let mut operations = skein_lib::List::with_capacity(u32::try_from(disposals.len() + 1).expect("scripted cohort"));
+    for disposal in disposals {
+        let task = task_number(disposal.task);
+        let reason = b"Finish this chat.".as_slice().into();
+        operations
+            .push(match disposal.keep {
+                parties::Keep::Cancel => people::Operation::Cancel { task, reason, grace: None },
+                parties::Keep::MakeMine => people::Operation::Move { task, reason },
+            })
+            .expect("cohort room");
+    }
+    operations
+        .push(people::Operation::Cancel {
+            task: task_number(task),
+            reason: b"Finish this chat.".as_slice().into(),
+            grace: Some(Duration::from_secs(5)),
+        })
+        .expect("chat last");
+    people::Ask::Compound { project, operations }
 }

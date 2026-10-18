@@ -72,11 +72,10 @@ fn expect_lines(tree: &Tree, lines: &[&[u8]]) {
     }
     assert_eq!(text_nodes, lines.len());
 }
-fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 28] {
+fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 23] {
     [
         created_case(),
         (OwnerOutcome::Withdrawn { proposal: u64::MAX }, &[b"Withdrawn", b"Proposal number: 18446744073709551615"]),
-        closing_case(),
         (
             OwnerOutcome::MarkedSeen { seen: SeenThrough::Results { through: u64::MAX } },
             &[b"Read position marked seen", b"Results seen through: 18446744073709551615"],
@@ -92,11 +91,6 @@ fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 28] {
         (OwnerOutcome::NoteEdited { name: u64::MAX }, &[b"Note edited", b"Note: 18446744073709551615"]),
         (OwnerOutcome::ServiceMade { person: u64::MAX }, &[b"Service made", b"Person: 18446744073709551615"]),
         (OwnerOutcome::Adopted { project: u32::MAX }, &[b"Project adopted", b"Project: 4294967295"]),
-        (OwnerOutcome::GoalStarted { task: u64::MAX }, &[b"Goal started", b"Task: 18446744073709551615"]),
-        (
-            OwnerOutcome::GoalProposed { proposal: u64::MAX },
-            &[b"Goal proposed", b"Proposal number: 18446744073709551615"],
-        ),
         (OwnerOutcome::Stopped { task: u64::MAX }, &[b"Task stopped", b"Task: 18446744073709551615"]),
         (OwnerOutcome::Cancelled { task: u64::MAX }, &[b"Task cancelled", b"Task: 18446744073709551615"]),
         (OwnerOutcome::Released { task: u64::MAX }, &[b"Task released", b"Task: 18446744073709551615"]),
@@ -136,7 +130,6 @@ fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 28] {
                 b"Message: 18446744073709551615",
             ],
         ),
-        (OwnerOutcome::Prioritised { project: u32::MAX }, &[b"Goal priorities changed", b"Project: 4294967295"]),
         (OwnerOutcome::Amended { task: u64::MAX }, &[b"Task amended", b"Task: 18446744073709551615"]),
         (OwnerOutcome::Proposed { proposal: u64::MAX }, &[b"Proposed", b"Proposal number: 18446744073709551615"]),
         (OwnerOutcome::RolesSet { project: u32::MAX }, &[b"Project roles set", b"Project: 4294967295"]),
@@ -162,7 +155,6 @@ fn max_cases() -> [(OwnerOutcome, &'static [&'static [u8]]); 28] {
                 b"Released",
             ],
         ),
-        (OwnerOutcome::Started { task: u64::MAX }, &[b"Chat started", b"Task: 18446744073709551615"]),
     ]
 }
 #[test]
@@ -261,14 +253,10 @@ fn released_flags_and_question_message_identities_remain_independent() {
     expect_lines(&question, &[b"Question answered", b"Task: 7", b"Question: 11", b"Message: 19"]);
     let seen = render(&OwnerOutcome::MarkedSeen { seen: SeenThrough::Conversation { task: 13, through: 17 } }, &words);
     expect_lines(&seen, &[b"Read position marked seen", b"Chat: 13", b"Replies seen through: 17"]);
-    let proposed = render(&OwnerOutcome::GoalProposed { proposal: 19 }, &words);
-    expect_lines(&proposed, &[b"Goal proposed", b"Proposal number: 19"]);
 }
 #[test]
-fn closing_counts_and_pool_person_remain_distinct_from_chat_and_project() {
+fn pool_person_remains_distinct_from_the_project() {
     let words = words();
-    let closing = render(&OwnerOutcome::Closing { chat: 7, cancelled: 11, kept: 19 }, &words);
-    expect_lines(&closing, &[b"Chat closed", b"Chat: 7", b"Cancelled delegates: 11", b"Kept delegates: 19"]);
     let pool = render(&OwnerOutcome::PoolSet { project: 13, person: 23 }, &words);
     expect_lines(&pool, &[b"Person pool set", b"Project: 13", b"Person: 23"]);
 }
@@ -312,7 +300,7 @@ fn selected_outcome_language_is_checked_and_maximum_fragment_fits() {
     missing.phrases = Box::new([]);
     assert_eq!(
         Phrasebook::load(phrases::shapes(), Box::new([missing]), &phrase_limits()).unwrap_err(),
-        Invalid::Missing { id: phrases::OutcomePhrase::Closing.id() }
+        Invalid::Missing { id: phrases::OutcomePhrase::MarkedSeen.id() }
     );
     let mut wrong = phrases::english();
     for phrase in &mut wrong.phrases {
@@ -438,18 +426,6 @@ fn created_case() -> (OwnerOutcome, &'static [&'static [u8]]) {
             b"Last task: 18446744073709551615",
             b"Budget given to task: 2",
             b"Amount given: 18446744073709551615",
-        ],
-    )
-}
-
-fn closing_case() -> (OwnerOutcome, &'static [&'static [u8]]) {
-    (
-        OwnerOutcome::Closing { chat: u64::MAX, cancelled: u32::MAX, kept: u32::MAX },
-        &[
-            b"Chat closed",
-            b"Chat: 18446744073709551615",
-            b"Cancelled delegates: 4294967295",
-            b"Kept delegates: 4294967295",
         ],
     )
 }

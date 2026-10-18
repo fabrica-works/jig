@@ -520,10 +520,8 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::ServiceMade { .. }
         | Outcome::Adopted { .. }
         | Outcome::Created { .. }
-        | Outcome::GoalStarted { .. }
         | Outcome::Proposed { .. }
         | Outcome::Withdrawn { .. }
-        | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
         | Outcome::Released { .. }
@@ -534,13 +532,11 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::ProposalDecided { .. }
         | Outcome::Said { .. }
         | Outcome::QuestionAnswered { .. }
-        | Outcome::Prioritised { .. }
         | Outcome::Amended { .. }
         | Outcome::RolesSet { .. }
         | Outcome::PolicyChanged { .. }
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
-        | Outcome::Started { .. }
         | Outcome::Refused(_) => Reply::Outcome(outcome),
     }
 }
@@ -575,19 +571,16 @@ fn apply_roles(
         Ask::SetRoles { project, .. } => *project,
         Ask::Compound { .. }
         | Ask::MarkSeen { .. }
-        | Ask::Close { .. }
         | Ask::Application { .. }
         | Ask::MakeService { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
-        | Ask::StartChat { .. }
         | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
-        | Ask::Prioritise { .. }
         | Ask::Amend { .. }
         | Ask::Move { .. }
         | Ask::TakePerson { .. }
@@ -598,8 +591,7 @@ fn apply_roles(
         | Ask::Release { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
-        | Ask::Withdraw { .. }
-        | Ask::SetGoal { .. } => {
+        | Ask::Withdraw { .. } => {
             return Err(Outcome::Refused(Refusal::Unknown));
         }
     };
@@ -624,19 +616,16 @@ fn apply_roles(
         }
         Ask::Compound { .. }
         | Ask::MarkSeen { .. }
-        | Ask::Close { .. }
         | Ask::Application { .. }
         | Ask::MakeService { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
-        | Ask::StartChat { .. }
         | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
-        | Ask::Prioritise { .. }
         | Ask::Amend { .. }
         | Ask::Move { .. }
         | Ask::TakePerson { .. }
@@ -647,8 +636,7 @@ fn apply_roles(
         | Ask::Release { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
-        | Ask::Withdraw { .. }
-        | Ask::SetGoal { .. } => {
+        | Ask::Withdraw { .. } => {
             unreachable!("validated roster flight")
         }
     };
@@ -733,14 +721,12 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         Ask::MakeService { project, name, role } => (*project, name.clone(), *role),
         Ask::Compound { .. }
         | Ask::MarkSeen { .. }
-        | Ask::Close { .. }
         | Ask::Application { .. }
         | Ask::EditNote { .. }
         | Ask::Adopt { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
         | Ask::Withdraw { .. }
-        | Ask::SetGoal { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
         | Ask::Release { .. }
@@ -751,13 +737,11 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         | Ask::DecideProposal { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
-        | Ask::Prioritise { .. }
         | Ask::Amend { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
-        | Ask::DecideEscalation { .. }
-        | Ask::StartChat { .. } => unreachable!("service creation is routed only from its ask"),
+        | Ask::DecideEscalation { .. } => unreachable!("service creation is routed only from its ask"),
     };
     let identity = Identity {
         key: IdentityKey { provider: domain.deployment_provider, subject: person.to_be_bytes().into() },
@@ -935,19 +919,16 @@ fn project(ask: &Ask) -> u32 {
         },
         Ask::MarkSeen { .. } => 0,
         Ask::Compound { project, .. }
-        | Ask::Close { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
         | Ask::SetRoles { project, .. }
         | Ask::ChangePolicy { project, .. }
         | Ask::SetPool { project, .. }
-        | Ask::StartChat { project, .. }
         | Ask::DecideEscalation { project, .. }
         | Ask::DecideProposal { project, .. }
         | Ask::Say { project, .. }
         | Ask::AnswerQuestion { project, .. }
-        | Ask::Prioritise { project, .. }
         | Ask::Amend { project, .. }
         | Ask::Move { project, .. }
         | Ask::TakePerson { project, .. }
@@ -958,8 +939,7 @@ fn project(ask: &Ask) -> u32 {
         | Ask::Release { project, .. }
         | Ask::Create { project, .. }
         | Ask::Propose { project, .. }
-        | Ask::Withdraw { project, .. }
-        | Ask::SetGoal { project, .. } => *project,
+        | Ask::Withdraw { project, .. } => *project,
     }
 }
 
@@ -1033,18 +1013,6 @@ fn valid_note(limits: &Limits, name: u64, scope: &crate::NoteScope, change: &cra
     }
 }
 
-fn valid_close(limits: &Limits, chat: u64, disposals: &List<crate::Disposal>) -> bool {
-    if chat == 0 || disposals.capacity() > crate::disposal_capacity(limits) {
-        return false;
-    }
-    for disposal in disposals {
-        if disposal.task == 0 {
-            return false;
-        }
-    }
-    true
-}
-
 fn valid_person_result(limits: &Limits, result: &crate::PersonResult) -> bool {
     let bound = usize::try_from(limits.words).expect("u32 fits usize");
     match result {
@@ -1063,20 +1031,12 @@ fn valid_person_result(limits: &Limits, result: &crate::PersonResult) -> bool {
     }
 }
 
-fn goal_executor(value: crate::GoalExecutor) -> bool {
-    match value {
-        crate::GoalExecutor::Charter(charter) => charter != 0,
-        crate::GoalExecutor::Procedure { connector, code } => connector != 0 && code != 0,
-    }
-}
-
 pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
     if !crate::words::valid(ask) {
         return false;
     }
     match ask {
         Ask::Compound { operations, .. } => crate::compound::refusal(limits, operations).is_none(),
-        Ask::Close { chat, disposals, .. } => valid_close(limits, *chat, disposals),
         Ask::MarkSeen { seen } => match seen {
             Seen::Results { .. } => true,
             Seen::Chat { task, .. } => *task != 0,
@@ -1116,12 +1076,6 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
                 && crate::amendment::valid(limits, amendment)
         }
         Ask::Withdraw { proposal, .. } => *proposal != 0,
-        Ask::SetGoal { spec, executor, .. } => {
-            goal_executor(*executor)
-                && !spec.is_empty()
-                && spec.len() <= usize::try_from(limits.words).expect("u32 fits usize")
-        }
-        Ask::StartChat { words, .. } => words.len() <= usize::try_from(limits.words).expect("u32 fits usize"),
         Ask::Say { task, words, .. } => {
             *task != 0 && !words.is_empty() && words.len() <= usize::try_from(limits.words).expect("u32 fits usize")
         }
@@ -1130,17 +1084,6 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
                 && *question != 0
                 && !words.is_empty()
                 && words.len() <= usize::try_from(limits.words).expect("u32 fits usize")
-        }
-        Ask::Prioritise { goals, .. } => {
-            if goals.is_empty() || goals.len() > usize::try_from(limits.goals).expect("u32 fits usize") {
-                return false;
-            }
-            for (task, _) in goals {
-                if *task == 0 {
-                    return false;
-                }
-            }
-            true
         }
         Ask::Amend { task, amendment, .. } => *task != 0 && crate::amendment::valid(limits, amendment),
         Ask::DecideEscalation { task, revision, decision, .. } => {
@@ -1171,18 +1114,6 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
     let which = match ask {
         Ask::Compound { operations, .. } => {
             return crate::compound::refusal(limits, operations).expect("invalid compound");
-        }
-        Ask::Close { chat, disposals, .. } => {
-            let mut unknown = *chat == 0;
-            for disposal in disposals {
-                if disposal.task == 0 {
-                    unknown = true;
-                }
-            }
-            if unknown {
-                return Refusal::Unknown;
-            }
-            LimitKind::LiveDelegates
         }
         Ask::EditNote { name, .. } => {
             if *name == 0 {
@@ -1217,13 +1148,7 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
         Ask::Create { batch, .. } | Ask::Propose { action: crate::Action::Batch(batch), .. } => {
             crate::batch::invalid(limits, batch)
         }
-        Ask::SetGoal { spec, executor, .. } => {
-            if !goal_executor(*executor) {
-                return Refusal::Unknown;
-            }
-            if spec.is_empty() { LimitKind::Empty } else { LimitKind::Words }
-        }
-        Ask::StartChat { .. } | Ask::Propose { action: crate::Action::Amend { .. }, .. } => LimitKind::Words,
+        Ask::Propose { action: crate::Action::Amend { .. }, .. } => LimitKind::Words,
         Ask::Say { task, words, .. } => {
             if *task == 0 {
                 return Refusal::Unknown;
@@ -1235,13 +1160,6 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
                 return Refusal::Unknown;
             }
             if words.is_empty() { LimitKind::Empty } else { LimitKind::Words }
-        }
-        Ask::Prioritise { goals, .. } => {
-            if goals.is_empty() {
-                LimitKind::Empty
-            } else {
-                LimitKind::Priority
-            }
         }
         Ask::Amend { task, .. } => {
             if *task == 0 {
@@ -1270,13 +1188,11 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
     #[derive(PartialEq, Eq)]
     enum Expected {
         Compound(u32, u32),
-        Close(u64, u32, u32),
         MarkSeen(Seen),
         Application(u16),
         Note(u64),
         Service,
         Create,
-        Goal,
         Propose,
         Withdraw(u64),
         Stop(u64),
@@ -1289,29 +1205,16 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Proposal(crate::Proposer, u64),
         Say(u64),
         AnswerQuestion(u64, u64),
-        Prioritise(u32),
         Amend(u64, bool),
         Roles(u32, bool),
         Policy(u32),
         Pool(u32, u64),
         Adoption(u32),
         Escalation,
-        Chat,
     }
 
     let expected = match ask {
         Ask::Compound { project, operations } => Expected::Compound(*project, operations.len()),
-        Ask::Close { chat, disposals, .. } => {
-            let mut cancelled = 0_u32;
-            let mut kept = 0_u32;
-            for disposal in disposals {
-                match disposal.keep {
-                    crate::Keep::Cancel => cancelled = cancelled.checked_add(1).expect("bounded list"),
-                    crate::Keep::MakeMine => kept = kept.checked_add(1).expect("bounded list"),
-                }
-            }
-            Expected::Close(*chat, cancelled, kept)
-        }
         Ask::MarkSeen { seen } => Expected::MarkSeen(*seen),
         Ask::Application { connector, .. } => Expected::Application(*connector),
         Ask::EditNote { name, .. } => Expected::Note(*name),
@@ -1320,7 +1223,6 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::Create { .. } => Expected::Create,
         Ask::Propose { .. } => Expected::Propose,
         Ask::Withdraw { proposal, .. } => Expected::Withdraw(*proposal),
-        Ask::SetGoal { .. } => Expected::Goal,
         Ask::Stop { task, .. } => Expected::Stop(*task),
         Ask::Cancel { task, .. } => Expected::Cancel(*task),
         Ask::Release { task, .. } => Expected::Release(*task),
@@ -1331,7 +1233,6 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::DecideProposal { proposer, proposal, .. } => Expected::Proposal(*proposer, *proposal),
         Ask::Say { task, .. } => Expected::Say(*task),
         Ask::AnswerQuestion { task, question, .. } => Expected::AnswerQuestion(*task, *question),
-        Ask::Prioritise { project, .. } => Expected::Prioritise(*project),
         Ask::Amend { task, release, .. } => Expected::Amend(*task, release.is_some()),
         Ask::SetRoles { project, holdings } => {
             let mut valid = true;
@@ -1350,7 +1251,6 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::ChangePolicy { project, .. } => Expected::Policy(*project),
         Ask::SetPool { project, person, .. } => Expected::Pool(*project, *person),
         Ask::DecideEscalation { .. } => Expected::Escalation,
-        Ask::StartChat { .. } => Expected::Chat,
     };
 
     match outcome {
@@ -1364,14 +1264,12 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
                 false
             }
         }
-        Outcome::Closing { chat, cancelled, kept } => expected == Expected::Close(chat, cancelled, kept),
         Outcome::MarkedSeen { seen } => expected == Expected::MarkSeen(seen),
         Outcome::Applied { connector, token } => expected == Expected::Application(connector) && token.raw() != 0,
         Outcome::NoteEdited { name } => expected == Expected::Note(name),
         Outcome::ServiceMade { person } => expected == Expected::Service && person != 0,
         Outcome::Adopted { project } => expected == Expected::Adoption(project),
         Outcome::Created { first, last, .. } => expected == Expected::Create && first != 0 && last >= first,
-        Outcome::GoalStarted { task } => expected == Expected::Goal && task != 0,
         Outcome::Proposed { proposal, .. } => expected == Expected::Propose && proposal != 0,
         Outcome::Withdrawn { proposal } => expected == Expected::Withdraw(proposal),
         Outcome::Stopped { task } => expected == Expected::Stop(task),
@@ -1386,7 +1284,6 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::QuestionAnswered { task, question, message } => {
             expected == Expected::AnswerQuestion(task, question) && message != 0
         }
-        Outcome::Prioritised { project } => expected == Expected::Prioritise(project),
         Outcome::Amended { task, released } => {
             expected == Expected::Amend(task, true) || !released && expected == Expected::Amend(task, false)
         }
@@ -1394,7 +1291,6 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::PolicyChanged { project } => expected == Expected::Policy(project),
         Outcome::PoolSet { project, person } => expected == Expected::Pool(project, person),
         Outcome::EscalationDecided { .. } => expected == Expected::Escalation,
-        Outcome::Started { task } => expected == Expected::Chat && task != 0,
         Outcome::Refused(_) => true,
         Outcome::Again(_) | Outcome::SignedOut => false,
     }
@@ -1561,18 +1457,14 @@ pub(super) fn answer_decided(
         | Outcome::RolesSet { .. }
         | Outcome::PolicyChanged { .. }
         | Outcome::PoolSet { .. }
-        | Outcome::Started { .. }
         | Outcome::Said { .. }
         | Outcome::QuestionAnswered { .. }
-        | Outcome::Prioritised { .. }
         | Outcome::Amended { .. }
         | Outcome::Moved { .. }
-        | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
         | Outcome::Released { .. }
         | Outcome::Created { .. }
-        | Outcome::GoalStarted { .. }
         | Outcome::Proposed { .. }
         | Outcome::Withdrawn { .. }
         | Outcome::PersonTaken { .. }
@@ -1722,11 +1614,9 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 }
                 Ask::Compound { .. }
                 | Ask::MarkSeen { .. }
-                | Ask::Close { .. }
                 | Ask::Application { .. }
                 | Ask::EditNote { .. }
                 | Ask::MakeService { .. }
-                | Ask::StartChat { .. }
                 | Ask::Adopt { .. }
                 | Ask::ChangePolicy { .. }
                 | Ask::SetPool { .. }
@@ -1734,7 +1624,6 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 | Ask::DecideProposal { .. }
                 | Ask::Say { .. }
                 | Ask::AnswerQuestion { .. }
-                | Ask::Prioritise { .. }
                 | Ask::Amend { .. }
                 | Ask::Move { .. }
                 | Ask::TakePerson { .. }
@@ -1745,8 +1634,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 | Ask::Release { .. }
                 | Ask::Create { .. }
                 | Ask::Propose { .. }
-                | Ask::Withdraw { .. }
-                | Ask::SetGoal { .. } => {
+                | Ask::Withdraw { .. } => {
                     unreachable!("restored role success has a matching roster ask");
                 }
             },
@@ -1756,23 +1644,19 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::Applied { .. }
             | Outcome::NoteEdited { .. }
             | Outcome::Adopted { .. }
-            | Outcome::Started { .. }
             | Outcome::PolicyChanged { .. }
             | Outcome::PoolSet { .. }
             | Outcome::Said { .. }
             | Outcome::QuestionAnswered { .. }
-            | Outcome::Prioritised { .. }
             | Outcome::Amended { .. }
             | Outcome::Moved { .. }
             | Outcome::PersonTaken { .. }
             | Outcome::PersonHandedBack { .. }
             | Outcome::PersonAnswered { .. }
-            | Outcome::Closing { .. }
             | Outcome::Stopped { .. }
             | Outcome::Cancelled { .. }
             | Outcome::Released { .. }
             | Outcome::Created { .. }
-            | Outcome::GoalStarted { .. }
             | Outcome::Proposed { .. }
             | Outcome::Withdrawn { .. }
             | Outcome::EscalationDecided { .. }
@@ -1822,21 +1706,17 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
             crate::ApplicationScope::Own | crate::ApplicationScope::Deployment => 0,
         },
         Ask::Compound { .. }
-        | Ask::Close { .. }
         | Ask::MarkSeen { .. }
         | Ask::MakeService { .. }
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
-        | Ask::StartChat { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
         | Ask::Withdraw { .. }
-        | Ask::SetGoal { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
-        | Ask::Prioritise { .. }
         | Ask::Amend { .. }
         | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
@@ -1852,21 +1732,17 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     match &ask {
         Ask::Application { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
         Ask::Compound { .. }
-        | Ask::Close { .. }
         | Ask::MarkSeen { .. }
         | Ask::MakeService { .. }
         | Ask::Adopt { .. }
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
-        | Ask::StartChat { .. }
         | Ask::Create { .. }
         | Ask::Propose { .. }
         | Ask::Withdraw { .. }
-        | Ask::SetGoal { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
-        | Ask::Prioritise { .. }
         | Ask::Amend { .. }
         | Ask::DecideEscalation { .. }
         | Ask::DecideProposal { .. }
@@ -1896,7 +1772,7 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     Ok(Request::Route { request, person, project: application_project, role, ask: Box::new(ask) })
 }
 
-fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {
+fn admission(_domain: &Domain, _person: u64, _project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {
     match ask {
         Ask::Application { scope, .. } => {
             if *scope == crate::ApplicationScope::Own || role.is_some() {
@@ -1904,13 +1780,6 @@ fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, as
             } else {
                 Some(Refusal::Role { held: None })
             }
-        }
-        Ask::StartChat { .. } => {
-            let service = match domain.people.get(&person) {
-                Some(party) => party.key.provider == domain.deployment_provider,
-                None => false,
-            };
-            if service { Some(Refusal::Role { held: role }) } else { None }
         }
         Ask::Compound { .. }
         | Ask::EditNote { .. }
@@ -1922,11 +1791,8 @@ fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, as
         | Ask::Create { .. }
         | Ask::Propose { .. }
         | Ask::Withdraw { .. }
-        | Ask::SetGoal { .. }
-        | Ask::Close { .. }
         | Ask::Say { .. }
         | Ask::AnswerQuestion { .. }
-        | Ask::Prioritise { .. }
         | Ask::Amend { .. }
         | Ask::MarkSeen { .. }
         | Ask::DecideEscalation { .. }

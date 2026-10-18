@@ -31,7 +31,6 @@ fn message(ask: &Ask, task: u64) -> Option<(&Text, u32)> {
         Ask::Propose { .. }
         | Ask::Withdraw { .. }
         | Ask::Create { .. }
-        | Ask::StartChat { .. }
         | Ask::Answer { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
@@ -40,10 +39,7 @@ fn message(ask: &Ask, task: u64) -> Option<(&Text, u32)> {
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
-        | Ask::Close { .. }
         | Ask::Move { .. }
-        | Ask::SetGoal { .. }
-        | Ask::Prioritise { .. }
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. }
@@ -62,7 +58,7 @@ pub(crate) fn admission(domain: &mut Ui, scope: u64, ask: &Ask) -> Option<Limit>
     if domain.conversation.words.admits() {
         None
     } else {
-        Some(Limit::ConversationWords { limit: domain.conversation.words.rows.capacity() })
+        Some(Limit::Words { limit: domain.conversation.words.rows.capacity() })
     }
 }
 /// Keeps the actual joined intent's snapshot, including across page navigation.

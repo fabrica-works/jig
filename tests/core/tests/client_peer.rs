@@ -47,7 +47,7 @@ fn chat(world: &mut World, sign_in: u64) {
         reply_to: ReplyTo::new(Token::new(45_101)),
         sign_in,
         key: [45; 16],
-        ask: people::Ask::StartChat { project: 1, words: Box::from(&b"hello from a client"[..]) },
+        ask: jig_core_world::fixtures::chat(world, 1, Box::from(&b"hello from a client"[..])),
     })));
 }
 
@@ -69,7 +69,7 @@ fn a_client_answer_and_read_wait_for_the_engines_commit_completion() {
     world.send(root::Event::Committed { number, fill: 0 });
     let receipts = &world.client_peer.as_ref().expect("client peer").delivered;
     assert!(receipts.iter().any(|(durable, receipt)| matches!(receipt,
-        root::Delivery::Core(core::Held::PeopleReply { reply: people::Reply::Outcome(people::Outcome::Started { .. }), .. })
+        root::Delivery::Core(core::Held::PeopleReply { reply: people::Reply::Outcome(people::Outcome::Created { .. }), .. })
             if *durable >= number)));
     assert!(receipts.iter().any(|(durable, receipt)| matches!(receipt,
         root::Delivery::Core(core::Held::Read { answer: reads::Answer::Document(document), .. })

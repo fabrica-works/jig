@@ -31,7 +31,7 @@ const ENGINE: &[u8] = br#"{
 "people.operations":2,"tasks.tasks":2,"tasks.funders":2,"tasks.project_tasks":1,"tasks.tree_tasks":1,"tasks.project_goals":1,
 "tasks.batch":1,"tasks.dependencies":1,"tasks.delegates":1,"tasks.charters":1,
 "people.people":1,"people.projects":1,"people.sign_ins":1,"people.holdings":1,
-"people.inbox_tasks":4,"people.pending":1,"people.waiters":1,"people.goals":1,
+"people.inbox_tasks":4,"people.pending":1,"people.waiters":1,
 "fleet.attempts":1,"fleet.calls":1,"fleet.turns":8,
 "brief.briefs":1,"brief.sections":1,
 "notes.entries_per_scope":1,"views.runs":1,"views.watchers":2,"views.watchers_per_party":2,
@@ -439,4 +439,61 @@ pub fn store_limits() -> jig_test_service::limits::Limits {
         let engine = jig_protocol_config::engine(&document, 0).expect("fixture engine");
         jig_test_service::limits::for_profile(jig_protocol_config::Profile::Small, &engine.limits)
     })
+}
+
+#[must_use]
+pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
+    use jig_domain_people as people;
+    people::Member {
+        executor: people::TaskExecutor::Agent { charter: 1 },
+        words: words.into(),
+        parameters: Box::new([]),
+        inputs: Box::new([]),
+        budget: people::Budget::Named,
+        named: Box::new([]),
+        contract: people::Contract::Report { words: 16 },
+        authority: people::Authority {
+            tools: 0,
+            grants: Box::new([]),
+            delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+            spend,
+            deadline: None,
+            notes: 0,
+            note_resources: Box::new([]),
+        },
+        wake: people::WakePolicy {
+            words: people::WakeRule::Immediate,
+            notices: people::WakeRule::Never,
+            news: people::WakeRule::Never,
+            results: people::ResultsWake::Never,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        dependencies: Box::new([]),
+        tracked: None,
+        label: 0,
+        flags: people::Flags::PLAIN,
+    }
+}
+
+#[must_use]
+pub fn chat(store: &crate::world::Store, project: u32, words: &[u8]) -> jig_domain_people::Ask {
+    use jig_domain_people as people;
+    let mut member = people_member(words, 0);
+    let Some(jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Policy { value, .. }))) =
+        store.rows.get(&jig_test_domain::Key::Core(jig_domain_core::Key::People(people::Key::Policy(project))))
+    else {
+        panic!("durable configured policy")
+    };
+    member.authority = value.roles.iter().find(|role| role.number == 0).expect("fixture role").authority.clone();
+    member.authority.spend = 0;
+    member.authority.delegation.tasks =
+        member.authority.delegation.tasks.min(store_limits().root.core.tasks.tree_tasks).saturating_sub(1);
+    member.authority.delegation.depth = member.authority.delegation.depth.saturating_sub(1);
+    member.budget = people::Budget::AsAllowed { cap: None };
+    member.contract = people::Contract::Report { words: 32 };
+    member.flags = people::Flags { conversation: true, listed: false, retention: people::Retention::Kept };
+    member.label = jig_client_test_records::CHAT;
+    people::Ask::Create { project, batch: Box::new([member]) }
 }

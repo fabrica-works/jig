@@ -4,9 +4,6 @@ use skein_lib::{Token, Wall};
 pub fn again_values() -> Box<[domain::Again]> {
     Box::new([domain::Again::Busy, domain::Again::NotReady])
 }
-pub fn disposal_issue_values() -> Box<[domain::DisposalIssue]> {
-    Box::new([domain::DisposalIssue::Missing, domain::DisposalIssue::Unknown, domain::DisposalIssue::Repeated])
-}
 pub fn failure_class_values() -> Box<[domain::FailureClass]> {
     Box::new([
         domain::FailureClass::Transient,
@@ -129,7 +126,6 @@ pub fn refusal_values() -> Box<[domain::Refusal]> {
         domain::Refusal::NotWellFormed { at: 0, why: domain::Malformed::Cycle },
         domain::Refusal::NotWellFormed { at: 1, why: domain::Malformed::AsAllowedTwice },
         domain::Refusal::NotWellFormed { at: 0, why: domain::Malformed::Conversation },
-        domain::Refusal::Disposal { task: 2, issue: domain::DisposalIssue::Repeated },
         domain::Refusal::Authority { lacking: domain::Lack::Approver, proposable: Some(domain::Accepter::Nobody) },
         domain::Refusal::Role { held: Some(domain::Role::Policy { role: 7 }) },
         domain::Refusal::Authority {
@@ -168,7 +164,6 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
         domain::Outcome::CompoundRefused { at: 2, why: domain::Refusal::Unknown },
         domain::Outcome::Created { first: 2, last: 3, given: None },
         domain::Outcome::Created { first: 2, last: 3, given: Some(domain::Given { task: 3, amount: 70 }) },
-        domain::Outcome::Closing { chat: 2, cancelled: 3, kept: 4 },
         domain::Outcome::MarkedSeen { seen: domain::Seen::Chat { task: 3, through: 7 } },
         domain::Outcome::Applied { connector: 2, token: Token::new(17) },
         domain::Outcome::Again(domain::Again::Busy),
@@ -176,7 +171,6 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
         domain::Outcome::NoteEdited { name: 2 },
         domain::Outcome::ServiceMade { person: 2 },
         domain::Outcome::Adopted { project: 2 },
-        domain::Outcome::GoalStarted { task: 2 },
         domain::Outcome::Proposed { proposal: 2, to: 0 },
         domain::Outcome::Withdrawn { proposal: 2 },
         domain::Outcome::Stopped { task: 2 },
@@ -195,7 +189,6 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
         },
         domain::Outcome::Said { task: 2, message: 3 },
         domain::Outcome::QuestionAnswered { task: 2, question: 3, message: 4 },
-        domain::Outcome::Prioritised { project: 2 },
         domain::Outcome::Amended { task: 2, released: true },
         domain::Outcome::RolesSet { project: 2 },
         domain::Outcome::PolicyChanged { project: 2 },
@@ -207,7 +200,6 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
             at: Wall::from_nanos(19),
             choice: domain::EscalationChoice::Rejected,
         },
-        domain::Outcome::Started { task: 2 },
         domain::Outcome::Refused(domain::Refusal::Authority {
             lacking: domain::Lack::Budget { needs: 17, left: 11 },
             proposable: Some(domain::Accepter::Role(0)),

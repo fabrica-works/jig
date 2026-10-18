@@ -64,7 +64,6 @@ fn fixed(refusal: &Refusal) -> bool {
         },
         Refusal::Malformed { .. }
         | Refusal::Role { .. }
-        | Refusal::Disposal { .. }
         | Refusal::Taken { .. }
         | Refusal::NotWaiting
         | Refusal::NoFurther

@@ -250,13 +250,10 @@ fn number(value: &OwnerOutcome, task: u64, place: u32) -> Option<u64> {
             }
         }
         OwnerOutcome::Created { .. }
-        | OwnerOutcome::Closing { .. }
         | OwnerOutcome::MarkedSeen { .. }
         | OwnerOutcome::NoteEdited { .. }
         | OwnerOutcome::ServiceMade { .. }
         | OwnerOutcome::Adopted { .. }
-        | OwnerOutcome::GoalStarted { .. }
-        | OwnerOutcome::GoalProposed { .. }
         | OwnerOutcome::Stopped { .. }
         | OwnerOutcome::Cancelled { .. }
         | OwnerOutcome::Released { .. }
@@ -266,14 +263,12 @@ fn number(value: &OwnerOutcome, task: u64, place: u32) -> Option<u64> {
         | OwnerOutcome::Moved { .. }
         | OwnerOutcome::ProposalDecided { .. }
         | OwnerOutcome::QuestionAnswered { .. }
-        | OwnerOutcome::Prioritised { .. }
         | OwnerOutcome::Amended { .. }
         | OwnerOutcome::Proposed { .. }
         | OwnerOutcome::Withdrawn { .. }
         | OwnerOutcome::RolesSet { .. }
         | OwnerOutcome::PolicyChanged { .. }
         | OwnerOutcome::PoolSet { .. }
-        | OwnerOutcome::EscalationDecided { .. }
-        | OwnerOutcome::Started { .. } => None,
+        | OwnerOutcome::EscalationDecided { .. } => None,
     }
 }

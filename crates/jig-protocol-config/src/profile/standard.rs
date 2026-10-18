@@ -58,7 +58,6 @@ pub(super) const PEOPLE: people::Limits = people::Limits {
     sign_ins: 32,
     projects: 8,
     holdings: 32,
-    goals: 64,
     initial_owners: 4,
     requests: 128,
     room_refusals: 32,

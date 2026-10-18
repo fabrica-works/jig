@@ -331,7 +331,6 @@ pub const PEOPLE_LIMITS: people::Limits = people::Limits {
     sign_ins: 2,
     projects: 2,
     holdings: 2,
-    goals: 2,
     initial_owners: 2,
     requests: 2,
     room_refusals: 2,
@@ -492,8 +491,6 @@ fn people_amend_proposal() -> people::Ask {
 pub fn people_asks() -> Box<[people::Ask]> {
     use people::{Ask, Proposer};
     let [cancel_move, amend_release, message_stop] = people_compounds();
-    let mut disposals = skein_lib::List::with_capacity(1);
-    disposals.push(people::Disposal { task: 2, keep: people::Keep::MakeMine }).expect("one disposal");
     let mut procedure = people_member();
     procedure.executor = people::TaskExecutor::Procedure { connector: 1, code: 1 };
     procedure.contract = people::Contract::Change { connector: 1, kind: 5, words: 17 };
@@ -512,7 +509,6 @@ pub fn people_asks() -> Box<[people::Ask]> {
         people_propose(),
         people_amend_proposal(),
         Ask::Withdraw { project: 1, proposal: 43 },
-        Ask::Close { project: 1, chat: 2, disposals },
         Ask::MarkSeen { seen: people::Seen::Chat { task: 2, through: 3 } },
         Ask::Application { scope: jig_domain_people::ApplicationScope::Project(1), connector: 2, digest: [3; 32] },
         Ask::EditNote {
@@ -535,14 +531,6 @@ pub fn people_asks() -> Box<[people::Ask]> {
                 options: Box::new([Box::new([3])]),
             },
         },
-        Ask::SetGoal {
-            project: 1,
-            spec: Box::new([2]),
-            executor: people::GoalExecutor::Procedure { connector: 1, code: 2 },
-            budget: 3,
-            priority: 4,
-            deadline: Some(skein_lib::Wall::from_nanos(5)),
-        },
         Ask::Stop { project: 1, task: 2 },
         Ask::Cancel { project: 1, task: 2, reason: Box::new([3]), grace: Some(skein_lib::Duration::from_secs(5)) },
         Ask::Release { project: 1, task: 2, revision: 3, again: Some(true) },
@@ -563,7 +551,6 @@ pub fn people_asks() -> Box<[people::Ask]> {
         },
         Ask::Say { project: 1, task: 2, words: Box::new([3]) },
         Ask::AnswerQuestion { project: 1, task: 2, question: 3, words: Box::new([4]) },
-        Ask::Prioritise { project: 1, goals: Box::new([(2, 3)]) },
         Ask::Amend { project: 1, task: 2, revision: 3, amendment: people_amendment(), release: Some(4) },
         Ask::SetRoles {
             project: 1,
@@ -586,7 +573,6 @@ pub fn people_asks() -> Box<[people::Ask]> {
             revision: 3,
             decision: people::EscalationDecision::Reject { reason: Box::new([4]) },
         },
-        Ask::StartChat { project: 1, words: Box::new([2]) },
     ])
 }
 

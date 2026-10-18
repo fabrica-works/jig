@@ -882,7 +882,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         4,
         [Offered {
             effect: None,
-            act: ActKind::SetGoal,
+            act: ActKind::Reorder,
             admission: Admission::Bounded {
                 within: Bounds::Create(CreateBounds {
                     authority: Box::new(crate::tests::cards_objects::owner_authority()),
@@ -1025,7 +1025,7 @@ fn owner_project_public_offer_ceiling_preserves_twenty_five_in_order_and_rejects
         .acts
         .push(Offered {
             effect: None,
-            act: ActKind::SetGoal,
+            act: ActKind::Reorder,
             admission: Admission::Bounded {
                 within: Bounds::Create(CreateBounds {
                     authority: Box::new(crate::tests::cards_objects::owner_authority()),

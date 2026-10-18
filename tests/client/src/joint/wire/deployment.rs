@@ -195,8 +195,8 @@ fn hello(value: fleet::HelloRefusal) -> client::OwnerHelloRefusal {
 
 fn person_action(value: people::CapacityAction) -> client::OwnerPersonCapacityAction {
     match value {
-        people::CapacityAction::Compound | people::CapacityAction::Create => unreachable!("no v8 ask leads to Create"),
-        people::CapacityAction::Close => client::OwnerPersonCapacityAction::Close,
+        people::CapacityAction::Create => client::OwnerPersonCapacityAction::Create,
+        people::CapacityAction::Compound => client::OwnerPersonCapacityAction::Compound,
         people::CapacityAction::Application { connector } => {
             client::OwnerPersonCapacityAction::Application { connector }
         }
@@ -206,8 +206,6 @@ fn person_action(value: people::CapacityAction) -> client::OwnerPersonCapacityAc
         people::CapacityAction::Roles => client::OwnerPersonCapacityAction::Roles,
         people::CapacityAction::Policy => client::OwnerPersonCapacityAction::Policy,
         people::CapacityAction::Pool { person } => client::OwnerPersonCapacityAction::Pool { person },
-        people::CapacityAction::Chat => client::OwnerPersonCapacityAction::Chat,
-        people::CapacityAction::Goal => client::OwnerPersonCapacityAction::Goal,
         people::CapacityAction::Escalation { task } => client::OwnerPersonCapacityAction::Escalation { task },
         people::CapacityAction::Proposal { proposer, number } => client::OwnerPersonCapacityAction::Proposal {
             proposer: match proposer {
@@ -220,7 +218,6 @@ fn person_action(value: people::CapacityAction) -> client::OwnerPersonCapacityAc
         people::CapacityAction::Question { task, question } => {
             client::OwnerPersonCapacityAction::Question { task, question }
         }
-        people::CapacityAction::Priority => client::OwnerPersonCapacityAction::Priority,
         people::CapacityAction::Amend { task } => client::OwnerPersonCapacityAction::Amend { task },
         people::CapacityAction::Move { task } => client::OwnerPersonCapacityAction::Move { task },
         people::CapacityAction::TakePerson { task } => client::OwnerPersonCapacityAction::TakePerson { task },

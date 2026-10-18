@@ -127,124 +127,6 @@ pub(super) fn pool_route(
     }
 }
 
-#[expect(
-    clippy::too_many_arguments,
-    reason = "one authenticated goal carries its task specification and funding request"
-)]
-pub(super) fn begin_goal_creation(
-    core: &mut Core,
-    env: &Env<Limits>,
-    out: &mut Queue<Request>,
-    work: &mut Queue<Event>,
-    request: Token,
-    person: u64,
-    project: u32,
-    role: people::Role,
-    spec: Box<[u8]>,
-    executor: people::GoalExecutor,
-    budget: u64,
-    priority: u32,
-    deadline: Option<skein_lib::Wall>,
-) {
-    if core.fill >= env.limits.fill_mark {
-        super::refusals::pool_again(work, request, people::Again::Busy);
-        return;
-    }
-    if core.projections.len() >= env.limits.tasks.tasks {
-        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::LiveTasks });
-        return;
-    }
-    let admitted = match core.goal_start(project, person, role, executor, budget, deadline, env.limits.tasks.tree_tasks)
-    {
-        Ok(admitted) => admitted,
-        Err(why) => {
-            pool_refused(work, request, why);
-            return;
-        }
-    };
-    let Some(number) = crate::fresh(&mut core.counters, crate::Family::Task) else {
-        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
-        return;
-    };
-    let new = tasks::New {
-        label: 2, // Transitional default goal label; 16.5 removes this handler.
-        flags: tasks::Flags { conversation: false, listed: true, retention: tasks::Retention::Kept },
-        number,
-        project,
-        executor: match executor {
-            people::GoalExecutor::Charter(charter) => tasks::Executor::Agent { charter },
-            people::GoalExecutor::Procedure { connector, code } => tasks::Executor::Procedure { connector, code },
-        },
-        spec: tasks::Spec { words: spec, parameters: Box::new([]), inputs: Box::new([]) },
-        contract: tasks::Contract::Report { words: env.limits.tasks.result_bytes },
-        authority: crate::translate::task_authority(&admitted.authority),
-        numbers: tasks::Numbers { budget, spent: 0, spent_below: 0, reserved: 0 },
-        funder: admitted.source,
-        dependencies: Box::new([]),
-        holdings: Box::new([]),
-        wake: tasks::WakePolicy::DEFAULT,
-        recurring: None,
-        tracked: Some(priority),
-    };
-    if !tasks::valid_spec(&env.limits.tasks, &new.spec) || !tasks::valid_authority(&env.limits.tasks, &new.authority) {
-        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Words });
-        return;
-    }
-    begin_creation(core, env, out, work, request, CreationKind::Goal { person }, Box::new([new]));
-}
-
-#[expect(clippy::too_many_arguments, reason = "one authenticated chat carries its membership and opening words")]
-pub(super) fn begin_chat_creation(
-    core: &mut Core,
-    env: &Env<Limits>,
-    out: &mut Queue<Request>,
-    work: &mut Queue<Event>,
-    request: Token,
-    person: u64,
-    project: u32,
-    role: people::Role,
-    words: Box<[u8]>,
-) {
-    if core.fill >= env.limits.fill_mark {
-        super::refusals::pool_again(work, request, people::Again::Busy);
-        return;
-    }
-    if let Err(why) = core.chat_admit(project, person, role, env.limits.tasks.tree_tasks) {
-        pool_refused(work, request, why);
-        return;
-    }
-    let (period, pool) = core.goal_open_pool(project, person);
-    if let Some(event) = period {
-        work.push(Event::Tasks(event));
-    }
-    if let Some(event) = pool {
-        work.push(Event::Tasks(event));
-    }
-    let Some(number) = crate::fresh(&mut core.counters, crate::Family::Task) else {
-        pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Arithmetic });
-        return;
-    };
-    let given = core.chat_authority(project, person, role, env.limits.tasks.tree_tasks);
-    let new = tasks::New {
-        label: 1, // Transitional default chat label; 16.5 removes this handler.
-        flags: tasks::Flags { conversation: true, listed: false, retention: tasks::Retention::Kept },
-        number,
-        project,
-        executor: tasks::Executor::Agent { charter: core.settings.chat },
-        spec: tasks::Spec { words, parameters: Box::new([]), inputs: Box::new([]) },
-        contract: tasks::Contract::Report { words: env.limits.tasks.result_bytes },
-        authority: crate::translate::task_authority(&given),
-        numbers: tasks::Numbers { budget: given.budget.spend, spent: 0, spent_below: 0, reserved: 0 },
-        funder: tasks::Funder::Pool { project, person, period: core.period(project) },
-        dependencies: Box::new([]),
-        holdings: Box::new([]),
-        wake: tasks::WakePolicy::DEFAULT,
-        recurring: None,
-        tracked: None,
-    };
-    begin_creation(core, env, out, work, request, CreationKind::Chat { person }, Box::new([new]));
-}
-
 pub(super) fn begin_creation(
     core: &mut Core,
     env: &Env<Limits>,
@@ -339,16 +221,12 @@ fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, 
             );
             return;
         }
-        CreationKind::Batch { .. } | CreationKind::Goal { .. } | CreationKind::Chat { .. } => {}
+        CreationKind::Batch { .. } => {}
     }
-    let person = match creating.kind {
-        CreationKind::Batch { person, .. } => Some(person),
-        CreationKind::Goal { .. } | CreationKind::Chat { .. } => None,
-        CreationKind::Propose { .. } => unreachable!("proposal handled above"),
-    };
-    if let Some(person) = person {
+    let CreationKind::Batch { person, .. } = creating.kind else { unreachable!("proposal handled above") };
+    {
         let first = creating.members.first().expect("nonempty batch").number;
-        let (period, pool) = core.goal_open_pool(creating.members.first().expect("nonempty batch").project, person);
+        let (period, pool) = core.open_person_pool(creating.members.first().expect("nonempty batch").project, person);
         if let Some(event) = period {
             work.push(Event::Tasks(event));
         }
@@ -356,55 +234,12 @@ fn finish_creation(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, 
             work.push(Event::Tasks(event));
         }
         let CreationKind::Batch { given, stubs, .. } = creating.kind else { unreachable!("batch creation") };
-        assert!(
-            core.made.insert(request, super::Made { first, goal: None, given, stubs }).is_ok(),
-            "one batch make flight"
-        );
+        assert!(core.made.insert(request, super::Made { first, given, stubs }).is_ok(), "one batch make flight");
         work.push(Event::Tasks(tasks::Event::Make {
             reply_to: ReplyTo::new(request),
             creator: tasks::Party::Person(person),
             batch: creating.members,
         }));
-        return;
-    }
-    let new = creating.members.into_iter().next().expect("single creation");
-    match creating.kind {
-        CreationKind::Batch { .. } | CreationKind::Propose { .. } => unreachable!("batch handled above"),
-        CreationKind::Goal { person } => {
-            let (period, pool) = core.goal_open_pool(new.project, person);
-            if let Some(event) = period {
-                work.push(Event::Tasks(event));
-            }
-            if let Some(event) = pool {
-                work.push(Event::Tasks(event));
-            }
-            assert!(
-                core.made.insert(
-                    request,
-                    super::Made { first: new.number, goal: Some(true), given: None, stubs: Box::new([]) }
-                ) == Ok(None),
-                "one goal make flight"
-            );
-            work.push(Event::Tasks(tasks::Event::Make {
-                reply_to: ReplyTo::new(request),
-                creator: tasks::Party::Person(person),
-                batch: Box::new([new]),
-            }));
-        }
-        CreationKind::Chat { person } => {
-            assert!(
-                core.made.insert(
-                    request,
-                    super::Made { first: new.number, goal: Some(false), given: None, stubs: Box::new([]) }
-                ) == Ok(None),
-                "one chat make flight"
-            );
-            work.push(Event::Tasks(tasks::Event::Make {
-                reply_to: ReplyTo::new(request),
-                creator: tasks::Party::Person(person),
-                batch: Box::new([new]),
-            }));
-        }
     }
 }
 

@@ -201,9 +201,8 @@ fn show_funder(b: &mut Builder, words: &Words, value: Funder) {
 }
 fn person_action(b: &mut Builder, words: &Words, value: OwnerPersonCapacityAction) {
     match value {
-        OwnerPersonCapacityAction::Close => {
-            text(b, words, P::PersonCapacityActionClose, &[]);
-        }
+        OwnerPersonCapacityAction::Create => text(b, words, P::PersonCapacityActionCreate, &[]),
+        OwnerPersonCapacityAction::Compound => text(b, words, P::PersonCapacityActionCompound, &[]),
         OwnerPersonCapacityAction::Application { connector } => {
             text(b, words, P::PersonCapacityActionApplication, &[]);
             field_number(b, words, P::Connector, u64::from(connector));
@@ -228,12 +227,6 @@ fn person_action(b: &mut Builder, words: &Words, value: OwnerPersonCapacityActio
             text(b, words, P::PersonCapacityActionPool, &[]);
             field_number(b, words, P::Person, person);
         }
-        OwnerPersonCapacityAction::Chat => {
-            text(b, words, P::PersonCapacityActionChat, &[]);
-        }
-        OwnerPersonCapacityAction::Goal => {
-            text(b, words, P::PersonCapacityActionGoal, &[]);
-        }
         OwnerPersonCapacityAction::Escalation { task } => {
             text(b, words, P::PersonCapacityActionEscalation, &[]);
             field_number(b, words, P::Task, task);
@@ -251,9 +244,6 @@ fn person_action(b: &mut Builder, words: &Words, value: OwnerPersonCapacityActio
             text(b, words, P::PersonCapacityActionQuestion, &[]);
             field_number(b, words, P::Task, task);
             field_number(b, words, P::Question, question);
-        }
-        OwnerPersonCapacityAction::Priority => {
-            text(b, words, P::PersonCapacityActionPriority, &[]);
         }
         OwnerPersonCapacityAction::Amend { task } => {
             text(b, words, P::PersonCapacityActionAmend, &[]);

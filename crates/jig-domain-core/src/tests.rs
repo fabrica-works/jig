@@ -92,7 +92,6 @@ fn limits() -> Limits {
         sign_ins: 2,
         projects: 1,
         holdings: 2,
-        goals: 4,
         initial_owners: 1,
         requests: 4,
         pending: 2,
@@ -274,10 +273,7 @@ fn config(seed: u64) -> Config {
         connectors: Box::new([1, 2]),
         settings: Settings {
             templates: Box::new([]),
-            close_grace: Duration::from_secs(5),
             deployment_provider: 3,
-
-            chat: 1,
             charters: Box::new([Charter {
                 number: 1,
                 hosts: fleet::Kinds::Workers,
@@ -365,7 +361,7 @@ pub(crate) fn make_task(core: &mut Core, limits: &Limits, number: u64) {
         &mut out,
     );
     while out.pop().is_some() {}
-    let mut given = core.chat_authority(1, 1, people::Role::Owner, u32::MAX);
+    let mut given = core.creating_authority(1, 1, people::Role::Owner, u32::MAX);
     given.budget.spend = 100;
     let row = tasks::New {
         label: 0,
@@ -420,7 +416,6 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
             role: people::Role::Owner,
             name: None,
             pool: None,
-            chat_budget: core.authority.role(1, 0).unwrap().authority.budget.spend,
             creating: Some(crate::acts::Creating {
                 within: frame_facts::owner_creating(limits.documents.lines, 1, 1),
                 beyond: crate::acts::Beyond::Proposed {
@@ -438,7 +433,6 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
         }]
     );
     assert_eq!(frame.retention, limits.people.request_retention);
-    assert_eq!(frame.charters.as_slice()[0].goals.as_slice(), &[1]);
     assert_eq!(frame.needs, 0);
     assert_eq!(frame.updates, Count::Known(0));
     let mut upgraded = limits;
@@ -568,7 +562,7 @@ fn send_task(core: &mut Core, limits: &Limits, event: tasks::Event) {
 }
 
 fn new_row(core: &Core, number: u64, funder: tasks::Funder, tracked: Option<u32>) -> tasks::New {
-    let mut authority = task_authority(&core.chat_authority(1, 1, people::Role::Owner, u32::MAX));
+    let mut authority = task_authority(&core.creating_authority(1, 1, people::Role::Owner, u32::MAX));
     let budget = match funder {
         tasks::Funder::Task(_) => 10,
         tasks::Funder::Pool { .. } | tasks::Funder::Recurring { .. } | tasks::Funder::Period { .. } => 100,
@@ -969,7 +963,7 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
                 assert_eq!(release, Some(1));
                 assert_eq!(
                     before.instructions.as_ref().unwrap().bytes,
-                    core.charter(core.settings.chat).expect("chat charter").policy.instructions
+                    core.charter(core.settings.charters[0].number).expect("chat charter").policy.instructions
                 );
                 assert_eq!(after.instructions.as_ref().unwrap().bytes.as_ref(), b"Use the new evidence");
                 assert_eq!(before.spec.words.bytes.as_ref(), b"Work\nDetailed instructions");
@@ -1222,7 +1216,7 @@ fn documents_history_retains_every_change_kind_and_a_passed_proposal_state() {
         tasks::Change::Cancelled,
         tasks::Change::Released,
         tasks::Change::Amended,
-        tasks::Change::Prioritised { priority: 3 },
+        jig_domain_tasks::Change::Amended,
         tasks::Change::Moved,
         tasks::Change::Proposed,
         tasks::Change::ProposalPassed,
@@ -2648,7 +2642,7 @@ fn deployment_capacity_carries_keyed_refusal_identity_time_and_bounded_omissions
                 reply_to: ReplyTo::new(Token::new(501)),
                 sign_in: 20,
                 key: [key; 16],
-                ask: people::Ask::StartChat { project: 1, words: Box::from(&b"chat"[..]) },
+                ask: people::Ask::Create { project: 1, batch: Box::new([fixtures::member(b"chat", 1)]) },
             },
             &mut out,
         );
@@ -2686,7 +2680,7 @@ fn deployment_capacity_carries_keyed_refusal_identity_time_and_bounded_omissions
     let refusal = document.person_room_refusals.get(0).unwrap();
     assert_eq!(refusal.key, people::RequestKey { person: 1, key: [3; 16] });
     assert_eq!(refusal.project, Some(1));
-    assert_eq!(refusal.action, people::CapacityAction::Chat);
+    assert_eq!(refusal.action, people::CapacityAction::Create);
     assert_eq!(refusal.at, Wall::from_nanos(3));
     assert_eq!(refusal.cause, people::CapacityCause::Limit { which: people::LimitKind::LiveTasks });
     assert_eq!(document.person_room_refusals_forgotten, 0);
@@ -2703,25 +2697,62 @@ fn goal_deadlines_are_checked_against_the_role_and_policy() {
     policy.roles[0].authority.budget.deadline = Some(deadline);
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy: policy.clone() }, &mut out);
-    let started = core
-        .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(earlier), 2)
-        .expect("within role");
+    let started = crate::acts::bounds::create_start(
+        &core,
+        1,
+        1,
+        people::Role::Owner,
+        tasks::Executor::Agent { charter: 1 },
+        10,
+        Some(earlier),
+        2,
+    )
+    .expect("within role");
     assert_eq!(started.authority.budget.spend, 10);
     assert_eq!(started.authority.budget.deadline, Some(earlier));
     assert_eq!(
-        core.goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(later), 2).unwrap_err(),
+        crate::acts::bounds::create_start(
+            &core,
+            1,
+            1,
+            people::Role::Owner,
+            tasks::Executor::Agent { charter: 1 },
+            10,
+            Some(later),
+            2
+        )
+        .unwrap_err(),
         people::Refusal::Authority { lacking: people::Lack::Deadline, proposable: Some(people::Accepter::Role(0)) }
     );
     assert_eq!(
-        core.goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, None, 2).unwrap_err(),
+        crate::acts::bounds::create_start(
+            &core,
+            1,
+            1,
+            people::Role::Owner,
+            tasks::Executor::Agent { charter: 1 },
+            10,
+            None,
+            2
+        )
+        .unwrap_err(),
         people::Refusal::Authority { lacking: people::Lack::Deadline, proposable: Some(people::Accepter::Role(0)) }
     );
     policy.ceiling.budget.deadline = Some(deadline);
     while out.pop().is_some() {}
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(
-        core.goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 10, Some(later), 2)
-            .expect_err("beyond policy"),
+        crate::acts::bounds::create_start(
+            &core,
+            1,
+            1,
+            people::Role::Owner,
+            tasks::Executor::Agent { charter: 1 },
+            10,
+            Some(later),
+            2
+        )
+        .expect_err("beyond policy"),
         people::Refusal::Authority { proposable: Some(people::Accepter::Nobody), lacking: people::Lack::Deadline }
     );
 }

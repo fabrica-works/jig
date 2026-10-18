@@ -11,7 +11,7 @@ fn whole_note_admission_keeps_writer_scalars_and_time_presence_with_all_nested_s
             let note = Note {
                 number: u64::MAX,
                 revision: Revision { value: u64::MAX },
-                scope: NoteScope::Goal { project: u32::MAX, goal: u64::MAX },
+                scope: NoteScope::Task { project: u32::MAX, task: u64::MAX },
                 description: DocumentText::complete(text(b"name")),
                 body: DocumentText { bytes: text(b"body"), cut: true },
                 writer,

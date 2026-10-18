@@ -16,7 +16,6 @@ pub enum HistoryPhrase {
     Cancelled,
     Released,
     Amended,
-    Prioritised,
     Moved,
     Proposed,
     Passed,
@@ -68,14 +67,13 @@ pub enum HistoryPhrase {
     DependenciesAbsent,
     DependenciesCut,
 }
-pub const ALL: [HistoryPhrase; 57] = [
+pub const ALL: [HistoryPhrase; 56] = [
     HistoryPhrase::History,
     HistoryPhrase::Task,
     HistoryPhrase::Revision,
     HistoryPhrase::Cancelled,
     HistoryPhrase::Released,
     HistoryPhrase::Amended,
-    HistoryPhrase::Prioritised,
     HistoryPhrase::Moved,
     HistoryPhrase::Proposed,
     HistoryPhrase::Passed,
@@ -137,7 +135,6 @@ impl HistoryPhrase {
             Self::Cancelled => 7603,
             Self::Released => 7604,
             Self::Amended => 7605,
-            Self::Prioritised => 7606,
             Self::Moved => 7607,
             Self::Proposed => 7608,
             Self::Passed => 7609,
@@ -232,7 +229,6 @@ impl HistoryPhrase {
             | Self::DependenciesCut => None,
             Self::Task
             | Self::Revision
-            | Self::Prioritised
             | Self::Proposal
             | Self::Proposer
             | Self::HolderTask
@@ -259,7 +255,6 @@ impl HistoryPhrase {
             Self::Cancelled => b"Cancelled",
             Self::Released => b"Released",
             Self::Amended => b"Amended",
-            Self::Prioritised => b"Priority: ",
             Self::Moved => b"Moved",
             Self::Proposed => b"Proposed",
             Self::Passed => b"Proposal passed",

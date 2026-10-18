@@ -175,7 +175,7 @@ fn chats(world: &mut jig_core_world::effects::World) -> Vec<u64> {
             jig_core_world::stories::reads::request(
                 world,
                 80 + index,
-                jig_domain_people::Ask::StartChat { project: 1, words: b"indexed chat".as_slice().into() },
+                jig_core_world::fixtures::chat(world, 1, b"indexed chat".as_slice().into()),
             );
         }
         numbers.push(world.assigned.as_ref().expect("chat").task);

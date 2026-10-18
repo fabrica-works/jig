@@ -63,10 +63,8 @@ pub(crate) fn proposal(
                 | Act::Amend
                 | Act::Stop
                 | Act::Cancel
-                | Act::Close
                 | Act::Move
-                | Act::SetGoal
-                | Act::Prioritise
+                | Act::Reorder
                 | Act::Seen
                 | Act::EditNote
                 | Act::DeleteNote
@@ -126,10 +124,8 @@ pub(crate) fn proposal(
                 | Act::Amend
                 | Act::Stop
                 | Act::Cancel
-                | Act::Close
                 | Act::Move
-                | Act::SetGoal
-                | Act::Prioritise
+                | Act::Reorder
                 | Act::Seen
                 | Act::EditNote
                 | Act::DeleteNote
@@ -189,10 +185,8 @@ pub(crate) fn escalation(
         | Act::Amend
         | Act::Stop
         | Act::Cancel
-        | Act::Close
         | Act::Move
-        | Act::SetGoal
-        | Act::Prioritise
+        | Act::Reorder
         | Act::Seen
         | Act::EditNote
         | Act::DeleteNote

@@ -76,7 +76,6 @@ pub fn me_document(needs: u32) -> jig_domain_core::documents::Document {
         updates: d::Count::Known(7),
         results_seen: 7,
         retention: Duration::from_nanos(19),
-        charters: List::with_capacity(0),
         cut: false,
     })
 }

@@ -106,9 +106,9 @@ pub enum IntentPurpose {
     /// One offered Project settings replacement.
     ProjectSettings,
     /// A new chat whose task page opens once made.
-    StartChat,
+    BeginConversation,
     /// A goal made or proposed from the project board.
-    SetGoal,
+    CreateGoal,
     /// One explicitly opened read position.
     Seen(jig_client::contract::SeenThrough),
 }

@@ -27,7 +27,6 @@ pub enum OwnerHistoryChange {
     Cancelled,
     Released,
     Amended,
-    Prioritised { priority: u32 },
     Moved,
     Proposed,
     ProposalPassed,

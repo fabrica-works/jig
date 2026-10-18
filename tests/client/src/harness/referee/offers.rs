@@ -4,8 +4,8 @@ use crate::harness::DraftOutcome;
 use jig_client::{
     Key,
     contract::{
-        ActKind, Admission, Answer, Ask, Bounds, Creating, GoalExecutor, Outcome, OwnerExecutor, OwnerHistoryHolder,
-        OwnerMessageProposalKind, OwnerOutcome, ProposalKey, ProposeAction, Proposer, ReadValue, Recipient,
+        Answer, Ask, Creating, Outcome, OwnerHistoryHolder, OwnerMessageProposalKind, OwnerOutcome, ProposalKey,
+        ProposeAction, Proposer, ReadValue, Recipient,
     },
     shapes::{self, Fall, GoalDraft},
 };
@@ -44,14 +44,6 @@ impl Offers {
                     }
                 }
             }
-            ReadValue::Project(project) => {
-                if let Some(Admission::Bounded { within: Bounds::Create(within), beyond }) =
-                    jig_client::facts::offer(project.acts.as_slice(), ActKind::SetGoal)
-                {
-                    self.latest
-                        .insert((client, project.number), Creating { within: within.clone(), beyond: beyond.clone() });
-                }
-            }
             ReadValue::Proposal(proposal) => self.recipient(proposal.key, &proposal.waiting, judge),
             ReadValue::OwnerProject(project) => {
                 self.roles.insert(
@@ -64,7 +56,8 @@ impl Offers {
                 }
             }
             ReadValue::OwnerProposal(proposal) => self.owner_recipient(proposal.key, proposal.waiting.holder, judge),
-            ReadValue::Tasks(_)
+            ReadValue::Project(_)
+            | ReadValue::Tasks(_)
             | ReadValue::Historical(_)
             | ReadValue::Task(_)
             | ReadValue::Escalation(_)
@@ -122,21 +115,6 @@ impl Offers {
     }
     pub(super) fn sent(&mut self, client: ClientId, ask: &Ask, judge: &mut JudgeOf) -> Option<Fall> {
         let (project, draft) = match ask {
-            Ask::SetGoal { project, spec, executor, budget, deadline, priority } => (
-                *project,
-                GoalDraft {
-                    words: spec.clone(),
-                    executor: match executor {
-                        GoalExecutor::Charter(charter) => OwnerExecutor::Agent { charter: *charter },
-                        GoalExecutor::Procedure { connector, code } => {
-                            OwnerExecutor::Procedure { connector: *connector, code: *code }
-                        }
-                    },
-                    budget: *budget,
-                    deadline: *deadline,
-                    priority: Some(*priority),
-                },
-            ),
             Ask::Create { project, tasks } | Ask::Propose { project, action: ProposeAction::Batch { tasks }, .. }
                 if tasks.len() == 1 =>
             {
@@ -155,7 +133,6 @@ impl Offers {
             Ask::Create { .. }
             | Ask::Propose { .. }
             | Ask::Withdraw { .. }
-            | Ask::StartChat { .. }
             | Ask::Message { .. }
             | Ask::Compound { .. }
             | Ask::Answer { .. }
@@ -166,9 +143,7 @@ impl Offers {
             | Ask::Amend { .. }
             | Ask::Stop { .. }
             | Ask::Cancel { .. }
-            | Ask::Close { .. }
             | Ask::Move { .. }
-            | Ask::Prioritise { .. }
             | Ask::Seen { .. }
             | Ask::EditNote { .. }
             | Ask::DeleteNote { .. }
@@ -218,10 +193,8 @@ impl Offers {
 }
 pub(crate) fn outcome(answer: &Answer) -> Option<DraftOutcome> {
     match answer {
-        Answer::Done(
-            Outcome::Made { .. } | Outcome::Owner(OwnerOutcome::Created { .. } | OwnerOutcome::GoalStarted { .. }),
-        ) => Some(DraftOutcome::Made),
-        Answer::Done(Outcome::Owner(OwnerOutcome::Proposed { proposal } | OwnerOutcome::GoalProposed { proposal })) => {
+        Answer::Done(Outcome::Made { .. } | Outcome::Owner(OwnerOutcome::Created { .. })) => Some(DraftOutcome::Made),
+        Answer::Done(Outcome::Owner(OwnerOutcome::Proposed { proposal })) => {
             Some(DraftOutcome::ProposedByParty { number: *proposal })
         }
         Answer::Done(Outcome::Proposed { proposal }) => Some(DraftOutcome::Proposed(*proposal)),

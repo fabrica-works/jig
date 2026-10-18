@@ -105,7 +105,7 @@ fn note_scope(value: w::NoteScope) -> notes::Scope {
     match value {
         w::NoteScope::Deployment => notes::Scope::Deployment,
         w::NoteScope::Project(value) => notes::Scope::Project { project: value.value() },
-        w::NoteScope::Goal(value) => notes::Scope::Goal { project: value.project(), goal: value.goal() },
+        w::NoteScope::Task(value) => notes::Scope::Goal { project: value.project(), goal: value.task() },
         w::NoteScope::Resource(value) => {
             let parts = value.into_parts();
             let pattern = parts.pattern.into_parts();

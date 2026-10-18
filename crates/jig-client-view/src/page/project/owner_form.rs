@@ -23,8 +23,7 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
         Ask::MakeService { project, .. } => (*project, ActKind::MakeService, true),
         // Only the separately supplied configured target establishes this baseline.
         Ask::SetPool { project, .. } => (*project, ActKind::SetPool, !doc.configured_pools_cut),
-        Ask::StartChat { .. }
-        | Ask::Message { .. }
+        Ask::Message { .. }
         | Ask::Propose { .. }
         | Ask::Withdraw { .. }
         | Ask::Create { .. }
@@ -37,10 +36,7 @@ pub fn supported(doc: &OwnerProject, ask: &Ask) -> bool {
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
-        | Ask::Close { .. }
         | Ask::Move { .. }
-        | Ask::SetGoal { .. }
-        | Ask::Prioritise { .. }
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. } => return false,
@@ -189,7 +185,6 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
             None
         }
         Ask::MakeService { .. }
-        | Ask::StartChat { .. }
         | Ask::Message { .. }
         | Ask::Propose { .. }
         | Ask::Withdraw { .. }
@@ -203,10 +198,7 @@ pub fn baseline(doc: &OwnerProject, ask: &Ask) -> Option<Ask> {
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
-        | Ask::Close { .. }
         | Ask::Move { .. }
-        | Ask::SetGoal { .. }
-        | Ask::Prioritise { .. }
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. } => None,
@@ -236,7 +228,6 @@ pub(crate) fn review(domain: &mut Ui, ask: Box<Ask>) {
             Ask::MakeService { .. }
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
-            | Ask::StartChat { .. }
             | Ask::Message { .. }
             | Ask::Propose { .. }
             | Ask::Withdraw { .. }
@@ -250,10 +241,7 @@ pub(crate) fn review(domain: &mut Ui, ask: Box<Ask>) {
             | Ask::Amend { .. }
             | Ask::Stop { .. }
             | Ask::Cancel { .. }
-            | Ask::Close { .. }
             | Ask::Move { .. }
-            | Ask::SetGoal { .. }
-            | Ask::Prioritise { .. }
             | Ask::Seen { .. }
             | Ask::EditNote { .. }
             | Ask::DeleteNote { .. } => None,
@@ -289,7 +277,6 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>) {
         Ask::MakeService { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetRoles { .. }
-        | Ask::StartChat { .. }
         | Ask::Message { .. }
         | Ask::Propose { .. }
         | Ask::Withdraw { .. }
@@ -303,10 +290,7 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>) {
         | Ask::Amend { .. }
         | Ask::Stop { .. }
         | Ask::Cancel { .. }
-        | Ask::Close { .. }
         | Ask::Move { .. }
-        | Ask::SetGoal { .. }
-        | Ask::Prioritise { .. }
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::DeleteNote { .. } => false,

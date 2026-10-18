@@ -198,10 +198,6 @@ pub enum JigPhrase {
     LeftHeld,
     /// Decided first by (0).
     DecidedFirst,
-    /// Made chat (0).
-    MadeChat,
-    /// Made goal (0).
-    MadeGoal,
     /// Made task (0).
     MadeTask,
     /// Made service party (0).
@@ -430,8 +426,8 @@ pub enum JigPhrase {
     ActTakeOver,
     /// Set goal.
     ActSetGoal,
-    /// Prioritise.
-    ActPrioritise,
+    /// Reorder.
+    ActReorder,
     /// Mark read.
     ActMarkSeen,
     /// Edit note.
@@ -680,7 +676,7 @@ pub enum JigPhrase {
     /// First words.
     NewChat,
     /// Start a conversation.
-    StartChat,
+    BeginConversation,
     /// Live delegates: (0).
     Delegates,
     /// Sign in.
@@ -1197,8 +1193,6 @@ impl JigPhrase {
             Self::ReleasedWithout => 48,
             Self::LeftHeld => 49,
             Self::DecidedFirst => 50,
-            Self::MadeChat => 51,
-            Self::MadeGoal => 53,
             Self::MadeTask => 54,
             Self::MadeService => 55,
             Self::MadeResult => 56,
@@ -1313,7 +1307,7 @@ impl JigPhrase {
             Self::ActClose => 171,
             Self::ActTakeOver => 172,
             Self::ActSetGoal => 173,
-            Self::ActPrioritise => 174,
+            Self::ActReorder => 174,
             Self::ActMarkSeen => 175,
             Self::ActEditNote => 176,
             Self::ActDeleteNote => 177,
@@ -1441,7 +1435,7 @@ impl JigPhrase {
             Self::WindowEnd => 297,
             Self::MoreRows => 298,
             Self::NewChat => 299,
-            Self::StartChat => 300,
+            Self::BeginConversation => 300,
             Self::Delegates => 301,
             Self::SignInPage => 302,
             Self::SignInWith => 303,
@@ -1844,7 +1838,7 @@ impl JigPhrase {
             | Self::WindowEnd
             | Self::MoreRows
             | Self::NewChat
-            | Self::StartChat
+            | Self::BeginConversation
             | Self::SignInPage
             | Self::MissingPage
             | Self::UpdateClient
@@ -1967,7 +1961,7 @@ impl JigPhrase {
             | Self::ActClose
             | Self::ActTakeOver
             | Self::ActSetGoal
-            | Self::ActPrioritise
+            | Self::ActReorder
             | Self::ActMarkSeen
             | Self::ActEditNote
             | Self::ActDeleteNote
@@ -2139,8 +2133,6 @@ impl JigPhrase {
             | Self::TasksBackingOff
             | Self::ByParty
             | Self::ByTask
-            | Self::MadeChat
-            | Self::MadeGoal
             | Self::MalformedTwoAsAllowed
             | Self::MalformedConversation
             | Self::MalformedProposedAsAllowed
@@ -2298,7 +2290,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 601] = [
+pub const ALL: [JigPhrase; 599] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2451,8 +2443,6 @@ pub const ALL: [JigPhrase; 601] = [
     JigPhrase::ReleasedWithout,
     JigPhrase::LeftHeld,
     JigPhrase::DecidedFirst,
-    JigPhrase::MadeChat,
-    JigPhrase::MadeGoal,
     JigPhrase::MadeTask,
     JigPhrase::MadeService,
     JigPhrase::MadeResult,
@@ -2567,7 +2557,7 @@ pub const ALL: [JigPhrase; 601] = [
     JigPhrase::ActClose,
     JigPhrase::ActTakeOver,
     JigPhrase::ActSetGoal,
-    JigPhrase::ActPrioritise,
+    JigPhrase::ActReorder,
     JigPhrase::ActMarkSeen,
     JigPhrase::ActEditNote,
     JigPhrase::ActDeleteNote,
@@ -2695,7 +2685,7 @@ pub const ALL: [JigPhrase; 601] = [
     JigPhrase::WindowEnd,
     JigPhrase::MoreRows,
     JigPhrase::NewChat,
-    JigPhrase::StartChat,
+    JigPhrase::BeginConversation,
     JigPhrase::Delegates,
     JigPhrase::SignInPage,
     JigPhrase::SignInWith,

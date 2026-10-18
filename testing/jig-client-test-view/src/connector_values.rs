@@ -282,8 +282,7 @@ pub fn answer(b: &mut Builder, value: &ConnectorAnswer, words: &Words, text_limi
                     Some(held) => number(b, words, Word::Role, u64::from(held)),
                     None => words.text(b, jig_client_view::phrases::jig::JigPhrase::NoHeldRole, &[]),
                 },
-                application_core::Refusal::Disposal { .. }
-                | application_core::Refusal::Authority { .. }
+                application_core::Refusal::Authority { .. }
                 | application_core::Refusal::Limit { .. }
                 | application_core::Refusal::Moved { .. }
                 | application_core::Refusal::Ended { .. }

@@ -26,7 +26,7 @@ impl<A: crate::Application> crate::Engine<A> {
             .get(&project)
             .map(|p| &p.acts)
             .or_else(|| self.truth.projects.get(&project).map(|p| &p.acts));
-        let admission = offers.and_then(|rows| rows.iter().find(|offer| offer.act == c::ActKind::Prioritise));
+        let admission = offers.and_then(|rows| rows.iter().find(|offer| offer.act == c::ActKind::Reorder));
         let refusal = if self.truth.visible(party, project) {
             match admission.map(|offer| &offer.admission) {
                 Some(Admission::Allowed) => None,

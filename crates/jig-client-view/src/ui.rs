@@ -584,7 +584,7 @@ fn act_event(domain: &mut Ui, env: &Env<Limits>, act: Act, out: &mut Queue<Reque
         },
         Act::Dismiss => dismiss_act(domain),
         Act::SignOut => crate::signin::sign_out(domain, out),
-        Act::StartChat { project } => crate::page::conversations::start(domain, env, project, out, lent),
+        Act::BeginConversation { project } => crate::page::conversations::start(domain, env, project, out, lent),
         Act::OpenChat { task } => crate::page::conversations::open_chat(domain, env, task, out, lent),
         Act::OpenUpdates => crate::page::conversations::open_updates(domain, out, lent),
         Act::FilterInbox { filter } => crate::page::conversations::filter_inbox(domain, filter, out),
@@ -633,6 +633,7 @@ fn act_event(domain: &mut Ui, env: &Env<Limits>, act: Act, out: &mut Queue<Reque
             }
         }
         Act::AmendRelease { object } => crate::confirm::amend_release(domain, env, Id::from_token(object), lent),
+        Act::CloseChat { object } => crate::confirm::close_chat(domain, env, Id::from_token(object), lent),
         Act::Intend { object, act } => crate::confirm::open(domain, env, Id::from_token(object), act, lent),
         Act::Choose { option } => crate::confirm::choose(domain, option),
         Act::CannotDo => crate::confirm::cannot(domain),

@@ -238,7 +238,7 @@ pub enum NoteScope {
     /// On a resource pattern.
     Resource { project: u32, connector: u16, pattern: super::OwnerPattern },
     /// For one goal.
-    Goal { project: u32, goal: u64 },
+    Task { project: u32, task: u64 },
 }
 
 /// How an object ended.

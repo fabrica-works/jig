@@ -61,6 +61,7 @@ pub struct World {
     pub hold_projection_settlements: bool,
     pub sign_in: Option<u64>,
     pub initial_ask: people::Ask,
+    pub(crate) creating: crate::fixtures::Creating,
     pub people_answers: Vec<people::Reply>,
     pub application_answers: Vec<(Token, u16, connector::ApplicationOutcome)>,
     pub procedure: Option<u64>,

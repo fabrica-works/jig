@@ -61,3 +61,38 @@ pub(super) fn query(project: u32) -> TaskQuery {
         order: QueryOrder::Changed,
     }
 }
+
+/// One root using the shared task's specification and authority.
+pub(super) fn new_task(words: Text) -> NewTask {
+    NewTask {
+        executor: OwnerExecutor::Agent { charter: 1 },
+        spec: Specification { words, parameters: list(vec![]), inputs: list(vec![]) },
+        contract: NewContract::Report { words: 128 },
+        authority: owner_authority().authority,
+        budget: NewBudget::Named,
+        wake: None,
+        dependencies: List::with_capacity(0),
+        named: List::with_capacity(0),
+        tracked: None,
+        label: 0,
+        flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
+    }
+}
+pub(super) fn create(project: u32, words: Text) -> Ask {
+    Ask::Create { project, tasks: list(vec![new_task(words)]) }
+}
+pub(super) fn creating(frame: &mut Me) {
+    frame.projects.get_mut(0).unwrap().creating = Some(Creating {
+        within: CreateBounds {
+            authority: Box::new(owner_authority()),
+            pool_left: 100,
+            charters: list(vec![1]),
+            procedures: List::with_capacity(0),
+            latest: None,
+            budget: 100,
+            maximum_budget: 1000,
+            maximum_deadline: None,
+        },
+        beyond: Beyond::Proposed { to: Recipient::Party(2) },
+    });
+}

@@ -19,7 +19,9 @@ fn done_is_handed_up_final_with_its_outcome() {
         h.answered(fixtures::ATTEMPT),
         Some((
             RequestEnvelope::Final,
-            Some(&Answered::Jig(c::Answer::Done(c::Outcome::Made { what: c::Made::Chat { task: 31 } })))
+            Some(&Answered::Jig(c::Answer::Done(c::Outcome::Made {
+                what: c::Made::Tasks { tasks: fixtures::list([31]) }
+            })))
         ))
     );
 }

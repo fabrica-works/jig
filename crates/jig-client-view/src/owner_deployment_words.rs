@@ -118,7 +118,8 @@ pub enum DeploymentPhrase {
     HelloRefusalReservedChannel,
     HelloRefusalWorkers,
     HelloRefusalStopBound,
-    PersonCapacityActionClose,
+    PersonCapacityActionCreate,
+    PersonCapacityActionCompound,
     PersonCapacityActionApplication,
     PersonCapacityActionNote,
     PersonCapacityActionService,
@@ -126,13 +127,10 @@ pub enum DeploymentPhrase {
     PersonCapacityActionRoles,
     PersonCapacityActionPolicy,
     PersonCapacityActionPool,
-    PersonCapacityActionChat,
-    PersonCapacityActionGoal,
     PersonCapacityActionEscalation,
     PersonCapacityActionProposal,
     PersonCapacityActionWords,
     PersonCapacityActionQuestion,
-    PersonCapacityActionPriority,
     PersonCapacityActionAmend,
     PersonCapacityActionMove,
     PersonCapacityActionTakePerson,
@@ -219,7 +217,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 227] = [
+pub const ALL: [DeploymentPhrase; 225] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -347,7 +345,8 @@ pub const ALL: [DeploymentPhrase; 227] = [
     DeploymentPhrase::HelloRefusalReservedChannel,
     DeploymentPhrase::HelloRefusalWorkers,
     DeploymentPhrase::HelloRefusalStopBound,
-    DeploymentPhrase::PersonCapacityActionClose,
+    DeploymentPhrase::PersonCapacityActionCreate,
+    DeploymentPhrase::PersonCapacityActionCompound,
     DeploymentPhrase::PersonCapacityActionApplication,
     DeploymentPhrase::PersonCapacityActionNote,
     DeploymentPhrase::PersonCapacityActionService,
@@ -355,13 +354,10 @@ pub const ALL: [DeploymentPhrase; 227] = [
     DeploymentPhrase::PersonCapacityActionRoles,
     DeploymentPhrase::PersonCapacityActionPolicy,
     DeploymentPhrase::PersonCapacityActionPool,
-    DeploymentPhrase::PersonCapacityActionChat,
-    DeploymentPhrase::PersonCapacityActionGoal,
     DeploymentPhrase::PersonCapacityActionEscalation,
     DeploymentPhrase::PersonCapacityActionProposal,
     DeploymentPhrase::PersonCapacityActionWords,
     DeploymentPhrase::PersonCapacityActionQuestion,
-    DeploymentPhrase::PersonCapacityActionPriority,
     DeploymentPhrase::PersonCapacityActionAmend,
     DeploymentPhrase::PersonCapacityActionMove,
     DeploymentPhrase::PersonCapacityActionTakePerson,
@@ -561,7 +557,8 @@ impl DeploymentPhrase {
                 Self::HelloRefusalReservedChannel => 9301,
                 Self::HelloRefusalWorkers => 9302,
                 Self::HelloRefusalStopBound => 9303,
-                Self::PersonCapacityActionClose => 9304,
+                Self::PersonCapacityActionCreate => 9422,
+                Self::PersonCapacityActionCompound => 9423,
                 Self::PersonCapacityActionApplication => 9305,
                 Self::PersonCapacityActionNote => 9306,
                 Self::PersonCapacityActionService => 9307,
@@ -569,13 +566,10 @@ impl DeploymentPhrase {
                 Self::PersonCapacityActionRoles => 9309,
                 Self::PersonCapacityActionPolicy => 9310,
                 Self::PersonCapacityActionPool => 9311,
-                Self::PersonCapacityActionChat => 9312,
-                Self::PersonCapacityActionGoal => 9313,
                 Self::PersonCapacityActionEscalation => 9314,
                 Self::PersonCapacityActionProposal => 9315,
                 Self::PersonCapacityActionWords => 9316,
                 Self::PersonCapacityActionQuestion => 9317,
-                Self::PersonCapacityActionPriority => 9318,
                 Self::PersonCapacityActionAmend => 9319,
                 Self::PersonCapacityActionMove => 9320,
                 Self::PersonCapacityActionTakePerson => 9321,
@@ -732,7 +726,8 @@ impl DeploymentPhrase {
             | Self::HelloRefusalReservedChannel
             | Self::HelloRefusalWorkers
             | Self::HelloRefusalStopBound
-            | Self::PersonCapacityActionClose
+            | Self::PersonCapacityActionCreate
+            | Self::PersonCapacityActionCompound
             | Self::PersonCapacityActionApplication
             | Self::PersonCapacityActionNote
             | Self::PersonCapacityActionService
@@ -740,13 +735,10 @@ impl DeploymentPhrase {
             | Self::PersonCapacityActionRoles
             | Self::PersonCapacityActionPolicy
             | Self::PersonCapacityActionPool
-            | Self::PersonCapacityActionChat
-            | Self::PersonCapacityActionGoal
             | Self::PersonCapacityActionEscalation
             | Self::PersonCapacityActionProposal
             | Self::PersonCapacityActionWords
             | Self::PersonCapacityActionQuestion
-            | Self::PersonCapacityActionPriority
             | Self::PersonCapacityActionAmend
             | Self::PersonCapacityActionMove
             | Self::PersonCapacityActionTakePerson
@@ -982,7 +974,8 @@ impl DeploymentPhrase {
             Self::HelloRefusalReservedChannel => b"Hello Refusal Reserved Channel",
             Self::HelloRefusalWorkers => b"Hello Refusal Workers",
             Self::HelloRefusalStopBound => b"Hello Refusal Stop Bound",
-            Self::PersonCapacityActionClose => b"Person Capacity Action Close",
+            Self::PersonCapacityActionCreate => b"Person Capacity Action Create",
+            Self::PersonCapacityActionCompound => b"Person Capacity Action Compound",
             Self::PersonCapacityActionApplication => b"Person Capacity Action Application",
             Self::PersonCapacityActionNote => b"Person Capacity Action Note",
             Self::PersonCapacityActionService => b"Person Capacity Action Service",
@@ -990,13 +983,10 @@ impl DeploymentPhrase {
             Self::PersonCapacityActionRoles => b"Person Capacity Action Roles",
             Self::PersonCapacityActionPolicy => b"Person Capacity Action Policy",
             Self::PersonCapacityActionPool => b"Person Capacity Action Pool",
-            Self::PersonCapacityActionChat => b"Person Capacity Action Chat",
-            Self::PersonCapacityActionGoal => b"Person Capacity Action Goal",
             Self::PersonCapacityActionEscalation => b"Person Capacity Action Escalation",
             Self::PersonCapacityActionProposal => b"Person Capacity Action Proposal",
             Self::PersonCapacityActionWords => b"Person Capacity Action Words",
             Self::PersonCapacityActionQuestion => b"Person Capacity Action Question",
-            Self::PersonCapacityActionPriority => b"Person Capacity Action Priority",
             Self::PersonCapacityActionAmend => b"Person Capacity Action Amend",
             Self::PersonCapacityActionMove => b"Person Capacity Action Move",
             Self::PersonCapacityActionTakePerson => b"Person Capacity Action Take Person",

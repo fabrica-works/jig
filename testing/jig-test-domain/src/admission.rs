@@ -123,13 +123,13 @@ mod tests {
             reply_to: ReplyTo::new(Token::new(7)),
             sign_in: 1,
             key: [1; 16],
-            ask: people::Ask::StartChat { project: 1, words: b"kept".as_slice().into() },
+            ask: people::Ask::Say { project: 1, task: 1, words: b"kept".as_slice().into() },
         }));
         let Err(Event::Core(core::Event::People(people::Event::Ask { ask, .. }))) = try_step(&mut domain, &env, event)
         else {
             panic!("unadmitted input returns to its owner");
         };
-        let people::Ask::StartChat { words, .. } = ask else {
+        let people::Ask::Say { words, .. } = ask else {
             panic!("same party input");
         };
         assert_eq!(words.as_ref(), b"kept");

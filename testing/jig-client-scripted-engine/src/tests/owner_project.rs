@@ -184,7 +184,7 @@ fn reserved_project_bytes(offer_slots: u32) -> u64 {
         + List::<Recurring>::worst_case(2).unwrap()
 }
 fn project_offers(populated: u32, capacity: u32) -> List<Offered> {
-    let kinds = [ActKind::SetGoal, ActKind::ChangePolicy, ActKind::SetRoles, ActKind::MakeService, ActKind::SetPool];
+    let kinds = [ActKind::Reorder, ActKind::ChangePolicy, ActKind::SetRoles, ActKind::MakeService, ActKind::SetPool];
     let mut offers = List::with_capacity(capacity);
     for index in 0..populated {
         offers
@@ -259,7 +259,7 @@ fn owner_project_last_of_twenty_five_offers_keeps_recursive_rows_and_source_orde
     let mut roles = List::with_capacity(2);
     roles.push(u32::MAX).unwrap();
     roles.push(u32::MAX).unwrap();
-    value.acts.get_mut(last).unwrap().act = ActKind::SetGoal;
+    value.acts.get_mut(last).unwrap().act = ActKind::Reorder;
     value.acts.get_mut(last).unwrap().admission = Admission::Bounded {
         within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
             authority: Box::new(crate::tests::owner_authority()),
@@ -295,7 +295,7 @@ fn owner_project_last_of_twenty_five_offers_keeps_recursive_rows_and_source_orde
     assert_eq!(value, malformed);
     assert_eq!(original.acts.capacity(), 25);
     assert_eq!(original.acts.len(), 25);
-    assert_eq!(original.acts.get(last).unwrap().act, ActKind::SetGoal);
+    assert_eq!(original.acts.get(last).unwrap().act, ActKind::Reorder);
     value = original.clone();
     value.members = List::with_capacity(3);
     assert!(!owner_project::fits(&value, &bounds));

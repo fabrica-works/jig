@@ -22,17 +22,22 @@ impl World {
                 reply: people::Reply::SignedIn { sign_in, .. }, ..
             }) => {
                 self.sign_in = Some(sign_in);
-                let ask = match self.scenario {
-                    Scenario::Chat => people::Ask::StartChat { project: 1, words: b"hello".as_slice().into() },
-                    Scenario::Goal | Scenario::Batch => people::Ask::SetGoal {
-                        project: 1,
-                        spec: b"complete procedure".as_slice().into(),
-                        executor: jig_domain_people::GoalExecutor::Charter(1),
-                        budget: 100,
-                        priority: 1,
-                        deadline: None,
-                    },
+                let people::Ask::Create { project, mut batch } =
+                    crate::fixtures::create_chat(&self.creating, 1, 0, b"hello".as_slice().into())
+                else {
+                    unreachable!()
                 };
+                if matches!(self.scenario, Scenario::Goal | Scenario::Batch) {
+                    let member = &mut batch[0];
+                    member.words = b"complete procedure".as_slice().into();
+                    member.flags.conversation = false;
+                    member.flags.listed = true;
+                    member.label = jig_client_test_records::GOAL;
+                    member.tracked = Some(1);
+                    member.budget = people::Budget::Named;
+                    member.authority.spend = 100;
+                }
+                let ask = people::Ask::Create { project, batch };
                 self.events.push_back(root::Event::Core(core::Event::People(people::Event::Ask {
                     reply_to: ReplyTo::new(Token::new(102)),
                     sign_in,
@@ -41,7 +46,7 @@ impl World {
                 })));
             }
             root::Delivery::Core(core::Held::PeopleReply {
-                reply: people::Reply::Outcome(people::Outcome::Started { task }),
+                reply: people::Reply::Outcome(people::Outcome::Created { first: task, .. }),
                 ..
             }) => {
                 self.chat = Some(task);
@@ -49,13 +54,6 @@ impl World {
                     self.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))),
                     "party saw task only after commit"
                 );
-            }
-            root::Delivery::Core(core::Held::PeopleReply {
-                reply: people::Reply::Outcome(people::Outcome::GoalStarted { task }),
-                ..
-            }) => {
-                self.chat = Some(task);
-                assert!(self.store.rows.contains_key(&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))));
             }
             root::Delivery::Assigned { channel, assignment } => {
                 assert_eq!(channel, Token::new(7));

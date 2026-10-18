@@ -135,8 +135,7 @@ record ProposedAmendment { task: u64 revision: u64 amendment: Amendment }
 record ProposedWidening { task: u64 authority: Authority }
 enum ProposalAction { batch: ProposedBatch, effect: ProposedEffect, procedure_effect: ProposedProcedureEffect, amend: boxed ProposedAmendment, widen: ProposedWidening, release: Task }
 record Proposal { number: u64 proposer: u64 project: u32 action: ProposalAction reason: bytes 65536 as_holder: bool state: ProposalState }
-record Priority { priority: u32 }
-enum Change { cancelled, released, amended, prioritised: Priority, moved, proposed, proposal_passed, proposal_accepted, proposal_rejected, proposal_withdrawn }
+enum Change { cancelled, released, amended, moved, proposed, proposal_passed, proposal_accepted, proposal_rejected, proposal_withdrawn }
 record Settings { tracked: option u32 addressed: option PersonAddress taken_by: option u64 instructions: option bytes 65536 spec: Spec wake: WakePolicy dependencies: list 64 Number authority: Authority }
 record AmendmentHistory { before: Settings after: Settings }
 record History { task: u64 revision: u64 by: Party change: Change reason: bytes 65536 proposal: option Proposal at: u64 amendment: option AmendmentHistory }

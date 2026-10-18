@@ -128,7 +128,8 @@ impl Payload for OwnerHelloRefusal {
 impl Payload for OwnerPersonCapacityAction {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Close
+            Self::Create
+            | Self::Compound
             | Self::Application { .. }
             | Self::Note { .. }
             | Self::Service
@@ -136,13 +137,10 @@ impl Payload for OwnerPersonCapacityAction {
             | Self::Roles
             | Self::Policy
             | Self::Pool { .. }
-            | Self::Chat
-            | Self::Goal
             | Self::Escalation { .. }
             | Self::Proposal { .. }
             | Self::Words { .. }
             | Self::Question { .. }
-            | Self::Priority
             | Self::Amend { .. }
             | Self::Move { .. }
             | Self::TakePerson { .. }

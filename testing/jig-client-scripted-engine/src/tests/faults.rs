@@ -1,13 +1,13 @@
 use super::*;
 fn making_script() -> (Script, Ask) {
     let mut setup = live_script();
-    let ask = Ask::StartChat { project: 1, words: text(b"hello") };
+    let ask = fixtures::create(1, text(b"hello"));
     let mut made = task();
     made.chip.title = DocumentText::complete(text(b"made"));
     setup.rules.push(Rule {
         party: Some(1),
         ask: ask.clone(),
-        answer: Answer::Done(Outcome::Made { what: Made::Chat { task: 8 } }),
+        answer: Answer::Done(Outcome::Made { what: Made::Tasks { tasks: list(vec![8]) } }),
         changes: vec![Change::Object { project: 1, key: ObjectKey::Task(8), value: ReadValue::Task(Box::new(made)) }],
     });
     (setup, ask)
@@ -76,7 +76,7 @@ fn scenario_busy_not_ready_loss_sign_out_versions_and_watch_faults() {
             Up::Answer {
                 attempt: Token::new(2),
                 envelope: Envelope::Final,
-                answer: Some(Answer::Done(Outcome::Made { what: Made::Chat { task: 8 } }))
+                answer: Some(Answer::Done(Outcome::Made { what: Made::Tasks { tasks: list(vec![8]) } }))
             },
         ],
         "loss targets one attempt while its joined attempt keeps the same durable final answer"

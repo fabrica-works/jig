@@ -37,7 +37,6 @@ pub(crate) fn owner_history_change_fields(value: &w::OwnerHistoryChange, _limits
         w::OwnerHistoryChange::Cancelled => c::OwnerHistoryChange::Cancelled,
         w::OwnerHistoryChange::Released => c::OwnerHistoryChange::Released,
         w::OwnerHistoryChange::Amended => c::OwnerHistoryChange::Amended,
-        w::OwnerHistoryChange::Prioritised(row) => c::OwnerHistoryChange::Prioritised { priority: row.priority() },
         w::OwnerHistoryChange::Moved => c::OwnerHistoryChange::Moved,
         w::OwnerHistoryChange::Proposed => c::OwnerHistoryChange::Proposed,
         w::OwnerHistoryChange::ProposalPassed => c::OwnerHistoryChange::ProposalPassed,

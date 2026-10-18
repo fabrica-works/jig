@@ -34,10 +34,10 @@ pub fn ceiling_text(n: u32) -> Box<[u8]> {
     words
 }
 
-pub fn start_chat() -> StartChat {
+pub fn message() -> Message {
     let limits = limits();
-    StartChat::new(&limits, StartChatParts { project: 17, words: ceiling_text(limits.start_chat_words) })
-        .expect("bounded chat")
+    Message::new(&limits, MessageParts { project: 17, task: 19, words: ceiling_text(limits.message_words) })
+        .expect("bounded message")
 }
 
 pub fn refused_moved() -> Refused {
@@ -84,14 +84,14 @@ pub fn encoded<T>(value: &T, measure: fn(&T) -> u32, encode: fn(&T, &mut Writer)
     writer.finish()
 }
 
-pub fn start_chat_bytes() -> Box<[u8]> {
-    encoded(&start_chat(), StartChat::measure, StartChat::encode)
+pub fn message_bytes() -> Box<[u8]> {
+    encoded(&message(), Message::measure, Message::encode)
 }
 
 pub fn owned() -> Owned {
     let limits = limits();
     let family = Family::new(&limits, FamilyParts { number: u16::MAX }).expect("whole family number");
-    Owned::new(&limits, OwnedParts { owner: Owner::Family(family), version: u32::MAX, record: start_chat_bytes() })
+    Owned::new(&limits, OwnedParts { owner: Owner::Family(family), version: u32::MAX, record: message_bytes() })
         .expect("whole owner's version")
 }
 

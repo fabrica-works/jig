@@ -31,21 +31,23 @@ mod effects;
 mod escalation;
 pub mod waits;
 pub use effects::{EffectKey, EffectOrigin, EffectPurpose, effect_worst_case};
-mod chats;
+
 mod ended_marks;
 pub mod forget;
 mod funding;
 mod goal_of;
 mod goals;
+pub use goals::CreateStart;
 mod historical;
 mod inbox;
 mod indexes;
 mod memory;
-pub use goals::GoalStart;
+
 pub use memory::{policy_owned_bytes, worst_case};
 mod numbers;
 mod person_task;
 mod policy;
+pub use policy::{authority_to_people, pattern_to_people};
 mod projections;
 pub use projections::{
     MilestoneId, Projection, ProjectionFeed, ProjectionGoal, ProjectionKey, ProjectionMilestone, ProjectionRecord,
@@ -132,14 +134,10 @@ pub struct Config {
 pub struct Settings {
     /// Configured templates, served without affecting decisions.
     pub templates: Box<[Template]>,
-    /// Time a chat has to finish after its whole close decision.
-    pub close_grace: skein_lib::Duration,
     /// Provider number for the application's services.
     pub deployment_provider: u16,
     /// Numbered charters offered by this deployment.
     pub charters: Box<[Charter]>,
-    /// Charter selected for chats.
-    pub chat: u32,
     /// Maximum committed conversation bytes resumed whole.
     pub resume_bytes: u32,
     /// Jig's one-bit authority family for each engine tool.

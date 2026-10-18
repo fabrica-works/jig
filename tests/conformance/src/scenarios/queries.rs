@@ -3,7 +3,6 @@ use super::{World, ask, check};
 use crate::{Neighbours, Store};
 use jig_conformance::{referee::Violation, scenarios::Action};
 use jig_domain_core::{self as core, documents, reads};
-use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use jig_test_domain as root;
 use skein_lib::{ReplyTo, Token};
@@ -41,7 +40,13 @@ pub(super) fn advance(world: &mut World, action: Action, phase: &mut u8) -> Resu
     match action {
         Action::WatchQuery => {
             if *phase < 2 && world.peers.children.is_empty() {
-                ask(world, 110 + *phase, people::Ask::StartChat { project: 1, words: b"query task".as_slice().into() });
+                let request = jig_core_world::fixtures::create_chat(
+                    world.peers.peers.creating.as_ref().expect("fixture creating authority"),
+                    1,
+                    0,
+                    b"query task".as_slice().into(),
+                );
+                ask(world, 110 + *phase, request);
                 *phase += 1;
                 return Ok(true);
             }

@@ -22,7 +22,7 @@ pub fn board(seed: u64) -> World<Test, Scripted> {
     second.priority = Some(1);
     let mut world = conversations::list_world(seed, &[first, second]);
     let mut project = super::project();
-    project.acts = list([Offered { act: ActKind::Prioritise, admission: Admission::Allowed, effect: None }]);
+    project.acts = list([Offered { act: ActKind::Reorder, admission: Admission::Allowed, effect: None }]);
     world
         .front()
         .engine

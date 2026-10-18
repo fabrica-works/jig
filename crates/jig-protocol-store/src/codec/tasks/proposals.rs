@@ -282,14 +282,11 @@ pub fn read_proposal(source: wire::Proposal, limits: &wire::Limits) -> Result<do
 }
 
 /// Translate `Change` to its store value.
-pub fn change(source: &domain::Change, limits: &wire::Limits) -> Result<wire::Change, wire::Problem> {
+pub fn change(source: &domain::Change, _limits: &wire::Limits) -> Result<wire::Change, wire::Problem> {
     Ok(match source {
         domain::Change::Cancelled => wire::Change::Cancelled,
         domain::Change::Released => wire::Change::Released,
         domain::Change::Amended => wire::Change::Amended,
-        domain::Change::Prioritised { priority } => {
-            wire::Change::Prioritised(wire::Priority::new(limits, wire::PriorityParts { priority: *priority })?)
-        }
         domain::Change::Moved => wire::Change::Moved,
         domain::Change::Proposed => wire::Change::Proposed,
         domain::Change::ProposalPassed => wire::Change::ProposalPassed,
@@ -304,10 +301,6 @@ pub fn read_change(source: wire::Change, _limits: &wire::Limits) -> Result<domai
         wire::Change::Cancelled => domain::Change::Cancelled,
         wire::Change::Released => domain::Change::Released,
         wire::Change::Amended => domain::Change::Amended,
-        wire::Change::Prioritised(value) => {
-            let wire::PriorityParts { priority } = value.into_parts();
-            domain::Change::Prioritised { priority }
-        }
         wire::Change::Moved => domain::Change::Moved,
         wire::Change::Proposed => domain::Change::Proposed,
         wire::Change::ProposalPassed => domain::Change::ProposalPassed,

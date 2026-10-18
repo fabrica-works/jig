@@ -39,8 +39,12 @@ const CLIENT: jig_client_domain::Limits = jig_client_domain::Limits {
 pub fn limits() -> Limits {
     Limits::new(CLIENT, 4).expect("valid client limits")
 }
-pub fn start_chat() -> c::Ask {
-    c::Ask::StartChat { project: 7, words: c::Text::new(Box::from(b"hello".as_slice()), 32).expect("fixture text") }
+pub fn message() -> c::Ask {
+    c::Ask::Message {
+        project: 7,
+        task: 8,
+        words: c::Text::new(Box::from(b"hello".as_slice()), 32).expect("fixture text"),
+    }
 }
 pub fn encoded_answer(value: &w::KeyedAnswer) -> Box<[u8]> {
     let mut out = Writer::new(usize::try_from(value.measure()).unwrap());
@@ -57,8 +61,10 @@ pub fn final_answer(value: w::Final) -> Box<[u8]> {
 }
 pub fn answer_done_chat(task: u64) -> Box<[u8]> {
     let lim = limits().wire;
-    let chat = w::MadeChat::new(&lim, w::MadeChatParts { task }).unwrap();
-    let made = w::OutcomeMade::new(&lim, w::OutcomeMadeParts { what: w::Made::Chat(chat) }).unwrap();
+    let mut tasks = skein_lib::List::with_capacity(1);
+    tasks.push(task).unwrap();
+    let made_tasks = w::MadeTasks::new(&lim, w::MadeTasksParts { tasks }).unwrap();
+    let made = w::OutcomeMade::new(&lim, w::OutcomeMadeParts { what: w::Made::Tasks(made_tasks) }).unwrap();
     final_answer(w::Final::Done(w::Done::new(&lim, w::DoneParts { outcome: w::Outcome::Made(made) }).unwrap()))
 }
 pub fn answer_done_service(credential: &[u8]) -> Box<[u8]> {
@@ -117,7 +123,7 @@ impl Harness {
     }
     pub fn sending() -> (Self, Token) {
         let mut h = Self::new(&limits());
-        let exchange = h.send(ATTEMPT, KEY, start_chat());
+        let exchange = h.send(ATTEMPT, KEY, message());
         (h, exchange)
     }
     pub fn answer(&mut self, exchange: Token, bytes: &[u8]) {

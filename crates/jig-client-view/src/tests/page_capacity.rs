@@ -232,7 +232,7 @@ fn task_pages(words: &Words) {
 fn goal_offers(doc: &mut Project) {
     doc.acts = list([Offered {
         effect: None,
-        act: ActKind::SetGoal,
+        act: ActKind::Reorder,
         admission: Admission::Bounded {
             within: Bounds::Create(CreateBounds {
                 authority: Box::new(crate::tests::cards_objects::owner_authority()),

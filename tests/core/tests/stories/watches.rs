@@ -178,18 +178,18 @@ fn inbox_across_projects_stories() {
     );
     let mut proposals = Vec::new();
     for project in [1, 2] {
+        let proposed_goal = jig_core_world::fixtures::goal(
+            &world,
+            project,
+            b"shared goal".as_slice().into(),
+            people::TaskExecutor::Agent { charter: 1 },
+            jig_core_world::fixtures::Goal { budget: 600, ..Default::default() },
+        );
         super::ask_as(
             &mut world,
             if project == 1 { first_sign_in } else { second_sign_in },
             u8::try_from(90 + project).expect("request"),
-            jig_core_world::fixtures::propose_goal(people::Ask::SetGoal {
-                project,
-                spec: b"shared goal".as_slice().into(),
-                executor: jig_domain_people::GoalExecutor::Charter(1),
-                budget: 600,
-                priority: 0,
-                deadline: None,
-            }),
+            jig_core_world::fixtures::propose_goal(proposed_goal),
         );
         let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) = world.people_answers.last()
         else {

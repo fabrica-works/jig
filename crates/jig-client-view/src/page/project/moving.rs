@@ -10,7 +10,7 @@ pub(crate) fn admission(domain: &Ui) -> Admission {
         (_, Some(project)) => &project.acts,
         _ => return Admission::Refused(c::Refusal::NotOffered),
     };
-    jig_client::facts::offer(rows.as_slice(), ActKind::Prioritise)
+    jig_client::facts::offer(rows.as_slice(), ActKind::Reorder)
         .cloned()
         .unwrap_or(Admission::Refused(c::Refusal::NotOffered))
 }
@@ -31,7 +31,7 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, task: u64, up: boo
         return;
     }
     let Some(id) = domain.objects.find(ObjectKey::Task(task)) else { return };
-    crate::confirm::open(domain, env, id, ActKind::Prioritise, lent);
+    crate::confirm::open(domain, env, id, ActKind::Reorder, lent);
     crate::confirm::priority(domain, target);
     crate::confirm::sync(domain, lent);
 }

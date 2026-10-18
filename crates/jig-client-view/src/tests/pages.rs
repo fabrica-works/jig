@@ -280,7 +280,7 @@ fn conversations_form(words: &crate::words::Words) {
     }
     assert_eq!(
         crate::decode(&mut bindings, named_binding(&tree, b"Start a conversation"), skein_ui::Act::Press),
-        Some(crate::action::Act::StartChat { project: 4 })
+        Some(crate::action::Act::BeginConversation { project: 4 })
     );
     let edit = crate::decode(
         &mut bindings,
@@ -289,7 +289,7 @@ fn conversations_form(words: &crate::words::Words) {
     )
     .unwrap();
     drive(&mut d, Event::Act { action: edit });
-    let out = drive(&mut d, Event::Act { action: crate::action::Act::StartChat { project: 4 } });
+    let out = drive(&mut d, Event::Act { action: crate::action::Act::BeginConversation { project: 4 } });
     let request = out
         .iter()
         .find_map(|r| match r {

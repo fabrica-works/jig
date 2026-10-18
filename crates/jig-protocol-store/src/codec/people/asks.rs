@@ -1,8 +1,8 @@
 //! Asks values retained by people (protocol/store.md, 5.1).
 use super::{
-    Box, List, Wall, count, decode_amendment, decode_holdings, decode_numbers, decode_pattern, decode_policy_change,
-    decode_role, decode_segments, domain, encode_amendment, encode_holdings, encode_numbers, encode_pattern,
-    encode_policy_change, encode_role, encode_segments, wire,
+    Box, decode_amendment, decode_holdings, decode_numbers, decode_pattern, decode_policy_change, decode_role,
+    decode_segments, domain, encode_amendment, encode_holdings, encode_numbers, encode_pattern, encode_policy_change,
+    encode_role, encode_segments, wire,
 };
 pub(super) fn encode_seen(value: &domain::Seen, limits: &wire::Limits) -> Result<wire::Seen, wire::Problem> {
     Ok(match value {
@@ -35,7 +35,7 @@ pub(super) fn encode_note_scope(
         domain::NoteScope::Deployment => wire::NoteScope::Deployment,
         domain::NoteScope::Project => wire::NoteScope::Project,
         domain::NoteScope::Goal { goal } => {
-            wire::NoteScope::Goal(wire::NoteScopeGoal::new(limits, wire::NoteScopeGoalParts { goal: *goal })?)
+            wire::NoteScope::Task(wire::NoteScopeTask::new(limits, wire::NoteScopeTaskParts { task: *goal })?)
         }
         domain::NoteScope::Resources { connector, pattern } => {
             wire::NoteScope::Resources(wire::NoteScopeResources::new(
@@ -52,9 +52,9 @@ pub(super) fn decode_note_scope(
     Ok(match value {
         wire::NoteScope::Deployment => domain::NoteScope::Deployment,
         wire::NoteScope::Project => domain::NoteScope::Project,
-        wire::NoteScope::Goal(value) => {
-            let wire::NoteScopeGoalParts { goal } = value.into_parts();
-            domain::NoteScope::Goal { goal }
+        wire::NoteScope::Task(value) => {
+            let wire::NoteScopeTaskParts { task } = value.into_parts();
+            domain::NoteScope::Goal { goal: task }
         }
         wire::NoteScope::Resources(value) => {
             let wire::NoteScopeResourcesParts { connector, pattern } = value.into_parts();
@@ -168,58 +168,6 @@ pub(super) fn decode_adoption(value: wire::Adoption, limits: &wire::Limits) -> R
         role: decode_resource_role(role),
         options: decode_segments(options, limits, limits.parameter_bytes_value)?,
     })
-}
-
-pub(super) fn encode_disposal(
-    value: &domain::Disposal,
-    limits: &wire::Limits,
-) -> Result<wire::Disposal, wire::Problem> {
-    let domain::Disposal { task, keep } = value;
-    wire::Disposal::new(limits, wire::DisposalParts { task: *task, keep: encode_keep(*keep, limits) })
-}
-pub(super) fn decode_disposal(value: wire::Disposal) -> domain::Disposal {
-    let wire::DisposalParts { task, keep } = value.into_parts();
-    domain::Disposal { task, keep: decode_keep(keep) }
-}
-
-pub(super) fn encode_keep(value: domain::Keep, _limits: &wire::Limits) -> wire::Keep {
-    match value {
-        domain::Keep::Cancel => wire::Keep::Cancel,
-        domain::Keep::MakeMine => wire::Keep::MakeMine,
-    }
-}
-pub(super) fn decode_keep(value: wire::Keep) -> domain::Keep {
-    match value {
-        wire::Keep::Cancel => domain::Keep::Cancel,
-        wire::Keep::MakeMine => domain::Keep::MakeMine,
-    }
-}
-
-pub(super) fn encode_goal_executor(
-    value: domain::GoalExecutor,
-    limits: &wire::Limits,
-) -> Result<wire::GoalExecutor, wire::Problem> {
-    Ok(match value {
-        domain::GoalExecutor::Charter(value) => wire::GoalExecutor::Charter(wire::GoalExecutorCharter::new(
-            limits,
-            wire::GoalExecutorCharterParts { value },
-        )?),
-        domain::GoalExecutor::Procedure { connector, code } => wire::GoalExecutor::Procedure(
-            wire::GoalExecutorProcedure::new(limits, wire::GoalExecutorProcedureParts { connector, code })?,
-        ),
-    })
-}
-pub(super) fn decode_goal_executor(value: wire::GoalExecutor) -> domain::GoalExecutor {
-    match value {
-        wire::GoalExecutor::Charter(value) => {
-            let wire::GoalExecutorCharterParts { value } = value.into_parts();
-            domain::GoalExecutor::Charter(value)
-        }
-        wire::GoalExecutor::Procedure(value) => {
-            let wire::GoalExecutorProcedureParts { connector, code } = value.into_parts();
-            domain::GoalExecutor::Procedure { connector, code }
-        }
-    }
 }
 
 pub(super) fn encode_person_result(
@@ -381,14 +329,6 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
             limits,
             wire::AskCreateParts { project: *project, batch: super::batch::encode(batch, limits)? },
         )?),
-        domain::Ask::Close { project, chat, disposals } => wire::Ask::Close(wire::AskClose::new(
-            limits,
-            wire::AskCloseParts {
-                project: *project,
-                chat: *chat,
-                disposals: encode_ask_close_disposals(disposals, limits)?,
-            },
-        )?),
         domain::Ask::MarkSeen { seen } => wire::Ask::MarkSeen(wire::AskMarkSeen::new(
             limits,
             wire::AskMarkSeenParts { seen: encode_seen(seen, limits)? },
@@ -418,22 +358,6 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
             limits,
             wire::AskAdoptParts { project: *project, adoption: encode_adoption(adoption, limits)? },
         )?),
-        domain::Ask::SetGoal { project, spec, executor, budget, priority, deadline } => {
-            wire::Ask::SetGoal(wire::AskSetGoal::new(
-                limits,
-                wire::AskSetGoalParts {
-                    project: *project,
-                    spec: spec.clone(),
-                    executor: encode_goal_executor(*executor, limits)?,
-                    budget: *budget,
-                    priority: *priority,
-                    deadline: match deadline {
-                        Some(value) => Some(value.as_nanos()),
-                        None => None,
-                    },
-                },
-            )?)
-        }
         domain::Ask::Stop { project, task } => {
             wire::Ask::Stop(wire::AskStop::new(limits, wire::AskStopParts { project: *project, task: *task })?)
         }
@@ -502,10 +426,6 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
                 },
             )?)
         }
-        domain::Ask::Prioritise { project, goals } => wire::Ask::Prioritise(wire::AskPrioritise::new(
-            limits,
-            wire::AskPrioritiseParts { project: *project, goals: encode_ask_prioritise_goals(goals, limits)? },
-        )?),
         domain::Ask::Amend { project, task, revision, amendment, release } => {
             wire::Ask::Amend(Box::new(wire::AskAmend::new(
                 limits,
@@ -541,10 +461,6 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
                 },
             )?)
         }
-        domain::Ask::StartChat { project, words } => wire::Ask::StartChat(wire::AskStartChat::new(
-            limits,
-            wire::AskStartChatParts { project: *project, words: words.clone() },
-        )?),
     })
 }
 #[expect(clippy::too_many_lines, reason = "one exhaustive arm translates each kind of keyed request")]
@@ -576,10 +492,6 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
             let wire::AskCreateParts { project, batch } = value.into_parts();
             domain::Ask::Create { project, batch: super::batch::decode(batch, limits)? }
         }
-        wire::Ask::Close(value) => {
-            let wire::AskCloseParts { project, chat, disposals } = value.into_parts();
-            domain::Ask::Close { project, chat, disposals: decode_ask_close_disposals(disposals) }
-        }
         wire::Ask::MarkSeen(value) => {
             let wire::AskMarkSeenParts { seen } = value.into_parts();
             domain::Ask::MarkSeen { seen: decode_seen(seen) }
@@ -604,20 +516,6 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
         wire::Ask::Adopt(value) => {
             let wire::AskAdoptParts { project, adoption } = value.into_parts();
             domain::Ask::Adopt { project, adoption: decode_adoption(adoption, limits)? }
-        }
-        wire::Ask::SetGoal(value) => {
-            let wire::AskSetGoalParts { project, spec, executor, budget, priority, deadline } = value.into_parts();
-            domain::Ask::SetGoal {
-                project,
-                spec,
-                executor: decode_goal_executor(executor),
-                budget,
-                priority,
-                deadline: match deadline {
-                    Some(value) => Some(Wall::from_nanos(value)),
-                    None => None,
-                },
-            }
         }
         wire::Ask::Stop(value) => {
             let wire::AskStopParts { project, task } = value.into_parts();
@@ -672,10 +570,6 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
             let wire::AskAnswerQuestionParts { project, task, question, words } = value.into_parts();
             domain::Ask::AnswerQuestion { project, task, question, words }
         }
-        wire::Ask::Prioritise(value) => {
-            let wire::AskPrioritiseParts { project, goals } = value.into_parts();
-            domain::Ask::Prioritise { project, goals: decode_ask_prioritise_goals(goals) }
-        }
         wire::Ask::Amend(value) => {
             let wire::AskAmendParts { project, task, revision, amendment, release } = (*value).into_parts();
             domain::Ask::Amend { project, task, revision, amendment: decode_amendment(amendment, limits)?, release }
@@ -696,54 +590,7 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
             let wire::AskDecideEscalationParts { project, task, revision, decision } = value.into_parts();
             domain::Ask::DecideEscalation { project, task, revision, decision: decode_escalation_decision(decision) }
         }
-        wire::Ask::StartChat(value) => {
-            let wire::AskStartChatParts { project, words } = value.into_parts();
-            domain::Ask::StartChat { project, words }
-        }
     })
-}
-
-fn encode_ask_close_disposals(
-    values: &List<domain::Disposal>,
-    limits: &wire::Limits,
-) -> Result<List<wire::Disposal>, wire::Problem> {
-    let mut result = List::with_capacity(values.len());
-    for value in values {
-        result.push(encode_disposal(value, limits)?).expect("same number of members");
-    }
-    Ok(result)
-}
-fn decode_ask_close_disposals(values: List<wire::Disposal>) -> List<domain::Disposal> {
-    let mut result = List::with_capacity(values.len());
-    for value in values.into_boxed() {
-        result.push(decode_disposal(value)).expect("same number of members");
-    }
-    result
-}
-
-fn encode_ask_prioritise_goals(
-    values: &[(u64, u32)],
-    limits: &wire::Limits,
-) -> Result<List<wire::Priority>, wire::Problem> {
-    let mut result = List::with_capacity(count(values.len())?);
-    for value in values {
-        result
-            .push(wire::Priority::new(limits, wire::PriorityParts { task: value.0, priority: value.1 })?)
-            .expect("same number of members");
-    }
-    Ok(result)
-}
-fn decode_ask_prioritise_goals(values: List<wire::Priority>) -> Box<[(u64, u32)]> {
-    let mut result = List::with_capacity(values.len());
-    for value in values.into_boxed() {
-        result
-            .push({
-                let wire::PriorityParts { task, priority } = value.into_parts();
-                (task, priority)
-            })
-            .expect("same number of members");
-    }
-    result.into_boxed()
 }
 
 fn encode_application_scope(

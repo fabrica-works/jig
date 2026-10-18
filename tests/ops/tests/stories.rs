@@ -126,7 +126,7 @@ fn result_world() -> jig_conformance::Harness<jig_ops_world::conformance::Ops> {
         reply_to: ReplyTo::new(Token::new(177)),
         sign_in: world.peers.sign_in.expect("signed in"),
         key: [177; 16],
-        ask: people::Ask::StartChat { project: 1, words: b"a result reading story".as_slice().into() },
+        ask: jig_ops_world::conformance::chat(b"a result reading story"),
     })));
     for _ in 0..128 {
         world.iterate().expect("scripted chat starts");

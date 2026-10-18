@@ -354,7 +354,7 @@ impl<A: crate::Application> Engine<A> {
                     NoteScope::Project(project) | NoteScope::Resource { project, .. } => {
                         self.truth.visible(party, *project)
                     }
-                    NoteScope::Goal { project, .. } => self.truth.visible(party, *project),
+                    NoteScope::Task { project, .. } => self.truth.visible(party, *project),
                 };
             }
             Read::Tasks { query, .. } => {

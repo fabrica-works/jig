@@ -89,6 +89,9 @@ fn script() -> Script {
     let mut truth = Truth::default();
     truth.frames.insert(1, frame(1));
     truth.frames.insert(2, frame(2));
+    for frame in truth.frames.values_mut() {
+        fixtures::creating(frame);
+    }
     truth.sign_ins.insert(11, 1);
     truth.sign_ins.insert(12, 1);
     truth.sign_ins.insert(22, 2);
@@ -300,7 +303,7 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
         }
     );
     let mut setup = script();
-    let ask = Ask::StartChat { project: 1, words: text(b"hello") };
+    let ask = Ask::MakeService { project: 1, name: text(b"service"), role: HeldRole::Owner };
     setup.rules.push(Rule {
         party: None,
         ask: ask.clone(),
@@ -326,10 +329,8 @@ fn revision_refusals_scripts_retention_and_whole_payload_admission() {
     setup.truth.frames.get_mut(&1).expect("frame").projects = List::with_capacity(33);
     assert_eq!(Engine::new(setup, 1).err(), Some(Invalid::Payload), "unused list capacity is part of a whole payload");
     let mut engine = Engine::new(script(), 1).expect("valid script");
-    let ask = Ask::StartChat {
-        project: 1,
-        words: Text::new(vec![0; 4097].into_boxed_slice(), 5000).expect("larger producer permits text"),
-    };
+    let ask =
+        fixtures::create(1, Text::new(vec![0; 4097].into_boxed_slice(), 5000).expect("larger producer permits text"));
     assert_eq!(engine.send(Time::ZERO, Wall::EPOCH, 11, [1; 16], Token::new(1), ask), Err(Invalid::Payload));
     assert!(engine.commits().is_empty());
 }
@@ -661,48 +662,16 @@ fn scenario_run_offsets_cut_names_and_activity() {
     assert!(!engine.runs.contains_key(&8), "durable matching activity replaces the provisional turn");
 }
 fn page_reply(position: u64) -> InboxEntry {
-    let line = TaskLine {
-        chip: {
-            let mut chip = task().chip;
-            chip.title = DocumentText::complete(text(&[b'x'; 1100]));
-            chip
-        },
-        project: 1,
-        requester: jig_client_domain::contract::OwnerRequester::Person(1),
-        tracked: None,
-        label: 1,
-        flags: jig_client_domain::contract::TaskFlags {
-            conversation: true,
-            listed: false,
-            retention: jig_client_domain::contract::Retention::ForgottenOnceRead,
-        },
-        changed: Wall::EPOCH,
-        last_activity: Wall::EPOCH,
-        ended_at: None,
-        budget: OwnerBudget {
-            numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
-            left: 100,
-            funder: Funder::Period { project: 1, period: 3 },
-            deadline: None,
-        },
-        waits_on: jig_client_domain::contract::WaitsOn::Nothing,
-        phases: jig_client_domain::contract::OwnerPhaseCounts {
-            waiting: 0,
-            idle: 0,
-            starting: 0,
-            running: 0,
-            backing_off: 0,
-            closing: 0,
-            held: 0,
-            done: 0,
-            failed: 0,
-            cancelled: 0,
-        },
-        held_below: 0,
-        conversation: Some(jig_client_domain::contract::ConversationRead {
-            seen: 0,
-            unread: Count { value: 1, limited: false },
-        }),
+    let line = {
+        let mut value = task();
+        value.chip.title = DocumentText::complete(text(&[b'x'; 1100]));
+        value.label = 1;
+        value.flags = TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead };
+        crate::queries::line(
+            &value,
+            core::iter::empty(),
+            Some(ConversationRead { seen: 0, unread: Count { value: 1, limited: false } }),
+        )
     };
     InboxEntry {
         reply: Some(Box::new(line)),
@@ -845,48 +814,16 @@ fn scenario_all_read_shapes_and_reverse_activity() {
 }
 fn scenario_reply_identity() {
     let mut setup = live_script();
-    let line = TaskLine {
-        chip: {
-            let mut chip = task().chip;
-            chip.title = DocumentText::complete(text(b"whole reply"));
-            chip
-        },
-        project: 1,
-        requester: jig_client_domain::contract::OwnerRequester::Person(1),
-        tracked: None,
-        label: 1,
-        flags: jig_client_domain::contract::TaskFlags {
-            conversation: true,
-            listed: false,
-            retention: jig_client_domain::contract::Retention::ForgottenOnceRead,
-        },
-        changed: Wall::EPOCH,
-        last_activity: Wall::EPOCH,
-        ended_at: None,
-        budget: OwnerBudget {
-            numbers: OwnerNumbers { budget: 100, spent: 0, spent_below: 0, reserved: 0 },
-            left: 100,
-            funder: Funder::Period { project: 1, period: 3 },
-            deadline: None,
-        },
-        waits_on: jig_client_domain::contract::WaitsOn::Nothing,
-        phases: jig_client_domain::contract::OwnerPhaseCounts {
-            waiting: 0,
-            idle: 0,
-            starting: 0,
-            running: 0,
-            backing_off: 0,
-            closing: 0,
-            held: 0,
-            done: 0,
-            failed: 0,
-            cancelled: 0,
-        },
-        held_below: 0,
-        conversation: Some(jig_client_domain::contract::ConversationRead {
-            seen: 0,
-            unread: Count { value: 1, limited: false },
-        }),
+    let line = {
+        let mut value = task();
+        value.chip.title = DocumentText::complete(text(b"whole reply"));
+        value.label = 1;
+        value.flags = TaskFlags { conversation: true, listed: false, retention: Retention::ForgottenOnceRead };
+        crate::queries::line(
+            &value,
+            core::iter::empty(),
+            Some(ConversationRead { seen: 0, unread: Count { value: 1, limited: false } }),
+        )
     };
     let entry = InboxEntry {
         reply: Some(Box::new(line)),
@@ -1549,7 +1486,7 @@ fn inbox_group_cursors_keep_exact_filters_and_whole_query_order() {
 
 #[test]
 fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
-    let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    let exact = OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
     let offer = Admission::Bounded {
         within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
             authority: Box::new(owner_authority()),
@@ -1597,45 +1534,30 @@ fn procedure_goal_bounds_price_allocated_pairs_and_judge_the_exact_executor() {
             Answer::Done(Outcome::Proposed { proposal: ProposalKey { proposer: Proposer::Task(1), number: 2 } }),
         ),
         (
-            GoalExecutor::Procedure { connector: 6, code: u32::MAX },
+            OwnerExecutor::Procedure { connector: 6, code: u32::MAX },
             3,
             Answer::Refused { refusal: Refusal::NotOffered, at: None },
         ),
         (
-            GoalExecutor::Procedure { connector: u16::MAX, code: 7 },
+            OwnerExecutor::Procedure { connector: u16::MAX, code: 7 },
             3,
             Answer::Refused { refusal: Refusal::NotOffered, at: None },
         ),
-        (GoalExecutor::Charter(1), 3, Answer::Refused { refusal: Refusal::NotOffered, at: None }),
+        (OwnerExecutor::Agent { charter: 1 }, 3, Answer::Refused { refusal: Refusal::NotOffered, at: None }),
         (exact, 11, Answer::Refused { refusal: Refusal::NotOffered, at: None }),
     ] {
         let mut setup = live_script();
-        // A project-scoped ask reads only its actual project's offered facts.
-        let project = Project {
-            number: 1,
-            period: 1,
-            name: text(b"project"),
-            spend: Budget { total: 100, own: 0, ended: 0, reserved: 0, left: 100, funder: Actor::Deployment },
-            policy: Policy {
-                ceiling: authority(),
-                period: 1,
-                spend: 0,
-                roles: list(vec![]),
-                requirements: list(vec![]),
-                deciders: list(vec![]),
-            },
-            roles: list(vec![]),
-            pools: list(vec![]),
-            resources: list(vec![]),
-            services: list(vec![]),
-            recurring: list(vec![]),
-            parts: list(vec![]),
-            spend_lines: list(vec![]),
-            acts: list(vec![Offered { effect: None, act: ActKind::SetGoal, admission: offer.clone() }]),
+        let Admission::Bounded { within: jig_client_domain::contract::Bounds::Create(within), beyond } = &offer else {
+            panic!("creating offer")
         };
-        setup.truth.projects.insert(1, project);
-        let ask =
-            Ask::SetGoal { project: 1, spec: text(b"exact procedure"), executor, budget, priority: 8, deadline: None };
+        setup.truth.frames.get_mut(&1).unwrap().projects.get_mut(0).unwrap().creating =
+            Some(Creating { within: within.clone(), beyond: beyond.clone() });
+        let mut member = fixtures::new_task(text(b"exact procedure"));
+        member.executor = executor;
+        member.authority.spend = budget;
+        member.tracked = Some(8);
+        member.flags.conversation = false;
+        let ask = Ask::Create { project: 1, tasks: list(vec![member]) };
         setup.rules.push(Rule { party: Some(1), ask: ask.clone(), answer: answer.clone(), changes: vec![] });
         let mut engine = Engine::new(setup, 1).unwrap();
         send(&mut engine, 0, 11, 1, 1, ask.clone());

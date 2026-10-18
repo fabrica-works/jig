@@ -8,14 +8,6 @@ fn each_again_reads_back() {
         people_round_trip(values::answered(domain::Outcome::Again(value)));
     }
 }
-fn each_disposal_issue_reads_back() {
-    for value in values::disposal_issue_values() {
-        people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Disposal {
-            task: 3,
-            issue: value,
-        })));
-    }
-}
 fn each_failure_class_reads_back() {
     for value in values::failure_class_values() {
         people_round_trip(values::answered(domain::Outcome::Refused(domain::Refusal::Moved {
@@ -118,7 +110,6 @@ fn an_authority_refusal_prevents_a_proposal_reads_back() {
 fn people_outcomes_read_back_as_written() {
     table([
         ("each_again_reads_back", each_again_reads_back),
-        ("each_disposal_issue_reads_back", each_disposal_issue_reads_back),
         ("each_failure_class_reads_back", each_failure_class_reads_back),
         ("each_hold_reason_reads_back", each_hold_reason_reads_back),
         ("each_moved_reads_back", each_moved_reads_back),

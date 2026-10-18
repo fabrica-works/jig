@@ -126,7 +126,7 @@ pub(super) fn note(value: &d::Note, limits: &w::Limits) -> Result<w::Note, w::Pr
             w::NoteScope::Project(w::NoteScopeProject::new(limits, w::NoteScopeProjectParts { value: *value })?)
         }
         d::NoteLocation::Goal { project, task } => {
-            w::NoteScope::Goal(w::NoteScopeGoal::new(limits, w::NoteScopeGoalParts { project: *project, goal: *task })?)
+            w::NoteScope::Task(w::NoteScopeTask::new(limits, w::NoteScopeTaskParts { project: *project, task: *task })?)
         }
         d::NoteLocation::Resources { project, scope } => w::NoteScope::Resource(w::NoteScopeResource::new(
             limits,

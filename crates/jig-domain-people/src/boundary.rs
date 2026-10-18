@@ -94,7 +94,7 @@ pub enum Role {
     Maintainer,
     /// Member membership; may start chats here within the root's policy and funding check.
     Member,
-    /// Observer membership; `StartChat` is refused and its keyed role outcome is saved.
+    /// Observer membership; creation is refused and its keyed role outcome is saved.
     Observer,
     /// A role numbered by this project's policy, beyond the four defaults.
     Policy { role: u32 },
@@ -206,19 +206,6 @@ pub enum NoteChange {
     Delete { recalled: u32 },
 }
 
-/// One direct live delegate's requested disposal (domain/people.md, section 7).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Disposal {
-    pub task: u64,
-    pub keep: Keep,
-}
-/// Whether a closing chat's delegate is cancelled or made the party's.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum Keep {
-    Cancel,
-    MakeMine,
-}
-
 /// Authenticated keyed requests admitted by the people child and routed by
 /// the root after role checks (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -227,8 +214,6 @@ pub enum Ask {
     Compound { project: u32, operations: List<crate::Operation> },
     /// Make these roots together (domain/people.md, 5.1).
     Create { project: u32, batch: Box<[crate::Member]> },
-    /// Dispose of every live delegate and ask this chat to finish within its configured grace.
-    Close { project: u32, chat: u64, disposals: List<Disposal> },
     /// Mark results or one chat's replies seen under this party's key.
     MarkSeen { seen: Seen },
     /// Application-owned request metadata; the root carries the value, and the protocol supplies its digest.
@@ -243,15 +228,6 @@ pub enum Ask {
     Propose { project: u32, action: crate::Action, reason: Box<[u8]> },
     /// Withdraw this party's own pending proposal.
     Withdraw { project: u32, proposal: u64 },
-    /// Start a tracked goal at the requested charter or procedure, budget and priority.
-    SetGoal {
-        project: u32,
-        spec: Box<[u8]>,
-        executor: GoalExecutor,
-        budget: u64,
-        priority: u32,
-        deadline: Option<Wall>,
-    },
     /// Hold a live run for this person's decision, cancelling its current claim.
     Stop { project: u32, task: u64 },
     /// Cancel a task and its descendants with a bounded reason, at once or after a grace.
@@ -272,8 +248,6 @@ pub enum Ask {
     Say { project: u32, task: u64, words: Box<[u8]> },
     /// Answer a numbered question waiting in a task requested by this person.
     AnswerQuestion { project: u32, task: u64, question: u64, words: Box<[u8]> },
-    /// Set the priorities of a bounded set of current project goals together.
-    Prioritise { project: u32, goals: Box<[(u64, u32)]> },
     /// Amend a live task this person may steer, after root policy and funding checks.
     /// A priority-only edit of a tracked task names spec revision zero.
     Amend { project: u32, task: u64, revision: u64, amendment: crate::Amendment, release: Option<u64> },
@@ -302,20 +276,6 @@ pub enum Ask {
         /// One bounded semantic choice; root authorizes before mutation.
         decision: EscalationDecision,
     },
-    /// Request a chat task; admitted member-or-higher asks route once per key to the root.
-    StartChat {
-        /** Project in which the root should create the chat task. */
-        project: u32,
-        /** Opening words, bounded by `Limits::words` before any route or saved answer. */
-        words: Box<[u8]>,
-    },
-}
-
-/// Executors a person may request for a tracked goal (domain/people.md, section 5.1).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum GoalExecutor {
-    Charter(u32),
-    Procedure { connector: u16, code: u32 },
 }
 
 /// A person's answer to a report, choice or failure contract; root translates it for tasks.
@@ -401,8 +361,6 @@ pub enum Outcome {
     CompoundRefused { at: u32, why: Refusal },
     /// The batch was made in order.
     Created { first: u64, last: u64, given: Option<crate::Given> },
-    /// The whole chat-close decision was kept.
-    Closing { chat: u64, cancelled: u32, kept: u32 },
     /// The named read position was accepted; it never moves backwards.
     MarkedSeen { seen: Seen },
     /// Connector-owned durable outcome named by token; the root asks its owner for the value.
@@ -417,8 +375,6 @@ pub enum Outcome {
     ServiceMade { person: u64 },
     /// Resource adoption and its connector-known party seed committed together.
     Adopted { project: u32 },
-    /// One tracked goal was durably created within the caller's allotment.
-    GoalStarted { task: u64 },
     /// An explicit proposal awaits the named policy role.
     Proposed { proposal: u64, to: u32 },
     /// This party withdrew its pending proposal.
@@ -443,8 +399,6 @@ pub enum Outcome {
     Said { task: u64, message: u64 },
     /// A named question was answered with a durable message.
     QuestionAnswered { task: u64, question: u64, message: u64 },
-    /// All named goal priorities were durably changed together.
-    Prioritised { project: u32 },
     /// The named task accepted this person's amendment.
     Amended { task: u64, released: bool },
     /// Root accepted one roster and all affected `Waiting` recipients atomically; saved keyed
@@ -467,11 +421,6 @@ pub enum Outcome {
         by: u64,
         at: Wall,
         choice: EscalationChoice,
-    },
-    /// Root created the chat task; save the keyed answer with the task in one decision.
-    Started {
-        /** Chat task number returned by the root; the parent withholds the reply until durability and people holds no task state. */
-        task: u64,
     },
     /// Final refusal, retained under the request key.
     Refused(/** Final refusal facts, retained under the request key. */ Refusal),

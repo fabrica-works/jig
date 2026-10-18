@@ -46,6 +46,7 @@ pub(crate) fn task_hold_fields(value: &w::TaskHold, limits: &Limits) -> Result<c
 
 pub(crate) fn act_kind_fields(value: &w::ActKind, _limits: &Limits) -> c::ActKind {
     match value {
+        w::ActKind::Reorder => c::ActKind::Reorder,
         w::ActKind::Message => c::ActKind::Message,
         w::ActKind::Answer => c::ActKind::Answer,
         w::ActKind::Take => c::ActKind::Take,
@@ -59,10 +60,7 @@ pub(crate) fn act_kind_fields(value: &w::ActKind, _limits: &Limits) -> c::ActKin
         w::ActKind::Amend => c::ActKind::Amend,
         w::ActKind::Stop => c::ActKind::Stop,
         w::ActKind::Cancel => c::ActKind::Cancel,
-        w::ActKind::Close => c::ActKind::Close,
         w::ActKind::MoveTask => c::ActKind::Move,
-        w::ActKind::SetGoal => c::ActKind::SetGoal,
-        w::ActKind::Prioritise => c::ActKind::Prioritise,
         w::ActKind::Seen => c::ActKind::Seen,
         w::ActKind::EditNote => c::ActKind::EditNote,
         w::ActKind::DeleteNote => c::ActKind::DeleteNote,

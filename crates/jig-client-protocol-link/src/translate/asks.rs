@@ -370,33 +370,6 @@ pub(crate) fn wire_amendment(value: &c::Amendment, limits: &w::Limits) -> Result
     )
 }
 
-pub(crate) fn wire_disposal(value: &c::Disposal, limits: &w::Limits) -> Result<w::Disposal, w::Problem> {
-    Ok(match value {
-        c::Disposal::Cancel { task } => {
-            w::Disposal::Cancel(w::DisposalCancel::new(limits, w::DisposalCancelParts { task: *task })?)
-        }
-        c::Disposal::TakeOver { task } => {
-            w::Disposal::TakeOver(w::DisposalTakeOver::new(limits, w::DisposalTakeOverParts { task: *task })?)
-        }
-    })
-}
-
-pub(crate) fn wire_goal_executor(value: c::GoalExecutor, limits: &w::Limits) -> Result<w::GoalExecutor, w::Problem> {
-    Ok(match value {
-        c::GoalExecutor::Charter(value) => {
-            w::GoalExecutor::Charter(w::GoalExecutorCharter::new(limits, w::GoalExecutorCharterParts { value })?)
-        }
-        c::GoalExecutor::Procedure { connector, code } => w::GoalExecutor::Procedure(w::GoalExecutorProcedure::new(
-            limits,
-            w::GoalExecutorProcedureParts { connector, code },
-        )?),
-    })
-}
-
-pub(crate) fn wire_priority(value: &c::Priority, limits: &w::Limits) -> Result<w::Priority, w::Problem> {
-    w::Priority::new(limits, w::PriorityParts { task: value.task, priority: value.priority })
-}
-
 pub(crate) fn wire_seen(value: &c::SeenThrough, limits: &w::Limits) -> Result<w::SeenThrough, w::Problem> {
     Ok(match value {
         c::SeenThrough::Results { through } => {
@@ -423,8 +396,8 @@ pub(crate) fn wire_note_scope(value: &c::NoteScope, limits: &w::Limits) -> Resul
                 pattern: wire_owner_pattern(pattern, limits)?,
             },
         )?),
-        c::NoteScope::Goal { project, goal } => {
-            w::NoteScope::Goal(w::NoteScopeGoal::new(limits, w::NoteScopeGoalParts { project: *project, goal: *goal })?)
+        c::NoteScope::Task { project, task: goal } => {
+            w::NoteScope::Task(w::NoteScopeTask::new(limits, w::NoteScopeTaskParts { project: *project, task: *goal })?)
         }
     })
 }
@@ -585,10 +558,6 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
         }
         c::Ask::Create { project, tasks } => super::operations::create(*project, tasks, limits)?,
         c::Ask::Compound { project, operations } => super::compound::encode(*project, operations, limits)?,
-        c::Ask::StartChat { project, words } => w::Ask::StartChat(w::StartChat::new(
-            limits,
-            w::StartChatParts { project: *project, words: bytes::copy_of(words.bytes()) },
-        )?),
         c::Ask::Message { project, task, words } => w::Ask::Message(w::Message::new(
             limits,
             w::MessageParts { project: *project, task: *task, words: bytes::copy_of(words.bytes()) },
@@ -642,41 +611,10 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
             limits,
             w::CancelParts { project: *project, task: *task, reason: bytes::copy_of(reason.bytes()), grace: *grace },
         )?),
-        c::Ask::Close { project, chat, disposals } => {
-            let mut list0 = List::with_capacity((disposals).len());
-            for item in disposals {
-                list0.push(wire_disposal(item, limits)?).expect("reserved supplied list");
-            }
-            w::Ask::Close(w::Close::new(limits, w::CloseParts { project: *project, chat: *chat, disposals: list0 })?)
-        }
         c::Ask::Move { project, task, reason } => w::Ask::MoveTask(w::Move::new(
             limits,
             w::MoveParts { project: *project, task: *task, reason: bytes::copy_of(reason.bytes()) },
         )?),
-        c::Ask::SetGoal { project, spec, executor, budget, priority, deadline } => {
-            let opt0 = match deadline {
-                Some(item) => Some(item.as_nanos()),
-                None => None,
-            };
-            w::Ask::SetGoal(w::SetGoal::new(
-                limits,
-                w::SetGoalParts {
-                    project: *project,
-                    spec: bytes::copy_of(spec.bytes()),
-                    executor: wire_goal_executor(*executor, limits)?,
-                    budget: *budget,
-                    priority: *priority,
-                    deadline: opt0,
-                },
-            )?)
-        }
-        c::Ask::Prioritise { project, goals } => {
-            let mut list0 = List::with_capacity((goals).len());
-            for item in goals {
-                list0.push(wire_priority(item, limits)?).expect("reserved supplied list");
-            }
-            w::Ask::Prioritise(w::Prioritise::new(limits, w::PrioritiseParts { project: *project, goals: list0 })?)
-        }
         c::Ask::Seen { through } => {
             w::Ask::Seen(w::Seen::new(limits, w::SeenParts { through: wire_seen(through, limits)? })?)
         }

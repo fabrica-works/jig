@@ -49,8 +49,8 @@ pub(super) fn goal_decide(
             if super::proposal_revisions::party(core, work, request, &proposal) {
                 return;
             }
-            let (source, _) = core.goal_pool(project, person);
-            let (period, pool) = core.goal_open_pool(project, person);
+            let (source, _) = core.person_pool(project, person);
+            let (period, pool) = core.open_person_pool(project, person);
             if let Some(event) = period {
                 work.push(Event::Tasks(event));
             }
@@ -223,7 +223,7 @@ pub(super) fn person_proposal_accept(
     let source = tasks::Funder::Pool { project: proposal.project, person, period: core.period(proposal.project) };
     match &proposal.action {
         tasks::ProposalAction::Amend { .. } | tasks::ProposalAction::Widen { .. } => {
-            let (period, pool) = core.goal_open_pool(proposal.project, person);
+            let (period, pool) = core.open_person_pool(proposal.project, person);
             if let Some(event) = period {
                 work.push(Event::Tasks(event));
             }
@@ -271,7 +271,7 @@ pub(super) fn person_proposal_accept(
             }
             let creator =
                 if proposal.as_holder { tasks::Party::Person(person) } else { tasks::Party::Task(proposal.proposer) };
-            let (period, pool) = core.goal_open_pool(proposal.project, person);
+            let (period, pool) = core.open_person_pool(proposal.project, person);
             if let Some(event) = period {
                 work.push(Event::Tasks(event));
             }

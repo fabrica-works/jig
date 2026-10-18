@@ -20,6 +20,8 @@ pub enum Act {
     Submit { field: Purpose },
     /// Open a confirmation for an object act.
     Intend { object: Token, act: ActKind },
+    /// Review the chat template's close compound.
+    CloseChat { object: Token },
     /// Amend and release where the document offers both operations.
     AmendRelease { object: Token },
     /// Choose an option in the confirmation.
@@ -63,7 +65,7 @@ pub enum Act {
     /// Open updates and mark the newest result shown as seen.
     OpenUpdates,
     /// Start a chat in the selected project from its first-words field.
-    StartChat { project: u32 },
+    BeginConversation { project: u32 },
     /// Open a listed chat and mark its replies through what was displayed.
     OpenChat { task: u64 },
     /// Choose the new goal charter, budget, deadline and priority.

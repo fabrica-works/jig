@@ -145,7 +145,6 @@ pub fn line(value: &documents::HistoryLine, limits: &Limits) -> Result<client::O
             tasks::Change::Cancelled => client::OwnerHistoryChange::Cancelled,
             tasks::Change::Released => client::OwnerHistoryChange::Released,
             tasks::Change::Amended => client::OwnerHistoryChange::Amended,
-            tasks::Change::Prioritised { priority } => client::OwnerHistoryChange::Prioritised { priority },
             tasks::Change::Moved => client::OwnerHistoryChange::Moved,
             tasks::Change::Proposed => client::OwnerHistoryChange::Proposed,
             tasks::Change::ProposalPassed => client::OwnerHistoryChange::ProposalPassed,
@@ -219,7 +218,7 @@ pub(super) mod tests {
             task: u64::MAX,
             revision: 0,
             by: tasks::Party::Deployment { project: u32::MAX },
-            change: tasks::Change::Prioritised { priority: u32::MAX },
+            change: tasks::Change::Amended,
             reason: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },
             proposal: Some(documents::ProposalHistory {
                 action: documents::RetainedAction::Release { task: u64::MAX },
@@ -243,7 +242,7 @@ pub(super) mod tests {
         assert_eq!(copied.by, client::OwnerRequester::Deployment { project: u32::MAX });
         assert_eq!(copied.reason.bytes.bytes(), UTF8_TEXTS[0]);
         assert!(copied.reason.cut);
-        assert_eq!(copied.change, client::OwnerHistoryChange::Prioritised { priority: u32::MAX });
+        assert_eq!(copied.change, client::OwnerHistoryChange::Amended);
         let proposal = copied.proposal.expect("retained proposal");
         assert_eq!((proposal.number, proposal.proposer, proposal.as_holder), (u64::MAX, 0, true));
         assert_eq!(

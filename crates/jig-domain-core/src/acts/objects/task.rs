@@ -15,6 +15,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
         return Admission::Refused(why);
     }
     match act {
+        Act::Reorder => allowed(core.reorder_allowed(row.project, held)),
         Act::Message => allowed(write(core, limits, party, number)),
         Act::Amend => {
             let admission = bounds::amend(core, limits, party, number, held);
@@ -49,10 +50,8 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
                 | Act::PassUp
                 | Act::LeaveHeld
                 | Act::Amend
-                | Act::Close
                 | Act::Move
-                | Act::SetGoal
-                | Act::Prioritise
+                | Act::Reorder
                 | Act::Seen
                 | Act::EditNote
                 | Act::DeleteNote
@@ -92,7 +91,6 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
         Act::Move => {
             allowed(core.move_admit(party, held, row.project, number, limits.tasks.tree_tasks, limits.tasks.depth))
         }
-        Act::Close => allowed(close(core, party, row)),
         Act::Seen => {
             if core.conversation_requester(row) == Some(party) && held.is_some() {
                 Admission::Allowed
@@ -100,7 +98,6 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
                 Admission::Refused(people::Refusal::Unknown)
             }
         }
-        Act::Prioritise => allowed(core.priorities_allowed(row.project, held, 0, limits.tasks.tasks)),
         Act::Answer
         | Act::Take
         | Act::HandBack
@@ -109,7 +106,6 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, number: 
         | Act::Reject
         | Act::PassUp
         | Act::LeaveHeld
-        | Act::SetGoal
         | Act::EditNote
         | Act::DeleteNote
         | Act::Adopt
@@ -156,21 +152,6 @@ pub(crate) fn write_in(
         | tasks::Phase::Held { was: tasks::Was::Waiting | tasks::Was::Closing(_), .. }
         | tasks::Phase::Ended(_) => Err(people::Refusal::NotWaiting),
     }
-}
-
-pub(crate) fn close(core: &Core, party: u64, row: &tasks::TaskRecord) -> Result<(), people::Refusal> {
-    standing::role(core, row.project, core.people.role(party, row.project), Act::Close)?;
-    if core.conversation_requester(row) != Some(party) {
-        return Err(people::Refusal::Unknown);
-    }
-    if row.grace.is_some() {
-        return Err(people::Refusal::NotWaiting);
-    }
-    mutable(row)?;
-    if core.settings.close_grace == skein_lib::Duration::ZERO {
-        return Err(people::Refusal::NotOffered);
-    }
-    Ok(())
 }
 
 pub(crate) fn person(
@@ -259,10 +240,8 @@ pub(crate) fn person(
         | Act::Amend
         | Act::Stop
         | Act::Cancel
-        | Act::Close
         | Act::Move
-        | Act::SetGoal
-        | Act::Prioritise
+        | Act::Reorder
         | Act::Seen
         | Act::EditNote
         | Act::DeleteNote

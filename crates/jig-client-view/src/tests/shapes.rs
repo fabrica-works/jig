@@ -16,7 +16,7 @@ fn a_chat_without_creating_sends_nothing_and_shows_the_refusal() {
     drive(&mut fixture, Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(me))) });
     drive(&mut fixture, Event::Went { place: Place::Jig(Address::Conversations { project: Some(PROJECT) }) });
     drive(&mut fixture, Event::Act { action: Act::Edit { field: Purpose::NewChat, text: text(b"not offered") } });
-    assert!(drive(&mut fixture, Event::Act { action: Act::StartChat { project: PROJECT } }).is_empty());
+    assert!(drive(&mut fixture, Event::Act { action: Act::BeginConversation { project: PROJECT } }).is_empty());
     assert_eq!(fixture.chats.refusal, Some(Refusal::NotOffered));
     assert!(contains(&tree(&fixture, None, None), b"This act is not offered"));
 }

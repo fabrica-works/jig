@@ -125,3 +125,42 @@ pub(crate) fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
         reason: reason.into(),
     }
 }
+
+pub(crate) fn creating(core: &Core, limits: &Limits, party: u64, project: u32) -> crate::acts::Admission {
+    crate::acts::bounds::creating(core, limits, party, project, core.people.role(party, project))
+}
+
+pub(crate) fn member(words: &[u8], spend: u64) -> jig_domain_people::Member {
+    use jig_domain_people as people;
+    people::Member {
+        executor: people::TaskExecutor::Agent { charter: 1 },
+        words: words.into(),
+        parameters: Box::new([]),
+        inputs: Box::new([]),
+        budget: people::Budget::Named,
+        named: Box::new([]),
+        contract: people::Contract::Report { words: 16 },
+        authority: people::Authority {
+            tools: 0,
+            grants: Box::new([]),
+            delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+            spend,
+            deadline: None,
+            notes: 0,
+            note_resources: Box::new([]),
+        },
+        wake: people::WakePolicy {
+            words: people::WakeRule::Immediate,
+            notices: people::WakeRule::Never,
+            news: people::WakeRule::Never,
+            results: people::ResultsWake::Never,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        dependencies: Box::new([]),
+        tracked: None,
+        label: 0,
+        flags: people::Flags::PLAIN,
+    }
+}

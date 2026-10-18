@@ -98,7 +98,7 @@ pub(crate) fn section(
     let state = client.chats();
     if let Some(token) = state.starting {
         b.open(Role::Status);
-        b.name(&words.say(JigPhrase::StartChat, &[]));
+        b.name(&words.say(JigPhrase::BeginConversation, &[]));
         b.state(State::Busy);
         if let Some(intent) = client.intents().get(skein_lib::Id::from_token(token)) {
             words.progress(b, intent.progress);
@@ -149,9 +149,9 @@ fn forms(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut J
                     words,
                     bindings,
                     Role::Button,
-                    JigPhrase::StartChat,
+                    JigPhrase::BeginConversation,
                     &[],
-                    Act::StartChat { project: project.project },
+                    Act::BeginConversation { project: project.project },
                 );
                 b.close();
             }

@@ -208,7 +208,7 @@ pub fn endings() -> [(p::Ending, w::Refusal); 7] {
         ),
     ]
 }
-pub fn extra_refusals() -> [(p::Refusal, w::Refusal); 10] {
+pub fn extra_refusals() -> [(p::Refusal, w::Refusal); 7] {
     let limits = wire();
     [
         (
@@ -234,30 +234,6 @@ pub fn extra_refusals() -> [(p::Refusal, w::Refusal); 10] {
             p::Refusal::Role { held: Some(p::Role::Observer) },
             w::Refusal::Role(
                 w::RefusalRole::new(&limits, w::RefusalRoleParts { held: Some(w::HeldRole::Observer) }).expect("role"),
-            ),
-        ),
-        (
-            p::Refusal::Disposal { task: 8, issue: p::DisposalIssue::Missing },
-            w::Refusal::Disposal(
-                w::RefusalDisposal::new(&limits, w::RefusalDisposalParts { task: 8, issue: w::DisposalIssue::Missing })
-                    .expect("disposal"),
-            ),
-        ),
-        (
-            p::Refusal::Disposal { task: 8, issue: p::DisposalIssue::Unknown },
-            w::Refusal::Disposal(
-                w::RefusalDisposal::new(&limits, w::RefusalDisposalParts { task: 8, issue: w::DisposalIssue::Unknown })
-                    .expect("disposal"),
-            ),
-        ),
-        (
-            p::Refusal::Disposal { task: 8, issue: p::DisposalIssue::Repeated },
-            w::Refusal::Disposal(
-                w::RefusalDisposal::new(
-                    &limits,
-                    w::RefusalDisposalParts { task: 8, issue: w::DisposalIssue::Repeated },
-                )
-                .expect("disposal"),
             ),
         ),
         (

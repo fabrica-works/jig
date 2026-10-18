@@ -218,7 +218,7 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client:
     };
     match domain.intents.ask(
         open.scope,
-        Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::SetGoal },
+        Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::CreateGoal },
         Box::new(ask),
         out,
     ) {
@@ -276,7 +276,7 @@ pub(crate) fn answered(
             }
             domain.project_page.form.answer = Some(outcome.clone());
             match crate::outcome::route(&outcome) {
-                crate::outcome::Route::Created { task } | crate::outcome::Route::Goal { task } => {
+                crate::outcome::Route::Created { task } => {
                     if handle == domain.page_handle() && domain.confirmed == Some(pending.scope) {
                         crate::page::routing::navigate(domain, env, Place::Jig(Address::task(task)), false, out, lent);
                     } else {
@@ -286,8 +286,7 @@ pub(crate) fn answered(
                         );
                     }
                 }
-                crate::outcome::Route::Chat { .. }
-                | crate::outcome::Route::Words { .. }
+                crate::outcome::Route::Words { .. }
                 | crate::outcome::Route::Proposed
                 | crate::outcome::Route::Other => {
                     crate::notices::kept::show(

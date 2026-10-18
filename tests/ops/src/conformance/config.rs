@@ -322,3 +322,11 @@ pub fn task_authority(spend: u64) -> tasks::Authority {
         note_resources: Box::new([]),
     }
 }
+
+#[must_use]
+pub fn chat(words: &[u8]) -> jig_domain_people::Ask {
+    const CONFIG_SEED: u64 = 0;
+    let (config, limits) = root(CONFIG_SEED);
+    let members = jig_core_world::fixtures::Creating::new(&config.core, limits.core.tasks.tree_tasks);
+    jig_core_world::fixtures::create_chat(&members, 1, 0, words.into())
+}

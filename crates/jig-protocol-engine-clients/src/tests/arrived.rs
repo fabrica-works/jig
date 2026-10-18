@@ -58,7 +58,7 @@ fn a_chunked_request_body_read_as_it_arrives_is_the_same_whatever_its_cuts() {
         let Some(Request::Core(event)) = exchange.out.pop() else { panic!("core ask") };
         let core::Event::People(people::Event::Ask { sign_in, ask, .. }) = *event else { panic!("people ask") };
         assert_eq!(sign_in, 41);
-        assert_eq!(ask, people::Ask::StartChat { project: 3, words: Box::from(b"hello".as_slice()) });
+        assert_eq!(ask, people::Ask::Say { project: 3, task: 8, words: Box::from(b"hello".as_slice()) });
         assert!(exchange.out.is_empty());
     }
 }

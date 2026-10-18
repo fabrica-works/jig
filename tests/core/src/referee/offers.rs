@@ -18,6 +18,7 @@ struct Received {
     subject: Subject,
     at: u64,
     offers: List<Offered>,
+    frame: Option<core::documents::Frame>,
     task: Option<Task>,
 }
 #[derive(Debug, Default)]
@@ -48,12 +49,42 @@ impl Referee {
         if let root::Event::Core(core::Event::Read { sign_in, read, .. }) = event
             && let Some(party) = self.people.get(sign_in)
         {
-            self.reading.push_back((*party, read_subject(read)));
+            self.reading.push_back((
+                *party,
+                if let core::reads::Read::Frame = read {
+                    Some(Subject::Frame { party: *party })
+                } else {
+                    read_subject(read)
+                },
+            ));
         }
         if let root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, ask, .. })) = event {
             let Some(party) = self.people.get(sign_in) else {
                 return;
             };
+            if let people::Ask::Create { project, .. }
+            | people::Ask::Propose { project, action: people::Action::Batch(_), .. } = &*ask
+            {
+                for received in self.documents.values() {
+                    if received.at != self.made || received.party != *party {
+                        continue;
+                    }
+                    let Some(frame) = &received.frame else { continue };
+                    for role in &frame.projects {
+                        if role.project != *project {
+                            continue;
+                        }
+                        if let Some(creating) = &role.creating {
+                            let offer =
+                                Admission::Bounded { within: creating.within.clone(), beyond: creating.beyond.clone() };
+                            if let Some(expected) = facts::predict(&offer, ask, None) {
+                                self.pending.insert(crate::observations::destination(reply_to), expected);
+                            }
+                        }
+                    }
+                }
+                return;
+            }
             let Some((act, subject)) = request(ask) else {
                 return;
             };
@@ -70,8 +101,11 @@ impl Referee {
         }
     }
     fn remember(&mut self, number: u64, party: u64, subject: Subject, document: &Document) {
-        let Some(offers) = offers(document) else {
-            return;
+        let (offers, frame) = if let Document::Frame(frame) = document {
+            (List::with_capacity(0), Some(frame.clone()))
+        } else {
+            let Some(offers) = offers(document) else { return };
+            (offers.clone(), None)
         };
         let task = match document {
             Document::Task(value) => Some(*value.clone()),
@@ -90,7 +124,7 @@ impl Referee {
             | Document::Inbox(_)
             | Document::Deployment(_) => None,
         };
-        self.documents.insert(number, Received { party, subject, at: self.made, offers: offers.clone(), task });
+        self.documents.insert(number, Received { party, subject, at: self.made, offers, frame, task });
     }
     pub fn delivered(&mut self, value: &mut root::Delivery) {
         match value {
@@ -185,9 +219,6 @@ fn fits(received: &Subject, request: &Subject) -> bool {
 }
 fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
     Some(match ask {
-        people::Ask::SetGoal { project, .. } | people::Ask::Propose { project, .. } => {
-            (Act::SetGoal, Subject::Project { project: *project })
-        }
         people::Ask::Say { task, .. } => (Act::Message, Subject::Task { task: *task }),
         people::Ask::AnswerQuestion { task, question, .. } => {
             (Act::Answer, Subject::Question { task: *task, message: *question })
@@ -215,9 +246,7 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
         people::Ask::Amend { task, .. } => (Act::Amend, Subject::Task { task: *task }),
         people::Ask::Stop { task, .. } => (Act::Stop, Subject::Task { task: *task }),
         people::Ask::Cancel { task, .. } => (Act::Cancel, Subject::Task { task: *task }),
-        people::Ask::Close { chat, .. } => (Act::Close, Subject::Task { task: *chat }),
         people::Ask::Move { task, .. } => (Act::Move, Subject::Task { task: *task }),
-        people::Ask::Prioritise { project, .. } => (Act::Prioritise, Subject::Project { project: *project }),
         people::Ask::MarkSeen { seen: people::Seen::Chat { task, .. } } => (Act::Seen, Subject::Task { task: *task }),
         people::Ask::EditNote { name, change, .. } => (
             match &**change {
@@ -232,10 +261,10 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
         people::Ask::MakeService { project, .. } => (Act::MakeService, Subject::Project { project: *project }),
         people::Ask::SetPool { project, .. } => (Act::SetPool, Subject::Project { project: *project }),
         people::Ask::Compound { .. }
+        | people::Ask::Propose { .. }
         | people::Ask::Create { .. }
         | people::Ask::Withdraw { .. }
         | people::Ask::Application { .. }
-        | people::Ask::StartChat { .. }
         | people::Ask::MarkSeen { seen: people::Seen::Results { .. } } => return None,
     })
 }

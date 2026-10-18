@@ -226,7 +226,7 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
     let mut note = Note {
         number: 6,
         revision: Revision { value: 11 },
-        scope: NoteScope::Goal { project: 1, goal: 900 },
+        scope: NoteScope::Task { project: 1, task: 900 },
         description: DocumentText::complete(text(b"before")),
         body: DocumentText::complete(text(b"body")),
         writer: NoteAuthor::Party { party: 7 },
@@ -247,7 +247,7 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
         Some(Ask::EditNote {
             project: 1,
             note: 6,
-            scope: NoteScope::Goal { project: 1, goal: 900 },
+            scope: NoteScope::Task { project: 1, task: 900 },
             revision: Revision { value: 11 },
             description: text(b"after"),
             body: text(b"new"),
@@ -259,7 +259,7 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
         Some(Ask::DeleteNote {
             project: 1,
             note: 6,
-            scope: NoteScope::Goal { project: 1, goal: 900 },
+            scope: NoteScope::Task { project: 1, task: 900 },
             revision: Revision { value: 11 }
         })
     );
@@ -274,7 +274,7 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
             Ask::EditNote {
                 project: 1,
                 note: 6,
-                scope: NoteScope::Goal { project: 1, goal: 900 },
+                scope: NoteScope::Task { project: 1, task: 900 },
                 revision: Revision { value: 11 },
                 description: text(b"after"),
                 body: text(b"new"),
@@ -284,7 +284,7 @@ fn note_corrections_keep_the_supplied_scope_revision_and_all_references() {
             Ask::DeleteNote {
                 project: 1,
                 note: 6,
-                scope: NoteScope::Goal { project: 1, goal: 900 },
+                scope: NoteScope::Task { project: 1, task: 900 },
                 revision: Revision { value: 11 },
             }
         };

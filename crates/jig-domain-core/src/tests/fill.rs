@@ -37,14 +37,9 @@ fn ask(core: &mut Core, env: &Env<Limits>, ask: people::Ask) -> Requests {
 }
 
 fn goal() -> people::Ask {
-    people::Ask::SetGoal {
-        project: 1,
-        spec: b"new goal".as_slice().into(),
-        executor: people::GoalExecutor::Charter(1),
-        budget: 100,
-        priority: 1,
-        deadline: None,
-    }
+    let mut member = fixtures::member(b"new goal", 100);
+    member.tracked = Some(1);
+    people::Ask::Create { project: 1, batch: Box::new([member]) }
 }
 
 fn busy(requests: Requests) {
@@ -78,7 +73,11 @@ fn a_sign_in_at_the_fill_mark_is_refused() {
 fn a_chat_at_the_fill_mark_is_answered_busy() {
     let (mut core, env) = filled_core(limits().fill_mark);
     signed_in(&mut core, &env);
-    busy(ask(&mut core, &env, people::Ask::StartChat { project: 1, words: b"new chat".as_slice().into() }));
+    busy(ask(
+        &mut core,
+        &env,
+        people::Ask::Create { project: 1, batch: Box::new([fixtures::member(b"new chat", 100)]) },
+    ));
 }
 
 #[test]

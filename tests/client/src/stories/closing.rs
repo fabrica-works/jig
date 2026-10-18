@@ -11,8 +11,8 @@ const NO_MESSAGE: u64 = 0;
 #[must_use]
 pub fn world(seed: u64) -> World<Test, Scripted> {
     let mut world = super::world(seed);
-    let mut chat = task();
-    chat.acts = list([Offered { effect: None, act: ActKind::Close, admission: Admission::Allowed }]);
+    let mut chat = super::conversations::chat(CHAT, b"Chat nine", Wall::EPOCH);
+    chat.acts = list([Offered { effect: None, act: ActKind::Cancel, admission: Admission::Allowed }]);
     let mut cancelled = task();
     cancelled.chip.task = CANCELLED;
     cancelled.requester = OwnerRequester::Task(CHAT);
@@ -56,6 +56,8 @@ pub fn world(seed: u64) -> World<Test, Scripted> {
     })));
     moved.requester = OwnerRequester::Person(PARTY);
     chat.chip.phase = Phase::Closing;
+    let ChipPhase::Owner { phase, .. } = chat.chip.details.as_mut() else { unreachable!("owner chat") };
+    *phase = OwnerChipPhase::Closing(ClosingStage::Delegates);
     chat.delegates.clear();
     world
         .front()

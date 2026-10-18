@@ -8,7 +8,7 @@ fn a_made_chat_is_answered_done_with_its_task() {
     let mut exchange = Exchange::new();
     let (owner, to) = exchange.ask();
     assert!(unanswered(&exchange, owner));
-    exchange.reply(to, p::Reply::Outcome(p::Outcome::Started { task: 8 }));
+    exchange.reply(to, p::Reply::Outcome(p::Outcome::Said { task: 8, message: 9 }));
     assert_eq!(exchange.final_answer(owner), f::started());
     assert!(exchange.component.pending.exchanges.is_empty());
     assert!(exchange.out.is_empty());
@@ -51,7 +51,7 @@ fn an_ended_sign_in_is_answered_signed_out() {
     };
     assert_eq!(secret_owner, crate::SecretOwner::SignIn(41));
     assert!(exchange.component.pending.exchanges.is_empty());
-    exchange.reply(to, p::Reply::Outcome(p::Outcome::Started { task: 8 }));
+    exchange.reply(to, p::Reply::Outcome(p::Outcome::Said { task: 8, message: 9 }));
     assert_eq!(exchange.answer(owner), w::KeyedAnswer::SignedOut);
     assert!(exchange.out.is_empty());
 }
@@ -74,10 +74,10 @@ fn a_lost_connection_drops_the_answer_and_nothing_else() {
     let (owner, to) = exchange.ask();
     let (other_owner, other_to) = exchange.ask();
     exchange.component.down(&exchange.env, Event::Io(skein_io::Event::Closed { owner }), &mut exchange.out);
-    exchange.reply(to, p::Reply::Outcome(p::Outcome::Started { task: 8 }));
+    exchange.reply(to, p::Reply::Outcome(p::Outcome::Said { task: 8, message: 9 }));
     assert_eq!(exchange.component.pending.exchanges.len(), 1);
     assert!(exchange.out.is_empty());
-    exchange.reply(other_to, p::Reply::Outcome(p::Outcome::Started { task: 8 }));
+    exchange.reply(other_to, p::Reply::Outcome(p::Outcome::Said { task: 8, message: 9 }));
     assert_eq!(exchange.final_answer(other_owner), f::started());
     assert!(exchange.component.pending.exchanges.is_empty());
 }

@@ -958,7 +958,7 @@ fn escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_se
     assert!(deadline(b"1969-12-31 23:59").is_none());
     assert!(deadline(b"9999-12-31 00:00").is_none());
 }
-const CONFIRMATION_ACTS: [(ActKind, bool); 19] = [
+const CONFIRMATION_ACTS: [(ActKind, bool); 18] = [
     (ActKind::Message, false),
     (ActKind::Take, false),
     (ActKind::HandBack, false),
@@ -968,10 +968,9 @@ const CONFIRMATION_ACTS: [(ActKind, bool); 19] = [
     (ActKind::Amend, true),
     (ActKind::Stop, false),
     (ActKind::Cancel, false),
-    (ActKind::Close, false),
     (ActKind::Move, false),
-    (ActKind::Prioritise, false),
-    (ActKind::SetGoal, false),
+    (ActKind::Reorder, false),
+    (ActKind::Reorder, false),
     (ActKind::Seen, false),
     (ActKind::Adopt, false),
     (ActKind::ChangePolicy, false),
@@ -1004,17 +1003,7 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
             let tree = dialog(&d, words, bindings);
             assert_eq!(press(&tree, b"Confirm", bindings), Action::Confirm);
         }
-        if act == ActKind::Close {
-            let choose = press(&tree, b"Take over delegate 8, reserving 13", bindings);
-            drive(&mut d, Event::Act { action: choose });
-            assert_eq!(
-                d.confirmation().unwrap().choices.disposals.as_slice(),
-                &[jig_client::shapes::Delegate { task: 8, fate: jig_client::shapes::Fate::Move }]
-            );
-            let tree = dialog(&d, words, bindings);
-            assert_eq!(press(&tree, b"Confirm", bindings), Action::Confirm);
-        }
-        if act == ActKind::Prioritise {
+        if act == ActKind::Reorder {
             let change = input(&tree, b"New goal priority", b"3", bindings);
             drive(&mut d, Event::Act { action: change });
             assert_eq!(d.confirmation().unwrap().choices.priority, Some(3));
@@ -1105,7 +1094,7 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
         parts: list([]),
         acts: list([Offered {
             effect: None,
-            act: ActKind::SetGoal,
+            act: ActKind::Reorder,
             admission: Admission::Proposed { to: Recipient::Role { project: 4, role: 2 } },
         }]),
     };
@@ -1146,7 +1135,7 @@ fn notice_scenarios(words: &crate::words::Words) {
             }),
         },
         Kind::Unknown { object: ObjectKey::Escalation(8), act: ActKind::Release },
-        Kind::PageUnknown { purpose: crate::page::IntentPurpose::SetGoal },
+        Kind::PageUnknown { purpose: crate::page::IntentPurpose::CreateGoal },
         Kind::Refused(Limit::Objects),
     ] {
         let mut b = Builder::new(&limits());
@@ -1648,7 +1637,7 @@ fn note_documents_keep_each_text_loss_and_reference_loss_without_reconstructing_
             let note = Note {
                 number: 77,
                 revision: Revision { value: 123 },
-                scope: NoteScope::Goal { project: 1, goal: 900 },
+                scope: NoteScope::Task { project: 1, task: 900 },
                 description: DocumentText { bytes: text(b"note title"), cut: mask & 1 != 0 },
                 body: DocumentText { bytes: text(b"note body"), cut: mask & 2 != 0 },
                 writer: NoteAuthor::Party { party: 1 },
@@ -1784,7 +1773,7 @@ fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_del
         let note = Note {
             number: 77,
             revision: Revision { value: 123 },
-            scope: NoteScope::Goal { project: 1, goal: 900 },
+            scope: NoteScope::Task { project: 1, task: 900 },
             description: DocumentText::complete(text(b"note title")),
             body: DocumentText::complete(text(b"note body")),
             writer: NoteAuthor::Party { party: 1 },
@@ -1811,7 +1800,7 @@ fn a_cut_note_shows_its_reference_loss_and_blocks_correction_but_keeps_exact_del
                     match &**ask {
                         Ask::DeleteNote {
                             note: 77,
-                            scope: NoteScope::Goal { project: 1, goal: 900 },
+                            scope: NoteScope::Task { project: 1, task: 900 },
                             revision: Revision { value: 123 },
                             ..
                         } => true,

@@ -1,13 +1,12 @@
 //! Core-owned role and funding admission for authenticated parties
 //! (domain/engine.md, sections 3 and 4.4).
 
-use alloc::boxed::Box;
 use jig_domain_authority as authority;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{Queue, ReplyTo, Token};
+use skein_lib::Queue;
 
-use crate::{Core, Limits, PersonTaskRoute, translate};
+use crate::{Core, Limits, translate};
 
 impl Core {
     /// Admit a person's funded move of a live task.
@@ -64,7 +63,7 @@ impl Core {
         let Some(left) = context.takeover_budget() else {
             return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
         };
-        let (source, fallback) = self.goal_pool(project, person);
+        let (source, fallback) = self.person_pool(project, person);
         let pool_numbers = match admission.funding(source) {
             Some(numbers) => numbers,
             None => fallback,
@@ -94,44 +93,6 @@ impl Core {
         Ok(())
     }
 
-    /// Admit a directly requested chat under current person and project policy.
-    pub fn chat_admit(
-        &self,
-        project: u32,
-        person: u64,
-        role: people::Role,
-        tasks_left: u32,
-    ) -> Result<(), people::Refusal> {
-        let (_, pool_numbers) = self.goal_pool(project, person);
-        let mut findings =
-            Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority check bound"));
-        let ask = authority::PersonAsk {
-            project,
-            role: role.number(),
-            pool: translate::authority_numbers(pool_numbers),
-            tasks_left,
-            request: authority::PersonRequest::Create(Box::new([authority::Delegate {
-                executor: authority::Executor::Charter(self.settings.chat),
-                authority: self.chat_authority(project, person, role, tasks_left),
-                symbolic: Box::new([]),
-            }])),
-        };
-        let checked = authority::check_request(&self.authority, &ask, &mut findings);
-        if checked.answer != authority::Answer::Allow {
-            return Err(self.request_refusal(&ask, checked.answer, &mut findings));
-        }
-        let Some(policy) = self.authority.policy(project) else { unreachable!("checked project policy") };
-        if !self.authority.escalations_held(project, role.number()) {
-            return Err(people::Refusal::NoEscalationHolder);
-        }
-        if self.period_budget(project) > policy.period_spend {
-            return Err(people::Refusal::Authority {
-                proposable: None,
-                lacking: people::Lack::Budget { needs: self.period_budget(project), left: policy.period_spend },
-            });
-        }
-        Ok(())
-    }
     /// Check standing, current policy and financial authority for a party's
     /// stop, cancel or release request before routing it to the task child.
     pub fn control_admit(
@@ -160,7 +121,6 @@ impl Core {
             people::Ask::Release { task, .. } => (*task, authority::RequestKind::Release, 0),
             people::Ask::Compound { .. }
             | people::Ask::MarkSeen { .. }
-            | people::Ask::Close { .. }
             | people::Ask::Application { .. }
             | people::Ask::TakePerson { .. }
             | people::Ask::HandBackPerson { .. }
@@ -169,7 +129,6 @@ impl Core {
             | people::Ask::DecideProposal { .. }
             | people::Ask::Say { .. }
             | people::Ask::AnswerQuestion { .. }
-            | people::Ask::Prioritise { .. }
             | people::Ask::Amend { .. }
             | people::Ask::EditNote { .. }
             | people::Ask::MakeService { .. }
@@ -178,11 +137,9 @@ impl Core {
             | people::Ask::ChangePolicy { .. }
             | people::Ask::SetPool { .. }
             | people::Ask::DecideEscalation { .. }
-            | people::Ask::StartChat { .. }
             | people::Ask::Create { .. }
             | people::Ask::Propose { .. }
-            | people::Ask::Withdraw { .. }
-            | people::Ask::SetGoal { .. } => unreachable!("control route owns its ask"),
+            | people::Ask::Withdraw { .. } => unreachable!("control route owns its ask"),
         };
         if let people::Ask::Cancel { grace: Some(span), .. } = ask
             && *span > limits.grace
@@ -283,54 +240,6 @@ impl Core {
         }
     }
 
-    /// Check an authenticated party's authority and bounded goal list for
-    /// one priority change.
-    pub(crate) fn priorities_allowed(
-        &self,
-        project: u32,
-        role: Option<people::Role>,
-        goals: usize,
-        task_capacity: u32,
-    ) -> Result<(), people::Refusal> {
-        crate::acts::role(self, project, role, crate::acts::Act::Prioritise)?;
-        let named = role.expect("common priority role judgment admitted membership");
-        let allowed = match self.authority.role(project, named.number()) {
-            Some(policy) => policy.requests.allows(authority::RequestKind::Amend),
-            None => false,
-        };
-        if !allowed {
-            return Err(people::Refusal::Role { held: role });
-        }
-        if goals > usize::try_from(task_capacity).expect("u32 fits usize") {
-            return Err(people::Refusal::Limit { which: people::LimitKind::Priority });
-        }
-        Ok(())
-    }
-
-    /// Route one admitted priority change to the task child, retaining the
-    /// party's keyed continuation until the task terminal arrives.
-    pub fn prioritise(
-        &mut self,
-        request: Token,
-        person: u64,
-        project: u32,
-        role: Option<people::Role>,
-        goals: Box<[(u64, u32)]>,
-        task_capacity: u32,
-    ) -> Result<tasks::Event, people::Refusal> {
-        self.priorities_allowed(project, role, goals.len(), task_capacity)?;
-        assert!(
-            self.person_tasks.insert(request, PersonTaskRoute::Prioritised(project)) == Ok(None),
-            "one priority route"
-        );
-        Ok(tasks::Event::Prioritise {
-            reply_to: ReplyTo::new(request),
-            project,
-            by: tasks::Party::Person(person),
-            goals,
-        })
-    }
-
     /// Check a party role's current note scope, including connector paths.
     #[must_use]
     pub fn note_authorized(&self, project: u32, role: Option<people::Role>, scope: &people::NoteScope) -> bool {
@@ -416,5 +325,20 @@ impl Core {
         } else {
             Err(self.request_refusal(&ask, checked.answer, &mut findings))
         }
+    }
+}
+
+impl Core {
+    pub(crate) fn reorder_allowed(&self, project: u32, role: Option<people::Role>) -> Result<(), people::Refusal> {
+        crate::acts::role(self, project, role, crate::acts::Act::Reorder)?;
+        let named = role.expect("common priority role judgment admitted membership");
+        let allowed = match self.authority.role(project, named.number()) {
+            Some(policy) => policy.requests.allows(authority::RequestKind::Amend),
+            None => false,
+        };
+        if !allowed {
+            return Err(people::Refusal::Role { held: role });
+        }
+        Ok(())
     }
 }

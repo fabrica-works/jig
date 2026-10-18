@@ -51,7 +51,7 @@ fn document_offers_fit_the_object_and_preserve_actor_specific_refusals() {
     let Document::Project(value) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap() else {
         panic!("project")
     };
-    assert_eq!(value.acts.len(), 7);
+    assert_eq!(value.acts.len(), 6);
     for offer in &value.acts {
         assert_eq!(offer.admission, Admission::Refused(people::Refusal::Role { held: Some(people::Role::Observer) }));
     }
@@ -71,7 +71,6 @@ fn complete_policy_recipients_and_authority_refuse_a_shortened_receiving_form() 
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     limits.documents.lines = 1;
     assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 2 }, &window()), Err(Missing::TooLarge));
-    assert_eq!(make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()), Err(Missing::TooLarge));
     let request = people::Ask::Amend {
         project: 1,
         task: 2,

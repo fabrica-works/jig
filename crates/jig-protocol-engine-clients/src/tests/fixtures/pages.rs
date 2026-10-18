@@ -64,7 +64,7 @@ pub fn history_page() -> reads::Page {
             task: 7,
             revision: 19,
             by: t::Party::Person(23),
-            change: t::Change::Prioritised { priority: 29 },
+            change: jig_domain_tasks::Change::Amended,
             reason: d::Text { bytes: Box::from("é".as_bytes()), cut: true },
             proposal: None,
             amendment: None,

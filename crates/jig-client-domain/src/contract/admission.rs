@@ -2,7 +2,7 @@
 //! The engine owns authorization; no role or policy is interpreted here.
 //! See client/domain/pages.md, 6.2, and objects.md, 11.
 use super::{
-    Admission, Amendment, Beyond, Bounds, GoalExecutor, OwnerAuthority, OwnerAuthorityDocument, OwnerGrant,
+    Admission, Amendment, Beyond, Bounds, OwnerAuthority, OwnerAuthorityDocument, OwnerExecutor, OwnerGrant,
     OwnerPattern, OwnerPatternEnd, Refusal,
 };
 use skein_lib::Wall;
@@ -24,9 +24,9 @@ fn deadline(draft: Option<Wall>, latest: Option<Wall>) -> bool {
     }
 }
 
-/// Explain the selected goal using only its current offer's factual bounds.
+/// Judge a creation from the supplied factual executor, budget and deadline bounds.
 #[must_use]
-pub fn goal(offer: &Admission, executor: GoalExecutor, budget: u64, at: Option<Wall>) -> Admission {
+pub fn creation(offer: &Admission, executor: OwnerExecutor, budget: u64, at: Option<Wall>) -> Admission {
     match offer {
         Admission::Bounded { within, beyond: outside } => match within {
             Bounds::Create(super::CreateBounds {
@@ -41,14 +41,15 @@ pub fn goal(offer: &Admission, executor: GoalExecutor, budget: u64, at: Option<W
             }) => {
                 let mut listed = false;
                 match executor {
-                    GoalExecutor::Charter(charter) => {
+                    OwnerExecutor::Person(_) => return Admission::Refused(Refusal::NotOffered),
+                    OwnerExecutor::Agent { charter } => {
                         for number in charters {
                             if *number == charter {
                                 listed = true;
                             }
                         }
                     }
-                    GoalExecutor::Procedure { connector, code } => {
+                    OwnerExecutor::Procedure { connector, code } => {
                         for procedure in procedures {
                             if procedure.connector == connector && procedure.code == code {
                                 listed = true;

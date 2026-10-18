@@ -1,6 +1,7 @@
 //! Ops's two proof-of-concept stories on jig's independent conformance loop.
 mod application;
 mod config;
+pub use config::chat;
 #[cfg(test)]
 mod creating;
 mod documents;
@@ -960,7 +961,7 @@ fn alert_documents(seed: u64, cut: jig_conformance::Cut, documents: bool) -> jig
         reply_to: ReplyTo::new(Token::new(101)),
         sign_in: world.peers.sign_in.expect("on-call session"),
         key: [2; 16],
-        ask: people::Ask::StartChat { project: 1, words: b"@watch_setup".as_slice().into() },
+        ask: config::chat(b"@watch_setup"),
     })));
     world.drain().unwrap_or_else(|error| panic!("watch: {error:?}\n{}", world.trace.join("\n")));
     for number in [7, 8, 9] {

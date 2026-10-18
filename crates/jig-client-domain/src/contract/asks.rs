@@ -4,13 +4,6 @@
 use super::{Actor, Authority, Decision, HeldRole, NoteScope, Part, Party, ProposalKey, Refusal, Revision, Text};
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
-/// Executors the engine supports for a tracked goal; domain/people.md, 5.1.
-/// Numeric identities stay whole; procedure names and parameters are not supplied.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum GoalExecutor {
-    Charter(u32),
-    Procedure { connector: u16, code: u32 },
-}
 
 /// A person destination change names the independent person-task revision (domain/tasks.md, 7).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -59,22 +52,6 @@ pub enum PersonAnswer {
     Words(Text),
     /// A failure with a reason.
     Cannot { reason: Text },
-}
-
-/// What becomes of one live chat delegate.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Disposal {
-    /// Cancel its subtree.
-    Cancel { task: u64 },
-    /// Make it the party's and move funding.
-    TakeOver { task: u64 },
-}
-
-/// A goal and its new priority.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Priority {
-    pub task: u64,
-    pub priority: u32,
 }
 
 /// The read position moved by an explicit act.
@@ -141,8 +118,6 @@ pub enum Ask {
     Propose { project: u32, action: super::ProposeAction, reason: Text },
     /// Withdraw the party's pending proposal.
     Withdraw { project: u32, proposal: u64 },
-    /// Start a chat.
-    StartChat { project: u32, words: Text },
     /// Add words to a task inbox.
     Message { project: u32, task: u64, words: Text },
     /// Commit the operations together, or refuse at the first failure.
@@ -163,14 +138,8 @@ pub enum Ask {
     Stop { project: u32, task: u64 },
     /// Cancel a task and its subtree.
     Cancel { project: u32, task: u64, reason: Text, grace: Option<Duration> },
-    /// Close a chat after disposing of every live delegate.
-    Close { project: u32, chat: u64, disposals: List<Disposal> },
     /// Become a task requester and fund it.
     Move { project: u32, task: u64, reason: Text },
-    /// Make or propose a goal.
-    SetGoal { project: u32, spec: Text, executor: GoalExecutor, budget: u64, priority: u32, deadline: Option<Wall> },
-    /// Change goal priorities together.
-    Prioritise { project: u32, goals: List<Priority> },
     /// Move a read position explicitly.
     Seen { through: SeenThrough },
     /// Correct the note revision seen.
@@ -215,10 +184,6 @@ pub enum Outcome {
 /// What an ask made, named for its client.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Made {
-    /// A chat task.
-    Chat { task: u64 },
-    /// A goal task.
-    Goal { task: u64 },
     /// Tasks accepted from a batch.
     Tasks { tasks: List<u64> },
     /// A service party.

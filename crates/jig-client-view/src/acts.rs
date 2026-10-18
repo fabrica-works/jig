@@ -135,10 +135,8 @@ pub fn revision(object: &Object, act: ActKind) -> Option<Revision> {
         | ActKind::Reject
         | ActKind::Stop
         | ActKind::Cancel
-        | ActKind::Close
         | ActKind::Move
-        | ActKind::SetGoal
-        | ActKind::Prioritise
+        | ActKind::Reorder
         | ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy
@@ -245,7 +243,6 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
         ActKind::Stop => Some(Ask::Stop { project, task }),
         ActKind::Cancel => Some(Ask::Cancel { project, task, reason: words(fields, Purpose::Reason)?, grace: None }),
         ActKind::Move => Some(Ask::Move { project, task, reason: words(fields, Purpose::Reason)? }),
-        ActKind::Prioritise => Some(priority(project, task, choices.priority?)),
         ActKind::EditNote | ActKind::DeleteNote => {
             let note = match object.key {
                 ObjectKey::Note { note, .. } => note,
@@ -276,8 +273,7 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
                 })
             }
         }
-        ActKind::Close
-        | ActKind::SetGoal
+        ActKind::Reorder
         | ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy
@@ -306,10 +302,8 @@ fn decide(object: &Object, confirmation: &Confirmation, fields: &Fields, project
                 | ActKind::Amend
                 | ActKind::Stop
                 | ActKind::Cancel
-                | ActKind::Close
                 | ActKind::Move
-                | ActKind::SetGoal
-                | ActKind::Prioritise
+                | ActKind::Reorder
                 | ActKind::Seen
                 | ActKind::EditNote
                 | ActKind::DeleteNote
@@ -438,10 +432,8 @@ pub fn note_ask(project: u32, note: &Note, act: ActKind, description: Text, body
         | ActKind::Amend
         | ActKind::Stop
         | ActKind::Cancel
-        | ActKind::Close
         | ActKind::Move
-        | ActKind::SetGoal
-        | ActKind::Prioritise
+        | ActKind::Reorder
         | ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy
@@ -485,26 +477,4 @@ fn amend(confirmation: &Confirmation, fields: &Fields, project: u32, task: u64) 
     } else {
         Some(Ask::Amend { project, task, revision, change, reason })
     }
-}
-
-fn priority(project: u32, task: u64, priority: u32) -> Ask {
-    let mut operations = List::with_capacity(1);
-    operations
-        .push(jig_client::contract::Operation::Amend {
-            project,
-            task,
-            revision: None,
-            change: Box::new(jig_client::contract::Amendment {
-                addressed: None,
-                spec: None,
-                wake: None,
-                dependencies: None,
-                authority: None,
-                instructions: None,
-                tracked: Some(jig_client::contract::Tracking::Tracked { priority }),
-            }),
-            reason: Text::new(Box::from([]), 0).expect("empty reason fits"),
-        })
-        .expect("one operation fits");
-    Ask::Compound { project, operations }
 }

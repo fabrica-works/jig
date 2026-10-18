@@ -33,9 +33,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
         connectors: Box::new([]),
         settings: core::Settings {
             templates: Box::new([]),
-            close_grace: Duration::from_secs(5),
             deployment_provider: 2,
-            chat: 1,
             resume_bytes: 256,
             tools: core::ToolFamilies::JIG,
             charters: Box::new([core::Charter {

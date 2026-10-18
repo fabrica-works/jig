@@ -11,7 +11,6 @@ use skein_lib::Wall;
 pub enum CapacityAction {
     Compound,
     Create,
-    Close,
     Application { connector: u16 },
     Note { name: u64 },
     Service,
@@ -19,13 +18,10 @@ pub enum CapacityAction {
     Roles,
     Policy,
     Pool { person: u64 },
-    Chat,
-    Goal,
     Escalation { task: u64 },
     Proposal { proposer: crate::Proposer, number: u64 },
     Words { task: u64 },
     Question { task: u64, question: u64 },
-    Priority,
     Amend { task: u64 },
     Move { task: u64 },
     TakePerson { task: u64 },
@@ -60,7 +56,6 @@ pub struct CapacityRefusal {
 pub(crate) fn action(ask: &Ask, person: u64) -> CapacityAction {
     match ask {
         Ask::Compound { .. } => CapacityAction::Compound,
-        Ask::Close { .. } => CapacityAction::Close,
         Ask::Application { connector, .. } => CapacityAction::Application { connector: *connector },
         Ask::EditNote { name, .. } => CapacityAction::Note { name: *name },
         Ask::MakeService { .. } => CapacityAction::Service,
@@ -68,19 +63,16 @@ pub(crate) fn action(ask: &Ask, person: u64) -> CapacityAction {
         Ask::SetRoles { .. } => CapacityAction::Roles,
         Ask::ChangePolicy { .. } => CapacityAction::Policy,
         Ask::SetPool { person, .. } => CapacityAction::Pool { person: *person },
-        Ask::StartChat { .. } => CapacityAction::Chat,
         Ask::Create { .. } | Ask::Propose { .. } => CapacityAction::Create,
         Ask::Withdraw { proposal, .. } => {
             CapacityAction::Proposal { proposer: crate::Proposer::Party(person), number: *proposal }
         }
-        Ask::SetGoal { .. } => CapacityAction::Goal,
         Ask::DecideEscalation { task, .. } => CapacityAction::Escalation { task: *task },
         Ask::DecideProposal { proposer, proposal, .. } => {
             CapacityAction::Proposal { proposer: *proposer, number: *proposal }
         }
         Ask::Say { task, .. } => CapacityAction::Words { task: *task },
         Ask::AnswerQuestion { task, question, .. } => CapacityAction::Question { task: *task, question: *question },
-        Ask::Prioritise { .. } => CapacityAction::Priority,
         Ask::Amend { task, .. } => CapacityAction::Amend { task: *task },
         Ask::Move { task, .. } => CapacityAction::Move { task: *task },
         Ask::TakePerson { task, .. } => CapacityAction::TakePerson { task: *task },
@@ -96,19 +88,16 @@ pub(crate) fn action(ask: &Ask, person: u64) -> CapacityAction {
 pub(crate) fn project(ask: &Ask) -> Option<u32> {
     match ask {
         Ask::Compound { project, .. }
-        | Ask::Close { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
         | Ask::Adopt { project, .. }
         | Ask::SetRoles { project, .. }
         | Ask::ChangePolicy { project, .. }
         | Ask::SetPool { project, .. }
-        | Ask::StartChat { project, .. }
         | Ask::DecideEscalation { project, .. }
         | Ask::DecideProposal { project, .. }
         | Ask::Say { project, .. }
         | Ask::AnswerQuestion { project, .. }
-        | Ask::Prioritise { project, .. }
         | Ask::Amend { project, .. }
         | Ask::Move { project, .. }
         | Ask::TakePerson { project, .. }
@@ -119,8 +108,7 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
         | Ask::Release { project, .. }
         | Ask::Create { project, .. }
         | Ask::Propose { project, .. }
-        | Ask::Withdraw { project, .. }
-        | Ask::SetGoal { project, .. } => Some(*project),
+        | Ask::Withdraw { project, .. } => Some(*project),
         Ask::Application { scope, .. } => match scope {
             crate::ApplicationScope::Own => None,
             crate::ApplicationScope::Project(project) => Some(*project),
@@ -141,10 +129,8 @@ pub(crate) fn permanent(outcome: Outcome) -> Option<CapacityCause> {
         | Outcome::ServiceMade { .. }
         | Outcome::Adopted { .. }
         | Outcome::Created { .. }
-        | Outcome::GoalStarted { .. }
         | Outcome::Proposed { .. }
         | Outcome::Withdrawn { .. }
-        | Outcome::Closing { .. }
         | Outcome::Stopped { .. }
         | Outcome::Cancelled { .. }
         | Outcome::Released { .. }
@@ -155,13 +141,11 @@ pub(crate) fn permanent(outcome: Outcome) -> Option<CapacityCause> {
         | Outcome::ProposalDecided { .. }
         | Outcome::Said { .. }
         | Outcome::QuestionAnswered { .. }
-        | Outcome::Prioritised { .. }
         | Outcome::Amended { .. }
         | Outcome::RolesSet { .. }
         | Outcome::PolicyChanged { .. }
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
-        | Outcome::Started { .. }
         | Outcome::MarkedSeen { .. } => None,
     }
 }
@@ -212,7 +196,6 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
         | Refusal::Role { .. }
         | Refusal::Authority { .. }
         | Refusal::Moved { .. }
-        | Refusal::Disposal { .. }
         | Refusal::Taken { .. }
         | Refusal::Ended { .. }
         | Refusal::NotWaiting

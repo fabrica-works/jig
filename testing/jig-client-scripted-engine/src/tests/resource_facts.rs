@@ -35,8 +35,8 @@ fn whole_segmented_resource_admission_prices_reserved_slots_terminal_bytes_and_e
     assert!(payload::fits(&scope, &bounds));
     bounds.document_bytes = scoped - 1;
     assert!(!payload::fits(&scope, &bounds));
-    let goal = NoteScope::Goal { project: u32::MAX, goal: u64::MAX };
+    let goal = NoteScope::Task { project: u32::MAX, task: u64::MAX };
     bounds.document_bytes = u64::try_from(size_of::<NoteScope>()).unwrap();
     assert!(payload::fits(&goal, &bounds));
-    assert_eq!(goal, NoteScope::Goal { project: u32::MAX, goal: u64::MAX });
+    assert_eq!(goal, NoteScope::Task { project: u32::MAX, task: u64::MAX });
 }

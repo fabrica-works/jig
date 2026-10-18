@@ -24,7 +24,6 @@ fn started() -> Service {
     core.people.holdings = 2;
     core.people.initial_owners = 2;
     core.people.requests = 4;
-    core.people.goals = 2;
     core.tasks.tasks = 2;
     core.people.operations = 2;
     core.tasks.project_tasks = 2;
@@ -119,9 +118,17 @@ fn a_first_start_opens_each_seeded_projects_period() {
             reply_to: ReplyTo::new(Token::new(u64::from(project) + 20)),
             sign_in,
             key: u128::from(project).to_be_bytes(),
-            ask: people::Ask::StartChat { project, words: b"first chat".as_slice().into() },
+            ask: f::chat(project, b"first chat"),
         }));
-        assert_eq!(reply(&mut service), people::Reply::Outcome(people::Outcome::Started { task }), "{label}");
+        assert_eq!(
+            reply(&mut service),
+            people::Reply::Outcome(people::Outcome::Created {
+                first: task,
+                last: task,
+                given: Some(people::Given { task, amount: budget })
+            }),
+            "{label}"
+        );
     }
 }
 

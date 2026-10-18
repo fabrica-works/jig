@@ -44,26 +44,10 @@ pub fn person_answer(value: &client::PersonAnswer) -> people::PersonResult {
 }
 
 #[must_use]
-pub fn goal_executor(value: client::GoalExecutor) -> people::GoalExecutor {
-    match value {
-        client::GoalExecutor::Charter(charter) => people::GoalExecutor::Charter(charter),
-        client::GoalExecutor::Procedure { connector, code } => people::GoalExecutor::Procedure { connector, code },
-    }
-}
-
-#[must_use]
 pub fn seen(value: client::SeenThrough) -> people::Seen {
     match value {
         client::SeenThrough::Results { through } => people::Seen::Results { through },
         client::SeenThrough::Conversation { task: chat, through } => people::Seen::Chat { task: chat, through },
-    }
-}
-
-#[must_use]
-pub fn disposal(value: &client::Disposal) -> people::Disposal {
-    match value {
-        client::Disposal::Cancel { task } => people::Disposal { task: *task, keep: people::Keep::Cancel },
-        client::Disposal::TakeOver { task } => people::Disposal { task: *task, keep: people::Keep::MakeMine },
     }
 }
 
@@ -145,12 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn goal_executor_disposal_and_seen_translation_preserve_closed_variants_and_full_width_identities() {
-        assert_eq!(goal_executor(client::GoalExecutor::Charter(u32::MAX)), people::GoalExecutor::Charter(u32::MAX));
-        assert_eq!(
-            goal_executor(client::GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX }),
-            people::GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX }
-        );
+    fn seen_translation_preserves_closed_variants_and_full_width_identities() {
         assert_eq!(
             seen(client::SeenThrough::Results { through: u64::MAX }),
             people::Seen::Results { through: u64::MAX }
@@ -158,14 +137,6 @@ mod tests {
         assert_eq!(
             seen(client::SeenThrough::Conversation { task: u64::MAX, through: u64::MAX }),
             people::Seen::Chat { task: u64::MAX, through: u64::MAX }
-        );
-        assert_eq!(
-            disposal(&client::Disposal::Cancel { task: u64::MAX }),
-            people::Disposal { task: u64::MAX, keep: people::Keep::Cancel }
-        );
-        assert_eq!(
-            disposal(&client::Disposal::TakeOver { task: u64::MAX }),
-            people::Disposal { task: u64::MAX, keep: people::Keep::MakeMine }
         );
     }
 }

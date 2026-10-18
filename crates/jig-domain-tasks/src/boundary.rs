@@ -1251,18 +1251,6 @@ pub enum Event {
         pool_budget: u64,
         period_budget: u64,
     },
-    /// One root-authorized chat close, with all direct delegate disposals and a durable grace.
-    CloseChat {
-        reply_to: ReplyTo,
-        task: u64,
-        person: u64,
-        message: u64,
-        until: Wall,
-        disposals: List<crate::chat::Disposal>,
-        period: u64,
-        pool_budget: u64,
-        period_budget: u64,
-    },
     /// Latest connector admission rule for this individual resource.
     Resource { name: Name, hold: HoldKind },
     /// Current adoption access for a named resource in one project.
@@ -1344,8 +1332,6 @@ pub enum Event {
         /// The accepter's source; a direct amendment keeps its present funding.
         funder: Option<Funder>,
     },
-    /// Root-checked project maintainer changes several tracked goal priorities atomically.
-    Prioritise { reply_to: ReplyTo, project: u32, by: Party, goals: Box<[(u64, u32)]> },
     /// Root-authorized person adoption of one live task, with its reservation moved to that person's pool.
     Move {
         reply_to: ReplyTo,

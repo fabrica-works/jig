@@ -53,8 +53,8 @@ pub fn facts(b: &mut Builder, kind: &Kind, words: &Words, text_limit: u32) {
         Kind::PageUnknown { purpose } => {
             match purpose {
                 IntentPurpose::ProjectSettings => words.text(b, JigPhrase::Settings, &[]),
-                IntentPurpose::StartChat => words.text(b, JigPhrase::Conversations, &[]),
-                IntentPurpose::SetGoal => words.text(b, JigPhrase::ActSetGoal, &[]),
+                IntentPurpose::BeginConversation => words.text(b, JigPhrase::Conversations, &[]),
+                IntentPurpose::CreateGoal => words.text(b, JigPhrase::ActSetGoal, &[]),
                 IntentPurpose::Seen(seen) => match seen {
                     SeenThrough::Results { through } => {
                         words.text(b, JigPhrase::ResultsThrough, &[Hole::Number(*through)]);

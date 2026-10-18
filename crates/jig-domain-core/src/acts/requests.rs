@@ -17,11 +17,8 @@ pub(crate) fn request(
 ) -> Result<(), people::Refusal> {
     let (act, subject) = match ask {
         people::Ask::Application { .. } | people::Ask::Compound { .. } | people::Ask::Withdraw { .. } => return Ok(()),
-        people::Ask::Create { .. }
-        | people::Ask::Propose { .. }
-        | people::Ask::StartChat { .. }
-        | people::Ask::SetGoal { .. } => {
-            return standing::role(core, project, role, Act::SetGoal);
+        people::Ask::Create { .. } | people::Ask::Propose { .. } => {
+            return standing::role(core, project, role, Act::Amend);
         }
         people::Ask::Say { task, .. } => (Act::Message, documents::Subject::Task { task: *task }),
         people::Ask::AnswerQuestion { task, question, .. } => {
@@ -58,9 +55,7 @@ pub(crate) fn request(
         }
         people::Ask::Stop { task, .. } => (Act::Stop, documents::Subject::Task { task: *task }),
         people::Ask::Cancel { task, .. } => (Act::Cancel, documents::Subject::Task { task: *task }),
-        people::Ask::Close { chat, .. } => (Act::Close, documents::Subject::Task { task: *chat }),
         people::Ask::Move { task, .. } => (Act::Move, documents::Subject::Task { task: *task }),
-        people::Ask::Prioritise { .. } => (Act::Prioritise, documents::Subject::Project { project }),
         people::Ask::MarkSeen { seen } => match seen {
             people::Seen::Results { .. } => (Act::Seen, documents::Subject::Inbox { party: person }),
             people::Seen::Chat { task, .. } => (Act::Seen, documents::Subject::Task { task: *task }),
@@ -110,7 +105,6 @@ pub(crate) fn request(
         }
         people::Ask::Compound { .. }
         | people::Ask::Application { .. }
-        | people::Ask::StartChat { .. }
         | people::Ask::Say { .. }
         | people::Ask::AnswerQuestion { .. }
         | people::Ask::TakePerson { .. }
@@ -119,13 +113,10 @@ pub(crate) fn request(
         | people::Ask::Amend { .. }
         | people::Ask::Stop { .. }
         | people::Ask::Cancel { .. }
-        | people::Ask::Close { .. }
         | people::Ask::Move { .. }
         | people::Ask::Create { .. }
         | people::Ask::Propose { .. }
         | people::Ask::Withdraw { .. }
-        | people::Ask::SetGoal { .. }
-        | people::Ask::Prioritise { .. }
         | people::Ask::MarkSeen { .. }
         | people::Ask::EditNote { .. }
         | people::Ask::Adopt { .. }

@@ -23,7 +23,6 @@ fn frame_projects_keep_unopened_pools_absent_and_use_actual_current_funding() {
     let project = initial.projects.get(0).expect("project role");
     assert_eq!(project.name, None);
     assert_eq!(project.pool, None);
-    assert_eq!(project.chat_budget, core.authority.role(1, 0).unwrap().authority.budget.spend);
     let period = core.period(1);
     let source = tasks::Funder::Pool { project: 1, person: 1, period };
     send_task(
@@ -39,8 +38,6 @@ fn frame_projects_keep_unopened_pools_absent_and_use_actual_current_funding() {
     assert_eq!(pool.numbers, actual.numbers);
     assert_eq!(pool.left, 177);
     assert_ne!(pool.numbers.budget, core.pool_budget(1, 1));
-    assert_eq!(joined.charters.get(0).expect("charters").chat, core.settings.chat);
-    assert_eq!(joined.charters.get(0).expect("charters").goals.as_slice(), core.tasks.charters());
 }
 
 #[test]
@@ -164,7 +161,12 @@ fn the_frame_offers_both_charters_for_goals() {
     let mut core = Core::new(config, &limits);
     core.people = old.people;
     let frame = frame(&core, &limits);
-    assert_eq!(frame.charters.get(0).expect("project charters").goals.as_slice(), [1, 2]);
+    let crate::acts::Creating { within: crate::acts::Bounds::Create { charters, .. }, .. } =
+        frame.projects.get(0).expect("project").creating.as_ref().expect("creating")
+    else {
+        panic!("creating bounds")
+    };
+    assert_eq!(charters.as_slice(), [1, 2]);
 }
 
 pub(super) fn owner_creating(capacity: u32, tasks_left: u32, depth: u32) -> crate::acts::Bounds {
@@ -172,12 +174,12 @@ pub(super) fn owner_creating(capacity: u32, tasks_left: u32, depth: u32) -> crat
     charters.push(1).unwrap();
     let mut procedures = List::with_capacity(capacity);
     for connector in [1, 2] {
-        procedures.push(crate::acts::GoalProcedure { connector, code: 1 }).unwrap();
+        procedures.push(crate::acts::CreateProcedure { connector, code: 1 }).unwrap();
     }
     let mut executors = List::with_capacity(2);
     executors.push(tasks::AuthorityExecutor::Charter(CREATING_CHARTER)).unwrap();
     executors.push(tasks::AuthorityExecutor::Procedure(CREATING_PROCEDURE)).unwrap();
-    crate::acts::Bounds::Goal {
+    crate::acts::Bounds::Create {
         authority: Box::new(AuthorityLine {
             tools: tasks::Tools(1023),
             grants: List::with_capacity(0),
@@ -222,8 +224,9 @@ fn me_carries_a_members_creating_bounds_per_project() {
     let value = frame(&core, &limits);
     let Some(creating) = &value.projects.get(0).unwrap().creating else { panic!("member creating bound") };
     assert_eq!(creating.within, owner_creating(limits.documents.lines, 15, 4));
-    let crate::acts::Bounds::Goal { authority, .. } = &creating.within else { panic!("creating authority") };
-    let given = core.chat_authority(CREATING_PROJECT, CREATING_PARTY, people::Role::Member, limits.tasks.tree_tasks);
+    let crate::acts::Bounds::Create { authority, .. } = &creating.within else { panic!("creating authority") };
+    let given =
+        core.creating_authority(CREATING_PROJECT, CREATING_PARTY, people::Role::Member, limits.tasks.tree_tasks);
     assert_eq!(**authority, act_authority(&limits, &task_authority(&given)).unwrap());
 }
 

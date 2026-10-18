@@ -36,7 +36,6 @@ pub(super) fn ask(project: u32, values: &List<client::Operation>) -> Result<peop
             people::Ask::Stop { project: owner, task } if owner == project => people::Operation::Stop { task },
             people::Ask::Compound { .. }
             | people::Ask::Create { .. }
-            | people::Ask::Close { .. }
             | people::Ask::MarkSeen { .. }
             | people::Ask::Application { .. }
             | people::Ask::EditNote { .. }
@@ -44,7 +43,6 @@ pub(super) fn ask(project: u32, values: &List<client::Operation>) -> Result<peop
             | people::Ask::Adopt { .. }
             | people::Ask::Propose { .. }
             | people::Ask::Withdraw { .. }
-            | people::Ask::SetGoal { .. }
             | people::Ask::Stop { .. }
             | people::Ask::Cancel { .. }
             | people::Ask::Release { .. }
@@ -55,13 +53,11 @@ pub(super) fn ask(project: u32, values: &List<client::Operation>) -> Result<peop
             | people::Ask::DecideProposal { .. }
             | people::Ask::Say { .. }
             | people::Ask::AnswerQuestion { .. }
-            | people::Ask::Prioritise { .. }
             | people::Ask::Amend { .. }
             | people::Ask::SetRoles { .. }
             | people::Ask::ChangePolicy { .. }
             | people::Ask::SetPool { .. }
-            | people::Ask::DecideEscalation { .. }
-            | people::Ask::StartChat { .. } => return Err(Invalid::CompoundProject),
+            | people::Ask::DecideEscalation { .. } => return Err(Invalid::CompoundProject),
         };
         operations.push(operation).expect("same capacity");
     }

@@ -77,16 +77,6 @@ fn an_approval_contract_in_a_template_is_refused() {
     );
 }
 #[test]
-fn a_configuration_whose_template_one_names_no_charter_is_refused() {
-    fixtures::refuses(
-        br#""executor": {"charter": 1}"#,
-        br#""executor": "chosen""#,
-        fixtures::path(&[b"templates"]),
-        What::Refers,
-    );
-}
-
-#[test]
 fn a_seeded_override_naming_no_template_refuses_the_start() {
     let document = fixtures::with(
         fixtures::ENGINE_SMALL,

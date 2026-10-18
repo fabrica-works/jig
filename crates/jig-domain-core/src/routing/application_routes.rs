@@ -168,10 +168,8 @@ impl Core {
                 | people::Outcome::ServiceMade { .. }
                 | people::Outcome::Adopted { .. }
                 | people::Outcome::Created { .. }
-                | people::Outcome::GoalStarted { .. }
                 | people::Outcome::Proposed { .. }
                 | people::Outcome::Withdrawn { .. }
-                | people::Outcome::Closing { .. }
                 | people::Outcome::Stopped { .. }
                 | people::Outcome::Cancelled { .. }
                 | people::Outcome::Released { .. }
@@ -182,13 +180,11 @@ impl Core {
                 | people::Outcome::ProposalDecided { .. }
                 | people::Outcome::Said { .. }
                 | people::Outcome::QuestionAnswered { .. }
-                | people::Outcome::Prioritised { .. }
                 | people::Outcome::Amended { .. }
                 | people::Outcome::RolesSet { .. }
                 | people::Outcome::PolicyChanged { .. }
                 | people::Outcome::PoolSet { .. }
                 | people::Outcome::EscalationDecided { .. }
-                | people::Outcome::Started { .. }
                 | people::Outcome::Refused(..) => true,
             },
             people::Stored::Person { .. }

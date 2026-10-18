@@ -159,6 +159,7 @@ dependencies = [
 name = "jig-channel-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-test-records",
  "jig-domain-core",
  "jig-domain-host",
  "jig-domain-notes",
@@ -343,6 +344,7 @@ dependencies = [
 name = "jig-client-test-records"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
  "jig-client-protocol-wire",
  "skein-codec",
  "skein-lib",
@@ -468,6 +470,7 @@ dependencies = [
 name = "jig-core-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client-test-records",
  "jig-conformance",
  "jig-domain-accounts",
  "jig-domain-authority",
@@ -1129,6 +1132,7 @@ dependencies = [
 name = "jig-test-service"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
  "jig-client-protocol-wire",
  "jig-client-test-protocol-wire",
  "jig-domain-accounts",

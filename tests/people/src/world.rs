@@ -26,7 +26,6 @@ pub const LIMITS: Limits = Limits {
     sign_ins: 8,
     projects: 3,
     holdings: 8,
-    goals: 8,
     initial_owners: 3,
     requests: 32,
     pending: 8,
@@ -413,7 +412,7 @@ impl World {
     }
 
     pub fn ask(&mut self, sign_in: u64, key: [u8; 16], words: &[u8]) -> u64 {
-        self.request(sign_in, key, Ask::StartChat { project: 1, words: words.to_vec().into_boxed_slice() })
+        self.request(sign_in, key, crate::fixtures::create(words, None))
     }
 
     pub fn request(&mut self, sign_in: u64, key: [u8; 16], ask: Ask) -> u64 {
@@ -462,7 +461,7 @@ impl World {
         let outcome = if self.settings.authority_refuses {
             Outcome::Refused(Refusal::Authority { proposable: None, lacking: Lack::Shape })
         } else {
-            Outcome::Started { task }
+            Outcome::Created { first: task, last: task, given: None }
         };
         self.send_inner(Event::Decided { request, outcome }, Some((key, task)));
     }
@@ -501,13 +500,10 @@ impl World {
                     let kind = match ask.as_ref() {
                         Ask::Compound { .. } => RouteKind::Control,
                         Ask::Application { .. } => RouteKind::Application,
-                        Ask::StartChat { .. } => RouteKind::Chat,
-                        Ask::Create { .. }
-                        | Ask::Propose { action: people::Action::Batch(_), .. }
-                        | Ask::Withdraw { .. } => {
+                        Ask::Create { .. } => RouteKind::Goal,
+                        Ask::Propose { action: people::Action::Batch(_), .. } | Ask::Withdraw { .. } => {
                             unreachable!("party batches are exercised by the core world")
                         }
-                        Ask::SetGoal { .. } => RouteKind::Goal,
                         Ask::MakeService { .. } => RouteKind::Service,
                         Ask::DecideProposal { .. } | Ask::Propose { action: people::Action::Amend { .. }, .. } => {
                             RouteKind::Proposal
@@ -518,14 +514,12 @@ impl World {
                         Ask::MarkSeen { .. } | Ask::Release { .. } | Ask::Amend { .. } | Ask::Say { .. } => {
                             RouteKind::Control
                         }
-                        Ask::Close { .. }
-                        | Ask::EditNote { .. }
+                        Ask::EditNote { .. }
                         | Ask::Adopt { .. }
                         | Ask::Stop { .. }
                         | Ask::Cancel { .. }
                         | Ask::Move { .. }
                         | Ask::AnswerQuestion { .. }
-                        | Ask::Prioritise { .. }
                         | Ask::SetRoles { .. }
                         | Ask::ChangePolicy { .. }
                         | Ask::SetPool { .. }
@@ -558,7 +552,7 @@ impl World {
                     self.stats.routes += 1;
                     self.observe(Seen::Routed { role: role.unwrap_or(Role::Observer), kind, service });
                     if self.defer_route {
-                        assert_eq!(kind, RouteKind::Chat, "only chats use the deferred script");
+                        assert_eq!(kind, RouteKind::Goal, "only creation uses the deferred script");
                         self.deferred.push((request, key));
                     } else {
                         match *ask {
@@ -634,23 +628,16 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::Create { .. }
-                            | Ask::Propose { action: people::Action::Batch(_), .. }
-                            | Ask::Withdraw { .. } => {
+                            Ask::Propose { action: people::Action::Batch(_), .. } | Ask::Withdraw { .. } => {
                                 unreachable!("party batches are exercised by the core world")
                             }
-                            Ask::StartChat { .. } | Ask::SetGoal { .. } => {
-                                let goal = kind == RouteKind::Goal;
+                            Ask::Create { .. } => {
                                 let outcome = if self.settings.authority_refuses {
                                     Outcome::Refused(Refusal::Authority { proposable: None, lacking: Lack::Shape })
                                 } else {
                                     let number = self.name();
                                     tasks.push((key, number));
-                                    if goal {
-                                        Outcome::GoalStarted { task: number }
-                                    } else {
-                                        Outcome::Started { task: number }
-                                    }
+                                    Outcome::Created { first: number, last: number, given: None }
                                 };
                                 people::step(
                                     &mut self.domain,
@@ -801,14 +788,12 @@ impl World {
                                         Ask::Compound { .. }
                                         | Ask::MarkSeen { .. }
                                         | Ask::Application { .. }
-                                        | Ask::Close { .. }
                                         | Ask::EditNote { .. }
                                         | Ask::MakeService { .. }
                                         | Ask::Adopt { .. }
                                         | Ask::Create { .. }
                                         | Ask::Propose { .. }
                                         | Ask::Withdraw { .. }
-                                        | Ask::SetGoal { .. }
                                         | Ask::Stop { .. }
                                         | Ask::Cancel { .. }
                                         | Ask::Release { .. }
@@ -816,13 +801,11 @@ impl World {
                                         | Ask::DecideProposal { .. }
                                         | Ask::Say { .. }
                                         | Ask::AnswerQuestion { .. }
-                                        | Ask::Prioritise { .. }
                                         | Ask::Amend { .. }
                                         | Ask::SetRoles { .. }
                                         | Ask::ChangePolicy { .. }
                                         | Ask::SetPool { .. }
-                                        | Ask::DecideEscalation { .. }
-                                        | Ask::StartChat { .. } => unreachable!("person task act"),
+                                        | Ask::DecideEscalation { .. } => unreachable!("person task act"),
                                     },
                                     None => Outcome::Refused(Refusal::Unknown),
                                 };
@@ -833,14 +816,12 @@ impl World {
                                     &mut self.out,
                                 );
                             }
-                            Ask::Close { .. }
-                            | Ask::EditNote { .. }
+                            Ask::EditNote { .. }
                             | Ask::Adopt { .. }
                             | Ask::Stop { .. }
                             | Ask::Cancel { .. }
                             | Ask::Move { .. }
                             | Ask::AnswerQuestion { .. }
-                            | Ask::Prioritise { .. }
                             | Ask::SetRoles { .. }
                             | Ask::ChangePolicy { .. }
                             | Ask::SetPool { .. }

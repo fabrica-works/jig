@@ -9,24 +9,6 @@ use crate::domain::{Domain, entrance, publish, record, refused, task_mut};
 use crate::{Change, Funder, Limits, Numbers, Party, Phase, Refusal, Request, Was};
 use skein_lib::{Env, List, Queue, ReplyTo};
 
-pub(crate) fn descendant(domain: &Domain, number: u64, ancestor: u64, bound: u32) -> bool {
-    let mut at = Some(number);
-    for _ in 0..bound {
-        let Some(current) = at else { return false };
-        if current == ancestor {
-            return true;
-        }
-        at = match record(domain, current) {
-            Some(task) => match task.requester {
-                Party::Task(parent) => Some(parent),
-                Party::Person(_) | Party::Deployment { .. } => None,
-            },
-            None => None,
-        };
-    }
-    false
-}
-
 pub(crate) fn mutable(phase: &Phase) -> bool {
     match phase {
         Phase::Waiting | Phase::Active(_) | Phase::Held { was: Was::Waiting | Was::Active(_), .. } => true,

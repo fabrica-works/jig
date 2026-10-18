@@ -53,7 +53,6 @@ pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
             "core prices its configured run policy"
         );
     }
-    assert!(seen.as_slice().contains(&settings.chat), "chat charter configured");
 }
 
 pub(crate) fn numbers(settings: &Settings, limits: &Limits) -> Box<[u32]> {

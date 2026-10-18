@@ -97,7 +97,7 @@ fn me_reads_the_pool_left_in_its_creating_bounds() {
     let reads::Answer::Document(document) = latest(&world) else { panic!("me document") };
     let documents::Document::Frame(value) = document.as_ref() else { panic!("me") };
     let project = value.projects.iter().find(|project| project.project == 1).expect("project");
-    let Some(core::acts::Creating { within: core::acts::Bounds::Goal { pool_left, .. }, .. }) = &project.creating
+    let Some(core::acts::Creating { within: core::acts::Bounds::Create { pool_left, .. }, .. }) = &project.creating
     else {
         panic!("creating")
     };
@@ -228,7 +228,8 @@ fn a_task_query_reads_a_partys_live_tasks_in_last_activity_order() {
     let older = world.assigned.as_ref().expect("first task").task;
     world.end(tasks::End::Parked, 0);
     world.advance(skein_lib::Duration::from_secs(1));
-    request(&mut world, QUERY_REQUEST, people::Ask::StartChat { project: 1, words: b"new task".as_slice().into() });
+    let new_chat = jig_core_world::fixtures::chat(&world, 1, b"new task".as_slice().into());
+    request(&mut world, QUERY_REQUEST, new_chat);
     let newer = world.assigned.as_ref().expect("second task").task;
     world.end(tasks::End::Parked, 0);
     world.advance(skein_lib::Duration::from_secs(1));
@@ -249,7 +250,8 @@ fn a_task_query_read_pages_its_live_group_and_then_ends() {
     let mut world = jig_core_world::stories::reads::world_with_rows(1207, 1);
     let mut expected = vec![world.assigned.as_ref().expect("first task").task];
     world.end(tasks::End::Parked, 0);
-    request(&mut world, QUERY_REQUEST, people::Ask::StartChat { project: 1, words: b"next task".as_slice().into() });
+    let later_chat = jig_core_world::fixtures::chat(&world, 1, b"next task".as_slice().into());
+    request(&mut world, QUERY_REQUEST, later_chat);
     expected.push(world.assigned.as_ref().expect("next task").task);
     let query = jig_core_world::fixtures::OWN_TASKS;
     ask(&mut world, QUERY_READ, reads::Read::Tasks { query, live: None, ended: None });
@@ -360,12 +362,8 @@ fn a_projectless_query_without_a_requester_keeps_the_asking_partys_tasks_alone()
     let first = world.sign_in.expect("first party signed in");
     world.end(tasks::End::Parked, 0);
     let second = jig_core_world::fixtures::second_party(&mut world, b"query-second", people::Role::Owner);
-    jig_core_world::fixtures::ask_as(
-        &mut world,
-        second,
-        QUERY_MORE_REQUEST,
-        people::Ask::StartChat { project: 1, words: b"other party's task".as_slice().into() },
-    );
+    let other_partys_chat = jig_core_world::fixtures::chat(&world, 1, b"other party's task".as_slice().into());
+    jig_core_world::fixtures::ask_as(&mut world, second, QUERY_MORE_REQUEST, other_partys_chat);
     let other = world.assigned.as_ref().expect("second party's task").task;
     assert_ne!(own, other);
     world.sign_in = Some(first);

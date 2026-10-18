@@ -186,13 +186,7 @@ pub fn mixed_history_page() -> w::HistoryPage {
                             w::OwnerRequesterPerson::new(&l, w::OwnerRequesterPersonParts { value: 23 })
                                 .expect("literal"),
                         ),
-                        change: w::OwnerHistoryChange::Prioritised(
-                            w::OwnerHistoryChangePrioritised::new(
-                                &l,
-                                w::OwnerHistoryChangePrioritisedParts { priority: 29 },
-                            )
-                            .expect("literal"),
-                        ),
+                        change: w::OwnerHistoryChange::Amended,
                         reason: w::DocumentText::new(&l, reason).expect("literal"),
                         proposal: None,
                         amendment: None,

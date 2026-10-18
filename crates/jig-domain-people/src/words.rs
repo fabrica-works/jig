@@ -3,10 +3,9 @@ use crate::{Ask, EscalationDecision, NoteChange, PersonResult, ProposalDecision}
 
 pub(crate) fn valid(ask: &Ask) -> bool {
     match ask {
-        Ask::StartChat { words, .. } | Ask::Say { words, .. } | Ask::AnswerQuestion { words, .. } => text(words),
+        Ask::Say { words, .. } | Ask::AnswerQuestion { words, .. } => text(words),
         Ask::Propose { action: crate::Action::Batch(batch), reason, .. } => text(reason) && batch_words(batch),
         Ask::Create { batch, .. } => batch_words(batch),
-        Ask::SetGoal { spec, .. } => text(spec),
         Ask::MakeService { name, .. } => text(name),
         Ask::Move { reason, .. } | Ask::Cancel { reason, .. } => text(reason),
         Ask::DecideEscalation { decision, .. } => match decision {
@@ -34,7 +33,6 @@ pub(crate) fn valid(ask: &Ask) -> bool {
         }
         Ask::Amend { amendment, .. } => amendment_words(amendment),
         Ask::Compound { .. }
-        | Ask::Close { .. }
         | Ask::MarkSeen { .. }
         | Ask::Application { .. }
         | Ask::Adopt { .. }
@@ -45,7 +43,6 @@ pub(crate) fn valid(ask: &Ask) -> bool {
         | Ask::SetRoles { .. }
         | Ask::ChangePolicy { .. }
         | Ask::SetPool { .. }
-        | Ask::Prioritise { .. }
         | Ask::Withdraw { .. } => true,
     }
 }

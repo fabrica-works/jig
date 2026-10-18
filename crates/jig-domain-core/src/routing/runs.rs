@@ -533,8 +533,7 @@ pub(super) fn named_action(
                                 capacity: None,
                             })
                         }
-                        jig_domain_people::Refusal::Disposal { .. }
-                        | jig_domain_people::Refusal::Role { .. }
+                        jig_domain_people::Refusal::Role { .. }
                         | jig_domain_people::Refusal::Authority { .. }
                         | jig_domain_people::Refusal::Ended { .. }
                         | jig_domain_people::Refusal::Taken { .. }

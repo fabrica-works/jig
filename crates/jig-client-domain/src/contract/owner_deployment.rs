@@ -222,8 +222,10 @@ pub enum OwnerHelloRefusal {
 /// The supplied closed personcapacityaction vocabulary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerPersonCapacityAction {
-    /// Close as supplied by its owner.
-    Close,
+    /// Creating tasks as one batch.
+    Create,
+    /// Applying several task operations together.
+    Compound,
     /// Application as supplied by its owner.
     Application { connector: u16 },
     /// Note as supplied by its owner.
@@ -238,10 +240,6 @@ pub enum OwnerPersonCapacityAction {
     Policy,
     /// Pool as supplied by its owner.
     Pool { person: u64 },
-    /// Chat as supplied by its owner.
-    Chat,
-    /// Goal as supplied by its owner.
-    Goal,
     /// Escalation as supplied by its owner.
     Escalation { task: u64 },
     /// Proposal as supplied by its owner.
@@ -250,8 +248,6 @@ pub enum OwnerPersonCapacityAction {
     Words { task: u64 },
     /// Question as supplied by its owner.
     Question { task: u64, question: u64 },
-    /// Priority as supplied by its owner.
-    Priority,
     /// Amend as supplied by its owner.
     Amend { task: u64 },
     /// Move as supplied by its owner.

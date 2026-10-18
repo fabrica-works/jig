@@ -187,8 +187,8 @@ fn signing_in_and_starting_a_chat_on_the_engine() {
     report(&mut world, &assignment, completion());
     world.run(Until::Time(Time::from_nanos(180_000_000)));
     let offers = world.front().session.task_offers(client, assignment.task).expect("admitted actual Task packet");
-    assert_eq!(offers.source.capacity(), 7);
-    assert_eq!(offers.native.capacity(), 7);
+    assert_eq!(offers.source.capacity(), 6);
+    assert_eq!(offers.native.capacity(), 6);
     for (source, native) in offers.source.iter().zip(offers.native.iter()) {
         same_task_admission(&source.admission, &native.admission);
     }
@@ -209,7 +209,6 @@ fn signing_in_and_starting_a_chat_on_the_engine() {
             jig_domain_core::acts::Act::Message,
             jig_domain_core::acts::Act::Amend,
             jig_domain_core::acts::Act::Move,
-            jig_domain_core::acts::Act::Close,
             jig_domain_core::acts::Act::Stop,
             jig_domain_core::acts::Act::Cancel,
             jig_domain_core::acts::Act::Seen,
@@ -221,7 +220,6 @@ fn signing_in_and_starting_a_chat_on_the_engine() {
             client::ActKind::Message,
             client::ActKind::Amend,
             client::ActKind::Move,
-            client::ActKind::Close,
             client::ActKind::Stop,
             client::ActKind::Cancel,
             client::ActKind::Seen,

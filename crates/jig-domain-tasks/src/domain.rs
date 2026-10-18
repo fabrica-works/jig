@@ -542,25 +542,6 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 out,
             );
         }
-        Event::Prioritise { reply_to, project, by, goals } => {
-            crate::control::prioritise(domain, env, reply_to, project, by, &goals, out);
-        }
-        Event::CloseChat { reply_to, task, person, message, until, disposals, period, pool_budget, period_budget } => {
-            crate::chat::close(
-                domain,
-                env,
-                reply_to,
-                task,
-                person,
-                message,
-                until,
-                disposals,
-                period,
-                pool_budget,
-                period_budget,
-                out,
-            );
-        }
         Event::Move { reply_to, task, person, period, pool_budget, period_budget, reason } => {
             crate::moving::apply(domain, env, reply_to, task, person, period, pool_budget, period_budget, &reason, out);
         }

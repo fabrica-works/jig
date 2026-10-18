@@ -1,5 +1,5 @@
 use super::*;
-use fixtures::{ATTEMPT, Harness, KEY, limits, signed_in, start_chat};
+use fixtures::{ATTEMPT, Harness, KEY, limits, message, signed_in};
 use skein_lib::Secret;
 const PARTY: u64 = 7;
 const CREDENTIAL: [u8; 40] = [9; 40];
@@ -15,7 +15,7 @@ fn a_sign_in_answer_puts_its_credential_on_each_exchange() {
     assert!(h.link.credential().is_none());
     h.answer(exchange, &signed_in(PARTY, &CREDENTIAL));
     assert!(h.has(&Request::Signing { signing: Signing::SignedIn { party: PARTY } }));
-    h.send(ATTEMPT, KEY, start_chat());
+    h.send(ATTEMPT, KEY, message());
     assert_eq!(h.credentials().as_slice().last(), Some(&Some(Secret::new(Box::new(CREDENTIAL)))));
 }
 #[test]
@@ -23,7 +23,7 @@ fn a_held_credential_is_carried_without_an_exchange() {
     let mut h = Harness::new(&limits());
     assert_eq!(h.sign_in(held()), None);
     assert!(h.out.is_empty());
-    h.send(ATTEMPT, KEY, start_chat());
+    h.send(ATTEMPT, KEY, message());
     assert_eq!(h.credentials().as_slice(), &[Some(Secret::new(Box::new(CREDENTIAL)))]);
 }
 #[test]

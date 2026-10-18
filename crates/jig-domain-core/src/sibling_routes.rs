@@ -273,23 +273,16 @@ impl Core {
         match self.delegating.remove(&request) {
             Some((key, stubs, given)) => MadeRoute::Delegated { key, tasks, stubs, given },
             None => {
-                let crate::routing::Made { first: expected, goal, given, stubs } =
+                let crate::routing::Made { first: expected, given, stubs } =
                     self.made.remove(&request).expect("pending make route");
-                if goal.is_some() {
-                    assert!(tasks.as_ref() == [expected], "one person task created");
-                }
                 MadeRoute::Person {
                     stubs,
                     event: Box::new(people::Event::Decided {
                         request,
-                        outcome: match goal {
-                            Some(true) => people::Outcome::GoalStarted { task: expected },
-                            Some(false) => people::Outcome::Started { task: expected },
-                            None => people::Outcome::Created {
-                                first: expected,
-                                given,
-                                last: *tasks.last().expect("nonempty created batch"),
-                            },
+                        outcome: people::Outcome::Created {
+                            first: expected,
+                            given,
+                            last: *tasks.last().expect("nonempty created batch"),
                         },
                     }),
                 }

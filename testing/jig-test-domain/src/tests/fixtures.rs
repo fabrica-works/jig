@@ -117,9 +117,7 @@ pub fn domain() -> Domain {
                 connectors: Box::new([1, 2]),
                 settings: core::Settings {
                     templates: Box::new([]),
-                    close_grace: Duration::from_secs(5),
                     deployment_provider: 3,
-                    chat: 1,
                     charters: Box::new([core::Charter {
                         number: 1,
                         hosts: fleet::Kinds::Workers,

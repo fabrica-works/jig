@@ -5,8 +5,6 @@ use jig_client::contract::{Made, Outcome, OwnerOutcome};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Route {
     Created { task: u64 },
-    Chat { task: u64 },
-    Goal { task: u64 },
     Words { task: u64, message: u64 },
     Proposed,
     Other,
@@ -21,13 +19,10 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
                     Route::Other
                 }
             }
-            OwnerOutcome::Started { task } => Route::Chat { task: *task },
-            OwnerOutcome::GoalStarted { task } => Route::Goal { task: *task },
             OwnerOutcome::Said { task, message, .. } => Route::Words { task: *task, message: *message },
-            OwnerOutcome::GoalProposed { .. } | OwnerOutcome::Proposed { .. } => Route::Proposed,
+            OwnerOutcome::Proposed { .. } => Route::Proposed,
             OwnerOutcome::Withdrawn { .. }
             | OwnerOutcome::Compound { .. }
-            | OwnerOutcome::Closing { .. }
             | OwnerOutcome::MarkedSeen { .. }
             | OwnerOutcome::NoteEdited { .. }
             | OwnerOutcome::ServiceMade { .. }
@@ -41,7 +36,6 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
             | OwnerOutcome::Moved { .. }
             | OwnerOutcome::ProposalDecided { .. }
             | OwnerOutcome::QuestionAnswered { .. }
-            | OwnerOutcome::Prioritised { .. }
             | OwnerOutcome::Amended { .. }
             | OwnerOutcome::RolesSet { .. }
             | OwnerOutcome::PolicyChanged { .. }
@@ -49,8 +43,6 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
             | OwnerOutcome::EscalationDecided { .. } => Route::Other,
         },
         Outcome::Made { what } => match what {
-            Made::Chat { task } => Route::Chat { task: *task },
-            Made::Goal { task } => Route::Goal { task: *task },
             Made::Tasks { tasks } => {
                 if tasks.len() == 1 {
                     Route::Created { task: *tasks.get(0).expect("one created task") }

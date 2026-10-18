@@ -29,7 +29,20 @@ fn holder_policy(core: &mut Core, decides: authority::Proposals, holder: Option<
 fn a_chat_is_refused_while_nobody_holds_its_escalations() {
     let (mut core, _) = core();
     holder_policy(&mut core, authority::Proposals(0), None);
-    assert_eq!(core.chat_admit(PROJECT, REQUESTER, people::Role::Owner, 2), Err(people::Refusal::NoEscalationHolder));
+    assert_eq!(
+        crate::acts::bounds::create_start(
+            &core,
+            PROJECT,
+            REQUESTER,
+            people::Role::Owner,
+            tasks::Executor::Agent { charter: 1 },
+            10,
+            None,
+            2
+        )
+        .unwrap_err(),
+        people::Refusal::NoEscalationHolder
+    );
 }
 
 #[test]
@@ -37,8 +50,17 @@ fn a_goal_is_refused_while_nobody_holds_its_escalations() {
     let (mut core, _) = core();
     holder_policy(&mut core, authority::Proposals(0), None);
     assert_eq!(
-        core.goal_start(PROJECT, REQUESTER, people::Role::Owner, people::GoalExecutor::Charter(1), 10, None, 2)
-            .unwrap_err(),
+        crate::acts::bounds::create_start(
+            &core,
+            PROJECT,
+            REQUESTER,
+            people::Role::Owner,
+            tasks::Executor::Agent { charter: 1 },
+            10,
+            None,
+            2
+        )
+        .unwrap_err(),
         people::Refusal::NoEscalationHolder
     );
 }
@@ -47,7 +69,17 @@ fn a_goal_is_refused_while_nobody_holds_its_escalations() {
 fn a_policy_role_numbered_five_holds_a_chats_escalations() {
     let (mut core, _) = core();
     holder_policy(&mut core, authority::Proposals(0), Some(POLICY_ROLE));
-    assert_eq!(core.chat_admit(PROJECT, REQUESTER, people::Role::Owner, 2), Ok(()));
+    crate::acts::bounds::create_start(
+        &core,
+        PROJECT,
+        REQUESTER,
+        people::Role::Owner,
+        tasks::Executor::Agent { charter: 1 },
+        10,
+        None,
+        2,
+    )
+    .unwrap();
 }
 
 #[test]

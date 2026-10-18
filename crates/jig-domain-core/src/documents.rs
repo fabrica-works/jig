@@ -228,15 +228,6 @@ pub struct Chip {
     pub details: Box<ChipDetails>,
 }
 
-/// A project's charter numbers offered for chats and goals.
-#[derive(Clone, PartialEq, Eq, Hash, Debug)]
-pub struct OfferedCharter {
-    pub project: u32,
-    pub chat: u32,
-    pub goals: List<u32>,
-    pub cut: bool,
-}
-
 /// A held project role and the actual current funding facts available to the party.
 /// Names are absent until an owner supplies one; unopened pools have no ledger.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -245,7 +236,6 @@ pub struct FrameProjectRole {
     pub role: people::Role,
     pub name: Option<Text>,
     pub pool: Option<Ledger>,
-    pub chat_budget: u64,
     /// Direct creating bounds for this party and project (contract.md, 5.3).
     pub creating: Option<crate::acts::Creating>,
     /// Configured templates with this project's policy overrides applied.
@@ -269,7 +259,6 @@ pub struct Frame {
     pub updates: Count,
     pub results_seen: u64,
     pub retention: Duration,
-    pub charters: List<OfferedCharter>,
     pub cut: bool,
 }
 
@@ -401,15 +390,13 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
     let chips = List::<Chip>::worst_case(limits.chips)?.checked_add(u64::from(limits.chips).checked_mul(chip)?)?;
     let charter = List::<u32>::worst_case(limits.lines)?;
     let creating = charter
-        .checked_add(List::<crate::acts::GoalProcedure>::worst_case(limits.lines)?)?
+        .checked_add(List::<crate::acts::CreateProcedure>::worst_case(limits.lines)?)?
         .checked_add(List::<u32>::worst_case(limits.roles)?)?
         .checked_add(u64::try_from(size_of::<AuthorityLine>()).ok()?)?
         .checked_add(task_tree::authority_worst_case(limits)?)?;
     let frame = List::<FrameProjectRole>::worst_case(limits.lines)?
         .checked_add(u64::from(limits.lines).checked_mul(creating)?)?
         .checked_add(u64::from(limits.lines).checked_mul(u64::from(limits.text_bytes))?)?
-        .checked_add(List::<OfferedCharter>::worst_case(limits.lines)?)?
-        .checked_add(u64::from(limits.lines).checked_mul(charter)?)?
         .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?;
     u64::try_from(size_of::<Document>()).ok()?.checked_add(
         chips

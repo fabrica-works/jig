@@ -294,66 +294,6 @@ fn amendments_move_only_the_spec_and_changed_person_question() {
 }
 
 #[test]
-fn priority_spend_delegate_phase_and_run_turn_do_not_move_decision_revisions() {
-    let mut test = Harness::new();
-    let mut root = task(1, &[]);
-    root.numbers.budget = 1000;
-    root.authority.budget.spend = 1000;
-    root.tracked = Some(1);
-    test.make(vec![root]);
-    let before = test.revisions(1);
-    test.send(Event::Prioritise { reply_to: to(), project: 1, by: Party::Person(9), goals: Box::new([(1, 2)]) });
-    test.send(Event::ChargeEffect { funder: Funder::Task(1), maximum: 1 });
-    let mut child = task(2, &[]);
-    child.funder = Funder::Task(1);
-    let out = test.send(Event::Make { reply_to: to(), creator: Party::Task(1), batch: Box::new([child]) });
-    assert!(
-        out.iter().any(|request| match request {
-            Request::Made { .. } => true,
-            _ => false,
-        }),
-        "{out:?}"
-    );
-    test.send(Event::Hold { task: 2, why: Hold::Budget });
-    assert_eq!(test.revisions(1), before);
-    test.send(Event::Prepare { reply_to: to(), task: 1 });
-    let out = test.send(Event::Claim {
-        reply_to: to(),
-        task: 1,
-        attempt: 1,
-        resumed: false,
-        budget: 10,
-        writes: Box::new([]),
-    });
-    assert!(
-        out.iter().any(|request| match request {
-            Request::Done { .. } => true,
-            _ => false,
-        }),
-        "{out:?}"
-    );
-    test.send(Event::Started { task: 1, attempt: 1 });
-    let out = test.send(Event::Turn {
-        refused: Box::new([]),
-        reply_to: to(),
-        task: 1,
-        attempt: 1,
-        turn: 1,
-        read: None,
-        offered: None,
-        cumulative: 1,
-    });
-    assert!(
-        out.iter().any(|request| match request {
-            Request::TurnAcknowledged { .. } => true,
-            _ => false,
-        }),
-        "{out:?}"
-    );
-    assert_eq!(test.revisions(1), before);
-}
-
-#[test]
 fn a_dependency_result_moves_only_its_person_tasks_revision_and_ended_rows_keep_it() {
     let mut test = Harness::new();
     test.env.wall = Wall::from_nanos(1_000_000_000);

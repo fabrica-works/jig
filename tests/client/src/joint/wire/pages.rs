@@ -487,7 +487,7 @@ mod tests {
     #[test]
     fn a_whole_scoped_note_page_keeps_empty_search_exact_owner_fields_and_independent_cursor_and_loss() {
         let source = note_source();
-        let scope = client::NoteScope::Goal { project: u32::MAX, goal: u64::MAX };
+        let scope = client::NoteScope::Task { project: u32::MAX, task: u64::MAX };
         let empty = client::Text::new(Box::new([]), limits().text).expect("explicit empty search");
         let client::ReadValue::Notes(page) =
             notes_page(&scope, Some(&empty), &source, &limits()).expect("whole note page")
@@ -511,7 +511,7 @@ mod tests {
         assert_eq!(row.acts.capacity(), 2);
         assert_eq!(notes_page(&scope, None, &source, &limits()), Err(Invalid::Identity));
         assert_eq!(
-            notes_page(&client::NoteScope::Goal { project: 0, goal: u64::MAX }, Some(&empty), &source, &limits()),
+            notes_page(&client::NoteScope::Task { project: 0, task: u64::MAX }, Some(&empty), &source, &limits()),
             Err(Invalid::Identity)
         );
     }
@@ -519,7 +519,7 @@ mod tests {
     fn scoped_note_pages_refuse_wrong_rows_reserved_capacity_and_whole_envelope_without_altering_owner_data() {
         let source = note_source();
         let before = source.clone();
-        let scope = client::NoteScope::Goal { project: u32::MAX, goal: u64::MAX };
+        let scope = client::NoteScope::Task { project: u32::MAX, task: u64::MAX };
         let empty = client::Text::new(Box::new([]), limits().text).expect("empty search");
         assert_eq!(
             notes_page(&scope, Some(&empty), &source, &Limits { rows: 2, ..limits() }),

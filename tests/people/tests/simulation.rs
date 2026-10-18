@@ -48,7 +48,7 @@ fn a_commit_failed_or_lost_releases_no_reply_and_the_retry_makes_one_task() {
     assert_eq!(world.tasks(), 0);
     let retry = world.ask(10, [1; 16], b"hello");
     world.commit_all();
-    assert!(matches!(world.reply(retry), Some(Reply::Outcome(Outcome::Started { .. }))));
+    assert!(matches!(world.reply(retry), Some(Reply::Outcome(Outcome::Created { .. }))));
     assert_eq!(world.tasks(), 1);
     world.assert_settled();
 }
@@ -82,18 +82,7 @@ fn an_observer_is_refused_a_request_and_told_why() {
     world.roles(1, Box::new([Holding { person, role: Role::Observer }]));
     world.commit_all();
     let before = world.stats().routes;
-    let call = world.request(
-        10,
-        [3; 16],
-        Ask::SetGoal {
-            project: 1,
-            spec: b"goal".to_vec().into_boxed_slice(),
-            executor: jig_domain_people::GoalExecutor::Charter(1),
-            budget: 1,
-            priority: 1,
-            deadline: None,
-        },
-    );
+    let call = world.request(10, [3; 16], jig_people_world::fixtures::create(b"goal", Some(1)));
     assert!(world.reply(call).is_none(), "refusal waits for its answer commit");
     world.commit_all();
     assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) }))));
@@ -102,7 +91,7 @@ fn an_observer_is_refused_a_request_and_told_why() {
 }
 
 #[test]
-fn a_service_sets_a_goal_its_role_allows_and_is_refused_a_chat() {
+fn a_service_creates_a_task_its_role_allows() {
     let owners = Box::new([InitialOwner {
         project: 1,
         identity: IdentityKey { provider: 0, subject: 1_u64.to_be_bytes().into() },
@@ -123,25 +112,9 @@ fn a_service_sets_a_goal_its_role_allows_and_is_refused_a_chat() {
     let signed_in = world.signin_service(11, person);
     world.commit_all();
     assert!(matches!(world.reply(signed_in), Some(Reply::SignedIn { person: found, .. }) if found == person));
-    let goal = world.request(
-        11,
-        [2; 16],
-        Ask::SetGoal {
-            project: 1,
-            spec: b"goal".to_vec().into_boxed_slice(),
-            executor: jig_domain_people::GoalExecutor::Charter(1),
-            budget: 1,
-            priority: 1,
-            deadline: None,
-        },
-    );
+    let goal = world.request(11, [2; 16], jig_people_world::fixtures::create(b"goal", Some(1)));
     world.commit_all();
-    assert!(matches!(world.reply(goal), Some(Reply::Outcome(Outcome::GoalStarted { .. }))));
-    let routes = world.stats().routes;
-    let chat = world.ask(11, [3; 16], b"hello");
-    world.commit_all();
-    assert_eq!(world.reply(chat), Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Member) }))));
-    assert_eq!(world.stats().routes, routes);
+    assert!(matches!(world.reply(goal), Some(Reply::Outcome(Outcome::Created { .. }))));
     assert_eq!(world.tasks(), 1);
     world.assert_settled();
 }
@@ -345,7 +318,7 @@ fn transient_root_wait_keeps_one_route_and_each_waiter_receives_one_reply() {
     world.decide_deferred();
     world.commit_all();
     for call in calls {
-        assert!(matches!(world.reply(call), Some(Reply::Outcome(Outcome::Started { .. }))));
+        assert!(matches!(world.reply(call), Some(Reply::Outcome(Outcome::Created { .. }))));
     }
     assert_eq!(world.tasks(), 1);
     world.assert_settled();
@@ -383,7 +356,7 @@ fn an_expired_sign_in_is_refused() {
     world.restart();
     let call = world.ask(10, [1; 16], b"owner");
     world.commit_all();
-    assert!(matches!(world.reply(call), Some(Reply::Outcome(Outcome::Started { .. }))));
+    assert!(matches!(world.reply(call), Some(Reply::Outcome(Outcome::Created { .. }))));
     world.advance(Duration::from_secs(31));
     world.restart();
     let call = world.ask(10, [2; 16], b"expired");
@@ -696,7 +669,7 @@ fn a_chat_marked_seen_leaves_other_chats_unread() {
     for key in [1, 2] {
         let call = world.ask(10, [key; 16], b"hello");
         world.commit_all();
-        let Some(Reply::Outcome(Outcome::Started { task })) = world.reply(call) else { panic!("chat made") };
+        let Some(Reply::Outcome(Outcome::Created { first: task, .. })) = world.reply(call) else { panic!("chat made") };
         chats.push(task);
         world.waiting(
             task,
@@ -761,7 +734,7 @@ fn a_conversations_read_position_moves_to_the_ended_family_and_reads_back_after_
     let person = member(&mut world);
     let call = world.ask(SIGN_IN, [CREATE; 16], b"hello");
     world.commit_all();
-    let Some(Reply::Outcome(Outcome::Started { task })) = world.reply(call) else { panic!("chat made") };
+    let Some(Reply::Outcome(Outcome::Created { first: task, .. })) = world.reply(call) else { panic!("chat made") };
     world.waiting(
         task,
         Box::new([Entry {

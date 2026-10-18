@@ -717,7 +717,7 @@ pub fn language() -> Language {
             JigPhrase::WindowEnd => Box::new([Segment::Text(copy_of(b"End of the list"))]),
             JigPhrase::MoreRows => Box::new([Segment::Text(copy_of(b"More entries are available"))]),
             JigPhrase::NewChat => Box::new([Segment::Text(copy_of(b"First words"))]),
-            JigPhrase::StartChat => Box::new([Segment::Text(copy_of(b"Start a conversation"))]),
+            JigPhrase::BeginConversation => Box::new([Segment::Text(copy_of(b"Start a conversation"))]),
             JigPhrase::Delegates => Box::new([
                 Segment::Text(copy_of(b"Live delegates: ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },
@@ -873,12 +873,6 @@ pub fn language() -> Language {
                 Segment::Text(copy_of(b"Decided first by ")),
                 Segment::Hole { index: 0, kind: HoleKind::Name },
             ]),
-            JigPhrase::MadeChat => {
-                Box::new([Segment::Text(copy_of(b"Made chat ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
-            }
-            JigPhrase::MadeGoal => {
-                Box::new([Segment::Text(copy_of(b"Made goal ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
-            }
             JigPhrase::MadeTask => {
                 Box::new([Segment::Text(copy_of(b"Made task ")), Segment::Hole { index: 0, kind: HoleKind::Number }])
             }
@@ -1178,7 +1172,7 @@ pub fn language() -> Language {
             JigPhrase::ActClose => Box::new([Segment::Text(copy_of(b"Close"))]),
             JigPhrase::ActTakeOver => Box::new([Segment::Text(copy_of(b"Take over"))]),
             JigPhrase::ActSetGoal => Box::new([Segment::Text(copy_of(b"Set goal"))]),
-            JigPhrase::ActPrioritise => Box::new([Segment::Text(copy_of(b"Prioritise"))]),
+            JigPhrase::ActReorder => Box::new([Segment::Text(copy_of(b"Reorder"))]),
             JigPhrase::ActMarkSeen => Box::new([Segment::Text(copy_of(b"Mark read"))]),
             JigPhrase::ActEditNote => Box::new([Segment::Text(copy_of(b"Edit note"))]),
             JigPhrase::ActDeleteNote => Box::new([Segment::Text(copy_of(b"Delete note"))]),

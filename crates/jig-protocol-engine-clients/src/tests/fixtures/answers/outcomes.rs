@@ -1,13 +1,4 @@
 use super::*;
-fn case_0() -> (p::Reply, w::Final) {
-    (
-        p::Reply::Outcome(p::Outcome::Closing { chat: 8, cancelled: 3, kept: 3 }),
-        owner(w::OwnerOutcome::Closing(
-            w::OwnerOutcomeClosing::new(&wire(), w::OwnerOutcomeClosingParts { chat: 8, cancelled: 3, kept: 3 })
-                .expect("Closing"),
-        )),
-    )
-}
 fn case_1() -> (p::Reply, w::Final) {
     (
         p::Reply::Outcome(p::Outcome::NoteEdited { name: 8 }),
@@ -21,14 +12,6 @@ fn case_2() -> (p::Reply, w::Final) {
         p::Reply::Outcome(p::Outcome::Adopted { project: 3 }),
         owner(w::OwnerOutcome::Adopted(
             w::OwnerOutcomeAdopted::new(&wire(), w::OwnerOutcomeAdoptedParts { project: 3 }).expect("Adopted"),
-        )),
-    )
-}
-fn case_3() -> (p::Reply, w::Final) {
-    (
-        p::Reply::Outcome(p::Outcome::GoalStarted { task: 8 }),
-        owner(w::OwnerOutcome::GoalStarted(
-            w::OwnerOutcomeGoalStarted::new(&wire(), w::OwnerOutcomeGoalStartedParts { task: 8 }).expect("GoalStarted"),
         )),
     )
 }
@@ -110,15 +93,6 @@ fn case_13() -> (p::Reply, w::Final) {
         )),
     )
 }
-fn case_14() -> (p::Reply, w::Final) {
-    (
-        p::Reply::Outcome(p::Outcome::Prioritised { project: 3 }),
-        owner(w::OwnerOutcome::Prioritised(
-            w::OwnerOutcomePrioritised::new(&wire(), w::OwnerOutcomePrioritisedParts { project: 3 })
-                .expect("Prioritised"),
-        )),
-    )
-}
 fn case_15() -> (p::Reply, w::Final) {
     (
         p::Reply::Outcome(p::Outcome::Amended { task: 8, released: true }),
@@ -153,20 +127,10 @@ fn case_19() -> (p::Reply, w::Final) {
         )),
     )
 }
-fn case_20() -> (p::Reply, w::Final) {
-    (
-        p::Reply::Outcome(p::Outcome::Started { task: 8 }),
-        owner(w::OwnerOutcome::Started(
-            w::OwnerOutcomeStarted::new(&wire(), w::OwnerOutcomeStartedParts { task: 8 }).expect("Started"),
-        )),
-    )
-}
-pub fn owner_outcomes() -> [(p::Reply, w::Final); 19] {
+pub fn owner_outcomes() -> [(p::Reply, w::Final); 15] {
     [
-        case_0(),
         case_1(),
         case_2(),
-        case_3(),
         case_5(),
         case_6(),
         case_7(),
@@ -176,12 +140,10 @@ pub fn owner_outcomes() -> [(p::Reply, w::Final); 19] {
         case_11(),
         case_12(),
         case_13(),
-        case_14(),
         case_15(),
         case_16(),
         case_18(),
         case_19(),
-        case_20(),
     ]
 }
 pub fn decision_outcomes() -> [(p::Reply, w::Final); 2] {

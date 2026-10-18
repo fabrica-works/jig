@@ -6,7 +6,6 @@ use facts::{
     decode_again, decode_escalation_choice, decode_proposal_choice, decode_refusal, encode_again,
     encode_escalation_choice, encode_proposal_choice, encode_refusal,
 };
-#[expect(clippy::too_many_lines, reason = "one exhaustive table translates permanent people outcomes")]
 pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
     Ok(match value {
         domain::Outcome::Compound { project, operations, first_message } => {
@@ -26,9 +25,6 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
             )?)
         }
         domain::Outcome::Created { first, last, given } => encode_created(*first, *last, *given, limits)?,
-        domain::Outcome::Closing { chat, cancelled, kept } => {
-            wire::Outcome::Closing(encode_closing(*chat, *cancelled, *kept, limits)?)
-        }
         domain::Outcome::MarkedSeen { seen } => wire::Outcome::MarkedSeen(marked_seen(seen, limits)?),
         domain::Outcome::Applied { connector, token } => wire::Outcome::Applied(wire::OutcomeApplied::new(
             limits,
@@ -50,10 +46,6 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
         domain::Outcome::Adopted { project } => {
             wire::Outcome::Adopted(wire::OutcomeAdopted::new(limits, wire::OutcomeAdoptedParts { project: *project })?)
         }
-        domain::Outcome::GoalStarted { task } => wire::Outcome::GoalStarted(wire::OutcomeGoalStarted::new(
-            limits,
-            wire::OutcomeGoalStartedParts { task: *task },
-        )?),
         domain::Outcome::Proposed { proposal, to } => encode_proposed(*proposal, *to, limits)?,
         domain::Outcome::Withdrawn { proposal } => encode_withdrawn(*proposal, limits)?,
         domain::Outcome::Stopped { task } => {
@@ -86,10 +78,6 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
         domain::Outcome::QuestionAnswered { task, question, message } => {
             wire::Outcome::QuestionAnswered(encode_question_answered(*task, *question, *message, limits)?)
         }
-        domain::Outcome::Prioritised { project } => wire::Outcome::Prioritised(wire::OutcomePrioritised::new(
-            limits,
-            wire::OutcomePrioritisedParts { project: *project },
-        )?),
         domain::Outcome::Amended { task, released } => wire::Outcome::Amended(wire::OutcomeAmended::new(
             limits,
             wire::OutcomeAmendedParts { task: *task, released: *released },
@@ -110,16 +98,12 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
         domain::Outcome::EscalationDecided { task, revision, by, at, choice } => {
             wire::Outcome::EscalationDecided(encode_escalation_decided(*task, *revision, *by, *at, *choice, limits)?)
         }
-        domain::Outcome::Started { task } => {
-            wire::Outcome::Started(wire::OutcomeStarted::new(limits, wire::OutcomeStartedParts { task: *task })?)
-        }
         domain::Outcome::Refused(value) => wire::Outcome::Refused(wire::OutcomeRefused::new(
             limits,
             wire::OutcomeRefusedParts { value: encode_refusal(value, limits)? },
         )?),
     })
 }
-#[expect(clippy::too_many_lines, reason = "one exhaustive table translates permanent people outcomes")]
 pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
     match value {
         wire::Outcome::Compound(value) => {
@@ -131,7 +115,6 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
             domain::Outcome::CompoundRefused { at, why: decode_refusal(why) }
         }
         wire::Outcome::Created(value) => decode_created(value),
-        wire::Outcome::Closing(value) => decode_closing(value),
         wire::Outcome::MarkedSeen(value) => decode_marked_seen(value),
         wire::Outcome::Applied(value) => {
             let wire::OutcomeAppliedParts { connector, token } = value.into_parts();
@@ -153,10 +136,6 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
         wire::Outcome::Adopted(value) => {
             let wire::OutcomeAdoptedParts { project } = value.into_parts();
             domain::Outcome::Adopted { project }
-        }
-        wire::Outcome::GoalStarted(value) => {
-            let wire::OutcomeGoalStartedParts { task } = value.into_parts();
-            domain::Outcome::GoalStarted { task }
         }
         wire::Outcome::Proposed(value) => {
             let wire::OutcomeProposedParts { proposal, to } = value.into_parts();
@@ -197,10 +176,6 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
             domain::Outcome::Said { task, message }
         }
         wire::Outcome::QuestionAnswered(value) => decode_question_answered(value),
-        wire::Outcome::Prioritised(value) => {
-            let wire::OutcomePrioritisedParts { project } = value.into_parts();
-            domain::Outcome::Prioritised { project }
-        }
         wire::Outcome::Amended(value) => {
             let wire::OutcomeAmendedParts { task, released } = value.into_parts();
             domain::Outcome::Amended { task, released }
@@ -218,27 +193,11 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
             domain::Outcome::PoolSet { project, person }
         }
         wire::Outcome::EscalationDecided(value) => decode_escalation_decided(value),
-        wire::Outcome::Started(value) => {
-            let wire::OutcomeStartedParts { task } = value.into_parts();
-            domain::Outcome::Started { task }
-        }
         wire::Outcome::Refused(value) => {
             let wire::OutcomeRefusedParts { value } = value.into_parts();
             domain::Outcome::Refused(decode_refusal(value))
         }
     }
-}
-fn encode_closing(
-    chat: u64,
-    cancelled: u32,
-    kept: u32,
-    limits: &wire::Limits,
-) -> Result<wire::OutcomeClosing, wire::Problem> {
-    wire::OutcomeClosing::new(limits, wire::OutcomeClosingParts { chat, cancelled, kept })
-}
-fn decode_closing(value: wire::OutcomeClosing) -> domain::Outcome {
-    let wire::OutcomeClosingParts { chat, cancelled, kept } = value.into_parts();
-    domain::Outcome::Closing { chat, cancelled, kept }
 }
 fn encode_proposal_decided(
     proposer: &domain::Proposer,

@@ -963,10 +963,8 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
         | people::Outcome::ServiceMade { .. }
         | people::Outcome::Adopted { .. }
         | people::Outcome::Created { .. }
-        | people::Outcome::GoalStarted { .. }
         | people::Outcome::Proposed { .. }
         | people::Outcome::Withdrawn { .. }
-        | people::Outcome::Closing { .. }
         | people::Outcome::Stopped { .. }
         | people::Outcome::Cancelled { .. }
         | people::Outcome::PersonTaken { .. }
@@ -976,14 +974,12 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
         | people::Outcome::ProposalDecided { .. }
         | people::Outcome::Said { .. }
         | people::Outcome::QuestionAnswered { .. }
-        | people::Outcome::Prioritised { .. }
         | people::Outcome::Amended { .. }
         | people::Outcome::RolesSet { .. }
         | people::Outcome::PolicyChanged { .. }
         | people::Outcome::PoolSet { .. }
         | people::Outcome::EscalationDecided { .. }
-        | people::Outcome::MarkedSeen { .. }
-        | people::Outcome::Started { .. } => unreachable!("release core part returns a release terminal"),
+        | people::Outcome::MarkedSeen { .. } => unreachable!("release core part returns a release terminal"),
     }
 }
 

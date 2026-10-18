@@ -6,16 +6,13 @@ use jig_client_domain::contract::{
 use skein_lib::Wall;
 use std::mem::size_of;
 
-fn maximum_outcomes() -> [OwnerOutcome; 27] {
+fn maximum_outcomes() -> [OwnerOutcome; 22] {
     [
-        OwnerOutcome::Closing { chat: u64::MAX, cancelled: u32::MAX, kept: u32::MAX },
         OwnerOutcome::MarkedSeen { seen: SeenThrough::Results { through: u64::MAX } },
         OwnerOutcome::MarkedSeen { seen: SeenThrough::Conversation { task: u64::MAX, through: u64::MAX } },
         OwnerOutcome::NoteEdited { name: u64::MAX },
         OwnerOutcome::ServiceMade { person: u64::MAX },
         OwnerOutcome::Adopted { project: u32::MAX },
-        OwnerOutcome::GoalStarted { task: u64::MAX },
-        OwnerOutcome::GoalProposed { proposal: u64::MAX },
         OwnerOutcome::Stopped { task: u64::MAX },
         OwnerOutcome::Cancelled { task: u64::MAX },
         OwnerOutcome::Released { task: u64::MAX },
@@ -31,7 +28,6 @@ fn maximum_outcomes() -> [OwnerOutcome; 27] {
         },
         OwnerOutcome::Said { task: u64::MAX, message: u64::MAX },
         OwnerOutcome::QuestionAnswered { task: u64::MAX, question: u64::MAX, message: u64::MAX },
-        OwnerOutcome::Prioritised { project: u32::MAX },
         OwnerOutcome::Amended { task: u64::MAX },
         OwnerOutcome::Proposed { proposal: u64::MAX },
         OwnerOutcome::Withdrawn { proposal: u64::MAX },
@@ -45,7 +41,6 @@ fn maximum_outcomes() -> [OwnerOutcome; 27] {
             at: Wall::from_nanos(u64::MAX),
             choice: OwnerEscalationChoice::Released,
         },
-        OwnerOutcome::Started { task: u64::MAX },
     ]
 }
 

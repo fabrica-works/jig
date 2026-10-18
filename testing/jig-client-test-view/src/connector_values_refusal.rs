@@ -5,14 +5,6 @@ use jig_client_test_domain::connector_values::application_core as owner;
 
 pub(super) fn refusal(value: owner::Refusal) -> Option<client::Refusal> {
     Some(match value {
-        owner::Refusal::Disposal { task, issue } => client::Refusal::Disposal {
-            task,
-            issue: match issue {
-                owner::DisposalIssue::Missing => client::DisposalIssue::Missing,
-                owner::DisposalIssue::Unknown => client::DisposalIssue::Unknown,
-                owner::DisposalIssue::Repeated => client::DisposalIssue::Repeated,
-            },
-        },
         // A raw connector role supplies no client policy-role category.
         // The owner renderer shows this complete fact directly.
         owner::Refusal::Role { .. } => return None,

@@ -86,18 +86,18 @@ pub use amendment::{
     ResourceScope, ResultsWake, Spec, Tracking, WakePolicy, WakeRule, amendment_bytes, authority_bytes,
 };
 pub use boundary::{
-    Adoption, Ask, Counts, Disposal, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, GoalExecutor,
-    Holding, Identity, IdentityKey, InitialOwner, Keep, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult,
-    ProjectRole, ProposalChoice, ProposalDecision, Proposer, Reply, Request, RequestKey, ResourceName, ResourceRole,
-    Role, Seed, Stored, Whom,
+    Adoption, Ask, Counts, Entry, EntryKind, EscalationChoice, EscalationDecision, Event, Holding, Identity,
+    IdentityKey, InitialOwner, Key, Kind, Needs, NoteChange, NoteScope, Outcome, PersonResult, ProjectRole,
+    ProposalChoice, ProposalDecision, Proposer, Reply, Request, RequestKey, ResourceName, ResourceRole, Role, Seed,
+    Stored, Whom,
 };
 pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
 pub use decisions::{FailureClass, HoldReason, Moved};
 pub use domain::{Domain, application_part, application_part_done, fire, max_out, step};
 pub use facts::Fact;
-pub use limits::{Limits, disposal_capacity, worst_case};
+pub use limits::{Limits, worst_case};
 pub use policy_value::{
     Guard, Judge, PermissionRole, PolicyChange, PolicyRole, PolicyValue, Requirement, policy_bytes,
     policy_change_bytes, requirements_bytes,
 };
-pub use refusals::{Accepter, Again, DisposalIssue, Ending, Lack, LimitKind, Malformed, Party, Refusal};
+pub use refusals::{Accepter, Again, Ending, Lack, LimitKind, Malformed, Party, Refusal};

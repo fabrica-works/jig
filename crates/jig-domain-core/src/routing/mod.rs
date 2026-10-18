@@ -107,16 +107,13 @@ pub(crate) struct PersonEscalation {
 #[derive(Debug)]
 pub(super) enum CreationKind {
     Batch { person: u64, given: Option<people::Given>, stubs: Box<[tasks::Stub]> },
-    Goal { person: u64 },
     Propose { person: u64, reason: Box<[u8]>, to: u32, stubs: Box<[tasks::Stub]> },
-    Chat { person: u64 },
 }
 
 /// A party's batch waiting for the task child's make result.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Made {
     pub first: u64,
-    pub goal: Option<bool>,
     pub given: Option<people::Given>,
     pub stubs: Box<[tasks::Stub]>,
 }

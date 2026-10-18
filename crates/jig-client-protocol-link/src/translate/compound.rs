@@ -41,8 +41,7 @@ fn operation(value: &c::Operation, limits: &w::Limits) -> Result<w::Operation, w
         w::Ask::Release(v) => w::Operation::Release(v),
         w::Ask::Stop(v) => w::Operation::Stop(v),
         w::Ask::MoveTask(v) => w::Operation::MoveTask(v),
-        w::Ask::StartChat(_)
-        | w::Ask::Propose(_)
+        w::Ask::Propose(_)
         | w::Ask::Withdraw(_)
         | w::Ask::Create(_)
         | w::Ask::Compound(_)
@@ -50,9 +49,6 @@ fn operation(value: &c::Operation, limits: &w::Limits) -> Result<w::Operation, w
         | w::Ask::Take(_)
         | w::Ask::HandBack(_)
         | w::Ask::Decide(_)
-        | w::Ask::Close(_)
-        | w::Ask::SetGoal(_)
-        | w::Ask::Prioritise(_)
         | w::Ask::Seen(_)
         | w::Ask::EditNote(_)
         | w::Ask::DeleteNote(_)
@@ -91,8 +87,7 @@ pub(super) fn restore(value: w::Compound, limits: &Limits) -> Result<c::Ask, w::
             }
             c::Ask::Stop { project, task } => c::Operation::Stop { project, task },
             c::Ask::Move { project, task, reason } => c::Operation::Move { project, task, reason },
-            c::Ask::StartChat { .. }
-            | c::Ask::Propose { .. }
+            c::Ask::Propose { .. }
             | c::Ask::Withdraw { .. }
             | c::Ask::Create { .. }
             | c::Ask::Compound { .. }
@@ -100,9 +95,6 @@ pub(super) fn restore(value: w::Compound, limits: &Limits) -> Result<c::Ask, w::
             | c::Ask::Take { .. }
             | c::Ask::HandBack { .. }
             | c::Ask::Decide { .. }
-            | c::Ask::Close { .. }
-            | c::Ask::SetGoal { .. }
-            | c::Ask::Prioritise { .. }
             | c::Ask::Seen { .. }
             | c::Ask::EditNote { .. }
             | c::Ask::DeleteNote { .. }

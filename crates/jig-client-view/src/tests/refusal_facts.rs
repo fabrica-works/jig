@@ -78,10 +78,6 @@ fn engine_refusals_keep_categories_supplied_hold_reasons_and_absent_ending_detai
         assert!(contains(&tree, b"The held role does not permit this action"));
         assert_eq!(tree.len(), 3);
     }
-    for issue in [DisposalIssue::Missing, DisposalIssue::Unknown, DisposalIssue::Repeated] {
-        let tree = render(Refusal::Disposal { task: 81, issue });
-        assert!(tree.nodes().iter().any(|node| node.text.iter().any(|run| run.text.windows(2).any(|v| v == b"81"))));
-    }
     for lacking in [
         Lacking::Approver,
         Lacking::Budget { needed: 8, left: 3 },

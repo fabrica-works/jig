@@ -83,7 +83,7 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             deadline: TemplateDeadline::None,
             tracked: None,
             flags: Flags { conversation: true, listed: false, retention: Retention::Kept },
-            label: 1,
+            label: jig_client_test_records::CHAT,
             grace: Some(skein_lib::Duration::from_millis(5000)),
         },
         jig_domain_core::Template {
@@ -96,7 +96,7 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             deadline: TemplateDeadline::Given,
             tracked: Some(1),
             flags: Flags { conversation: false, listed: true, retention: Retention::Kept },
-            label: 2,
+            label: jig_client_test_records::GOAL,
             grace: None,
         },
     ])
@@ -225,22 +225,11 @@ pub fn two_projects(seed: u64) -> (root::Config, root::Limits) {
 #[must_use]
 pub fn propose_goal(ask: jig_domain_people::Ask) -> jig_domain_people::Ask {
     use jig_domain_people as people;
-    let people::Ask::SetGoal { project, spec, executor, budget, priority, deadline } = ask else {
-        panic!("goal fixture")
-    };
-    let mut member = people_member(b"", budget);
-    member.words = spec;
-    member.executor = match executor {
-        people::GoalExecutor::Charter(charter) => people::TaskExecutor::Agent { charter },
-        people::GoalExecutor::Procedure { connector, code } => people::TaskExecutor::Procedure { connector, code },
-    };
-    member.authority.deadline = deadline;
-    member.tracked = Some(priority);
-    member.flags.listed = true;
+    let people::Ask::Create { project, batch } = ask else { panic!("creation fixture") };
     people::Ask::Propose {
         project,
         reason: Box::from(b"please fund this goal".as_slice()),
-        action: people::Action::Batch(Box::new([member])),
+        action: people::Action::Batch(batch),
     }
 }
 
@@ -383,4 +372,108 @@ pub fn long_resource_world(seed: u64) -> (crate::effects::World, u64, jig_test_c
     let child = numbers[0].task;
     world.reads = Some(crate::reads::Parties::new(world.store.applied));
     (world, child, path)
+}
+
+/// The configured authority and task bound used by a creating party.
+#[derive(Clone, Debug)]
+pub struct Creating {
+    roles: std::collections::BTreeMap<(u32, u32), authority::Authority>,
+    tasks: u32,
+}
+impl Creating {
+    #[must_use]
+    pub fn new(config: &core::Config, tasks: u32) -> Self {
+        let roles = config
+            .projects
+            .iter()
+            .flat_map(|project| {
+                config
+                    .authority
+                    .policy(*project)
+                    .expect("fixture policy")
+                    .roles
+                    .iter()
+                    .map(move |role| ((*project, role.number), role.authority.clone()))
+            })
+            .collect();
+        Self { roles, tasks }
+    }
+}
+/// Only a goal's supplied terms differ from ordinary creation.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Goal {
+    pub budget: u64,
+    pub priority: u32,
+    pub deadline: Option<skein_lib::Wall>,
+}
+#[must_use]
+pub fn chat(world: &crate::effects::World, project: u32, words: Box<[u8]>) -> people::Ask {
+    chat_for(world, project, 0, words)
+}
+#[must_use]
+pub fn create_chat(creating: &Creating, project: u32, role: u32, words: Box<[u8]>) -> people::Ask {
+    let role =
+        creating.roles.get(&(project, role)).or_else(|| creating.roles.get(&(project, 0))).expect("fixture role");
+    let mut member = people_member(&[], 0);
+    member.words = words;
+    member.authority = core::authority_to_people(role).expect("fixture authority");
+    member.authority.spend = 0;
+    member.authority.delegation.tasks = member.authority.delegation.tasks.min(creating.tasks).saturating_sub(1);
+    member.authority.delegation.depth = member.authority.delegation.depth.saturating_sub(1);
+    member.budget = people::Budget::AsAllowed { cap: None };
+    member.flags = people::Flags { conversation: true, listed: false, retention: people::Retention::Kept };
+    member.label = jig_client_test_records::CHAT;
+    member.contract = people::Contract::Report { words: 128 };
+    member.wake = people::WakePolicy {
+        words: people::WakeRule::Immediate,
+        notices: people::WakeRule::Immediate,
+        news: people::WakeRule::Immediate,
+        results: people::ResultsWake::LastOrFailure,
+        questions: true,
+        answers: true,
+        timers: true,
+    };
+    people::Ask::Create { project, batch: Box::new([member]) }
+}
+
+#[must_use]
+pub fn goal(
+    world: &crate::effects::World,
+    project: u32,
+    words: Box<[u8]>,
+    executor: people::TaskExecutor,
+    terms: Goal,
+) -> people::Ask {
+    let people::Ask::Create { mut batch, .. } = chat(world, project, words) else { unreachable!() };
+    let member = &mut batch[0];
+    member.executor = executor;
+    member.budget = people::Budget::Named;
+    member.authority.spend = terms.budget;
+    member.authority.deadline = terms.deadline;
+    member.tracked = Some(terms.priority);
+    member.flags.conversation = false;
+    member.flags.listed = true;
+    member.label = jig_client_test_records::GOAL;
+    if matches!(executor, people::TaskExecutor::Procedure { .. }) {
+        member.authority.tools = 0;
+    }
+    people::Ask::Create { project, batch }
+}
+
+#[must_use]
+pub fn chat_for(world: &crate::effects::World, project: u32, role: u32, words: Box<[u8]>) -> people::Ask {
+    let people::Ask::Create { mut batch, .. } = create_chat(&world.creating, project, role, words) else {
+        unreachable!()
+    };
+    if let Some(root::Record::Core(core::Record::People(people::Stored::Policy { value, .. }))) =
+        world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::Policy(project))))
+        && let Some(current) = value.roles.iter().find(|value| value.number == role)
+    {
+        let task_cap = world.creating.tasks;
+        batch[0].authority = current.authority.clone();
+        batch[0].authority.spend = 0;
+        batch[0].authority.delegation.tasks = current.authority.delegation.tasks.min(task_cap).saturating_sub(1);
+        batch[0].authority.delegation.depth = current.authority.delegation.depth.saturating_sub(1);
+    }
+    people::Ask::Create { project, batch }
 }

@@ -14,45 +14,6 @@ pub struct Grace {
     pub message: u64,
 }
 
-#[expect(clippy::too_many_arguments, reason = "the chat keeps its existing distinct finish and cancellation texts")]
-pub(crate) fn ask_chat(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    number: u64,
-    person: u64,
-    until: Wall,
-    message: u64,
-    words: &[u8],
-    reason: &[u8],
-    out: &mut Queue<Request>,
-) -> Result<(), Refusal> {
-    ask(domain, env, number, Party::Person(person), until, message, words, reason, out)
-}
-
-#[expect(clippy::too_many_arguments, reason = "one durable finish request includes distinct chat texts")]
-fn ask(
-    domain: &mut Domain,
-    env: &Env<Limits>,
-    number: u64,
-    by: Party,
-    until: Wall,
-    message: u64,
-    words: &[u8],
-    reason: &[u8],
-    out: &mut Queue<Request>,
-) -> Result<(), Refusal> {
-    let plan = check_finish(
-        domain,
-        &crate::compound::Staged::new(0),
-        env,
-        Finish { number, by, until, message },
-        words,
-        reason,
-    )?;
-    apply_finish(domain, env, plan, out);
-    Ok(())
-}
-
 pub(crate) struct Finish {
     pub number: u64,
     pub by: Party,
@@ -167,7 +128,7 @@ pub(crate) fn cancel_selected(
 pub(crate) fn schedule(domain: &mut Domain, env: &Env<Limits>, number: u64) {
     let task = task_mut(domain, number).expect("live chat schedule");
     let until = match &task.record.grace {
-        Some(grace) if crate::chat::mutable(&task.record.phase) => Some(grace.until),
+        Some(grace) if mutable(&task.record.phase) => Some(grace.until),
         Some(_) | None => None,
     };
     let alarm = match until {
@@ -195,8 +156,17 @@ pub(crate) fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Reque
     let Some(number) = domain.grace_alarms.expire(env.now) else { return };
     let Some(row) = record(domain, number) else { return };
     let Some(grace) = row.grace.clone() else { return };
-    if !crate::chat::mutable(&row.phase) {
+    if !mutable(&row.phase) {
         return;
     }
     crate::closing::cancel_tree(domain, env, number, grace.by, &grace.reason, out);
+}
+
+pub(crate) fn mutable(phase: &Phase) -> bool {
+    match phase {
+        Phase::Waiting | Phase::Active(_) | Phase::Held { was: crate::Was::Waiting | crate::Was::Active(_), .. } => {
+            true
+        }
+        Phase::Closing(_) | Phase::Held { was: crate::Was::Closing(_), .. } | Phase::Ended(_) => false,
+    }
 }

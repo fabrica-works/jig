@@ -52,7 +52,7 @@ fn template(value: &Template, limits: &Limits) -> Result<c::Template, owner::Inv
 pub(super) fn creating(value: &acts::Creating, limits: &Limits) -> Result<c::Creating, owner::Invalid> {
     let mut value = value.clone();
     match &mut value.within {
-        acts::Bounds::Goal { charters, procedures, .. } => {
+        acts::Bounds::Create { charters, procedures, .. } => {
             *charters = entries(charters);
             *procedures = entries(procedures);
         }

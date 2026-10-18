@@ -212,7 +212,7 @@ fn acquire(d: &mut Fixture, watch: jig_client::Handle, root: ObjectKey, key: Obj
 fn dependencies_and_proposal(d: &mut Fixture, watch: jig_client::Handle, root: ObjectKey) {
     let p = full_proposal(full_batch());
     acquire(d, watch, root, ObjectKey::Proposal(p.key), ReadValue::Proposal(Box::new(p)));
-    let mut task = task_doc(&[ActKind::Close, ActKind::Amend]);
+    let mut task = task_doc(&[ActKind::Cancel, ActKind::Amend]);
     task.chip = full_chip(9);
     acquire(d, watch, root, ObjectKey::Task(9), ReadValue::Task(Box::new(task)));
     assert_eq!(d.objects().len(), CLIENT.objects);
@@ -323,22 +323,10 @@ fn full_cards(words: &crate::words::Words, sized: &Limits) {
     let tree = builder.finish();
     assert!(tree.len() <= crate::refusal_nodes(&CLIENT).unwrap().checked_add(1).unwrap());
     super::super::cards_access::check(&tree);
-    let mut task = task_doc(&[ActKind::Close, ActKind::Amend]);
-    task.chip = full_chip(8);
-    task.spec = specification(full_text());
-    task.instructions = Some(DocumentText { bytes: full_text(), cut: true });
-    task.wake = full_wake();
-    task.subscriptions = full_subscriptions();
-
-    task.authority = full_owner_authority();
-    task.dependencies = list([OwnerTaskLink::Live(full_chip(9)), OwnerTaskLink::Live(full_chip(10))]);
-    task.delegates = list([
-        LiveDelegate { chip: full_chip(9), takeover_budget: 10 },
-        LiveDelegate { chip: full_chip(10), takeover_budget: 20 },
-    ]);
+    let task = full_chat();
     let (mut d, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(task)));
     card_tree(&d, id, words, sized, crate::card_nodes(&CLIENT).unwrap());
-    drive(&mut d, Event::Act { action: Action::Intend { object: id.token(), act: ActKind::Close } });
+    drive(&mut d, Event::Act { action: Action::CloseChat { object: id.token() } });
     full_dialog(&d, words, sized);
 }
 fn full_dialog(d: &Fixture, words: &crate::words::Words, sized: &Limits) {
@@ -540,3 +528,21 @@ fn full_pattern() -> OwnerPattern {
 }
 
 const UTF8_TEXTS: [&[u8]; 1] = [&[b'n'; 128]];
+
+fn full_chat() -> Task {
+    let mut task = task_doc(&[ActKind::Cancel, ActKind::Amend]);
+    task.chip = full_chip(8);
+    task.flags.conversation = true;
+    task.spec = specification(full_text());
+    task.instructions = Some(DocumentText { bytes: full_text(), cut: true });
+    task.wake = full_wake();
+    task.subscriptions = full_subscriptions();
+
+    task.authority = full_owner_authority();
+    task.dependencies = list([OwnerTaskLink::Live(full_chip(9)), OwnerTaskLink::Live(full_chip(10))]);
+    task.delegates = list([
+        LiveDelegate { chip: full_chip(9), takeover_budget: 10 },
+        LiveDelegate { chip: full_chip(10), takeover_budget: 20 },
+    ]);
+    task
+}

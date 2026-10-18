@@ -8,20 +8,12 @@ fn me_preserves_two_projects_in_its_wire_record() {
         Ok(jig_client_test_records::frame_two_projects_record())
     );
 }
-const SPARE_FRAME_ROOM: [(u32, u32); 2] = [(32, 2), (1, 32)];
+const PROJECT_ROOM: [u32; 2] = [2, 32];
 #[test]
 fn me_encoding_preserves_rows_despite_spare_list_capacity() {
     let limits = fixtures::wire_limits();
-    for (goal_room, project_room) in SPARE_FRAME_ROOM {
+    for project_room in PROJECT_ROOM {
         let mut frame = fixtures::frame_two_projects();
-        for index in 0..frame.charters.len() {
-            let charter = frame.charters.get_mut(index).expect("fixture charter");
-            let mut goals = skein_lib::List::with_capacity(goal_room);
-            for number in &charter.goals {
-                goals.push(*number).expect("fixture goal room");
-            }
-            charter.goals = goals;
-        }
         let mut projects = skein_lib::List::with_capacity(project_room);
         for project in frame.projects.into_boxed() {
             projects.push(project).expect("fixture project room");
@@ -30,7 +22,7 @@ fn me_encoding_preserves_rows_despite_spare_list_capacity() {
         assert_eq!(
             translate::owner::frame(&frame, &limits),
             Ok(jig_client_test_records::frame_two_projects_record()),
-            "goals room {goal_room}, projects room {project_room}"
+            "projects room {project_room}"
         );
     }
 }
@@ -248,7 +240,7 @@ fn frame_with_creating_bounds() -> jig_domain_core::documents::Frame {
     for index in 0..frame.projects.len() {
         let project = frame.projects.get_mut(index).unwrap();
         project.creating = Some(acts::Creating {
-            within: acts::Bounds::Goal {
+            within: acts::Bounds::Create {
                 authority: Box::new(fixtures::authority()),
                 pool_left: POOL_LEFT,
                 charters: fixtures::list([TEMPLATE_CHARTER]),
@@ -264,4 +256,21 @@ fn frame_with_creating_bounds() -> jig_domain_core::documents::Frame {
         });
     }
     frame
+}
+
+const CREATION_CAPACITY: [(jig_domain_people::CapacityAction, w::OwnerPersonCapacityAction); 2] = [
+    (jig_domain_people::CapacityAction::Create, w::OwnerPersonCapacityAction::Create),
+    (jig_domain_people::CapacityAction::Compound, w::OwnerPersonCapacityAction::Compound),
+];
+#[test]
+fn creating_and_compound_capacity_refusals_keep_the_operations_kind() {
+    let deployment = fixtures::deployment_document();
+    let mut refusal = *deployment.person_room_refusals.get(0).unwrap();
+    for (action, expected) in CREATION_CAPACITY {
+        refusal.action = action;
+        let row = translate::deployment::person_refusal(&refusal, &fixtures::wire_limits()).unwrap();
+        assert_eq!(row.action(), &expected);
+        assert_eq!(row.key().person(), refusal.key.person);
+        assert_eq!(row.key().key(), &refusal.key.key);
+    }
 }

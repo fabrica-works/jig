@@ -205,14 +205,10 @@ pub enum ActKind {
     Stop,
     /// Cancel a subtree.
     Cancel,
-    /// Close a chat.
-    Close,
     /// Become a requester.
     Move,
-    /// Set a goal.
-    SetGoal,
-    /// Reorder goals.
-    Prioritise,
+    /// Reorder tracked work in its project.
+    Reorder,
     /// Mark updates read.
     Seen,
     /// Edit a note.

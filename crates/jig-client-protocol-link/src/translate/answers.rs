@@ -61,15 +61,10 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::Owne
             operations: row.operations(),
             first_message: row.first_message(),
         },
-        w::OwnerOutcome::Closing(row) => {
-            c::OwnerOutcome::Closing { chat: row.chat(), cancelled: row.cancelled(), kept: row.kept() }
-        }
         w::OwnerOutcome::MarkedSeen(row) => c::OwnerOutcome::MarkedSeen { seen: seen(row.seen(), limits) },
         w::OwnerOutcome::NoteEdited(row) => c::OwnerOutcome::NoteEdited { name: row.name() },
         w::OwnerOutcome::ServiceMade(row) => c::OwnerOutcome::ServiceMade { person: row.person() },
         w::OwnerOutcome::Adopted(row) => c::OwnerOutcome::Adopted { project: row.project() },
-        w::OwnerOutcome::GoalStarted(row) => c::OwnerOutcome::GoalStarted { task: row.task() },
-        w::OwnerOutcome::GoalProposed(row) => c::OwnerOutcome::GoalProposed { proposal: row.proposal() },
         w::OwnerOutcome::Stopped(row) => c::OwnerOutcome::Stopped { task: row.task() },
         w::OwnerOutcome::Cancelled(row) => c::OwnerOutcome::Cancelled { task: row.task() },
         w::OwnerOutcome::Released(row) => c::OwnerOutcome::Released { task: row.task() },
@@ -87,7 +82,6 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::Owne
         w::OwnerOutcome::QuestionAnswered(row) => {
             c::OwnerOutcome::QuestionAnswered { task: row.task(), question: row.question(), message: row.message() }
         }
-        w::OwnerOutcome::Prioritised(row) => c::OwnerOutcome::Prioritised { project: row.project() },
         w::OwnerOutcome::Amended(row) => c::OwnerOutcome::Amended { task: row.task() },
         w::OwnerOutcome::Proposed(row) => c::OwnerOutcome::Proposed { proposal: row.proposal() },
         w::OwnerOutcome::Withdrawn(row) => c::OwnerOutcome::Withdrawn { proposal: row.proposal() },
@@ -101,7 +95,6 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::Owne
             at: Wall::from_nanos(row.at()),
             choice: owner_escalation_choice(row.choice(), limits),
         },
-        w::OwnerOutcome::Started(row) => c::OwnerOutcome::Started { task: row.task() },
     }
 }
 
@@ -129,14 +122,12 @@ pub(crate) fn note_scope(value: &w::NoteScope, limits: &Limits) -> c::NoteScope 
             connector: row.connector(),
             pattern: owner_pattern(row.pattern(), limits),
         },
-        w::NoteScope::Goal(row) => c::NoteScope::Goal { project: row.project(), goal: row.goal() },
+        w::NoteScope::Task(row) => c::NoteScope::Task { project: row.project(), task: row.task() },
     }
 }
 
 pub(crate) fn made(value: &w::Made, limits: &Limits) -> c::Made {
     match value {
-        w::Made::Chat(row) => c::Made::Chat { task: row.task() },
-        w::Made::Goal(row) => c::Made::Goal { task: row.task() },
         w::Made::Tasks(row) => {
             let mut list0 = List::with_capacity(row.tasks().len());
             for item in row.tasks() {
@@ -230,14 +221,6 @@ pub(crate) fn held_role(value: &w::HeldRole, _limits: &Limits) -> c::HeldRole {
         w::HeldRole::Member => c::HeldRole::Member,
         w::HeldRole::Observer => c::HeldRole::Observer,
         w::HeldRole::Policy(row) => c::HeldRole::Policy { role: row.role() },
-    }
-}
-
-pub(crate) fn disposal_issue(value: &w::DisposalIssue, _limits: &Limits) -> c::DisposalIssue {
-    match value {
-        w::DisposalIssue::Missing => c::DisposalIssue::Missing,
-        w::DisposalIssue::Unknown => c::DisposalIssue::Unknown,
-        w::DisposalIssue::Repeated => c::DisposalIssue::Repeated,
     }
 }
 
@@ -358,7 +341,6 @@ pub(crate) fn limit(value: &w::Limit, limits: &Limits) -> c::Limit {
         w::Limit::LiveTasks(row) => c::Limit::LiveTasks { project: row.project(), limit: row.limit() },
         w::Limit::Inbox(row) => c::Limit::Inbox { task: row.task(), limit: row.limit() },
         w::Limit::Words(row) => c::Limit::Words { limit: row.limit() },
-        w::Limit::ConversationWords(row) => c::Limit::ConversationWords { limit: row.limit() },
         w::Limit::Fields => c::Limit::Fields,
         w::Limit::Records => c::Limit::Records,
         w::Limit::Requests => c::Limit::Requests,
@@ -440,9 +422,6 @@ pub(crate) fn refusal(value: &w::Refusal, limits: &Limits) -> Result<c::Refusal,
                 None => None,
             };
             c::Refusal::Role { held: opt0 }
-        }
-        w::Refusal::Disposal(row) => {
-            c::Refusal::Disposal { task: row.task(), issue: disposal_issue(row.issue(), limits) }
         }
         w::Refusal::Taken(row) => c::Refusal::Taken { by: row.by() },
         w::Refusal::NotWaiting => c::Refusal::NotWaiting,

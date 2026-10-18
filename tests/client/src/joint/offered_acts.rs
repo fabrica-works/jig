@@ -21,11 +21,10 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
         Found::Absent | Found::Pending => panic!("the current source Task has a public card"),
     };
     let mut face = TreeFace::subtree(tree, card).expect("whole public Task card");
-    let captions: [(Act, &[u8]); 8] = [
+    let captions: [(Act, &[u8]); 7] = [
         (Act::Message, b"Write"),
         (Act::Amend, b"Amend"),
         (Act::Move, b"Take over"),
-        (Act::Close, b"Close"),
         (Act::Release, b"Release"),
         (Act::Stop, b"Stop"),
         (Act::Cancel, b"Cancel"),

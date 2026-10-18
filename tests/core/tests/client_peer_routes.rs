@@ -17,6 +17,7 @@ use skein_lib::{ReplyTo, Token};
 const SCRIPTED: u64 = u64::MAX - 20;
 const CLIENT: Token = Token::new(u64::MAX);
 const OTHER_CLIENT: Token = Token::new(1);
+const CHAT_BUDGET: u64 = 40;
 const SUBJECT: &[u8] = b"same identity";
 
 fn world(peer: ClientPeer) -> World {
@@ -224,18 +225,21 @@ fn keyed_client_work_replays_after_explicit_registration_reset_and_cold_restart(
         project: 1,
         holdings: Box::new([people::Holding { person, role: people::Role::Owner }]),
     })));
+    let creation = jig_core_world::fixtures::chat(&world, 1, b"one chat".as_slice().into());
     let chat = || {
         root::Event::Core(core::Event::People(people::Event::Ask {
             reply_to: ReplyTo::new(CLIENT),
             sign_in: session,
             key: [16; 16],
-            ask: people::Ask::StartChat { project: 1, words: b"one chat".as_slice().into() },
+            ask: creation.clone(),
         }))
     };
     world.send(chat());
     let first = replies(&mut world);
     assert_eq!(first.len(), 1);
-    let people::Reply::Outcome(people::Outcome::Started { task }) = first[0].2 else { panic!("chat started") };
+    let people::Reply::Outcome(people::Outcome::Created { first: task, .. }) = first[0].2 else {
+        panic!("chat started")
+    };
     world.send(chat());
     let duplicate = replies(&mut world);
     assert_eq!(duplicate.len(), 1);
@@ -281,7 +285,7 @@ fn keyed_client_work_replays_after_explicit_registration_reset_and_cold_restart(
             .values()
             .filter(|row| matches!(row,
         root::Record::Core(core::Record::People(people::Stored::Answer { key, outcome, .. }))
-            if key.person == person && key.key == [16; 16] && *outcome == people::Outcome::Started { task }))
+            if key.person == person && key.key == [16; 16] && *outcome == people::Outcome::Created { first: task, last: task, given: Some(people::Given { task, amount: CHAT_BUDGET }) }))
             .count(),
         1
     );
@@ -306,12 +310,14 @@ fn default_capture_and_independent_worker_delivery_keep_their_original_paths() {
         reply_to: ReplyTo::new(OTHER_CLIENT),
         sign_in: session,
         key: [17; 16],
-        ask: people::Ask::StartChat { project: 1, words: b"worker still receives work".as_slice().into() },
+        ask: jig_core_world::fixtures::chat(&world, 1, b"worker still receives work".as_slice().into()),
     })));
     let received = replies(&mut world);
     assert_eq!(received.len(), 1);
     assert_eq!(received[0].1, OTHER_CLIENT);
-    let people::Reply::Outcome(people::Outcome::Started { task }) = received[0].2 else { panic!("chat started") };
+    let people::Reply::Outcome(people::Outcome::Created { first: task, .. }) = received[0].2 else {
+        panic!("chat started")
+    };
     assert_eq!(world.peers.as_ref().expect("peers").workers[0].seen[0].task, task);
     assert_eq!(world.assignments.len(), 1);
 }

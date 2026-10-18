@@ -98,10 +98,6 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
                 },
             )?)
         }
-        p::Outcome::Closing { chat, cancelled, kept } => w::OwnerOutcome::Closing(w::OwnerOutcomeClosing::new(
-            limits,
-            w::OwnerOutcomeClosingParts { chat: *chat, cancelled: *cancelled, kept: *kept },
-        )?),
         p::Outcome::NoteEdited { name } => w::OwnerOutcome::NoteEdited(w::OwnerOutcomeNoteEdited::new(
             limits,
             w::OwnerOutcomeNoteEditedParts { name: *name },
@@ -113,10 +109,6 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
         p::Outcome::Adopted { project } => w::OwnerOutcome::Adopted(w::OwnerOutcomeAdopted::new(
             limits,
             w::OwnerOutcomeAdoptedParts { project: *project },
-        )?),
-        p::Outcome::GoalStarted { task } => w::OwnerOutcome::GoalStarted(w::OwnerOutcomeGoalStarted::new(
-            limits,
-            w::OwnerOutcomeGoalStartedParts { task: *task },
         )?),
         p::Outcome::Stopped { task } => {
             w::OwnerOutcome::Stopped(w::OwnerOutcomeStopped::new(limits, w::OwnerOutcomeStoppedParts { task: *task })?)
@@ -153,10 +145,6 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
                 w::OwnerOutcomeQuestionAnsweredParts { task: *task, question: *question, message: *message },
             )?)
         }
-        p::Outcome::Prioritised { project } => w::OwnerOutcome::Prioritised(w::OwnerOutcomePrioritised::new(
-            limits,
-            w::OwnerOutcomePrioritisedParts { project: *project },
-        )?),
         p::Outcome::Amended { task, .. } => {
             w::OwnerOutcome::Amended(w::OwnerOutcomeAmended::new(limits, w::OwnerOutcomeAmendedParts { task: *task })?)
         }
@@ -172,9 +160,6 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
             limits,
             w::OwnerOutcomePoolSetParts { project: *project, person: *person },
         )?),
-        p::Outcome::Started { task } => {
-            w::OwnerOutcome::Started(w::OwnerOutcomeStarted::new(limits, w::OwnerOutcomeStartedParts { task: *task })?)
-        }
         p::Outcome::MarkedSeen { seen } => w::OwnerOutcome::MarkedSeen(w::OwnerOutcomeMarkedSeen::new(
             limits,
             w::OwnerOutcomeMarkedSeenParts { seen: self::seen(*seen, limits)? },

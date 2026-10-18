@@ -1,5 +1,5 @@
 //! Read-only object judgments shared with authenticated requests.
-use super::{Act, Admission, allowed, bounds, standing};
+use super::{Act, Admission, allowed, standing};
 use crate::{Core, Limits, documents};
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
@@ -7,7 +7,7 @@ use jig_domain_tasks as tasks;
 mod decisions;
 mod task;
 pub(crate) use decisions::{escalation, proposal};
-pub(crate) use task::{close, person, question, write, write_in};
+pub(crate) use task::{person, question, write, write_in};
 
 pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: &documents::Subject) -> Admission {
     match object {
@@ -29,10 +29,8 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
             | Act::Release
             | Act::LeaveHeld
             | Act::Stop
-            | Act::Close
             | Act::Move
-            | Act::SetGoal
-            | Act::Prioritise
+            | Act::Reorder
             | Act::Seen
             | Act::EditNote
             | Act::DeleteNote
@@ -77,8 +75,7 @@ fn project_admission(core: &Core, limits: &Limits, party: u64, act: Act, project
         return Admission::Refused(why);
     }
     match act {
-        Act::SetGoal => bounds::goal(core, limits, party, project, held),
-        Act::Prioritise => allowed(core.priorities_allowed(project, held, 0, limits.tasks.tasks)),
+        Act::Reorder => allowed(core.reorder_allowed(project, held)),
         Act::Adopt | Act::ChangePolicy | Act::SetRoles | Act::MakeService | Act::SetPool => {
             allowed(core.role_allowed(party, project, limits.tasks.tree_tasks))
         }
@@ -96,7 +93,6 @@ fn project_admission(core: &Core, limits: &Limits, party: u64, act: Act, project
         | Act::Amend
         | Act::Stop
         | Act::Cancel
-        | Act::Close
         | Act::Move
         | Act::EditNote
         | Act::DeleteNote => Admission::Refused(people::Refusal::NotOffered),

@@ -66,7 +66,7 @@ mod batch;
 mod boundary;
 mod capacity;
 mod changed;
-mod chat;
+
 mod closing;
 mod compound;
 mod control;
@@ -124,7 +124,7 @@ pub use boundary::{
     WriterSlot,
 };
 pub use capacity::{Capacity, CapacityAction, CapacityCause, CapacityRefusal};
-pub use chat::{Disposal, Keep};
+
 pub use control::{
     AddressChange, Amendment, AmendmentHistory, Change, Control, History, Milestone, Settings, Tracking, address_admit,
     instruction_admit,

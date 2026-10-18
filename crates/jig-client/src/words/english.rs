@@ -65,7 +65,6 @@ impl Word {
             Self::Refusal(RefusalWord::NoEscalationHolder) => (30, b"No one to escalate to", &[]),
             Self::Refusal(RefusalWord::Malformed) => (31, b"Malformed operation", &[]),
             Self::Refusal(RefusalWord::Role) => (32, b"The held role does not permit this action", &[]),
-            Self::Refusal(RefusalWord::Disposal) => (33, b"Delegate disposal refused", &[]),
             Self::Refusal(RefusalWord::Taken) => (34, b"Held by party ", &[HoleKind::Number]),
             Self::Refusal(RefusalWord::NotWaiting) => (35, b"This object waits for someone else", &[]),
             Self::Refusal(RefusalWord::NoFurther) => (36, b"This holder cannot pass further", &[]),

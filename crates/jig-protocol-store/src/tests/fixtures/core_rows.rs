@@ -86,7 +86,7 @@ pub fn milestone(identity: core::MilestoneId) -> core::ProjectionRecord {
         milestone: core::ProjectionMilestone {
             identity,
             phase: Some(super::task_phase()),
-            change: Some(tasks::Change::Prioritised { priority: 7 }),
+            change: Some(jig_domain_tasks::Change::Amended),
             words: Box::from(b"history".as_slice()),
         },
     }

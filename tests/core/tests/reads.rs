@@ -84,11 +84,8 @@ fn an_inbox_longer_than_the_engine_holds_pages_from_the_store() {
     let mut tasks = Vec::new();
     for number in 0..3 {
         if number != 0 {
-            request(
-                &mut world,
-                10 + number,
-                people::Ask::StartChat { project: 1, words: b"next chat".as_slice().into() },
-            );
+            let proposed_goal = jig_core_world::fixtures::chat(&world, 1, b"next chat".as_slice().into());
+            request(&mut world, 10 + number, proposed_goal);
         }
         tasks.push(world.assigned.as_ref().expect("chat").task);
         world.end(
@@ -494,7 +491,14 @@ fn ended_delegate_world(seed: u64) -> (jig_core_world::effects::World, u64, u64)
     let mut world = world(seed);
     let chat = chat_task(&world);
     finish_chat(&mut world, chat);
-    request(&mut world, 124, jig_core_world::stories::offers::goal(300));
+    let ask = jig_core_world::fixtures::goal(
+        &world,
+        1,
+        b"goal with a delegate".as_slice().into(),
+        people::TaskExecutor::Agent { charter: 1 },
+        jig_core_world::fixtures::Goal { budget: 300, priority: 1, ..Default::default() },
+    );
+    request(&mut world, 124, ask);
     let goal = chat_task(&world);
     world.delegate();
     world.observed(13);

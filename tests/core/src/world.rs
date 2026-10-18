@@ -81,7 +81,6 @@ fn profile() -> root::Limits {
         sign_ins: 2,
         projects: 1,
         holdings: 2,
-        goals: 4,
         initial_owners: 1,
         requests: 4,
         pending: 2,
@@ -313,10 +312,8 @@ pub fn config(seed: u64) -> root::Config {
             connectors: Box::new([1, 2]),
             settings: core::Settings {
                 templates: crate::fixtures::templates(),
-                close_grace: Duration::from_secs(5),
                 deployment_provider: 3,
 
-                chat: 1,
                 charters: Box::new([core::Charter {
                     number: 1,
                     hosts: fleet::Kinds::Workers,
@@ -390,6 +387,7 @@ pub struct World {
     pub observer: crate::observations::Observer,
     heap: crate::observations::Heap,
     scenario: Scenario,
+    creating: crate::fixtures::Creating,
     delegated: bool,
     goal_answer_sent: bool,
     limits: root::Limits,
@@ -467,6 +465,7 @@ impl World {
         }));
         let heap = crate::observations::Heap::new(&limits);
         World {
+            creating: crate::fixtures::Creating::new(&config(seed).core, limits.core.tasks.tree_tasks),
             domain: root::Domain::new(config(seed), &limits),
             store: Store::new(&limits),
             events,

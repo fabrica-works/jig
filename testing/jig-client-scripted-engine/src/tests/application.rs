@@ -181,14 +181,7 @@ fn scenario_application_hooks_share_keys_commits_retention_and_restart() {
     assert!(up.contains(&Up::App { watch: Token::new(1), document: engine.application().document.clone() }));
     assert_eq!(engine.commits()[0].application.as_ref().expect("own ledger").digest, Some([9; 32]));
     engine
-        .send(
-            at(10_000_001),
-            Wall::EPOCH,
-            11,
-            [1; 16],
-            Token::new(5),
-            Ask::StartChat { project: 1, words: text(b"collision") },
-        )
+        .send(at(10_000_001), Wall::EPOCH, 11, [1; 16], Token::new(5), fixtures::create(1, text(b"collision")))
         .expect("jig collision");
     assert!(engine.poll(at(10_000_001)).contains(&Up::Answer {
         attempt: Token::new(5),
@@ -290,14 +283,7 @@ fn scenario_hook_limits_visibility_conflicts_and_expired_retention() {
         vec![Up::ApplicationRead { token: Token::new(5), terminal: Err(ReadNone::Unknown) }]
     );
     engine
-        .send(
-            Time::ZERO,
-            Wall::EPOCH,
-            11,
-            [1; 16],
-            Token::new(6),
-            Ask::StartChat { project: 1, words: text(b"jig first") },
-        )
+        .send(Time::ZERO, Wall::EPOCH, 11, [1; 16], Token::new(6), fixtures::create(1, text(b"jig first")))
         .expect("jig key");
     engine
         .send_application(Time::ZERO, Wall::EPOCH, 12, [1; 16], Token::new(7), 7, 1, [9; 32], own_ask(b"own conflict"))
@@ -362,13 +348,13 @@ fn scenario_deployment_parts_dynamic_rules_and_scheduling() {
     engine.act(Time::ZERO, Wall::EPOCH, Change::Me(removed)).expect("role removed");
     assert_eq!(engine.poll(at(10_000_000)), vec![Up::Ended { token: Token::new(2), why: WatchEnd::NotAllowed }]);
     let mut engine = Engine::new(live_script(), 19).expect("dynamic rules");
-    let ask = Ask::StartChat { project: 1, words: text(b"world generated words") };
+    let ask = fixtures::create(1, text(b"world generated words"));
     let mut made = task();
     made.chip.task = 9;
     let rule = Rule {
         party: Some(1),
         ask: ask.clone(),
-        answer: Answer::Done(Outcome::Made { what: Made::Chat { task: 9 } }),
+        answer: Answer::Done(Outcome::Made { what: Made::Tasks { tasks: list(vec![9]) } }),
         changes: vec![Change::Object { project: 1, key: ObjectKey::Task(9), value: ReadValue::Task(Box::new(made)) }],
     };
     engine.script(rule.clone()).expect("world scripts actual words");
@@ -391,7 +377,7 @@ fn scenario_deployment_parts_dynamic_rules_and_scheduling() {
     );
     engine.fault(at(10_000_001), Fault::Restart { offline: Duration::from_millis(1) });
     drop(engine.poll(at(10_000_001)));
-    send(&mut engine, 12_000_000, 11, 2, 3, Ask::StartChat { project: 1, words: text(b"fresh") });
+    send(&mut engine, 12_000_000, 11, 2, 3, fixtures::create(1, text(b"fresh")));
     assert!(
         engine.next_due().is_some_and(|due| due >= at(12_000_000)),
         "late activity after offline cannot move the world's clock back"
@@ -429,7 +415,7 @@ fn scenario_application_jig_requests_cannot_bypass_admission() {
             false,
             Some(list(vec![
                 Ask::Seen { through: SeenThrough::Results { through: 1 } },
-                Ask::StartChat { project: 2, words: text(b"hidden") },
+                fixtures::create(2, text(b"hidden")),
             ])),
             Refusal::Unknown,
         ),

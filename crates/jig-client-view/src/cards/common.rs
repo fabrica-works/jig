@@ -30,10 +30,8 @@ pub const fn act_phrase(act: ActKind) -> JigPhrase {
         ActKind::Withdraw => JigPhrase::ActWithdraw,
         ActKind::Stop => JigPhrase::ActStop,
         ActKind::Cancel => JigPhrase::ActCancel,
-        ActKind::Close => JigPhrase::ActClose,
         ActKind::Move => JigPhrase::ActTakeOver,
-        ActKind::SetGoal => JigPhrase::ActSetGoal,
-        ActKind::Prioritise => JigPhrase::ActPrioritise,
+        ActKind::Reorder => JigPhrase::ActReorder,
         ActKind::Seen => JigPhrase::ActMarkSeen,
         ActKind::EditNote => JigPhrase::ActEditNote,
         ActKind::DeleteNote => JigPhrase::ActDeleteNote,
@@ -200,7 +198,7 @@ pub fn authority(b: &mut Builder, facts: &Authority, words: &Words, bindings: &m
                 words.text(b, JigPhrase::PartConnector, &[Hole::Number(u64::from(*connector))]);
                 crate::owner_authority::pattern(b, words, pattern, text_limit);
             }
-            jig_client::contract::NoteScope::Goal { project, goal } => {
+            jig_client::contract::NoteScope::Task { project, task: goal } => {
                 words.text(b, JigPhrase::ContextProject, &[Hole::Number(u64::from(*project))]);
                 words.text(b, JigPhrase::TaskPage, &[Hole::Number(*goal)]);
             }

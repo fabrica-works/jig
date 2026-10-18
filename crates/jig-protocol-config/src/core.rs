@@ -46,7 +46,6 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
             Address::Addr(Addr::Ip(_)) | Address::Host { .. } => {}
         }
     }
-    let (chat, close_grace) = crate::templates::chat(&engine.templates).expect("checked chat template");
     domain::Config {
         deployment,
         seed: engine.deployment.seed.unwrap_or(seed),
@@ -56,10 +55,8 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
         authority,
         settings: domain::Settings {
             templates: engine.templates.clone(),
-            close_grace,
             deployment_provider: deployment_provider.expect("one checked deployment provider"),
             charters: engine.charters.clone(),
-            chat,
             resume_bytes: limits.resume_bytes,
             tools: domain::ToolFamilies::JIG,
         },

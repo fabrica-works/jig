@@ -16,31 +16,7 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
     authority::step(&mut configuration.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
     assert_eq!(facts.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
     let mut world = World::configured(170, true, configuration, limits);
-    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
-        reply_to: ReplyTo::new(Token::new(9000)),
-        sign_in: world.sign_in.expect("signed in party"),
-        key: [31; 16],
-        ask: people::Ask::SetGoal {
-            project: 1,
-            spec: Box::from(&b"Project this goal"[..]),
-            executor: jig_domain_people::GoalExecutor::Charter(1),
-            budget: 20,
-            priority: 1,
-            deadline: None,
-        },
-    })));
-    let goal = world
-        .people_answers
-        .iter()
-        .find_map(|reply| match reply {
-            people::Reply::Outcome(people::Outcome::GoalStarted { task }) => Some(*task),
-            people::Reply::SignedIn { .. }
-            | people::Reply::SignedOut
-            | people::Reply::Outcome(_)
-            | people::Reply::Refused(_)
-            | people::Reply::Again(_) => None,
-        })
-        .expect("tracked goal admitted");
+    let goal = tracked_goal(&mut world);
     let record = world
         .store
         .rows
@@ -217,14 +193,13 @@ fn a_delegate_of_a_delegate_ending_feeds_the_whole_plan_once_and_closing_waits_f
         reply_to: ReplyTo::new(Token::new(9200)),
         sign_in: world.sign_in.expect("signed in party"),
         key: [33; 16],
-        ask: people::Ask::SetGoal {
-            project: 1,
-            spec: Box::from(&b"Whole tree"[..]),
-            executor: jig_domain_people::GoalExecutor::Charter(1),
-            budget: 300,
-            priority: 1,
-            deadline: None,
-        },
+        ask: jig_core_world::fixtures::goal(
+            &world,
+            1,
+            Box::from(&b"Whole tree"[..]),
+            people::TaskExecutor::Agent { charter: 1 },
+            jig_core_world::fixtures::Goal { budget: 300, priority: 1, ..Default::default() },
+        ),
     })));
     let goal = {
         let row = world.assigned.as_ref().expect("goal assigned");
@@ -356,18 +331,14 @@ fn untracked_world(seed: u64) -> (World, root::Config, u64) {
     let restart = untracked_configuration(seed).0;
     let mut world = World::configured(seed, false, configuration, limits);
     finish_chat(&mut world, 0, b"");
-    jig_core_world::stories::reads::request(
-        &mut world,
-        91,
-        people::Ask::SetGoal {
-            project: 1,
-            spec: b"untracked goal".as_slice().into(),
-            executor: people::GoalExecutor::Charter(1),
-            budget: 20,
-            priority: 1,
-            deadline: None,
-        },
+    let tracked_goal_request = jig_core_world::fixtures::goal(
+        &world,
+        1,
+        b"untracked goal".as_slice().into(),
+        people::TaskExecutor::Agent { charter: 1 },
+        jig_core_world::fixtures::Goal { budget: 20, priority: 1, ..Default::default() },
     );
+    jig_core_world::stories::reads::request(&mut world, 91, tracked_goal_request);
     let goal = world.assigned.as_ref().expect("goal assigned").task;
     world.hold_projection_settlements = true;
     world.projections.clear();
@@ -435,4 +406,32 @@ fn an_untracked_goals_projection_is_forgotten_once_its_write_settles() {
     world.send(root::Event::Core(core::Event::ProjectionSettled { goal, connector: 2 }));
     assert_eq!(projection_rows(&world, goal), 0);
     assert_eq!(jig_core_world::fixtures::live_row(&world, goal).tracked, None, "the task stays live");
+}
+
+fn tracked_goal(world: &mut World) -> u64 {
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        reply_to: ReplyTo::new(Token::new(9000)),
+        sign_in: world.sign_in.expect("signed in party"),
+        key: [31; 16],
+        ask: jig_core_world::fixtures::goal(
+            world,
+            1,
+            Box::from(&b"Project this goal"[..]),
+            people::TaskExecutor::Agent { charter: 1 },
+            jig_core_world::fixtures::Goal { budget: 20, priority: 1, ..Default::default() },
+        ),
+    })));
+    world
+        .people_answers
+        .iter()
+        .rev()
+        .find_map(|reply| match reply {
+            people::Reply::Outcome(people::Outcome::Created { first: task, .. }) => Some(*task),
+            people::Reply::SignedIn { .. }
+            | people::Reply::SignedOut
+            | people::Reply::Outcome(_)
+            | people::Reply::Refused(_)
+            | people::Reply::Again(_) => None,
+        })
+        .expect("tracked goal admitted")
 }

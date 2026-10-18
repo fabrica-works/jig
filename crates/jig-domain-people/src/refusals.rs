@@ -17,8 +17,6 @@ pub enum Accepter {
 pub enum Refusal {
     /// The named batch member is not well formed.
     NotWellFormed { at: u32, why: Malformed },
-    /// A named direct delegate lacks its disposal or was named incorrectly.
-    Disposal { task: u64, issue: DisposalIssue },
     /// The held role does not permit this request here.
     Role { held: Option<Role> },
     /// The request lacks the stated authority.
@@ -219,12 +217,4 @@ pub enum Again {
     Busy,
     /// Restoration or a required neighbour is not ready.
     NotReady,
-}
-
-/// Why a close request's named disposal does not match its live delegates.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub enum DisposalIssue {
-    Missing,
-    Unknown,
-    Repeated,
 }

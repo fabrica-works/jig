@@ -87,6 +87,7 @@ impl Config {
             limits.core.fleet.slots = 3;
         }
         if self.scenario == Some(Scenario::QueryWatchedWhileTasksEnd) {
+            limits.core.people.operations = 3;
             limits.core.tasks.tasks = 3;
             limits.core.tasks.project_tasks = 3;
         }
@@ -291,19 +292,23 @@ impl Application for Testing {
                 .participating
                 .insert(jig_conformance::referee::Name { connector: 1, path: vec![vec![1], vec![1]] });
         }
+        let (configuration, limits) = config.root();
+        let mut peers = Peers::new(
+            workers,
+            vec![Party::new(
+                1,
+                Role::Owner,
+                10_000,
+                Box::new([
+                    Act::SignIn { provider: 0, subject: 7_u64.to_be_bytes().into() },
+                    Act::Request { key: [1; 16], ask: Ask::Chat { words: b"work".as_slice().into() } },
+                ]),
+            )],
+        );
+        peers.creating =
+            Some(jig_core_world::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks));
         Neighbours {
-            peers: Peers::new(
-                workers,
-                vec![Party::new(
-                    1,
-                    Role::Owner,
-                    10_000,
-                    Box::new([
-                        Act::SignIn { provider: 0, subject: 7_u64.to_be_bytes().into() },
-                        Act::Request { key: [1; 16], ask: Ask::Chat { words: b"work".as_slice().into() } },
-                    ]),
-                )],
-            ),
+            peers,
             observer,
             restart_reads: BTreeMap::new(),
             account_ready: false,

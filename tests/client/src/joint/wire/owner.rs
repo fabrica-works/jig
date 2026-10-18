@@ -791,7 +791,6 @@ pub(super) mod tests {
         for (role, _) in roles {
             projects
                 .push(documents::FrameProjectRole {
-                    chat_budget: u64::MAX,
                     project: u32::MAX,
                     role,
                     name: None,
@@ -801,12 +800,6 @@ pub(super) mod tests {
                 })
                 .expect("the complete supplied fixture is admitted");
         }
-        let mut goals = List::with_capacity(4);
-        goals.push(u32::MAX).expect("the complete supplied fixture is admitted");
-        let mut offers = List::with_capacity(3);
-        offers
-            .push(documents::OfferedCharter { project: 0, chat: 17, goals, cut: true })
-            .expect("the complete supplied fixture is admitted");
         let source = documents::Frame {
             party: u64::MAX,
             kind: jig_domain_people::Kind::Service,
@@ -824,7 +817,6 @@ pub(super) mod tests {
             updates: documents::Count::AtLeast(u32::MAX),
             results_seen: u64::MAX,
             retention: skein_lib::Duration::from_nanos(u64::MAX),
-            charters: offers,
             cut: true,
         };
         let limits = Limits { projects: 7, rows: 7, text: 2, ..crate::test::limits().jig };

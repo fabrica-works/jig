@@ -659,7 +659,6 @@ pub(crate) mod tests {
             updates: documents::Count::Known(0),
             results_seen: u64::MAX,
             retention: Duration::from_secs(7),
-            charters: List::with_capacity(3),
             cut: true,
         }
     }

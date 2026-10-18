@@ -130,7 +130,8 @@ pub(crate) fn owner_person_capacity_action_fields(
     limits: &Limits,
 ) -> c::OwnerPersonCapacityAction {
     match value {
-        w::OwnerPersonCapacityAction::Close => c::OwnerPersonCapacityAction::Close,
+        w::OwnerPersonCapacityAction::Create => c::OwnerPersonCapacityAction::Create,
+        w::OwnerPersonCapacityAction::Compound => c::OwnerPersonCapacityAction::Compound,
         w::OwnerPersonCapacityAction::Application(row) => {
             c::OwnerPersonCapacityAction::Application { connector: row.connector() }
         }
@@ -140,8 +141,6 @@ pub(crate) fn owner_person_capacity_action_fields(
         w::OwnerPersonCapacityAction::Roles => c::OwnerPersonCapacityAction::Roles,
         w::OwnerPersonCapacityAction::Policy => c::OwnerPersonCapacityAction::Policy,
         w::OwnerPersonCapacityAction::Pool(row) => c::OwnerPersonCapacityAction::Pool { person: row.person() },
-        w::OwnerPersonCapacityAction::Chat => c::OwnerPersonCapacityAction::Chat,
-        w::OwnerPersonCapacityAction::Goal => c::OwnerPersonCapacityAction::Goal,
         w::OwnerPersonCapacityAction::Escalation(row) => c::OwnerPersonCapacityAction::Escalation { task: row.task() },
         w::OwnerPersonCapacityAction::Proposal(row) => c::OwnerPersonCapacityAction::Proposal {
             proposer: crate::translate::answers::proposer(row.proposer(), limits),
@@ -151,7 +150,6 @@ pub(crate) fn owner_person_capacity_action_fields(
         w::OwnerPersonCapacityAction::Question(row) => {
             c::OwnerPersonCapacityAction::Question { task: row.task(), question: row.question() }
         }
-        w::OwnerPersonCapacityAction::Priority => c::OwnerPersonCapacityAction::Priority,
         w::OwnerPersonCapacityAction::Amend(row) => c::OwnerPersonCapacityAction::Amend { task: row.task() },
         w::OwnerPersonCapacityAction::MoveTask(row) => c::OwnerPersonCapacityAction::Move { task: row.task() },
         w::OwnerPersonCapacityAction::TakePerson(row) => c::OwnerPersonCapacityAction::TakePerson { task: row.task() },

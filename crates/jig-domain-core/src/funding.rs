@@ -37,7 +37,7 @@ impl Core {
         }
     }
     /// The most a person's next task can take from its role and remaining pool.
-    pub(crate) fn chat_authority(
+    pub(crate) fn creating_authority(
         &self,
         project: u32,
         person: u64,
@@ -45,7 +45,7 @@ impl Core {
         tasks_left: u32,
     ) -> jig_domain_authority::Authority {
         let mut given = self.authority.role(project, role.number()).expect("configured role policy").authority.clone();
-        let (_, pool) = self.goal_pool(project, person);
+        let (_, pool) = self.person_pool(project, person);
         given.delegation.tasks = given.delegation.tasks.min(tasks_left).saturating_sub(1);
         given.delegation.depth = given.delegation.depth.saturating_sub(1);
         let ask = jig_domain_authority::PersonAsk {

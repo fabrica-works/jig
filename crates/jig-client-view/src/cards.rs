@@ -197,7 +197,7 @@ pub fn card(
                     crate::task_result::render(b, client, result, words, bindings);
                 }
                 common::acts(b, &facts.card, &task.acts, object, words, bindings);
-                close(b);
+                task_footer(b, client, object, task, words, bindings);
             }
         }
         Some(crate::objects::Body::OwnerEscalation(_)) => {
@@ -278,3 +278,25 @@ pub fn refusal(b: &mut Builder, refusal: &jig_client::contract::Refusal, words: 
 }
 
 pub mod owner_escalation;
+
+fn task_footer(
+    b: &mut Builder,
+    client: &Borrowed<'_>,
+    object: Id<Object>,
+    task: &jig_client::contract::Task,
+    words: &Words,
+    bindings: &mut JigBindings,
+) {
+    close(b);
+    if crate::confirm::can_close(client, task) {
+        crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Button,
+            JigPhrase::ActClose,
+            &[],
+            Act::CloseChat { object: object.token() },
+        );
+    }
+}

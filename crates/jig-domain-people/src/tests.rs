@@ -4,6 +4,7 @@
     clippy::arithmetic_side_effects,
     reason = "step tests are ordinary Rust (testing-strategy.md, section 4)"
 )]
+mod fixtures;
 use crate::*;
 use skein_lib::{Duration, Env, List, Queue, ReplyTo, Time, Token, Wall};
 
@@ -17,7 +18,6 @@ const LIMITS: Limits = Limits {
     sign_ins: 4,
     projects: 3,
     holdings: 4,
-    goals: 4,
     initial_owners: 3,
     requests: 4,
     pending: 2,
@@ -172,7 +172,7 @@ fn an_owner_routes_a_connector_resource_adoption_once_by_its_key() {
 }
 
 #[test]
-fn owner_makes_a_service_which_can_request_work_but_cannot_start_a_chat() {
+fn owner_makes_a_service_which_can_request_work() {
     let mut test = Test::new(LIMITS);
     test.signin(1, 10, identity(0, 1));
     test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Owner }]) });
@@ -217,22 +217,7 @@ fn owner_makes_a_service_which_can_request_work_but_cannot_start_a_chat() {
         kind: Kind::Service,
     });
     assert_eq!(reply(&service), Reply::SignedIn { person: 2, sign_in: 21, expires: Wall::from_nanos(60_000_000_000) });
-    assert_eq!(
-        reply(&test.request(21, 2, Ask::StartChat { project: 1, words: Box::new([]) })),
-        Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Member) }))
-    );
-    let routed = test.request(
-        21,
-        3,
-        Ask::SetGoal {
-            project: 1,
-            spec: b"work".as_slice().into(),
-            executor: GoalExecutor::Charter(1),
-            budget: 1,
-            priority: 1,
-            deadline: None,
-        },
-    );
+    let routed = test.request(21, 3, create_request(1, Box::new([])));
     let mut service_routed = false;
     for row in &routed {
         if let Request::Route { person, .. } = row {
@@ -244,7 +229,10 @@ fn owner_makes_a_service_which_can_request_work_but_cannot_start_a_chat() {
 }
 
 fn ask(project: u32) -> Ask {
-    Ask::StartChat { project, words: Box::new([1]) }
+    create_request(project, Box::new([1]))
+}
+fn create_request(project: u32, words: Box<[u8]>) -> Ask {
+    Ask::Create { project, batch: Box::new([fixtures::member(&words)]) }
 }
 
 struct Test {
@@ -527,9 +515,13 @@ fn pending_duplicates_share_one_route_and_reserve_answer_room() {
     assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Again(Again::Busy));
     assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
     assert_eq!(reply(&test.request(10, 1, ask(2))), Reply::Refused(Refusal::KeyConflict));
-    let completed = test.send(Event::Decided { request: token, outcome: Outcome::Started { task: 90 } });
+    let completed =
+        test.send(Event::Decided { request: token, outcome: Outcome::Created { first: 90, last: 90, given: None } });
     assert_eq!(completed.iter().filter(|r| is_reply(r)).count(), 2);
-    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Outcome(Outcome::Started { task: 90 }));
+    assert_eq!(
+        reply(&test.request(10, 1, ask(1))),
+        Reply::Outcome(Outcome::Created { first: 90, last: 90, given: None })
+    );
 }
 
 #[test]
@@ -538,12 +530,15 @@ fn answered_keys_follow_people_across_signins_and_role_changes() {
     test.member();
     let rows = test.request(10, 1, ask(1));
     let token = route(&rows);
-    test.send(Event::Decided { request: token, outcome: Outcome::Started { task: 90 } });
+    test.send(Event::Decided { request: token, outcome: Outcome::Created { first: 90, last: 90, given: None } });
     let reply_to = test.to();
     test.send(Event::SignOut { reply_to, sign_in: 10 });
     test.signin(2, 11, identity(0, 1));
     test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Observer }]) });
-    assert_eq!(reply(&test.request(11, 1, ask(1))), Reply::Outcome(Outcome::Started { task: 90 }));
+    assert_eq!(
+        reply(&test.request(11, 1, ask(1))),
+        Reply::Outcome(Outcome::Created { first: 90, last: 90, given: None })
+    );
     assert_eq!(reply(&test.request(11, 1, ask(2))), Reply::Refused(Refusal::KeyConflict));
 }
 
@@ -552,8 +547,11 @@ fn completed_key_replays_until_its_deadline_then_can_be_reused() {
     let mut test = Test::new(LIMITS);
     test.member();
     let token = route(&test.request(10, 1, ask(1)));
-    test.send(Event::Decided { request: token, outcome: Outcome::Started { task: 90 } });
-    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Outcome(Outcome::Started { task: 90 }));
+    test.send(Event::Decided { request: token, outcome: Outcome::Created { first: 90, last: 90, given: None } });
+    assert_eq!(
+        reply(&test.request(10, 1, ask(1))),
+        Reply::Outcome(Outcome::Created { first: 90, last: 90, given: None })
+    );
     test.env.now = Time::from_nanos(Duration::from_secs(120).as_nanos());
     test.env.wall = Wall::from_nanos(Duration::from_secs(120).as_nanos());
     // The old sign-in has expired too; a new sign-in still belongs to the same person.
@@ -573,7 +571,12 @@ fn expired_completed_key_is_erased_from_a_restore_page_and_frees_its_slot() {
     test.env.wall = Wall::from_nanos(Duration::from_secs(120).as_nanos());
     let key = RequestKey { person: 1, key: [1; 16] };
     let erased = test.send(Event::Restore {
-        record: Stored::Answer { key, ask: Box::new(ask(1)), outcome: Outcome::Started { task: 90 }, at: Wall::EPOCH },
+        record: Stored::Answer {
+            key,
+            ask: Box::new(ask(1)),
+            outcome: Outcome::Created { first: 90, last: 90, given: None },
+            at: Wall::EPOCH,
+        },
     });
     assert_eq!(erased, [Request::Erase { key: Key::Answer(key) }]);
     test.send(Event::Restore { record: Stored::Person { number: 1, identity: identity(0, 1) } });
@@ -601,7 +604,7 @@ fn every_admission_point_refuses_without_partial_state() {
     test.send(Event::SignOut { reply_to, sign_in: 10 });
     assert_eq!(reply(&test.signin(2, 11, identity(0, 2))), Reply::Again(Again::Busy));
     assert_eq!(signed_person(reply(&test.signin(3, 11, identity(0, 1)))), Some(1));
-    let big = Ask::StartChat { project: 1, words: Box::new([1, 2]) };
+    let big = create_request(1, Box::new([1, 2]));
     assert_eq!(reply(&test.request(11, 1, big)), Reply::Refused(Refusal::Limit { which: LimitKind::Words }));
     let roles = test.send(Event::Roles { project: 2, holdings: Box::new([]) });
     assert_eq!(roles, [Request::RolesRefused { project: 2, outcome: Outcome::Again(Again::Busy) }]);
@@ -734,7 +737,7 @@ fn restored_role_success_requires_matching_ask_kind_and_project() {
             Ask::DecideEscalation { project: 1, task: 9, revision: 2, decision: EscalationDecision::Pass },
             Outcome::RolesSet { project: 1 },
         ),
-        (Ask::SetRoles { project: 1, holdings: Box::new([]) }, Outcome::Started { task: 9 }),
+        (Ask::SetRoles { project: 1, holdings: Box::new([]) }, Outcome::Created { first: 9, last: 9, given: None }),
         (
             Ask::SetRoles { project: 1, holdings: Box::new([]) },
             Outcome::EscalationDecided {
@@ -982,10 +985,16 @@ fn equal_keys_of_different_people_are_independent() {
     let first = route(&test.request(10, 1, ask(1)));
     let second = route(&test.request(20, 1, ask(1)));
     assert_ne!(first, second);
-    test.send(Event::Decided { request: first, outcome: Outcome::Started { task: 90 } });
-    test.send(Event::Decided { request: second, outcome: Outcome::Started { task: 91 } });
-    assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Outcome(Outcome::Started { task: 90 }));
-    assert_eq!(reply(&test.request(20, 1, ask(1))), Reply::Outcome(Outcome::Started { task: 91 }));
+    test.send(Event::Decided { request: first, outcome: Outcome::Created { first: 90, last: 90, given: None } });
+    test.send(Event::Decided { request: second, outcome: Outcome::Created { first: 91, last: 91, given: None } });
+    assert_eq!(
+        reply(&test.request(10, 1, ask(1))),
+        Reply::Outcome(Outcome::Created { first: 90, last: 90, given: None })
+    );
+    assert_eq!(
+        reply(&test.request(20, 1, ask(1))),
+        Reply::Outcome(Outcome::Created { first: 91, last: 91, given: None })
+    );
 }
 
 #[test]
@@ -1015,8 +1024,11 @@ fn root_pressure_answers_every_waiter_and_releases_the_key_for_retry() {
         assert_eq!(reply(&rows), Reply::Again(again));
         let retry = route(&test.request(10, 1, ask(1)));
         assert_ne!(first, retry, "retired route tokens fence earlier completions");
-        test.send(Event::Decided { request: retry, outcome: Outcome::Started { task: 90 } });
-        assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Outcome(Outcome::Started { task: 90 }));
+        test.send(Event::Decided { request: retry, outcome: Outcome::Created { first: 90, last: 90, given: None } });
+        assert_eq!(
+            reply(&test.request(10, 1, ask(1))),
+            Reply::Outcome(Outcome::Created { first: 90, last: 90, given: None })
+        );
     }
 }
 
@@ -1058,7 +1070,7 @@ fn calls_before_restore_and_after_failed_restore_are_answered_not_ready() {
         record: Stored::Answer {
             key: RequestKey { person: 99, key: [1; 16] },
             ask: Box::new(ask(1)),
-            outcome: Outcome::Started { task: 90 },
+            outcome: Outcome::Created { first: 90, last: 90, given: None },
             at: Wall::EPOCH,
         },
     });
@@ -1306,7 +1318,7 @@ fn restored_application_tokens_must_name_their_connector_and_a_positive_outcome(
     for outcome in [
         Outcome::Applied { connector: 3, token: Token::new(42) },
         Outcome::Applied { connector: 2, token: Token::new(0) },
-        Outcome::Started { task: 42 },
+        Outcome::Created { first: 42, last: 42, given: None },
     ] {
         let mut test = Test::new(LIMITS);
         test.d = Domain::new(&LIMITS, Box::new([]), 2);
@@ -1422,7 +1434,7 @@ fn capacity_facts_keep_actual_times_replay_and_diagnostics_independent() {
     let value = entrance.get(0).expect("request pressure");
     assert_eq!(value.key, RequestKey { person: 1, key: [2; 16] });
     assert_eq!(value.project, Some(1));
-    assert_eq!(value.action, CapacityAction::Chat);
+    assert_eq!(value.action, CapacityAction::Create);
     assert_eq!(value.cause, CapacityCause::Requests { limit: 1 });
     assert_eq!(value.at, Wall::from_nanos(8));
     assert_eq!(reply(&test.request(10, 1, ask(2))), Reply::Refused(Refusal::KeyConflict));
@@ -1499,29 +1511,6 @@ fn read_position_room_pressure_keeps_scoped_identity_without_a_project() {
     assert_eq!(capacity::permanent(Outcome::MarkedSeen { seen }), None);
 }
 
-#[test]
-fn a_goal_deadline_is_retained_under_its_key() {
-    let mut test = Test::new(LIMITS);
-    test.member();
-    let ask = Ask::SetGoal {
-        project: 1,
-        spec: b"deadline".as_slice().into(),
-        executor: GoalExecutor::Charter(1),
-        budget: 1,
-        priority: 1,
-        deadline: Some(Wall::from_nanos(1_000_000_000)),
-    };
-    let request = route(&test.request(10, 1, ask.clone()));
-    let outcome = Outcome::GoalStarted { task: 7 };
-    test.send(Event::Decided { request, outcome });
-    assert_eq!(reply(&test.request(10, 1, ask.clone())), Reply::Outcome(outcome));
-    let Ask::SetGoal { project, spec, executor, budget, priority, .. } = ask else { panic!() };
-    let changed =
-        Ask::SetGoal { project, spec, executor, budget, priority, deadline: Some(Wall::from_nanos(2_000_000_000)) };
-    assert_eq!(reply(&test.request(10, 1, changed)), Reply::Refused(Refusal::KeyConflict));
-}
-
-mod closing_chat;
 #[test]
 fn inbox_counts_follow_current_project_roles_without_losing_archived_census() {
     let mut test = Test::new(LIMITS);
@@ -1609,7 +1598,6 @@ mod utf8;
 mod create;
 
 mod application_scope;
-mod fixtures;
 
 mod compound;
 mod ended;

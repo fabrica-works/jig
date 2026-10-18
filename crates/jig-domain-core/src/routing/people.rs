@@ -5,13 +5,10 @@
 //! before history. Other families select disjoint variants.
 
 use super::note_routes::edit_note_request;
-use super::parties::{
-    adopt_request, begin_chat_creation, begin_goal_creation, change_policy_request, make_service_request, pool_route,
-    roles_route,
-};
+use super::parties::{adopt_request, change_policy_request, make_service_request, pool_route, roles_route};
 use super::party_controls::{
-    amend_route, answer_question_request, cancel_request, move_request, person_task_request, prioritise_request,
-    release_request, say_request, stop_request,
+    amend_route, answer_question_request, cancel_request, move_request, person_task_request, release_request,
+    say_request, stop_request,
 };
 use super::party_decisions::{escalation_request, proposal_request};
 use crate::{Core, Event, Held, Key, Limits, Now, Record, Request, Requests, Write};
@@ -166,10 +163,8 @@ pub(super) fn tag_people(
                     | people::Outcome::ServiceMade { .. }
                     | people::Outcome::Adopted { .. }
                     | people::Outcome::Created { .. }
-                    | people::Outcome::GoalStarted { .. }
                     | people::Outcome::Proposed { .. }
                     | people::Outcome::Withdrawn { .. }
-                    | people::Outcome::Closing { .. }
                     | people::Outcome::Stopped { .. }
                     | people::Outcome::Cancelled { .. }
                     | people::Outcome::Released { .. }
@@ -180,13 +175,11 @@ pub(super) fn tag_people(
                     | people::Outcome::ProposalDecided { .. }
                     | people::Outcome::Said { .. }
                     | people::Outcome::QuestionAnswered { .. }
-                    | people::Outcome::Prioritised { .. }
                     | people::Outcome::Amended { .. }
                     | people::Outcome::RolesSet { .. }
                     | people::Outcome::PolicyChanged { .. }
                     | people::Outcome::PoolSet { .. }
                     | people::Outcome::EscalationDecided { .. }
-                    | people::Outcome::Started { .. }
                     | people::Outcome::Refused(..),
                 )) => Request::Held(Box::new(Held::PeopleReply { to, reply })),
             },
@@ -304,21 +297,6 @@ pub(super) fn tag_people(
                         &mut out,
                         super::propose::Withdrawal { request, person, project, proposal },
                     ),
-                    people::Ask::SetGoal { spec, executor, budget, priority, deadline, .. } => begin_goal_creation(
-                        core,
-                        env,
-                        &mut out,
-                        work,
-                        request,
-                        person,
-                        project,
-                        role.expect("goal membership admitted"),
-                        spec,
-                        executor,
-                        budget,
-                        priority,
-                        deadline,
-                    ),
                     people::Ask::MarkSeen { seen } => match seen {
                         people::Seen::Results { through } => {
                             let mut loading = false;
@@ -396,28 +374,11 @@ pub(super) fn tag_people(
                             }
                         },
                     },
-                    people::Ask::StartChat { words, .. } => begin_chat_creation(
-                        core,
-                        env,
-                        &mut out,
-                        work,
-                        request,
-                        person,
-                        project,
-                        role.expect("chat membership admitted"),
-                        words,
-                    ),
                     people::Ask::Say { task, words, .. } => {
                         say_request(core, env, work, request, person, project, task, words);
                     }
                     people::Ask::AnswerQuestion { task, question, words, .. } => {
                         answer_question_request(core, env, work, request, person, project, task, question, words);
-                    }
-                    people::Ask::Prioritise { goals, .. } => {
-                        prioritise_request(core, env, work, request, person, project, role, goals);
-                    }
-                    people::Ask::Close { chat, disposals, .. } => {
-                        crate::chats::route(core, env, work, request, person, project, role, chat, disposals);
                     }
                     people::Ask::Move { task, reason, .. } => {
                         move_request(core, env, work, request, person, project, role, task, reason);

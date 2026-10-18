@@ -258,7 +258,7 @@ fn answer_refusals(
     }
 }
 
-pub(crate) fn party_event(up: parties::Up) -> core::Event {
+pub(crate) fn party_event(up: parties::Up, store: &Store) -> core::Event {
     match up {
         parties::Up::SignIn { to, provider, subject } => core::Event::SignIn {
             reply_to: ReplyTo::new(Token::new(to)),
@@ -273,7 +273,7 @@ pub(crate) fn party_event(up: parties::Up) -> core::Event {
                 reply_to: ReplyTo::new(Token::new(to)),
                 sign_in,
                 key,
-                ask: people::Ask::StartChat { project, words },
+                ask: fixtures::chat(store, project, &words),
             })
         }
         parties::Up::Request {
@@ -311,7 +311,9 @@ pub(crate) fn answer_parties(engine: &mut jig_test_service::Engine, party: &mut 
             PartyOutput::Held(root::Delivery::Core(core::Held::PeopleReply { to, reply })) => {
                 let reply = match reply {
                     people::Reply::SignedIn { person, sign_in, .. } => parties::Reply::SignedIn { person, sign_in },
-                    people::Reply::Outcome(people::Outcome::Started { task }) => parties::Reply::Started { task },
+                    people::Reply::Outcome(people::Outcome::Created { first: task, .. }) => {
+                        parties::Reply::Started { task }
+                    }
                     people::Reply::Outcome(people::Outcome::Said { task, message }) => {
                         parties::Reply::Said { task, message }
                     }

@@ -1,5 +1,6 @@
 //! Admission refuses party proposals with no accepting role (QUESTIONS 31).
 use super::*;
+const READ_CREATING: u64 = 94;
 use jig_core_world::stories::offers::{goal, no_acceptor_fixture, project};
 
 #[test]
@@ -27,14 +28,13 @@ fn a_members_goal_beyond_their_pool_is_refused_when_nobody_may_accept_it() {
         .filter(|row| matches!(row, root::Record::Core(core::Record::Tasks(_))))
         .cloned()
         .collect();
-    let goal = people::Ask::SetGoal {
-        project: 1,
-        spec: b"beyond my pool".as_slice().into(),
-        executor: jig_domain_people::GoalExecutor::Charter(1),
-        budget: 600,
-        priority: 1,
-        deadline: None,
-    };
+    let goal = jig_core_world::fixtures::goal(
+        &world,
+        1,
+        b"beyond my pool".as_slice().into(),
+        people::TaskExecutor::Agent { charter: 1 },
+        jig_core_world::fixtures::Goal { budget: 600, priority: 1, ..Default::default() },
+    );
     let refused = people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Authority {
         lacking: people::Lack::Budget { needs: 600, left: 100 },
         proposable: Some(people::Accepter::Nobody),
@@ -66,18 +66,17 @@ fn a_members_goal_beyond_their_pool_is_refused_when_nobody_may_accept_it() {
 #[test]
 fn a_member_is_offered_a_goal_past_their_allotment_as_proposed() {
     use jig_domain_core::{
-        acts::{Act, Admission, Beyond, Bounds, Recipient},
+        acts::{Beyond, Bounds, Recipient},
         documents::Document,
     };
     let mut world = jig_core_world::stories::offers::world(181, Some(people::Role::Member));
-    let Document::Project(project) = project(&world) else {
-        panic!("project");
-    };
-    let offered = project.acts.iter().find(|value| value.act == Act::SetGoal).expect("goal offer");
-    let Admission::Bounded {
-        within: Bounds::Goal { pool_left, budget, charters, maximum_budget, .. },
+    jig_core_world::reads::ask(&mut world, READ_CREATING, core::reads::Read::Frame);
+    let Document::Frame(frame) = project(&world) else { panic!("creating frame") };
+    let creating = frame.projects.get(0).expect("project").creating.as_ref().expect("creating offer");
+    let core::acts::Creating {
+        within: Bounds::Create { pool_left, budget, charters, maximum_budget, .. },
         beyond: Beyond::Proposed { to: Recipient::Roles { project, roles } },
-    } = &offered.admission
+    } = creating
     else {
         panic!("bounded proposal");
     };
@@ -108,9 +107,9 @@ fn an_observer_is_offered_nothing_and_told_why() {
         panic!("project");
     };
     let refused = people::Refusal::Role { held: Some(people::Role::Observer) };
-    assert_eq!(project.acts.len(), 7);
+    assert_eq!(project.acts.len(), 6);
     assert!(project.acts.iter().all(|value| value.admission == Admission::Refused(refused)));
-    assert!(project.acts.iter().any(|value| value.act == Act::SetGoal));
+    assert!(project.acts.iter().any(|value| value.act == Act::Reorder));
     let task_rows = world
         .store
         .rows
@@ -118,7 +117,7 @@ fn an_observer_is_offered_nothing_and_told_why() {
         .filter(|row| matches!(row, root::Record::Core(core::Record::Tasks(_))))
         .cloned()
         .collect::<Vec<_>>();
-    ask(&mut world, 93, goal(50));
+    ask(&mut world, 93, people::Ask::SetPool { project: 1, person: 1, budget: 50 });
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::Refused(refused))));
     assert_eq!(
         world

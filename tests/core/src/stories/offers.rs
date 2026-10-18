@@ -115,6 +115,7 @@ pub fn world_with_policy(
     world.watches =
         Some(crate::watches::Parties::new(seed, world.store.applied, true, world.sign_in.expect("signed in")));
     world.reads = Some(crate::reads::Parties::new(world.store.applied));
+    crate::reads::ask(&mut world, 90, core::reads::Read::Frame);
     crate::reads::ask(&mut world, 91, core::reads::Read::Project { project: 1 });
     world
 }
@@ -153,14 +154,11 @@ pub fn no_holder_fixture(seed: u64) -> (root::Config, root::Limits) {
 
 #[must_use]
 pub fn goal(budget: u64) -> people::Ask {
-    people::Ask::SetGoal {
-        project: 1,
-        spec: b"offered goal".as_slice().into(),
-        executor: jig_domain_people::GoalExecutor::Charter(1),
-        budget,
-        priority: 1,
-        deadline: None,
-    }
+    let mut member = crate::fixtures::people_member(b"offered goal", budget);
+    member.label = jig_client_test_records::GOAL;
+    member.flags.listed = true;
+    member.tracked = Some(1);
+    people::Ask::Create { project: 1, batch: Box::new([member]) }
 }
 
 #[must_use]

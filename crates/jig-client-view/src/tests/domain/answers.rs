@@ -92,7 +92,6 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
     let refusals = [
         Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) },
         Refusal::Role { held: None },
-        Refusal::Disposal { task: 81, issue: DisposalIssue::Repeated },
         Refusal::Taken { by: 71 },
         Refusal::NotWaiting,
         Refusal::NoFurther,
@@ -148,7 +147,6 @@ fn refusals_keep_every_engine_fact_and_moved_reads_the_current_object_without_lo
                 assert!(rows.is_empty());
             }
             Refusal::Malformed { .. }
-            | Refusal::Disposal { .. }
             | Refusal::Taken { .. }
             | Refusal::NotWaiting
             | Refusal::NoFurther
@@ -250,14 +248,11 @@ fn full_requests_refuse_without_queueing_and_hidden_answers_and_unknowns_have_no
 fn every_owner_outcome_remains_whole_on_its_original_card_after_duplicate_terminals() {
     use OwnerOutcome as O;
     let outcomes = [
-        O::Closing { chat: 101, cancelled: 2, kept: 3 },
         O::MarkedSeen { seen: SeenThrough::Results { through: 103 } },
         O::MarkedSeen { seen: SeenThrough::Conversation { task: 104, through: 105 } },
         O::NoteEdited { name: 106 },
         O::ServiceMade { person: 107 },
         O::Adopted { project: 108 },
-        O::GoalStarted { task: 109 },
-        O::GoalProposed { proposal: 110 },
         O::Stopped { task: 111 },
         O::Cancelled { task: 112 },
         O::Released { task: 113 },
@@ -273,7 +268,6 @@ fn every_owner_outcome_remains_whole_on_its_original_card_after_duplicate_termin
         },
         O::Said { task: 122, message: 123 },
         O::QuestionAnswered { task: 124, question: 125, message: 126 },
-        O::Prioritised { project: 127 },
         O::Amended { task: 128 },
         O::Proposed { proposal: 130 },
         O::RolesSet { project: 131 },
@@ -286,7 +280,6 @@ fn every_owner_outcome_remains_whole_on_its_original_card_after_duplicate_termin
             at: Wall::from_nanos(138),
             choice: OwnerEscalationChoice::Passed,
         },
-        O::Started { task: 139 },
     ];
     for value in outcomes {
         let (mut domain, _) = live();
@@ -347,9 +340,8 @@ fn owner_historical_proposal_choices_keep_the_named_winner_and_clock_without_exp
             assert_eq!(domain.objects().get(id).unwrap().answer, Some(Answer::Done(outcome)));
         }
     }
-    for value in [OwnerOutcome::GoalProposed { proposal: u64::MAX }, OwnerOutcome::Proposed { proposal: u64::MAX }] {
-        assert!(!crate::objects::stops_waiting(ObjectKey::Proposal(proposal().key), &Outcome::Owner(value)));
-    }
+    let value = OwnerOutcome::Proposed { proposal: u64::MAX };
+    assert!(!crate::objects::stops_waiting(ObjectKey::Proposal(proposal().key), &Outcome::Owner(value)));
 }
 
 use jig_client::contract::DecideOn;

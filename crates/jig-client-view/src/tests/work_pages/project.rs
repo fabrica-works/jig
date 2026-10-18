@@ -42,6 +42,6 @@ pub(crate) fn project_doc() -> Project {
             next: Some(Wall::EPOCH),
         }]),
         parts: list([part()]),
-        acts: list([Offered { effect: None, act: ActKind::SetGoal, admission: Admission::Allowed }]),
+        acts: list([Offered { effect: None, act: ActKind::Reorder, admission: Admission::Allowed }]),
     }
 }

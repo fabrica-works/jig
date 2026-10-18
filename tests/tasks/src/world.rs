@@ -439,8 +439,6 @@ impl World {
             | Event::DecideProposal { .. }
             | Event::WithdrawProposal { .. }
             | Event::StalledProposal { .. }
-            | Event::Prioritise { .. }
-            | Event::CloseChat { .. }
             | Event::CarvePool { .. }
             | Event::ResizePool { .. }
             | Event::Make { .. }
@@ -504,8 +502,6 @@ impl World {
             | Event::HandBackPerson { .. }
             | Event::AnswerPerson { .. }
             | Event::Control { .. }
-            | Event::Prioritise { .. }
-            | Event::CloseChat { .. }
             | Event::Move { .. }
             | Event::Compound { .. }
             | Event::Propose { .. }

@@ -13,20 +13,6 @@ pub(super) fn decode_again(value: wire::Again) -> domain::Again {
         wire::Again::NotReady => domain::Again::NotReady,
     }
 }
-pub(super) fn encode_disposal_issue(value: domain::DisposalIssue, _limits: &wire::Limits) -> wire::DisposalIssue {
-    match value {
-        domain::DisposalIssue::Missing => wire::DisposalIssue::Missing,
-        domain::DisposalIssue::Unknown => wire::DisposalIssue::Unknown,
-        domain::DisposalIssue::Repeated => wire::DisposalIssue::Repeated,
-    }
-}
-pub(super) fn decode_disposal_issue(value: wire::DisposalIssue) -> domain::DisposalIssue {
-    match value {
-        wire::DisposalIssue::Missing => domain::DisposalIssue::Missing,
-        wire::DisposalIssue::Unknown => domain::DisposalIssue::Unknown,
-        wire::DisposalIssue::Repeated => domain::DisposalIssue::Repeated,
-    }
-}
 pub(super) fn encode_failure_class(value: domain::FailureClass, _limits: &wire::Limits) -> wire::FailureClass {
     match value {
         domain::FailureClass::Transient => wire::FailureClass::Transient,
@@ -420,10 +406,6 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
                 },
             },
         )?),
-        domain::Refusal::Disposal { task, issue } => wire::Refusal::Disposal(wire::RefusalDisposal::new(
-            limits,
-            wire::RefusalDisposalParts { task: *task, issue: encode_disposal_issue(*issue, limits) },
-        )?),
         domain::Refusal::Role { held } => wire::Refusal::Role(wire::RefusalRole::new(
             limits,
             wire::RefusalRoleParts {
@@ -483,10 +465,6 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
                     wire::Malformed::Conversation => domain::Malformed::Conversation,
                 },
             }
-        }
-        wire::Refusal::Disposal(value) => {
-            let wire::RefusalDisposalParts { task, issue } = value.into_parts();
-            domain::Refusal::Disposal { task, issue: decode_disposal_issue(issue) }
         }
         wire::Refusal::Role(value) => {
             let wire::RefusalRoleParts { held } = value.into_parts();

@@ -389,7 +389,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
             reply_to: skein_lib::ReplyTo::new(Token::new(102)),
             sign_in,
             key: [2; 16],
-            ask: people::Ask::StartChat { project: 1, words: b"find the incident".as_ref().into() },
+            ask: chat_request(&env.limits.core, b"find the incident"),
         })),
     );
     let outputs = settle(&mut domain, &env);
@@ -769,4 +769,10 @@ fn adding_provision_preserves_scale_and_remediate_codes_and_service_hold() {
         );
     }
     assert_eq!(crate::translate::procedure(99, &spec), None);
+}
+
+fn chat_request(limits: &core::Limits, words: &[u8]) -> jig_domain_people::Ask {
+    let config = jig_core_world::world::config(17).core;
+    let members = jig_core_world::fixtures::Creating::new(&config, limits.tasks.tree_tasks);
+    jig_core_world::fixtures::create_chat(&members, 1, 0, words.into())
 }

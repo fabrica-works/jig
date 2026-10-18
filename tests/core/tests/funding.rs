@@ -55,7 +55,8 @@ fn a_chat_takes_the_most_that_fits_under_its_persons_role() {
     limits.core.tasks.tree_tasks = 4;
     jig_core_world::peers::journal(&mut limits);
     let mut world = World::configured(602, false, config, limits);
-    ask(&mut world, 6, people::Ask::StartChat { project: 1, words: b"use the remainder".as_slice().into() });
+    let remainder_chat = jig_core_world::fixtures::chat(&world, 1, b"use the remainder".as_slice().into());
+    ask(&mut world, 6, remainder_chat);
     let task = 2;
     let root::Record::Core(core::Record::Tasks(tasks::Stored::Live(row))) =
         &world.store.rows[&root::Key::Core(core::Key::Tasks(tasks::Key::Live(task)))]
@@ -76,18 +77,14 @@ fn a_policy_change_reaches_the_next_pool_budget() {
     assert_eq!(ledger(&world, initial).numbers.budget, 500);
     ask(&mut world, 3, people::Ask::ChangePolicy { project: 1, change: people::PolicyChange::Role(changed_role()) });
     world.send(root::Event::Core(core::Event::Period { project: 1, period: 2, budget: 1000, next: None }));
-    ask(
-        &mut world,
-        4,
-        people::Ask::SetGoal {
-            project: 1,
-            spec: b"next period".as_slice().into(),
-            executor: people::GoalExecutor::Charter(1),
-            budget: 20,
-            priority: 1,
-            deadline: None,
-        },
+    let funded_goal = jig_core_world::fixtures::goal(
+        &world,
+        1,
+        b"next period".as_slice().into(),
+        people::TaskExecutor::Agent { charter: 1 },
+        jig_core_world::fixtures::Goal { budget: 20, priority: 1, ..Default::default() },
     );
+    ask(&mut world, 4, funded_goal);
     assert_eq!(ledger(&world, tasks::Funder::Pool { project: 1, person: 1, period: 2 }).numbers.budget, 175);
     assert_eq!(ledger(&world, initial).numbers.budget, 500);
 }

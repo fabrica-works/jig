@@ -642,7 +642,7 @@ fn procedure_goal_choices_preserve_pairs_without_me_charters() {
     let mut doc = project_doc();
     doc.acts = list([Offered {
         effect: None,
-        act: ActKind::SetGoal,
+        act: ActKind::Reorder,
         admission: Admission::Bounded {
             within: Bounds::Create(CreateBounds {
                 authority: Box::new(crate::tests::cards_objects::owner_authority()),

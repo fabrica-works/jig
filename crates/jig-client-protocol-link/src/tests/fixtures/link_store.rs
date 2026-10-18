@@ -37,7 +37,7 @@ fn policy() -> c::PolicyEdit {
 pub fn store_asks() -> List<c::Ask> {
     let revision = read_value_revision();
     list([
-        start_chat(),
+        message(),
         create_ask(),
         propose_amendment(revision),
         propose_batch(),
@@ -83,26 +83,12 @@ pub fn store_asks() -> List<c::Ask> {
         },
         c::Ask::Stop { project: 7, task: u64::MAX },
         c::Ask::Cancel { project: 7, task: u64::MAX, reason: store_text(), grace: None },
-        c::Ask::Close {
-            project: 7,
-            chat: u64::MAX,
-            disposals: list([c::Disposal::Cancel { task: 8 }, c::Disposal::TakeOver { task: 9 }]),
-        },
         c::Ask::Move { project: 7, task: u64::MAX, reason: store_text() },
-        c::Ask::SetGoal {
-            project: 7,
-            spec: store_text(),
-            executor: c::GoalExecutor::Procedure { connector: 7, code: 9 },
-            budget: u64::MAX,
-            priority: u32::MAX,
-            deadline: Some(Wall::from_nanos(u64::MAX)),
-        },
-        c::Ask::Prioritise { project: 7, goals: list([c::Priority { task: u64::MAX, priority: u32::MAX }]) },
         c::Ask::Seen { through: c::SeenThrough::Conversation { task: u64::MAX, through: u64::MAX } },
         c::Ask::EditNote {
             project: 7,
             note: u64::MAX,
-            scope: c::NoteScope::Goal { project: 7, goal: 9 },
+            scope: c::NoteScope::Task { project: 7, task: 9 },
             revision,
             description: store_text(),
             body: store_text(),
@@ -179,7 +165,7 @@ impl Harness {
     pub fn send_kept(&mut self, attempt: Token) {
         self.link.step(
             Time::ZERO,
-            Event::Send { attempt, key: KEY, ask: Ask::Jig(Box::new(start_chat())) },
+            Event::Send { attempt, key: KEY, ask: Ask::Jig(Box::new(message())) },
             &mut self.out,
         );
     }

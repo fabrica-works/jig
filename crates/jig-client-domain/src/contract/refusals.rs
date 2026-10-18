@@ -76,8 +76,6 @@ pub enum Limit {
     Inbox { task: u64, limit: u32 },
     /// The words byte limit.
     Words { limit: u32 },
-    /// The client's unread conversation word snapshots.
-    ConversationWords { limit: u32 },
     /// The client field limit.
     Fields,
     /// The client record limit.
@@ -155,8 +153,6 @@ pub enum Refusal {
     Malformed { at: u32, why: super::Malformed },
     /// The project role does not allow the act.
     Role { held: Option<HeldRole> },
-    /// A named delegate disposal is absent or invalid.
-    Disposal { task: u64, issue: DisposalIssue },
     /// Another person holds this role-addressed task.
     Taken { by: u64 },
     /// The object waits for someone else.
@@ -187,11 +183,4 @@ pub enum HeldRole {
     Member,
     Observer,
     Policy { role: u32 },
-}
-/// Why a named delegate disposal failed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum DisposalIssue {
-    Missing,
-    Unknown,
-    Repeated,
 }

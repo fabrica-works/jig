@@ -33,24 +33,33 @@ fn policy(core: &mut Core, accept: bool, period: u64) {
 #[test]
 fn a_goal_within_its_offer_is_direct_and_a_supported_goal_beyond_it_is_proposed() {
     let (core, limits) = core();
-    let Admission::Bounded { within: Bounds::Goal { budget, pool_left, charters, .. }, beyond } =
-        offers::admit(&core, &limits, 1, Act::SetGoal, &Subject::Project { project: 1 })
+    let Admission::Bounded { within: Bounds::Create { budget, pool_left, charters, .. }, beyond } =
+        fixtures::creating(&core, &limits, 1, 1)
     else {
         panic!("bounded goal")
     };
     assert_eq!((budget, pool_left), (500, 500));
     assert_eq!(charters.as_slice(), &[1]);
     assert_eq!(beyond, Beyond::Proposed { to: policy_holder(&[0]) });
-    let started = core
-        .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), budget, None, limits.tasks.tree_tasks)
-        .unwrap();
+    let started = crate::acts::bounds::create_start(
+        &core,
+        1,
+        1,
+        people::Role::Owner,
+        tasks::Executor::Agent { charter: 1 },
+        budget,
+        None,
+        limits.tasks.tree_tasks,
+    )
+    .unwrap();
     assert_eq!(started.authority.budget.spend, budget);
     assert_eq!(
-        core.goal_start(
+        crate::acts::bounds::create_start(
+            &core,
             1,
             1,
             people::Role::Owner,
-            people::GoalExecutor::Charter(1),
+            tasks::Executor::Agent { charter: 1 },
             budget + 1,
             None,
             limits.tasks.tree_tasks
@@ -62,11 +71,12 @@ fn a_goal_within_its_offer_is_direct_and_a_supported_goal_beyond_it_is_proposed(
         }
     );
     assert_eq!(
-        core.goal_start(
+        crate::acts::bounds::create_start(
+            &core,
             1,
             1,
             people::Role::Owner,
-            people::GoalExecutor::Charter(2),
+            tasks::Executor::Agent { charter: 2 },
             budget,
             None,
             limits.tasks.tree_tasks
@@ -80,9 +90,7 @@ fn a_goal_within_its_offer_is_direct_and_a_supported_goal_beyond_it_is_proposed(
 fn a_goal_without_an_accepting_role_reports_the_same_refusal_in_its_bound_and_admission() {
     let (mut core, limits) = core();
     policy(&mut core, false, 500);
-    let Admission::Bounded { beyond: Beyond::Refused(why), .. } =
-        offers::admit(&core, &limits, 1, Act::SetGoal, &Subject::Project { project: 1 })
-    else {
+    let Admission::Bounded { beyond: Beyond::Refused(why), .. } = fixtures::creating(&core, &limits, 1, 1) else {
         panic!("unproposable bound")
     };
     assert_eq!(
@@ -90,11 +98,12 @@ fn a_goal_without_an_accepting_role_reports_the_same_refusal_in_its_bound_and_ad
         people::Refusal::Authority { lacking: people::Lack::Approver, proposable: Some(people::Accepter::Nobody) }
     );
     assert_eq!(
-        core.goal_start(
+        crate::acts::bounds::create_start(
+            &core,
             1,
             1,
             people::Role::Owner,
-            people::GoalExecutor::Charter(1),
+            tasks::Executor::Agent { charter: 1 },
             501,
             None,
             limits.tasks.tree_tasks
@@ -105,9 +114,17 @@ fn a_goal_without_an_accepting_role_reports_the_same_refusal_in_its_bound_and_ad
             proposable: Some(people::Accepter::Nobody)
         }
     );
-    let started = core
-        .goal_start(1, 1, people::Role::Owner, people::GoalExecutor::Charter(1), 100, None, limits.tasks.tree_tasks)
-        .unwrap();
+    let started = crate::acts::bounds::create_start(
+        &core,
+        1,
+        1,
+        people::Role::Owner,
+        tasks::Executor::Agent { charter: 1 },
+        100,
+        None,
+        limits.tasks.tree_tasks,
+    )
+    .unwrap();
     assert_eq!(started.authority.budget.spend, 100);
 }
 
@@ -126,18 +143,15 @@ fn a_policy_proposal_names_every_eligible_role_without_choosing_one_holder() {
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
-    let Admission::Bounded { beyond, .. } =
-        offers::admit(&core, &limits, 1, Act::SetGoal, &Subject::Project { project: 1 })
-    else {
-        panic!("bounded goal")
-    };
+    let Admission::Bounded { beyond, .. } = fixtures::creating(&core, &limits, 1, 1) else { panic!("bounded goal") };
     assert_eq!(beyond, Beyond::Proposed { to: policy_holder(&[0, 4]) });
     assert_eq!(
-        core.goal_start(
+        crate::acts::bounds::create_start(
+            &core,
             1,
             1,
             people::Role::Owner,
-            people::GoalExecutor::Charter(1),
+            tasks::Executor::Agent { charter: 1 },
             501,
             None,
             limits.tasks.tree_tasks
@@ -227,9 +241,7 @@ fn an_observers_core_role_refusals_match_their_offers() {
     holding(&mut core, &limits, people::Role::Observer);
     let project = Subject::Project { project: 1 };
     let expected = people::Refusal::Role { held: Some(people::Role::Observer) };
-    for act in
-        [Act::SetGoal, Act::Prioritise, Act::Adopt, Act::ChangePolicy, Act::SetRoles, Act::MakeService, Act::SetPool]
-    {
+    for act in [Act::Reorder, Act::Adopt, Act::ChangePolicy, Act::SetRoles, Act::MakeService, Act::SetPool] {
         assert_eq!(offers::admit(&core, &limits, 1, act, &project), Admission::Refused(expected));
     }
     core.people = people::Domain::new(&limits.people, Box::new([]), 2);
@@ -280,14 +292,6 @@ fn an_observers_core_role_refusals_match_their_offers() {
         &mut child,
     );
     for (index, ask) in [
-        people::Ask::SetGoal {
-            project: 1,
-            spec: b"goal".as_slice().into(),
-            executor: jig_domain_people::GoalExecutor::Charter(1),
-            budget: 1,
-            priority: 1,
-            deadline: None,
-        },
         people::Ask::SetPool { project: 1, person: 1, budget: 1 },
         people::Ask::SetRoles { project: 1, holdings: Box::new([]) },
         people::Ask::MakeService { project: 1, name: b"service".as_slice().into(), role: people::Role::Member },
@@ -499,12 +503,7 @@ fn task_controls_owner_changes_priorities_and_note_scopes_share_their_judges() {
         core.move_admit(1, Some(people::Role::Owner), 1, 2, limits.tasks.tree_tasks, limits.tasks.depth),
         Err(why)
     );
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Prioritise, &Subject::Project { project: 1 }), Admission::Allowed);
-    let event = core
-        .prioritise(Token::new(90), 1, 1, Some(people::Role::Owner), Box::new([(1, 2)]), limits.tasks.tasks)
-        .unwrap();
-    let tasks::Event::Prioritise { project, by, goals, .. } = event else { panic!("one admitted priority request") };
-    assert_eq!((project, by, goals.as_ref()), (1, tasks::Party::Person(1), &[(1, 2)][..]));
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Reorder, &Subject::Project { project: 1 }), Admission::Allowed);
     for act in [Act::Adopt, Act::ChangePolicy, Act::SetRoles, Act::MakeService, Act::SetPool] {
         assert_eq!(offers::admit(&core, &limits, 1, act, &Subject::Project { project: 1 }), Admission::Allowed);
         assert_eq!(core.role_allowed(1, 1, limits.tasks.tree_tasks), Ok(()));
@@ -644,8 +643,7 @@ fn leaving_an_escalation_held_closing_a_chat_and_marking_it_seen_are_admitted() 
         people::Outcome::MarkedSeen { seen: people::Seen::Chat { task: 1, through: 0 } }
     );
     core.reclaim();
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Close, &task), Admission::Allowed);
-    assert_eq!(offers::close(&core, 1, core.tasks.task(1).unwrap()), Ok(()));
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Cancel, &task), Admission::Allowed);
     send_task(&mut core, &limits, tasks::Event::Hold { task: 1, why: tasks::Hold::Uncertain { entry: 1 } });
     let Admission::Bounded { .. } = offers::admit(&core, &limits, 1, Act::Amend, &task) else {
         panic!("amend and release remains bounded with an explicit uncertainty choice")
@@ -679,10 +677,15 @@ fn leaving_an_escalation_held_closing_a_chat_and_marking_it_seen_are_admitted() 
         }
     );
     core.reclaim();
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Close, &task), Admission::Allowed);
+    assert_eq!(offers::admit(&core, &limits, 1, Act::Cancel, &task), Admission::Allowed);
     assert_eq!(
-        ask_now(&mut core, &limits, 3, people::Ask::Close { project: 1, chat: 1, disposals: List::with_capacity(0) }),
-        people::Outcome::Closing { chat: 1, cancelled: 0, kept: 0 }
+        ask_now(
+            &mut core,
+            &limits,
+            3,
+            people::Ask::Cancel { project: 1, task: 1, reason: b"Finish this chat.".as_slice().into(), grace: None }
+        ),
+        people::Outcome::Cancelled { task: 1 }
     );
 }
 
@@ -726,37 +729,57 @@ fn a_move_offer_tracks_requester_changes_after_adoption() {
 #[test]
 fn procedure_goal_bounds_and_admission_keep_exact_executor_and_authority_facts() {
     let (mut core, limits) = core();
-    let executor = people::GoalExecutor::Procedure { connector: 2, code: 1 };
-    let Admission::Bounded { within: Bounds::Goal { procedures, .. }, .. } =
-        offers::admit(&core, &limits, 1, Act::SetGoal, &Subject::Project { project: 1 })
+    let executor = tasks::Executor::Procedure { connector: 2, code: 1 };
+    let Admission::Bounded { within: Bounds::Create { procedures, .. }, .. } = fixtures::creating(&core, &limits, 1, 1)
     else {
         panic!("goal facts")
     };
     assert_eq!(
         procedures.as_slice(),
-        &[offers::GoalProcedure { connector: 1, code: 1 }, offers::GoalProcedure { connector: 2, code: 1 },]
+        &[offers::CreateProcedure { connector: 1, code: 1 }, offers::CreateProcedure { connector: 2, code: 1 },]
     );
-    let admitted = core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).unwrap();
+    let admitted = crate::acts::bounds::create_start(
+        &core,
+        1,
+        1,
+        people::Role::Owner,
+        executor,
+        100,
+        None,
+        limits.tasks.tree_tasks,
+    )
+    .unwrap();
     assert_eq!(admitted.authority.budget.spend, 100);
     assert_eq!(admitted.authority.tools, authority::Tools(0));
     assert_eq!(admitted.authority.grants, core.authority.role(1, 0).unwrap().authority.grants);
     assert_eq!(
         admitted.authority.delegation,
-        core.chat_authority(1, 1, people::Role::Owner, limits.tasks.tree_tasks).delegation
+        core.creating_authority(1, 1, people::Role::Owner, limits.tasks.tree_tasks).delegation
     );
     assert_eq!(
-        core.goal_start(1, 1, people::Role::Owner, executor, 501, None, limits.tasks.tree_tasks).unwrap_err(),
+        crate::acts::bounds::create_start(
+            &core,
+            1,
+            1,
+            people::Role::Owner,
+            executor,
+            501,
+            None,
+            limits.tasks.tree_tasks
+        )
+        .unwrap_err(),
         people::Refusal::Authority {
             lacking: people::Lack::Budget { needs: 501, left: 500 },
             proposable: Some(people::Accepter::Role(0))
         }
     );
     assert_eq!(
-        core.goal_start(
+        crate::acts::bounds::create_start(
+            &core,
             1,
             1,
             people::Role::Owner,
-            people::GoalExecutor::Procedure { connector: 3, code: 1 },
+            tasks::Executor::Procedure { connector: 3, code: 1 },
             100,
             None,
             limits.tasks.tree_tasks
@@ -764,11 +787,12 @@ fn procedure_goal_bounds_and_admission_keep_exact_executor_and_authority_facts()
         .unwrap_err(),
         people::Refusal::NotOffered
     );
-    core.goal_start(
+    crate::acts::bounds::create_start(
+        &core,
         1,
         1,
         people::Role::Owner,
-        people::GoalExecutor::Procedure { connector: 1, code: u32::MAX },
+        tasks::Executor::Procedure { connector: 1, code: u32::MAX },
         100,
         None,
         limits.tasks.tree_tasks,
@@ -779,9 +803,9 @@ fn procedure_goal_bounds_and_admission_keep_exact_executor_and_authority_facts()
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy: changed }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
-    core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).unwrap_err();
-    let Admission::Bounded { within: Bounds::Goal { procedures, .. }, .. } =
-        offers::admit(&core, &limits, 1, Act::SetGoal, &Subject::Project { project: 1 })
+    crate::acts::bounds::create_start(&core, 1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks)
+        .unwrap_err();
+    let Admission::Bounded { within: Bounds::Create { procedures, .. }, .. } = fixtures::creating(&core, &limits, 1, 1)
     else {
         panic!("changed goal facts")
     };
@@ -793,12 +817,22 @@ fn procedure_goal_bounds_refuse_an_incomplete_executor_list() {
     let (core, mut limits) = core();
     limits.documents.lines = 1;
     assert_eq!(
-        offers::admit(&core, &limits, 1, Act::SetGoal, &Subject::Project { project: 1 }),
+        fixtures::creating(&core, &limits, 1, 1),
         Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority })
     );
-    let executor = people::GoalExecutor::Procedure { connector: 2, code: 1 };
+    let executor = tasks::Executor::Procedure { connector: 2, code: 1 };
     assert!(
-        core.goal_start(1, 1, people::Role::Owner, executor, 100, None, limits.tasks.tree_tasks).is_ok(),
+        crate::acts::bounds::create_start(
+            &core,
+            1,
+            1,
+            people::Role::Owner,
+            executor,
+            100,
+            None,
+            limits.tasks.tree_tasks
+        )
+        .is_ok(),
         "document receiving bound does not alter owner admission"
     );
 }

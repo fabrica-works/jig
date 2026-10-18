@@ -403,7 +403,7 @@ fn routed_later_words(domain: &mut Fixture) {
     let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
     assert_eq!(
         domain.objects().get(id).unwrap().card,
-        crate::objects::Card::Refused { refusal: Refusal::Limit { which: Limit::ConversationWords { limit: 2 } } }
+        crate::objects::Card::Refused { refusal: Refusal::Limit { which: Limit::Words { limit: 2 } } }
     );
     domain.conversation.words.read(5);
     assert_eq!(domain.conversation().words.rows.get(0).unwrap().state, jig_client::thread::Words::Read { message: 4 });

@@ -179,7 +179,7 @@ impl Core {
         action: authority::Action,
         tasks_left: u32,
     ) -> Result<(), people::Refusal> {
-        let (_, pool) = self.goal_pool(project, person);
+        let (_, pool) = self.person_pool(project, person);
         let ask = authority::PersonAsk {
             project,
             role: role.number(),

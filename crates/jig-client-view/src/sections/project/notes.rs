@@ -57,7 +57,7 @@ pub(super) fn notes(b: &mut Builder, client: &Borrowed<'_>, project: u32, words:
         }
     }
     for goal in &project_page.goals {
-        scope_choice(b, words, bindings, &filter, NoteScope::Goal { project, goal: goal.chip.task });
+        scope_choice(b, words, bindings, &filter, NoteScope::Task { project, task: goal.chip.task });
     }
     b.close();
     b.open(Role::List);
@@ -80,7 +80,7 @@ fn scope_choice(b: &mut Builder, words: &Words, bindings: &mut JigBindings, filt
     let (phrase, holes): (JigPhrase, Box<[Hole]>) = match &scope {
         NoteScope::Deployment => (JigPhrase::Deployment, Box::new([])),
         NoteScope::Project(project) => (JigPhrase::ContextProject, Box::new([Hole::Number(u64::from(*project))])),
-        NoteScope::Goal { goal, .. } => (JigPhrase::OnlyGoal, Box::new([Hole::Number(*goal)])),
+        NoteScope::Task { task: goal, .. } => (JigPhrase::OnlyGoal, Box::new([Hole::Number(*goal)])),
         NoteScope::Resource { project, connector, .. } => (
             JigPhrase::ScopedResourceNotes,
             Box::new([Hole::Number(u64::from(*project)), Hole::Number(u64::from(*connector))]),

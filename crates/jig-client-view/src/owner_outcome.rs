@@ -34,13 +34,10 @@ fn header(value: &OwnerOutcome) -> P {
     match value {
         OwnerOutcome::Created { .. } => P::Created,
         OwnerOutcome::Compound { .. } => P::Compound,
-        OwnerOutcome::Closing { .. } => P::Closing,
         OwnerOutcome::MarkedSeen { .. } => P::MarkedSeen,
         OwnerOutcome::NoteEdited { .. } => P::NoteEdited,
         OwnerOutcome::ServiceMade { .. } => P::ServiceMade,
         OwnerOutcome::Adopted { .. } => P::Adopted,
-        OwnerOutcome::GoalStarted { .. } => P::GoalStarted,
-        OwnerOutcome::GoalProposed { .. } => P::GoalProposed,
         OwnerOutcome::Stopped { .. } => P::Stopped,
         OwnerOutcome::Cancelled { .. } => P::Cancelled,
         OwnerOutcome::Released { .. } => P::Released,
@@ -51,7 +48,6 @@ fn header(value: &OwnerOutcome) -> P {
         OwnerOutcome::ProposalDecided { .. } => P::ProposalDecided,
         OwnerOutcome::Said { .. } => P::Said,
         OwnerOutcome::QuestionAnswered { .. } => P::QuestionAnswered,
-        OwnerOutcome::Prioritised { .. } => P::Prioritised,
         OwnerOutcome::Amended { .. } => P::Amended,
         OwnerOutcome::Proposed { .. } => P::Proposed,
         OwnerOutcome::Withdrawn { .. } => P::Withdrawn,
@@ -59,7 +55,6 @@ fn header(value: &OwnerOutcome) -> P {
         OwnerOutcome::PolicyChanged { .. } => P::PolicyChanged,
         OwnerOutcome::PoolSet { .. } => P::PoolSet,
         OwnerOutcome::EscalationDecided { .. } => P::EscalationDecided,
-        OwnerOutcome::Started { .. } => P::Started,
     }
 }
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
@@ -118,28 +113,19 @@ fn escalation(
 fn details(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
     match value {
         OwnerOutcome::Created { first, last, given } => created(b, *first, *last, *given, words),
-        OwnerOutcome::Closing { chat, cancelled, kept } => {
-            number(b, words, P::Chat, *chat);
-            number(b, words, P::CancelledCount, u64::from(*cancelled));
-            number(b, words, P::KeptCount, u64::from(*kept));
-        }
         OwnerOutcome::MarkedSeen { seen: position } => seen(b, position, words),
         OwnerOutcome::NoteEdited { name } => number(b, words, P::Note, *name),
         OwnerOutcome::ServiceMade { person } => number(b, words, P::Person, *person),
         OwnerOutcome::Adopted { project }
-        | OwnerOutcome::Prioritised { project }
         | OwnerOutcome::RolesSet { project }
         | OwnerOutcome::PolicyChanged { project } => number(b, words, P::Project, u64::from(*project)),
-        OwnerOutcome::GoalStarted { task }
-        | OwnerOutcome::Stopped { task }
+        OwnerOutcome::Stopped { task }
         | OwnerOutcome::Cancelled { task }
         | OwnerOutcome::Released { task }
         | OwnerOutcome::PersonTaken { task }
         | OwnerOutcome::PersonHandedBack { task }
         | OwnerOutcome::PersonAnswered { task }
-        | OwnerOutcome::Moved { task }
-        | OwnerOutcome::Started { task } => number(b, words, P::Task, *task),
-        OwnerOutcome::GoalProposed { proposal } => number(b, words, P::ProposalNumber, *proposal),
+        | OwnerOutcome::Moved { task } => number(b, words, P::Task, *task),
         OwnerOutcome::ProposalDecided { proposal: key, by, at, choice } => proposal(b, key, *by, *at, *choice, words),
         OwnerOutcome::Compound { project, operations, first_message } => {
             number(b, words, P::Project, u64::from(*project));

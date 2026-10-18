@@ -180,7 +180,7 @@ fn generated_event(core: &Core, draw: u64, iteration: u64) -> Event {
             reply_to,
             sign_in: SIGN_IN,
             key: [u8::try_from(iteration).unwrap(); 16],
-            ask: people::Ask::StartChat { project: 1, words: Box::from(&b"new task"[..]) },
+            ask: people::Ask::Create { project: 1, batch: Box::new([fixtures::member(b"new task", 100)]) },
         }),
         1 => Event::Tasks(tasks::Event::Amend {
             funder: None,

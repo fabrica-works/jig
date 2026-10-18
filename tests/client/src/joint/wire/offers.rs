@@ -21,10 +21,8 @@ pub fn act(value: acts::Act) -> client::ActKind {
         acts::Act::Amend => client::ActKind::Amend,
         acts::Act::Stop => client::ActKind::Stop,
         acts::Act::Cancel => client::ActKind::Cancel,
-        acts::Act::Close => client::ActKind::Close,
         acts::Act::Move => client::ActKind::Move,
-        acts::Act::SetGoal => client::ActKind::SetGoal,
-        acts::Act::Prioritise => client::ActKind::Prioritise,
+        acts::Act::Reorder => client::ActKind::Reorder,
         acts::Act::Seen => client::ActKind::Seen,
         acts::Act::EditNote => client::ActKind::EditNote,
         acts::Act::DeleteNote => client::ActKind::DeleteNote,
@@ -53,7 +51,7 @@ pub fn recipient(value: &acts::Recipient, limits: &Limits) -> Result<client::Rec
 /// Refuses overflowing or pending owner facts and any whole offer allocation above bounds.
 pub fn bounds(value: &acts::Bounds, limits: &Limits) -> Result<client::Bounds, owner::Invalid> {
     Ok(match value {
-        acts::Bounds::Goal {
+        acts::Bounds::Create {
             authority,
             pool_left,
             charters,
@@ -165,12 +163,12 @@ mod tests {
         let mut charters = List::with_capacity(4);
         charters.push(u32::MAX).expect("supplied charter");
         let mut procedures = List::with_capacity(4);
-        procedures.push(acts::GoalProcedure { connector: u16::MAX, code: u32::MAX }).expect("supplied procedure");
+        procedures.push(acts::CreateProcedure { connector: u16::MAX, code: u32::MAX }).expect("supplied procedure");
         let mut roles = List::with_capacity(4);
         roles.push(0).expect("supplied zero role");
         roles.push(u32::MAX).expect("supplied full role");
         let source = acts::Admission::Bounded {
-            within: acts::Bounds::Goal {
+            within: acts::Bounds::Create {
                 authority: Box::new(super::super::me::empty_authority()),
                 pool_left: 3,
                 charters,

@@ -390,7 +390,7 @@ pub fn project() -> Project {
         ]),
         recurring: list([recurring.clone(), Recurring { key: 2, ..recurring }]),
         parts: list([part.clone(), part]),
-        acts: list([Offered { effect: None, act: ActKind::SetGoal, admission: Admission::Allowed }]),
+        acts: list([Offered { effect: None, act: ActKind::Reorder, admission: Admission::Allowed }]),
     }
 }
 /// Full bounded deployment facts for every capacity panel.
@@ -716,32 +716,22 @@ pub fn start_chat_steps() -> Vec<skein_fake_person::Step<RootAddress>> {
 #[must_use]
 pub fn goal_world(seed: u64) -> World<Test, Scripted> {
     let mut world = world(seed);
-    let mut doc = project();
-    doc.acts = list([Offered {
-        effect: None,
-        act: ActKind::SetGoal,
-        admission: Admission::Bounded {
-            within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
-                authority: Box::new(owner_authority()),
-                pool_left: 1,
-                procedures: list([]),
-                charters: list([1]),
-                latest: None,
-                budget: 1,
-                maximum_budget: 100,
-                maximum_deadline: None,
-            }),
-            beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
+    let doc = project();
+    let creating = Creating {
+        within: CreateBounds {
+            authority: Box::new(owner_authority()),
+            pool_left: 1,
+            procedures: list([]),
+            charters: list([1]),
+            latest: None,
+            budget: 1,
+            maximum_budget: 100,
+            maximum_deadline: None,
         },
-    }]);
-    let mut me = frame(7);
-    let Admission::Bounded { within: jig_client_domain::contract::Bounds::Create(within), beyond } =
-        &doc.acts.get(0).expect("goal offer").admission
-    else {
-        unreachable!()
+        beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
     };
-    me.projects.get_mut(0).expect("project").creating =
-        Some(Creating { within: within.clone(), beyond: beyond.clone() });
+    let mut me = frame(7);
+    me.projects.get_mut(0).expect("project").creating = Some(creating);
     let ask = goals::ask(&me, OwnerExecutor::Agent { charter: 1 });
     world
         .front()
@@ -782,32 +772,22 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
         .engine
         .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Me(procedure_frame))
         .expect("procedure-only frame fits");
-    let mut doc = project();
-    doc.acts = list([Offered {
-        effect: None,
-        act: ActKind::SetGoal,
-        admission: Admission::Bounded {
-            within: jig_client_domain::contract::Bounds::Create(jig_client_domain::contract::CreateBounds {
-                authority: Box::new(owner_authority()),
-                pool_left: 1,
-                procedures: list([CreateProcedure { connector: 2, code: 7 }]),
-                charters: list([]),
-                latest: None,
-                budget: 1,
-                maximum_budget: 100,
-                maximum_deadline: None,
-            }),
-            beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
+    let doc = project();
+    let creating = Creating {
+        within: CreateBounds {
+            authority: Box::new(owner_authority()),
+            pool_left: 1,
+            procedures: list([CreateProcedure { connector: 2, code: 7 }]),
+            charters: list([]),
+            latest: None,
+            budget: 1,
+            maximum_budget: 100,
+            maximum_deadline: None,
         },
-    }]);
-    let mut me = frame(7);
-    let Admission::Bounded { within: jig_client_domain::contract::Bounds::Create(within), beyond } =
-        &doc.acts.get(0).expect("goal offer").admission
-    else {
-        unreachable!()
+        beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
     };
-    me.projects.get_mut(0).expect("project").creating =
-        Some(Creating { within: within.clone(), beyond: beyond.clone() });
+    let mut me = frame(7);
+    me.projects.get_mut(0).expect("project").creating = Some(creating);
     let ask = goals::ask(&me, OwnerExecutor::Procedure { connector: 2, code: 7 });
     world
         .front()

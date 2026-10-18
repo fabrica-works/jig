@@ -42,22 +42,7 @@ pub(crate) fn templates(
         }
     }
     let templates = templates.into_boxed();
-    if chat(&templates).is_none() {
-        problems.push(path.clone(), What::Refers);
-    }
     Some(templates)
-}
-/// Transitional until jig 16 removes the engine's chat operations.
-pub(crate) fn chat(templates: &[Template]) -> Option<(u32, Duration)> {
-    for template in templates {
-        if template.number == 1 {
-            return match template.executor {
-                TemplateExecutor::Charter(charter) => Some((charter, template.grace?)),
-                TemplateExecutor::Chosen => None,
-            };
-        }
-    }
-    None
 }
 
 fn report(value: Result<u64, What>, path: &Path, problems: &mut Problems) -> Option<u64> {

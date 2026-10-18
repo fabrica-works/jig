@@ -8,7 +8,7 @@ use alloc::boxed::Box;
 use skein_lib::List;
 use skein_ui::phrases::{HoleKind, HoleShape, Language, PhraseId, PhraseShape};
 /// Phrase count, for a caller composing a bounded phrasebook.
-pub const PHRASES: u32 = 59;
+pub const PHRASES: u32 = 58;
 /// Owner of jig's public enum vocabulary.
 pub const OWNER: skein_ui::Owner = skein_ui::Owner { number: 65_537 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,7 +43,6 @@ pub enum RefusalWord {
     NoEscalationHolder,
     Malformed,
     Role,
-    Disposal,
     Taken,
     NotWaiting,
     NoFurther,
@@ -108,7 +107,6 @@ impl Word {
             Refusal::NoEscalationHolder => RefusalWord::NoEscalationHolder,
             Refusal::Malformed { .. } => RefusalWord::Malformed,
             Refusal::Role { .. } => RefusalWord::Role,
-            Refusal::Disposal { .. } => RefusalWord::Disposal,
             Refusal::Taken { .. } => RefusalWord::Taken,
             Refusal::NotWaiting => RefusalWord::NotWaiting,
             Refusal::NoFurther => RefusalWord::NoFurther,
@@ -158,7 +156,7 @@ impl Word {
     }
 }
 /// All public words, for composing phrasebook capacities without allocation.
-pub const ALL: [Word; 59] = [
+pub const ALL: [Word; 58] = [
     Word::Phase(Phase::Waiting),
     Word::Phase(Phase::Idle),
     Word::Phase(Phase::Due),
@@ -192,7 +190,6 @@ pub const ALL: [Word; 59] = [
     Word::Refusal(RefusalWord::NoEscalationHolder),
     Word::Refusal(RefusalWord::Malformed),
     Word::Refusal(RefusalWord::Role),
-    Word::Refusal(RefusalWord::Disposal),
     Word::Refusal(RefusalWord::Taken),
     Word::Refusal(RefusalWord::NotWaiting),
     Word::Refusal(RefusalWord::NoFurther),

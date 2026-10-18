@@ -4,7 +4,6 @@ use alloc::boxed::Box;
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_people as p;
 use skein_lib::{List, Reader, Wall};
-#[expect(clippy::manual_map, reason = "step code matches optional fields")]
 #[expect(clippy::too_many_lines, reason = "one total match names every wire ask")]
 pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
     Ok(match record {
@@ -12,10 +11,6 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
         w::Ask::Withdraw(value) => p::Ask::Withdraw { project: value.project(), proposal: value.proposal() },
         w::Ask::Create(value) => super::operations::create(value, limits)?,
         w::Ask::Compound(value) => super::operations::compound(value, limits)?,
-        w::Ask::StartChat(value) => {
-            let v = value.into_parts();
-            p::Ask::StartChat { project: v.project, words: v.words }
-        }
         w::Ask::Message(value) => {
             let v = value.into_parts();
             p::Ask::Say { project: v.project, task: v.task, words: v.words }
@@ -65,20 +60,6 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
             let v = value.into_parts();
             p::Ask::Move { project: v.project, task: v.task, reason: v.reason }
         }
-        w::Ask::SetGoal(value) => {
-            let v = value.into_parts();
-            p::Ask::SetGoal {
-                project: v.project,
-                spec: v.spec,
-                executor: goal_executor(v.executor),
-                budget: v.budget,
-                priority: v.priority,
-                deadline: match v.deadline {
-                    Some(value) => Some(Wall::from_nanos(value)),
-                    None => None,
-                },
-            }
-        }
         w::Ask::Seen(value) => {
             let v = value.into_parts();
             p::Ask::MarkSeen { seen: seen(v.through) }
@@ -119,22 +100,6 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
         w::Ask::ChangePolicy(value) => {
             let v = value.into_parts();
             p::Ask::ChangePolicy { project: v.project, change: policy(v.edit, limits)? }
-        }
-        w::Ask::Close(value) => {
-            let v = value.into_parts();
-            let mut disposals = List::with_capacity(v.disposals.capacity());
-            for item in v.disposals.into_boxed() {
-                disposals.push(disposal(item)).expect("same capacity");
-            }
-            p::Ask::Close { project: v.project, chat: v.chat, disposals }
-        }
-        w::Ask::Prioritise(value) => {
-            let v = value.into_parts();
-            let mut goals = List::with_capacity(v.goals.capacity());
-            for item in v.goals.into_boxed() {
-                goals.push((item.task(), item.priority())).expect("same capacity");
-            }
-            p::Ask::Prioritise { project: v.project, goals: goals.into_boxed() }
         }
         w::Ask::SetRoles(value) => {
             let v = value.into_parts();
@@ -198,18 +163,6 @@ pub(super) fn person_answer(value: w::PersonAnswer) -> p::PersonResult {
         w::PersonAnswer::Cannot(v) => p::PersonResult::Failure { reason: v.into_parts().reason },
     }
 }
-fn disposal(value: w::Disposal) -> p::Disposal {
-    match value {
-        w::Disposal::Cancel(v) => p::Disposal { task: v.task(), keep: p::Keep::Cancel },
-        w::Disposal::TakeOver(v) => p::Disposal { task: v.task(), keep: p::Keep::MakeMine },
-    }
-}
-fn goal_executor(value: w::GoalExecutor) -> p::GoalExecutor {
-    match value {
-        w::GoalExecutor::Charter(v) => p::GoalExecutor::Charter(v.value()),
-        w::GoalExecutor::Procedure(v) => p::GoalExecutor::Procedure { connector: v.connector(), code: v.code() },
-    }
-}
 fn seen(value: w::SeenThrough) -> p::Seen {
     match value {
         w::SeenThrough::Results(v) => p::Seen::Results { through: v.through() },
@@ -244,11 +197,11 @@ fn note_scope(value: w::NoteScope, project: u32, path: w::Path) -> Result<p::Not
             }
             p::NoteScope::Project
         }
-        w::NoteScope::Goal(v) => {
+        w::NoteScope::Task(v) => {
             if v.project() != project {
                 return Err(Untranslatable { path });
             }
-            p::NoteScope::Goal { goal: v.goal() }
+            p::NoteScope::Goal { goal: v.task() }
         }
         w::NoteScope::Resource(v) => {
             let v = v.into_parts();

@@ -5,14 +5,6 @@ use jig_domain_people as people;
 
 pub fn refusal(value: people::Refusal) -> client::Refusal {
     match value {
-        people::Refusal::Disposal { task, issue } => client::Refusal::Disposal {
-            task,
-            issue: match issue {
-                people::DisposalIssue::Missing => client::DisposalIssue::Missing,
-                people::DisposalIssue::Unknown => client::DisposalIssue::Unknown,
-                people::DisposalIssue::Repeated => client::DisposalIssue::Repeated,
-            },
-        },
         people::Refusal::Role { held } => client::Refusal::Role { held: held.map(super::owner::held_role) },
         people::Refusal::Authority { lacking, proposable } => client::Refusal::Authority {
             lacking: lack(lacking),

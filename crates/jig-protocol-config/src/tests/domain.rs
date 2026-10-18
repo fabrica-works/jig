@@ -94,11 +94,9 @@ fn the_cores_policy_and_permissions_are_seeded_per_project() {
     );
 }
 #[test]
-fn the_cores_chat_settings_take_the_provider_charter_and_grace() {
+fn the_cores_settings_take_the_deployment_provider() {
     let core = core_config(fixtures::ENGINE_SMALL);
     assert_eq!(core.settings.deployment_provider, 2);
-    assert_eq!(core.settings.chat, 1);
-    assert_eq!(core.settings.close_grace, skein_lib::Duration::from_secs(5));
 }
 #[test]
 fn the_cores_limits_and_tools_take_the_profile_and_jigs_numbering() {
@@ -194,7 +192,7 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
 fn memory_below_the_components_sum_is_refused() {
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_576_833_503 });
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_576_824_223 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

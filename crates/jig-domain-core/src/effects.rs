@@ -611,7 +611,7 @@ fn complete(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, out: &m
                 let refusal = match by {
                     tasks::Party::Person(person) if !findings.is_empty() => {
                         let role = core.people.role(person, proposal.project).expect("accepted party's role");
-                        let (_, pool) = core.goal_pool(proposal.project, person);
+                        let (_, pool) = core.person_pool(proposal.project, person);
                         let ask = authority::PersonAsk {
                             project: proposal.project,
                             role: role.number(),
@@ -839,7 +839,7 @@ fn charge(core: &mut Core, work: &mut Queue<Event>, origin: &EffectOrigin, price
             EffectOrigin::Accept { proposal, by, .. } => match *by {
                 tasks::Party::Task(task) => tasks::Funder::Task(task),
                 tasks::Party::Person(person) => {
-                    let (period, pool) = core.goal_open_pool(proposal.project, person);
+                    let (period, pool) = core.open_person_pool(proposal.project, person);
                     if let Some(event) = period {
                         work.push(Event::Tasks(event));
                     }

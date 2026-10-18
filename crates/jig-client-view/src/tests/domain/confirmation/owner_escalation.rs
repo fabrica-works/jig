@@ -173,10 +173,8 @@ fn owner_escalation_decisions_name_supplied_hold_and_outer_offers_without_guessi
             | ActKind::Amend
             | ActKind::Stop
             | ActKind::Cancel
-            | ActKind::Close
             | ActKind::Move
-            | ActKind::SetGoal
-            | ActKind::Prioritise
+            | ActKind::Reorder
             | ActKind::Seen
             | ActKind::EditNote
             | ActKind::DeleteNote

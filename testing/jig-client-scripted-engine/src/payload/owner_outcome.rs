@@ -24,28 +24,20 @@ impl Payload for OwnerOutcome {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Created { .. } | Self::Compound { .. } => Some(0),
-            Self::Closing { chat, cancelled, kept } => {
-                sum(&[chat.heap(bounds), cancelled.heap(bounds), kept.heap(bounds)])
-            }
             Self::MarkedSeen { seen } => seen.heap(bounds),
             Self::NoteEdited { name } => name.heap(bounds),
             Self::ServiceMade { person } => person.heap(bounds),
-            Self::Adopted { project }
-            | Self::Prioritised { project }
-            | Self::RolesSet { project }
-            | Self::PolicyChanged { project } => project.heap(bounds),
-            Self::GoalStarted { task }
-            | Self::Stopped { task }
+            Self::Adopted { project } | Self::RolesSet { project } | Self::PolicyChanged { project } => {
+                project.heap(bounds)
+            }
+            Self::Stopped { task }
             | Self::Cancelled { task }
             | Self::Released { task }
             | Self::PersonTaken { task }
             | Self::PersonHandedBack { task }
             | Self::PersonAnswered { task }
-            | Self::Moved { task }
-            | Self::Started { task } => task.heap(bounds),
-            Self::GoalProposed { proposal } | Self::Proposed { proposal } | Self::Withdrawn { proposal } => {
-                proposal.heap(bounds)
-            }
+            | Self::Moved { task } => task.heap(bounds),
+            Self::Proposed { proposal } | Self::Withdrawn { proposal } => proposal.heap(bounds),
             Self::ProposalDecided { proposal, by, at, choice } => {
                 sum(&[proposal.heap(bounds), by.heap(bounds), at.heap(bounds), choice.heap(bounds)])
             }

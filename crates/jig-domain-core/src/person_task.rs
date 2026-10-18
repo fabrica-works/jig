@@ -15,13 +15,11 @@ pub(crate) fn number(ask: &people::Ask) -> u64 {
         | people::Ask::AnswerPerson { task, .. } => *task,
         people::Ask::Compound { .. }
         | people::Ask::MarkSeen { .. }
-        | people::Ask::Close { .. }
         | people::Ask::Application { .. }
         | people::Ask::Move { .. }
         | people::Ask::DecideProposal { .. }
         | people::Ask::Say { .. }
         | people::Ask::AnswerQuestion { .. }
-        | people::Ask::Prioritise { .. }
         | people::Ask::Amend { .. }
         | people::Ask::EditNote { .. }
         | people::Ask::MakeService { .. }
@@ -30,14 +28,12 @@ pub(crate) fn number(ask: &people::Ask) -> u64 {
         | people::Ask::ChangePolicy { .. }
         | people::Ask::SetPool { .. }
         | people::Ask::DecideEscalation { .. }
-        | people::Ask::StartChat { .. }
         | people::Ask::Stop { .. }
         | people::Ask::Cancel { .. }
         | people::Ask::Release { .. }
         | people::Ask::Create { .. }
         | people::Ask::Propose { .. }
-        | people::Ask::Withdraw { .. }
-        | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
+        | people::Ask::Withdraw { .. } => unreachable!("person-task route owns its ask"),
     }
 }
 
@@ -128,13 +124,11 @@ impl Core {
             people::Ask::AnswerPerson { .. } => crate::acts::Act::Answer,
             people::Ask::Compound { .. }
             | people::Ask::MarkSeen { .. }
-            | people::Ask::Close { .. }
             | people::Ask::Application { .. }
             | people::Ask::Move { .. }
             | people::Ask::DecideProposal { .. }
             | people::Ask::Say { .. }
             | people::Ask::AnswerQuestion { .. }
-            | people::Ask::Prioritise { .. }
             | people::Ask::Amend { .. }
             | people::Ask::EditNote { .. }
             | people::Ask::MakeService { .. }
@@ -143,14 +137,12 @@ impl Core {
             | people::Ask::ChangePolicy { .. }
             | people::Ask::SetPool { .. }
             | people::Ask::DecideEscalation { .. }
-            | people::Ask::StartChat { .. }
             | people::Ask::Stop { .. }
             | people::Ask::Cancel { .. }
             | people::Ask::Release { .. }
             | people::Ask::Create { .. }
             | people::Ask::Propose { .. }
-            | people::Ask::Withdraw { .. }
-            | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
+            | people::Ask::Withdraw { .. } => unreachable!("person-task route owns its ask"),
         };
         let revision = if let people::Ask::AnswerPerson { revision, .. } = &ask { Some(*revision) } else { None };
         match crate::acts::person(self, person, act, task, revision) {
@@ -188,13 +180,11 @@ impl Core {
             }
             people::Ask::Compound { .. }
             | people::Ask::MarkSeen { .. }
-            | people::Ask::Close { .. }
             | people::Ask::Application { .. }
             | people::Ask::Move { .. }
             | people::Ask::DecideProposal { .. }
             | people::Ask::Say { .. }
             | people::Ask::AnswerQuestion { .. }
-            | people::Ask::Prioritise { .. }
             | people::Ask::Amend { .. }
             | people::Ask::EditNote { .. }
             | people::Ask::MakeService { .. }
@@ -203,14 +193,12 @@ impl Core {
             | people::Ask::ChangePolicy { .. }
             | people::Ask::SetPool { .. }
             | people::Ask::DecideEscalation { .. }
-            | people::Ask::StartChat { .. }
             | people::Ask::Stop { .. }
             | people::Ask::Cancel { .. }
             | people::Ask::Release { .. }
             | people::Ask::Create { .. }
             | people::Ask::Propose { .. }
-            | people::Ask::Withdraw { .. }
-            | people::Ask::SetGoal { .. } => unreachable!("person-task route owns its ask"),
+            | people::Ask::Withdraw { .. } => unreachable!("person-task route owns its ask"),
         };
         assert!(self.person_tasks.insert(request, route) == Ok(None), "one routed person task per keyed flight");
         Ok(event)

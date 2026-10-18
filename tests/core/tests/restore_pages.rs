@@ -21,12 +21,12 @@ fn sign_in(token: u64) -> root::Event {
     root::Event::Core(core::Event::SignIn { reply_to: ReplyTo::new(Token::new(token)), identity: identity() })
 }
 
-fn ask(sign_in: u64, token: u64) -> root::Event {
+fn ask(world: &World, sign_in: u64, token: u64) -> root::Event {
     root::Event::Core(core::Event::People(people::Event::Ask {
         reply_to: ReplyTo::new(Token::new(token)),
         sign_in,
         key: KEY,
-        ask: people::Ask::StartChat { project: 1, words: UTF8_TEXTS[0].into() },
+        ask: jig_core_world::fixtures::chat(world, 1, UTF8_TEXTS[0].into()),
     }))
 }
 
@@ -81,7 +81,7 @@ fn a_paused_restore_answers_an_ask_not_ready_without_a_commit_or_retained_answer
     let applied = world.store.applied;
     let commits = world.commits.len();
     pause(&mut world);
-    world.send(ask(sign_in, 7101));
+    world.send(ask(&world, sign_in, 7101));
     assert_eq!(reply(&mut world, 7101).1, people::Reply::Again(people::Again::NotReady));
     assert!(world.store.loading());
     assert_eq!(world.store.applied, applied, "NotReady must not commit");
@@ -90,8 +90,8 @@ fn a_paused_restore_answers_an_ask_not_ready_without_a_commit_or_retained_answer
     assert!(world.store_peer.as_mut().expect("store peer").take().is_empty());
     world.finish_restore_pages();
     assert_eq!(world.store.rows, rows, "whole original restored facts");
-    world.send(ask(sign_in, 7101));
-    assert!(matches!(reply(&mut world, 7101).1, people::Reply::Outcome(people::Outcome::Started { .. })));
+    world.send(ask(&world, sign_in, 7101));
+    assert!(matches!(reply(&mut world, 7101).1, people::Reply::Outcome(people::Outcome::Created { .. })));
 }
 
 #[test]
@@ -150,23 +150,23 @@ fn finishing_held_original_pages_restores_real_authentication_and_admission() {
     pause(&mut world);
     world.finish_restore_pages();
     assert_eq!(world.store.rows, rows);
-    world.send(ask(sign_in, 7105));
-    assert!(matches!(reply(&mut world, 7105).1, people::Reply::Outcome(people::Outcome::Started { .. })));
+    world.send(ask(&world, sign_in, 7105));
+    assert!(matches!(reply(&mut world, 7105).1, people::Reply::Outcome(people::Outcome::Created { .. })));
     assert!(world.store.rows.values().any(|row| matches!(row,
         root::Record::Core(core::Record::People(people::Stored::Answer { key, ask, .. }))
-        if key.key == KEY && **ask == people::Ask::StartChat { project: 1, words: UTF8_TEXTS[0].into() }
+        if key.key == KEY && **ask == jig_core_world::fixtures::chat(&world, 1, UTF8_TEXTS[0].into())
     )));
 }
 
 #[test]
 fn default_restore_replays_the_same_durable_whole_request_without_making_it_twice() {
     let (mut world, sign_in) = world();
-    world.send(ask(sign_in, 7103));
+    world.send(ask(&world, sign_in, 7103));
     let answer = reply(&mut world, 7103).1;
-    assert!(matches!(answer, people::Reply::Outcome(people::Outcome::Started { .. })));
+    assert!(matches!(answer, people::Reply::Outcome(people::Outcome::Created { .. })));
     assert!(world.store.rows.values().any(|row| matches!(row,
         root::Record::Core(core::Record::People(people::Stored::Answer { key, ask, .. }))
-        if key.key == KEY && **ask == people::Ask::StartChat { project: 1, words: UTF8_TEXTS[0].into() }
+        if key.key == KEY && **ask == jig_core_world::fixtures::chat(&world, 1, UTF8_TEXTS[0].into())
     )));
     let rows = world.store.rows.clone();
     let applied = world.store.applied;
@@ -174,7 +174,7 @@ fn default_restore_replays_the_same_durable_whole_request_without_making_it_twic
     world.restart_with(jig_core_world::effects::fixture(SEED, false).0);
     assert!(!world.store.loading());
     assert_eq!(world.store.rows, rows);
-    world.send(ask(sign_in, 7103));
+    world.send(ask(&world, sign_in, 7103));
     assert_eq!(reply(&mut world, 7103), (None, answer));
     assert_eq!(world.store.rows, rows);
     assert_eq!(world.store.applied, applied);
@@ -214,6 +214,6 @@ fn a_held_restore_expires_sign_ins_at_the_current_external_wall_time() {
     assert_eq!(snapshots[0].commit, applied + 1);
     assert!(snapshots[0].at.as_nanos() > release_at.as_nanos());
     assert!(snapshots[0].at.as_nanos() <= world.wall_time().as_nanos());
-    world.send(ask(sign_in, 7104));
+    world.send(ask(&world, sign_in, 7104));
     assert_eq!(reply(&mut world, 7104).1, people::Reply::SignedOut);
 }

@@ -108,17 +108,12 @@ fn person_action(
     limits: &w::Limits,
 ) -> Result<w::OwnerPersonCapacityAction, w::Problem> {
     Ok(match value {
-        people::CapacityAction::Compound | people::CapacityAction::Create => {
-            return Err(super::problem(skein_codec::Reason::Tag));
-        }
-        people::CapacityAction::Close => w::OwnerPersonCapacityAction::Close,
+        people::CapacityAction::Create => w::OwnerPersonCapacityAction::Create,
+        people::CapacityAction::Compound => w::OwnerPersonCapacityAction::Compound,
         people::CapacityAction::Service => w::OwnerPersonCapacityAction::Service,
         people::CapacityAction::Adoption => w::OwnerPersonCapacityAction::Adoption,
         people::CapacityAction::Roles => w::OwnerPersonCapacityAction::Roles,
         people::CapacityAction::Policy => w::OwnerPersonCapacityAction::Policy,
-        people::CapacityAction::Chat => w::OwnerPersonCapacityAction::Chat,
-        people::CapacityAction::Goal => w::OwnerPersonCapacityAction::Goal,
-        people::CapacityAction::Priority => w::OwnerPersonCapacityAction::Priority,
         people::CapacityAction::Application { connector } => {
             w::OwnerPersonCapacityAction::Application(w::OwnerPersonCapacityActionApplication::new(
                 limits,

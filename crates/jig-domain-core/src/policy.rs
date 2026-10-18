@@ -15,7 +15,9 @@ pub(crate) fn pattern_to_authority(value: people::Pattern) -> authority::Pattern
     }
 }
 
-fn pattern_to_people(value: &authority::Pattern) -> people::Pattern {
+/// Copy an authority pattern into the party vocabulary.
+#[must_use]
+pub fn pattern_to_people(value: &authority::Pattern) -> people::Pattern {
     people::Pattern {
         segments: value.segments.clone(),
         last: match &value.last {
@@ -66,7 +68,9 @@ fn authority_to_authority(value: people::Authority) -> Option<authority::Authori
     })
 }
 
-fn authority_to_people(value: &authority::Authority) -> Option<people::Authority> {
+/// Copy bounded authority into the party vocabulary.
+#[must_use]
+pub fn authority_to_people(value: &authority::Authority) -> Option<people::Authority> {
     let mut grants = List::with_capacity(u32::try_from(value.grants.len()).ok()?);
     for grant in &value.grants {
         grants

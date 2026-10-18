@@ -5,13 +5,13 @@ pub fn history_read() -> c::Read {
 }
 pub fn notes_read() -> c::Read {
     c::Read::Notes {
-        scope: c::NoteScope::Goal { project: 7, goal: 9 },
+        scope: c::NoteScope::Task { project: 7, task: 9 },
         description: Some(text(b"filter")),
         after: Some(raw_cursor(READ_CURSOR)),
     }
 }
 pub fn notes_scope_record() -> w::NoteScope {
-    w::NoteScope::Goal(w::NoteScopeGoal::new(&limits().wire, w::NoteScopeGoalParts { project: 7, goal: 9 }).unwrap())
+    w::NoteScope::Task(w::NoteScopeTask::new(&limits().wire, w::NoteScopeTaskParts { project: 7, task: 9 }).unwrap())
 }
 
 pub fn family_read() -> Family {

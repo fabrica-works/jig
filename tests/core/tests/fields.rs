@@ -35,6 +35,7 @@ const PROJECT: u32 = 1;
 const OWNER: u64 = 1;
 const MEMBER: u64 = 2;
 const MEMBER_CHAT: u64 = 2;
+const MEMBER_CHAT_BUDGET: u64 = 100;
 const SIGN_IN: u64 = 8100;
 const ACTION: u64 = 8300;
 const COMPLETION: u32 = 1;
@@ -90,7 +91,13 @@ fn member_decides(world: &mut World, owner: u64, key: u8, decides: authority::Pr
 }
 
 fn start_member_chat(world: &mut World, member: u64, key: u8) {
-    ask_as(world, member, key, people::Ask::StartChat { project: PROJECT, words: b"member's root".as_slice().into() });
+    let request = jig_core_world::fixtures::chat_for(
+        world,
+        PROJECT,
+        people::Role::Member.number(),
+        b"member's root".as_slice().into(),
+    );
+    ask_as(world, member, key, request);
 }
 
 #[test]
@@ -105,7 +112,11 @@ fn a_party_refused_a_root_is_made_once_their_role_holds_it() {
     start_member_chat(&mut world, member, 13);
     assert_eq!(
         world.people_answers.last(),
-        Some(&people::Reply::Outcome(people::Outcome::Started { task: MEMBER_CHAT }))
+        Some(&people::Reply::Outcome(people::Outcome::Created {
+            first: MEMBER_CHAT,
+            last: MEMBER_CHAT,
+            given: Some(people::Given { task: MEMBER_CHAT, amount: MEMBER_CHAT_BUDGET })
+        }))
     );
 }
 
@@ -157,7 +168,11 @@ fn accepting_a_chats_batch_as_ones_own_is_refused_while_nobody_holds_it() {
     start_member_chat(&mut world, member, 22);
     assert_eq!(
         world.people_answers.last(),
-        Some(&people::Reply::Outcome(people::Outcome::Started { task: MEMBER_CHAT }))
+        Some(&people::Reply::Outcome(people::Outcome::Created {
+            first: MEMBER_CHAT,
+            last: MEMBER_CHAT,
+            given: Some(people::Given { task: MEMBER_CHAT, amount: MEMBER_CHAT_BUDGET })
+        }))
     );
     let proposal = propose_member_batch(&mut world);
     member_decides(&mut world, owner, 23, authority::Proposals(1));

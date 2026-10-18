@@ -65,6 +65,12 @@ pub enum ReasonInput {
     /// A person supplied bounded bytes, including an empty value.
     Supplied,
 }
+/// The form shown for an operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Form {
+    Act,
+    CloseChat,
+}
 /// One act and the revision its card showed when the confirmation opened.
 #[derive(Debug)]
 pub struct Confirmation {
@@ -72,6 +78,7 @@ pub struct Confirmation {
     /// Stable through edits and live-document updates; advances on opening another.
     pub writes: u64,
     pub act: ActKind,
+    pub form: Form,
     pub object: Id<Object>,
     pub revision: Option<Revision>,
     /// Hold snapshot for an amendment that also releases.
@@ -150,7 +157,7 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
         Card::Open | Card::NotSent { .. } | Card::Refused { .. } => {}
         Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => return,
     }
-    let proposed = match if act == ActKind::Prioritise && domain.shown_project().is_some() {
+    let proposed = match if act == ActKind::Reorder && domain.shown_project().is_some() {
         crate::page::project::moving::admission(domain)
     } else {
         acts::offered(&object, act)
@@ -204,7 +211,7 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
             return;
         }
     }
-    let dangerous = act == ActKind::Close || jig_client::facts::dangerous(act);
+    let dangerous = jig_client::facts::dangerous(act);
     let choices = Choices {
         option: None,
         cannot: false,
@@ -217,6 +224,7 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
     domain.confirming = Some(Confirmation {
         writes: domain.shown,
         act,
+        form: Form::Act,
         object: id,
         revision,
         release_revision: if act == ActKind::Message { acts::hold_revision(&object) } else { None },
@@ -464,10 +472,8 @@ fn draft_admission(domain: &Ui, object: &Object, open: &Confirmation) -> Admissi
         | ActKind::LeaveHeld
         | ActKind::Stop
         | ActKind::Cancel
-        | ActKind::Close
         | ActKind::Move
-        | ActKind::SetGoal
-        | ActKind::Prioritise
+        | ActKind::Reorder
         | ActKind::Seen
         | ActKind::EditNote
         | ActKind::DeleteNote
@@ -513,7 +519,7 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
     {
         return Some(Missing::Context);
     }
-    match if open.act == ActKind::Prioritise && domain.shown_project().is_some() {
+    match if open.act == ActKind::Reorder && domain.shown_project().is_some() {
         crate::page::project::moving::admission(domain)
     } else {
         draft_admission(domain, object, open)
@@ -526,6 +532,9 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
         && let Some(document) = crate::objects::person_task::owner_facts(object)
     {
         return owner_answer_missing(domain, open, document);
+    }
+    if open.form == Form::CloseChat {
+        return delegates_missing(open, object);
     }
     let field = match open.act {
         ActKind::Reject | ActKind::LeaveHeld | ActKind::Cancel | ActKind::Move => Some(Purpose::Reason),
@@ -552,13 +561,7 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
             None
         }
         ActKind::Amend => return amendment_missing(domain, open),
-        ActKind::Close => {
-            if let Some(missing) = delegates_missing(open, object) {
-                return Some(missing);
-            }
-            None
-        }
-        ActKind::Prioritise => {
+        ActKind::Reorder => {
             if open.choices.priority.is_none() {
                 return Some(Missing::Priority);
             }
@@ -585,8 +588,7 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
             }
             None
         }
-        ActKind::SetGoal
-        | ActKind::Seen
+        ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy
         | ActKind::SetRoles
@@ -664,7 +666,7 @@ pub(crate) fn write_release(domain: &mut Ui, release: bool) {
 /// Records a goal's new place, leaving admission to the engine.
 pub(crate) fn priority(domain: &mut Ui, priority: u32) {
     if let Some(open) = &mut domain.confirming
-        && open.act == ActKind::Prioritise
+        && open.act == ActKind::Reorder
     {
         open.choices.priority = Some(priority);
         domain.changed();
@@ -682,9 +684,9 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client:
     let Some(object) = domain.borrow(lent).objects().get(open.object) else {
         return;
     };
-    let ask = if open.act == ActKind::Prioritise && domain.shown_project().is_some() {
+    let ask = if open.act == ActKind::Reorder && domain.shown_project().is_some() {
         crate::page::project::moving::ask(domain, &object, open.choices.priority.expect("complete priority"), lent)
-    } else if open.act == ActKind::Close {
+    } else if open.form == Form::CloseChat {
         let Some(me) = domain.frame(lent).document else { return };
         let Some(project) = acts::request_project(&object) else { return };
         let ObjectKey::Task(task) = object.key else { return };
@@ -746,4 +748,32 @@ fn amendment_missing(domain: &Ui, open: &Confirmation) -> Option<Missing> {
         return Some(Missing::Words { field: Purpose::Reason });
     }
     None
+}
+
+/// Offer the shape's compound only from the task's cancel offer and requesting party.
+pub(crate) fn can_close(client: &crate::Borrowed<'_>, task: &jig_client::contract::Task) -> bool {
+    let Some(me) = client.frame().document else { return false };
+    if !task.flags.conversation
+        || task.requester != jig_client::contract::OwnerRequester::Person(me.party.number)
+        || jig_client::shapes::template(me, task.project, jig_client::shapes::CHAT).is_none()
+    {
+        return false;
+    }
+    match jig_client::facts::offer(task.acts.as_slice(), ActKind::Cancel) {
+        Some(Admission::Allowed | Admission::Bounded { .. } | Admission::Proposed { .. }) => true,
+        Some(Admission::Refused(_)) | None => false,
+    }
+}
+pub(crate) fn close_chat(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, lent: &jig_client::Client) {
+    let borrowed = domain.borrow(lent);
+    let Some(object) = borrowed.objects().get(id) else { return };
+    let Some(Body::Task(task)) = object.body else { return };
+    if !can_close(&borrowed, &task) {
+        return;
+    }
+    open(domain, env, id, ActKind::Cancel, lent);
+    if let Some(open) = &mut domain.confirming {
+        open.form = Form::CloseChat;
+    }
+    sync(domain, lent);
 }

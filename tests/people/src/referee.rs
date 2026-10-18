@@ -157,7 +157,6 @@ fn filled(why: Refusal) -> bool {
             Moved::Spec { .. } | Moved::Person { .. } => true,
             Moved::Note { revision } => revision != 0,
         },
-        Refusal::Disposal { task, .. } => task != 0,
         Refusal::Taken { by } => by != 0,
         Refusal::Ended { how } => match how {
             Ending::Cancelled { by, .. } => match by {

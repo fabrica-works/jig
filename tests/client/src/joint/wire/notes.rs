@@ -11,7 +11,7 @@ pub fn scope(value: &documents::NoteLocation, limits: &Limits) -> Result<client:
     Ok(match value {
         documents::NoteLocation::Deployment => client::NoteScope::Deployment,
         documents::NoteLocation::Project(project) => client::NoteScope::Project(*project),
-        documents::NoteLocation::Goal { project, task } => client::NoteScope::Goal { project: *project, goal: *task },
+        documents::NoteLocation::Goal { project, task } => client::NoteScope::Task { project: *project, task: *task },
         documents::NoteLocation::Resources { project, scope } => client::NoteScope::Resource {
             project: *project,
             connector: scope.connector,
@@ -160,7 +160,7 @@ mod tests {
             (documents::NoteLocation::Project(u32::MAX), client::NoteScope::Project(u32::MAX)),
             (
                 documents::NoteLocation::Goal { project: 0, task: u64::MAX },
-                client::NoteScope::Goal { project: 0, goal: u64::MAX },
+                client::NoteScope::Task { project: 0, task: u64::MAX },
             ),
         ] {
             assert_eq!(scope(&source, &limits), Ok(expected));

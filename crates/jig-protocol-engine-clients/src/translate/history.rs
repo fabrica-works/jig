@@ -8,9 +8,6 @@ pub fn line(value: &d::HistoryLine, limits: &w::Limits) -> Result<w::OwnerHistor
         t::Change::Cancelled => w::OwnerHistoryChange::Cancelled,
         t::Change::Released => w::OwnerHistoryChange::Released,
         t::Change::Amended => w::OwnerHistoryChange::Amended,
-        t::Change::Prioritised { priority } => w::OwnerHistoryChange::Prioritised(
-            w::OwnerHistoryChangePrioritised::new(limits, w::OwnerHistoryChangePrioritisedParts { priority })?,
-        ),
         t::Change::Moved => w::OwnerHistoryChange::Moved,
         t::Change::Proposed => w::OwnerHistoryChange::Proposed,
         t::Change::ProposalPassed => w::OwnerHistoryChange::ProposalPassed,

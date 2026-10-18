@@ -1,5 +1,5 @@
 //! Small live documents and the shared bounded chip construction.
-use super::{Chip, Count, ExecutorKind, Frame, FrameProjectRole, Missing, OfferedCharter, PhaseLine, Run, Text};
+use super::{Chip, Count, ExecutorKind, Frame, FrameProjectRole, Missing, PhaseLine, Run, Text};
 use crate::{Core, Limits};
 use alloc::boxed::Box;
 use jig_domain_tasks as tasks;
@@ -89,7 +89,6 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
     let identity = core.people.identity(party).ok_or(Missing::Unknown)?;
     let roles = core.people.project_roles(party).ok_or(Missing::Unknown)?;
     let mut projects = List::with_capacity(limits.documents.lines);
-    let mut charters = List::with_capacity(limits.documents.lines);
     for role in roles.iter().take(usize::try_from(limits.documents.lines).expect("line count fits")) {
         let pool = match core.tasks.funding(tasks::Funder::Pool {
             project: role.project,
@@ -115,7 +114,7 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
                 role: role.role,
                 name: None,
                 pool,
-                creating: match crate::acts::bounds::goal(core, limits, party, role.project, Some(role.role)) {
+                creating: match crate::acts::bounds::creating(core, limits, party, role.project, Some(role.role)) {
                     crate::acts::Admission::Bounded { within, beyond } => {
                         Some(crate::acts::Creating { within, beyond })
                     }
@@ -124,28 +123,8 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
                         unreachable!("creating is bounded or refused")
                     }
                 },
-                chat_budget: match core.authority.role(role.project, role.role.number()) {
-                    Some(_) => {
-                        core.chat_authority(role.project, party, role.role, limits.tasks.tree_tasks).budget.spend
-                    }
-                    None => 0,
-                },
             })
             .expect("bounded project list");
-        let mut goals = List::with_capacity(limits.documents.lines);
-        let mut cut = false;
-        for charter in &core.settings.charters {
-            if crate::acts::bounds::goal_charter(core, limits, party, role.project, role.role, charter.number) {
-                if goals.room() > 0 {
-                    goals.push(charter.number).expect("bounded charter list");
-                } else {
-                    cut = true;
-                }
-            }
-        }
-        charters
-            .push(OfferedCharter { project: role.project, chat: core.settings.chat, goals, cut })
-            .expect("one charter line per project");
     }
     let counts = core.people.counts(&limits.people, party).ok_or(Missing::Unknown)?;
     let updates = if counts.more_unread { Count::AtLeast(counts.unread) } else { Count::Known(counts.unread) };
@@ -161,7 +140,6 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
         need_counts: core.people.need_counts(party).ok_or(Missing::Unknown)?,
         updates,
         results_seen: core.people.results_seen(party).ok_or(Missing::Unknown)?,
-        charters,
         retention: limits.people.request_retention,
     })
 }

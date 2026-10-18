@@ -17,9 +17,6 @@ pub enum Outcome {
 #[must_use]
 pub fn outcome(value: &people::Outcome) -> Outcome {
     let owner = match value {
-        people::Outcome::Closing { chat, cancelled, kept } => {
-            client::OwnerOutcome::Closing { chat: *chat, cancelled: *cancelled, kept: *kept }
-        }
         people::Outcome::NoteEdited { name } => client::OwnerOutcome::NoteEdited { name: *name },
         people::Outcome::ServiceMade { person } => client::OwnerOutcome::ServiceMade { person: *person },
         people::Outcome::Adopted { project } => client::OwnerOutcome::Adopted { project: *project },
@@ -34,7 +31,6 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
             last: *last,
             given: given.map(|value| client::CreatedGiven { task: value.task, amount: value.amount }),
         },
-        people::Outcome::GoalStarted { task } => client::OwnerOutcome::GoalStarted { task: *task },
         people::Outcome::Stopped { task } => client::OwnerOutcome::Stopped { task: *task },
         people::Outcome::Cancelled { task } => client::OwnerOutcome::Cancelled { task: *task },
         people::Outcome::Released { task } => client::OwnerOutcome::Released { task: *task },
@@ -46,7 +42,6 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::QuestionAnswered { task, question, message } => {
             client::OwnerOutcome::QuestionAnswered { task: *task, question: *question, message: *message }
         }
-        people::Outcome::Prioritised { project } => client::OwnerOutcome::Prioritised { project: *project },
         people::Outcome::Amended { task, .. } => client::OwnerOutcome::Amended { task: *task },
 
         people::Outcome::RolesSet { project } => client::OwnerOutcome::RolesSet { project: *project },
@@ -54,7 +49,6 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::PoolSet { project, person } => {
             client::OwnerOutcome::PoolSet { project: *project, person: *person }
         }
-        people::Outcome::Started { task } => client::OwnerOutcome::Started { task: *task },
         people::Outcome::MarkedSeen { seen } => client::OwnerOutcome::MarkedSeen {
             seen: match seen {
                 people::Seen::Results { through } => client::SeenThrough::Results { through: *through },
@@ -206,10 +200,7 @@ mod tests {
             outcome(&people::Outcome::QuestionAnswered { task: 11, question: 19, message: u64::MAX }),
             Outcome::Owner(client::OwnerOutcome::QuestionAnswered { task: 11, question: 19, message: u64::MAX })
         );
-        assert_eq!(
-            outcome(&people::Outcome::Closing { chat: u64::MAX, cancelled: u32::MAX, kept: 0 }),
-            Outcome::Owner(client::OwnerOutcome::Closing { chat: u64::MAX, cancelled: u32::MAX, kept: 0 })
-        );
+
         assert_eq!(
             outcome(&people::Outcome::MarkedSeen { seen: people::Seen::Chat { task: 11, through: u64::MAX } }),
             Outcome::Owner(client::OwnerOutcome::MarkedSeen {

@@ -91,7 +91,7 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
     };
     match (within, ask) {
         (
-            Bounds::Goal {
+            Bounds::Create {
                 authority: _,
                 pool_left,
                 charters,
@@ -101,12 +101,18 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
                 maximum_budget,
                 maximum_deadline,
             },
-            people::Ask::SetGoal { executor, budget: amount, deadline: until, .. },
+            people::Ask::Create { batch, .. },
         ) => {
+            let [member] = batch.as_ref() else { return None };
+            let executor = &member.executor;
+            let amount = &member.authority.spend;
+            let until = &member.authority.deadline;
             let supported = match executor {
-                people::GoalExecutor::Charter(charter) => charters.as_slice().contains(charter),
-                people::GoalExecutor::Procedure { connector, code } => {
-                    procedures.iter().any(|value| value.connector == *connector && value.code == *code)
+                people::TaskExecutor::Person(_) => false,
+                people::TaskExecutor::Agent { charter } => charters.as_slice().contains(charter),
+                people::TaskExecutor::Procedure { connector, code } => {
+                    !member.flags.conversation
+                        && procedures.iter().any(|value| value.connector == *connector && value.code == *code)
                 }
             };
             if !supported || amount > maximum_budget || !deadline(*maximum_deadline, *until) {
@@ -133,7 +139,7 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
             })
         }
         (
-            Bounds::Goal { maximum_budget, maximum_deadline, .. },
+            Bounds::Create { maximum_budget, maximum_deadline, .. },
             people::Ask::Propose { action: people::Action::Batch(batch), .. },
         ) => {
             let [member] = batch.as_ref() else { return None };
@@ -170,7 +176,7 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
                 });
             Some(if direct { Admission::Allowed } else { beyond(outcome) })
         }
-        (Bounds::Goal { .. } | Bounds::Amend { .. }, _) => None,
+        (Bounds::Create { .. } | Bounds::Amend { .. }, _) => None,
     }
 }
 

@@ -21,14 +21,14 @@ fn a_table_entry_restores_its_key_and_ask() {
 fn a_record_of_another_store_version_is_dropped_and_told() {
     let mut harness = fixtures::Harness::new(&fixtures::limits());
     harness.start_store(fixtures::one_store_read(fixtures::other_store_version(fixtures::store_read(
-        fixtures::saved_table(fixtures::start_chat()),
+        fixtures::saved_table(fixtures::message()),
     ))));
     assert!(harness.has(&Request::Dropped));
     assert_eq!(harness.out.len(), 1);
 }
 #[test]
 fn a_step_s_writes_leave_before_its_exchanges() {
-    let mut harness = pending_write(fixtures::saved_table(fixtures::start_chat()));
+    let mut harness = pending_write(fixtures::saved_table(fixtures::message()));
     assert_eq!(harness.exchanges(), 0);
     harness.written();
     let Some(Request::Save { .. }) = harness.out.iter().next() else { panic!("write leaves first") };
@@ -38,7 +38,7 @@ fn a_step_s_writes_leave_before_its_exchanges() {
 fn a_write_gathers_exchanges_already_in_the_step_s_output_queue() {
     let mut harness = fixtures::Harness::new(&fixtures::limits());
     harness.send_kept(fixtures::ATTEMPT);
-    harness.save(fixtures::saved_table(fixtures::start_chat()));
+    harness.save(fixtures::saved_table(fixtures::message()));
     assert_eq!(harness.exchanges(), 0);
     harness.written();
     let Some(Request::Save { .. }) = harness.out.iter().next() else { panic!("write leaves first") };
@@ -46,7 +46,7 @@ fn a_write_gathers_exchanges_already_in_the_step_s_output_queue() {
 }
 #[test]
 fn a_failed_write_withholds_the_step_s_exchanges() {
-    let mut harness = pending_write(fixtures::saved_table(fixtures::start_chat()));
+    let mut harness = pending_write(fixtures::saved_table(fixtures::message()));
     harness.write_failed();
     harness.written();
     assert_eq!(harness.exchanges(), 0);
@@ -84,7 +84,7 @@ fn an_erased_key_waits_for_durability_before_the_step_s_exchange() {
 }
 #[test]
 fn malformed_kept_bytes_drop_the_owner_and_are_reported() {
-    let mut entry = fixtures::store_read(fixtures::saved_table(fixtures::start_chat()));
+    let mut entry = fixtures::store_read(fixtures::saved_table(fixtures::message()));
     entry.bytes = Box::from([255]);
     let mut harness = fixtures::Harness::new(&fixtures::limits());
     harness.start_store(fixtures::one_store_read(entry));
@@ -94,7 +94,7 @@ fn malformed_kept_bytes_drop_the_owner_and_are_reported() {
 }
 #[test]
 fn a_mismatched_table_storage_key_drops_its_record() {
-    let mut entry = fixtures::store_read(fixtures::saved_table(fixtures::start_chat()));
+    let mut entry = fixtures::store_read(fixtures::saved_table(fixtures::message()));
     let length = entry.key.len();
     *entry.key.get_mut(length - 1).unwrap() = 0;
     let mut harness = fixtures::Harness::new(&fixtures::limits());
@@ -107,7 +107,7 @@ fn a_cancelled_opening_already_in_the_step_queue_is_never_sent_after_writing() {
     let mut harness = fixtures::Harness::streaming(fixtures::family_subject());
     let (exchange, _) = harness.opening();
     harness.link.step(Time::ZERO, Event::Lost { exchange }, &mut harness.out);
-    harness.save(fixtures::saved_table(fixtures::start_chat()));
+    harness.save(fixtures::saved_table(fixtures::message()));
     harness.written();
     assert_eq!(harness.exchanges(), 0);
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));

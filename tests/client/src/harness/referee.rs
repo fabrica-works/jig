@@ -609,13 +609,9 @@ fn decisions(ask: &Ask) -> Vec<(ObjectKey, ActKind)> {
         | Ask::Propose { action: ProposeAction::Batch { .. }, .. }
         | Ask::Withdraw { .. }
         | Ask::Create { .. }
-        | Ask::StartChat { .. }
         | Ask::Message { .. }
         | Ask::Take { .. }
         | Ask::HandBack { .. }
-        | Ask::Close { .. }
-        | Ask::SetGoal { .. }
-        | Ask::Prioritise { .. }
         | Ask::Seen { .. }
         | Ask::EditNote { .. }
         | Ask::ChangePolicy { .. }

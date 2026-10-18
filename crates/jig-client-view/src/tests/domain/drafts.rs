@@ -50,15 +50,7 @@ fn steering_document(act: ActKind) -> Task {
 }
 #[test]
 fn steering_sends_one_ask_with_each_choice_and_amend_release_is_atomic() {
-    for act in [
-        ActKind::Message,
-        ActKind::Stop,
-        ActKind::Cancel,
-        ActKind::Move,
-        ActKind::Amend,
-        ActKind::Prioritise,
-        ActKind::Release,
-    ] {
+    for act in [ActKind::Message, ActKind::Stop, ActKind::Cancel, ActKind::Move, ActKind::Amend, ActKind::Release] {
         let (mut domain, _) = live();
         let mut document = steering_document(act);
         if act == ActKind::Release {
@@ -119,29 +111,13 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
                 Some(Revision { value: 3 }),
             )
         }
-        ActKind::Prioritise => {
-            assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Priority));
-            drive(domain, Time::ZERO, Event::Act { action: Act::Priority { priority: 2 } });
-            Ask::Compound {
-                project: 1,
-                operations: super::super::work_pages::list([Operation::Amend {
-                    project: 1,
-                    task: 8,
-                    revision: None,
-                    change: Box::new(Amendment {
-                        tracked: Some(Tracking::Tracked { priority: 2 }),
-                        ..Amendment { spec: None, ..change() }
-                    }),
-                    reason: text(b""),
-                }]),
-            }
-        }
         ActKind::Release => {
             assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Again));
             drive(domain, Time::ZERO, Event::Act { action: Act::Again { again: false } });
             Ask::Release { project: 1, task: 8, revision: Revision { value: 3 }, again: Some(false) }
         }
-        ActKind::Withdraw
+        ActKind::Reorder
+        | ActKind::Withdraw
         | ActKind::Answer
         | ActKind::Take
         | ActKind::HandBack
@@ -149,8 +125,6 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
         | ActKind::Reject
         | ActKind::PassUp
         | ActKind::LeaveHeld
-        | ActKind::Close
-        | ActKind::SetGoal
         | ActKind::Seen
         | ActKind::EditNote
         | ActKind::DeleteNote
@@ -169,12 +143,13 @@ fn closing_names_each_live_delegate_once_and_chat_about_sends_only_the_named_fir
     me.projects.push(project(1, true)).unwrap();
     let watch = domain.frame_watch.unwrap();
     delivered(&mut domain, Time::ZERO, watch, me);
-    let mut document = steering_document(ActKind::Close);
+    let mut document = steering_document(ActKind::Cancel);
+    document.flags.conversation = true;
     document.delegates = List::with_capacity(2);
     document.delegates.push(LiveDelegate { chip: chip(10), takeover_budget: 6 }).unwrap();
     document.delegates.push(LiveDelegate { chip: chip(11), takeover_budget: 7 }).unwrap();
     let id = install(&mut domain, document);
-    intend(&mut domain, id, ActKind::Close);
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::CloseChat { object: id.token() } }).is_empty());
     assert!(domain.confirmation().unwrap().dangerous, "closing includes cancellation");
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Delegates));
     for task in [10, 10, 99] {
@@ -184,7 +159,7 @@ fn closing_names_each_live_delegate_once_and_chat_about_sends_only_the_named_fir
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dispose { task: 99, take_over: true } });
     // Reopen to discard the invalid selection, then choose both live identities.
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dismiss });
-    intend(&mut domain, id, ActKind::Close);
+    assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::CloseChat { object: id.token() } }).is_empty());
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dispose { task: 10, take_over: false } });
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dispose { task: 11, take_over: true } });
     let mut operations = List::with_capacity(3);

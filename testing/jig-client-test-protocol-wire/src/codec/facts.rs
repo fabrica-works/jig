@@ -4,13 +4,6 @@ use skein_lib::Wall;
 #[expect(clippy::manual_map, reason = "step code translates optional fields without closures")]
 pub(super) fn encode_refusal(value: &d::application_core::Refusal) -> w::Refusal {
     match value {
-        d::application_core::Refusal::Disposal { task, issue } => w::Refusal::Disposal(
-            w::RefusalDisposal::new(
-                &w::CEILINGS,
-                w::RefusalDisposalParts { task: *task, issue: encode_disposal_issue(*issue) },
-            )
-            .expect("admitted fields fit schema"),
-        ),
         d::application_core::Refusal::Role { held } => w::Refusal::Role(
             w::RefusalRole::new(
                 &w::CEILINGS,
@@ -61,10 +54,6 @@ pub(super) fn encode_refusal(value: &d::application_core::Refusal) -> w::Refusal
 #[expect(clippy::manual_map, reason = "step code translates optional fields without closures")]
 pub(super) fn decode_refusal(value: w::Refusal, limits: &d::Limits) -> d::application_core::Refusal {
     match value {
-        w::Refusal::Disposal(value) => {
-            let w::RefusalDisposalParts { task, issue } = value.into_parts();
-            d::application_core::Refusal::Disposal { task, issue: decode_disposal_issue(issue, limits) }
-        }
         w::Refusal::Role(value) => {
             let w::RefusalRoleParts { held } = value.into_parts();
             d::application_core::Refusal::Role {
@@ -473,22 +462,5 @@ pub(super) fn decode_failure_class(value: w::FailureClass, _limits: &d::Limits) 
         w::FailureClass::Agent => d::application_core::FailureClass::Agent,
         w::FailureClass::Lost => d::application_core::FailureClass::Lost,
         w::FailureClass::Invalid => d::application_core::FailureClass::Invalid,
-    }
-}
-pub(super) fn encode_disposal_issue(value: d::application_core::DisposalIssue) -> w::DisposalIssue {
-    match &value {
-        d::application_core::DisposalIssue::Missing => w::DisposalIssue::Missing,
-        d::application_core::DisposalIssue::Unknown => w::DisposalIssue::Unknown,
-        d::application_core::DisposalIssue::Repeated => w::DisposalIssue::Repeated,
-    }
-}
-pub(super) fn decode_disposal_issue(
-    value: w::DisposalIssue,
-    _limits: &d::Limits,
-) -> d::application_core::DisposalIssue {
-    match value {
-        w::DisposalIssue::Missing => d::application_core::DisposalIssue::Missing,
-        w::DisposalIssue::Unknown => d::application_core::DisposalIssue::Unknown,
-        w::DisposalIssue::Repeated => d::application_core::DisposalIssue::Repeated,
     }
 }

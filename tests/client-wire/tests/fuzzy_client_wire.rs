@@ -266,20 +266,13 @@ fn records_6(bytes: &[u8]) {
     check!(OwnerResourceScope, bytes);
     check!(OwnerAuthority, bytes);
     check!(Amendment, bytes);
-    check!(DisposalCancel, bytes);
-    check!(DisposalTakeOver, bytes);
-    check!(Disposal, bytes);
-    check!(GoalExecutorCharter, bytes);
-    check!(GoalExecutorProcedure, bytes);
-    check!(GoalExecutor, bytes);
-    check!(Priority, bytes);
     check!(SeenResults, bytes);
     check!(SeenConversation, bytes);
     check!(SeenThrough, bytes);
     check!(Seen, bytes);
     check!(NoteScopeProject, bytes);
     check!(NoteScopeResource, bytes);
-    check!(NoteScopeGoal, bytes);
+    check!(NoteScopeTask, bytes);
 }
 
 fn records_7(bytes: &[u8]) {
@@ -299,7 +292,6 @@ fn records_7(bytes: &[u8]) {
     check!(HeldRolePolicy, bytes);
     check!(HeldRole, bytes);
     check!(Holding, bytes);
-    check!(StartChat, bytes);
     check!(Message, bytes);
     check!(AnswerQuestion, bytes);
     check!(AnswerPerson, bytes);
@@ -311,10 +303,7 @@ fn records_7(bytes: &[u8]) {
     check!(Amend, bytes);
     check!(Stop, bytes);
     check!(Cancel, bytes);
-    check!(Close, bytes);
     check!(Move, bytes);
-    check!(SetGoal, bytes);
-    check!(Prioritise, bytes);
     check!(Decide, bytes);
     check!(DecideOn, bytes);
     check!(Answer, bytes);
@@ -362,13 +351,10 @@ fn records_7(bytes: &[u8]) {
 fn records_8(bytes: &[u8]) {
     check!(OwnerProposalChoice, bytes);
     check!(OwnerEscalationChoice, bytes);
-    check!(OwnerOutcomeClosing, bytes);
     check!(OwnerOutcomeMarkedSeen, bytes);
     check!(OwnerOutcomeNoteEdited, bytes);
     check!(OwnerOutcomeServiceMade, bytes);
     check!(OwnerOutcomeAdopted, bytes);
-    check!(OwnerOutcomeGoalStarted, bytes);
-    check!(OwnerOutcomeGoalProposed, bytes);
     check!(OwnerOutcomeStopped, bytes);
     check!(OwnerOutcomeCancelled, bytes);
     check!(OwnerOutcomeReleased, bytes);
@@ -379,7 +365,6 @@ fn records_8(bytes: &[u8]) {
     check!(OwnerOutcomeProposalDecided, bytes);
     check!(OwnerOutcomeSaid, bytes);
     check!(OwnerOutcomeQuestionAnswered, bytes);
-    check!(OwnerOutcomePrioritised, bytes);
     check!(OwnerOutcomeAmended, bytes);
     check!(OwnerOutcomeProposed, bytes);
     check!(OwnerOutcomeWithdrawn, bytes);
@@ -387,10 +372,7 @@ fn records_8(bytes: &[u8]) {
     check!(OwnerOutcomePolicyChanged, bytes);
     check!(OwnerOutcomePoolSet, bytes);
     check!(OwnerOutcomeEscalationDecided, bytes);
-    check!(OwnerOutcomeStarted, bytes);
     check!(OwnerOutcome, bytes);
-    check!(MadeChat, bytes);
-    check!(MadeGoal, bytes);
     check!(MadeTasks, bytes);
     check!(MadeService, bytes);
     check!(MadePersonResult, bytes);
@@ -405,7 +387,6 @@ fn records_8(bytes: &[u8]) {
 fn records_9(bytes: &[u8]) {
     check!(OutcomeDecidedFirst, bytes);
     check!(Outcome, bytes);
-    check!(DisposalIssue, bytes);
     check!(Grant, bytes);
     check!(LackingBudget, bytes);
     check!(LackingGrant, bytes);
@@ -424,7 +405,6 @@ fn records_9(bytes: &[u8]) {
     check!(LimitLiveTasks, bytes);
     check!(LimitInbox, bytes);
     check!(LimitWords, bytes);
-    check!(LimitConversationWords, bytes);
     check!(Limit, bytes);
     check!(CurrentHoldDocument, bytes);
     check!(CurrentHoldReason, bytes);
@@ -432,7 +412,6 @@ fn records_9(bytes: &[u8]) {
     check!(MovedHold, bytes);
     check!(Moved, bytes);
     check!(RefusalRole, bytes);
-    check!(RefusalDisposal, bytes);
     check!(RefusalTaken, bytes);
     check!(RefusalAuthority, bytes);
     check!(RefusalLimit, bytes);
@@ -578,7 +557,6 @@ fn records_13(bytes: &[u8]) {
     check!(HistoryChangeMoved, bytes);
     check!(HistoryChange, bytes);
     check!(HistoryLine, bytes);
-    check!(OwnerHistoryChangePrioritised, bytes);
     check!(OwnerHistoryChange, bytes);
     check!(ParameterDocumentNumber, bytes);
     check!(ParameterDocumentBytes, bytes);

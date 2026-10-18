@@ -72,7 +72,7 @@ impl World {
             reply_to: ReplyTo::new(Token::new(102)),
             sign_in,
             key: [2; 16],
-            ask: people::Ask::StartChat { project: 1, words: b"backoff story".as_slice().into() },
+            ask: super::config::chat(b"backoff story"),
         })));
         world.owner = world
             .settle()

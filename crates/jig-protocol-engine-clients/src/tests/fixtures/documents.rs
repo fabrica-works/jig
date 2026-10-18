@@ -11,9 +11,7 @@ pub fn text() -> d::Text {
 }
 pub fn frame_two_projects() -> d::Frame {
     let mut projects = List::with_capacity(2);
-    for (project, role, chat_budget) in
-        [(3, jig_domain_people::Role::Owner, 11), (5, jig_domain_people::Role::Observer, 13)]
-    {
+    for (project, role) in [(3, jig_domain_people::Role::Owner), (5, jig_domain_people::Role::Observer)] {
         projects
             .push(d::FrameProjectRole {
                 project,
@@ -21,15 +19,10 @@ pub fn frame_two_projects() -> d::Frame {
                 name: None,
                 pool: None,
                 creating: None,
-                chat_budget,
                 templates: List::with_capacity(0),
             })
             .unwrap();
     }
-    let mut goals = List::with_capacity(1);
-    goals.push(19).unwrap();
-    let mut charters = List::with_capacity(1);
-    charters.push(d::OfferedCharter { project: 3, chat: 17, goals, cut: true }).unwrap();
     d::Frame {
         party: 7,
         kind: jig_domain_people::Kind::Person,
@@ -42,7 +35,6 @@ pub fn frame_two_projects() -> d::Frame {
         updates: d::Count::Known(7),
         results_seen: 7,
         retention: Duration::from_nanos(19),
-        charters,
         cut: false,
     }
 }

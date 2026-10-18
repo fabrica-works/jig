@@ -148,10 +148,8 @@ pub const fn dangerous(act: ActKind) -> bool {
         | ActKind::LeaveHeld
         | ActKind::Amend
         | ActKind::Stop
-        | ActKind::Close
         | ActKind::Move
-        | ActKind::SetGoal
-        | ActKind::Prioritise
+        | ActKind::Reorder
         | ActKind::Seen
         | ActKind::EditNote
         | ActKind::Adopt

@@ -270,8 +270,7 @@ impl<A: crate::Application> Engine<A> {
             Ask::EditNote { note, .. } | Ask::DeleteNote { note, .. } => {
                 self.truth.notes.get(note).map(|note| &note.acts)
             }
-            Ask::StartChat { .. }
-            | Ask::Propose { .. }
+            Ask::Propose { .. }
             | Ask::Withdraw { .. }
             | Ask::Create { .. }
             | Ask::Compound { .. }
@@ -284,10 +283,7 @@ impl<A: crate::Application> Engine<A> {
             | Ask::Amend { .. }
             | Ask::Stop { .. }
             | Ask::Cancel { .. }
-            | Ask::Close { .. }
             | Ask::Move { .. }
-            | Ask::SetGoal { .. }
-            | Ask::Prioritise { .. }
             | Ask::Seen { .. }
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
@@ -315,9 +311,6 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::Propose { action: jig_client_domain::contract::ProposeAction::Batch { tasks }, .. } => {
                     Self::batch_admission(offer, tasks)
                 }
-                Ask::SetGoal { executor, budget, deadline, .. } => {
-                    jig_client_domain::contract::admission::goal(offer, *executor, *budget, *deadline)
-                }
                 Ask::Amend { task, change, .. }
                 | Ask::Propose {
                     action: jig_client_domain::contract::ProposeAction::Amendment { task, change, .. },
@@ -330,8 +323,7 @@ impl<A: crate::Application> Engine<A> {
                     };
                     self.amendment_admission(offer, *task, change)
                 }
-                Ask::StartChat { .. }
-                | Ask::Message { .. }
+                Ask::Message { .. }
                 | Ask::Answer { .. }
                 | Ask::Take { .. }
                 | Ask::HandBack { .. }
@@ -339,9 +331,7 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::Release { .. }
                 | Ask::Stop { .. }
                 | Ask::Cancel { .. }
-                | Ask::Close { .. }
                 | Ask::Move { .. }
-                | Ask::Prioritise { .. }
                 | Ask::Seen { .. }
                 | Ask::EditNote { .. }
                 | Ask::DeleteNote { .. }
@@ -392,7 +382,7 @@ impl<A: crate::Application> Engine<A> {
                 {
                     return Err(Invalid::Script);
                 }
-                if admission.is_none() && !matches!(ask, Ask::StartChat { .. } | Ask::Seen { .. }) {
+                if admission.is_none() && !matches!(ask, Ask::Seen { .. }) {
                     return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
                 }
             }
@@ -413,8 +403,7 @@ impl<A: crate::Application> Engine<A> {
             Ask::Decide { on: DecideOn::Proposal { decision, .. }, .. }
             | Ask::Decide { on: DecideOn::Escalation { decision, .. }, .. } => Some(decision.clone()),
             Ask::Release { again, .. } => Some(Decision::Released { again: *again }),
-            Ask::StartChat { .. }
-            | Ask::Propose { .. }
+            Ask::Propose { .. }
             | Ask::Withdraw { .. }
             | Ask::Create { .. }
             | Ask::Compound { .. }
@@ -425,10 +414,7 @@ impl<A: crate::Application> Engine<A> {
             | Ask::Amend { .. }
             | Ask::Stop { .. }
             | Ask::Cancel { .. }
-            | Ask::Close { .. }
             | Ask::Move { .. }
-            | Ask::SetGoal { .. }
-            | Ask::Prioritise { .. }
             | Ask::Seen { .. }
             | Ask::EditNote { .. }
             | Ask::DeleteNote { .. }
@@ -619,7 +605,7 @@ fn target(ask: &Ask) -> Target {
         Ask::Compound { project, operations } => {
             compound_target(*project, operations).unwrap_or((Some(*project), None, ActKind::Message, None))
         }
-        Ask::Create { project, .. } | Ask::StartChat { project, .. } => (Some(*project), None, ActKind::Message, None),
+        Ask::Create { project, .. } => (Some(*project), None, ActKind::Message, None),
         Ask::Message { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Message, None),
         Ask::Answer { project, on: AnswerOn::Question { task, message, .. }, .. } => {
             (Some(*project), Some(ObjectKey::Question { task: *task, message: *message }), ActKind::Answer, None)
@@ -650,18 +636,15 @@ fn target(ask: &Ask) -> Target {
             jig_client_domain::contract::ProposeAction::Amendment { task, revision, .. } => {
                 (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Amend, Some((*revision, Moved::Spec)))
             }
-            jig_client_domain::contract::ProposeAction::Batch { .. } => (Some(*project), None, ActKind::SetGoal, None),
+            jig_client_domain::contract::ProposeAction::Batch { .. } => (Some(*project), None, ActKind::Message, None),
         },
         Ask::Amend { project, task, revision, .. } => {
             (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Amend, revision.map(|value| (value, Moved::Spec)))
         }
         Ask::Stop { project, task } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Stop, None),
         Ask::Cancel { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Cancel, None),
-        Ask::Close { project, chat, .. } => (Some(*project), Some(ObjectKey::Task(*chat)), ActKind::Close, None),
         Ask::Move { project, task, .. } => (Some(*project), Some(ObjectKey::Task(*task)), ActKind::Move, None),
         Ask::Withdraw { project, .. } => (Some(*project), None, ActKind::Withdraw, None),
-        Ask::SetGoal { project, .. } => (Some(*project), None, ActKind::SetGoal, None),
-        Ask::Prioritise { project, .. } => (Some(*project), None, ActKind::Prioritise, None),
         Ask::Seen { .. } => (None, None, ActKind::Seen, None),
         Ask::EditNote { project, .. } => (Some(*project), None, ActKind::EditNote, None),
         Ask::DeleteNote { project, .. } => (Some(*project), None, ActKind::DeleteNote, None),
@@ -688,7 +671,7 @@ fn compound_target(project: u32, operations: &List<Operation>) -> Option<Target>
         operations => {
             let Operation::Cancel { project: named, task, .. } = operations.last()? else { return None };
             if *named != project || !operations.iter().all(|op| matches!(op, Operation::Cancel { project: named, .. } | Operation::Move { project: named, .. } if *named == project)) { return None; }
-            Some((Some(project), Some(ObjectKey::Task(*task)), ActKind::Close, None))
+            Some((Some(project), Some(ObjectKey::Task(*task)), ActKind::Cancel, None))
         }
     }
 }

@@ -2,14 +2,13 @@
 use super::*;
 
 fn goal(budget: u64) -> people::Ask {
-    people::Ask::SetGoal {
-        project: 1,
-        spec: b"procedure goal".as_slice().into(),
-        executor: people::GoalExecutor::Procedure { connector: 1, code: 1 },
-        budget,
-        priority: 7,
-        deadline: Some(skein_lib::Wall::from_nanos(60_000_000_000)),
-    }
+    let mut member = jig_core_world::fixtures::people_member(b"procedure goal", budget);
+    member.executor = people::TaskExecutor::Procedure { connector: 1, code: 1 };
+    member.flags.listed = true;
+    member.label = jig_client_test_records::GOAL;
+    member.tracked = Some(7);
+    member.authority.deadline = Some(skein_lib::Wall::from_nanos(60_000_000_000));
+    people::Ask::Create { project: 1, batch: Box::new([member]) }
 }
 
 fn raise_pool_ceiling(world: &mut World, seed: u64) {
@@ -82,7 +81,8 @@ fn a_procedure_goal_commits_before_delivery_and_replays_its_exact_owner_facts() 
     assert_eq!(world.people_answers.len(), replies);
     assert!(world.procedure_inputs.is_empty(), "no procedure receives an uncommitted goal");
     world.release_commits();
-    let Some(people::Reply::Outcome(people::Outcome::GoalStarted { task })) = world.people_answers.last().copied()
+    let Some(people::Reply::Outcome(people::Outcome::Created { first: task, .. })) =
+        world.people_answers.last().copied()
     else {
         panic!("procedure goal: {:?}", world.people_answers)
     };
@@ -102,11 +102,17 @@ fn a_procedure_goal_commits_before_delivery_and_replays_its_exact_owner_facts() 
     );
     let inputs = world.procedure_inputs.len();
     ask(&mut world, 90, goal(100));
-    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::GoalStarted { task })));
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Created { first: task, last: task, given: None }))
+    );
     assert_eq!(world.procedure_inputs.len(), inputs, "same keyed creation does not run twice");
     world.restart_with(jig_core_world::stories::offers::world_configuration(215));
     ask(&mut world, 90, goal(100));
-    assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::GoalStarted { task })));
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&people::Reply::Outcome(people::Outcome::Created { first: task, last: task, given: None }))
+    );
     assert_eq!(live_row(&world, task).executor, row.executor);
     assert_eq!(live_row(&world, task).tracked, row.tracked);
     jig_core_world::watches::open(&mut world, 93, core::documents::Watched::Task { task });

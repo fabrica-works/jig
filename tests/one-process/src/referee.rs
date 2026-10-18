@@ -181,11 +181,11 @@ fn snapshot(rows: &BTreeMap<root::Key, root::Record>) -> rules::Snapshot {
 }
 fn received(seen: &Received, store: &Store) -> Vec<rules::Receipt> {
     if let Received::Answer {
-        answer: client::Answer::Done(client::Outcome::Owner(client::OwnerOutcome::Started { task })),
+        answer: client::Answer::Done(client::Outcome::Owner(client::OwnerOutcome::Created { first, last, .. })),
         ..
     } = seen
     {
-        return vec![rules::Receipt::Task(*task)];
+        return (*first..=*last).map(rules::Receipt::Task).collect();
     }
     if let Received::SignedIn { person } = seen {
         let receipts: Vec<_> = store

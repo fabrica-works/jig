@@ -451,7 +451,8 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
         Event::Act { action: crate::action::Act::Edit { field: crate::fields::Purpose::NewChat, text: text(b"help") } },
     );
     for refused in [true, false] {
-        let out = drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::StartChat { project: 1 } });
+        let out =
+            drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::BeginConversation { project: 1 } });
         let mut token = None;
         for request in &out {
             if let Request::Client {
@@ -463,7 +464,7 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
             }
         }
         assert!(
-            drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::StartChat { project: 1 } })
+            drive(&mut domain, Time::ZERO, Event::Act { action: crate::action::Act::BeginConversation { project: 1 } })
                 .is_empty()
         );
         assert_eq!(
@@ -473,7 +474,7 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
         let answer = if refused {
             refusal_answer(Refusal::Authority { lacking: Lacking::Budget { needed: 10, left: 2 }, proposable: None })
         } else {
-            Answer::Done(Outcome::Made { what: Made::Chat { task: 42 } })
+            Answer::Done(Outcome::Made { what: Made::Tasks { tasks: crate::tests::fixtures::one(42) } })
         };
         drive(&mut domain, Time::ZERO, AnsweredByEngine { request: token.unwrap(), answer });
         if refused {
@@ -669,7 +670,7 @@ fn project_document() -> Project {
     charters.push(1).unwrap();
     acts.push(Offered {
         effect: None,
-        act: ActKind::SetGoal,
+        act: ActKind::Reorder,
         admission: Admission::Bounded {
             within: Bounds::Create(CreateBounds {
                 authority: Box::new(crate::tests::cards_objects::owner_authority()),
@@ -791,10 +792,10 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
     task.goal = Some(task.chip.task);
     task.priority = Some(1);
     task.acts = List::with_capacity(1);
-    task.acts.push(Offered { effect: None, act: ActKind::Prioritise, admission: Admission::Allowed }).unwrap();
+    task.acts.push(Offered { effect: None, act: ActKind::Reorder, admission: Admission::Allowed }).unwrap();
     drive(&mut domain, Time::ZERO, ReadPage { read, result: ReadResult::Value(ReadValue::Task(Box::new(task))) });
     let id = domain.objects().find(ObjectKey::Task(8)).unwrap();
-    assert_eq!(crate::acts::offered(&domain.objects().get(id).unwrap(), ActKind::Prioritise), Admission::Allowed);
+    assert_eq!(crate::acts::offered(&domain.objects().get(id).unwrap(), ActKind::Reorder), Admission::Allowed);
 
     let mut rows = List::with_capacity(2);
     rows.push(goal_line(9, 2, Phase::Running, 1)).unwrap();
@@ -918,7 +919,10 @@ fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
     drive(
         &mut domain,
         Time::ZERO,
-        AnsweredByEngine { request, answer: Answer::Done(Outcome::Made { what: Made::Goal { task: 42 } }) },
+        AnsweredByEngine {
+            request,
+            answer: Answer::Done(Outcome::Made { what: Made::Tasks { tasks: crate::tests::fixtures::one(42) } }),
+        },
     );
     assert_eq!(domain.address, Address::task(42));
     assert_eq!(domain.fields().get(Purpose::NewGoal).unwrap().text, text(b"later words"));
@@ -1813,7 +1817,7 @@ fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers
             Time::ZERO,
             Event::Act { action: Act::Edit { field: Purpose::NewChat, text: text(b"start") } },
         );
-        let sent = drive(&mut domain, Time::ZERO, Event::Act { action: Act::StartChat { project: 1 } });
+        let sent = drive(&mut domain, Time::ZERO, Event::Act { action: Act::BeginConversation { project: 1 } });
         let mut request = None;
         for row in &sent {
             if let Request::Client {
@@ -1828,7 +1832,8 @@ fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers
         if away {
             drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
         }
-        let answer = Answer::Done(Outcome::Owner(OwnerOutcome::Started { task: u64::MAX }));
+        let answer =
+            Answer::Done(Outcome::Owner(OwnerOutcome::Created { first: u64::MAX, last: u64::MAX, given: None }));
         drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: answer.clone() });
         assert!(domain.chats().starting.is_none());
         assert!(domain.fields().get(Purpose::NewChat).unwrap().text.bytes().is_empty());
@@ -1882,9 +1887,9 @@ fn owner_goal_answers_preserve_numeric_proposals_and_late_started_task_facts() {
                 drive(&mut domain, Time::ZERO, Event::Went { place: Place::Elsewhere });
             }
             let outcome = Outcome::Owner(if proposed {
-                OwnerOutcome::GoalProposed { proposal: u64::MAX }
+                OwnerOutcome::Proposed { proposal: u64::MAX }
             } else {
-                OwnerOutcome::GoalStarted { task: u64::MAX }
+                OwnerOutcome::Created { first: u64::MAX, last: u64::MAX, given: None }
             });
             let answer = Answer::Done(outcome.clone());
             drive(&mut domain, Time::ZERO, AnsweredByEngine { request, answer: answer.clone() });
@@ -1994,7 +1999,7 @@ fn goal_note_scope_keeps_its_supplied_project_instead_of_the_parent_page() {
         Time::ZERO,
         Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Notes }) },
     );
-    let scope = NoteScope::Goal { project: u32::MAX, goal: u64::MAX };
+    let scope = NoteScope::Task { project: u32::MAX, task: u64::MAX };
     let output = drive(
         &mut domain,
         Time::ZERO,

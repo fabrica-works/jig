@@ -94,7 +94,7 @@ pub(crate) fn note_scope(value: &client::NoteScope) -> notes::Scope {
     match value {
         client::NoteScope::Deployment => notes::Scope::Deployment,
         client::NoteScope::Project(project) => notes::Scope::Project { project: *project },
-        client::NoteScope::Goal { project, goal } => notes::Scope::Goal { project: *project, goal: *goal },
+        client::NoteScope::Task { project, task: goal } => notes::Scope::Goal { project: *project, goal: *goal },
         client::NoteScope::Resource { project, connector, pattern } => notes::Scope::Resources {
             project: *project,
             connector: *connector,
@@ -258,7 +258,7 @@ mod tests {
             assert_eq!(pattern.segments.capacity(), 3);
         }
         let query = client::Read::Notes {
-            scope: client::NoteScope::Goal { project: u32::MAX, goal: u64::MAX },
+            scope: client::NoteScope::Task { project: u32::MAX, task: u64::MAX },
             description: None,
             after: None,
         };

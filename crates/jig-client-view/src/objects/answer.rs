@@ -33,7 +33,6 @@ pub fn recovery(object: &Object) -> Recovery {
             Refusal::Moved { .. } => recovery.look_again = true,
             Refusal::Authority { .. } | Refusal::Limit { .. } => recovery.change_ask = true,
             Refusal::Malformed { .. }
-            | Refusal::Disposal { .. }
             | Refusal::Taken { .. }
             | Refusal::NotWaiting
             | Refusal::NoFurther

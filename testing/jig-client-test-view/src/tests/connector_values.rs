@@ -553,7 +553,7 @@ fn connector_values_view_the_capacity_envelope_covers_full_rows_paths_and_escape
 }
 #[test]
 fn connector_values_view_exact_core_refusals_cover_all_admission_categories_and_eligibility_states() {
-    use application_core::{DisposalIssue, Lack, LimitKind, Refusal};
+    use application_core::{Lack, LimitKind, Refusal};
     let words = words::english(64).unwrap();
     for (which, label) in [
         (LimitKind::Words, "Engine admission limit: words"),
@@ -607,16 +607,6 @@ fn connector_values_view_exact_core_refusals_cover_all_admission_categories_and_
                 &words,
             ),
             &[b"Your pool has 7 left; this needs 18446744073709551615", label],
-        );
-    }
-    for (issue, label) in [
-        (DisposalIssue::Missing, b"needs a disposal".as_slice()),
-        (DisposalIssue::Unknown, b"is not a named live delegate"),
-        (DisposalIssue::Repeated, b"has repeated disposals"),
-    ] {
-        expect(
-            &answer(ApplicationOutcome::CoreRefused { why: Refusal::Disposal { task: u64::MAX, issue } }, &words),
-            &[b"18446744073709551615", label],
         );
     }
     assert_eq!(crate::connector_values_refusal::refusal(Refusal::Role { held: Some(u32::MAX) }), None);

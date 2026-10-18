@@ -29,8 +29,6 @@ pub struct Limits {
     pub projects: u32,
     /// Maximum unique-person holdings per project role set.
     pub holdings: u32,
-    /// Maximum goals whose priorities one keyed request changes together.
-    pub goals: u32,
     /// Maximum retained configured first-owner entries; also bounds bootstrap output matches.
     pub initial_owners: u32,
     /// Maximum completed keys plus slots reserved by pending flights.
@@ -159,15 +157,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)
 }
 
-/// Close disposals share the existing whole-amendment byte bound, including their list allocation.
-#[must_use]
-pub fn disposal_capacity(limits: &Limits) -> u32 {
-    limits
-        .amendment_bytes
-        .checked_div(u32::try_from(size_of::<crate::Disposal>()).expect("fixed disposal size fits"))
-        .expect("nonzero disposal size")
-}
-
 fn ask_bytes(limits: &Limits) -> Option<u64> {
     let compound = List::<crate::Operation>::worst_case(limits.operations)?.checked_add(
         u64::from(limits.operations).checked_mul(
@@ -177,20 +166,14 @@ fn ask_bytes(limits: &Limits) -> Option<u64> {
         )?,
     )?;
     Some(
-        List::<crate::Disposal>::worst_case(disposal_capacity(limits))?
-            .max(
-                u64::from(limits.batch)
-                    .checked_mul(
-                        u64::try_from(size_of::<crate::Member>())
-                            .ok()?
-                            .checked_add(u64::from(limits.amendment_bytes))?,
-                    )?
-                    .checked_add(u64::from(limits.words))?,
-            )
-            .max(compound)
-            .max(u64::from(limits.words))
-            .max(u64::from(limits.amendment_bytes))
-            .max(u64::from(limits.holdings).checked_mul(u64::try_from(size_of::<Holding>()).ok()?)?)
-            .max(u64::from(limits.goals).checked_mul(u64::try_from(size_of::<(u64, u32)>()).ok()?)?),
+        (u64::from(limits.batch)
+            .checked_mul(
+                u64::try_from(size_of::<crate::Member>()).ok()?.checked_add(u64::from(limits.amendment_bytes))?,
+            )?
+            .checked_add(u64::from(limits.words))?)
+        .max(compound)
+        .max(u64::from(limits.words))
+        .max(u64::from(limits.amendment_bytes))
+        .max(u64::from(limits.holdings).checked_mul(u64::try_from(size_of::<Holding>()).ok()?)?),
     )
 }

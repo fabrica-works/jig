@@ -116,8 +116,8 @@ pub fn subjects() -> [(&'static str, d::ClientSubject); 8] {
 }
 
 pub fn outcomes() -> List<(&'static str, d::ApplicationOutcome)> {
-    use d::application_core::{DisposalIssue, Ending, HoldReason, Lack, LimitKind, Moved, Party, Refusal};
-    let mut cases = List::with_capacity(17);
+    use d::application_core::{Ending, HoldReason, Lack, LimitKind, Moved, Party, Refusal};
+    let mut cases = List::with_capacity(16);
     for case in [
         ("changed", d::ApplicationOutcome::Changed { object: 1, now: OBJECT }),
         ("moved", d::ApplicationOutcome::Moved { object: 2, now: OBJECT }),
@@ -125,10 +125,9 @@ pub fn outcomes() -> List<(&'static str, d::ApplicationOutcome)> {
         ("unknown", d::ApplicationOutcome::Unknown),
         ("exhausted", d::ApplicationOutcome::Exhausted),
     ] {
-        cases.push(case).expect("17 terminals");
+        cases.push(case).expect("16 terminals");
     }
     for (label, why) in [
-        ("disposal", Refusal::Disposal { task: 4, issue: DisposalIssue::Repeated }),
         ("role absent", Refusal::Role { held: None }),
         ("authority", Refusal::Authority { lacking: Lack::Budget { needs: 5, left: 6 }, proposable: Some(false) }),
         ("limit", Refusal::Limit { which: LimitKind::Authority }),
@@ -146,7 +145,7 @@ pub fn outcomes() -> List<(&'static str, d::ApplicationOutcome)> {
         ("not offered", Refusal::NotOffered),
         ("key conflict", Refusal::KeyConflict),
     ] {
-        cases.push((label, d::ApplicationOutcome::CoreRefused { why })).expect("17 terminals");
+        cases.push((label, d::ApplicationOutcome::CoreRefused { why })).expect("16 terminals");
     }
     cases
 }

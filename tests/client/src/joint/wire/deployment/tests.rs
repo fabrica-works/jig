@@ -395,7 +395,8 @@ fn deployment_hello_refusals_keep_each_owner_reason_and_its_full_width_bound() {
 #[test]
 fn deployment_person_capacity_actions_keep_every_original_kind_and_address() {
     for (source, expected) in [
-        (people::CapacityAction::Close, client::OwnerPersonCapacityAction::Close),
+        (people::CapacityAction::Create, client::OwnerPersonCapacityAction::Create),
+        (people::CapacityAction::Compound, client::OwnerPersonCapacityAction::Compound),
         (
             people::CapacityAction::Application { connector: u16::MAX },
             client::OwnerPersonCapacityAction::Application { connector: u16::MAX },
@@ -409,8 +410,6 @@ fn deployment_person_capacity_actions_keep_every_original_kind_and_address() {
             people::CapacityAction::Pool { person: u64::MAX },
             client::OwnerPersonCapacityAction::Pool { person: u64::MAX },
         ),
-        (people::CapacityAction::Chat, client::OwnerPersonCapacityAction::Chat),
-        (people::CapacityAction::Goal, client::OwnerPersonCapacityAction::Goal),
         (
             people::CapacityAction::Escalation { task: u64::MAX },
             client::OwnerPersonCapacityAction::Escalation { task: u64::MAX },
@@ -420,7 +419,6 @@ fn deployment_person_capacity_actions_keep_every_original_kind_and_address() {
             people::CapacityAction::Question { task: 0, question: u64::MAX },
             client::OwnerPersonCapacityAction::Question { task: 0, question: u64::MAX },
         ),
-        (people::CapacityAction::Priority, client::OwnerPersonCapacityAction::Priority),
         (people::CapacityAction::Amend { task: u64::MAX }, client::OwnerPersonCapacityAction::Amend { task: u64::MAX }),
         (people::CapacityAction::Move { task: u64::MAX }, client::OwnerPersonCapacityAction::Move { task: u64::MAX }),
         (
@@ -641,7 +639,6 @@ fn me_deployment_role_is_independent_of_project_rows() {
             projects: rows(
                 1,
                 [documents::FrameProjectRole {
-                    chat_budget: u64::MAX,
                     project: 1,
                     name: None,
                     role: people::Role::Owner,
@@ -655,7 +652,6 @@ fn me_deployment_role_is_independent_of_project_rows() {
             updates: documents::Count::Known(0),
             results_seen: 0,
             retention: Duration::ZERO,
-            charters: List::with_capacity(0),
             cut: true,
         };
         assert_eq!(owner::frame(&source, &limits()).expect("supplied Me").deployment_role, expected);

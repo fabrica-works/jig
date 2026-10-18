@@ -96,13 +96,13 @@ impl World {
         configuration: root::Config,
         limits: root::Limits,
     ) -> World {
-        Self::configured_with(
-            seed,
-            requirement,
-            configuration,
-            limits,
-            people::Ask::StartChat { project: 1, words: b"make an effect".as_slice().into() },
-        )
+        let initial = crate::fixtures::create_chat(
+            &crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks),
+            1,
+            0,
+            b"make an effect".as_slice().into(),
+        );
+        Self::configured_with(seed, requirement, configuration, limits, initial)
     }
 
     /// Choose the initial authenticated task request.
@@ -125,6 +125,7 @@ impl World {
             authority::step(&mut bootstrap.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
         }
         let mut world = Self::empty(bootstrap, &limits);
+        world.creating = crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks);
         world.initial_ask = initial;
         world.send(root::Event::Core(core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) })));
         let projects: Vec<_> = configuration
@@ -184,6 +185,8 @@ impl World {
     pub(super) fn empty(configuration: root::Config, limits: &root::Limits) -> World {
         let observer = crate::observations::Observer::new(&configuration);
         let heap = crate::observations::Heap::new(limits);
+        let creating = crate::fixtures::Creating::new(&configuration.core, limits.core.tasks.tree_tasks);
+        let initial_ask = crate::fixtures::create_chat(&creating, 1, 0, b"make an effect".as_slice().into());
         World {
             bootstrap_owners: Vec::new(),
             domain: root::Domain::new(configuration, limits),
@@ -211,7 +214,8 @@ impl World {
             projections: Vec::new(),
             hold_projection_settlements: false,
             sign_in: None,
-            initial_ask: people::Ask::StartChat { project: 1, words: b"make an effect".as_slice().into() },
+            initial_ask,
+            creating,
             people_answers: Vec::new(),
             application_answers: Vec::new(),
             procedure: None,
@@ -298,6 +302,8 @@ impl World {
         if let Some((now, wall)) = clock {
             world.set_clock(now, wall);
         }
+        let mut peers = peers;
+        peers.creating = Some(world.creating.clone());
         world.peers = Some(peers);
         world.cut = cut;
         world.events.push_back(root::Event::RestartBegin);

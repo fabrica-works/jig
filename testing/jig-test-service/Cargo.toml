@@ -45,6 +45,7 @@ jig-protocol-worker-wire.workspace = true
 jig-protocol-engine-workers.workspace = true
 
 [dev-dependencies]
+jig-client.workspace = true
 skein-world.workspace = true
 skein-fake-channel.workspace = true
 smith-charter.workspace = true

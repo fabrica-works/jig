@@ -4,18 +4,14 @@ use super::*;
 fn a_second_party_proposal_request_reads_the_original_committed_decision_after_restart() {
     let (configuration, limits) = fixture(816, false);
     let mut world = World::configured(816, false, configuration, limits);
-    ask(
-        &mut world,
-        80,
-        jig_core_world::fixtures::propose_goal(people::Ask::SetGoal {
-            project: 1,
-            spec: b"retain the goal decision".as_slice().into(),
-            executor: people::GoalExecutor::Charter(1),
-            budget: 600,
-            priority: 0,
-            deadline: None,
-        }),
+    let proposed_goal = jig_core_world::fixtures::goal(
+        &world,
+        1,
+        b"retain the goal decision".as_slice().into(),
+        people::TaskExecutor::Agent { charter: 1 },
+        jig_core_world::fixtures::Goal { budget: 600, ..Default::default() },
     );
+    ask(&mut world, 80, jig_core_world::fixtures::propose_goal(proposed_goal));
     let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) =
         world.people_answers.last().copied()
     else {

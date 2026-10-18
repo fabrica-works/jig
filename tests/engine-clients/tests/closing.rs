@@ -63,8 +63,9 @@ fn second_stream(peer: &mut Peer) -> [u8; 16] {
 }
 fn keyed() -> Box<[u8]> {
     let lim = fixtures::limits().wire;
-    let ask = w::Ask::StartChat(
-        w::StartChat::new(&lim, w::StartChatParts { project: 3, words: Box::from(b"hello".as_slice()) }).expect("ask"),
+    let ask = w::Ask::Message(
+        w::Message::new(&lim, w::MessageParts { project: 3, task: 8, words: Box::from(b"hello".as_slice()) })
+            .expect("ask"),
     );
     let mut bytes = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
     ask.encode(&mut bytes).expect("ask bytes");

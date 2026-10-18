@@ -15,7 +15,7 @@ pub fn wire() -> w::Limits {
         keyed_request: 256,
         owned_record: 256,
         ending_rows: 128,
-        start_chat_words: 64,
+        message_words: 64,
         amend_reason: 64,
         ..w::CEILINGS
     }
@@ -58,9 +58,9 @@ pub fn env() -> Env<Limits> {
     }
 }
 pub fn start(limits: &w::Limits) -> w::Ask {
-    w::Ask::StartChat(
-        w::StartChat::new(limits, w::StartChatParts { project: 3, words: Box::from(b"hello".as_slice()) })
-            .expect("start"),
+    w::Ask::Message(
+        w::Message::new(limits, w::MessageParts { project: 3, task: 8, words: Box::from(b"hello".as_slice()) })
+            .expect("message"),
     )
 }
 pub fn revision(value: u64) -> w::Revision {
@@ -190,25 +190,8 @@ impl Exchange {
     }
 }
 
-pub fn other_asks() -> [(w::Ask, people::Ask); 20] {
-    use jig_domain_people as p;
+pub fn other_asks() -> [(w::Ask, people::Ask); 17] {
     let limits = wire();
-    let mut priorities = List::with_capacity(1);
-    priorities
-        .push(w::Priority::new(&limits, w::PriorityParts { task: 8, priority: u32::MAX }).expect("priority"))
-        .expect("room");
-    let mut disposals = List::with_capacity(2);
-    disposals
-        .push(w::Disposal::Cancel(w::DisposalCancel::new(&limits, w::DisposalCancelParts { task: 9 }).expect("cancel")))
-        .expect("room");
-    disposals
-        .push(w::Disposal::TakeOver(
-            w::DisposalTakeOver::new(&limits, w::DisposalTakeOverParts { task: 10 }).expect("take"),
-        ))
-        .expect("room");
-    let mut expected_disposals = List::with_capacity(2);
-    expected_disposals.push(p::Disposal { task: 9, keep: p::Keep::Cancel }).expect("room");
-    expected_disposals.push(p::Disposal { task: 10, keep: p::Keep::MakeMine }).expect("room");
     let mut holdings = List::with_capacity(1);
     holdings
         .push(
@@ -236,10 +219,7 @@ pub fn other_asks() -> [(w::Ask, people::Ask); 20] {
         cancel_case(&limits),
         take_over_case(&limits),
         set_pool_case(&limits),
-        prioritise_case(&limits, priorities),
-        close_case(&limits, disposals, expected_disposals),
         mark_seen_case(&limits),
-        set_goal_case(&limits),
         answer_person_case(&limits),
         decide_proposal_case(&limits),
         set_roles_case(&limits, holdings),
@@ -321,7 +301,7 @@ fn take_over_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
     (
         w::Ask::MoveTask(
             w::Move::new(limits, w::MoveParts { project: 3, task: 8, reason: Box::from(b"take".as_slice()) })
-                .expect("TakeOver"),
+                .expect("move"),
         ),
         p::Ask::Move { project: 3, task: 8, reason: Box::from(b"take".as_slice()) },
     )
@@ -334,26 +314,6 @@ fn set_pool_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
                 .expect("SetPool"),
         ),
         p::Ask::SetPool { project: 3, person: u64::MAX, budget: u64::MAX },
-    )
-}
-fn prioritise_case(limits: &w::Limits, priorities: List<w::Priority>) -> (w::Ask, people::Ask) {
-    use jig_domain_people as p;
-    (
-        w::Ask::Prioritise(
-            w::Prioritise::new(limits, w::PrioritiseParts { project: 3, goals: priorities }).expect("Prioritise"),
-        ),
-        p::Ask::Prioritise { project: 3, goals: Box::new([(8, u32::MAX)]) },
-    )
-}
-fn close_case(
-    limits: &w::Limits,
-    disposals: List<w::Disposal>,
-    expected_disposals: List<people::Disposal>,
-) -> (w::Ask, people::Ask) {
-    use jig_domain_people as p;
-    (
-        w::Ask::Close(w::Close::new(limits, w::CloseParts { project: 3, chat: 8, disposals }).expect("Close")),
-        p::Ask::Close { project: 3, chat: 8, disposals: expected_disposals },
     )
 }
 fn mark_seen_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
@@ -372,39 +332,6 @@ fn mark_seen_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
             .expect("MarkSeen"),
         ),
         p::Ask::MarkSeen { seen: p::Seen::Chat { task: 8, through: u64::MAX } },
-    )
-}
-fn set_goal_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
-    use jig_domain_people as p;
-    (
-        w::Ask::SetGoal(
-            w::SetGoal::new(
-                limits,
-                w::SetGoalParts {
-                    project: 3,
-                    spec: Box::new([]),
-                    executor: w::GoalExecutor::Procedure(
-                        w::GoalExecutorProcedure::new(
-                            limits,
-                            w::GoalExecutorProcedureParts { connector: u16::MAX, code: u32::MAX },
-                        )
-                        .expect("executor"),
-                    ),
-                    budget: u64::MAX,
-                    priority: u32::MAX,
-                    deadline: Some(99),
-                },
-            )
-            .expect("SetGoal"),
-        ),
-        p::Ask::SetGoal {
-            project: 3,
-            spec: Box::new([]),
-            executor: p::GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
-            budget: u64::MAX,
-            priority: u32::MAX,
-            deadline: Some(Wall::from_nanos(99)),
-        },
     )
 }
 fn answer_person_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
@@ -520,8 +447,8 @@ fn delete_note_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
                 w::DeleteNoteParts {
                     project: 3,
                     note: 9,
-                    scope: w::NoteScope::Goal(
-                        w::NoteScopeGoal::new(limits, w::NoteScopeGoalParts { project: 3, goal: 8 }).expect("scope"),
+                    scope: w::NoteScope::Task(
+                        w::NoteScopeTask::new(limits, w::NoteScopeTaskParts { project: 3, task: 8 }).expect("scope"),
                     ),
                     revision: revision(u64::from(u32::MAX)),
                 },

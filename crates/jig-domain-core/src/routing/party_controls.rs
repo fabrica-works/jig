@@ -145,7 +145,6 @@ pub(super) fn cancel_request(
         people::Ask::Cancel { reason, grace, .. } => (reason, grace),
         people::Ask::Compound { .. }
         | people::Ask::MarkSeen { .. }
-        | people::Ask::Close { .. }
         | people::Ask::Application { .. }
         | people::Ask::EditNote { .. }
         | people::Ask::MakeService { .. }
@@ -153,7 +152,6 @@ pub(super) fn cancel_request(
         | people::Ask::Create { .. }
         | people::Ask::Propose { .. }
         | people::Ask::Withdraw { .. }
-        | people::Ask::SetGoal { .. }
         | people::Ask::Stop { .. }
         | people::Ask::Release { .. }
         | people::Ask::TakePerson { .. }
@@ -165,10 +163,8 @@ pub(super) fn cancel_request(
         | people::Ask::ChangePolicy { .. }
         | people::Ask::SetPool { .. }
         | people::Ask::DecideEscalation { .. }
-        | people::Ask::StartChat { .. }
         | people::Ask::Say { .. }
         | people::Ask::AnswerQuestion { .. }
-        | people::Ask::Prioritise { .. }
         | people::Ask::Move { .. } => unreachable!("cancel route retains its ask"),
     };
     match admitted {
@@ -213,7 +209,6 @@ pub(super) fn release_request(
                 people::Ask::Release { revision, again, .. } => (revision, again),
                 people::Ask::Compound { .. }
                 | people::Ask::MarkSeen { .. }
-                | people::Ask::Close { .. }
                 | people::Ask::Application { .. }
                 | people::Ask::EditNote { .. }
                 | people::Ask::MakeService { .. }
@@ -221,7 +216,6 @@ pub(super) fn release_request(
                 | people::Ask::Create { .. }
                 | people::Ask::Propose { .. }
                 | people::Ask::Withdraw { .. }
-                | people::Ask::SetGoal { .. }
                 | people::Ask::Stop { .. }
                 | people::Ask::Cancel { .. }
                 | people::Ask::TakePerson { .. }
@@ -231,13 +225,11 @@ pub(super) fn release_request(
                 | people::Ask::DecideProposal { .. }
                 | people::Ask::Say { .. }
                 | people::Ask::AnswerQuestion { .. }
-                | people::Ask::Prioritise { .. }
                 | people::Ask::Amend { .. }
                 | people::Ask::SetRoles { .. }
                 | people::Ask::ChangePolicy { .. }
                 | people::Ask::SetPool { .. }
-                | people::Ask::DecideEscalation { .. }
-                | people::Ask::StartChat { .. } => unreachable!("release route owns its ask"),
+                | people::Ask::DecideEscalation { .. } => unreachable!("release route owns its ask"),
             };
             let message = match core.release_admit(task, revision, again) {
                 Ok(message) => message,
@@ -298,25 +290,6 @@ pub(super) fn answer_question_request(
         &env.limits,
         crate::PersonMessage { request, person, project, task, question: Some(question), words, at: env.wall },
     ) {
-        Ok(event) => work.push(Event::Tasks(event)),
-        Err(why) => {
-            work.push(Event::People(people::Event::Decided { request, outcome: people::Outcome::Refused(why) }));
-        }
-    }
-}
-
-#[expect(clippy::too_many_arguments, reason = "the route retains the admitted party and request fields")]
-pub(super) fn prioritise_request(
-    core: &mut Core,
-    env: &Env<Limits>,
-    work: &mut Queue<Event>,
-    request: Token,
-    person: u64,
-    project: u32,
-    role: Option<people::Role>,
-    goals: Box<[(u64, u32)]>,
-) {
-    match core.prioritise(request, person, project, role, goals, env.limits.tasks.tasks) {
         Ok(event) => work.push(Event::Tasks(event)),
         Err(why) => {
             work.push(Event::People(people::Event::Decided { request, outcome: people::Outcome::Refused(why) }));

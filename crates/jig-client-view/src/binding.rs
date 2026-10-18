@@ -137,6 +137,7 @@ impl JigBindings {
                         crate::action::Act::Edit { .. }
                         | crate::action::Act::Submit { .. }
                         | crate::action::Act::AmendRelease { .. }
+                        | crate::action::Act::CloseChat { .. }
                         | crate::action::Act::Intend { .. }
                         | crate::action::Act::Choose { .. }
                         | crate::action::Act::CannotDo
@@ -158,7 +159,7 @@ impl JigBindings {
                         | crate::action::Act::More { .. }
                         | crate::action::Act::FilterInbox { .. }
                         | crate::action::Act::OpenUpdates
-                        | crate::action::Act::StartChat { .. }
+                        | crate::action::Act::BeginConversation { .. }
                         | crate::action::Act::ProjectSettings { .. }
                         | crate::action::Act::ProjectServiceRole { .. }
                         | crate::action::Act::GoalForm { .. }

@@ -22,8 +22,6 @@ pub enum OutcomePhrase {
     Compound,
     /// The number of committed operations.
     Operations,
-    /// The chat closed saying.
-    Closing,
     /// The read position marked seen saying.
     MarkedSeen,
     /// The note edited saying.
@@ -32,10 +30,6 @@ pub enum OutcomePhrase {
     ServiceMade,
     /// The project adopted saying.
     Adopted,
-    /// The goal started saying.
-    GoalStarted,
-    /// The goal proposed saying.
-    GoalProposed,
     /// The task stopped saying.
     Stopped,
     /// The task cancelled saying.
@@ -56,8 +50,6 @@ pub enum OutcomePhrase {
     Said,
     /// The question answered saying.
     QuestionAnswered,
-    /// The goal priorities changed saying.
-    Prioritised,
     /// The task amended saying.
     Amended,
     /// The proposal admitted saying.
@@ -70,8 +62,6 @@ pub enum OutcomePhrase {
     PoolSet,
     /// The escalation decided saying.
     EscalationDecided,
-    /// The chat started saying.
-    Started,
     /// The accepted saying.
     Accepted,
     /// The rejected saying.
@@ -119,7 +109,7 @@ pub enum OutcomePhrase {
     RepliesThrough,
 }
 /// Every outcome phrase in stable owner order.
-pub const ALL: [OutcomePhrase; 55] = [
+pub const ALL: [OutcomePhrase; 50] = [
     OutcomePhrase::Created,
     OutcomePhrase::FirstTask,
     OutcomePhrase::LastTask,
@@ -127,13 +117,10 @@ pub const ALL: [OutcomePhrase; 55] = [
     OutcomePhrase::GivenAmount,
     OutcomePhrase::Compound,
     OutcomePhrase::Operations,
-    OutcomePhrase::Closing,
     OutcomePhrase::MarkedSeen,
     OutcomePhrase::NoteEdited,
     OutcomePhrase::ServiceMade,
     OutcomePhrase::Adopted,
-    OutcomePhrase::GoalStarted,
-    OutcomePhrase::GoalProposed,
     OutcomePhrase::Stopped,
     OutcomePhrase::Cancelled,
     OutcomePhrase::Released,
@@ -144,14 +131,12 @@ pub const ALL: [OutcomePhrase; 55] = [
     OutcomePhrase::ProposalDecided,
     OutcomePhrase::Said,
     OutcomePhrase::QuestionAnswered,
-    OutcomePhrase::Prioritised,
     OutcomePhrase::Amended,
     OutcomePhrase::Proposed,
     OutcomePhrase::RolesSet,
     OutcomePhrase::PolicyChanged,
     OutcomePhrase::PoolSet,
     OutcomePhrase::EscalationDecided,
-    OutcomePhrase::Started,
     OutcomePhrase::Accepted,
     OutcomePhrase::Rejected,
     OutcomePhrase::Passed,
@@ -188,13 +173,10 @@ impl OutcomePhrase {
             Self::GivenAmount => 6456,
             Self::Compound => 6450,
             Self::Operations => 6451,
-            Self::Closing => 6400,
             Self::MarkedSeen => 6401,
             Self::NoteEdited => 6402,
             Self::ServiceMade => 6403,
             Self::Adopted => 6404,
-            Self::GoalStarted => 6405,
-            Self::GoalProposed => 6406,
             Self::Stopped => 6407,
             Self::Cancelled => 6408,
             Self::Released => 6409,
@@ -205,14 +187,12 @@ impl OutcomePhrase {
             Self::ProposalDecided => 6414,
             Self::Said => 6415,
             Self::QuestionAnswered => 6416,
-            Self::Prioritised => 6417,
             Self::Amended => 6418,
             Self::Proposed => 6419,
             Self::RolesSet => 6420,
             Self::PolicyChanged => 6421,
             Self::PoolSet => 6422,
             Self::EscalationDecided => 6423,
-            Self::Started => 6424,
             Self::Accepted => 6425,
             Self::Rejected => 6426,
             Self::Passed => 6427,
@@ -265,13 +245,10 @@ impl OutcomePhrase {
             Self::At => Some(HoleKind::Wall),
             Self::Created
             | Self::Compound
-            | Self::Closing
             | Self::MarkedSeen
             | Self::NoteEdited
             | Self::ServiceMade
             | Self::Adopted
-            | Self::GoalStarted
-            | Self::GoalProposed
             | Self::Stopped
             | Self::Cancelled
             | Self::Released
@@ -282,14 +259,12 @@ impl OutcomePhrase {
             | Self::ProposalDecided
             | Self::Said
             | Self::QuestionAnswered
-            | Self::Prioritised
             | Self::Amended
             | Self::Proposed
             | Self::RolesSet
             | Self::PolicyChanged
             | Self::PoolSet
             | Self::EscalationDecided
-            | Self::Started
             | Self::Accepted
             | Self::Rejected
             | Self::Passed
@@ -325,13 +300,10 @@ pub fn english() -> Language {
             OutcomePhrase::GivenAmount => b"Amount given: ",
             OutcomePhrase::Compound => b"Operations committed",
             OutcomePhrase::Operations => b"Operations: ",
-            OutcomePhrase::Closing => b"Chat closed",
             OutcomePhrase::MarkedSeen => b"Read position marked seen",
             OutcomePhrase::NoteEdited => b"Note edited",
             OutcomePhrase::ServiceMade => b"Service made",
             OutcomePhrase::Adopted => b"Project adopted",
-            OutcomePhrase::GoalStarted => b"Goal started",
-            OutcomePhrase::GoalProposed => b"Goal proposed",
             OutcomePhrase::Stopped => b"Task stopped",
             OutcomePhrase::Cancelled => b"Task cancelled",
             OutcomePhrase::Released => b"Task released",
@@ -342,14 +314,12 @@ pub fn english() -> Language {
             OutcomePhrase::ProposalDecided => b"Proposal decided",
             OutcomePhrase::Said => b"Words admitted",
             OutcomePhrase::QuestionAnswered => b"Question answered",
-            OutcomePhrase::Prioritised => b"Goal priorities changed",
             OutcomePhrase::Amended => b"Task amended",
             OutcomePhrase::Proposed => b"Proposed",
             OutcomePhrase::RolesSet => b"Project roles set",
             OutcomePhrase::PolicyChanged => b"Project policy changed",
             OutcomePhrase::PoolSet => b"Person pool set",
             OutcomePhrase::EscalationDecided => b"Escalation decided",
-            OutcomePhrase::Started => b"Chat started",
             OutcomePhrase::Accepted => b"Accepted",
             OutcomePhrase::Rejected => b"Rejected",
             OutcomePhrase::Passed => b"Passed up",
