@@ -3,6 +3,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "testing/jig-client-fake-person-browser",
     "testing/jig-client-test-shell-web",
     "tests/client-browser",
     "tests/one-process",
@@ -175,6 +176,7 @@ jig-test-connector-world = { path = "tests/test-connector" }
 jig-test-domain = { path = "testing/jig-test-domain" }
 jig-client-test-domain = { path = "testing/jig-client-test-domain" }
 jig-client-test-kit = { path = "testing/jig-client-test-kit" }
+jig-client-fake-person-browser = { path = "testing/jig-client-fake-person-browser" }
 jig-client-test-view = { path = "testing/jig-client-test-view" }
 jig-conformance = { path = "testing/jig-conformance" }
 jig-fake-store = { path = "testing/jig-fake-store" }

@@ -1,0 +1,8 @@
+# Browser stories are ordinary Rust, driving one harness loop.
+disallowed-types = [
+    { path = "std::collections::HashMap", reason = "ordered maps" },
+    { path = "std::collections::HashSet", reason = "ordered sets" },
+]
+disallowed-methods = [
+    { path = "std::thread::spawn", reason = "one thread, one inbox" },
+]

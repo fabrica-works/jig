@@ -1,0 +1,22 @@
+[package]
+name = "jig-client-fake-person-browser"
+description = "Browser-shell and attack stories parameterized by application pages"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-fake-person-browser.workspace = true
+skein-fake-person.workspace = true
+skein-lib.workspace = true
+
+[lints.rust]
+unsafe_code = "forbid"
+elided_lifetimes_in_paths = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_panics_doc = "allow"
+missing_errors_doc = "allow"

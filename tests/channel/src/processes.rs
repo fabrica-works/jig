@@ -389,6 +389,10 @@ pub(crate) fn window_provider(scripts: Box<[skein_fake_llm_domain::api::Script]>
     let mut config = skein_llm_world::fake::config();
     config.too_long = 200;
     let mut protocol = skein_llm_world::fake::limits(&skein_llm_world::limits());
+    // This story checks resumed windows; tiny HTTP pieces only repeat the loop.
+    protocol.http.send = 4096;
+    protocol.http.read = 4096;
+    protocol.sse.chunk = 4096;
     protocol.documents.openai.request = 32_768;
     protocol.documents.openai.strings = 4096;
     protocol.documents.openai.tokens = 1024;
