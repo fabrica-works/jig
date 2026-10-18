@@ -5,6 +5,7 @@ use skein_fake_person_browser::{
 };
 use std::{
     fs,
+    net::TcpListener,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
 };
@@ -96,6 +97,35 @@ impl Tier {
         let value = configuration(scratch.path(), &bundle());
         private(&scratch.path().join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));
         Self { scratch }
+    }
+    #[must_use]
+    pub fn reserved(name: &str) -> Self {
+        let tier = Self::new(name);
+        let listener = TcpListener::bind("127.0.0.1:0").expect("reserve restart port");
+        let address = listener.local_addr().expect("restart address");
+        let path = tier.scratch.path().join("config.json");
+        let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("deployment")).expect("JSON");
+        value["application"]["server"]["listener"]["socket"] = serde_json::json!(address.to_string());
+        private(&path, &serde_json::to_vec(&value).expect("reserved deployment JSON"));
+        tier
+    }
+    #[must_use]
+    pub fn request_script(&self) -> skein_fake_person_browser::Script {
+        use skein_fake_person::{Find, Step};
+        use skein_fake_person_browser::{Script, Step as BrowserStep};
+        use skein_ui::Role;
+        Script::new(Box::new([
+            BrowserStep::Person(Step::Press { find: Find::named(Role::Link, b"Conversations") }),
+            BrowserStep::Person(Step::See {
+                find: Find::named(Role::TextArea, b"First words"),
+                within: skein_lib::Duration::from_secs(5),
+            }),
+            BrowserStep::Person(Step::Type {
+                find: Find::named(Role::TextArea, b"First words"),
+                words: b"Reload story".as_slice().into(),
+            }),
+            BrowserStep::Person(Step::Press { find: Find::named(Role::Button, b"Start a conversation") }),
+        ]))
     }
     #[must_use]
     pub fn setup(&self) -> Setup<'_> {

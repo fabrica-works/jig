@@ -13,3 +13,6 @@ jig-client-view.workspace = true
 jig-test-connector.workspace = true
 [lints]
 workspace = true
+
+[dev-dependencies]
+skein-ui.workspace = true

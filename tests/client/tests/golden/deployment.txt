@@ -25,7 +25,8 @@ Work:
   Go to a task:
     [5] Go to task number: (empty) (enter sends)
 Navigation:
-  [6] Family
+  [6] Conversations
+  [7] Family
 Deployment:
   ## Deployment
   Hosts:
@@ -36,11 +37,11 @@ Deployment:
         Slots used: 1
         Slots free: 1
         Task 9: Chat nine:
-          [7] Task 9: Chat nine
+          [8] Task 9: Chat nine
           Agent
           * Cannot show this part
         Task 9: Chat nine:
-          [8] Task 9: Chat nine
+          [9] Task 9: Chat nine
           Agent
           * Cannot show this part
         Refused
@@ -51,11 +52,11 @@ Deployment:
         Slots used: 1
         Slots free: 1
         Task 9: Chat nine:
-          [9] Task 9: Chat nine
+          [10] Task 9: Chat nine
           Agent
           * Cannot show this part
         Task 9: Chat nine:
-          [10] Task 9: Chat nine
+          [11] Task 9: Chat nine
           Agent
           * Cannot show this part
         Refused
@@ -65,40 +66,40 @@ Deployment:
       Unavailable
       aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       Task 9: Chat nine:
-        [11] Task 9: Chat nine
-        Agent
-        * Cannot show this part
-      Task 9: Chat nine:
         [12] Task 9: Chat nine
         Agent
         * Cannot show this part
-      Tasks waiting for this account
       Task 9: Chat nine:
         [13] Task 9: Chat nine
         Agent
         * Cannot show this part
+      Tasks waiting for this account
       Task 9: Chat nine:
         [14] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Task 9: Chat nine:
+        [15] Task 9: Chat nine
         Agent
         * Cannot show this part
     - LLM account 2
       Unavailable
       aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       Task 9: Chat nine:
-        [15] Task 9: Chat nine
-        Agent
-        * Cannot show this part
-      Task 9: Chat nine:
         [16] Task 9: Chat nine
         Agent
         * Cannot show this part
-      Tasks waiting for this account
       Task 9: Chat nine:
         [17] Task 9: Chat nine
         Agent
         * Cannot show this part
+      Tasks waiting for this account
       Task 9: Chat nine:
         [18] Task 9: Chat nine
+        Agent
+        * Cannot show this part
+      Task 9: Chat nine:
+        [19] Task 9: Chat nine
         Agent
         * Cannot show this part
   Capacity:

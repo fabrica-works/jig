@@ -27,10 +27,17 @@ fn build(limits: &Limits, seed: u64, unlinked: bool) -> Domain {
         jig_client::Client::new(&limits.client, rng.next_u64())
     }
     .expect("checked client capacities");
+    let mut navigation = jig_client_view::page::navigation::Navigation::new(limits.jig.navigation_entries);
+    navigation
+        .entries
+        .push(jig_client_view::page::navigation::Destination::Jig(jig_client_view::address::Address::Conversations {
+            project: None,
+        }))
+        .expect("root navigation has room for Conversations");
     Domain {
         jig: jig_client_view::Ui::new(
             &limits.jig,
-            jig_client_view::page::navigation::Navigation::new(limits.jig.navigation_entries),
+            navigation,
             jig_client_view::address::Address::Inbox { project: None },
             jig_client_view::page::Arrangement::none(),
         )

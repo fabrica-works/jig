@@ -25,18 +25,19 @@ Work:
   Go to a task:
     [5] Go to task number: (empty) (enter sends)
 Navigation:
-  [6] Family
+  [6] Conversations
+  [7] Family
 Inbox:
-  [7] All projects
-  [8] Project: First
-  [9] All kinds
-  [10] Question
-  [11] Proposal
-  [12] Escalation
-  [13] Person task
-  [14] Result
-  [15] Reply
-  [16] All goals
+  [8] All projects
+  [9] Project: First
+  [10] All kinds
+  [11] Question
+  [12] Proposal
+  [13] Escalation
+  [14] Person task
+  [15] Result
+  [16] Reply
+  [17] All goals
   4 need you
   2 updates not read
 Needs you:
@@ -58,14 +59,14 @@ Needs you:
         Funds 1; 1 left now, 0 after
         By party 7
         Waiting for party 7
-        [17] Accept
+        [18] Accept
   - Waiting 1000013153015 min
     - Escalation:
         ## Escalation
         In project 1
         * Open
         Task 9: Chat nine:
-          [18] Task 9: Chat nine
+          [19] Task 9: Chat nine
           Agent
           Held: stopped by Pat at 0
           Since 0
@@ -103,14 +104,14 @@ Needs you:
           Grants
           Allowed delegation executors
           Note resources
-        [19] Release
+        [20] Release
   - Waiting 1000013153015 min
     - Question:
         ## Question
         In project 1
         * Open
         Task 9: Chat nine:
-          [20] Task 9: Chat nine
+          [21] Task 9: Chat nine
           Agent
           * Cannot show this part
         Question from person 7
@@ -122,7 +123,7 @@ Needs you:
         In project 1
         * Open
         Task 10: Chat nine:
-          [21] Task 10: Chat nine
+          [22] Task 10: Chat nine
           Person
           * Cannot show this part
         By party 7
@@ -139,11 +140,11 @@ Updates:
         In project 1
         * Open
         Task 9: Chat nine:
-          [22] Task 9: Chat nine
+          [23] Task 9: Chat nine
           Agent
           * Cannot show this part
         Hello
-        [23] Open at first reply not read: 1
+        [24] Open at first reply not read: 1
   - New
     - Result:
         ## Result
@@ -151,7 +152,7 @@ Updates:
         * Open
         Task 11: Chat nine:
           Task 11: Chat nine:
-            [24] Task 11: Chat nine
+            [25] Task 11: Chat nine
             Agent
             * Cannot show this part
           Completed

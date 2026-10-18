@@ -25,23 +25,24 @@ Work:
   Go to a task:
     [5] Go to task number: (empty) (enter sends)
 Navigation:
-  [6] Family
+  [6] Conversations
+  [7] Family
 Task 9:
   - Task 9: Chat nine:
       ## Task 9: Chat nine
       * Open
       Task 9: Chat nine:
-        [7] Task 9: Chat nine
+        [8] Task 9: Chat nine
         Agent
         * Cannot show this part
-      [8] Write
+      [9] Write
   In project 1
   Priority 1
 Task 9:
-  [9] Overview
-  [10] Activity (current)
-  [11] History
-  [12] Budget and authority
+  [10] Overview
+  [11] Activity (current)
+  [12] History
+  [13] Budget and authority
 Activity:
   ## Activity
   Waiting for news
@@ -58,7 +59,7 @@ Activity:
               Using tool delegate
               Call completed
               Delegate ten
-              [13] Open input and result for delegate
+              [14] Open input and result for delegate
               - Proposal:
                   ## Proposal
                   * Open
@@ -74,7 +75,7 @@ Activity:
                   Funds 1; 1 left now, 0 after
                   By party 7
                   Waiting for party 7
-                  [14] Accept
+                  [15] Accept
           Input tokens: 1
           Output tokens: 1
           Cache tokens read: 0

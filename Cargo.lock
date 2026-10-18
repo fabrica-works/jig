@@ -508,6 +508,7 @@ dependencies = [
  "jig-client-view",
  "jig-test-connector",
  "skein-lib",
+ "skein-ui",
 ]
 
 [[package]]

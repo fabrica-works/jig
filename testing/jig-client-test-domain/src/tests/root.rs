@@ -1094,6 +1094,7 @@ fn whole_owner_parts_require_original_inner_identity_and_keep_unversioned_snapsh
 
 mod client;
 mod fixtures;
+mod navigation;
 use fixtures::{
     ask, confirm, drive, env, family_answer, family_request, limits, out_iter, resource_path, start, taken,
 };

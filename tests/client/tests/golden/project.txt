@@ -25,21 +25,22 @@ Work:
   Go to a task:
     [5] Go to task number: (empty) (enter sends)
 Navigation:
-  [6] Family
+  [6] Conversations
+  [7] Family
 Project:
   In project 1
   pppppppppppppppppppppppppppppppp
 pppppppppppppppppppppppppppppppp:
-  [7] Overview
-  [8] Goals
-  [9] Tasks
-  [10] Notes
-  [11] Settings (current)
-  [12] Resources
-  [13] Policy
-  [14] Roles and services
-  [15] Spend
-  [16] Recurring tasks
+  [8] Overview
+  [9] Goals
+  [10] Tasks
+  [11] Notes
+  [12] Settings (current)
+  [13] Resources
+  [14] Policy
+  [15] Roles and services
+  [16] Spend
+  [17] Recurring tasks
 Settings:
   ## Settings
   Resources:
@@ -103,12 +104,12 @@ Settings:
     Left: 1
     By party 7
     Task 9: Chat nine:
-      [17] Task 9: Chat nine
+      [18] Task 9: Chat nine
       Agent
       * Cannot show this part
     6
     Task 9: Chat nine:
-      [18] Task 9: Chat nine
+      [19] Task 9: Chat nine
       Agent
       * Cannot show this part
     5
@@ -118,7 +119,7 @@ Settings:
     ## Recurring tasks
     Chat nine:
       Task 9: Chat nine:
-        [19] Task 9: Chat nine
+        [20] Task 9: Chat nine
         Agent
         * Cannot show this part
       Recurring template 1
@@ -153,11 +154,11 @@ Settings:
       Period began at 0
       Next runs at 0
       Last batch period 2
-      [20] Task 8
-      [21] Task 9
+      [21] Task 8
+      [22] Task 9
     Chat nine:
       Task 9: Chat nine:
-        [22] Task 9: Chat nine
+        [23] Task 9: Chat nine
         Agent
         * Cannot show this part
       Recurring template 2
@@ -192,8 +193,8 @@ Settings:
       Period began at 0
       Next runs at 0
       Last batch period 2
-      [23] Task 8
-      [24] Task 9
+      [24] Task 8
+      [25] Task 9
   - Family item:
       * Unknown family object
       * Unknown family object

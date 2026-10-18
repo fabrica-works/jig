@@ -25,5 +25,6 @@ Work:
   Go to a task:
     [5] Go to task number: (empty) (enter sends)
 Navigation:
-  [6] Family
+  [6] Conversations
+  [7] Family
 Someone else's work: sign in as its owner to continue:
