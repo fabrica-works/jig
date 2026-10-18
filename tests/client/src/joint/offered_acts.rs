@@ -40,7 +40,8 @@ pub(super) fn task(world: &mut World<Test, Joint>, client: crate::ClientId, numb
         });
         assert_eq!(matches!(button, Found::Node(_)), actionable, "source act {act:?}");
         if offered.is_some() {
-            assert!(matches!(face.find(&Find::text(caption)), Found::Node(_)));
+            let caption = if actionable { Find::exactly_named(Role::Button, caption) } else { Find::text(caption) };
+            assert!(matches!(face.find(&caption), Found::Node(_)));
         }
     }
     // The card has no unrelated navigation controls; every button names one
@@ -106,7 +107,8 @@ pub(super) fn card(world: &mut World<Test, Joint>, client: crate::ClientId, key:
             "source act {act:?}"
         );
         if offered.is_some() {
-            assert!(matches!(face.find(&Find::text(caption)), Found::Node(_)));
+            let caption = if actionable { Find::exactly_named(Role::Button, caption) } else { Find::text(caption) };
+            assert!(matches!(face.find(&caption), Found::Node(_)));
         }
     }
     let composed = composed(source.as_slice());
