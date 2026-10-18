@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod bundle;
 mod host;
 pub use host::Host;
 const CONFIG_BYTES: u32 = 1 << 20;
@@ -243,6 +244,10 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String
     let mut service =
         service::startup(bytes, &files, agent.as_ref(), &seeds, runtime, Some(service::WorkerRuntime { roots }))
             .map_err(|why| format!("startup: {why:?}"))?;
+    if let Some(directory) = service.bundle_directory() {
+        let bundle = bundle::read(path(directory))?;
+        service.serve(bundle).map_err(|why| format!("serve bundle: {why:?}"))?;
+    }
     if let Some(engine) = engine {
         let root = skein_shell::make_root(path(&engine.deployment.directory), 0o700)
             .map_err(|errno| format!("deployment directory: errno {errno}"))?;

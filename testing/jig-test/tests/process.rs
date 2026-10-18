@@ -20,3 +20,17 @@ fn a_killed_jig_test_restarts_and_the_work_is_found() {
     assert_eq!(support::run(directory.path(), Script::answered_chat(b"Hello", support::ANSWER), Some(peer)), (1, 1));
     assert_eq!(support::run(directory.path(), Script::found_chat(support::ANSWER), None), (1, 0));
 }
+
+#[path = "support/browser.rs"]
+mod browser;
+#[test]
+fn jig_test_serves_its_bundle_s_page_under_the_reference_policy() {
+    let directory = support::scratch();
+    browser::configuration(directory.path(), &browser::fixture_bundle(directory.path()));
+    let mut binary = browser::start(directory.path());
+    let link = browser::printed_link_line(&mut binary);
+    let (status, headers, body) = browser::get(&link, "/tasks/7");
+    assert_eq!(status, 200);
+    assert_eq!(browser::field(&headers, "content-security-policy"), Some(browser::POLICY));
+    assert_eq!(body, browser::PAGE);
+}

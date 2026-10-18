@@ -44,3 +44,47 @@ fn a_secret_file_readable_by_others_refuses_the_start() {
     assert!(owned.is_empty(), "refusal happens before opening runtime descriptors");
     fs::remove_dir_all(directory).expect("scratch cleanup");
 }
+
+fn fixture_bundle(directory: &std::path::Path) {
+    fs::write(directory.join("index.html"), b"<!doctype html><title>t</title>").expect("page");
+    let digest = directory.join("0123456789abcdef");
+    fs::create_dir_all(digest.join("files")).expect("digest files");
+    fs::write(digest.join("boot.js"), b"boot();").expect("script");
+    fs::write(digest.join("files/robots.txt"), b"User-agent: *\nDisallow:\n").expect("root file");
+}
+#[test]
+fn a_bundle_directory_is_read_with_its_one_digest_directory() {
+    let directory = scratch("bundle-read");
+    fixture_bundle(&directory);
+    let bundle = super::bundle::read(&directory).expect("bundle read");
+    assert_eq!(bundle.page.as_ref(), b"<!doctype html><title>t</title>");
+    assert_eq!(bundle.etag.as_ref(), b"\"edaa28e315690734\"");
+    assert_eq!(bundle.digest.as_ref(), b"0123456789abcdef");
+    assert_eq!(bundle.files.len(), 2);
+    let script = bundle.files.get(b"boot.js".as_slice()).expect("script");
+    assert_eq!((script.kind, script.bytes.as_ref()), (b"text/javascript".as_slice(), b"boot();".as_slice()));
+    let robots = bundle.files.get(b"files/robots.txt".as_slice()).expect("root file");
+    assert_eq!(robots.bytes.as_ref(), b"User-agent: *\nDisallow:\n");
+    fs::remove_dir_all(directory).expect("scratch cleanup");
+}
+#[test]
+fn a_file_off_the_closed_list_refuses_the_bundle_naming_it() {
+    let directory = scratch("bundle-type");
+    fixture_bundle(&directory);
+    let file = directory.join("0123456789abcdef/private.exe");
+    fs::write(&file, b"not served").expect("unknown file");
+    let error = super::bundle::read(&directory).expect_err("closed list");
+    assert!(error.contains(file.to_str().expect("path")), "{error}");
+    assert!(error.contains("closed list"), "{error}");
+    fs::remove_dir_all(directory).expect("scratch cleanup");
+}
+#[test]
+fn a_second_digest_directory_refuses_the_bundle() {
+    let directory = scratch("bundle-digests");
+    fixture_bundle(&directory);
+    fs::create_dir(directory.join("fedcba9876543210")).expect("second digest");
+    let error = super::bundle::read(&directory).expect_err("one digest");
+    assert!(error.contains("digest directory"), "{error}");
+    assert!(error.contains(directory.to_str().expect("path")), "{error}");
+    fs::remove_dir_all(directory).expect("scratch cleanup");
+}
