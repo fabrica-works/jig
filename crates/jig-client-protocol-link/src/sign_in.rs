@@ -94,10 +94,16 @@ impl Link {
         let signing = {
             match kind {
                 ExchangeKind::SignIn => match w::SignInAnswer::decode(&self.limits.wire, &mut reader) {
-                    Ok(w::SignInAnswer::SignedIn(value)) if reader.remaining() == 0 && value.token().len() == 40 => {
+                    Ok(w::SignInAnswer::SignedIn(value))
+                        if reader.remaining() == 0
+                            && match value.token() {
+                                Some(token) => token.len() == 40,
+                                None => true,
+                            } =>
+                    {
                         let fields = value.into_parts();
                         self.end_sign_in(out);
-                        self.credential = Some(fields.token);
+                        self.credential = fields.token;
                         self.generation = self.generation.saturating_add(1);
                         Signing::SignedIn { party: fields.party }
                     }

@@ -275,7 +275,7 @@ pub fn signed_in(party: u64, token: &[u8; 40]) -> Box<[u8]> {
     let record = w::SignInAnswer::SignedIn(
         w::SignedIn::new(
             &limits().wire,
-            w::SignedInParts { token: skein_lib::Secret::new(Box::from(*token)), party, expires: 10 },
+            w::SignedInParts { token: Some(skein_lib::Secret::new(Box::from(*token))), party, expires: 10 },
         )
         .unwrap(),
     );

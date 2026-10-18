@@ -14,6 +14,7 @@ pub(crate) struct Call {
     pub requests: Queue<http::Request>,
     pub body_kind: http::Body,
     pub credential: Option<skein_lib::Secret>,
+    pub browser: bool,
     pub body: Intake,
     pub route: Route,
     pub response: Box<[u8]>,
@@ -30,6 +31,7 @@ impl Call {
             requests: Queue::with_capacity(8),
             body_kind: http::Body::None,
             credential: None,
+            browser: false,
             body: Intake::with_capacity(limits.body),
             route: Route::Missing,
             response: Box::new([]),
@@ -53,18 +55,30 @@ impl Call {
     }
 
     pub fn respond(&mut self, status: u16, body: Box<[u8]>, limits: &Limits) {
+        self.respond_with_cookie(status, body, None, limits);
+    }
+    pub fn respond_with_cookie(
+        &mut self,
+        status: u16,
+        body: Box<[u8]>,
+        cookie: Option<skein_http::Header>,
+        limits: &Limits,
+    ) {
         self.response = body;
         self.offset = 0;
         self.requests.push(http::Request::Discard);
+        let content = skein_http::Header {
+            name: bytes::copy_of(b"content-type"),
+            value: bytes::copy_of(b"application/octet-stream"),
+        };
+        let cache = skein_http::Header { name: bytes::copy_of(b"cache-control"), value: bytes::copy_of(b"no-store") };
+        let headers = match cookie {
+            Some(cookie) => Box::from([content, cache, cookie]),
+            None => Box::from([content, cache]),
+        };
         self.requests.push(http::Request::Respond(http::Response {
             status,
-            headers: Box::new([
-                skein_http::Header {
-                    name: bytes::copy_of(b"content-type"),
-                    value: bytes::copy_of(b"application/octet-stream"),
-                },
-                skein_http::Header { name: bytes::copy_of(b"cache-control"), value: bytes::copy_of(b"no-store") },
-            ]),
+            headers,
             body: http::Body::Length(u64::try_from(self.response.len()).expect("bounded response")),
             close: false,
         }));

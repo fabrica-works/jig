@@ -22,7 +22,7 @@ pub const MAX_OUT_UP: u32 = 3;
 pub const MAX_OUT_FIRE: u32 = 1;
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.wire.signed_in_token < 40
+    if limits.wire.signed_in_token_some < 40
         || limits.wire.made_service_credential < 40
         || limits.wire.link_sign_in_secret < 32
         || limits.identity_bytes < 8
@@ -43,7 +43,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         jig_client_protocol_wire::v8::KeyedAnswer::worst_case_bytes(&limits.wire)?,
         jig_client_protocol_wire::v8::ReadAnswer::worst_case_bytes(&limits.wire)?,
     );
-    let each = u64::from(limits.wire.signed_in_token).checked_add(32)?.checked_add(answer)?;
+    let each = u64::from(limits.wire.signed_in_token_some).checked_add(1)?.checked_add(32)?.checked_add(answer)?;
     Map::<Token, Exchange>::worst_case(limits.exchanges)?
         .checked_add(each.checked_mul(u64::from(limits.exchanges))?)?
         .checked_add(Map::<Token, Waiting>::worst_case(limits.exchanges.checked_add(limits.exchanges)?)?)?

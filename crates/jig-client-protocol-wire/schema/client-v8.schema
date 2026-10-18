@@ -10,7 +10,7 @@ record Served { owner: Owner first: u32 last: u32 }
 record NotServed { owner: Owner served: list 16 Served }
 enum KeyedAnswer { not_served: NotServed, final_answer: Owned, busy, not_ready, signed_out }
 record LinkSignIn { secret: bytes 64 }
-record SignedIn { token: secret 48 party: u64 expires: u64 }
+record SignedIn { token: option secret 48 party: u64 expires: u64 }
 enum SignInAnswer { signed_in: SignedIn, refused, not_ready }
 record SignOut {}
 enum SignOutAnswer { signed_out, not_ready }

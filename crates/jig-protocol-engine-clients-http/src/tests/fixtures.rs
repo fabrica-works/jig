@@ -159,3 +159,47 @@ fn append(out: &mut List<u8>, bytes: &[u8]) {
         out.push(*byte).expect("bounded output");
     }
 }
+
+pub const TOKEN: [u8; 40] = [7; 40];
+pub const PARTY: u64 = 7;
+pub const IN_A_DAY: u64 = 86_400_000_000_000;
+pub const COOKIE_ON_LOOPBACK: &[u8] = b"jig-sign-in=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=86400";
+pub const COOKIE_SECURE: &[u8] = b"jig-sign-in=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=86400; Secure";
+pub const COOKIE_CLEARED: &[u8] = b"jig-sign-in=; Path=/jig; HttpOnly; SameSite=Strict; Max-Age=0";
+pub fn browser_header() -> [skein_http::Header; 1] {
+    [skein_http::Header { name: Box::from(b"jig-client".as_slice()), value: Box::from(b"browser".as_slice()) }]
+}
+pub fn browser() -> [skein_http::Header; 2] {
+    let [header] = browser_header();
+    [header, cookie_header()]
+}
+pub fn cookie_header() -> skein_http::Header {
+    skein_http::Header {
+        name: Box::from(b"cookie".as_slice()),
+        value: Box::from(
+            b"other=kept; jig-sign-in=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBw; after=kept".as_slice(),
+        ),
+    }
+}
+pub fn signed_in_reply(token: &[u8; 40], expires: u64) -> kit::Reply {
+    use jig_client_protocol_wire::v8 as w;
+    let answer = w::SignInAnswer::SignedIn(
+        w::SignedIn::new(
+            &w::CEILINGS,
+            w::SignedInParts { token: Some(Secret::new(Box::new(*token))), party: PARTY, expires },
+        )
+        .expect("signed in"),
+    );
+    let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("sign-in size"));
+    answer.encode(&mut bytes).expect("sign in");
+    kit::Reply::Record(bytes.finish())
+}
+pub fn signed_in(bytes: &[u8]) -> jig_client_protocol_wire::v8::SignedIn {
+    use jig_client_protocol_wire::v8 as w;
+    let w::SignInAnswer::SignedIn(value) =
+        w::SignInAnswer::decode(&w::CEILINGS, &mut skein_lib::Reader::new(bytes)).expect("sign-in answer")
+    else {
+        panic!("signed in")
+    };
+    value
+}

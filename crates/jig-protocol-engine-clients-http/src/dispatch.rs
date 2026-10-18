@@ -1,5 +1,6 @@
 //! Method and route dispatch (protocol/client.md, 17.1).
 use alloc::boxed::Box;
+use jig_client_protocol_wire::v8 as w;
 use jig_protocol_engine_clients::Message;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Route {
@@ -48,4 +49,36 @@ pub(crate) fn message(route: Route, body: Box<[u8]>) -> Option<Message> {
         Route::Gone => Message::Gone(body),
         Route::Stream | Route::Missing => return None,
     })
+}
+
+pub(crate) fn reply(
+    settings: &crate::Settings,
+    call: &crate::call::Call,
+    wall: skein_lib::Wall,
+    body: Box<[u8]>,
+) -> (Box<[u8]>, Option<skein_http::Header>) {
+    if !call.browser {
+        return (body, None);
+    }
+    if call.route == Route::SignOut {
+        return (body, Some(crate::cleared(settings)));
+    }
+    if call.route != Route::Link && call.route != Route::Service {
+        return (body, None);
+    }
+    let mut reader = skein_lib::Reader::new(&body);
+    let Ok(w::SignInAnswer::SignedIn(value)) = w::SignInAnswer::decode(&w::CEILINGS, &mut reader) else {
+        return (body, None);
+    };
+    if reader.remaining() != 0 {
+        return (body, None);
+    }
+    let mut parts = value.into_parts();
+    let Some(credential) = parts.token.take() else { return (body, None) };
+    let life = skein_lib::Duration::from_nanos(parts.expires.saturating_sub(wall.as_nanos()));
+    let cookie = crate::cookie(settings, &credential, life);
+    let answer = w::SignInAnswer::SignedIn(w::SignedIn::new(&w::CEILINGS, parts).expect("token removed"));
+    let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("short sign-in"));
+    answer.encode(&mut bytes).expect("measured answer");
+    (bytes.finish(), Some(cookie))
 }

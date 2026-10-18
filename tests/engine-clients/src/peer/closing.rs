@@ -108,7 +108,8 @@ impl Peer {
         let token = self.sign_in_answer(socket);
         let mut bearer = Writer::new(61);
         bearer.put(b"Bearer ").expect("prefix");
-        base64::encode(Alphabet::Url, token.token().expose(), &mut bearer).expect("bearer");
+        base64::encode(Alphabet::Url, token.token().as_ref().expect("native token").expose(), &mut bearer)
+            .expect("bearer");
         self.bearer = Some(bearer.finish());
     }
 }

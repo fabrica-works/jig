@@ -174,7 +174,7 @@ impl Wire {
                 Some(Kind::SignIn) => {
                     match w::SignInAnswer::decode(&w::CEILINGS, &mut Reader::new(message)).expect("sign-in bytes") {
                         w::SignInAnswer::SignedIn(value) => {
-                            self.credential = Some(value.token().clone());
+                            self.credential.clone_from(value.token());
                             vec![Received::SignedIn { person: value.party() }]
                         }
                         w::SignInAnswer::Refused | w::SignInAnswer::NotReady => vec![],

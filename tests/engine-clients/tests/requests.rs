@@ -14,7 +14,7 @@ fn bearer(peer: &mut Peer, sign_in: u64, person: u64) -> Box<[u8]> {
     let token = peer.sign_in_answer(exchange);
     let mut out = Writer::new(61);
     out.put(b"Bearer ").expect("prefix");
-    base64::encode(Alphabet::Url, token.token().expose(), &mut out).expect("bearer");
+    base64::encode(Alphabet::Url, token.token().as_ref().expect("native token").expose(), &mut out).expect("bearer");
     out.finish()
 }
 fn request() -> Box<[u8]> {

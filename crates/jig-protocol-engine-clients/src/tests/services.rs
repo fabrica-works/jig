@@ -67,8 +67,8 @@ fn a_service_signs_in_with_its_credential_and_exchanges_with_its_sign_in() {
     exchange.component.down(&exchange.env, Event::Secrets(SecretsAnswer::Kept { owner: who }), &mut exchange.out);
     let answer = exchange.signed_in_answer(owner);
     assert_eq!(answer.party(), f::SERVICE);
-    assert_eq!(answer.token().expose()[..8], f::NUMBER.to_be_bytes());
-    exchange.token = answer.token().expose().into();
+    assert_eq!(answer.token().as_ref().expect("native token").expose()[..8], f::NUMBER.to_be_bytes());
+    exchange.token = answer.token().as_ref().expect("native token").expose().into();
     let (request_owner, to) = exchange.ask();
     exchange.reply(to, people::Reply::Outcome(people::Outcome::Said { task: 8, message: 9 }));
     assert_eq!(exchange.final_answer(request_owner), f::started());

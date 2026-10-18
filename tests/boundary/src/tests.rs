@@ -257,5 +257,5 @@ fn engine_http_links_only_its_component_and_foundation() {
     assert_eq!(selected.len(), 1, "one engine HTTP mapping");
     let mut dependencies = selected[0].dependencies.clone();
     dependencies.sort();
-    assert_eq!(dependencies, ["jig-protocol-engine-clients", "skein-http", "skein-lib"]);
+    assert_eq!(dependencies, ["jig-client-protocol-wire", "jig-protocol-engine-clients", "skein-http", "skein-lib"]);
 }

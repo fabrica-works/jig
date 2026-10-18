@@ -60,7 +60,7 @@ impl Component {
                 } else {
                     let value = w::SignedIn::new(
                         &env.limits.wire,
-                        w::SignedInParts { token, party: person, expires: expires.as_nanos() },
+                        w::SignedInParts { token: Some(token), party: person, expires: expires.as_nanos() },
                     )
                     .expect("40-byte token admitted");
                     sign_in::Answer::SignedIn(value)

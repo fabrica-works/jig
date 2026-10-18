@@ -93,7 +93,12 @@ pub fn signed_in(peer: &mut Peer) -> Box<[u8]> {
     let answer = peer.sign_in_answer(exchange);
     let mut out = skein_lib::Writer::new(61);
     out.put(b"Bearer ").expect("prefix");
-    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, answer.token().expose(), &mut out).expect("bearer");
+    skein_lib::base64::encode(
+        skein_lib::base64::Alphabet::Url,
+        answer.token().as_ref().expect("native token").expose(),
+        &mut out,
+    )
+    .expect("bearer");
     out.finish()
 }
 #[must_use]

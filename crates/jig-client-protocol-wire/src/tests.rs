@@ -40,9 +40,9 @@ fn each_answer_kind_round_trips_unchanged() {
 
 fn a_bearer_token_past_its_bound_is_refused() {
     let limits = fixtures::limits();
-    let token = fixtures::bytes(limits.signed_in_token.checked_add(1).expect("small bound"));
+    let token = fixtures::bytes(limits.signed_in_token_some.checked_add(1).expect("small bound"));
     assert_eq!(
-        SignedIn::new(&limits, SignedInParts { token: skein_lib::Secret::new(token), party: 17, expires: 29 }),
+        SignedIn::new(&limits, SignedInParts { token: Some(skein_lib::Secret::new(token)), party: 17, expires: 29 }),
         Err(Problem { path: Path::SignedInToken, reason: skein_codec::Reason::Bound })
     );
 }

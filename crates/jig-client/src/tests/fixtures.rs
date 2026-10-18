@@ -239,7 +239,7 @@ pub fn signed_in(credential: &[u8; 40]) -> Box<[u8]> {
     let record = w::SignInAnswer::SignedIn(
         w::SignedIn::new(
             &w::CEILINGS,
-            w::SignedInParts { token: self::credential(credential), party: PARTY, expires: 10 },
+            w::SignedInParts { token: Some(self::credential(credential)), party: PARTY, expires: 10 },
         )
         .unwrap(),
     );

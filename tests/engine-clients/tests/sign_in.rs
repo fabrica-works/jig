@@ -41,7 +41,9 @@ fn the_token_leaves_only_after_its_digest_is_kept() {
     let answer = peer.sign_in_answer(exchange);
     assert_eq!(answer.party(), fixtures::FIRST_PERSON);
     assert_eq!(
-        u64::from_be_bytes(answer.token().expose()[..8].try_into().expect("sign-in number")),
+        u64::from_be_bytes(
+            answer.token().as_ref().expect("native token").expose()[..8].try_into().expect("sign-in number")
+        ),
         fixtures::FIRST_SIGN_IN
     );
 }

@@ -8,6 +8,7 @@ use skein_http::server as http;
 use skein_lib::{Env, Map, Queue, Secret, Time, Token};
 mod call;
 mod credential;
+pub use credential::{cleared, cookie};
 mod dispatch;
 mod stream;
 #[derive(Debug)]
@@ -51,14 +52,26 @@ impl Mount {
                 let mut value = call::Call::new(call, &env.limits);
                 value.route = dispatch::route(&self.settings.prefix, &head);
                 value.body_kind = head.body;
-                value.credential = credential::read(&head);
+                value.browser = head.header(b"jig-client") == Some(b"browser");
+                let mut forbidden = false;
+                value.credential = match credential::read(&head) {
+                    credential::Read::Bearer(secret) => Some(secret),
+                    credential::Read::Cookie(secret) => {
+                        forbidden = !value.browser;
+                        Some(secret)
+                    }
+                    credential::Read::None => None,
+                };
                 let mut streams = 0_u32;
                 for (_, call) in &self.calls {
                     if call.streaming {
                         streams = streams.saturating_add(1);
                     }
                 }
-                if value.route == dispatch::Route::Stream && streams >= env.limits.streams {
+                if forbidden {
+                    value.route = dispatch::Route::Missing;
+                    value.respond(403, Box::new([]), &env.limits);
+                } else if value.route == dispatch::Route::Stream && streams >= env.limits.streams {
                     value.route = dispatch::Route::Missing;
                     value.respond(409, Box::new([]), &env.limits);
                 } else if value.route == dispatch::Route::Missing {
@@ -115,7 +128,9 @@ impl Mount {
                     kit::Reply::NotARecord => (400, Box::new([])),
                     kit::Reply::Conflict => (409, Box::new([])),
                 };
-                call.respond(status, body, &env.limits);
+                let (body, cookie) =
+                    if status == 200 { dispatch::reply(&self.settings, call, env.wall, body) } else { (body, None) };
+                call.respond_with_cookie(status, body, cookie, &env.limits);
             }
             kit::ToTransport::Streamed { message, .. } => call.stream(env, message),
             kit::ToTransport::StreamEnded { why, .. } => call.end(env, why),

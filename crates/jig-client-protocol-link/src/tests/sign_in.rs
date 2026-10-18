@@ -97,3 +97,21 @@ fn an_old_sign_out_cannot_end_a_new_held_credential() {
         assert_eq!(h.link.credential(), Some(&Secret::new(Box::new(NEW_CREDENTIAL))), "{label}");
     }
 }
+
+#[test]
+fn a_sign_in_answer_with_no_token_leaves_none_held() {
+    let mut h = Harness::new(&limits());
+    assert_eq!(h.sign_in(held()), None);
+    let generation = h.link.generation;
+    let exchange = h.sign_in(With::Link(Secret::new(Box::new(LINK_SECRET)))).expect("sign-in exchange");
+    let answer = w::SignInAnswer::SignedIn(
+        w::SignedIn::new(&limits().wire, w::SignedInParts { token: None, party: PARTY, expires: 10 })
+            .expect("transport credential"),
+    );
+    let mut bytes = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("short sign-in"));
+    answer.encode(&mut bytes).expect("measured sign-in");
+    h.answer(exchange, &bytes.finish());
+    assert!(h.link.credential().is_none());
+    assert_eq!(h.link.generation, generation.checked_add(1).expect("next generation"));
+    assert!(h.has(&Request::Signing { signing: Signing::SignedIn { party: PARTY } }));
+}
