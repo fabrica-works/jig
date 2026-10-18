@@ -17,7 +17,7 @@ const HOST_BYTES: u32 = 64;
 #[derive(Debug)]
 pub(super) struct Clients {
     component: kit::Component,
-    server: crate::server::Server,
+    pub(super) server: crate::server::Server,
     mount: http::Mount,
     mount_env: Env<http::Limits>,
     mount_out: Queue<http::Request>,
@@ -682,6 +682,6 @@ fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
     text.meet(skein_lib::stream::Read::Fill(text.len()))
 }
 
-fn http_settings() -> http::Settings {
+pub(super) fn http_settings() -> http::Settings {
     http::Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }
 }

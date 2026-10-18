@@ -1,8 +1,24 @@
 //! The application's listener and HTTP connections (service.md, 2).
+use alloc::boxed::Box;
 use core::net::SocketAddr;
 use skein_http::server as http;
 use skein_io as io;
 use skein_lib::{Duration, Env, Map, Queue, Time, Token, Wall, stream::Down};
+mod bundle;
+pub mod policy;
+pub use bundle::{Bundle, File, kind};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Which part answers a request head (protocol/browser.md, 12).
+pub enum Answer {
+    Mount,
+    File,
+    Page,
+    NotModified,
+    Root,
+    NotFound,
+    NotAllowed,
+}
 
 const LISTENER: Token = Token::new(0);
 #[derive(Clone, Copy, Debug)]
@@ -25,6 +41,7 @@ struct Connection {
     requests: Queue<http::Request>,
     below: Queue<Down>,
     call: Option<Token>,
+    reply: Option<bundle::Reply>,
     reuse: Option<http::Reuse>,
     closing: bool,
     draining: bool,
@@ -40,6 +57,7 @@ enum Phase {
 #[derive(Debug)]
 pub struct Server {
     address: io::Addr,
+    bundle: Option<Bundle>,
     listener: Option<Token>,
     listening: bool,
     starting: bool,
@@ -53,6 +71,7 @@ impl Server {
     pub fn new(listener: io::Addr, limits: &Limits) -> Self {
         Self {
             address: listener,
+            bundle: None,
             listener: None,
             listening: true,
             starting: true,
@@ -61,6 +80,14 @@ impl Server {
             next: 1,
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
         }
+    }
+    /// The bundle the startup read; none serves no browser.
+    pub fn serve(&mut self, bundle: Bundle) {
+        self.bundle = Some(bundle);
+    }
+    #[must_use]
+    pub fn route(&self, head: &http::Call) -> Answer {
+        bundle::route(self.bundle.as_ref(), head)
     }
     #[must_use]
     pub fn listening(&self) -> Option<SocketAddr> {
@@ -112,6 +139,7 @@ impl Server {
                                 requests,
                                 below: Queue::with_capacity(8),
                                 call: None,
+                                reply: None,
                                 reuse: None,
                                 closing: false,
                                 draining: false,
@@ -136,6 +164,7 @@ impl Server {
                     self.listener = None;
                 }
                 if let Some(connection) = self.connections.remove(&owner)
+                    && connection.reply.is_none()
                     && let Some(call) = connection.call
                 {
                     out.push(Routed::Http { call, event: http::Event::Closed });
@@ -168,7 +197,10 @@ impl Server {
         }
         None
     }
-    pub fn answer(&mut self, call: Token, request: http::Request, out: &mut Queue<Routed>) {
+    pub fn answer(&mut self, call: Token, mut request: http::Request, out: &mut Queue<Routed>) {
+        if let http::Request::Respond(response) = &mut request {
+            policy::add(response);
+        }
         if let http::Request::Next = request {
             self.done(call, out);
             return;
@@ -185,6 +217,7 @@ impl Server {
         if let Some(owner) = self.owner(call) {
             let connection = self.connections.get_mut(&owner).expect("call owner");
             connection.call = None;
+            connection.reply = None;
             if connection.reuse.take() == Some(http::Reuse::Keep) && self.phase < Phase::Closing {
                 connection.requests.push(http::Request::Next);
             } else {
@@ -246,6 +279,45 @@ impl Server {
             end(self.connections.get_mut(&owner).expect("due connection"), false, out);
         }
     }
+    fn event(&mut self, owner: Token, call: Token, event: http::Event, out: &mut Queue<Routed>) {
+        if let http::Event::Call(head) = event {
+            let answer = self.route(&head);
+            let connection = self.connections.get_mut(&owner).expect("call owner");
+            connection.call = Some(call);
+            if answer == Answer::Mount {
+                out.push(Routed::Call { call, head });
+            } else {
+                bundle::start(self.bundle.as_ref(), &head, answer, connection, self.env.limits.http.send);
+            }
+            return;
+        }
+        let connection = self.connections.get_mut(&owner).expect("event owner");
+        if let http::Event::Done(reuse) = &event {
+            connection.reuse = Some(*reuse);
+        }
+        if connection.reply.is_some() {
+            match event {
+                http::Event::Reply(skein_lib::stream::Up::Room) => {
+                    bundle::send(self.bundle.as_ref().expect("body's bundle"), connection, self.env.limits.http.send);
+                }
+                http::Event::Done(_) | http::Event::Ended => {
+                    let call = connection.call.expect("own call");
+                    self.done(call, out);
+                }
+                http::Event::Refused(_)
+                | http::Event::Failed(_)
+                | http::Event::Closed
+                | http::Event::Reply(skein_lib::stream::Up::Failed(_))
+                | http::Event::Body(skein_lib::stream::Up::Failed(_)) => end(connection, false, out),
+                http::Event::Body(_) | http::Event::Reply(_) => {}
+                http::Event::Call(_) => unreachable!("head handled above"),
+            }
+        } else if let Some(call) = connection.call {
+            out.push(Routed::Http { call, event });
+        } else {
+            end(connection, false, out);
+        }
+    }
     /// Runs one queued HTTP transition, or one shutdown transition.
     pub fn advance(&mut self, out: &mut Queue<Routed>) -> bool {
         if self.starting {
@@ -276,28 +348,7 @@ impl Server {
         } else if let Some(request) = connection.requests.pop() {
             http::down(&mut connection.http, &env, request, &mut connection.events, &mut connection.below);
         } else if let Some(event) = connection.events.pop() {
-            match event {
-                http::Event::Call(head) => {
-                    connection.call = Some(call);
-                    out.push(Routed::Call { call, head });
-                }
-                event @ (http::Event::Ended
-                | http::Event::Body(_)
-                | http::Event::Reply(_)
-                | http::Event::Refused(_)
-                | http::Event::Done(_)
-                | http::Event::Failed(_)
-                | http::Event::Closed) => {
-                    if let http::Event::Done(reuse) = &event {
-                        connection.reuse = Some(*reuse);
-                    }
-                    if let Some(call) = connection.call {
-                        out.push(Routed::Http { call, event });
-                    } else {
-                        end(connection, false, out);
-                    }
-                }
-            }
+            self.event(owner, call, event, out);
         }
         true
     }
@@ -305,6 +356,7 @@ impl Server {
 fn end(connection: &mut Connection, drain: bool, out: &mut Queue<Routed>) {
     if !connection.closing || (connection.draining && !drain) {
         connection.closing = true;
+        connection.reply = None;
         connection.draining = drain;
         connection.events = Queue::with_capacity(8);
         connection.requests = Queue::with_capacity(8);
@@ -321,12 +373,20 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.connections == 0 || limits.stall == Duration::ZERO {
         return None;
     }
-    Map::<Token, Connection>::worst_case(limits.connections)?.checked_add(
-        skein_http::server::worst_case(&limits.http)?
-            .checked_add(Queue::<http::Event>::worst_case(8)?)?
-            .checked_add(Queue::<http::Request>::worst_case(8)?)?
-            .checked_add(Queue::<Down>::worst_case(8)?)?
-            .checked_add(u64::from(limits.http.read))?
-            .checked_mul(u64::from(limits.connections))?,
-    )
+    // One bounded bundle (16 MiB, 128 names of 1024 bytes), shared by replies.
+    Map::<Token, Connection>::worst_case(limits.connections)?
+        .checked_add(16 << 20)?
+        .checked_add(Map::<Box<[u8]>, File>::worst_case(128)?)?
+        .checked_add(128 * 1024 + 34)?
+        .checked_add(
+            skein_http::server::worst_case(&limits.http)?
+                .checked_add(Queue::<http::Event>::worst_case(8)?)?
+                .checked_add(Queue::<http::Request>::worst_case(8)?)?
+                .checked_add(Queue::<Down>::worst_case(8)?)?
+                .checked_add(u64::from(limits.http.read))?
+                .checked_add(u64::from(limits.http.head))?
+                .checked_add(u64::from(limits.http.send))?
+                .checked_add(u64::from(limits.http.response))?
+                .checked_mul(u64::from(limits.connections))?,
+        )
 }

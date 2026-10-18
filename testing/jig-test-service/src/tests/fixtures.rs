@@ -719,3 +719,6 @@ pub fn paths(problems: &jig_protocol_config::Problems) -> Box<[jig_protocol_conf
 pub fn with_server_listener(listener: &[u8]) -> Box<[u8]> {
     with(&engine_document(), br#"{"socket":"127.0.0.1:7100"}"#, listener)
 }
+
+mod bundle;
+pub use bundle::{POLICY_FIELDS, answer, bundle, head, native_head, serving, wire_response};

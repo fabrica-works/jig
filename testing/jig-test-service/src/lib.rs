@@ -32,6 +32,10 @@ use skein_io::{
 use skein_lib::{Env, List, Queue, Time, Token, Wall};
 pub use startup::{named, startup};
 
+/// No application server is available, or its loop has already started.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Refused;
+
 /// The worker's parsed agent values are supplied by its caller.
 #[derive(Debug)]
 pub struct Agent {
@@ -43,6 +47,7 @@ pub struct Agent {
 
 #[expect(missing_debug_implementations, reason = "the service owns protocol account credentials")]
 pub struct Service {
+    started: bool,
     bundle_directory: Option<Box<[u8]>>,
     io: Io,
     io_env: Env<io::Limits>,
@@ -63,6 +68,7 @@ pub struct Service {
 impl Service {
     fn new(engine: Option<Engine>, workers: List<Worker>, limits: io::Limits, bytes: u64, queue: u32) -> Self {
         Self {
+            started: false,
             bundle_directory: None,
             io: Io::new(&limits),
             io_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
@@ -92,6 +98,16 @@ impl Service {
     #[must_use]
     pub fn bundle_directory(&self) -> Option<&[u8]> {
         self.bundle_directory.as_deref()
+    }
+    /// Give the application server its browser bundle before driving the loop.
+    pub fn serve(&mut self, bundle: server::Bundle) -> Result<(), Refused> {
+        if self.started {
+            return Err(Refused);
+        }
+        let engine = self.engine.as_mut().ok_or(Refused)?;
+        let clients = engine.clients.as_mut().ok_or(Refused)?;
+        clients.server.serve(bundle);
+        Ok(())
     }
     /// Adopt the deployment directory opened by the caller before driving startup.
     pub fn adopt_store(&mut self, root: Fd, effective_user: u32) -> Result<(), Fd> {
@@ -413,6 +429,7 @@ impl Service {
 }
 
 pub fn iterate(service: &mut Service, now: Time, wall: Wall) {
+    service.started = true;
     service.clock(now, wall);
     for _ in 0..service.io_env.limits.sockets.checked_add(service.io_env.limits.refusals).expect("io entries") {
         if !service.io.is_ready() || !service.room(io::MAX_OUT_RESUME) {
