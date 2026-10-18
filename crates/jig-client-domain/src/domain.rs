@@ -154,7 +154,11 @@ impl Domain {
             return;
         }
         let mut shared = None;
+        let mut reserved = 1;
         for (id, w) in &self.watches {
+            if w.own {
+                reserved = 0;
+            }
             if !w.closing && w.subject == subject {
                 shared = Some(*id);
             }
@@ -178,7 +182,7 @@ impl Domain {
         let id = match shared {
             Some(id) => id,
             None => {
-                if self.watches.len() == env.limits.watches {
+                if self.watches.len() >= env.limits.watches.checked_sub(reserved).expect("room for own watch") {
                     tell(out, Told::Ended { handle, why: Why::Limit });
                     return;
                 }
@@ -216,6 +220,7 @@ impl Domain {
                     latest: None,
                     state: State::Opening,
                     closing: false,
+                    answered: false,
                     own,
                     until: None,
                     span: None,
@@ -244,7 +249,11 @@ impl Domain {
         w.closing = true;
         w.until = None;
         match w.name {
-            Some(watch) => down(out, Down::Close { watch }),
+            Some(watch) => {
+                if w.answered {
+                    down(out, Down::Close { watch });
+                }
+            }
             None => {
                 self.watches.remove(&id);
             }

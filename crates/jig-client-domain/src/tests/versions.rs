@@ -79,6 +79,7 @@ fn a_family_owner_not_served_ends_its_watches_not_served() {
         window: Window { rows: 3, after: None },
         record: record(),
     });
+    client.step(Event::Up { up: Up::Watched { watch, event: contract::WatchEvent::Opened } });
     client.downs();
     client.told();
     served(&mut client, Some(RANGE));

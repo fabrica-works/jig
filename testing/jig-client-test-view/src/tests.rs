@@ -20,6 +20,21 @@ use skein_ui::{NodeId, Patch, Role};
 use skein_lib::{Duration, List, Queue, Token, Wall};
 use transport::limits;
 
+fn open_families(root: &mut Domain, rows: &[Request]) {
+    for row in rows {
+        if let Request::First(first::Out::Open { watch, .. }) = row {
+            native_hold::drive(
+                root,
+                Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Watched { watch: *watch, event: WatchEvent::Opened },
+                    },
+                },
+            );
+        }
+    }
+}
+
 fn drive(root: &mut Domain, event: Event) -> Vec<Request> {
     transport::drive(root, event, &limits())
 }

@@ -201,7 +201,6 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: Told, out: &mut Q
             end: match why {
                 Why::Unknown => first::WatchEnd::Unknown,
                 Why::NotAllowed => first::WatchEnd::NotAllowed,
-                Why::Busy => first::WatchEnd::Busy,
                 Why::SubjectEnded => first::WatchEnd::SubjectEnded,
                 Why::SignedOut => first::WatchEnd::SignedOut,
                 Why::NotServed => first::WatchEnd::Unsupported,

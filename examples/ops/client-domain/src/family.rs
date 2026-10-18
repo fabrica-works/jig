@@ -142,7 +142,6 @@ pub(crate) mod infrastructure {
                 end: match why {
                     jig_client::Why::Unknown | jig_client::Why::NotServed => d::WatchEnd::Unknown,
                     jig_client::Why::NotAllowed => d::WatchEnd::NotAllowed,
-                    jig_client::Why::Busy => d::WatchEnd::Busy,
                     jig_client::Why::SubjectEnded => d::WatchEnd::SubjectEnded,
                     jig_client::Why::SignedOut => d::WatchEnd::SignedOut,
                     jig_client::Why::Limit => d::WatchEnd::Closed,
@@ -268,7 +267,6 @@ pub(crate) mod observability {
                 end: match why {
                     jig_client::Why::Unknown | jig_client::Why::NotServed => d::WatchEnd::Unknown,
                     jig_client::Why::NotAllowed => d::WatchEnd::NotAllowed,
-                    jig_client::Why::Busy => d::WatchEnd::Busy,
                     jig_client::Why::SubjectEnded => d::WatchEnd::SubjectEnded,
                     jig_client::Why::SignedOut => d::WatchEnd::SignedOut,
                     jig_client::Why::Limit => d::WatchEnd::Closed,

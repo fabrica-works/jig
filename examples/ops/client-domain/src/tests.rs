@@ -164,6 +164,21 @@ fn environment(revision: u64) -> infrastructure::Document {
         }),
     })
 }
+fn open_families(root: &mut Domain, rows: &[Request]) {
+    for row in rows {
+        let watch = match row {
+            Request::Infrastructure(infrastructure::Out::Open { watch, .. })
+            | Request::Observability(crate::observability::Out::Open { watch, .. }) => *watch,
+            _ => continue,
+        };
+        drive(
+            root,
+            Event::Client {
+                event: jig_client::Event::Up { up: jig_client::Up::Watched { watch, event: WatchEvent::Opened } },
+            },
+        );
+    }
+}
 fn family_page(root: &mut Domain) -> Vec<Request> {
     drive(
         root,
@@ -333,6 +348,7 @@ fn abandoned_read_and_closing_watch_tokens_cannot_recreate_a_page() {
     let rows = family_page(&mut root);
     let watch = family_watch(&rows);
     let read = family_read(&rows);
+    open_families(&mut root, &rows);
     let rows = drive(
         &mut root,
         Event::Went {
@@ -471,6 +487,7 @@ fn both_connectors_route_all_parts_in_the_supplied_scope_and_leave_resources_in_
                 _ => {}
             }
         }
+        open_families(&mut root, &rows);
         let rows = drive(
             &mut root,
             Event::Went {

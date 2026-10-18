@@ -13,6 +13,7 @@ pub(crate) struct Watch {
     pub latest: Option<Latest>,
     pub state: State,
     pub closing: bool,
+    pub answered: bool,
     pub own: bool,
     pub until: Option<Time>,
     pub span: Option<Duration>,
@@ -51,11 +52,27 @@ impl Domain {
                 unreachable!("watch events only")
             }
             Up::Watched { event, .. } => match event {
-                WatchEvent::Delivered(value) => self.deliver(env, id, Latest::Jig(value), out),
-                WatchEvent::Opened | WatchEvent::Alive | WatchEvent::Behind => {}
+                WatchEvent::Delivered(value) => {
+                    self.opened(id, name, out);
+                    self.deliver(env, id, Latest::Jig(value), out);
+                }
+                WatchEvent::Opened => self.opened(id, name, out),
+                WatchEvent::Alive | WatchEvent::Behind => {}
             },
-            Up::FamilyDelivered { record, .. } => self.deliver(env, id, Latest::Family(record), out),
+            Up::FamilyDelivered { record, .. } => {
+                self.opened(id, name, out);
+                self.deliver(env, id, Latest::Family(record), out);
+            }
             Up::WatchEnded { end, .. } => self.ended(env, id, end, out),
+        }
+    }
+    fn opened(&mut self, id: u64, name: Token, out: &mut Queue<Request>) {
+        let w = self.watches.get_mut(&id).expect("answered watch");
+        if !w.answered {
+            w.answered = true;
+            if w.closing {
+                crate::domain::down(out, crate::Down::Close { watch: name });
+            }
         }
     }
     fn select_handles(&mut self, id: u64) {
@@ -131,8 +148,10 @@ impl Domain {
         let watch = self.watches.get_mut(&id).expect("refused watch");
         watch.closing = true;
         watch.until = None;
-        if let Some(watch) = watch.name {
-            crate::domain::down(out, crate::Down::Close { watch });
+        if let Some(name) = watch.name {
+            if watch.answered {
+                crate::domain::down(out, crate::Down::Close { watch: name });
+            }
         } else {
             self.watches.remove(&id);
         }
@@ -140,17 +159,18 @@ impl Domain {
     fn ended(&mut self, env: &Env<Limits>, id: u64, end: WatchEnd, out: &mut Queue<Request>) {
         let w = self.watches.get_mut(&id).expect("terminal watch");
         w.name = None;
+        w.answered = false;
         if w.closing {
             self.watches.remove(&id);
             return;
         }
         let why = match end {
-            WatchEnd::Dropped | WatchEnd::Stopping => None,
+            WatchEnd::Closed | WatchEnd::SubjectEnded | WatchEnd::Unknown | WatchEnd::NotAllowed if w.own => None,
+            WatchEnd::Dropped | WatchEnd::Stopping | WatchEnd::Busy => None,
             WatchEnd::Closed | WatchEnd::SubjectEnded => Some(Why::SubjectEnded),
             WatchEnd::Unknown => Some(Why::Unknown),
             WatchEnd::NotAllowed => Some(Why::NotAllowed),
             WatchEnd::NotServed => Some(Why::NotServed),
-            WatchEnd::Busy => Some(Why::Busy),
             WatchEnd::SignedOut => Some(Why::SignedOut),
         };
         match why {

@@ -246,6 +246,26 @@ fn item(revision: u64) -> crate::family::Document {
         touchable: true,
     })
 }
+fn open_families(root: &mut Domain, rows: &[Request]) {
+    for row in rows {
+        if let Request::Client {
+            request:
+                jig_client::Request::Down {
+                    down: jig_client::Down::Open { watch, subject: jig_client::Watchable::Family { .. } },
+                },
+        } = row
+        {
+            drive(
+                root,
+                Event::Client {
+                    event: jig_client::Event::Up {
+                        up: jig_client::Up::Watched { watch: *watch, event: WatchEvent::Opened },
+                    },
+                },
+            );
+        }
+    }
+}
 fn family_page(root: &mut Domain) -> Vec<Request> {
     drive(root, Event::Went { place: crate::Place::Address(Address::First(first::Address { project: 3, item: 5 })) })
 }
@@ -312,6 +332,7 @@ fn a_jig_page_routes_every_part_kind_and_forgets_its_generation() {
             .count(),
         6
     );
+    open_families(&mut root, &rows);
     assert_eq!(root.first().part(&expected.as_slice()[2]).unwrap().value, first::Value::Loading);
     let read = family_read(&rows);
     drive(&mut root, Event::First(first::Event::Read { read, result: first::ReadResult::Unknown }));

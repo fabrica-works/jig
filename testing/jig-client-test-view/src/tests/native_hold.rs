@@ -233,6 +233,7 @@ fn a_supplied_native_hold_slot_reads_and_renders_its_actual_scoped_account() {
         root.jig().borrow(root.client()).objects().get(root.jig().objects().find(ObjectKey::Task(9)).unwrap()).unwrap();
     let jig_client_view::objects::Body::Task(retained) = retained.body.as_ref().unwrap() else { panic!("whole task") };
     assert_eq!(retained.as_ref(), &original);
+    open_families(&mut root, &rows);
     let left = drive(
         &mut root,
         Event::Went { place: Place::Address(Address::Jig(jig_client_view::address::Address::Inbox { project: None })) },

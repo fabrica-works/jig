@@ -153,6 +153,7 @@ fn a_native_effect_slot_reads_its_separate_scoped_description_and_releases_it_on
     };
     assert_eq!(retained.as_ref(), &original);
     assert!(patches(&mut view, &root).is_empty());
+    open_families(&mut root, &rows);
     let left = drive(
         &mut root,
         Event::Went { place: Place::Address(Address::Jig(jig_client_view::address::Address::Inbox { project: None })) },

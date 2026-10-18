@@ -80,7 +80,6 @@ pub enum Why {
     NotServed,
     Unknown,
     NotAllowed,
-    Busy,
     SubjectEnded,
     SignedOut,
     Limit,
