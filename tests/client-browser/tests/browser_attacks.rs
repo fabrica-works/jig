@@ -22,3 +22,20 @@ fn a_page_of_another_site_cannot_make_a_request_as_the_person() {
         Outcome::Done
     );
 }
+
+#[test]
+fn a_rebound_host_is_answered_421_and_makes_nothing() {
+    let tier = Tier::new("rebound-host");
+    let target = tier.target();
+    assert_eq!(
+        attacks::a_rebound_host_is_answered_421_and_does_nothing(&tier.setup(), &tier.states(), &target),
+        Outcome::Done
+    );
+}
+
+#[test]
+fn a_framed_page_shows_nothing_of_the_application() {
+    let tier = Tier::new("framed-page");
+    let target = tier.target();
+    assert_eq!(attacks::a_framed_page_shows_nothing(&tier.setup(), &tier.states(), &target), Outcome::Done);
+}

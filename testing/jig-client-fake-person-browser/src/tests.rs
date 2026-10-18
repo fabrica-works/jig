@@ -6,6 +6,20 @@ use skein_lib::Duration;
 const PAGE_WAIT: Duration = Duration::from_secs(5);
 
 #[test]
+fn the_framing_page_frames_the_application_s_page() {
+    let target =
+        crate::Target { prefix: b"/mapping", page: b"/inbox", request: b"forged", done: Find::text(b"Forged") };
+    let page = crate::pages::framing(&target);
+    assert_eq!(page.path.as_ref(), b"/framing");
+    assert_eq!(page.kind.as_ref(), b"text/html");
+    assert!(page.headers.is_empty());
+    assert_eq!(
+        page.body.as_ref(),
+        br#"<!doctype html><title>Elsewhere</title><iframe src="http://{address}/inbox"></iframe>"#
+    );
+}
+
+#[test]
 fn the_forging_page_posts_to_the_mapping_s_request_route() {
     let target = crate::Target { prefix: b"/mapping", page: b"/", request: b"forged", done: Find::text(b"Forged") };
     let page = crate::pages::forging(&target);

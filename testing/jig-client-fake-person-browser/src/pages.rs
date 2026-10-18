@@ -23,3 +23,17 @@ fetch("http://{{address}}{prefix}/v1/request", {{method: "POST", credentials: "i
         headers: vec![],
     }
 }
+
+/// The harness substitutes the application's address in this other origin's frame.
+#[must_use]
+pub fn framing(target: &Target<'_>) -> Page {
+    let page = std::str::from_utf8(target.page).expect("application page is UTF-8");
+    Page {
+        path: b"/framing".as_slice().into(),
+        kind: b"text/html".as_slice().into(),
+        body: format!(r#"<!doctype html><title>Elsewhere</title><iframe src="http://{{address}}{page}"></iframe>"#)
+            .into_bytes()
+            .into(),
+        headers: vec![],
+    }
+}

@@ -389,6 +389,7 @@ dependencies = [
  "base64",
  "skein-fake-person",
  "skein-fake-person-browser",
+ "skein-http",
  "skein-lib",
 ]
 
