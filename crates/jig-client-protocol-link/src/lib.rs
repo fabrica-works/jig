@@ -11,6 +11,8 @@ mod store;
 pub mod translate;
 mod watches;
 pub use boundary::*;
+/// The kept name of the preceding client's stream (protocol/client.md, 10).
+pub const STREAM_KEY: &[u8] = b"stream";
 pub use component::Link;
 pub use limits::{Limits, Unusable, worst_case};
 pub use translate::Undecodable;

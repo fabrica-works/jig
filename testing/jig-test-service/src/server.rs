@@ -221,7 +221,7 @@ impl Server {
             if connection.reuse.take() == Some(http::Reuse::Keep) && self.phase < Phase::Closing {
                 connection.requests.push(http::Request::Next);
             } else {
-                end(connection, self.phase >= Phase::Closing && self.phase != Phase::Aborting, out);
+                end(connection, self.phase != Phase::Aborting, out);
             }
         }
     }

@@ -15,7 +15,7 @@ pub use jig_client_domain::{
     Answered, Ask, Asker, Backoff, Document, Down, Family, Handle, Held, Key, Latest, Link, Outcome, Pending, Progress,
     Readable, Readout, Retry, Spoken, State, Told, Up, Watchable, Why, contract,
 };
-pub use jig_client_protocol_link::{Message, Record, Streamed, With};
+pub use jig_client_protocol_link::{Message, Record, STREAM_KEY, Streamed, With};
 pub use limits::{Limits, Unusable, max_out, worst_case};
 #[cfg(test)]
 mod tests;

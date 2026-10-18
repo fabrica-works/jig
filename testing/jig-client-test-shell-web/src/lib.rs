@@ -55,6 +55,15 @@ pub fn start() {
     let platform = platform::Browser::new(fetch::web::Fetch::new(9, Rc::clone(&inbox), Report::Fetch));
     let store = Store::new(b"jig.", None);
     let mut host = host::Host::new(facts.seed, facts.now, facts.wall);
+    #[cfg(debug_assertions)]
+    if path
+        .as_bytes()
+        .strip_prefix(b"/test/prefixed")
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with(b"/") || rest.starts_with(b"?"))
+    {
+        host.codec =
+            jig_client_view::address::Codec { prefix: b"/test/prefixed", ..jig_client_view::address::REFERENCE };
+    }
     host.start(path.as_bytes(), store.read_all(&platform), facts.offset, secret);
     let page = Rc::new(RefCell::new(Page::new(
         Look {

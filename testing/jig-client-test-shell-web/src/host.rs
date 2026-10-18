@@ -51,7 +51,7 @@ impl Host {
         secret: Option<Box<[u8]>>,
     ) {
         let mut kept =
-            List::with_capacity(self.env.limits.jig.records + self.env.limits.client.domain.requests.requests);
+            List::with_capacity(self.env.limits.jig.records + self.env.limits.client.domain.requests.requests + 1);
         for record in records {
             if let Some(record) = super::records::decode(record) {
                 kept.push(record).expect("bounded records");

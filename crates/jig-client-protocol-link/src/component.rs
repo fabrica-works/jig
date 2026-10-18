@@ -28,6 +28,8 @@ pub struct Link {
     pub(super) credential: Option<Secret>,
     pub(super) generation: u64,
     stream: Option<crate::silence::Silence>,
+    pub(super) predecessor: Option<[u8; 16]>,
+    retiring: Option<Token>,
     watches: crate::watches::Watches,
     pub(super) store: crate::store::Store,
 }
@@ -42,6 +44,8 @@ impl Link {
             credential: None,
             generation: 0,
             stream: None,
+            predecessor: None,
+            retiring: None,
             watches: crate::watches::Watches::new(limits),
         })
     }
@@ -60,6 +64,15 @@ impl Link {
         crate::worst_case(limits)
     }
     pub fn step(&mut self, now: Time, event: Event, out: &mut Queue<Request>) {
+        if let Event::Reply { exchange, .. } | Event::Lost { exchange } = &event
+            && self.retiring == Some(*exchange)
+        {
+            self.retiring = None;
+            if !self.watches.0.is_empty() {
+                self.begin_stream(now, out);
+            }
+            return;
+        }
         match event {
             Event::SignIn { with } => self.sign_in(now, with, out),
             Event::SignOut => self.sign_out(now, out),
@@ -360,16 +373,21 @@ impl Link {
         };
         self.watches.0.insert(watch, opening).expect("checked watch capacity");
         match &self.stream {
-            None => {
-                self.stream = Some(crate::silence::Silence::new(self.limits.client.heartbeat, now));
-                out.push(Request::OpenStream { credential: self.credential.clone() });
-            }
-            Some(stream) => {
-                if stream.name.is_some() {
-                    self.send_open(now, watch, out);
+            None if self.retiring.is_none() => {
+                if let Some(stream) = self.predecessor.take() {
+                    self.retiring = Some(name);
+                    self.gone(name, stream, out);
+                } else {
+                    self.begin_stream(now, out);
                 }
             }
+            Some(stream) if stream.name.is_some() => self.send_open(now, watch, out),
+            None | Some(_) => {}
         }
+    }
+    fn begin_stream(&mut self, now: Time, out: &mut Queue<Request>) {
+        self.stream = Some(crate::silence::Silence::new(self.limits.client.heartbeat, now));
+        out.push(Request::OpenStream { credential: self.credential.clone() });
     }
     fn send_open(&mut self, _now: Time, watch: Token, out: &mut Queue<Request>) {
         let Some(stream) = &self.stream else { return };
@@ -567,6 +585,7 @@ impl Link {
                         return Err(crate::Undecodable::Malformed);
                     }
                 }
+                self.save_stream(*hello.stream(), out)?;
                 out.push(Request::Hello { family: None, versions: hello_versions(&hello, None) });
                 for owner in self.limits.client.owners {
                     let family = Some(owner.family);
@@ -666,13 +685,16 @@ impl Link {
         if let Some(stream) = stream.name
             && let Some(exchange) = self.token()
         {
-            let record = w::Gone::new(&self.limits.wire, w::GoneParts { stream }).expect("fixed stream name");
-            let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
-            record.encode(&mut writer).expect("measured stream gone");
-            self.exchange(exchange, Message::StreamGone(writer.finish()), out);
+            self.gone(exchange, stream, out);
         }
         out.push(Request::CloseStream);
         out.push(Request::Fact { fact: Fact::StreamDropped });
+    }
+    fn gone(&mut self, exchange: Token, stream: [u8; 16], out: &mut Queue<Request>) {
+        let record = w::Gone::new(&self.limits.wire, w::GoneParts { stream }).expect("fixed stream name");
+        let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
+        record.encode(&mut writer).expect("measured stream gone");
+        self.exchange(exchange, Message::StreamGone(writer.finish()), out);
     }
 }
 

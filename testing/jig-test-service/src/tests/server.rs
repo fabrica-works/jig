@@ -15,19 +15,23 @@ fn an_accepted_connection_s_call_goes_to_the_mount() {
 }
 #[test]
 fn a_connection_past_the_limit_is_rejected() {
+    const FIRST_SOCKET: u64 = 100;
+    const REJECTED_SOCKET: u64 = 108;
+    const ROUTED_CAPACITY: u32 = 32;
+    const REFUSAL_CAPACITY: u32 = 1;
     let mut server = f::server();
-    let mut out = Queue::with_capacity(32);
-    for socket in 100..104 {
+    let mut out = Queue::with_capacity(ROUTED_CAPACITY);
+    for socket in FIRST_SOCKET..REJECTED_SOCKET {
         server.up(f::accepted(Token::new(socket)), &mut out);
     }
-    server.up(f::accepted(Token::new(104)), &mut out);
-    let mut rejected = List::with_capacity(1);
+    server.up(f::accepted(Token::new(REJECTED_SOCKET)), &mut out);
+    let mut rejected = List::with_capacity(REFUSAL_CAPACITY);
     for _ in 0..out.len() {
         if let Some(Routed::Io(skein_io::Request::Reject { socket })) = out.pop() {
             rejected.push(socket).expect("one refusal");
         }
     }
-    assert_eq!(rejected.as_slice(), [Token::new(104)]);
+    assert_eq!(rejected.as_slice(), [Token::new(REJECTED_SOCKET)]);
 }
 #[test]
 fn a_kept_connection_carries_a_second_call_after_done() {
@@ -294,6 +298,15 @@ fn the_root_file_is_served_with_the_page_s_cache_policy() {
     assert_eq!(*reply.fields(b"Content-Type"), [b"text/plain; charset=utf-8".as_slice()]);
     assert_eq!(*reply.fields(b"Cache-Control"), [b"no-cache".as_slice()]);
     assert_eq!(*reply.fields(b"ETag"), [b"\"0011223344556677\"".as_slice()]);
+}
+#[test]
+fn a_closing_root_request_receives_the_robots_file() {
+    const OK_STATUS: u16 = 200;
+    let reply = f::answer(
+        &mut f::serving(f::bundle()),
+        b"GET /robots.txt HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+    );
+    assert_eq!(reply.status, OK_STATUS);
 }
 #[test]
 fn a_bundle_file_larger_than_one_send_is_delivered_in_full() {

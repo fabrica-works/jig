@@ -23,7 +23,7 @@ pub(crate) fn event(root: &mut Domain, env: &Env<Limits>, event: Event, out: &mu
     match event {
         Event::Start { address, kept, offset: _ } => {
             let mut jig_kept = List::with_capacity(env.limits.jig.records);
-            let mut bytes = List::with_capacity(env.limits.client.domain.requests.requests);
+            let mut bytes = List::with_capacity(env.limits.client.domain.requests.requests.saturating_add(1));
             let mut records = List::with_capacity(env.limits.client.domain.requests.requests);
             for record in kept.into_boxed() {
                 match record {

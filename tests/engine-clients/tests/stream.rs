@@ -13,6 +13,14 @@ fn watched() -> (Peer, [u8; 16], skein_lib::Token) {
     (peer, stream, watcher)
 }
 #[test]
+fn two_streams_of_one_sign_in_each_open_with_their_own_names() {
+    let (mut peer, first) = streaming();
+    let second = peer.open_stream();
+    assert_ne!(first, second);
+    assert_eq!(peer.events(first), vec![hello(first)]);
+    assert_eq!(peer.events(second), vec![hello(second)]);
+}
+#[test]
 fn a_stream_opens_with_its_hello() {
     let (peer, stream) = streaming();
     assert_ne!(stream, [0; 16]);

@@ -125,13 +125,7 @@ impl Component {
         }
     }
     fn stream_open(&mut self, env: &Env<Limits>, owner: Token, sign_in: u64) {
-        let mut existing = false;
-        for (_, stream) in &self.streams {
-            if stream.sign_in == sign_in {
-                existing = true;
-            }
-        }
-        if existing || self.streams.len() == self.streams.capacity() {
+        if self.streams.len() == self.streams.capacity() {
             self.connections.get_mut(&owner).expect("stream owner").respond(crate::Reply::Conflict, &env.limits);
             return;
         }

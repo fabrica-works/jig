@@ -290,3 +290,11 @@ fn propose_amendment(revision: c::Revision) -> c::Ask {
         reason: store_text(),
     }
 }
+
+pub fn kept_stream() -> Record {
+    let record =
+        w::Kept::new(&limits().wire, w::KeptParts { store_version: TABLE_VERSION, record: Box::from(STREAM) }).unwrap();
+    let mut writer = Writer::new(usize::try_from(record.measure()).unwrap());
+    record.encode(&mut writer).unwrap();
+    Record { key: Box::from(STREAM_KEY), bytes: writer.finish() }
+}

@@ -245,7 +245,7 @@ impl Host for NativeClient {
         if let Some((credential, kept)) = self.shell.loaded() {
             let mut client_records = Vec::new();
             for record in kept {
-                if record.key.len() == 16 {
+                if record.key.len() == 16 || record.key.as_ref() == jig_client::STREAM_KEY {
                     client_records.push(client::store::Record::Client(record));
                 } else if let Some(record) = crate::front::persistence::child_record(&record) {
                     client_records.push(record);

@@ -64,7 +64,11 @@ pub(super) fn decode(bytes: &Bytes) -> Vec<client::store::Record> {
         .iter()
         .filter_map(|(key, bytes)| {
             let record = link::Record { key: key.clone(), bytes: bytes.clone() };
-            if key.len() == 16 { Some(client::store::Record::Client(record)) } else { child_record(&record) }
+            if key.len() == 16 || key.as_ref() == jig_client::STREAM_KEY {
+                Some(client::store::Record::Client(record))
+            } else {
+                child_record(&record)
+            }
         })
         .collect()
 }

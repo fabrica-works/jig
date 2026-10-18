@@ -75,7 +75,7 @@ pub fn for_profile(name: Profile, jig: &jig_protocol_config::Limits) -> Limits {
         clients_http: jig.clients_http,
         server: crate::server::Limits {
             connections: match name {
-                Profile::Small => 4,
+                Profile::Small => 8,
                 Profile::Standard => 16,
             },
             http: skein_http::server::Limits {

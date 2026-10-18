@@ -365,6 +365,7 @@ dependencies = [
  "serde_json",
  "skein-fake-person",
  "skein-fake-person-browser",
+ "skein-http",
  "skein-lib",
  "skein-scratch",
  "skein-ui",

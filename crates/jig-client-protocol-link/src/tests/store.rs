@@ -112,3 +112,27 @@ fn a_cancelled_opening_already_in_the_step_queue_is_never_sent_after_writing() {
     assert_eq!(harness.exchanges(), 0);
     assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::Dropped));
 }
+
+#[test]
+fn a_full_table_and_the_stream_s_name_start() {
+    const TABLE_RECORDS: u32 = 4;
+    const KEPT_RECORDS: u32 = TABLE_RECORDS + 1;
+    let mut h = fixtures::Harness::new(&fixtures::limits());
+    let mut kept = skein_lib::List::with_capacity(KEPT_RECORDS);
+    assert_eq!(fixtures::limits().client.requests.requests, TABLE_RECORDS);
+    for number in 0..TABLE_RECORDS {
+        let mut record = fixtures::saved_table(fixtures::message());
+        record.record.key = [u8::try_from(number).unwrap(); 16];
+        kept.push(fixtures::store_read(record)).unwrap();
+    }
+    kept.push(fixtures::kept_stream()).unwrap();
+    h.start_store(kept);
+    assert_eq!(h.out.len(), TABLE_RECORDS);
+    for request in &h.out {
+        let Request::Kept { .. } = request else { panic!("restored table entry: {request:?}") };
+    }
+    h.clear();
+    h.open(fixtures::WATCH, fixtures::frame_subject());
+    assert_eq!(h.gone_name(), fixtures::STREAM);
+    assert!(!h.has(&Request::OpenStream { credential: None }));
+}

@@ -27,7 +27,7 @@ pub fn encode(record: Record) -> Bytes {
     }
 }
 pub fn decode(record: skein_ui_web::store::Record) -> Option<Record> {
-    if record.key.len() == 16 {
+    if record.key.len() == 16 || record.key.as_ref() == jig_client::STREAM_KEY {
         return Some(Record::Client(jig_client::Record { key: record.key, bytes: record.value }));
     }
     if record.key.as_ref() == FIRST {

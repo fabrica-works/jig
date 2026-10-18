@@ -309,3 +309,35 @@ fn a_watch_ended_not_served_ends_its_handle_naming_why() {
     assert_eq!(h.ended(fixtures::WATCH), Some(c::WatchEnd::NotServed));
     assert!(h.has(&Request::Hello { family: Some(19), versions: Some(c::VersionRange { first: 24, last: 24 }) }));
 }
+
+#[test]
+fn the_stream_s_name_is_saved_at_each_hello() {
+    const HELLOS: u32 = 2;
+    let mut h = fixtures::Harness::new(&fixtures::limits());
+    for _ in 0..HELLOS {
+        h.clear();
+        h.open(fixtures::WATCH, fixtures::frame_subject());
+        h.stream_record(&fixtures::hello_event(fixtures::HEARTBEAT));
+        assert!(h.has(&Request::Save { record: fixtures::kept_stream() }));
+        h.link.step(Time::ZERO, Event::StreamGone, &mut h.out);
+    }
+}
+const GONE_TERMINALS: [bool; 2] = [false, true];
+#[test]
+fn a_kept_stream_name_is_sent_gone_before_the_first_open() {
+    for lost in GONE_TERMINALS {
+        let mut h = fixtures::Harness::new(&fixtures::limits());
+        h.start_store(fixtures::one_store_read(fixtures::kept_stream()));
+        h.open(fixtures::WATCH, fixtures::frame_subject());
+        assert_eq!(h.gone_name(), fixtures::STREAM, "lost={lost}");
+        let Some(Request::Exchange { exchange, .. }) = h.out.iter().next() else { panic!("gone first") };
+        let exchange = *exchange;
+        h.clear();
+        h.open(fixtures::ATTEMPT, fixtures::family_subject());
+        assert_eq!(h.out.len(), 0, "lost={lost}");
+        let event = if lost { Event::Lost { exchange } } else { Event::Reply { exchange, message: Box::new([]) } };
+        h.link.step(Time::ZERO, event, &mut h.out);
+        assert_eq!(h.out.len(), 1, "lost={lost}");
+        assert!(h.has(&Request::OpenStream { credential: None }), "lost={lost}");
+    }
+}

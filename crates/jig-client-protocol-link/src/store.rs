@@ -164,15 +164,33 @@ impl Link {
             }
         }
     }
+    pub(super) fn save_stream(&mut self, stream: [u8; 16], out: &mut Queue<Request>) -> Result<(), crate::Undecodable> {
+        let Ok(value) = w::Kept::new(
+            &self.limits.wire,
+            w::KeptParts { store_version: jig_client_domain::TABLE_VERSION, record: Box::from(stream) },
+        ) else {
+            return Err(crate::Undecodable::TooLarge);
+        };
+        let mut writer = Writer::new(usize::try_from(value.measure()).expect("fixed stream record"));
+        value.encode(&mut writer).expect("measured stream record");
+        out.push(Request::Save { record: Record { key: bytes::copy_of(crate::STREAM_KEY), bytes: writer.finish() } });
+        Ok(())
+    }
     pub(super) fn start_store(&mut self, kept: List<Record>, out: &mut Queue<Request>) {
-        let bound = self.limits.client.requests.requests;
+        let mut bound = self.limits.client.requests.requests;
+        for record in &kept {
+            if record.key.as_ref() == crate::STREAM_KEY {
+                bound = bound.saturating_add(1);
+                break;
+            }
+        }
         if kept.len() > bound {
             out.push(Request::Fact { fact: Fact::UndecodableStore });
             return;
         }
         for entry in kept.into_boxed() {
             let mut reader = Reader::new(&entry.bytes);
-            let result = if entry.key.len() != 16
+            let result = if (entry.key.len() != 16 && entry.key.as_ref() != crate::STREAM_KEY)
                 || u64::try_from(entry.bytes.len()).expect("bounded bytes fit u64") > self.limits.client.document_bytes
             {
                 Err(translate::too_large())
@@ -186,6 +204,16 @@ impl Link {
             };
             if reader.remaining() != 0 || value.store_version() != jig_client_domain::TABLE_VERSION {
                 out.push(Request::Dropped);
+                continue;
+            }
+            if entry.key.as_ref() == crate::STREAM_KEY {
+                match <[u8; 16]>::try_from(value.record()) {
+                    Ok(stream) => self.predecessor = Some(stream),
+                    Err(_) => {
+                        out.push(Request::Dropped);
+                        out.push(Request::Fact { fact: Fact::UndecodableStore });
+                    }
+                }
                 continue;
             }
             match restore(value, &entry.key, &self.limits) {
