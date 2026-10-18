@@ -205,6 +205,30 @@ the engine's messages to the client as they come.
   Its first message is the hello: the stream's name, the versions the
   engine serves of jig's wire and of each application's, and the
   heartbeat. Every watch the client opens names its stream.
+- **A client is one run of `jig-client`,** from its start to its end: a
+  native process; a browser page from its load until it is left. A link
+  followed, or back and forward, within the page's history keeps it
+  (`browser.md`, section 9); a reload, an address typed or opened, or
+  back and forward to an entry another load made, starts a new client.
+  Each client holds a stream of its own, so two clients of one sign-in,
+  two tabs or a page and the page that follows it, hold two. The engine
+  never refuses or ends a stream for another stream of its sign-in:
+  streams are bounded in all, by the component and by the transport
+  (section 13), and an opening past either bound is refused, which the
+  client takes as a dropped stream.
+- **The predecessor's stream is sent gone.** A page that was left, or a
+  process that died, may hold its stream, and its watches their places
+  in the party's room, until the engine sees the stream's connection
+  end: seconds later for a page whose browser drains it, and later
+  still for a connection cut half-open. So the client keeps its
+  stream's name in the small store, saved at each hello (section 10).
+  The first time it would open a stream, a client whose kept records
+  name one sends that stream gone (4.1), and opens its own once that
+  exchange has its terminal, a reply or `Lost`. The engine ends a stream
+  named gone only when it is the sign-in's and still open, so a name
+  kept by another sign-in, or of a stream already ended, does nothing.
+  A store copied (a browser tab duplicated) ends the original's stream
+  once, which the original takes as any drop.
 - **Heartbeats.** The engine sends a heartbeat on the stream whenever it
   has sent nothing for the heartbeat's span. The link tells each of the
   stream's watches it is alive at each heartbeat and each message; past
@@ -224,7 +248,7 @@ the engine's messages to the client as they come.
 | a read | its owner, version and record: one of jig's reads, or an application's naming its scope and window | the document, a page, or why there is none (section 6) |
 | opening a watch | the stream's name; the client's name for the watch; the subject, with its owner, version and window | admitted, or refused (section 7) |
 | closing a watch | the stream's name and the watch's | closed, once the engine has ended it |
-| a stream gone | the stream's name | nothing more: the engine ends its watches |
+| a stream gone | the stream's name | nothing more: the engine ends the stream and its watches, when it is the sign-in's and still open (section 4) |
 | signing in | the printed link's secret; or, as a service, nothing more than the service's credential, as the message's credential | a sign-in's credential, refused, or not ready (section 8) |
 | signing out | nothing more than the credential of the sign-in it ends | signed out, or not ready |
 
@@ -272,9 +296,9 @@ out, to the application's startup:
 - **The credential is checked** on every exchange and every stream
   opened (section 8). A stream opened with none, or with one the engine
   does not know, ends at once, `StreamEnded` signed out.
-- **Bounded:** exchanges in flight per client and in all, streams, a
-  message's bytes, what a stream may have queued, mints in flight
-  (section 13).
+- **Bounded:** exchanges in flight per sign-in and in all; streams in
+  all, never per sign-in (section 4); a message's bytes, what a stream
+  may have queued, mints in flight (section 13).
 
 ### 4.3 The link
 
@@ -305,6 +329,9 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   (section 9); each delivery and run's text routed to its watch by name;
   heartbeats keeping the watches alive; `StreamGone`, or silence past
   twice the heartbeat, dropping it.
+- **The predecessor's stream:** the stream's name saved at each hello;
+  the name kept at start sent gone before the first `OpenStream`, which
+  waits for that exchange's terminal (section 4).
 - **The small store's records** encoded and decoded (section 10).
 
 ## 5. Keyed requests
@@ -563,9 +590,17 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **The client's records** (`../client/domain/client.md`, section 11):
   the request table's, each a whole request, jig's or an application's,
   with the key the engine knows it by, its party, the application's key
-  for it, its owner and version, and when it was first sent; nothing
-  else of the client's, and never a credential or an answer. Each is
-  encoded with jig's wire, with its store version.
+  for it, its owner and version, and when it was first sent; and the
+  name of the client's stream (section 4), under a key of its own, which
+  no request's key can be (a request's is 16 bytes); nothing else of the
+  client's, and never a credential or an answer. Each is encoded with
+  jig's wire, with its store version.
+- **The stream's name** is saved at each hello, in a write of its own,
+  and replaces the last; nothing waits for it, and a write of it not
+  stored retires nothing. It is not a credential: ending a stream takes
+  its sign-in's credential as well (section 4). It is not one of the
+  request table's records, and the records read at start are bounded by
+  what the table holds and this one.
 - **The application's own records are its own.** What its presentation
   keeps (where the person was, their drafts; the reference UI's places
   and drafts among them) it keeps itself, where it likes. The client's
@@ -577,7 +612,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   whose record that write was the last to carry not sent, parked or not,
   answered *not kept* (`../client/domain/client.md`, section 11).
 - **Read at start,** the records the application's shell loaded handed
-  to `jig-client` as it starts, each to the request table; one of a
+  to `jig-client` as it starts, each request's to the request table, and
+  the stream's name to the link (section 4); one of a
   version the client does not read is dropped, and the application told,
   so a request kept across an update that changed its record's version
   is lost, not sent wrong. A family's request whose owner and version
@@ -643,14 +679,16 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   at the client's limits), the stream's message bytes.
 - **The transport's:** an exchange's deadline, and what it buffers of the
   stream and of the small store's writes.
-- **The component's:** clients' streams; the watches one stream holds,
-  each until the engine has ended it, at least the engine's watches one
-  client opens at its limit, as a party's room is
-  (`../client/domain/contract.md`, 7.2), and past them an opening is
-  refused busy, within the views' limits on a party's watches and on all
-  (`../domain/engine.md`, section 13); exchanges in flight per client and
-  in all, a message's bytes, what a stream may have queued before
-  nothing more is handed out, the heartbeat's span, mints in flight.
+- **The component's:** streams in all, whatever their sign-ins (section
+  4); the watches one stream holds, each until the engine has ended it,
+  at least the engine's watches one client opens at its limit, as a
+  party's room is (`../client/domain/contract.md`, 7.2), and past them
+  an opening is refused busy, within the views' limits on a party's
+  watches and on all (`../domain/engine.md`, section 13); exchanges in
+  flight per sign-in, which its clients share, since an exchange names
+  no stream, and in all; a message's bytes, what a stream may have
+  queued before nothing more is handed out, the heartbeat's span, mints
+  in flight.
 - **The default mapping's,** at each end: its HTTP machines', TLS's, and
   the stream's buffer, at those limits.
 - **The worst case** of each side is its components' and its transport's,
@@ -666,11 +704,12 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **The component's world,** `jig-engine-clients-world`: the component
   against a scripted transport of messages and a scripted root, with no
   HTTP: answers of every kind and none, deliveries paced by a slow
-  `StreamTaken`, a stream gone mid-delivery, signed out, records that do
-  not decode, a version not served, a `Mint` answered and refused, the
-  printed link spent and drawn again, a service signing in. Its referee:
-  one reply per exchange; one streamed message in flight per stream; no
-  credential reaches a domain.
+  `StreamTaken`, a stream gone mid-delivery, two streams of one sign-in
+  each with its own name, a stream sent gone by the client that followed
+  it, signed out, records that do not decode, a version not served, a
+  `Mint` answered and refused, the printed link spent and drawn again, a
+  service signing in. Its referee: one reply per exchange; one streamed
+  message in flight per stream; no credential reaches a domain.
 - **The default mapping's ends,** each against a scripted peer of bytes:
   every route, the stream's events cut at random, the credential as a
   cookie and as a bearer, the printed link's route, and the example
@@ -696,6 +735,14 @@ Each within jig's suites' budgets (`../../development/workflow.md`).
 - **Several tabs:** each tab a client with its own stream, which a hidden
   tab lets go (`browser.md`, section 10); whether tabs of one person
   share one stream through the platform's means.
+- **A page that is left sending its stream gone as it goes** (a
+  `keepalive` request at `pagehide`), so that a tab whose next page
+  never opens a stream frees the room before the browser ends the
+  connection. The next client's gone (section 4) frees it today.
+- **A bound on one sign-in's streams,** for an engine serving many
+  people between hosts. On one person's machine, the browser's
+  connections to one origin and the engine's streams in all bound them
+  (section 4).
 - **Bundling parts** in a jig read's answer (`../client/domain/contract.md`,
   section 11).
 - **A binary stream** in the default mapping: a streamed response body

@@ -562,6 +562,14 @@ data (skein's `ui-web.md`, section 10; 5.1).
   (`client.md`, 17.2). The next
   read is asked by the loop after the step (5.2), so the platform paces
   it. Its end is the stream gone.
+- **Each load of the page is a client,** with a stream of its own
+  (`client.md`, section 4): links and back and forward within the page's
+  history keep it (section 9); a reload, an address typed or opened,
+  and skein's restart part's reload (section 5) start a new one, which
+  sends its predecessor's stream gone, by the name the small store
+  kept, before it opens its own. The browser ends the old page's
+  connection when it likes, often after the new page's stream has
+  opened.
 - **The transport,** skein's, takes a step's requests whole, as the
   client's adapter gives them: the small store's writes first, then the
   exchanges and the stream, then a navigation, if any (5.3).
@@ -571,13 +579,13 @@ data (skein's `ui-web.md`, section 10; 5.1).
   client takes as any drop, and an opening while hidden waits until the
   tab is shown (skein's `ui-web.md`, section 10).
 - **The small store** is skein's, the tab's session storage: each of the
-  client's records under its key (`client.md`, section 10), both as
-  base64 text, under the prefix the application gives, the reference's
-  `jig.`; read whole at start. The reference UI's own records (its
-  places and drafts) are its application's, kept beside the client's
-  through the same transport (`../client/domain/view.md`). A write the
-  platform refuses, its quota full, is a failed write. The restart
-  part's key is outside the prefix (section 5).
+  client's records under its key (`client.md`, section 10), the stream's
+  name among them, both as base64 text, under the prefix the application
+  gives, the reference's `jig.`; read whole at start. The reference UI's
+  own records (its places and drafts) are its application's, kept beside
+  the client's through the same transport (`../client/domain/view.md`).
+  A write the platform refuses, its quota full, is a failed write. The
+  restart part's key is outside the prefix (section 5).
 - **Closing a tab with requests pending** asks the platform to warn
   (`beforeunload`), through skein's title and closing part, only while
   the client holds requests not yet answered durable.
@@ -777,10 +785,10 @@ otherwise (skein's `ui-web.md`, section 12).
 - **The client's:** an exchange's answer, at most its largest record; a
   piece of the stream; exchanges in flight (`client.md`, section 13),
   which the client's adapter gives fetch.
-- **The mapping's engine end's:** a request's bytes, exchanges in flight
-  and streams, per client and in all (`client.md`, section 13), its
-  numbers in `jig-protocol-config`'s profiles (`configuration.md`,
-  section 6).
+- **The mapping's engine end's:** a request's bytes; calls in flight,
+  and streams among them, in all, never per sign-in (`client.md`,
+  sections 4 and 13); its numbers in `jig-protocol-config`'s profiles
+  (`configuration.md`, section 6).
 - **The tree's:** `skein_ui::Limits` (skein's `ui.md`, section 15), whose
   numbers the reference UI's constructors derive from the client's
   limits (`../client/domain/view.md`, section 10); a drawing's SVG has

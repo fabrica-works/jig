@@ -438,8 +438,9 @@ handles, as every presentation does (sections 7 and 8).
   backoff, under a fresh name; its handle stays, behind, and is live
   again at its next delivery. Busy is the party's room full for now
   (contract.md, 7.2): the party's other clients, or a stream this client
-  dropped whose watches the engine has not yet ended, hold the rest, and
-  it empties as their watches end.
+  dropped, or its predecessor's (`../../protocol/client.md`, section 4),
+  whose watches the engine has not yet ended, hold the rest, and it
+  empties as their watches end.
 - **`Ended { handle, why }`** is a handle's one terminal, for what opening
   again would not mend: the engine refused it (unknown, not allowed);
   its subject ended and left the engine; the party lost the right to see
@@ -620,10 +621,12 @@ for any presentation of a chat or of any agent task's activity.
   answered, as the request table's records, each with the key the engine
   knows it by, its party, the application's key, the request (jig's
   record, or a family's bytes under its owner's number and version), and
-  the wall time of its first sending. Nothing else of the client's:
-  everything shown is read again. A presentation's own records (the
-  reference UI's drafts and its place) are the application's, which it
-  keeps beside the client's (root.md, section 8; view.md, 18.8).
+  the wall time of its first sending; and the name of its stream, which
+  the client that follows sends gone before it opens its own
+  (`../../protocol/client.md`, sections 4 and 10). Nothing else of the
+  client's: everything shown is read again. A presentation's own records
+  (the reference UI's drafts and its place) are the application's, which
+  it keeps beside the client's (root.md, section 8; view.md, 18.8).
 - **Kept before sent.** A request's record leaves in a `Save`, and the
   client gives the request's first `Exchange` only once the transport
   says `Stored`. `NotStored` (a quota full, a disk failing) retires the
@@ -637,11 +640,11 @@ for any presentation of a chat or of any agent task's activity.
   again is decided by that later write, and one whose record the write
   did not carry is sent once its own write is stored. So a restart never
   loses a request the engine may have made.
-- **Restored at `Start { kept }`,** before any other event: each record
-  admitted to the table under its key, parked until the link is live,
-  its party confirmed and the retention known; and each told to the
-  application as `Kept { key, request }`, which the client root routes by
-  the key's asker (root.md, section 8).
+- **Restored at `Start { kept }`,** before any other event: each
+  request's record admitted to the table under its key, parked until
+  the link is live, its party confirmed and the retention known; and
+  each told to the application as `Kept { key, request }`, which the
+  client root routes by the key's asker (root.md, section 8).
 - **It names its party.** Each record carries the party it is for, and
   its request is sent, under its original key, only once `me` confirms
   that party. While another party is signed in, it stays parked and
@@ -665,7 +668,8 @@ for any presentation of a chat or of any agent task's activity.
   file written whole and synced, a world's memory. A host whose store is
   copied (a browser tab duplicated) sends the same keys from both
   copies, which the engine makes once, while each copy draws new keys
-  from a seed of its own.
+  from a seed of its own; the copy sends the original's stream gone,
+  once, which the original takes as a drop (8.2).
 - **It is never the truth.** A request kept is answered by the engine by
   its key, made once whatever the client did before.
 
@@ -774,7 +778,8 @@ Each is configured and part of the worst case:
   client's limits (`../../protocol/client.md`, section 13);
 - the request table's: requests held, and their bytes, a family's
   included (skein's `lib.md`, section 12); the records restored at
-  start, no more than the table holds;
+  start, no more than the table holds and the stream's name (section
+  11);
 - backoffs' first and most spans, the heartbeat's tolerance, the
   retention's margin;
 - the family owners the application declares, each once, with its
