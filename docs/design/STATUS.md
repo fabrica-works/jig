@@ -82,12 +82,18 @@ development.md, section 3.3).
   channel carries facts without content, so they give neither (which a
   conversation's presentation wants); and an abort and a closed terminal
   for smith's LLM component. Waits for a smith design and plan.
-- **smith's parity changes, for jig's next repin of smith** (smith's
-  parity plan, its `later.md`; skein's development.md, 5.7): the tools
-  domain's new `Call` and `Outcome` variants, for jobs, in
-  `smith-domain-tools`, which jig's users of that crate follow. jig pins
-  smith `29fa97c9`, before them. Waits for the plan that moves jig's pin
-  of smith.
+- **smith's parity and wall-clock changes, for jig's next repin of
+  smith** (smith's parity and wall-clock plans, their `later.md`; skein's
+  development.md, 5.7): the tools domain's new `Call` and `Outcome`
+  variants, for jobs, in `smith-domain-tools`, which jig's users of that
+  crate follow; the transcript's version 5 and its not-run why
+  (`NotRun::AfterFailedWrite`), which `jig-protocol-transcript` follows
+  where it matches `Returned::NotRun`; the event vocabulary's version 3
+  (`run.compaction_material`); `Purpose::Ordinary { guard }`; and the
+  shipped profiles' larger `memory`, which jig's test configurations
+  follow (`testing/jig-test/tests/support/mod.rs`, `tests/store/src/root.rs`).
+  jig pins smith `29fa97c9`, before them. Waits for the plan that moves
+  jig's pin of smith.
 - **`ops` standalone** (`examples.md`, sections 2, 4 and 8 to 10, and 9.1;
   `domain/testing.md`, section 7; `protocol/configuration.md`, section
   5; `protocol/service.md`, sections 7 and 8; `protocol/store.md`,
