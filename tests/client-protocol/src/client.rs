@@ -127,7 +127,9 @@ impl Front {
                     self.event(now, Event::NotStored);
                 } else {
                     for record in records.into_boxed() {
-                        self.referee.stored(&record);
+                        if record.key.as_ref() != client::STREAM_KEY {
+                            self.referee.stored(&record);
+                        }
                         self.store.insert(record.key, record.bytes);
                     }
                     self.event(now, Event::Stored);
@@ -163,7 +165,8 @@ impl Front {
         let limits = client::Limits { domain: fixtures::domain_limits(), exchanges: 8 };
         assert!(self.out.len() <= client::max_out(&limits), "bounded client output queue");
         assert!(
-            self.store.len() <= usize::try_from(limits.domain.requests.requests).expect("table bound fits"),
+            self.store.keys().filter(|key| key.len() == 16).count()
+                <= usize::try_from(limits.domain.requests.requests).expect("table bound fits"),
             "bounded small store"
         );
     }
@@ -298,7 +301,9 @@ impl Story {
         let mut kept = List::with_capacity(u32::try_from(front.store.len()).expect("bounded store"));
         for (key, bytes) in &front.store {
             let record = client::Record { key: key.clone(), bytes: bytes.clone() };
-            front.referee.stored(&record);
+            if record.key.as_ref() != client::STREAM_KEY {
+                front.referee.stored(&record);
+            }
             kept.push(record).expect("bounded store");
         }
         front.event(self.now, Event::Start { kept });
