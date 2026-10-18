@@ -11,6 +11,7 @@ use skein_lib::{
 #[derive(Debug)]
 pub(crate) struct Stream {
     pub writer: sse::Writer,
+    pub ending: bool,
     pub above: Queue<sse::Event>,
     pub below: Queue<skein_lib::stream::Down>,
 }
@@ -46,6 +47,7 @@ impl Call {
             }));
             self.stream = Some(Stream {
                 writer: sse::Writer::new(&env.limits),
+                ending: false,
                 above: Queue::with_capacity(2),
                 below: Queue::with_capacity(2),
             });
@@ -66,24 +68,37 @@ impl Call {
     }
     pub fn end(&mut self, context: &Env<Limits>, why: Ended) {
         if let Some(stream) = &mut self.stream {
-            sse::down(&mut stream.writer, &env(context), sse::Request::Finish, &mut stream.above, &mut stream.below);
+            stream.ending = true;
+            stream.finish(context);
         } else {
             self.respond(if why == Ended::SignedOut { 401 } else { 409 }, Box::new([]), &context.limits);
         }
     }
-    pub fn stream_up(&mut self, _env: &Env<Limits>, out: &mut Queue<Request>) {
+    pub fn stream_up(&mut self, context: &Env<Limits>, out: &mut Queue<Request>) {
         let stream = self.stream.as_mut().expect("ready stream");
         if let Some(down) = stream.below.pop() {
             self.requests.push(http::Request::Reply(down));
         } else if let Some(event) = stream.above.pop() {
             match event {
-                sse::Event::Sent => out.push(Request::Component(FromTransport::StreamTaken { stream: self.name })),
+                sse::Event::Sent => {
+                    out.push(Request::Component(FromTransport::StreamTaken { stream: self.name }));
+                    stream.finish(context);
+                }
                 sse::Event::Failed(_) | sse::Event::Refused(_) => {
                     out.push(Request::Component(FromTransport::StreamGone { stream: self.name }));
                     self.requests.push(http::Request::Close);
                 }
                 sse::Event::Closed => {}
             }
+        }
+    }
+}
+
+impl Stream {
+    fn finish(&mut self, context: &Env<Limits>) {
+        if self.ending && self.writer.waiting() == sse::Waiting::Above {
+            self.ending = false;
+            sse::down(&mut self.writer, &env(context), sse::Request::Finish, &mut self.above, &mut self.below);
         }
     }
 }

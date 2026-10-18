@@ -327,3 +327,21 @@ fn the_mapping_s_answers_carry_nosniff_and_no_store() {
         assert!(!fixtures::names_a_cors_field(&headers));
     }
 }
+
+#[test]
+fn ending_a_mount_stream_while_its_record_waits_for_room_does_not_panic() {
+    use skein_http::sse::writer::Waiting;
+    let env = fixtures::env();
+    let mut call = call::Call::new(fixtures::EXCHANGE, &env.limits);
+    let mut out = Queue::with_capacity(8);
+    call.stream(&env, kit::Streamed::Record(Box::new([1, 2, 3])));
+    call.end(&env, kit::Ended::Stopping);
+    assert_eq!(call.stream.as_ref().expect("stream").writer.waiting(), Waiting::Room);
+    call.http(&env, http::Event::Reply(Up::Room), &mut out);
+    while call.stream_ready() {
+        call.stream_up(&env, &mut out);
+    }
+    assert_eq!(call.stream.as_ref().expect("stream").writer.waiting(), Waiting::Close);
+    call.end(&env, kit::Ended::Stopping);
+    assert_eq!(call.stream.as_ref().expect("stream").writer.waiting(), Waiting::Close);
+}
