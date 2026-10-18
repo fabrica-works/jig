@@ -156,7 +156,7 @@ fn action(
             match &object.body {
                 Some(Body::OwnerProposal(doc)) => crate::owner_proposal::render(b, client, doc, words, bindings),
                 Some(Body::Proposal(doc)) => {
-                    proposal::action(b, &doc.action, words, bindings);
+                    proposal::action(b, &doc.action, words, bindings, client.limits.rows);
                     common::authority(b, &doc.needs, words, bindings);
                     common::funding(b, &doc.funding, doc.needs.budget, words);
                 }

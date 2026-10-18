@@ -107,7 +107,7 @@ pub(crate) fn note_scope_piece(bytes: &[u8], limits: &Limits, bound: u32) -> Res
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 pub(crate) fn authority_fields(value: &w::Authority, limits: &Limits) -> Result<c::Authority, w::Problem> {
-    if value.task_kinds().len() > limits.client.rows {
+    if value.task_kinds().len() > limits.client.authority {
         return Err(too_large());
     }
     let mut list0 = List::with_capacity(value.task_kinds().len());
@@ -127,13 +127,13 @@ pub(crate) fn authority_fields(value: &w::Authority, limits: &Limits) -> Result<
     }
     Ok(c::Authority {
         budget: value.budget(),
-        grants: grant_piece(value.grants(), limits, limits.client.rows)?,
+        grants: grant_piece(value.grants(), limits, limits.client.authority)?,
         task_kinds: list0,
         depth: value.depth(),
         tasks: value.tasks(),
         deadline: opt1,
         tools: list2,
-        note_scopes: note_scope_piece(value.note_scopes(), limits, limits.client.rows)?,
+        note_scopes: note_scope_piece(value.note_scopes(), limits, limits.client.authority)?,
     })
 }
 

@@ -15,6 +15,7 @@ use std::{
 /// The test application’s client root and view adapter.
 pub struct Test;
 // Keep the story's before/after-linger transition within one heartbeat.
+pub(crate) const AUTHORITY_ENTRIES: u32 = 8;
 const LINGER: Duration = Duration::from_millis(25);
 /// Returns the small focused-world capacities.
 #[must_use]
@@ -96,6 +97,7 @@ pub fn limits() -> jig_client_test_domain::Limits {
                 records: 2,
                 kept: 4,
                 parts: 10,
+                authority: AUTHORITY_ENTRIES,
                 heartbeat: Duration::from_millis(100),
             },
             exchanges: 8,

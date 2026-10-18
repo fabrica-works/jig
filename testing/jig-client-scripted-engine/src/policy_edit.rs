@@ -26,7 +26,7 @@ impl Payload for PolicyEdit {
             Self::ProjectSpend { .. } => Some(0),
             Self::Role(value) => value.heap(bounds),
             Self::Requirements { requirements } => requirements.heap(bounds),
-            Self::Projections { grants } => grants.heap(bounds),
+            Self::Projections { grants } => crate::payload::authority(grants, bounds),
             Self::Permissions { mappings } => mappings.heap(bounds),
         }
     }

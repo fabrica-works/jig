@@ -292,6 +292,7 @@ pub(crate) mod tests {
         assert_eq!(hold.revision, 17);
         let bounds = jig_client_scripted_engine::Bounds {
             rows: limits.rows,
+            authority: crate::test::AUTHORITY_ENTRIES,
             segments: limits.segments,
             text: limits.text,
             document_bytes: limits.document_bytes,

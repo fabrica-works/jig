@@ -74,16 +74,24 @@ pub fn bounds(value: &acts::Bounds, limits: &Limits) -> Result<client::Bounds, o
         }),
         acts::Bounds::Amend { budget_left, grants, implications, authority, ceiling } => client::Bounds::Amend {
             budget_left: *budget_left,
-            grants: owner::list(grants, limits, |grant| {
+            grants: owner::list(grants, &Limits { rows: crate::test::AUTHORITY_ENTRIES, ..*limits }, |grant| {
                 Ok(client::OwnerGrant {
                     connector: grant.connector,
                     kind: grant.kind,
                     pattern: owner::pattern(&grant.segments, &grant.last, limits)?,
                 })
             })?,
-            implications: owner::list(implications, limits, |pair| {
-                Ok(client::OwnerKindImplication { connector: pair.connector, kind: pair.kind, implies: pair.implies })
-            })?,
+            implications: owner::list(
+                implications,
+                &Limits { rows: crate::test::AUTHORITY_ENTRIES, ..*limits },
+                |pair| {
+                    Ok(client::OwnerKindImplication {
+                        connector: pair.connector,
+                        kind: pair.kind,
+                        implies: pair.implies,
+                    })
+                },
+            )?,
             authority: Box::new(owner::authority(authority, limits)?),
             ceiling: Box::new(owner::authority(ceiling, limits)?),
         },
@@ -252,10 +260,8 @@ mod tests {
             ceiling: tasks::Budget { spend: u64::MAX, deadline: None },
             notes: tasks::Scopes(u8::MAX),
             note_resources: List::with_capacity(3),
-            cut: true,
         };
         let mut ceiling = authority.clone();
-        ceiling.cut = false;
         ceiling.ceiling.deadline = Some(Wall::EPOCH);
         let source = acts::Bounds::Amend {
             budget_left: u64::MAX,
@@ -274,7 +280,7 @@ mod tests {
         assert_eq!(grants.capacity(), 3);
         assert_eq!(implications.capacity(), 4);
         assert!(implications.is_empty(), "reserved empty complete relation is retained, not synthesized");
-        assert!(authority.cut);
+        assert!(!authority.cut);
         assert!(!ceiling.cut);
         assert_eq!(authority.authority.tools, u64::MAX);
         assert_eq!(authority.authority.notes, u8::MAX);
@@ -283,7 +289,10 @@ mod tests {
         assert_eq!(authority.authority.grants.capacity(), 3);
         assert_eq!(authority.authority.delegation.kinds.capacity(), 3);
         assert_eq!(authority.authority.note_resources.capacity(), 3);
-        assert_eq!(bounds(&source, &Limits { rows: 3, ..limits }), Err(owner::Invalid::TooLarge));
+        let mut oversized = source.clone();
+        let acts::Bounds::Amend { implications, .. } = &mut oversized else { panic!("amendment") };
+        *implications = List::with_capacity(crate::test::AUTHORITY_ENTRIES + 1);
+        assert_eq!(bounds(&oversized, &Limits { rows: 3, ..limits }), Err(owner::Invalid::TooLarge));
         assert_eq!(source, before);
     }
 }

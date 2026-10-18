@@ -33,6 +33,7 @@ const CLIENT: jig_client_domain::Limits = jig_client_domain::Limits {
     rows: 2,
     segments: 4,
     backoff: Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
+    authority: 8,
     heartbeat: Duration::from_nanos(100),
 };
 

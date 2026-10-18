@@ -19,6 +19,8 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
     core_limits.tasks.parameters = 4;
     core_limits.tasks.spec_bytes = 512;
     core_limits.tasks.authority_grants = 8;
+    core_limits.documents.grants = 8;
+    core_limits.documents.executors = 8;
     core_limits.tasks.authority_segments = 3;
     core_limits.tasks.authority_bytes = if environment_chat { 128 } else { 64 };
     core_limits.tasks.executor_kinds = 3;

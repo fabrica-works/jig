@@ -42,7 +42,7 @@ impl PolicyFragment {
 }
 /// Counts all checked labels, whole authority and escaped literal segment leaves.
 #[must_use]
-pub fn required(value: &PolicyEdit, words: &Words) -> Option<PolicyFragment> {
+pub fn required(value: &PolicyEdit, words: &Words, rows: u32) -> Option<PolicyFragment> {
     let phrase = match value {
         PolicyEdit::Templates { .. } => return None,
         PolicyEdit::ProjectSpend { .. } => JigPhrase::PolicyPeriodSpend,
@@ -65,7 +65,7 @@ pub fn required(value: &PolicyEdit, words: &Words) -> Option<PolicyFragment> {
             ] {
                 result.phrase(words, phrase)?;
             }
-            let authority = crate::owner_authority::required_words(&role.authority, words)?;
+            let authority = crate::owner_authority::required_words(&role.authority, words, rows)?;
             result.nodes = result.nodes.checked_add(authority.nodes)?;
             result.text_bytes = result.text_bytes.checked_add(authority.text_bytes)?;
             result.text_per_node = result.text_per_node.max(authority.text_per_node);
@@ -132,7 +132,7 @@ fn effect(b: &mut Builder, connector: u16, kind: u16, words: &Words) {
     words.text(b, JigPhrase::PolicyEffect, &[Hole::Number(u64::from(connector)), Hole::Number(u64::from(kind))]);
 }
 /// Display one whole edit without inventing role names or parsing resource names.
-pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words, text_limit: u32) {
+pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words, text_limit: u32, rows: u32) {
     let name = match value {
         PolicyEdit::Templates { .. } => return,
         PolicyEdit::ProjectSpend { period_spend } => {
@@ -152,7 +152,7 @@ pub fn render(b: &mut Builder, value: &PolicyEdit, words: &Words, text_limit: u3
         }
         PolicyEdit::Role(role) => {
             words.text(b, JigPhrase::PolicyEditRole, &[Hole::Number(u64::from(role.number))]);
-            crate::owner_authority::render_words(b, &role.authority, words, text_limit);
+            crate::owner_authority::render_words(b, &role.authority, words, text_limit, rows);
             words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(role.period_spend)]);
             words.text(b, JigPhrase::PolicyRequests, &[Hole::Number(u64::from(role.requests))]);
             words.text(b, JigPhrase::PolicyDecides, &[Hole::Number(u64::from(role.decides))]);

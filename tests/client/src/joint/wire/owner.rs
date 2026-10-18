@@ -208,6 +208,7 @@ pub(super) fn pattern(
 /// # Errors
 /// Refuses inconsistent executor or specification resource facts, any whole text/list allocation above bounds.
 pub fn authority(value: &documents::AuthorityLine, limits: &Limits) -> Result<client::OwnerAuthorityDocument, Invalid> {
+    let limits = &Limits { rows: crate::test::AUTHORITY_ENTRIES, ..*limits };
     Ok(client::OwnerAuthorityDocument {
         authority: client::OwnerAuthority {
             tools: value.tools.0,
@@ -241,7 +242,7 @@ pub fn authority(value: &documents::AuthorityLine, limits: &Limits) -> Result<cl
                 })
             })?,
         },
-        cut: value.cut,
+        cut: false,
     })
 }
 
@@ -397,7 +398,6 @@ pub(super) mod tests {
                 ceiling: tasks::Budget { spend: u64::MAX, deadline: None },
                 notes: tasks::Scopes(u8::MAX),
                 note_resources: List::with_capacity(1),
-                cut: false,
             },
             wake: tasks::WakePolicy {
                 words: tasks::WakeRule::Never,
@@ -460,17 +460,14 @@ pub(super) mod tests {
     #[test]
     fn amendment_snapshot_independent_loss_and_reserved_capacity_refuse_whole_values_without_trimming() {
         let limits = Limits { text: 3, rows: 4, ..crate::test::limits().jig };
-        for (spec_loss, authority_loss, dependency_loss) in
-            [(false, false, false), (true, false, false), (false, true, false), (false, false, true)]
-        {
+        for (spec_loss, dependency_loss) in [(false, false), (true, false), (false, true)] {
             let mut source = amendment_source();
             source.spec.cut = spec_loss;
-            source.authority.cut = authority_loss;
             source.cut = dependency_loss;
             let actual = amendment(&source, &limits).expect("independent loss facts fit");
             assert_eq!(actual.spec.cut, spec_loss);
             assert!(actual.spec.specification.words.cut, "supplied word loss is independent of list loss");
-            assert_eq!(actual.authority.cut, authority_loss);
+            assert!(!actual.authority.cut);
             assert_eq!(actual.cut, dependency_loss);
         }
         let source = amendment_source();
@@ -640,10 +637,9 @@ pub(super) mod tests {
                 ceiling: tasks::Budget { spend: u64::MAX, deadline },
                 notes: tasks::Scopes(u8::MAX),
                 note_resources: resources.clone(),
-                cut: true,
             };
             let actual = authority(&source, &limits).expect("the complete supplied fixture is admitted");
-            assert!(actual.cut);
+            assert!(!actual.cut);
             assert_eq!(actual.authority.tools, u64::MAX);
             assert_eq!(actual.authority.notes, u8::MAX);
             assert_eq!(actual.authority.deadline, deadline);
@@ -672,7 +668,9 @@ pub(super) mod tests {
                 actual.authority.delegation.kinds.get(0).expect("the complete supplied row is retained"),
                 &client::OwnerAuthorityExecutor::Role(u32::MAX)
             );
-            assert_eq!(authority(&source, &Limits { rows: 3, ..limits }), Err(Invalid::TooLarge));
+            let mut oversized = source.clone();
+            oversized.note_resources = List::with_capacity(crate::test::AUTHORITY_ENTRIES + 1);
+            assert_eq!(authority(&oversized, &Limits { rows: 3, ..limits }), Err(Invalid::TooLarge));
         }
         assert_whole_verdict_contract(&limits);
     }

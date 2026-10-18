@@ -41,7 +41,7 @@ fn receiving_part0(checked: &mut Limits, limits: &Limits) {
     checked.wire.amendment_dependencies_some = limits.client.rows;
     checked.wire.amendment_instructions_some = limits.client.text;
     checked.wire.authority_grants = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
-    checked.wire.authority_task_kinds = limits.client.rows;
+    checked.wire.authority_task_kinds = limits.client.authority;
     checked.wire.authority_tools = limits.client.rows;
     checked.wire.authority_note_scopes =
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
@@ -69,7 +69,7 @@ fn receiving_part0(checked: &mut Limits, limits: &Limits) {
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.owner_chip_ending_rows =
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
-    checked.wire.owner_delegation_kinds = limits.client.rows;
+    checked.wire.owner_delegation_kinds = limits.client.authority;
     checked.wire.owner_ended_page_rows =
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.owner_escalation_acts =

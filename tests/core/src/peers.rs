@@ -475,6 +475,7 @@ pub fn fixture(seed: u64, engine_slots: u32) -> (root::Config, root::Limits) {
     limits.core.people.amendment_bytes = 256;
     limits.core.authority.roles = 4;
     limits.core.authority.executors = 3;
+    limits.core.documents.executors = 3;
     limits.core.fleet.workers = 3;
     limits.core.fleet.slots = 1;
     limits.core.fleet.engine_slots = engine_slots;

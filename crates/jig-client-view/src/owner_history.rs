@@ -219,7 +219,7 @@ pub(crate) fn holder(b: &mut Builder, value: OwnerHistoryHolder, words: &Words) 
         }
     }
 }
-fn retained_amendment(b: &mut Builder, value: &OwnerRetainedAmendment, words: &Words, text_limit: u32) {
+fn retained_amendment(b: &mut Builder, value: &OwnerRetainedAmendment, words: &Words, text_limit: u32, rows: u32) {
     match value.addressed {
         Some(address) => {
             saying(b, words, P::AddressRevision, &[Hole::Number(address.revision.value)]);
@@ -251,7 +251,7 @@ fn retained_amendment(b: &mut Builder, value: &OwnerRetainedAmendment, words: &W
     match &value.authority {
         Some(value) => {
             saying(b, words, P::Authority, &[]);
-            crate::owner_authority::document_words(b, value, words, text_limit);
+            crate::owner_authority::document_words(b, value, words, text_limit, rows);
         }
         None => saying(b, words, P::AuthorityAbsent, &[]),
     }
@@ -277,19 +277,19 @@ fn retained_amendment(b: &mut Builder, value: &OwnerRetainedAmendment, words: &W
     saying(b, words, P::Reason, &[]);
     crate::document_text::markdown(b, &value.reason, words);
 }
-fn action(b: &mut Builder, value: &OwnerRetainedAction, words: &Words, bindings: &mut JigBindings) {
+fn action(b: &mut Builder, value: &OwnerRetainedAction, words: &Words, bindings: &mut JigBindings, rows: u32) {
     let text_limit = bindings.text_limit();
     match value {
         OwnerRetainedAction::Batch(tasks) => {
             saying(b, words, P::Batch, &[]);
             for task in tasks {
-                crate::cards::proposal::proposed_task(b, task, words, bindings);
+                crate::cards::proposal::proposed_task(b, task, words, bindings, rows);
             }
         }
         OwnerRetainedAction::Effect { part, authority, attempt, completion, position, purpose } => {
             saying(b, words, P::Effect, &[]);
             crate::proposed_task::part(b, part, words, bindings);
-            crate::owner_authority::document_words(b, authority, words, text_limit);
+            crate::owner_authority::document_words(b, authority, words, text_limit, rows);
             for (phrase, number) in [
                 (P::Attempt, *attempt),
                 (P::Completion, u64::from(*completion)),
@@ -302,19 +302,19 @@ fn action(b: &mut Builder, value: &OwnerRetainedAction, words: &Words, bindings:
         OwnerRetainedAction::ProcedureEffect { part, authority, step, purpose } => {
             saying(b, words, P::Effect, &[]);
             crate::proposed_task::part(b, part, words, bindings);
-            crate::owner_authority::document_words(b, authority, words, text_limit);
+            crate::owner_authority::document_words(b, authority, words, text_limit, rows);
             saying(b, words, P::ProcedureStep, &[Hole::Number(*step)]);
             saying(b, words, P::Purpose, &[Hole::Number(*purpose)]);
         }
         OwnerRetainedAction::Amend { task, change } => {
             saying(b, words, P::Amend, &[]);
             saying(b, words, P::Task, &[Hole::Number(*task)]);
-            retained_amendment(b, change, words, text_limit);
+            retained_amendment(b, change, words, text_limit, rows);
         }
         OwnerRetainedAction::Widen { task, authority } => {
             saying(b, words, P::Widen, &[]);
             saying(b, words, P::Task, &[Hole::Number(*task)]);
-            crate::owner_authority::document_words(b, authority, words, text_limit);
+            crate::owner_authority::document_words(b, authority, words, text_limit, rows);
         }
         OwnerRetainedAction::Release { task } => {
             saying(b, words, P::Release, &[]);
@@ -323,7 +323,7 @@ fn action(b: &mut Builder, value: &OwnerRetainedAction, words: &Words, bindings:
     }
 }
 /// Render only supplied immutable facts, borrowing the normal checked language.
-pub fn render(b: &mut Builder, value: &OwnerHistoryLine, words: &Words, bindings: &mut JigBindings) {
+pub fn render(b: &mut Builder, value: &OwnerHistoryLine, words: &Words, bindings: &mut JigBindings, rows: u32) {
     let text_limit = bindings.text_limit();
     b.open(Role::Region);
     let name = words.book.say(words.language, P::History.id(), &[]).expect("history heading checked");
@@ -342,24 +342,30 @@ pub fn render(b: &mut Builder, value: &OwnerHistoryLine, words: &Words, bindings
         Some((before, after)) => {
             saying(b, words, P::Stored, &[]);
             saying(b, words, P::Before, &[]);
-            crate::owner_amendment::render(b, before, words, text_limit);
+            crate::owner_amendment::render(b, before, words, text_limit, rows);
             saying(b, words, P::After, &[]);
-            crate::owner_amendment::render(b, after, words, text_limit);
+            crate::owner_amendment::render(b, after, words, text_limit, rows);
         }
         None => saying(b, words, P::SnapshotsAbsent, &[]),
     }
     if let Some(proposal) = &value.proposal {
-        self::proposal(b, proposal, words, bindings);
+        self::proposal(b, proposal, words, bindings, rows);
     }
     b.close();
 }
 
 /// Render supplied retained proposal facts inline, without current controls or outer history metadata.
-pub fn proposal(b: &mut Builder, proposal: &OwnerProposalHistory, words: &Words, bindings: &mut JigBindings) {
+pub fn proposal(
+    b: &mut Builder,
+    proposal: &OwnerProposalHistory,
+    words: &Words,
+    bindings: &mut JigBindings,
+    rows: u32,
+) {
     saying(b, words, P::Proposal, &[Hole::Number(proposal.number)]);
     saying(b, words, P::Proposer, &[Hole::Number(proposal.proposer)]);
     saying(b, words, if proposal.as_holder { P::AsHolder } else { P::NotAsHolder }, &[]);
-    action(b, &proposal.action, words, bindings);
+    action(b, &proposal.action, words, bindings, rows);
     match &proposal.state {
         OwnerProposalHistoryState::Pending { holder: value, since } => {
             saying(b, words, P::Pending, &[]);

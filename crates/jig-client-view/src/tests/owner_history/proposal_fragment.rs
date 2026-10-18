@@ -22,7 +22,7 @@ fn limits(fragment: HistoryFragment) -> Limits {
 fn render(value: &OwnerProposalHistory, words: &Words, limits: &Limits) -> (Tree, JigBindings) {
     let mut bindings = JigBindings::new(limits.bindings, 8);
     let mut builder = Builder::new(limits);
-    view::proposal(&mut builder, value, words, &mut bindings);
+    view::proposal(&mut builder, value, words, &mut bindings, client_limits().rows);
     (builder.finish(), bindings)
 }
 fn bare(value: &OwnerProposalHistory, words: &Words) -> (Tree, JigBindings, HistoryFragment) {
@@ -192,10 +192,10 @@ fn retained_proposal_fragment_validation_refuses_whole_allocated_rows_and_text_w
     };
     assert!(view::proposal_required(&value, &limits, words).is_some());
     assert!(view::proposal_required(&value, &crate::Limits { text: 7, ..limits }, words).is_none());
-    for action in actions().into_iter().skip(1).take(3) {
+    for (action, fits) in actions().into_iter().skip(1).take(3).zip([true, false, true]) {
         let value = proposal(action);
         assert!(view::proposal_required(&value, &limits, words).is_some());
-        assert!(view::proposal_required(&value, &crate::Limits { rows: 2, ..limits }, words).is_none());
+        assert_eq!(view::proposal_required(&value, &crate::Limits { rows: 2, ..limits }, words).is_some(), fits);
     }
     assert!(view::proposal_max_nodes(&crate::Limits { rows: u32::MAX, ..limits }).is_none());
 }

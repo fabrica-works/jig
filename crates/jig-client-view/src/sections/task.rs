@@ -168,7 +168,7 @@ pub(crate) fn section(
                 match section {
                     TaskSection::Overview => overview(b, client, &doc, words, bindings),
                     TaskSection::Activity => activity(b, client, &doc, words, bindings),
-                    TaskSection::Budget => budget(b, &doc, words, bindings),
+                    TaskSection::Budget => budget(b, &doc, words, bindings, client.limits.rows),
                     TaskSection::Panels => slots(b, &doc, section, words, bindings),
                     TaskSection::Plan | TaskSection::History => unreachable!("independent section"),
                 }
@@ -364,7 +364,7 @@ fn activity(b: &mut Builder, client: &Borrowed<'_>, doc: &Task, words: &Words, b
         }
     }
 }
-pub(crate) fn budget(b: &mut Builder, doc: &Task, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn budget(b: &mut Builder, doc: &Task, words: &Words, bindings: &mut JigBindings, rows: u32) {
     let text_limit = bindings.text_limit();
     crate::owner_budget::render(b, &doc.budget, words);
     if let Some(context) = &doc.context {
@@ -381,7 +381,7 @@ pub(crate) fn budget(b: &mut Builder, doc: &Task, words: &Words, bindings: &mut 
     }
     match doc.chip.executor {
         Executor::Agent { .. } | Executor::Procedure { .. } => {
-            crate::owner_authority::document_words(b, &doc.authority, words, text_limit);
+            crate::owner_authority::document_words(b, &doc.authority, words, text_limit, rows);
         }
         Executor::Party { .. } | Executor::Role { .. } => {}
     }

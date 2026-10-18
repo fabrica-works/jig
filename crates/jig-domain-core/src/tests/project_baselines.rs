@@ -59,7 +59,7 @@ fn project_permission_baselines_copy_restored_full_width_mappings_and_independen
     assert_eq!(shortened.policy.permissions.as_ref().unwrap().as_slice(), &mappings[..2]);
     assert!(shortened.policy.permissions_cut);
     assert!(shortened.policy.cut);
-    assert!(!shortened.policy.ceiling.cut);
+    assert_eq!(shortened.policy.ceiling, complete.policy.ceiling);
     assert!(!shortened.configured_pools_cut);
     assert!(!shortened.cut);
 }

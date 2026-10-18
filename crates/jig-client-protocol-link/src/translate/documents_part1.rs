@@ -177,7 +177,7 @@ pub(crate) fn owner_delegation_fields(
     value: &w::OwnerDelegation,
     limits: &Limits,
 ) -> Result<c::OwnerDelegation, w::Problem> {
-    if value.kinds().len() > limits.client.rows {
+    if value.kinds().len() > limits.client.authority {
         return Err(too_large());
     }
     let mut list0 = List::with_capacity(value.kinds().len());
@@ -238,12 +238,12 @@ pub(crate) fn owner_authority_fields(
     };
     Ok(c::OwnerAuthority {
         tools: value.tools(),
-        grants: owner_grant_piece(value.grants(), limits, limits.client.rows)?,
+        grants: owner_grant_piece(value.grants(), limits, limits.client.authority)?,
         delegation: owner_delegation_fields(value.delegation(), limits)?,
         spend: value.spend(),
         deadline: opt0,
         notes: value.notes(),
-        note_resources: owner_resource_scope_piece(value.note_resources(), limits, limits.client.rows)?,
+        note_resources: owner_resource_scope_piece(value.note_resources(), limits, limits.client.authority)?,
     })
 }
 
@@ -251,6 +251,9 @@ pub(crate) fn owner_authority_document_fields(
     value: &w::OwnerAuthorityDocument,
     limits: &Limits,
 ) -> Result<c::OwnerAuthorityDocument, w::Problem> {
+    if value.cut() {
+        return Err(too_large());
+    }
     Ok(c::OwnerAuthorityDocument { authority: owner_authority_fields(value.authority(), limits)?, cut: value.cut() })
 }
 

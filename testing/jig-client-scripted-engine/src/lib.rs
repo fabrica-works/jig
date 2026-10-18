@@ -38,6 +38,7 @@ pub use truth::{Change, Rule, Script, Truth};
 pub struct Bounds {
     pub text: u32,
     pub rows: u32,
+    pub authority: u32,
     pub segments: u32,
     pub document_bytes: u64,
     pub commit_delay: Duration,
@@ -50,6 +51,7 @@ impl Default for Bounds {
         Self {
             text: 4096,
             rows: 32,
+            authority: 32,
             segments: 32,
             document_bytes: 65536,
             commit_delay: Duration::from_millis(10),

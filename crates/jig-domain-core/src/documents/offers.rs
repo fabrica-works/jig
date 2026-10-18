@@ -34,11 +34,8 @@ fn receiving(value: Admission, limits: &DocumentLimits) -> Result<Admission, Mis
                 Bounds::Create { charters, procedures, .. } => {
                     charters.len() <= limits.lines && procedures.len() <= limits.lines
                 }
-                Bounds::Amend { authority, ceiling, grants, implications, .. } => {
-                    !authority.cut
-                        && !ceiling.cut
-                        && grants.len() <= limits.lines
-                        && implications.capacity() <= limits.lines
+                Bounds::Amend { grants, implications, .. } => {
+                    grants.len() <= limits.grants && implications.capacity() <= limits.implications
                 }
             };
             if !fits {
@@ -56,11 +53,6 @@ fn list(core: &Core, limits: &Limits, party: u64, subject: &Subject, kinds: &[Ac
     let mut result = List::with_capacity(u32::try_from(kinds.len()).expect("closed act list"));
     for act in kinds {
         let value = acts::admit(core, limits, party, *act, subject);
-        if *act == Act::Amend
-            && value == Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority })
-        {
-            return Err(Missing::TooLarge);
-        }
         let admission = receiving(value, &limits.documents)?;
         result
             .push(Offered { effect: effect(core, limits, *act, subject), act: *act, admission })
@@ -208,13 +200,13 @@ pub(super) fn note(core: &Core, party: u64, project: u32, scope: &people::NoteSc
 
 pub(super) fn heap_worst_case(limits: &DocumentLimits) -> Option<u64> {
     let authority = super::task_tree::authority_worst_case(limits)?;
-    let grants = List::<super::GrantLine>::worst_case(limits.lines)?
-        .checked_add(u64::from(limits.lines).checked_mul(super::task_tree::grant_worst_case(limits)?)?)?;
+    let grants = List::<super::GrantLine>::worst_case(limits.grants)?
+        .checked_add(u64::from(limits.grants).checked_mul(super::task_tree::grant_worst_case(limits)?)?)?;
     let amended = authority
         .checked_add(u64::try_from(size_of::<super::AuthorityLine>()).ok()?)?
         .checked_mul(2)?
         .checked_add(grants)?
-        .checked_add(List::<jig_domain_authority::Implication>::worst_case(limits.lines)?)?;
+        .checked_add(List::<jig_domain_authority::Implication>::worst_case(limits.implications)?)?;
     let recipient = List::<u32>::worst_case(limits.lines)?;
     // Amend carries the full amendment facts on a task;
     // all other object kinds carry at most one bounded act.

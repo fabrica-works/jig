@@ -57,8 +57,8 @@ fn phrase_limits() -> PhraseLimits {
 fn english() -> OwnerAuthorityWords {
     OwnerAuthorityWords::load(Box::new([words::english()]), &phrase_limits(), 0, 0).expect("checked English")
 }
-fn render(value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords) -> Tree {
-    let required = view::document_required(value, words).expect("capacity fits");
+fn render(value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords, rows: u32) -> Tree {
+    let required = view::document_required(value, words, rows).expect("capacity fits");
     let limits = Limits {
         nodes: required.nodes,
         depth: required.depth,
@@ -74,7 +74,7 @@ fn render(value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords) -> Tree {
         scene_bytes: 0,
     };
     let mut builder = Builder::new(&limits);
-    view::document(&mut builder, value, words, 5);
+    view::document(&mut builder, value, words, 5, rows);
     let tree = builder.finish();
     assert_eq!(tree.len(), required.nodes);
     assert!(
@@ -90,7 +90,7 @@ fn has(tree: &Tree, bytes: &[u8]) -> bool {
 fn exact_authority_fragment_keeps_opaque_boundaries_full_codes_and_explicit_cut() {
     let value = fixture();
     let words = english();
-    let tree = render(&value, &words);
+    let tree = render(&value, &words, 3);
     assert_eq!(tree.len(), 26, "one region and every independent fact/segment/end leaf");
     for text in [
         &b"a/b"[..],
@@ -104,15 +104,15 @@ fn exact_authority_fragment_keeps_opaque_boundaries_full_codes_and_explicit_cut(
         &b"Procedure: 4294967295"[..],
         &b"Tool bits: 18446744073709551615"[..],
         &b"Note scope bits: 255"[..],
-        &b"Authority document is cut"[..],
+        &b"More are held than shown"[..],
     ] {
         assert!(has(&tree, text), "exact independent fact retained");
     }
     assert_eq!(value.authority.grants.get(0).unwrap().pattern.segments.get(1).unwrap().as_ref(), &[255, 0, 128]);
     let mut complete = value;
     complete.cut = false;
-    let tree = render(&complete, &words);
-    assert!(!has(&tree, b"Authority document is cut"));
+    let tree = render(&complete, &words, 3);
+    assert!(!has(&tree, b"More are held than shown"));
     assert_eq!(tree.len(), 25);
     let envelope = view::worst_case(3, 3, 5, &words).expect("configured envelope");
     assert!(tree.len() <= envelope.nodes);
@@ -134,7 +134,7 @@ fn owner_authority_words_use_selected_language_and_person_offset() {
     }
     let words = OwnerAuthorityWords::load(Box::new([words::english(), translated]), &phrase_limits(), 1, -1)
         .expect("all selected words checked");
-    let tree = render(&fixture(), &words);
+    let tree = render(&fixture(), &words, 3);
     assert!(has(&tree, b"selected 00:01"));
     assert!(has(&tree, b"selected 4294967295"));
     assert!(!has(&tree, b"Exact ending"));
@@ -181,4 +181,33 @@ fn authority_words_reject_unrepresentable_utc_offsets_before_retaining_the_book(
     let positive =
         OwnerAuthorityWords::load(Box::new([words::english()]), &phrase_limits(), 0, 60).expect("person offset fits");
     assert_eq!(positive.adjusted_wall(Wall::from_nanos(u64::MAX)), Wall::from_nanos(u64::MAX));
+}
+
+const SHOWN: u32 = 2;
+const GRANT_CONNECTORS: [u16; 3] = [11, 12, 13];
+#[test]
+fn a_long_authority_shows_rows_of_grants_and_one_partial_mark() {
+    let mut value = fixture();
+    value.cut = false;
+    let grant = value.authority.grants.get(0).unwrap().clone();
+    value.authority.grants = List::with_capacity(3);
+    for connector in GRANT_CONNECTORS {
+        value.authority.grants.push(OwnerGrant { connector, ..grant.clone() }).unwrap();
+    }
+    value.authority.delegation.kinds.clear();
+    let words = english();
+    let tree = render(&value, &words, SHOWN);
+    assert!(has(&tree, b"Connector: 11"));
+    assert!(has(&tree, b"Connector: 12"));
+    assert!(!has(&tree, b"Connector: 13"));
+    assert_eq!(
+        tree.nodes()
+            .iter()
+            .flat_map(|node| &node.text)
+            .filter(|run| run.text.as_ref() == b"More are held than shown")
+            .count(),
+        1
+    );
+    assert_eq!(value.authority.grants.len(), 3);
+    assert_eq!(value.authority.grants.get(SHOWN).unwrap().connector, GRANT_CONNECTORS[2]);
 }

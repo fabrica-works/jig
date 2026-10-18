@@ -61,14 +61,14 @@ fn kind(b: &mut Builder, value: OwnerMessageProposalKind, words: &Words) {
         },
     );
 }
-fn goal(b: &mut Builder, value: &OwnerPersonProposalGoal, words: &Words, bindings: &mut JigBindings) {
+fn goal(b: &mut Builder, value: &OwnerPersonProposalGoal, words: &Words, bindings: &mut JigBindings, rows: u32) {
     let text_limit = bindings.text_limit();
     number(b, words, P::Goal, value.number);
     number(b, words, P::Project, u64::from(value.project));
     crate::proposed_task::executor(b, value.executor, words);
     crate::specification::specification(b, &value.spec, words);
     crate::proposed_task::contract(b, &value.contract, words, bindings);
-    crate::owner_authority::render_words(b, &value.authority, words, text_limit);
+    crate::owner_authority::render_words(b, &value.authority, words, text_limit, rows);
     for (phrase, amount) in [
         (P::Budget, value.numbers.budget),
         (P::Spent, value.numbers.spent),
@@ -137,7 +137,7 @@ fn task(b: &mut Builder, client: &Borrowed<'_>, value: &Task, words: &Words, bin
     number(b, words, P::Project, u64::from(value.project));
     crate::cards::chip::chip(b, client, &value.chip, words, bindings);
     crate::sections::task::overview(b, client, value, words, bindings);
-    crate::sections::task::budget(b, value, words, bindings);
+    crate::sections::task::budget(b, value, words, bindings, client.limits.rows);
 }
 fn outer(b: &mut Builder, value: &OwnerHistorical, words: &Words) {
     match value.at {
@@ -170,14 +170,14 @@ pub fn render(
         }
         OwnerHistoricalValue::Proposal(value) => {
             label(b, words, P::TaskProposal);
-            crate::owner_history::proposal(b, value, words, bindings);
+            crate::owner_history::proposal(b, value, words, bindings, client.limits.rows);
         }
         OwnerHistoricalValue::PersonProposal { proposal, decision } => {
             label(b, words, P::PersonProposal);
             number(b, words, P::Number, proposal.number);
             number(b, words, P::Proposer, proposal.proposer);
             number(b, words, P::Project, u64::from(proposal.project));
-            goal(b, &proposal.goal, words, bindings);
+            goal(b, &proposal.goal, words, bindings, client.limits.rows);
             match &proposal.state {
                 OwnerPersonProposalState::Pending { since } => {
                     label(b, words, P::Pending);
@@ -476,12 +476,6 @@ pub fn required(value: &OwnerHistorical, l: &Limits, words: &Words) -> Option<Hi
             spec_fits(&goal.spec, l)?;
             contract_fits(&goal.contract, l)?;
             let authority = &goal.authority;
-            if authority.grants.capacity() > l.rows
-                || authority.delegation.kinds.capacity() > l.rows
-                || authority.note_resources.capacity() > l.rows
-            {
-                return None;
-            }
             for grant in &authority.grants {
                 pattern_fits(&grant.pattern, l)?;
             }

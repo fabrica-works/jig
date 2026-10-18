@@ -311,7 +311,7 @@ pub fn authority(value: &d::AuthorityLine, limits: &w::Limits) -> Result<w::Owne
                     note_resources,
                 },
             )?,
-            cut: value.cut,
+            cut: false,
         },
     )
 }

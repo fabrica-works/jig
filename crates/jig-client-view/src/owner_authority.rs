@@ -48,7 +48,7 @@ impl AuthorityFragment {
 }
 /// Checked fragment capacities; phrase capacities cover every loaded language.
 #[must_use]
-pub fn required_words(value: &OwnerAuthority, words: &Words) -> Option<AuthorityFragment> {
+pub fn required_words(value: &OwnerAuthority, words: &Words, rows: u32) -> Option<AuthorityFragment> {
     let mut result = AuthorityFragment { nodes: 1, text_bytes: 0, text_per_node: 0, depth: 2 };
     for phrase in [
         AuthorityPhrase::Tools,
@@ -65,12 +65,12 @@ pub fn required_words(value: &OwnerAuthority, words: &Words) -> Option<Authority
     if value.deadline.is_some() {
         result.phrase(words, AuthorityPhrase::Deadline)?;
     }
-    for grant in &value.grants {
+    for grant in value.grants.iter().take(usize::try_from(rows).expect("rows fit")) {
         result.phrase(words, AuthorityPhrase::Connector)?;
         result.phrase(words, AuthorityPhrase::Kind)?;
         result.pattern(&grant.pattern, words)?;
     }
-    for kind in &value.delegation.kinds {
+    for kind in value.delegation.kinds.iter().take(usize::try_from(rows).expect("rows fit")) {
         let phrase = match kind {
             OwnerAuthorityExecutor::Charter(_) => AuthorityPhrase::Charter,
             OwnerAuthorityExecutor::Procedure(_) => AuthorityPhrase::Procedure,
@@ -78,17 +78,23 @@ pub fn required_words(value: &OwnerAuthority, words: &Words) -> Option<Authority
         };
         result.phrase(words, phrase)?;
     }
-    for resource in &value.note_resources {
+    for resource in value.note_resources.iter().take(usize::try_from(rows).expect("rows fit")) {
         result.phrase(words, AuthorityPhrase::Connector)?;
         result.pattern(&resource.pattern, words)?;
     }
+    if partial(value, rows) {
+        result.phrase(words, AuthorityPhrase::Cut)?;
+    }
     Some(result)
+}
+fn partial(value: &OwnerAuthority, rows: u32) -> bool {
+    value.grants.len() > rows || value.delegation.kinds.len() > rows || value.note_resources.len() > rows
 }
 /// Include the owner's cut fact without inferring completeness from other facts.
 #[must_use]
-pub fn document_required_words(value: &OwnerAuthorityDocument, words: &Words) -> Option<AuthorityFragment> {
-    let mut result = required_words(&value.authority, words)?;
-    if value.cut {
+pub fn document_required_words(value: &OwnerAuthorityDocument, words: &Words, rows: u32) -> Option<AuthorityFragment> {
+    let mut result = required_words(&value.authority, words, rows)?;
+    if value.cut && !partial(&value.authority, rows) {
         result.phrase(words, AuthorityPhrase::Cut)?;
     }
     Some(result)
@@ -143,7 +149,7 @@ pub(crate) fn pattern(b: &mut Builder, words: &Words, value: &OwnerPattern, text
         }
     }
 }
-fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words, text_limit: u32) {
+fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words, text_limit: u32, rows: u32) {
     number(b, words, AuthorityPhrase::Tools, value.tools);
     number(b, words, AuthorityPhrase::Tasks, u64::from(value.delegation.tasks));
     number(b, words, AuthorityPhrase::Depth, u64::from(value.delegation.depth));
@@ -153,13 +159,13 @@ fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words, text_limit: u32)
         text(b, words, AuthorityPhrase::Deadline, &[Hole::Wall(words.adjusted_wall(deadline))]);
     }
     text(b, words, AuthorityPhrase::Grants, &[]);
-    for grant in &value.grants {
+    for grant in value.grants.iter().take(usize::try_from(rows).expect("rows fit")) {
         number(b, words, AuthorityPhrase::Connector, u64::from(grant.connector));
         number(b, words, AuthorityPhrase::Kind, u64::from(grant.kind));
         pattern(b, words, &grant.pattern, text_limit);
     }
     text(b, words, AuthorityPhrase::Delegation, &[]);
-    for kind in &value.delegation.kinds {
+    for kind in value.delegation.kinds.iter().take(usize::try_from(rows).expect("rows fit")) {
         match kind {
             OwnerAuthorityExecutor::Charter(code) => number(b, words, AuthorityPhrase::Charter, u64::from(*code)),
             OwnerAuthorityExecutor::Procedure(code) => number(b, words, AuthorityPhrase::Procedure, u64::from(*code)),
@@ -167,22 +173,25 @@ fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words, text_limit: u32)
         }
     }
     text(b, words, AuthorityPhrase::Resources, &[]);
-    for resource in &value.note_resources {
+    for resource in value.note_resources.iter().take(usize::try_from(rows).expect("rows fit")) {
         number(b, words, AuthorityPhrase::Connector, u64::from(resource.connector));
         pattern(b, words, &resource.pattern, text_limit);
     }
+    if partial(value, rows) {
+        text(b, words, AuthorityPhrase::Cut, &[]);
+    }
 }
 /// Render a whole admitted payload using a separately reserved fragment capacity.
-pub fn render_words(b: &mut Builder, value: &OwnerAuthority, words: &Words, text_limit: u32) {
+pub fn render_words(b: &mut Builder, value: &OwnerAuthority, words: &Words, text_limit: u32, rows: u32) {
     b.open(Role::Description);
-    body(b, value, words, text_limit);
+    body(b, value, words, text_limit, rows);
     b.close();
 }
 /// Render a document projection and its explicit cut metadata.
-pub fn document_words(b: &mut Builder, value: &OwnerAuthorityDocument, words: &Words, text_limit: u32) {
+pub fn document_words(b: &mut Builder, value: &OwnerAuthorityDocument, words: &Words, text_limit: u32, rows: u32) {
     b.open(Role::Description);
-    body(b, &value.authority, words, text_limit);
-    if value.cut {
+    body(b, &value.authority, words, text_limit, rows);
+    if value.cut && !partial(&value.authority, rows) {
         text(b, words, AuthorityPhrase::Cut, &[]);
     }
     b.close();
@@ -196,13 +205,17 @@ pub fn document_nodes(rows: u32, segments: u32) -> Option<u32> {
 }
 /// Standalone capacity API shares the original checked book.
 #[must_use]
-pub fn required(value: &OwnerAuthority, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
-    required_words(value, words.words())
+pub fn required(value: &OwnerAuthority, words: &OwnerAuthorityWords, rows: u32) -> Option<AuthorityFragment> {
+    required_words(value, words.words(), rows)
 }
 /// Standalone document capacity API shares the original checked book.
 #[must_use]
-pub fn document_required(value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords) -> Option<AuthorityFragment> {
-    document_required_words(value, words.words())
+pub fn document_required(
+    value: &OwnerAuthorityDocument,
+    words: &OwnerAuthorityWords,
+    rows: u32,
+) -> Option<AuthorityFragment> {
+    document_required_words(value, words.words(), rows)
 }
 /// Standalone configured envelope includes escaped literal presentation.
 #[must_use]
@@ -210,10 +223,16 @@ pub fn worst_case(rows: u32, segments: u32, text: u32, words: &OwnerAuthorityWor
     worst_case_words(rows, segments, text, words.words())
 }
 /// Render a standalone authority with its selected checked language.
-pub fn render(b: &mut Builder, value: &OwnerAuthority, words: &OwnerAuthorityWords, text_limit: u32) {
-    render_words(b, value, words.words(), text_limit);
+pub fn render(b: &mut Builder, value: &OwnerAuthority, words: &OwnerAuthorityWords, text_limit: u32, rows: u32) {
+    render_words(b, value, words.words(), text_limit, rows);
 }
 /// Render a standalone authority document and its supplied cut marker.
-pub fn document(b: &mut Builder, value: &OwnerAuthorityDocument, words: &OwnerAuthorityWords, text_limit: u32) {
-    document_words(b, value, words.words(), text_limit);
+pub fn document(
+    b: &mut Builder,
+    value: &OwnerAuthorityDocument,
+    words: &OwnerAuthorityWords,
+    text_limit: u32,
+    rows: u32,
+) {
+    document_words(b, value, words.words(), text_limit, rows);
 }

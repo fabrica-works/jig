@@ -32,6 +32,7 @@ fn limits() -> jig_client::Limits {
             records: l.records,
             kept: l.kept,
             parts: l.parts,
+            authority: 8,
             heartbeat: world.client.domain.heartbeat,
             handles: 8,
             turn_bytes: 32,

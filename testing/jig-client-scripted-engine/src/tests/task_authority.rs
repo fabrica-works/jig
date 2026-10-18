@@ -22,7 +22,8 @@ fn supplied() -> OwnerAuthorityDocument {
 
 #[test]
 fn task_authority_receiving_prices_whole_documents_replacements_and_reserved_nested_permissions() {
-    let mut bounds = Bounds { rows: 2, segments: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
+    let mut bounds =
+        Bounds { rows: 2, authority: 2, segments: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
     for cut in [false, true] {
         let mut row = task();
         row.authority = supplied();
@@ -95,7 +96,8 @@ fn amendment_receiving_prices_reserved_kind_order_rows_and_refuses_the_whole_ove
             ceiling: Box::new(row.clone()),
         };
         let before = value.clone();
-        let mut bounds = Bounds { rows: 2, segments: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
+        let mut bounds =
+            Bounds { rows: 2, authority: 2, segments: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
         let bytes =
             u64::try_from(size_of::<jig_client_domain::contract::Bounds>()).unwrap() + value.heap(&bounds).unwrap();
         bounds.document_bytes = bytes;
@@ -110,6 +112,7 @@ fn amendment_receiving_prices_reserved_kind_order_rows_and_refuses_the_whole_ove
         *implications = List::with_capacity(3);
         assert!(!payload::fits(&oversized, &bounds));
         bounds.rows = 1;
+        bounds.authority = 1;
         assert!(!payload::fits(&value, &bounds));
         assert_eq!(value, before);
         let jig_client_domain::contract::Bounds::Amend { implications, .. } = value else { panic!("whole offer") };

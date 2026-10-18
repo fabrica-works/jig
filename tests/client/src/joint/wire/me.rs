@@ -115,6 +115,5 @@ pub(super) fn empty_authority() -> jig_domain_core::documents::AuthorityLine {
         ceiling: t::Budget { spend: 0, deadline: None },
         notes: t::Scopes(0),
         note_resources: List::with_capacity(0),
-        cut: false,
     }
 }

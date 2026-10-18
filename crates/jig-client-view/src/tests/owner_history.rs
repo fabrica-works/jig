@@ -231,7 +231,7 @@ fn build(value: &OwnerHistoryLine, words: &Words) -> (Tree, JigBindings) {
     assert!(crate::limits::jig_worst_case(&limits).is_some());
     let mut bindings = JigBindings::new(f.bindings, 8);
     let mut b = Builder::new(&limits);
-    view::render(&mut b, value, words, &mut bindings);
+    view::render(&mut b, value, words, &mut bindings, client_limits().rows);
     let tree = b.finish();
     assert!(tree.len() <= f.nodes);
     let mut total = 0_u64;
@@ -413,7 +413,7 @@ fn owner_history_retained_optional_delta_keeps_revision_channels_empty_presence_
         saying(&tree, words, P::HoldRevision, &[Hole::Number(4)]);
         assert_eq!(count(&tree, b"Only part of this text was supplied"), usize::from(flag < 3));
         assert_eq!(has(&tree, b"The specification is incomplete"), flag == 3);
-        assert_eq!(has(&tree, b"Authority document is cut"), flag == 4);
+        assert_eq!(has(&tree, b"More are held than shown"), flag == 4);
         assert_eq!(has(&tree, b"Retained dependency list incomplete"), flag == 5);
     }
     let absent = OwnerRetainedAmendment {

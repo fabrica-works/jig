@@ -27,6 +27,7 @@ pub fn client_limits() -> jig_client_protocol_link::Limits {
         segments: 4,
         rows: 2,
         backoff: jig_client_domain::Backoff { first: Duration::from_nanos(10), most: Duration::from_nanos(80) },
+        authority: 8,
         heartbeat: Duration::from_nanos(100),
     };
     jig_client_protocol_link::Limits::new(client, 4).expect("valid receiving limits")

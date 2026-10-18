@@ -396,3 +396,33 @@ pub fn task_with_resource_path(count: u32) -> w::Task {
         w::TaskContractDocument::Approval(w::TaskContractDocumentApproval::new(&wire, approval).unwrap());
     w::Task::new(&wire, parts).unwrap()
 }
+
+pub fn task_with_authority_grants(count: u32) -> (w::Task, c::Task) {
+    let mut expected = task();
+    expected.authority.authority.grants = List::with_capacity(count);
+    for _ in 0..count {
+        expected
+            .authority
+            .authority
+            .grants
+            .push(c::OwnerGrant {
+                connector: u16::MAX,
+                kind: u16::MAX,
+                pattern: c::OwnerPattern {
+                    segments: List::with_capacity(0),
+                    last: c::OwnerPatternEnd::Open(Box::new([])),
+                },
+            })
+            .unwrap();
+    }
+    let mut parts = task_record().into_parts();
+    parts.authority = w::OwnerAuthorityDocument::new(
+        &w::CEILINGS,
+        w::OwnerAuthorityDocumentParts {
+            authority: translate::asks::wire_owner_authority(&expected.authority.authority, &w::CEILINGS).unwrap(),
+            cut: false,
+        },
+    )
+    .unwrap();
+    (w::Task::new(&w::CEILINGS, parts).unwrap(), expected)
+}

@@ -46,7 +46,7 @@ fn task_authority_forms_preserve_all_permissions_and_selected_delta_without_reco
         assert!(contains(&tree, b"Role: 4294967295"));
         assert!(contains(&tree, b"a/b"));
         assert!(contains(&tree, b"\\xFF\\x00"));
-        assert_eq!(contains(&tree, b"Authority document is cut"), cut);
+        assert_eq!(contains(&tree, b"More are held than shown"), cut);
         assert_eq!(tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New budget")), !cut);
         assert_eq!(
             tree.nodes().iter().any(|node| node.name.as_deref() == Some(b"New deadline (UTC, YYYY-MM-DD HH:MM)")),
@@ -135,7 +135,7 @@ fn task_budget_section_renders_exact_bitmap_delegation_and_literal_authority_los
             assert!(contains(&tree, b"a/b"));
             assert!(contains(&tree, b"\\xFF\\x00"));
             assert!(contains(&tree, b"Open ending"));
-            assert_eq!(contains(&tree, b"Authority document is cut"), cut);
+            assert_eq!(contains(&tree, b"More are held than shown"), cut);
             assert!(tree.len() <= crate::task_nodes(&CLIENT, 0).unwrap());
             let id = domain.task_page().header.unwrap();
             let Some(crate::objects::Body::Task(actual)) = &domain.objects().get(id).unwrap().body else {

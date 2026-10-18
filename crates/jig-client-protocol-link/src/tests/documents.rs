@@ -185,3 +185,23 @@ fn a_resource_path_at_its_segment_bound_is_decoded_past_the_row_bound() {
 fn a_resource_path_one_segment_past_its_bound_is_refused() {
     assert_eq!(documents::task(fixtures::task_with_resource_path(5), &fixtures::limits()), Err(Undecodable::TooLarge));
 }
+
+#[test]
+fn an_authority_uses_its_own_bound_beyond_the_document_rows() {
+    let limits = fixtures::limits();
+    assert_eq!(limits.client.rows, 2);
+    let (record, expected) = fixtures::task_with_authority_grants(limits.client.authority);
+    assert_eq!(documents::task(record, &limits), Ok(expected));
+    let (record, _) = fixtures::task_with_authority_grants(limits.client.authority + 1);
+    assert_eq!(documents::task(record, &limits), Err(Undecodable::TooLarge));
+}
+#[test]
+fn a_document_with_a_cut_authority_is_refused_as_too_large() {
+    let limits = fixtures::limits();
+    let (record, _) = fixtures::task_with_authority_grants(limits.client.authority);
+    let mut parts = record.into_parts();
+    let mut authority = parts.authority.into_parts();
+    authority.cut = true;
+    parts.authority = w::OwnerAuthorityDocument::new(&w::CEILINGS, authority).unwrap();
+    assert_eq!(documents::task(w::Task::new(&w::CEILINGS, parts).unwrap(), &limits), Err(Undecodable::TooLarge));
+}

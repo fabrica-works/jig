@@ -87,7 +87,8 @@ fn owner_project_kit_checks_final_member_text_and_whole_segment_and_nested_reser
             role: OwnerProjectResourceRole::Unavailable,
         })
         .unwrap();
-    let mut bounds = Bounds { rows: 2, segments: 2, text: 4, document_bytes: u64::MAX, ..Bounds::default() };
+    let mut bounds =
+        Bounds { rows: 2, authority: 2, segments: 2, text: 4, document_bytes: u64::MAX, ..Bounds::default() };
     assert!(owner_project::fits(&value, &bounds));
     bounds.text = 3;
     assert!(!owner_project::fits(&value, &bounds));

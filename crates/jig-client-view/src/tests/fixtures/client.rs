@@ -79,6 +79,7 @@ impl Fixture {
             records: limits.records,
             kept: limits.kept,
             parts: limits.parts,
+            authority: 8,
             heartbeat: HEARTBEAT,
         };
         let mut value = Self {

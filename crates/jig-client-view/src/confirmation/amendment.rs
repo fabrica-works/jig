@@ -100,7 +100,7 @@ pub fn deadline(value: &[u8]) -> Option<skein_lib::Wall> {
 /// Show all before facts and form fields; each input preserves the other selected changes.
 pub fn form(
     b: &mut Builder,
-    _client: &Borrowed<'_>,
+    client: &Borrowed<'_>,
     object: &Object,
     open: &Confirmation,
     words: &Words,
@@ -111,15 +111,15 @@ pub fn form(
         return;
     };
     words.text(b, JigPhrase::Before, &[]);
-    proposal::amendment(b, &before, words, bindings);
+    proposal::amendment(b, &before, words, bindings, client.limits.rows);
     loss(b, object, words);
     task_loss(b, object, words);
-    authority_loss(b, object, words, text_limit);
+    authority_loss(b, object, words, text_limit, client.limits.rows);
     let empty = empty();
     let change = open.choices.change.as_ref().unwrap_or(&empty);
     let value = values(&before, change);
     words.text(b, JigPhrase::After, &[]);
-    proposal::amendment(b, change, words, bindings);
+    proposal::amendment(b, change, words, bindings, client.limits.rows);
     if value.spec.is_some() {
         input(b, &value, open, Field::Words, JigPhrase::NewSpec, words, bindings);
     }
@@ -207,7 +207,7 @@ pub fn form(
         | None => {}
     }
 }
-fn authority_loss(b: &mut Builder, object: &Object, words: &Words, text_limit: u32) {
+fn authority_loss(b: &mut Builder, object: &Object, words: &Words, text_limit: u32, rows: u32) {
     let document = match &object.body {
         Some(Body::Task(doc)) => Some(&doc.authority),
         Some(Body::OwnerEscalation(doc)) => Some(&doc.task.authority),
@@ -228,7 +228,7 @@ fn authority_loss(b: &mut Builder, object: &Object, words: &Words, text_limit: u
     if let Some(document) = document
         && document.cut
     {
-        crate::owner_authority::document_words(b, document, words, text_limit);
+        crate::owner_authority::document_words(b, document, words, text_limit, rows);
     }
 }
 fn task_loss(b: &mut Builder, object: &Object, words: &Words) {

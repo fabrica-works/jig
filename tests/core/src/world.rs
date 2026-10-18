@@ -124,6 +124,9 @@ fn profile() -> root::Limits {
             templates: 8,
             fill_mark: 1000,
             documents: core::documents::DocumentLimits {
+                grants: 1,
+                executors: 2,
+                implications: 0,
                 roles: authority_limits().roles,
                 segments: 4,
                 rows: 32,

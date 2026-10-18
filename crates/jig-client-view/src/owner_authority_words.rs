@@ -139,7 +139,7 @@ pub fn english() -> Language {
             AuthorityPhrase::Segments => b"Literal segments",
             AuthorityPhrase::Exact => b"Exact ending",
             AuthorityPhrase::Open => b"Open ending",
-            AuthorityPhrase::Cut => b"Authority document is cut",
+            AuthorityPhrase::Cut => b"More are held than shown",
             AuthorityPhrase::Deadline => b"Deadline: ",
             AuthorityPhrase::OmittedSegments => "…".as_bytes(),
         };

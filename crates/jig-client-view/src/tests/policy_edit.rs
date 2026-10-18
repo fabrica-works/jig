@@ -12,7 +12,7 @@ fn pattern(last: OwnerPatternEnd) -> OwnerPattern {
 }
 fn shown(value: &PolicyEdit) -> skein_ui::Tree {
     let words = words();
-    let required = policy_edit::required(value, words).unwrap();
+    let required = policy_edit::required(value, words, super::cards::CLIENT.rows).unwrap();
     let mut b = Builder::new(&skein_ui::Limits {
         nodes: required.nodes.checked_add(1).unwrap(),
         depth: required.depth.checked_add(1).unwrap(),
@@ -28,7 +28,7 @@ fn shown(value: &PolicyEdit) -> skein_ui::Tree {
         scene_bytes: 0,
     });
     b.open(Role::Page);
-    policy_edit::render(&mut b, value, words, super::cards::CLIENT.text);
+    policy_edit::render(&mut b, value, words, super::cards::CLIENT.text, super::cards::CLIENT.rows);
     b.close();
     let tree = b.finish();
     assert_eq!(tree.len(), required.nodes.checked_add(1).unwrap());

@@ -104,6 +104,9 @@ pub const CORE_LIMITS: core::Limits = core::Limits {
     templates: 8,
     fill_mark: 1000,
     documents: core::documents::DocumentLimits {
+        grants: 2,
+        executors: 3,
+        implications: 0,
         roles: 2,
         segments: 2,
         rows: 32,

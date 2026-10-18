@@ -37,7 +37,6 @@ fn bounded(limits: &DocumentLimits, order_rows: u32) -> Admission {
         ceiling: tasks::Budget { spend: u64::MAX, deadline: None },
         notes: tasks::Scopes(7),
         note_resources,
-        cut: false,
     };
     let mut implications = List::with_capacity(order_rows);
     for _ in 0..order_rows {
@@ -58,6 +57,9 @@ fn bounded(limits: &DocumentLimits, order_rows: u32) -> Admission {
 }
 fn limits() -> DocumentLimits {
     DocumentLimits {
+        grants: 2,
+        executors: 2,
+        implications: 2,
         roles: 4,
         segments: 4,
         rows: 2,

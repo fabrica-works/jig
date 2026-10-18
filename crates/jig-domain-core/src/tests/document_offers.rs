@@ -58,7 +58,7 @@ fn document_offers_fit_the_object_and_preserve_actor_specific_refusals() {
 }
 
 #[test]
-fn complete_policy_recipients_and_authority_refuse_a_shortened_receiving_form() {
+fn complete_policy_recipients_refuse_a_shortened_receiving_form() {
     let (mut core, mut limits) = make_tree();
     limits.authority.roles = 2;
     let mut policy = core.authority.policy(1).unwrap().clone();
@@ -79,22 +79,6 @@ fn complete_policy_recipients_and_authority_refuse_a_shortened_receiving_form() 
         release: None,
     };
     assert_eq!(crate::acts::request(&core, &limits, 1, 1, Some(people::Role::Owner), &request), Ok(()));
-    let mut full = core.tasks.task(2).unwrap().authority.clone();
-    full.delegation.kinds = Box::new([tasks::AuthorityExecutor::Charter(1), tasks::AuthorityExecutor::Role(0)]);
-    assert_eq!(act_authority(&limits, &full), Err(Missing::TooLarge));
-    limits.documents.lines = 2;
-    let mut before = core.tasks.task(2).unwrap().clone();
-    let pattern = tasks::Pattern { segments: Box::new([]), last: tasks::Last::Open(Box::new([])) };
-    before.authority.grants = Box::new([
-        tasks::Grant { connector: 1, kind: 1, pattern: pattern.clone() },
-        tasks::Grant { connector: 1, kind: 2, pattern: pattern.clone() },
-        tasks::Grant { connector: 1, kind: 3, pattern },
-    ]);
-    assert_eq!(
-        task_from_row(&core, &limits, 1, &before),
-        Err(Missing::TooLarge),
-        "the before authority cannot be shortened beneath a bounded offer"
-    );
 }
 
 #[test]
@@ -189,5 +173,69 @@ fn cancellation_during_closing_and_release_of_a_held_closing_task_keep_the_owner
     if let tasks::Phase::Closing(_) = core.tasks.task(3).unwrap().phase {
     } else {
         panic!("released closing");
+    }
+}
+
+const PROJECT: u32 = 1;
+const PERSON: u64 = 1;
+const TASK: u64 = 2;
+const CONNECTOR: u16 = 1;
+const KINDS: [u16; 3] = [1, 2, 3];
+const GRANTS: u32 = 3;
+fn full_grants() -> (Core, Limits, tasks::TaskRecord) {
+    let (mut core, mut limits) = make_tree();
+    limits.authority.grants = GRANTS;
+    limits.tasks.authority_grants = GRANTS;
+    limits.documents.grants = GRANTS;
+    limits.documents.lines = 2;
+    let grants: Box<[_]> = KINDS
+        .map(|kind| authority::Grant {
+            connector: CONNECTOR,
+            kind,
+            pattern: authority::Pattern { segments: Box::new([]), last: authority::Last::Open(Box::new([])) },
+        })
+        .into();
+    let mut rules = core.authority.rules().clone();
+    rules.ceiling.grants = grants.clone();
+    let mut policy = core.authority.policy(PROJECT).unwrap().clone();
+    policy.ceiling.grants = grants.clone();
+    policy.roles[0].authority.grants = grants;
+    core.authority = authority::Domain::new(rules, limits.authority).unwrap();
+    let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut core.authority, authority::Event::Policy { project: PROJECT, policy }, &mut out);
+    assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: PROJECT }));
+    let mut row = core.tasks.task(TASK).unwrap().clone();
+    row.authority.grants = KINDS
+        .map(|kind| tasks::Grant {
+            connector: CONNECTOR,
+            kind,
+            pattern: tasks::Pattern { segments: Box::new([]), last: tasks::Last::Open(Box::new([])) },
+        })
+        .into();
+    (core, limits, row)
+}
+#[test]
+fn a_task_and_its_amend_offer_hold_the_roles_grants_whole() {
+    let (core, limits, row) = full_grants();
+    let value = task_from_row(&core, &limits, PERSON, &row).unwrap();
+    let Some(Admission::Bounded { within: crate::acts::Bounds::Amend { authority, grants, .. }, .. }) =
+        find(&value.acts, Act::Amend)
+    else {
+        panic!("whole bounded amendment")
+    };
+    assert_eq!(value.authority.grants.len(), limits.authority.grants);
+    assert_eq!(authority.grants.len(), GRANTS);
+    assert_eq!(grants.len(), GRANTS);
+    for (index, kind) in KINDS.into_iter().enumerate() {
+        let i = u32::try_from(index).unwrap();
+        let expected = GrantLine {
+            connector: CONNECTOR,
+            kind,
+            segments: List::with_capacity(0),
+            last: PatternEnd::Open(Box::new([])),
+        };
+        assert_eq!(value.authority.grants.get(i), Some(&expected), "task grant {kind}");
+        assert_eq!(authority.grants.get(i), Some(&expected), "role grant {kind}");
+        assert_eq!(grants.get(i), Some(&expected), "listed grant {kind}");
     }
 }

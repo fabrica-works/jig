@@ -39,6 +39,7 @@ fn admitted(value: client::ReadValue, limits: &Limits) -> Result<client::ReadVal
         &admission::Bounds {
             text: limits.text,
             rows: limits.rows,
+            authority: crate::test::AUTHORITY_ENTRIES,
             segments: limits.segments,
             document_bytes: limits.document_bytes,
             ..admission::Bounds::default()

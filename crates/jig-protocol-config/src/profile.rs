@@ -56,3 +56,17 @@ pub(crate) const fn name_segments(tasks: &jig_domain_tasks::Limits, authority: &
         if tasks.hold_segments > tasks.authority_segments { tasks.hold_segments } else { tasks.authority_segments };
     if authority.segments > task { authority.segments } else { task }
 }
+
+/// Every admitted authority list fits independently of short document lists.
+pub(crate) const fn authority_grants(
+    tasks: &jig_domain_tasks::Limits,
+    authority: &jig_domain_authority::Limits,
+) -> u32 {
+    if tasks.authority_grants > authority.grants { tasks.authority_grants } else { authority.grants }
+}
+pub(crate) const fn authority_executors(
+    tasks: &jig_domain_tasks::Limits,
+    authority: &jig_domain_authority::Limits,
+) -> u32 {
+    if tasks.executor_kinds > authority.executors { tasks.executor_kinds } else { authority.executors }
+}

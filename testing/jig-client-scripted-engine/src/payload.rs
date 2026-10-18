@@ -90,6 +90,9 @@ impl<T: Payload> Payload for List<T> {
 pub(crate) fn path<T: Payload>(value: &List<T>, bounds: &Bounds) -> Option<u64> {
     value.heap(&Bounds { rows: bounds.segments, ..*bounds })
 }
+pub(crate) fn authority<T: Payload>(value: &List<T>, bounds: &Bounds) -> Option<u64> {
+    value.heap(&Bounds { rows: bounds.authority, ..*bounds })
+}
 impl<T: Payload> Payload for Option<T> {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         self.as_ref().map_or(Some(0), |value| value.heap(bounds))
@@ -501,8 +504,8 @@ impl Payload for jig_client_domain::contract::Bounds {
             Self::Create(value) => value.heap(bounds),
             Self::Amend { budget_left, grants, implications, authority, ceiling } => sum(&[
                 budget_left.heap(bounds),
-                grants.heap(bounds),
-                implications.heap(bounds),
+                self::authority(grants, bounds),
+                self::authority(implications, bounds),
                 authority.heap(bounds),
                 ceiling.heap(bounds),
             ]),

@@ -158,13 +158,13 @@ pub fn action(
         OwnerProposalAction::Batch(tasks) => {
             saying(b, words, P::Batch, &[]);
             for task in tasks {
-                crate::cards::proposal::proposed_task(b, task, words, bindings);
+                crate::cards::proposal::proposed_task(b, task, words, bindings, client.limits.rows);
             }
         }
         OwnerProposalAction::Effect { part, authority, attempt, completion, position, purpose } => {
             saying(b, words, P::Effect, &[]);
             crate::proposed_task::part(b, part, words, bindings);
-            crate::owner_authority::document_words(b, authority, words, text_limit);
+            crate::owner_authority::document_words(b, authority, words, text_limit, client.limits.rows);
             saying(b, words, P::Attempt, &[Hole::Number(*attempt)]);
             saying(b, words, P::Completion, &[Hole::Number(u64::from(*completion))]);
             saying(b, words, P::Position, &[Hole::Number(u64::from(*position))]);
@@ -173,7 +173,7 @@ pub fn action(
         OwnerProposalAction::ProcedureEffect { part, authority, step, purpose } => {
             saying(b, words, P::Effect, &[]);
             crate::proposed_task::part(b, part, words, bindings);
-            crate::owner_authority::document_words(b, authority, words, text_limit);
+            crate::owner_authority::document_words(b, authority, words, text_limit, client.limits.rows);
             saying(b, words, P::ProcedureStep, &[Hole::Number(*step)]);
             saying(b, words, P::Purpose, &[Hole::Number(*purpose)]);
         }
@@ -185,9 +185,9 @@ pub fn action(
                 None => saying(b, words, P::AddressAbsent, &[]),
             }
             saying(b, words, P::Before, &[]);
-            crate::owner_amendment::render(b, before, words, text_limit);
+            crate::owner_amendment::render(b, before, words, text_limit, client.limits.rows);
             saying(b, words, P::After, &[]);
-            crate::owner_amendment::render(b, after, words, text_limit);
+            crate::owner_amendment::render(b, after, words, text_limit, client.limits.rows);
             saying(b, words, P::AmendReason, &[]);
             crate::document_text::markdown(b, reason, words);
             match release {
@@ -199,9 +199,9 @@ pub fn action(
             saying(b, words, P::Widen, &[]);
             crate::owner_result::link(b, client, task, words, bindings);
             saying(b, words, P::Before, &[]);
-            crate::owner_authority::document_words(b, before, words, text_limit);
+            crate::owner_authority::document_words(b, before, words, text_limit, client.limits.rows);
             saying(b, words, P::After, &[]);
-            crate::owner_authority::document_words(b, after, words, text_limit);
+            crate::owner_authority::document_words(b, after, words, text_limit, client.limits.rows);
         }
         OwnerProposalAction::Release { task, hold } => {
             saying(b, words, P::Release, &[]);

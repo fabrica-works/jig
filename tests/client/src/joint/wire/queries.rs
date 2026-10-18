@@ -132,6 +132,7 @@ pub(crate) fn page(value: &jig_domain_core::reads::TaskPage, limits: &Limits) ->
     let bounds = jig_client_scripted_engine::Bounds {
         text: limits.text,
         rows: limits.rows,
+        authority: crate::test::AUTHORITY_ENTRIES,
         segments: limits.segments,
         document_bytes: limits.document_bytes,
         ..Default::default()

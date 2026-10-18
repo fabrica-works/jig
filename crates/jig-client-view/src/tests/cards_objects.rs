@@ -524,7 +524,7 @@ fn proposal_kinds_chip_phases_and_live_replies_keep_facts_and_slots(words: &crat
         let mut b = Builder::new(&limits());
         b.open(Role::Page);
         let mut bindings = JigBindings::new(64, CLIENT.text);
-        cards::proposal::action(&mut b, &action, words, &mut bindings);
+        cards::proposal::action(&mut b, &action, words, &mut bindings, CLIENT.rows);
         b.close();
         let tree = b.finish();
         super::cards_access::check(&tree);

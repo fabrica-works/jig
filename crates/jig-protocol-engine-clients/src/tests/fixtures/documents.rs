@@ -114,7 +114,6 @@ pub fn authority() -> d::AuthorityLine {
         ceiling: t::Budget { spend: 7, deadline: None },
         notes: t::Scopes(7),
         note_resources: List::with_capacity(0),
-        cut: false,
     }
 }
 pub fn hold() -> d::HoldLine {

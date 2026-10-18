@@ -97,6 +97,9 @@ pub(super) const NOTES: notes::Limits =
     notes::Limits { scopes: 16, entries_per_scope: 64, body_bytes: 8_192, lines: 8, recalled: 8, ..small::NOTES };
 pub(super) const DOCUMENTS: core::documents::DocumentLimits = core::documents::DocumentLimits {
     roles: AUTHORITY.roles,
+    grants: super::authority_grants(&TASKS, &AUTHORITY),
+    executors: super::authority_executors(&TASKS, &AUTHORITY),
+    implications: AUTHORITY.implications,
     rows: 8,
     text_bytes: 8_192,
     chips: 8,

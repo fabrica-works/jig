@@ -88,6 +88,9 @@ pub struct Versions {
 pub struct DocumentLimits {
     pub roles: u32,
     pub segments: u32,
+    pub grants: u32,
+    pub executors: u32,
+    pub implications: u32,
     pub rows: u32,
     pub text_bytes: u32,
     pub chips: u32,
@@ -454,6 +457,5 @@ pub fn budget_from_row(row: &tasks::TaskRecord) -> BudgetLine {
 
 /// Complete bounded authority facts used when judging draft controls.
 pub(crate) fn act_authority(limits: &Limits, value: &tasks::Authority) -> Result<AuthorityLine, Missing> {
-    let value = task_tree::authority(limits, value)?;
-    if value.cut { Err(Missing::TooLarge) } else { Ok(value) }
+    task_tree::authority(limits, value)
 }

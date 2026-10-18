@@ -252,9 +252,9 @@ fn region(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
     let text = words.book.say(words.language, phrase.id(), holes).expect("checked project region").text;
     b.name(&text);
 }
-fn policy(b: &mut Builder, value: &OwnerProjectPolicy, words: &Words, text_limit: u32) {
+fn policy(b: &mut Builder, value: &OwnerProjectPolicy, words: &Words, text_limit: u32, rows: u32) {
     region(b, words, P::Policy, &[]);
-    crate::owner_authority::document_words(b, &value.ceiling, words, text_limit);
+    crate::owner_authority::document_words(b, &value.ceiling, words, text_limit, rows);
     words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(value.period_spend)]);
     match value.escalation_role {
         Some(role) => text(b, words, P::EscalationRole, &[Hole::Number(u64::from(role))]),
@@ -269,7 +269,7 @@ fn policy(b: &mut Builder, value: &OwnerProjectPolicy, words: &Words, text_limit
         b.open(Role::Region);
         b.name(&words.say(JigPhrase::PolicyEditRole, &[Hole::Number(u64::from(role.number))]));
         words.text(b, JigPhrase::PolicyEditRole, &[Hole::Number(u64::from(role.number))]);
-        crate::owner_authority::document_words(b, &role.authority, words, text_limit);
+        crate::owner_authority::document_words(b, &role.authority, words, text_limit, rows);
         words.text(b, JigPhrase::PolicyPeriodSpend, &[Hole::Amount(role.period_spend)]);
         words.text(b, JigPhrase::PolicyRequests, &[Hole::Number(u64::from(role.requests))]);
         words.text(b, JigPhrase::PolicyDecides, &[Hole::Number(u64::from(role.decides))]);
@@ -303,7 +303,13 @@ fn policy(b: &mut Builder, value: &OwnerProjectPolicy, words: &Words, text_limit
     match &value.permissions {
         None => text(b, words, P::PermissionsAbsent, &[]),
         Some(mappings) => {
-            crate::policy_edit::render(b, &PolicyEdit::Permissions { mappings: mappings.clone() }, words, text_limit);
+            crate::policy_edit::render(
+                b,
+                &PolicyEdit::Permissions { mappings: mappings.clone() },
+                words,
+                text_limit,
+                rows,
+            );
         }
     }
     if value.permissions_cut {
@@ -387,12 +393,12 @@ fn resources(b: &mut Builder, value: &OwnerProject, _client: &Borrowed<'_>, word
 fn policy_section(
     b: &mut Builder,
     value: &OwnerProject,
-    _client: &Borrowed<'_>,
+    client: &Borrowed<'_>,
     words: &Words,
     bindings: &mut JigBindings,
 ) {
     let text_limit = bindings.text_limit();
-    policy(b, &value.policy, words, text_limit);
+    policy(b, &value.policy, words, text_limit, client.limits.rows);
 }
 fn members(b: &mut Builder, value: &OwnerProject, _client: &Borrowed<'_>, words: &Words, _bindings: &mut JigBindings) {
     b.open(Role::List);
@@ -463,7 +469,7 @@ fn whole_recurring(
     words.text(b, JigPhrase::RecurringKey, &[Hole::Number(u64::from(row.key))]);
     b.open(Role::List);
     for task in &row.batch {
-        cards::proposal::proposed_task(b, task, words, bindings);
+        cards::proposal::proposed_task(b, task, words, bindings, client.limits.rows);
     }
     b.close();
     words.text(b, JigPhrase::Budget, &[Hole::Amount(row.budget)]);
@@ -995,7 +1001,7 @@ fn review_form(
         region(b, words, P::Review, &[]);
         words.text(b, JigPhrase::Before, &[]);
         if let Some(before) = &state.before {
-            render_request(b, before, words, text_limit);
+            render_request(b, before, words, text_limit, client.limits.rows);
         } else if pool_request(ask) {
             text(b, words, P::PoolAbsent, &[]);
         }
@@ -1003,7 +1009,7 @@ fn review_form(
             text(b, words, P::ConfiguredPeriod, &[Hole::Number(period)]);
         }
         words.text(b, JigPhrase::After, &[]);
-        render_request(b, ask, words, text_limit);
+        render_request(b, ask, words, text_limit, client.limits.rows);
         crate::frame::control(b, words, bindings, Role::Button, JigPhrase::Confirm, &[], Act::Confirm);
         crate::frame::control(b, words, bindings, Role::Button, JigPhrase::Dismiss, &[], Act::Dismiss);
         b.close();
@@ -1168,9 +1174,9 @@ fn remove_control(b: &mut Builder, ask: &Ask, index: u32, words: &Words, binding
     b.bind(bindings.insert(JigMeaning::Action(owner_form::action(ask.clone()))));
     b.close();
 }
-fn render_request(b: &mut Builder, ask: &Ask, words: &Words, text_limit: u32) {
+fn render_request(b: &mut Builder, ask: &Ask, words: &Words, text_limit: u32, rows: u32) {
     match ask {
-        Ask::ChangePolicy { edit, .. } => crate::policy_edit::render(b, edit, words, text_limit),
+        Ask::ChangePolicy { edit, .. } => crate::policy_edit::render(b, edit, words, text_limit, rows),
         Ask::SetRoles { holdings, .. } => {
             for row in holdings {
                 words.actor(b, jig_client::contract::Actor::Party(row.party));

@@ -296,7 +296,7 @@ fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_langu
     b.open(Role::Page);
     let mut bindings = JigBindings::new(limits.bindings, CLIENT.text);
     let task = super::work_pages::recurring_task(u64::MAX, b"whole template words");
-    crate::cards::proposal::proposed_task(&mut b, &task, &words, &mut bindings);
+    crate::cards::proposal::proposed_task(&mut b, &task, &words, &mut bindings, CLIENT.rows);
     b.close();
     let tree = b.finish();
     assert!(contains(&tree, b"whole template words"));

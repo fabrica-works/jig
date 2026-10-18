@@ -379,4 +379,7 @@ fn document_segments_follow_the_largest_admitted_name_after_overrides() {
 #[test]
 fn document_segments_have_no_operator_override() {
     assert_eq!(overrides::apply(&mut small(), b"documents.segments", 8), Err(What::Override));
+    assert_eq!(overrides::apply(&mut small(), b"documents.grants", 8), Err(What::Override));
+    assert_eq!(overrides::apply(&mut small(), b"documents.executors", 8), Err(What::Override));
+    assert_eq!(overrides::apply(&mut small(), b"documents.implications", 8), Err(What::Override));
 }

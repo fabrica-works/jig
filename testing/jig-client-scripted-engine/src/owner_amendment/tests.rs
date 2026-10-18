@@ -79,7 +79,7 @@ fn fixture() -> OwnerAmendmentState {
     }
 }
 fn bounds() -> Bounds {
-    Bounds { text: 8, rows: 3, segments: 3, document_bytes: u64::MAX, ..Bounds::default() }
+    Bounds { text: 8, rows: 3, authority: 3, segments: 3, document_bytes: u64::MAX, ..Bounds::default() }
 }
 #[test]
 fn owner_amendment_whole_admission_counts_inline_nested_lists_and_every_opaque_byte_at_plus_minus_one() {
@@ -159,7 +159,7 @@ fn owner_amendment_empty_reserved_capacities_and_each_nested_text_refuse_without
         assert_eq!(bytes(&value, &bounds()), None);
         assert!(!fits(&value, &bounds()));
         assert_eq!(value, original);
-        let larger = Bounds { rows: 4, segments: 4, ..bounds() };
+        let larger = Bounds { rows: 4, authority: 4, segments: 4, ..bounds() };
         let size = bytes(&value, &larger).unwrap();
         assert!(fits(&value, &Bounds { document_bytes: size, ..larger }));
         assert!(!fits(&value, &Bounds { document_bytes: size - 1, ..larger }));
@@ -197,7 +197,7 @@ fn owner_amendment_empty_reserved_capacities_and_each_nested_text_refuse_without
 }
 #[test]
 fn owner_amendment_full_rows_and_text_reach_the_declared_worst_case_without_omission() {
-    let bounds = Bounds { rows: 2, segments: 2, text: 3, ..bounds() };
+    let bounds = Bounds { rows: 2, authority: 2, segments: 2, text: 3, ..bounds() };
     let mut value = fixture();
     let doc = doc(b"xxx", true);
     value.instructions = Some(doc.clone());

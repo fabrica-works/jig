@@ -43,12 +43,6 @@ fn pattern_fits(value: &OwnerPattern, limits: &Limits) -> Option<()> {
 }
 pub(crate) fn authority_fits(value: &OwnerAuthorityDocument, limits: &Limits) -> Option<()> {
     let value = &value.authority;
-    if value.grants.capacity() > limits.rows
-        || value.delegation.kinds.capacity() > limits.rows
-        || value.note_resources.capacity() > limits.rows
-    {
-        return None;
-    }
     for grant in &value.grants {
         pattern_fits(&grant.pattern, limits)?;
     }
@@ -112,7 +106,7 @@ fn saying(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
 }
 /// Render only supplied owner facts, borrowing the normal checked language book.
 /// No request, revision, actor, project, clock, origin or subscription is inferred.
-pub fn render(b: &mut Builder, value: &OwnerAmendmentState, words: &Words, text_limit: u32) {
+pub fn render(b: &mut Builder, value: &OwnerAmendmentState, words: &Words, text_limit: u32, rows: u32) {
     b.open(Role::Region);
     let name = words.book.say(words.language, P::State.id(), &[]).expect("checked amendment region name");
     b.name(&name.text);
@@ -130,7 +124,7 @@ pub fn render(b: &mut Builder, value: &OwnerAmendmentState, words: &Words, text_
     saying(b, words, P::Specification, &[]);
     crate::specification::document(b, &value.spec, words);
     saying(b, words, P::Authority, &[]);
-    crate::owner_authority::document_words(b, &value.authority, words, text_limit);
+    crate::owner_authority::document_words(b, &value.authority, words, text_limit, rows);
     crate::owner_wake::policy(b, &value.wake, &words.book, words.language);
     for task in &value.dependencies {
         saying(b, words, P::Dependencies, &[Hole::Number(*task)]);

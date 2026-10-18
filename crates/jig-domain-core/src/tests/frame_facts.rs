@@ -144,6 +144,7 @@ fn the_frame_offers_both_charters_for_goals() {
     limits.tasks.charters = 2;
     limits.tasks.executor_kinds = 3;
     limits.authority.executors = 3;
+    limits.documents.executors = 3;
     let mut config = config(146);
     let mut second = config.settings.charters[0].clone();
     second.number = 2;
@@ -189,7 +190,6 @@ pub(super) fn owner_creating(capacity: u32, tasks_left: u32, depth: u32) -> crat
             ceiling: tasks::Budget { spend: 500, deadline: None },
             notes: tasks::Scopes(0),
             note_resources: List::with_capacity(0),
-            cut: false,
         }),
         pool_left: 500,
         charters,

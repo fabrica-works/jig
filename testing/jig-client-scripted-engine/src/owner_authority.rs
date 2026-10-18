@@ -37,15 +37,14 @@ impl Payload for OwnerAuthorityExecutor {
 }
 impl Payload for OwnerDelegation {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
-        self.kinds.heap(bounds)
+        crate::payload::authority(&self.kinds, bounds)
     }
 }
 impl Payload for OwnerAuthority {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
-        self.grants
-            .heap(bounds)?
+        crate::payload::authority(&self.grants, bounds)?
             .checked_add(self.delegation.heap(bounds)?)?
-            .checked_add(self.note_resources.heap(bounds)?)
+            .checked_add(crate::payload::authority(&self.note_resources, bounds)?)
     }
 }
 impl Payload for OwnerAuthorityDocument {
@@ -73,18 +72,18 @@ pub fn fits(value: &OwnerAuthority, bounds: &Bounds) -> bool {
 pub fn document_fits(value: &OwnerAuthorityDocument, bounds: &Bounds) -> bool {
     crate::payload::fits(value, bounds)
 }
-/// Maximum whole document allocation at the configured row and byte bounds.
+/// Maximum whole document allocation at the configured authority and byte bounds.
 /// An unrepresentable total is rejected explicitly.
 #[must_use]
 pub fn worst_case(bounds: &Bounds) -> Option<u64> {
-    let rows = u64::from(bounds.rows);
+    let entries = u64::from(bounds.authority);
     let pattern = List::<Box<[u8]>>::worst_case(bounds.segments)?
         .checked_add(u64::from(bounds.segments).checked_mul(u64::from(bounds.text))?)?
         .checked_add(u64::from(bounds.text))?;
-    let nested = pattern.checked_mul(rows)?.checked_mul(2)?;
-    List::<OwnerGrant>::worst_case(bounds.rows)?
-        .checked_add(List::<OwnerResourceScope>::worst_case(bounds.rows)?)?
-        .checked_add(List::<OwnerAuthorityExecutor>::worst_case(bounds.rows)?)?
+    let nested = pattern.checked_mul(entries)?.checked_mul(2)?;
+    List::<OwnerGrant>::worst_case(bounds.authority)?
+        .checked_add(List::<OwnerResourceScope>::worst_case(bounds.authority)?)?
+        .checked_add(List::<OwnerAuthorityExecutor>::worst_case(bounds.authority)?)?
         .checked_add(nested)?
         .checked_add(u64::try_from(size_of::<OwnerAuthorityDocument>()).ok()?)
 }

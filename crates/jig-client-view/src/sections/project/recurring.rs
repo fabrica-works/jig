@@ -21,7 +21,7 @@ pub(super) fn recurring(
     words.text(b, JigPhrase::RecurringKey, &[Hole::Number(u64::from(row.key))]);
     b.open(Role::List);
     for task in &row.batch {
-        cards::proposal::proposed_task(b, task, words, bindings);
+        cards::proposal::proposed_task(b, task, words, bindings, client.limits.rows);
     }
     b.close();
     words.text(b, JigPhrase::Budget, &[Hole::Amount(row.budget)]);

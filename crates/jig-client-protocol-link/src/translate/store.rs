@@ -48,7 +48,7 @@ fn policy_edit(value: &w::PolicyEdit, limits: &Limits) -> Result<c::PolicyEdit, 
             requirements: documents::policy_requirement_piece(value.requirements(), limits, limits.client.rows)?,
         },
         w::PolicyEdit::Projections(value) => c::PolicyEdit::Projections {
-            grants: documents::owner_grant_piece(value.grants(), limits, limits.client.rows)?,
+            grants: documents::owner_grant_piece(value.grants(), limits, limits.client.authority)?,
         },
         w::PolicyEdit::Permissions(value) => {
             let mut mappings = List::with_capacity(value.mappings().len());

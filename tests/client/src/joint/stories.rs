@@ -44,7 +44,7 @@ fn same_pattern(source: &jig_domain_core::documents::GrantLine, native: &client:
 
 fn same_authority(source: &jig_domain_core::documents::AuthorityLine, native: &client::OwnerAuthorityDocument) {
     let authority = &native.authority;
-    assert_eq!(source.cut, native.cut);
+    assert!(!native.cut);
     assert_eq!((source.tools.0, source.notes.0), (authority.tools, authority.notes));
     assert_eq!((source.ceiling.spend, source.ceiling.deadline), (authority.spend, authority.deadline));
     assert_eq!((source.tasks, source.depth), (authority.delegation.tasks, authority.delegation.depth));

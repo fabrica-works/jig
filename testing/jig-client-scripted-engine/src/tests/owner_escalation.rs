@@ -136,7 +136,7 @@ fn owner_escalation_normal_read_preserves_offer_order_recursive_admissions_and_b
         beyond: Beyond::Refused(Refusal::NotOffered),
     };
     let mut setup = script();
-    setup.bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..setup.bounds };
+    setup.bounds = Bounds { rows: 2, authority: 2, text: 32, document_bytes: u64::MAX, ..setup.bounds };
     let authority_heap = row.task.authority.heap(&setup.bounds).unwrap();
     let nested = List::<u32>::worst_case(2).unwrap()
         + List::<OwnerKindImplication>::worst_case(2).unwrap()

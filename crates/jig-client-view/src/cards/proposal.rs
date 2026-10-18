@@ -35,7 +35,7 @@ pub fn proposal(
     words.waiting(b, client.wall(), document.since);
     words.text(b, JigPhrase::ProposalWhy, &[]);
     skein_ui::markdown::read(document.why.bytes(), 2, b);
-    action(b, &document.action, words, bindings);
+    action(b, &document.action, words, bindings, client.limits.rows);
     super::common::authority(b, &document.needs, words, bindings);
     super::common::funding(b, &document.funding, document.needs.budget, words);
     super::common::recipient(b, &document.waiting, words);
@@ -49,7 +49,7 @@ pub fn proposal(
     true
 }
 /// Describe every proposal kind without evaluating the authority it asks for.
-pub fn action(b: &mut Builder, action: &ProposalAction, words: &Words, bindings: &mut JigBindings) {
+pub fn action(b: &mut Builder, action: &ProposalAction, words: &Words, bindings: &mut JigBindings, rows: u32) {
     match action {
         ProposalAction::Batch { tasks, own } => {
             words.text(b, JigPhrase::Batch, &[]);
@@ -58,7 +58,7 @@ pub fn action(b: &mut Builder, action: &ProposalAction, words: &Words, bindings:
             }
             b.open(Role::List);
             for task in tasks {
-                proposed_task(b, task, words, bindings);
+                proposed_task(b, task, words, bindings, rows);
             }
             b.close();
         }
@@ -78,18 +78,24 @@ pub fn action(b: &mut Builder, action: &ProposalAction, words: &Words, bindings:
             words.text(b, JigPhrase::Before, &[]);
             skein_ui::markdown::read(before.bytes(), 2, b);
             words.text(b, JigPhrase::After, &[]);
-            amendment(b, change, words, bindings);
+            amendment(b, change, words, bindings, rows);
         }
     }
 }
-pub(crate) fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words, bindings: &mut JigBindings) {
+pub(crate) fn proposed_task(
+    b: &mut Builder,
+    task: &ProposedTask,
+    words: &Words,
+    bindings: &mut JigBindings,
+    rows: u32,
+) {
     let text_limit = bindings.text_limit();
     b.open(Role::Item);
     words.text(b, JigPhrase::BatchTask, &[Hole::Number(task.number)]);
     crate::specification::document(b, &task.spec, words);
     crate::proposed_task::executor(b, task.executor, words);
     crate::proposed_task::contract(b, &task.contract, words, bindings);
-    crate::owner_authority::document_words(b, &task.authority, words, text_limit);
+    crate::owner_authority::document_words(b, &task.authority, words, text_limit, rows);
     words.text(b, JigPhrase::Budget, &[Hole::Amount(task.budget)]);
     crate::proposed_task::funder(b, task.funder, words);
     crate::owner_wake::policy(b, &task.wake, &words.book, words.language);
@@ -108,7 +114,7 @@ pub(crate) fn proposed_task(b: &mut Builder, task: &ProposedTask, words: &Words,
     b.close();
 }
 /// Changes retain the before/after facts instead of interpreting instructions.
-pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &mut JigBindings) {
+pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &mut JigBindings, rows: u32) {
     let text_limit = bindings.text_limit();
     if let Some(to) = &change.addressed {
         address_change(b, to, words);
@@ -128,7 +134,7 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &
         }
     }
     if let Some(authority) = &change.authority {
-        crate::owner_authority::render_words(b, authority, words, text_limit);
+        crate::owner_authority::render_words(b, authority, words, text_limit, rows);
     }
     b.open(Role::Separator);
     b.close();

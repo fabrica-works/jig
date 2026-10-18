@@ -52,8 +52,7 @@ fn covers(
     draft: &people::Authority,
     implications: &skein_lib::List<jig_domain_authority::Implication>,
 ) -> bool {
-    !bound.cut
-        && draft.spend <= bound.ceiling.spend
+    draft.spend <= bound.ceiling.spend
         && deadline(bound.ceiling.deadline, draft.deadline)
         && draft.tools & !bound.tools.0 == 0
         && draft.notes & !bound.notes.0 == 0
@@ -156,7 +155,7 @@ pub(super) fn predict(value: &Admission, ask: &people::Ask, before: Option<&Task
             people::Ask::Amend { amendment, revision, .. },
         ) => {
             let old = before?;
-            if old.spec_revision != *revision || old.authority.cut {
+            if old.spec_revision != *revision {
                 return None;
             }
             let Some(after) = &amendment.authority else {

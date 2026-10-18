@@ -231,7 +231,7 @@ fn recursive_goal_and_amend_offers_keep_full_width_holders_rows_and_opaque_bytes
 }
 #[test]
 fn nested_offer_lists_and_unused_paged_rows_keep_their_original_independent_bounds() {
-    let bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
+    let bounds = Bounds { rows: 2, authority: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
     for dimension in 0..6 {
         let mut value = seven();
         value.acts = nested();

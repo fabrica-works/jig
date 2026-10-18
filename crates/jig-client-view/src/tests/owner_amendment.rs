@@ -147,7 +147,7 @@ fn build(value: &OwnerAmendmentState, words: &Words) -> Tree {
     };
     assert!(crate::limits::jig_worst_case(&limits).is_some());
     let mut builder = Builder::new(&limits);
-    view::render(&mut builder, value, words, client_limits().text);
+    view::render(&mut builder, value, words, client_limits().text, client_limits().rows);
     let tree = builder.finish();
     assert!(tree.len() <= f.nodes);
     assert!(tree.nodes().iter().all(|node| crate::tests::text_bytes(node) <= f.text_per_node));
@@ -217,7 +217,7 @@ fn owner_amendment_each_text_spec_authority_and_dependency_loss_is_independent()
         let tree = build(&value, normal_words());
         assert_eq!(count(&tree, b"Only part of this text was supplied"), usize::from(flag < 2));
         assert_eq!(has(&tree, b"The specification is incomplete"), flag == 2);
-        assert_eq!(has(&tree, b"Authority document is cut"), flag == 3);
+        assert_eq!(has(&tree, b"More are held than shown"), flag == 3);
         assert_eq!(has(&tree, b"Dependency list incomplete"), flag == 4);
         assert_eq!(value.spec.whole().is_none(), flag <= 2);
         assert!(crate::instructions::whole(value.instructions.as_ref()).is_some());
@@ -369,25 +369,27 @@ fn owner_amendment_selected_normal_words_preserve_checked_captions_numbers_and_n
         "normal Words Clone retains the complete checked owner composition"
     );
 }
+type CapacityCase = (fn(&mut OwnerAmendmentState), bool);
+const CAPACITY_CASES: [CapacityCase; 8] = [
+    (|s| s.dependencies = List::with_capacity(4), false),
+    (|s| s.spec.specification.parameters = List::with_capacity(4), false),
+    (|s| s.spec.specification.inputs = List::with_capacity(4), false),
+    (|s| s.authority.authority.grants = List::with_capacity(4), true),
+    (|s| s.authority.authority.delegation.kinds = List::with_capacity(4), true),
+    (|s| s.authority.authority.note_resources = List::with_capacity(4), true),
+    (|s| s.authority.authority.grants.get_mut(0).unwrap().pattern.segments = List::with_capacity(4), false),
+    (|s| s.authority.authority.note_resources.get_mut(0).unwrap().pattern.segments = List::with_capacity(4), false),
+];
 #[test]
 fn owner_amendment_whole_tree_envelope_checks_full_nested_capacities_and_overflow_before_rendering() {
     let words = normal_words();
     let limits = client_limits();
     let value = fixture();
-    let mutations: [fn(&mut OwnerAmendmentState); 8] = [
-        |s| s.dependencies = List::with_capacity(4),
-        |s| s.spec.specification.parameters = List::with_capacity(4),
-        |s| s.spec.specification.inputs = List::with_capacity(4),
-        |s| s.authority.authority.grants = List::with_capacity(4),
-        |s| s.authority.authority.delegation.kinds = List::with_capacity(4),
-        |s| s.authority.authority.note_resources = List::with_capacity(4),
-        |s| s.authority.authority.grants.get_mut(0).unwrap().pattern.segments = List::with_capacity(4),
-        |s| s.authority.authority.note_resources.get_mut(0).unwrap().pattern.segments = List::with_capacity(4),
-    ];
-    for mutate in mutations {
+
+    for (mutate, fits) in CAPACITY_CASES {
         let mut larger = value.clone();
         mutate(&mut larger);
-        assert!(view::required(&larger, &limits, words).is_none());
+        assert_eq!(view::required(&larger, &limits, words).is_some(), fits);
         assert!(view::required(&larger, &crate::Limits { rows: 4, segments: 4, ..limits }, words).is_some());
     }
     assert!(view::required(&value, &crate::Limits { text: 4, ..limits }, words).is_none());

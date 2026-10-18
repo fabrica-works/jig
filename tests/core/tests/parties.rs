@@ -145,6 +145,7 @@ fn person_world(seed: u64) -> World {
         limits.core.tasks.project_tasks = 8;
         limits.core.tasks.executor_kinds = 3;
         limits.core.authority.executors = 3;
+        limits.core.documents.executors = 3;
         let kinds: Box<[jig_domain_authority::Executor]> = Box::new([
             jig_domain_authority::Executor::Charter(CHARTER),
             jig_domain_authority::Executor::Procedure(PROCEDURE),

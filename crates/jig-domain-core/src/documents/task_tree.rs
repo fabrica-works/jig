@@ -50,7 +50,6 @@ pub struct AuthorityLine {
     pub ceiling: tasks::Budget,
     pub notes: tasks::Scopes,
     pub note_resources: List<NoteScope>,
-    pub cut: bool,
 }
 
 /// Result form and its admitted bounds, usable as a person task's form.
@@ -336,8 +335,8 @@ fn pattern(limits: &Limits, value: &tasks::Pattern) -> Result<PatternEnd, Missin
 }
 
 pub(super) fn authority(limits: &Limits, value: &tasks::Authority) -> Result<AuthorityLine, Missing> {
-    let mut grants = List::with_capacity(limits.documents.lines);
-    for grant in value.grants.iter().take(bound(limits)) {
+    let mut grants = List::with_capacity(limits.documents.grants);
+    for grant in &value.grants {
         grants
             .push(GrantLine {
                 connector: grant.connector,
@@ -347,12 +346,12 @@ pub(super) fn authority(limits: &Limits, value: &tasks::Authority) -> Result<Aut
             })
             .expect("bounded grants");
     }
-    let mut executors = List::with_capacity(limits.documents.lines);
-    for kind in value.delegation.kinds.iter().take(bound(limits)) {
+    let mut executors = List::with_capacity(limits.documents.executors);
+    for kind in &value.delegation.kinds {
         executors.push(*kind).expect("bounded executor list");
     }
-    let mut note_resources = List::with_capacity(limits.documents.lines);
-    for scope in value.note_resources.iter().take(bound(limits)) {
+    let mut note_resources = List::with_capacity(limits.documents.grants);
+    for scope in &value.note_resources {
         note_resources
             .push(NoteScope {
                 connector: scope.connector,
@@ -363,9 +362,6 @@ pub(super) fn authority(limits: &Limits, value: &tasks::Authority) -> Result<Aut
     }
     Ok(AuthorityLine {
         tools: value.tools,
-        cut: size(grants.len()) < value.grants.len()
-            || size(executors.len()) < value.delegation.kinds.len()
-            || size(note_resources.len()) < value.note_resources.len(),
         grants,
         executors,
         tasks: value.delegation.tasks,
@@ -734,14 +730,6 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
     };
     let acts = super::offers::task(core, limits, party, row)?;
     let authority = authority(limits, &row.authority)?;
-    if authority.cut {
-        for offer in &acts {
-            if let crate::acts::Admission::Bounded { within: crate::acts::Bounds::Amend { .. }, .. } = offer.admission {
-                // The before facts used to compare a draft must also be whole.
-                return Err(Missing::TooLarge);
-            }
-        }
-    }
     Ok(Task {
         waits_on: core.waits_on(limits, row.number),
         label: row.label,
@@ -910,10 +898,10 @@ pub(super) fn grant_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(u64::from(limits.segments).checked_add(1)?.checked_mul(u64::from(limits.text_bytes))?)
 }
 pub(super) fn authority_worst_case(limits: &super::DocumentLimits) -> Option<u64> {
-    List::<GrantLine>::worst_case(limits.lines)?
-        .checked_add(List::<NoteScope>::worst_case(limits.lines)?)?
-        .checked_add(u64::from(limits.lines).checked_mul(grant_worst_case(limits)?)?.checked_mul(2)?)?
-        .checked_add(List::<tasks::AuthorityExecutor>::worst_case(limits.lines)?)
+    List::<GrantLine>::worst_case(limits.grants)?
+        .checked_add(List::<NoteScope>::worst_case(limits.grants)?)?
+        .checked_add(u64::from(limits.grants).checked_mul(grant_worst_case(limits)?)?.checked_mul(2)?)?
+        .checked_add(List::<tasks::AuthorityExecutor>::worst_case(limits.executors)?)
 }
 
 pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {

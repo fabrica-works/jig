@@ -169,10 +169,10 @@ pub(super) fn amend(core: &Core, limits: &Limits, party: u64, task: u64, held: O
         return Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority });
     };
     let order = &core.authority.rules().implies;
-    if order.len() > limits.documents.lines {
+    if order.len() > limits.documents.implications {
         return Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority });
     }
-    let mut implications = List::with_capacity(limits.documents.lines);
+    let mut implications = List::with_capacity(limits.documents.implications);
     for pair in order.entries() {
         implications.push(*pair).expect("complete configured relation fits receiving bound");
     }

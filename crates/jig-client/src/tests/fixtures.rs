@@ -31,6 +31,7 @@ pub fn domain_limits() -> DomainLimits {
         records: 2,
         kept: 4,
         parts: 8,
+        authority: 8,
         heartbeat: Duration::from_millis(100),
         handles: 8,
         turn_bytes: 32,        // tests/client/src/test.rs:42

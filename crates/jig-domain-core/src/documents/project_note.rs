@@ -173,12 +173,12 @@ fn grant(limits: &Limits, value: &authority::Grant) -> Result<GrantLine, Missing
     })
 }
 fn authority_line(limits: &Limits, value: &authority::Authority) -> Result<AuthorityLine, Missing> {
-    let mut grants = List::with_capacity(limits.documents.lines);
-    for value in value.grants.iter().take(bound(limits)) {
+    let mut grants = List::with_capacity(limits.documents.grants);
+    for value in &value.grants {
         grants.push(grant(limits, value)?).expect("bounded grants");
     }
-    let mut executors = List::with_capacity(limits.documents.lines);
-    for value in value.delegation.kinds.iter().take(bound(limits)) {
+    let mut executors = List::with_capacity(limits.documents.executors);
+    for value in &value.delegation.kinds {
         executors
             .push(match value {
                 authority::Executor::Charter(number) => tasks::AuthorityExecutor::Charter(*number),
@@ -187,8 +187,8 @@ fn authority_line(limits: &Limits, value: &authority::Authority) -> Result<Autho
             })
             .expect("bounded executors");
     }
-    let mut note_resources = List::with_capacity(limits.documents.lines);
-    for value in value.note_resources.iter().take(bound(limits)) {
+    let mut note_resources = List::with_capacity(limits.documents.grants);
+    for value in &value.note_resources {
         note_resources
             .push(NoteScope {
                 connector: value.connector,
@@ -206,9 +206,6 @@ fn authority_line(limits: &Limits, value: &authority::Authority) -> Result<Autho
         ceiling: tasks::Budget { spend: value.budget.spend, deadline: value.budget.deadline },
         notes: tasks::Scopes(value.notes.0),
         note_resources,
-        cut: value.grants.len() > bound(limits)
-            || value.delegation.kinds.len() > bound(limits)
-            || value.note_resources.len() > bound(limits),
     })
 }
 fn policy(

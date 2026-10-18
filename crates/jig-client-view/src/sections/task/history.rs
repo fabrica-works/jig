@@ -25,7 +25,7 @@ pub(super) fn history(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bin
             HistoryRow::Line(row) => line(b, row, words, bindings),
             HistoryRow::Change(row) => {
                 b.key(skein_ui::Key { owner: crate::Owner::Jig.opaque(), kind: 41, a: row.task, b: row.revision });
-                crate::owner_history::render(b, row, words, bindings);
+                crate::owner_history::render(b, row, words, bindings, client.limits.rows);
                 task_link(b, row.task, words, bindings);
             }
             HistoryRow::Milestone(row) => {

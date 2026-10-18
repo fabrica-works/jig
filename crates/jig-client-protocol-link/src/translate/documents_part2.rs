@@ -121,7 +121,7 @@ pub(crate) fn bounds_fields(value: &w::Bounds, limits: &Limits) -> Result<c::Bou
             })
         }
         w::Bounds::Amend(row) => {
-            if row.implications().len() > limits.client.rows {
+            if row.implications().len() > limits.client.authority {
                 return Err(too_large());
             }
             let mut list0 = List::with_capacity(row.implications().len());
@@ -130,7 +130,7 @@ pub(crate) fn bounds_fields(value: &w::Bounds, limits: &Limits) -> Result<c::Bou
             }
             c::Bounds::Amend {
                 budget_left: row.budget_left(),
-                grants: owner_grant_piece(row.grants(), limits, limits.client.rows)?,
+                grants: owner_grant_piece(row.grants(), limits, limits.client.authority)?,
                 implications: list0,
                 authority: Box::new(owner_authority_document_fields(row.authority(), limits)?),
                 ceiling: Box::new(owner_authority_document_fields(row.ceiling(), limits)?),

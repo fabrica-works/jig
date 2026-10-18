@@ -330,7 +330,7 @@ fn restore_task(v: &w::NewTask, limits: &crate::Limits) -> Result<c::NewTask, w:
         },
         wake: restore_wake(v.wake().as_ref(), limits),
         dependencies,
-        named: super::documents::owner_grant_piece(v.named(), limits, limits.client.rows)?,
+        named: super::documents::owner_grant_piece(v.named(), limits, limits.client.authority)?,
         tracked: *v.tracked(),
         label: v.label(),
         flags: c::TaskFlags {

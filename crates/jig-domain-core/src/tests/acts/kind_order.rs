@@ -13,7 +13,7 @@ fn grant(kind: u16, last: authority::Last) -> authority::Grant {
 }
 fn configured(pairs: Box<[authority::Implication]>, rows: u32) -> (Core, Limits) {
     let mut limits = limits();
-    limits.documents.lines = rows;
+    limits.documents.implications = rows;
     limits.authority.implications = u32::try_from(pairs.len()).unwrap();
     let mut cfg = config(41);
     let mut rules = cfg.authority.rules().clone();
@@ -152,12 +152,12 @@ fn an_amendment_relation_at_its_receiving_boundary_fits_and_one_under_refuses_th
     let pairs = Box::new([pair(1, 2, 1), pair(2, 2, 1), pair(u16::MAX, 2, 1), pair(1, 2, 1)]);
     let (core, mut limits) = configured(pairs, 4);
     make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap();
-    limits.documents.lines = 3;
+    limits.documents.implications = 3;
     assert_eq!(
         offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 }),
         Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority })
     );
-    assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()), Err(Missing::TooLarge));
+    make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap();
 }
 
 #[test]
@@ -170,6 +170,6 @@ fn an_empty_amendment_relation_is_not_expanded_into_equality_rows() {
         panic!("identity-only relation")
     };
     assert!(implications.is_empty());
-    assert_eq!(implications.capacity(), limits.documents.lines);
+    assert_eq!(implications.capacity(), limits.documents.implications);
     assert!(core.authority.rules().implies.allows(u16::MAX, u16::MAX, u16::MAX));
 }

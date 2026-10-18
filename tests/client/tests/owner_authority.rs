@@ -45,7 +45,7 @@ fn authority() -> OwnerAuthority {
     }
 }
 fn bounds() -> Bounds {
-    Bounds { rows: 3, segments: 3, text: 4, document_bytes: u64::MAX, ..Bounds::default() }
+    Bounds { rows: 3, authority: 3, segments: 3, text: 4, document_bytes: u64::MAX, ..Bounds::default() }
 }
 #[test]
 fn saturated_authority_prices_every_capacity_and_byte_exactly() {
@@ -95,7 +95,7 @@ fn nested_bounds_check_reserved_empty_lists_terminal_bytes_and_overflow() {
         .expect("segment")
         .clone_from(&Box::from(*b"large"));
     assert_eq!(price::bytes(&value, &bounds()), None, "resource scope bytes bounded");
-    assert_eq!(price::worst_case(&Bounds { rows: u32::MAX, text: u32::MAX, ..bounds() }), None);
+    assert_eq!(price::worst_case(&Bounds { rows: u32::MAX, authority: u32::MAX, text: u32::MAX, ..bounds() }), None);
 }
 #[test]
 fn authority_document_cut_is_separate_from_whole_payload_and_keeps_exact_codes() {
@@ -131,7 +131,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     assert!(word_meter.held() <= words::worst_case(&language_limits).expect("checked word envelope"));
     let value = OwnerAuthorityDocument { authority: authority(), cut: true };
     let envelope = view::worst_case(3, 3, 4, &words).expect("full view envelope");
-    let required = view::document_required(&value, &words).expect("value capacity");
+    let required = view::document_required(&value, &words, 3).expect("value capacity");
     assert_eq!(required.nodes, 59, "full three-by-three patterns and executor rows");
     assert_eq!(required.nodes, envelope.nodes);
     assert!(required.text_bytes <= envelope.text_bytes);
@@ -151,7 +151,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     };
     let meter = Meter::new();
     let mut builder = Builder::new(&limits);
-    view::document(&mut builder, &value, &words, 4);
+    view::document(&mut builder, &value, &words, 4, 3);
     let tree = builder.finish();
     assert_eq!(tree.len(), 59);
     assert!(meter.held() <= jig_client_view::limits::jig_worst_case(&limits).expect("tree heap envelope"));
@@ -172,6 +172,18 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
         },
         cut: false,
     };
-    assert_eq!(view::document_required(&empty, &words).expect("empty facts").nodes, 9);
-    assert!(price::document_fits(&empty, &Bounds { rows: 0, text: 0, ..bounds() }));
+    assert_eq!(view::document_required(&empty, &words, 3).expect("empty facts").nodes, 9);
+    assert!(price::document_fits(&empty, &Bounds { rows: 0, authority: 0, text: 0, ..bounds() }));
+}
+
+#[test]
+fn a_whole_authority_is_admitted_independently_of_document_rows() {
+    const DISPLAY_ROWS: u32 = 2;
+    let value = authority();
+    let cap = Bounds { rows: DISPLAY_ROWS, ..bounds() };
+    assert!(price::fits(&value, &cap));
+    assert_eq!(
+        price::worst_case(&cap),
+        price::document_bytes(&OwnerAuthorityDocument { authority: value, cut: false }, &cap)
+    );
 }

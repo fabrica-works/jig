@@ -155,6 +155,9 @@ pub(super) const NOTES: notes::Limits = notes::Limits {
 };
 pub(super) const DOCUMENTS: core::documents::DocumentLimits = core::documents::DocumentLimits {
     roles: AUTHORITY.roles,
+    grants: super::authority_grants(&TASKS, &AUTHORITY),
+    executors: super::authority_executors(&TASKS, &AUTHORITY),
+    implications: AUTHORITY.implications,
     segments: super::name_segments(&TASKS, &AUTHORITY),
     rows: 4,
     text_bytes: 4_096,

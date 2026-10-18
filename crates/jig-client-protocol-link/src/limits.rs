@@ -92,7 +92,7 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.owner_pattern_end_open_value = client.text;
     wire.owner_pattern_segments = client.segments;
     wire.owner_pattern_segments_item = client.text;
-    wire.owner_delegation_kinds = client.rows;
+    wire.owner_delegation_kinds = client.authority;
     wire.owner_authority_grants = u32::try_from(client.document_bytes).ok()?;
     wire.owner_authority_note_resources = u32::try_from(client.document_bytes).ok()?;
     wire.amendment_dependencies_some = client.rows;
@@ -128,7 +128,7 @@ fn wire(client: &jig_client_domain::Limits) -> Option<w::Limits> {
     wire.bounds_create_charters = client.rows;
     wire.bounds_create_procedures = client.rows;
     wire.bounds_amend_grants = u32::try_from(client.document_bytes).ok()?;
-    wire.bounds_amend_implications = client.rows;
+    wire.bounds_amend_implications = client.authority;
     wire.result_document_acts = u32::try_from(client.document_bytes).ok()?;
     wire.activity_words_words = client.text;
     wire.activity_run_began_why = client.text;

@@ -261,7 +261,7 @@ fn receiving_part1(checked: &mut Limits, limits: &Limits) {
     checked.wire.owner_chip_phase_waiting_dependencies = limits.client.rows;
     checked.wire.owner_chip_work_tool_call = limits.client.text;
     checked.wire.owner_chip_work_tool_tool = limits.client.text;
-    checked.wire.owner_delegation_kinds = limits.client.rows;
+    checked.wire.owner_delegation_kinds = limits.client.authority;
     checked.wire.owner_deployment_hosts =
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.owner_deployment_attempts =

@@ -169,7 +169,7 @@ pub(crate) fn owner_project_policy_fields(
         ceiling: owner_authority_document_fields(value.ceiling(), limits)?,
         period_spend: value.period_spend(),
         escalation_role: opt0,
-        projections: owner_grant_piece(value.projections(), limits, limits.client.rows)?,
+        projections: owner_grant_piece(value.projections(), limits, limits.client.authority)?,
         roles: owner_project_policy_role_piece(value.roles(), limits, limits.client.rows)?,
         requirements: policy_requirement_piece(value.requirements(), limits, limits.client.rows)?,
         permissions: opt1,

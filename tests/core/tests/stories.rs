@@ -1822,6 +1822,7 @@ fn a_refused_procedure_delegation_retains_the_exact_none_outcome() {
 fn procedure_configuration(seed: u64) -> (root::Config, root::Limits) {
     let (mut configuration, mut limits) = person_world_fixture(seed);
     limits.core.authority.executors = 3;
+    limits.core.documents.executors = 3;
     limits.core.tasks.executor_kinds = 3;
     let kinds: Box<[authority::Executor]> =
         Box::new([authority::Executor::Charter(1), authority::Executor::Role(0), authority::Executor::Procedure(1)]);

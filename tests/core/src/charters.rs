@@ -25,6 +25,7 @@ pub fn two_charters(seed: u64) -> (root::Config, root::Limits) {
     limits.core.tasks.executor_kinds = 3;
     limits.core.fleet.slots = 2;
     limits.core.authority.executors = 3;
+    limits.core.documents.executors = 3;
     limits.core.accounts.accounts = 2;
     let kinds: Box<[authority::Executor]> =
         Box::new([authority::Executor::Charter(1), authority::Executor::Charter(2), authority::Executor::Procedure(1)]);

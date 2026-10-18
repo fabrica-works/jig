@@ -144,6 +144,7 @@ pub fn domain_limits() -> jig_client_domain::Limits {
         records: jig.records,
         kept: jig.kept,
         parts: jig.parts,
+        authority: 8,
         heartbeat: jig_client_world::test::limits().client.domain.heartbeat,
     }
 }
