@@ -345,3 +345,19 @@ fn ending_a_mount_stream_while_its_record_waits_for_room_does_not_panic() {
     call.end(&env, kit::Ended::Stopping);
     assert_eq!(call.stream.as_ref().expect("stream").writer.waiting(), Waiting::Close);
 }
+
+#[test]
+fn an_empty_response_finishes_its_http_reply() {
+    const STATUS: u16 = 200;
+    const FINISHES: u32 = 1;
+    let env = fixtures::env();
+    let mut call = call::Call::new(fixtures::EXCHANGE, &env.limits);
+    call.respond(STATUS, Box::new([]), &env.limits);
+    let mut finishes = 0_u32;
+    while let Some(request) = call.requests.pop() {
+        if let http::Request::Reply(Down::Finish) = request {
+            finishes += 1;
+        }
+    }
+    assert_eq!(finishes, FINISHES);
+}

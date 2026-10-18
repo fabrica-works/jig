@@ -84,7 +84,9 @@ impl Call {
             body: http::Body::Length(u64::try_from(self.response.len()).expect("bounded response")),
             close: false,
         }));
-        if !self.response.is_empty() {
+        if self.response.is_empty() {
+            self.requests.push(http::Request::Reply(Down::Finish));
+        } else {
             self.room(limits);
         }
     }
