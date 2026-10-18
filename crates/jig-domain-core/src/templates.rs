@@ -19,7 +19,10 @@ pub struct Template {
     pub grace: Option<Duration>,
 }
 
-/// Apply the project's named overrides in configuration order (engine.md, 11.1).
+/// Apply the project's named overrides in configuration order (configuration.md, 3.1).
+///
+/// A policy overrides a template at most once, refused at start and on a policy change, so
+/// the first override naming a template is its only one.
 #[must_use]
 pub fn merged(templates: &[Template], overrides: &[jig_domain_people::TemplateOverride]) -> Box<[Template]> {
     let mut merged = skein_lib::List::with_capacity(u32::try_from(templates.len()).expect("configured template count"));

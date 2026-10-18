@@ -40,6 +40,29 @@ fn a_policy_change_past_the_templates_limit_is_refused() {
     );
 }
 
+#[test]
+fn a_policy_change_overriding_a_template_twice_is_refused_as_a_repeated_identity() {
+    let (mut core, _) = make_tree();
+    core.settings.templates = Box::new([template()]);
+    let first = people::TemplateOverride {
+        template: template().number,
+        executor: None,
+        budget: None,
+        deadline: None,
+        priority: Some(5),
+    };
+    let kept = people::PolicyChange::Templates { overrides: Box::new([first.clone()]) };
+    core.change_policy(&limits(), OWNER, PROJECT, kept).expect("one override per template");
+    let twice = people::PolicyChange::Templates {
+        overrides: Box::new([first.clone(), people::TemplateOverride { priority: Some(7), ..first.clone() }]),
+    };
+    assert_eq!(
+        core.change_policy(&limits(), OWNER, PROJECT, twice),
+        Err(people::Refusal::Limit { which: people::LimitKind::Duplicate })
+    );
+    assert_eq!(core.template_overrides.get(&PROJECT), Some(&Box::from([first])));
+}
+
 fn template() -> Template {
     Template {
         number: PROJECT,

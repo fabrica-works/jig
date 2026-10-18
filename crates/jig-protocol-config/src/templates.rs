@@ -321,11 +321,19 @@ pub(crate) fn overrides(
     problems: &mut Problems,
 ) -> Option<Box<[jig_domain_people::TemplateOverride]>> {
     let items = report_list(read::list(document, at, limit), path, problems)?;
-    let mut entries = List::with_capacity(items.len());
+    let mut entries = List::<jig_domain_people::TemplateOverride>::with_capacity(items.len());
     for (index, at) in items.iter().enumerate() {
         let path = check::index(path, index);
         let mut object = check::object(document, *at, &path, problems)?;
         let template = check::count(&mut object, document, b"template", &path, problems);
+        if let Some(number) = template {
+            for previous in &entries {
+                if previous.template == number {
+                    problems.push(path.member(b"template"), What::Duplicate);
+                    break;
+                }
+            }
+        }
         let at = object.required(document, b"executor", &path, problems)?;
         let executor =
             if null(document, at) { None } else { Some(executor(document, at, &path.member(b"executor"), problems)?) };

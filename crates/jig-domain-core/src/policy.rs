@@ -329,13 +329,18 @@ impl Core {
             if overrides.len() > usize::try_from(limits.templates).expect("template bound") {
                 return Err(people::Refusal::Limit { which: people::LimitKind::Policy });
             }
-            for entry in overrides {
+            for (index, entry) in overrides.iter().enumerate() {
                 let mut known = false;
                 for template in &self.settings.templates {
                     known |= template.number == entry.template;
                 }
                 if !known {
                     return Err(people::Refusal::Unknown);
+                }
+                for previous in overrides.iter().take(index) {
+                    if previous.template == entry.template {
+                        return Err(people::Refusal::Limit { which: people::LimitKind::Duplicate });
+                    }
                 }
             }
         }

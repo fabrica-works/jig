@@ -95,6 +95,21 @@ fn a_seeded_override_naming_no_template_refuses_the_start() {
             .member(b"template")
     );
 }
+#[test]
+fn a_seeded_policy_overriding_a_template_twice_refuses_the_start() {
+    fixtures::refuses(
+        br#""templates": []"#,
+        br#""templates": [{"template": 2, "executor": null, "budget": null, "deadline": null, "priority": 5},
+            {"template": 2, "executor": null, "budget": null, "deadline": null, "priority": 7}]"#,
+        fixtures::path(&[b"projects"])
+            .child(Segment::Index(0))
+            .member(b"policy")
+            .member(b"templates")
+            .child(Segment::Index(1))
+            .member(b"template"),
+        What::Duplicate,
+    );
+}
 
 #[test]
 fn a_seeded_override_reaches_the_cores_config() {
