@@ -777,14 +777,15 @@ says they moved.
   the engine; the party may no longer see it; the sign-in ended; the
   engine is stopping.
 - **Admitted** against the party's sign-in and what they may see, and the
-  watches the engine allows per party and in all; past them, refused as
-  busy. A watch holds its place from its admission until the engine has
+  watches the engine allows per party, per stream
+  (`../../protocol/client.md`, section 13) and in all; past them, refused
+  as busy. A watch holds its place from its admission until the engine has
   ended it: while its closing is in flight, and while its stream's end
   or its last delivery is (`../../domain/engine.md`, section 11). A
-  deployment allows each party at least the engine's watches one client
-  opens at its limit, `me`'s included (client.md, section 14), so that a
-  party's one client within its limit never finds the party's room
-  full. Busy is the room full for now, and the client opens the watch
+  deployment allows each party, and each stream, at least the engine's
+  watches one client opens at its limit, `me`'s included (client.md,
+  section 14), so that a party's one client within its limit never finds
+  its room full. Busy is the room full for now, and the client opens the watch
   again after a backoff (client.md, 8.1), as a request refused busy is
   sent again (section 4).
 - **An application's subject names its owner, its scope and its

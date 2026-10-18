@@ -639,11 +639,14 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   at the client's limits), the stream's message bytes.
 - **The transport's:** an exchange's deadline, and what it buffers of the
   stream and of the small store's writes.
-- **The component's:** clients' streams and their watches (the views'
-  limits, `../domain/engine.md`, section 13), exchanges in flight per
-  client and in all, a message's bytes, what a stream may have queued
-  before nothing more is handed out, the heartbeat's span, mints in
-  flight.
+- **The component's:** clients' streams; the watches one stream holds,
+  each until the engine has ended it, at least the engine's watches one
+  client opens at its limit, as a party's room is
+  (`../client/domain/contract.md`, 7.2), and past them an opening is
+  refused busy, within the views' limits on a party's watches and on all
+  (`../domain/engine.md`, section 13); exchanges in flight per client and
+  in all, a message's bytes, what a stream may have queued before
+  nothing more is handed out, the heartbeat's span, mints in flight.
 - **The default mapping's,** at each end: its HTTP machines', TLS's, and
   the stream's buffer, at those limits.
 - **The worst case** of each side is its components' and its transport's,
