@@ -6,7 +6,14 @@ use jig_domain_views as views;
 use skein_lib::{Duration, List, ReplyTo, Secret, Token, Wall};
 #[derive(Debug)]
 pub enum Event {
-    Io(skein_io::Event),
+    Call {
+        call: Token,
+        head: skein_http::server::Call,
+    },
+    Http {
+        call: Token,
+        event: skein_http::server::Event,
+    },
     Reply {
         to: ReplyTo,
         reply: people::Reply,
@@ -57,7 +64,8 @@ pub enum Event {
 }
 #[derive(Debug)]
 pub enum Request {
-    Io(skein_io::Request),
+    Http { call: Token, request: skein_http::server::Request },
+    Done { call: Token },
     Core(Box<core::Event>),
     Application(ToApplication),
     Secrets(SecretsRequest),
@@ -137,7 +145,6 @@ pub enum MintRefusal {
 }
 #[derive(Clone, Debug)]
 pub struct Settings {
-    pub listener: skein_io::Addr,
     pub link: Option<people::Identity>,
     pub deployment_provider: u16,
     pub heartbeat: Duration,

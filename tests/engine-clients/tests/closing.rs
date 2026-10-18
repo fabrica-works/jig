@@ -2,7 +2,7 @@ use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_engine_clients_world::fixtures::{self, Peer};
-use jig_protocol_engine_clients::{Event, MintRefusal, Settings};
+use jig_protocol_engine_clients::{Event, MintRefusal};
 use skein_lib::{Reader, Token, Writer};
 fn signed() -> Peer {
     Peer::signed_in(&fixtures::settings(), fixtures::FIRST_SIGN_IN)
@@ -183,35 +183,6 @@ fn close_keeps_an_exchange_until_its_released_answer_is_written() {
     assert_eq!(peer.closed(), 1);
 }
 #[test]
-fn a_close_waits_for_its_listener_to_open() {
-    use jig_protocol_engine_clients::{Component, Request};
-    use skein_lib::{Env, Queue, Time, Wall};
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: fixtures::limits() };
-    let mut out = Queue::with_capacity(8);
-    let mut component = Component::new(Settings { link: None, ..fixtures::settings() }, &env, &mut out).expect("start");
-    assert!(matches!(out.pop(), Some(Request::Io(skein_io::Request::Listen { .. }))));
-    component.down(&env, Event::Close, &mut out);
-    assert!(!component.up(&env, &mut out), "the pending listener has not closed");
-    assert!(out.is_empty());
-    component.down(
-        &env,
-        Event::Io(skein_io::Event::Listening {
-            owner: Token::new(0),
-            listener: Token::new(99),
-            addr: fixtures::settings().listener,
-        }),
-        &mut out,
-    );
-    assert!(matches!(out.pop(), Some(Request::Io(skein_io::Request::Close { entity })) if entity == Token::new(99)));
-    assert!(!component.up(&env, &mut out), "waiting for io's close terminal");
-    component.down(&env, Event::Io(skein_io::Event::Closed { owner: Token::new(0) }), &mut out);
-    assert!(component.up(&env, &mut out));
-    assert!(matches!(out.pop(), Some(Request::Closed)));
-    assert!(!component.up(&env, &mut out));
-    assert!(out.is_empty());
-}
-
-#[test]
 fn after_stop_a_sign_in_and_a_sign_out_are_answered_not_ready() {
     let mut peer = signed();
     let spent = peer.printed_link();
@@ -251,16 +222,4 @@ fn after_stop_a_pending_mint_commits_nothing() {
     assert_eq!(peer.mint_refusal(exchange), Some(MintRefusal::NotReady));
     assert!(peer.take_core().is_none());
     assert_eq!(peer.digest_kept(), None);
-}
-#[test]
-fn abort_upgrades_sockets_waiting_for_their_graceful_close() {
-    let mut peer = signed();
-    let stream = peer.open_stream();
-    peer.hold_closes();
-    peer.event(Event::Close);
-    assert_eq!(peer.closed(), 0, "io has not settled its closes");
-    assert_eq!(peer.socket_closes(peer.stream_socket(stream)), 1);
-    peer.event(Event::Abort);
-    assert_eq!(peer.socket_closes(peer.stream_socket(stream)), 2, "the drain is upgraded once to abort");
-    assert_eq!(peer.closed(), 1);
 }

@@ -1,4 +1,4 @@
-//! Listener, exchanges, and durable sign-in sequencing (protocol/client.md, 8).
+//! Calls, exchanges, and durable sign-in sequencing (protocol/client.md, 8).
 use crate::{
     Event, Kept, Limits, Request, SecretOwner, SecretsAnswer, SecretsRequest, Settings,
     connection::Connection,
@@ -24,26 +24,21 @@ mod reads;
 mod services;
 #[path = "watches.rs"]
 mod watches;
-const LISTENER: Token = Token::new(0);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Unusable {
     Limits,
     Seed,
-    Listener,
 }
 #[derive(Debug)]
 pub struct Component {
     settings: Settings,
     rng: CryptoRng,
     link: Option<Link>,
-    listener: Option<Token>,
     connections: Map<Token, Connection>,
     pending: Pending,
     streams: Map<Token, crate::stream::Stream>,
     next: u64,
     phase: closing::Phase,
-    listening: bool,
-    listener_closing: bool,
 }
 impl Component {
     pub fn new(settings: Settings, env: &Env<Limits>, out: &mut Queue<Request>) -> Result<Self, Unusable> {
@@ -70,32 +65,22 @@ impl Component {
                 return Err(Unusable::Limits);
             }
         }
-        if settings.link.is_some() {
-            let addr = settings.listener.socket().ok_or(Unusable::Listener)?;
-            if !addr.ip().is_loopback() {
-                return Err(Unusable::Listener);
-            }
-        }
         let rng = CryptoRng::new(&settings.seed, settings.stream).ok_or(Unusable::Seed)?;
         let mut value = Self {
             settings,
             rng,
             link: None,
-            listener: None,
-            connections: Map::with_capacity(env.limits.connections),
+            connections: Map::with_capacity(env.limits.exchanges),
             pending: Pending {
                 mints: Map::with_capacity(env.limits.mints),
                 exchanges: Map::with_capacity(
-                    env.limits.exchanges.checked_add(env.limits.connections).expect("checked pending capacity"),
+                    env.limits.exchanges.checked_add(env.limits.exchanges).expect("checked pending capacity"),
                 ),
             },
             streams: Map::with_capacity(env.limits.streams),
             next: 1,
             phase: closing::Phase::Active,
-            listening: true,
-            listener_closing: false,
         };
-        out.push(Request::Io(skein_io::Request::Listen { owner: LISTENER, addr: value.settings.listener }));
         value.fresh_link(env, out);
         Ok(value)
     }
@@ -115,7 +100,16 @@ impl Component {
     pub fn down(&mut self, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
         assert!(!self.closed(), "the owner sends nothing after Closed");
         match event {
-            Event::Io(event) => self.io(env, event, out),
+            Event::Call { call, head } => {
+                let mut connection = Connection::new(call, &env.limits, env.now);
+                self.http(env, &mut connection, http::Event::Call(head), out);
+                self.connections.insert(call, connection).expect("server bounds active calls");
+            }
+            Event::Http { call, event } => {
+                if let Some(connection) = self.connections.get_mut(&call) {
+                    connection.events.push(event);
+                }
+            }
             Event::Reply { to, reply } => self.reply(env, to.into_token(), reply, out),
             Event::SignInRefused { to } => {
                 let exchange = to.into_token();
@@ -156,69 +150,6 @@ impl Component {
             Event::Mint { exchange, identity } => self.mint(env, exchange, identity, out),
         }
     }
-    fn io(&mut self, env: &Env<Limits>, event: skein_io::Event, out: &mut Queue<Request>) {
-        match event {
-            skein_io::Event::Listening { owner, listener, addr } => {
-                if owner == LISTENER {
-                    self.listening = false;
-                    self.listener = Some(listener);
-                    self.settings.listener = addr;
-                    self.fresh_link(env, out);
-                    self.close_listener(out);
-                }
-            }
-            skein_io::Event::Accepted { owner, socket, .. } => {
-                if owner != LISTENER || self.stopping() || self.connections.len() == self.connections.capacity() {
-                    out.push(Request::Io(skein_io::Request::Reject { socket }));
-                } else {
-                    let owner = self.name();
-                    self.connections
-                        .insert(owner, Connection::new(socket, &env.limits, env.now))
-                        .expect("admitted socket");
-                    out.push(Request::Io(skein_io::Request::Bind { socket, owner }));
-                }
-            }
-            skein_io::Event::Stream { owner, up } => {
-                if let Some(connection) = self.connections.get_mut(&owner)
-                    && !connection.closing
-                {
-                    connection.feed(env, up);
-                }
-            }
-            skein_io::Event::Closed { owner } => {
-                if let Some(stream) = self.streams.get_mut(&owner) {
-                    stream.phase = crate::stream::Phase::Closing;
-                }
-                if owner == LISTENER {
-                    self.listener = None;
-                }
-                if let Some(connection) = self.connections.remove(&owner)
-                    && let Some(exchange) = connection.exchange
-                {
-                    self.pending.exchanges.remove(&exchange);
-                }
-            }
-            skein_io::Event::Failed { owner, .. } => {
-                if owner == LISTENER {
-                    self.listening = false;
-                }
-                if let Some(connection) = self.connections.get_mut(&owner) {
-                    connection.close(out);
-                } else if let Some(listener) = self.listener {
-                    out.push(Request::Io(skein_io::Request::Abort { entity: listener }));
-                }
-            }
-            skein_io::Event::Connecting { .. }
-            | skein_io::Event::Connected { .. }
-            | skein_io::Event::Output { .. }
-            | skein_io::Event::Spawned { .. }
-            | skein_io::Event::Exited { .. }
-            | skein_io::Event::Usage { .. }
-            | skein_io::Event::Resized
-            | skein_io::Event::Window { .. }
-            | skein_io::Event::Shutdown { .. } => {}
-        }
-    }
     /// Advances one queued HTTP transition, bounding each invocation's output.
     pub fn up(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
         if self.aborting() {
@@ -230,15 +161,10 @@ impl Component {
             if self.stream_up(env, out) {
                 return true;
             }
-            let mut closing = None;
-            for (owner, connection) in &self.connections {
-                if !connection.closing || connection.draining {
-                    closing = Some(*owner);
-                    break;
-                }
-            }
-            if let Some(owner) = closing {
-                self.connections.get_mut(&owner).expect("closing connection").close(out);
+            if let Some((owner, _)) = self.connections.first() {
+                let owner = *owner;
+                let mut connection = self.connections.remove(&owner).expect("closing call");
+                connection.close(out);
                 return true;
             }
             if self.settled() {
@@ -291,9 +217,7 @@ impl Component {
         }
         let mut selected = None;
         for (owner, connection) in &self.connections {
-            if !connection.closing
-                && (!connection.below.is_empty() || !connection.requests.is_empty() || !connection.events.is_empty())
-            {
+            if connection.closing || !connection.requests.is_empty() || !connection.events.is_empty() {
                 selected = Some(*owner);
                 break;
             }
@@ -305,12 +229,23 @@ impl Component {
             return self.close_up(env, out);
         };
         let mut connection = self.connections.remove(&owner).expect("selected connection");
-        if !connection.progress(env, out)
+        if !connection.closing
+            && !connection.progress(env, out)
             && let Some(event) = connection.events.pop()
         {
             self.http(env, &mut connection, event, out);
         }
-        self.connections.insert(owner, connection).expect("same slot");
+        if connection.closing {
+            if let Some(exchange) = connection.exchange {
+                self.pending.exchanges.remove(&exchange);
+            }
+            if let Some(stream) = self.streams.get_mut(&owner) {
+                stream.phase = crate::stream::Phase::Closing;
+                stream.closed_connection = true;
+            }
+        } else {
+            self.connections.insert(owner, connection).expect("same slot");
+        }
         true
     }
     fn http(&mut self, env: &Env<Limits>, connection: &mut Connection, event: http::Event, out: &mut Queue<Request>) {
@@ -352,35 +287,13 @@ impl Component {
                 }
             }
             http::Event::Reply(Up::Room) => connection.send(&env.limits),
-            http::Event::Done(reuse) => {
-                if let Some(exchange) = connection.exchange {
-                    self.pending.exchanges.remove(&exchange);
-                }
-                connection.exchange = None;
-                connection.call = None;
-                connection.body.clear();
-                connection.response = Box::new([]);
-                if self.closing() {
-                    if let Some(owner) = connection.stream
-                        && let Some(stream) = self.streams.get_mut(&owner)
-                    {
-                        stream.phase = crate::stream::Phase::Closing;
-                        stream.closed_connection = true;
-                    }
-                    connection.finish(out);
-                } else {
-                    match reuse {
-                        http::Reuse::Keep => connection.requests.push(http::Request::Next),
-                        http::Reuse::Close => connection.close(out),
-                    }
-                }
-            }
+            http::Event::Done(_) => connection.finish(out),
             http::Event::Ended
             | http::Event::Failed(_)
             | http::Event::Refused(_)
             | http::Event::Body(Up::Failed(_) | Up::Room)
-            | http::Event::Reply(Up::Failed(_) | Up::End | Up::Bytes(_)) => connection.close(out),
-            http::Event::Closed => {}
+            | http::Event::Reply(Up::Failed(_) | Up::End | Up::Bytes(_))
+            | http::Event::Closed => connection.close(out),
         }
     }
     fn body(&mut self, env: &Env<Limits>, connection: &mut Connection, out: &mut Queue<Request>) {
@@ -631,16 +544,8 @@ impl Component {
             Some(link) => Some(link.until),
             None => None,
         };
-        for (_, connection) in &self.connections {
-            if !connection.closing && connection.stream.is_none() {
-                next = Some(match next {
-                    Some(next) => next.min(connection.deadline),
-                    None => connection.deadline,
-                });
-            }
-        }
         for (_, stream) in &self.streams {
-            if !stream.closing() {
+            if !stream.closing() && !stream.waiting && !stream.finishing() {
                 next = Some(match next {
                     Some(next) => next.min(stream.deadline),
                     None => stream.deadline,
@@ -649,14 +554,14 @@ impl Component {
         }
         next
     }
-    pub fn fire(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) {
+    pub fn fire(&mut self, env: &Env<Limits>, _out: &mut Queue<Request>) {
         if expired(self.link.as_ref(), env.now) {
             self.link = None;
             return;
         }
         let mut due = None;
         for (owner, stream) in &self.streams {
-            if !stream.closing() && stream.deadline <= env.now {
+            if !stream.closing() && !stream.waiting && !stream.finishing() && stream.deadline <= env.now {
                 due = Some(*owner);
                 break;
             }
@@ -668,17 +573,6 @@ impl Component {
             } else {
                 stream.heartbeat(env);
             }
-            return;
-        }
-        let mut due = None;
-        for (owner, connection) in &self.connections {
-            if !connection.closing && connection.stream.is_none() && connection.deadline <= env.now {
-                due = Some(*owner);
-                break;
-            }
-        }
-        if let Some(owner) = due {
-            self.connections.get_mut(&owner).expect("due connection").close(out);
         }
     }
 

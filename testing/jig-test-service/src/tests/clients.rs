@@ -221,6 +221,14 @@ fn an_erased_sign_in_record_ends_its_stream_once_durable() {
 }
 
 fn take_listener(engine: &mut crate::Engine) {
+    let limits = engine.env.limits;
+    engine.clients.as_mut().expect("clients").iterate(
+        engine.env.now,
+        engine.env.wall,
+        &mut engine.events,
+        &limits.connector,
+        limits.core.documents.rows,
+    );
     let Some(io::Request::Listen { .. }) = engine.clients.as_mut().expect("clients").io.pop() else {
         panic!("clients listener")
     };
@@ -255,8 +263,19 @@ fn started(clients: bool) -> crate::Service {
     assert!(root::worst_case(&limits.root).is_some(), "test root pricing: {:?}", limits.root);
     let seeds = f::seeds();
     let root = root::Config { core: jig_protocol_config::core(&config, seeds.deployment, seeds.seed), first, second };
-    let clients =
-        if clients { Some(crate::clients::Clients::new(&config, &seeds, 512).expect("clients fixture")) } else { None };
+    let clients = if clients {
+        Some(
+            crate::clients::Clients::new(
+                &config,
+                &seeds,
+                512,
+                &crate::limits::profile_limits(jig_protocol_config::Profile::Small).server,
+            )
+            .expect("clients fixture"),
+        )
+    } else {
+        None
+    };
     let values = crate::values::Values {
         application: skein_lib::Map::with_capacity(0),
         accounts: jig_protocol_accounts::table::Table::new(1, 256),

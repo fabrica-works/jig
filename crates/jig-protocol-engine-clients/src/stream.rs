@@ -84,7 +84,6 @@ impl Stream {
         self.bytes = u32::try_from(packet.event.data.len()).expect("bounded packet");
         self.taken = packet.taken;
         self.waiting = true;
-        self.deadline = env.now.saturating_add(env.limits.stall);
         sse::down(
             &mut self.writer,
             &writer_env(env),
@@ -96,7 +95,6 @@ impl Stream {
     pub fn heartbeat(&mut self, env: &Env<Limits>) {
         self.waiting = true;
         self.taken = Taken::None;
-        self.deadline = env.now.saturating_add(env.limits.stall);
         sse::down(
             &mut self.writer,
             &writer_env(env),

@@ -100,7 +100,7 @@ impl Front {
         self.connections.take(now, &mut self.up, &mut self.below);
         while let Some((conn, down)) = self.below.pop() {
             if let Some(event) = net.down(id, conn, down) {
-                engine.event(jig_protocol_engine_clients::Event::Io(event));
+                engine.io_event(event);
             }
         }
         self.client.reclaim();
@@ -480,6 +480,7 @@ impl Story {
                 .chain(self.front.connections.next_deadline())
                 .chain(second)
                 .chain(self.engine.component.next_deadline())
+                .chain(self.engine.server.next_deadline())
                 .chain(self.engine.driver.world.next_due())
                 .chain(self.net.next_due())
                 .filter(|t| *t > self.now)
@@ -504,7 +505,13 @@ impl Story {
                 if let Some(request) = self.engine.request(request)
                     && let Some(event) = self.net.io(request)
                 {
-                    self.engine.event(jig_protocol_engine_clients::Event::Io(event));
+                    self.engine.io_event(event);
+                }
+            }
+            while let Some(request) = self.engine.io() {
+                active = true;
+                if let Some(event) = self.net.io(request) {
+                    self.engine.io_event(event);
                 }
             }
             active |= self.front.advance(self.now, CLIENT, &mut self.net, &mut self.engine);
@@ -514,7 +521,7 @@ impl Story {
             let (events, clients, changed) = self.net.advance(&mut self.engine.rules);
             active |= changed;
             for event in events {
-                self.engine.event(jig_protocol_engine_clients::Event::Io(event));
+                self.engine.io_event(event);
             }
             for (id, conn, up) in clients {
                 let front = if id == CLIENT {

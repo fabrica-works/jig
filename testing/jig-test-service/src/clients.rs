@@ -15,14 +15,15 @@ const PREFIX: u64 = 4_u64 << 60;
 #[derive(Debug)]
 pub(super) struct Clients {
     component: kit::Component,
-    listener: Option<::core::net::SocketAddr>,
+    server: crate::server::Server,
+    server_out: Queue<crate::server::Routed>,
+    component_closed: bool,
     secret: Option<skein_lib::Secret>,
     pub(super) env: Env<kit::Limits>,
     out: Queue<kit::Request>,
     pub(super) io: Queue<io::Request>,
     pub(super) links: Queue<Box<[u8]>>,
     pub(super) secrets: Queue<kit::SecretsRequest>,
-    pub(super) opened: bool,
     pub(super) closed: bool,
     pending: bool,
     pub(super) starting: Option<()>,
@@ -43,7 +44,8 @@ pub(super) enum Routed {
     Root(Box<root::Event>),
     Application(kit::ToApplication),
     Secrets(kit::SecretsRequest),
-    Io(io::Request),
+    Http { call: Token, request: skein_http::server::Request },
+    Done { call: Token },
     Link(skein_lib::Secret),
     Closed,
 }
@@ -52,7 +54,8 @@ pub(super) fn to_root(request: kit::Request) -> Routed {
         kit::Request::Core(event) => Routed::Root(Box::new(root::Event::Core(*event))),
         kit::Request::Application(value) => Routed::Application(value),
         kit::Request::Secrets(value) => Routed::Secrets(value),
-        kit::Request::Io(value) => Routed::Io(tag(value)),
+        kit::Request::Http { call, request } => Routed::Http { call, request },
+        kit::Request::Done { call } => Routed::Done { call },
         kit::Request::Link { secret } => Routed::Link(secret),
         kit::Request::Minted { .. } | kit::Request::MintRefused { .. } => {
             unreachable!("the test service mints no application sign-ins")
@@ -66,7 +69,12 @@ fn invalid(what: What) -> Problems {
     problems
 }
 impl Clients {
-    pub fn new(config: &config::Engine, seeds: &Seeds, room: u32) -> Result<Self, Problems> {
+    pub fn new(
+        config: &config::Engine,
+        seeds: &Seeds,
+        room: u32,
+        transport: &crate::server::Limits,
+    ) -> Result<Self, Problems> {
         let config::Address::Addr(listener) = config.clients.listener else {
             return Err(invalid(What::Form));
         };
@@ -115,7 +123,6 @@ impl Clients {
             })
             .or(Err(invalid(What::Bound)))?;
         let settings = kit::Settings {
-            listener,
             link,
             deployment_provider,
             heartbeat: config.clients.heartbeat,
@@ -130,14 +137,15 @@ impl Clients {
         let component = kit::Component::new(settings, &env, &mut out).or(Err(invalid(What::Bound)))?;
         Ok(Self {
             component,
-            listener: None,
+            server: crate::server::Server::new(listener, transport),
+            server_out: Queue::with_capacity(room),
+            component_closed: false,
             secret: None,
             env,
             out,
             io: Queue::with_capacity(room),
             links: Queue::with_capacity(room),
             secrets: Queue::with_capacity(room),
-            opened: false,
             closed: false,
             pending: true,
             starting: Some(()),
@@ -150,7 +158,7 @@ impl Clients {
         })
     }
     fn print_link(&mut self) {
-        if let Some(listener) = self.listener
+        if let Some(listener) = self.server.listening()
             && let Some(secret) = self.secret.take()
         {
             self.links.push(printed(listener, &secret));
@@ -163,8 +171,11 @@ impl Clients {
             && self.links.room() >= count
             && self.secrets.room() >= count
     }
+    pub fn opened(&self) -> bool {
+        self.server.opened()
+    }
     pub fn next_deadline(&self) -> Option<Time> {
-        self.component.next_deadline()
+        crate::accounts::earliest(self.component.next_deadline(), self.server.next_deadline())
     }
     pub fn work_pending(&self, now: Time) -> bool {
         !self.closed
@@ -181,36 +192,48 @@ impl Clients {
                 })
     }
     pub fn down(&mut self, event: kit::Event) {
-        if !self.closed {
+        if let kit::Event::Stop = &event {
+            self.server.stop(&mut self.server_out);
+        }
+        if let kit::Event::Close = &event {
+            self.server.close(&mut self.server_out);
+        }
+        if let kit::Event::Abort = &event {
+            self.server.abort(&mut self.server_out);
+        }
+        if !self.component_closed {
             self.component.down(&self.env, event, &mut self.out);
             self.pending = true;
         }
     }
     pub fn up(&mut self, event: io::Event) -> bool {
         let event = untag(event);
-        match &event {
-            io::Event::Listening { addr, .. } => {
-                self.opened = true;
-                self.listener = addr.socket();
-                self.print_link();
-            }
-            io::Event::Failed { owner, .. } if *owner == Token::new(0) => return false,
-            io::Event::Accepted { .. }
-            | io::Event::Connecting { .. }
-            | io::Event::Connected { .. }
-            | io::Event::Stream { .. }
-            | io::Event::Output { .. }
-            | io::Event::Spawned { .. }
-            | io::Event::Exited { .. }
-            | io::Event::Usage { .. }
-            | io::Event::Resized
-            | io::Event::Window { .. }
-            | io::Event::Shutdown { .. }
-            | io::Event::Closed { .. }
-            | io::Event::Failed { .. } => {}
+        if let io::Event::Failed { owner, .. } = &event
+            && *owner == Token::new(0)
+        {
+            return false;
         }
-        self.down(kit::Event::Io(event));
+        self.server.up(event, &mut self.server_out);
+        self.print_link();
+        self.pending = true;
         true
+    }
+    fn server_requests(&mut self) {
+        for _ in 0..self.server_out.len() {
+            if self.io.room() == 0 || self.out.room() < kit::MAX_OUT_DOWN {
+                break;
+            }
+            match self.server_out.pop().expect("server requests") {
+                crate::server::Routed::Io(request) => self.io.push(tag(request)),
+                crate::server::Routed::Call { call, head } => self.down(kit::Event::Call { call, head }),
+                crate::server::Routed::Http { call, event } => {
+                    if !self.component_closed {
+                        self.down(kit::Event::Http { call, event });
+                    }
+                }
+            }
+        }
+        self.closed = self.component_closed && self.server.closed();
     }
     fn root(&mut self, value: root::Event, events: &mut Queue<root::Event>) {
         if self.starting.is_some() {
@@ -230,7 +253,8 @@ impl Clients {
                 break;
             }
             match to_root(self.out.pop().expect("client requests")) {
-                Routed::Io(value) => self.io.push(value),
+                Routed::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
+                Routed::Done { call } => self.server.done(call, &mut self.server_out),
                 Routed::Link(value) => {
                     self.secret = Some(value);
                     self.print_link();
@@ -241,7 +265,7 @@ impl Clients {
                     Ok(value) => self.root(value, events),
                     Err(value) => self.down(*value),
                 },
-                Routed::Closed => self.closed = true,
+                Routed::Closed => self.component_closed = true,
             }
         }
     }
@@ -255,17 +279,26 @@ impl Clients {
     ) {
         self.env.now = now;
         self.env.wall = wall;
+        self.server.clock(now, wall);
         if self.closed || !self.room(1) || self.early.room() < kit::MAX_OUT_DOWN || events.room() < kit::MAX_OUT_DOWN {
             return;
         }
+        self.server.fire(&mut self.server_out);
+        let server_pending = self.server.advance(&mut self.server_out);
+        self.server_requests();
         self.endings_step(events, bound, rows);
         self.advance(events, bound, rows);
         if self.closed {
             return;
         }
-        self.component.fire(&self.env, &mut self.out);
+        if !self.component_closed {
+            self.component.fire(&self.env, &mut self.out);
+        }
         self.advance(events, bound, rows);
-        self.pending = self.component.up(&self.env, &mut self.out);
+        self.pending = server_pending || !self.server_out.is_empty();
+        if !self.component_closed {
+            self.pending |= self.component.up(&self.env, &mut self.out);
+        }
         self.advance(events, bound, rows);
     }
 }

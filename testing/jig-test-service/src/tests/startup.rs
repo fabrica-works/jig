@@ -39,3 +39,16 @@ fn a_service_whose_operations_cannot_close_a_conversation_is_refused() {
     assert_eq!(problem.path, Path::root().member(b"engine").member(b"limits"));
     assert_eq!(problem.what, What::Operations { operations: 4, delegates: 4, goals: 8 });
 }
+
+#[test]
+fn a_link_on_a_non_loopback_listener_refuses_the_start() {
+    let document = fixtures::with(&fixtures::engine_document(), b"127.0.0.1:7100", b"192.0.2.1:8080");
+    let found = crate::startup::parse(&document).expect_err("off-loopback link");
+    let path = Path::root().member(b"engine").member(b"clients");
+    assert_eq!(found.problems.len(), 2);
+    for (index, member) in [b"listener".as_slice(), b"link"].into_iter().enumerate() {
+        let problem = found.problems.get(u32::try_from(index).expect("two inputs")).expect("input");
+        assert_eq!(problem.path, path.member(member));
+        assert_eq!(problem.what, What::Plaintext);
+    }
+}

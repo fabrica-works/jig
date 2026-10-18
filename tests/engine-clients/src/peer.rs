@@ -154,6 +154,8 @@ impl Exchange {
 }
 #[derive(Debug)]
 pub struct Peer {
+    server: jig_test_service::server::Server,
+    server_out: Queue<jig_test_service::server::Routed>,
     component: Component,
     env: Env<Limits>,
     out: Queue<Request>,
@@ -193,6 +195,8 @@ impl Peer {
         let component = Component::new(settings.clone(), &env, &mut out).expect("component starts");
         let mut peer = Self {
             component,
+            server: fixtures::server(),
+            server_out: Queue::with_capacity(64),
             env,
             out,
             sockets: BTreeMap::new(),
@@ -227,19 +231,53 @@ impl Peer {
         peer
     }
     pub fn event(&mut self, event: Event) {
+        if let Event::Stop = &event {
+            self.server.stop(&mut self.server_out);
+        }
+        if let Event::Close = &event {
+            self.server.close(&mut self.server_out);
+        }
+        if let Event::Abort = &event {
+            self.server.abort(&mut self.server_out);
+        }
         self.component.down(&self.env, event, &mut self.out);
         self.pump();
+    }
+    fn server_step(&mut self) -> bool {
+        let mut active = false;
+        self.server.clock(self.env.now, self.env.wall);
+        self.server.fire(&mut self.server_out);
+        active |= self.server.advance(&mut self.server_out);
+        if let Some(routed) = self.server_out.pop() {
+            active = true;
+            match routed {
+                jig_test_service::server::Routed::Io(request) => self.io(request),
+                jig_test_service::server::Routed::Call { call, head } => {
+                    self.component.down(&self.env, Event::Call { call, head }, &mut self.out);
+                }
+                jig_test_service::server::Routed::Http { call, event } => {
+                    if self.closed == 0 {
+                        self.component.down(&self.env, Event::Http { call, event }, &mut self.out);
+                    }
+                }
+            }
+        }
+        active
     }
     fn pump(&mut self) {
         // Every packet is tiny; this bound includes the seeded wire's harmless delays.
         let mut quiet = 0;
         for _ in 0..512 {
             let mut active = false;
-            self.component.up(&self.env, &mut self.out);
+            active |= self.server_step();
+            if self.closed == 0 {
+                active |= self.component.up(&self.env, &mut self.out);
+            }
             if let Some(request) = self.out.pop() {
                 active = true;
                 match request {
-                    Request::Io(request) => self.io(request),
+                    Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
+                    Request::Done { call } => self.server.done(call, &mut self.server_out),
                     Request::Core(event) => {
                         if let core::Event::Delivered { watcher } = event.as_ref() {
                             self.in_flight.remove(watcher);
@@ -309,7 +347,7 @@ impl Peer {
                 }
             }
             for (owner, up) in ups {
-                self.component.down(&self.env, Event::Io(skein_io::Event::Stream { owner, up }), &mut self.out);
+                self.server.up(skein_io::Event::Stream { owner, up }, &mut self.server_out);
             }
             quiet = if active { 0 } else { quiet + 1 };
             if quiet == 16 {
@@ -319,11 +357,9 @@ impl Peer {
     }
     fn io(&mut self, request: skein_io::Request) {
         match request {
-            skein_io::Request::Listen { owner, addr } => self.component.down(
-                &self.env,
-                Event::Io(skein_io::Event::Listening { owner, listener: Token::new(99), addr }),
-                &mut self.out,
-            ),
+            skein_io::Request::Listen { owner, addr } => self
+                .server
+                .up(skein_io::Event::Listening { owner, listener: Token::new(99), addr }, &mut self.server_out),
             skein_io::Request::Bind { socket, owner } => {
                 self.sockets.get_mut(&socket).expect("accepted socket").owner = Some(owner);
             }
@@ -364,11 +400,11 @@ impl Peer {
             socket,
             Exchange::new(skein_http::Method::Get, b"/jig/v1/stream", Box::new([]), self.bearer.as_deref()),
         );
-        self.event(Event::Io(skein_io::Event::Accepted {
-            owner: Token::new(0),
-            socket,
-            peer: fixtures::settings().listener,
-        }));
+        self.server.up(
+            skein_io::Event::Accepted { owner: Token::new(0), socket, peer: fixtures::address() },
+            &mut self.server_out,
+        );
+        self.pump();
         let events = self.stream_records(socket);
         let Some(w::StreamEvent::Hello(hello)) = events.first() else {
             panic!("hello first: {:?}", self.sockets.get(&socket).expect("stream").body);
@@ -475,6 +511,9 @@ impl Peer {
         self.watch_sign_ins.clear();
         self.last_watch = None;
         self.component = Component::new(settings.clone(), &self.env, &mut self.out).expect("restart");
+        self.server = fixtures::server();
+        self.server_out = Queue::with_capacity(64);
+        self.closed = 0;
         self.pump();
     }
     pub fn release_text(&mut self, watcher: Token) {
@@ -523,7 +562,11 @@ impl Peer {
         let exchange = self.sockets.get_mut(&self.streams[&stream]).expect("stream");
         exchange.state = ExchangeState::Cut;
         let owner = exchange.owner.expect("bound stream");
-        self.event(Event::Io(skein_io::Event::Stream { owner, up: Up::Failed(skein_lib::stream::Fault::Other) }));
+        self.server.up(
+            skein_io::Event::Stream { owner, up: Up::Failed(skein_lib::stream::Fault::Other) },
+            &mut self.server_out,
+        );
+        self.pump();
     }
     pub fn advance_time(&mut self, span: skein_lib::Duration) {
         self.env.now = self.env.now.saturating_add(span);
@@ -546,11 +589,11 @@ impl Peer {
         let socket = Token::new(self.next_socket);
         self.next_socket += 1;
         self.sockets.insert(socket, Exchange::new(skein_http::Method::Post, target, body, bearer));
-        self.event(Event::Io(skein_io::Event::Accepted {
-            owner: Token::new(0),
-            socket,
-            peer: fixtures::settings().listener,
-        }));
+        self.server.up(
+            skein_io::Event::Accepted { owner: Token::new(0), socket, peer: fixtures::address() },
+            &mut self.server_out,
+        );
+        self.pump();
         socket
     }
     fn take_sign_in(&mut self) -> ReplyTo {

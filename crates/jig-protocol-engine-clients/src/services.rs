@@ -38,7 +38,7 @@ impl Component {
             }
             SecretsAnswer::Got { owner, value } => {
                 // Gets answer in the same iterate; waiting gets of one owner can use it.
-                for _ in 0..env.limits.connections {
+                for _ in 0..env.limits.exchanges {
                     let mut found = None;
                     for (exchange, waiting) in &self.pending.exchanges {
                         let wanted = match waiting {
@@ -168,7 +168,7 @@ impl Component {
         }
     }
     fn replayed(&mut self, env: &Env<Limits>, owner: SecretOwner, out: &mut Queue<Request>) {
-        for _ in 0..env.limits.connections {
+        for _ in 0..env.limits.exchanges {
             let mut found = None;
             for (exchange, waiting) in &self.pending.exchanges {
                 if let Waiting::Made { party, .. } = waiting

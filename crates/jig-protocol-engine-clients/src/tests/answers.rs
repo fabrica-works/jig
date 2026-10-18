@@ -73,7 +73,11 @@ fn a_lost_connection_drops_the_answer_and_nothing_else() {
     let mut exchange = Exchange::new();
     let (owner, to) = exchange.ask();
     let (other_owner, other_to) = exchange.ask();
-    exchange.component.down(&exchange.env, Event::Io(skein_io::Event::Closed { owner }), &mut exchange.out);
+    exchange.component.down(
+        &exchange.env,
+        Event::Http { call: owner, event: skein_http::server::Event::Closed },
+        &mut exchange.out,
+    );
     exchange.reply(to, p::Reply::Outcome(p::Outcome::Said { task: 8, message: 9 }));
     assert_eq!(exchange.component.pending.exchanges.len(), 1);
     assert!(exchange.out.is_empty());
@@ -164,7 +168,7 @@ fn an_answer_past_its_bound_is_lost_without_a_partial_response() {
             Some(expected) => assert_eq!(exchange.answer(owner), expected),
             None => {
                 assert!(unanswered(&exchange, owner));
-                let Some(Request::Io(skein_io::Request::Abort { entity })) = exchange.out.pop() else {
+                let Some(Request::Done { call: entity }) = exchange.out.pop() else {
                     panic!("lost answer");
                 };
                 assert_eq!(entity, owner);

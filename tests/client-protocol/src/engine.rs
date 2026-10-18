@@ -11,6 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(super) struct Engine {
     pub driver: Driver,
     pub component: clients::Component,
+    pub server: jig_test_service::server::Server,
+    server_out: Queue<jig_test_service::server::Routed>,
     pub env: Env<clients::Limits>,
     pub out: Queue<Request>,
     pub link: Box<[u8]>,
@@ -49,6 +51,8 @@ impl Engine {
         Self {
             driver,
             component,
+            server: crate::fixtures::server(),
+            server_out: Queue::with_capacity(256),
             env,
             out,
             link: Box::new([]),
@@ -65,6 +69,7 @@ impl Engine {
         }
     }
     pub fn clock(&mut self, now: Time, wall: Wall) {
+        self.server.clock(now, wall);
         self.env.now = now;
         self.env.wall = wall;
         self.driver.world.set_clock(now, wall);
@@ -74,7 +79,8 @@ impl Engine {
     }
     pub fn request(&mut self, request: Request) -> Option<skein_io::Request> {
         match request {
-            Request::Io(request) => return Some(request),
+            Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
+            Request::Done { call } => self.server.done(call, &mut self.server_out),
             Request::Link { secret } => self.link = crate::fixtures::printed(&secret),
             Request::Secrets(request) => {
                 let answer = match request {
@@ -108,6 +114,19 @@ impl Engine {
                 panic!("the world asks for no application sign-ins")
             }
             Request::Closed => {}
+        }
+        None
+    }
+    pub fn io_event(&mut self, event: skein_io::Event) {
+        self.server.up(event, &mut self.server_out);
+    }
+    pub fn io(&mut self) -> Option<skein_io::Request> {
+        while let Some(routed) = self.server_out.pop() {
+            match routed {
+                jig_test_service::server::Routed::Io(request) => return Some(request),
+                jig_test_service::server::Routed::Call { call, head } => self.event(Event::Call { call, head }),
+                jig_test_service::server::Routed::Http { call, event } => self.event(Event::Http { call, event }),
+            }
         }
         None
     }
@@ -219,11 +238,13 @@ impl Engine {
             self.driver.world.fire_due(self.env.now, self.env.wall);
         }
         let peer = self.driver.world.client_peer.as_ref().expect("joint protocol peer");
-        let active = !peer.delivered.is_empty() || !peer.now.is_empty();
+        let mut active = !peer.delivered.is_empty() || !peer.now.is_empty();
         self.deliveries(None);
         for snapshot in self.driver.snapshots() {
             self.observed.extend(self.truth.applied(snapshot));
         }
+        self.server.fire(&mut self.server_out);
+        active |= self.server.advance(&mut self.server_out) || !self.server_out.is_empty();
         self.component.fire(&self.env, &mut self.out);
         while self.component.up(&self.env, &mut self.out) {}
         active

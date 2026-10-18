@@ -3,7 +3,6 @@ use crate::{Request, connection::Connection, sign_in::Waiting};
 use skein_lib::{Duration, Map, Queue, Token};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Limits {
-    pub connections: u32,
     pub streams: u32,
     pub watches_per_stream: u32,
     pub queued_bytes: u32,
@@ -16,7 +15,6 @@ pub struct Limits {
     pub http: skein_http::server::Limits,
     pub wire: jig_client_protocol_wire::v8::Limits,
     pub link_span: Duration,
-    pub stall: Duration,
 }
 pub const MAX_OUT_DOWN: u32 = 4;
 pub const MAX_OUT_UP: u32 = 3;
@@ -27,7 +25,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.wire.made_service_credential < 40
         || limits.wire.link_sign_in_secret < 32
         || limits.identity_bytes < 8
-        || limits.connections == 0
         || limits.streams == 0
         || limits.watches_per_stream == 0
         || limits.queued_bytes < 128
@@ -36,7 +33,6 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.exchanges == 0
         || limits.exchanges_per_client == 0
         || limits.link_span == Duration::ZERO
-        || limits.stall == Duration::ZERO
     {
         return None;
     }
@@ -46,21 +42,19 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         jig_client_protocol_wire::v8::KeyedAnswer::worst_case_bytes(&limits.wire)?,
         jig_client_protocol_wire::v8::ReadAnswer::worst_case_bytes(&limits.wire)?,
     );
-    let each = skein_http::server::worst_case(&limits.http)?
-        .checked_add(u64::from(limits.http.read))?
+    let each = u64::from(limits.http.read)
         .checked_add(skein_lib::Intake::worst_case(body)?)?
         .checked_add(u64::from(limits.http.head))?
         .checked_add(skein_lib::List::<skein_http::Header>::worst_case(limits.http.headers)?)?
         .checked_add(u64::from(limits.wire.signed_in_token).checked_add(32)?)?
         .checked_add(answer)?
         .checked_add(Queue::<skein_http::server::Event>::worst_case(8)?)?
-        .checked_add(Queue::<skein_http::server::Request>::worst_case(8)?)?
-        .checked_add(Queue::<skein_lib::stream::Down>::worst_case(8)?)?;
-    Map::<Token, Connection>::worst_case(limits.connections)?
-        .checked_add(each.checked_mul(u64::from(limits.connections))?)?
-        .checked_add(Map::<Token, Waiting>::worst_case(limits.exchanges.checked_add(limits.connections)?)?)?
+        .checked_add(Queue::<skein_http::server::Request>::worst_case(8)?)?;
+    Map::<Token, Connection>::worst_case(limits.exchanges)?
+        .checked_add(each.checked_mul(u64::from(limits.exchanges))?)?
+        .checked_add(Map::<Token, Waiting>::worst_case(limits.exchanges.checked_add(limits.exchanges)?)?)?
         .checked_add(
-            u64::from(limits.exchanges.checked_add(limits.connections)?)
+            u64::from(limits.exchanges.checked_add(limits.exchanges)?)
                 .checked_mul(u64::from(body).checked_mul(128)?.checked_add(80)?)?,
         )?
         .checked_add(Queue::<Request>::worst_case(MAX_OUT_DOWN)?)?

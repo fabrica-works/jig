@@ -47,7 +47,6 @@ pub fn peers() -> jig_core_world::peers::Peers {
 #[must_use]
 pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
     jig_protocol_engine_clients::Settings {
-        listener: address(),
         link: Some(jig_domain_people::Identity {
             key: jig_domain_people::IdentityKey { provider: 0, subject: 7_u64.to_be_bytes().into() },
             login: b"login".as_slice().into(),
@@ -68,7 +67,6 @@ pub fn settings(rows: u32) -> jig_protocol_engine_clients::Settings {
 #[must_use]
 pub fn engine_limits() -> Limits {
     Limits {
-        connections: 16,
         streams: 4,
         watches_per_stream: 8,
         queued_bytes: 65536,
@@ -88,7 +86,6 @@ pub fn engine_limits() -> Limits {
         },
         wire: jig_client_protocol_wire::v8::CEILINGS,
         link_span: Duration::from_secs(300),
-        stall: Duration::from_secs(30),
     }
 }
 #[must_use]
@@ -190,4 +187,12 @@ pub fn printed(secret: &skein_lib::Secret) -> Box<[u8]> {
     bytes.put(PREFIX).expect("prefix fits");
     skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, secret.expose(), &mut bytes).expect("secret fits");
     bytes.finish()
+}
+
+#[must_use]
+pub fn server() -> jig_test_service::server::Server {
+    let mut limits = jig_test_service::limits::profile_limits(jig_protocol_config::Profile::Small).server;
+    limits.connections = 16;
+    limits.http = engine_limits().http;
+    jig_test_service::server::Server::new(address(), &limits)
 }

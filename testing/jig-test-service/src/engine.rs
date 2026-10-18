@@ -232,7 +232,7 @@ impl Engine {
             Some(workers) => workers.opened(),
             None => true,
         }) && match &self.clients {
-            Some(clients) => clients.opened,
+            Some(clients) => clients.opened(),
             None => true,
         }
     }

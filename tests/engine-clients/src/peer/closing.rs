@@ -12,12 +12,12 @@ impl Peer {
         }
         self.closing_sockets.remove(&entity);
         if entity == Token::new(99) {
-            self.component.down(&self.env, Event::Io(skein_io::Event::Closed { owner: Token::new(0) }), &mut self.out);
+            self.server.up(skein_io::Event::Closed { owner: Token::new(0) }, &mut self.server_out);
         }
         if let Some(exchange) = self.sockets.get_mut(&entity) {
             exchange.state = state;
             let owner = exchange.owner.expect("bound socket");
-            self.component.down(&self.env, Event::Io(skein_io::Event::Closed { owner }), &mut self.out);
+            self.server.up(skein_io::Event::Closed { owner }, &mut self.server_out);
         }
     }
 
@@ -55,7 +55,7 @@ impl Peer {
     }
     #[must_use]
     pub fn closed(&self) -> usize {
-        self.closed
+        if self.server.closed() { self.closed } else { 0 }
     }
     #[must_use]
     pub fn socket_closes(&self, socket: Token) -> usize {
@@ -90,10 +90,9 @@ impl Peer {
         let socket = Token::new(self.next_socket);
         self.next_socket += 1;
         self.sockets.insert(socket, Exchange::new(skein_http::Method::Post, target, body, self.bearer.as_deref()));
-        self.component.down(
-            &self.env,
-            Event::Io(skein_io::Event::Accepted { owner: Token::new(0), socket, peer: fixtures::settings().listener }),
-            &mut self.out,
+        self.server.up(
+            skein_io::Event::Accepted { owner: Token::new(0), socket, peer: fixtures::address() },
+            &mut self.server_out,
         );
         socket
     }

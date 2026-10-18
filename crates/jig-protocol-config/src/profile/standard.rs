@@ -144,7 +144,7 @@ pub(super) const LIMITS: Limits = Limits {
 };
 
 pub(super) const CLIENTS: jig_protocol_engine_clients::Limits =
-    jig_protocol_engine_clients::Limits { connections: 16, streams: 8, exchanges: 32, mints: 16, ..small::CLIENTS };
+    jig_protocol_engine_clients::Limits { streams: 8, exchanges: 32, mints: 16, ..small::CLIENTS };
 
 const JOURNAL: skein_lib::JournalLimits =
     skein_lib::JournalLimits { commits: 3, writes: 142_684, held: 428_052, now: 1024, release: 1024 };

@@ -26,7 +26,6 @@ pub fn settings() -> Settings {
     served.push(crate::Served { family: Some(9), first: 2, last: 2 }).expect("one family range");
     Settings {
         deployment_provider: 2,
-        listener: skein_io::Addr::Ip(::core::net::SocketAddr::new(::core::net::IpAddr::from([127, 0, 0, 1]), 8080)),
         link: None,
         heartbeat: Duration::from_secs(5),
         rows: 32,
@@ -41,7 +40,6 @@ pub fn env() -> Env<Limits> {
         now: Time::ZERO,
         wall: Wall::EPOCH,
         limits: Limits {
-            connections: 4,
             streams: 2,
             watches_per_stream: 4,
             queued_bytes: 65536,
@@ -54,7 +52,6 @@ pub fn env() -> Env<Limits> {
             http: http::Limits { head: 512, headers: 4, body: 256, read: 32, response: 256, send: 32 },
             wire: wire(),
             link_span: Duration::from_secs(300),
-            stall: Duration::from_secs(30),
         },
     }
 }

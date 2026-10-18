@@ -200,16 +200,6 @@ fn a_run_watch_keeps_the_complete_provisional_position() {
 }
 
 #[test]
-fn a_heartbeat_waiting_for_room_keeps_its_stall_deadline() {
-    let env = fixtures::env();
-    let mut stream = crate::stream::Stream::new([7; 16], 41, &env);
-    stream.heartbeat(&env);
-    assert!(stream.waiting);
-    assert_eq!(stream.deadline, env.now.saturating_add(env.limits.stall));
-    assert_eq!(stream.below.len(), 1);
-}
-
-#[test]
 fn an_absent_stream_digest_is_answered_signed_out() {
     let mut world = fixtures::Exchange::new();
     let owner = world.post_to_method(b"/jig/v1/stream", Box::new([]), skein_http::Method::Get);

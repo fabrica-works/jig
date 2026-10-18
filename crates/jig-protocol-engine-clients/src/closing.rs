@@ -96,7 +96,7 @@ impl Component {
         }
         self.end_streams(Some(sign_in));
     }
-    pub(super) fn abort(&mut self, out: &mut Queue<Request>) {
+    pub(super) fn abort(&mut self, _out: &mut Queue<Request>) {
         if self.aborting() {
             return;
         }
@@ -104,10 +104,6 @@ impl Component {
         self.end_streams(None);
         self.link = None;
         self.pending.exchanges = Map::with_capacity(self.pending.exchanges.capacity());
-        if let Some(listener) = self.listener {
-            self.listener_closing = true;
-            out.push(Request::Io(skein_io::Request::Abort { entity: listener }));
-        }
     }
 
     pub(super) fn sign_out(
@@ -164,25 +160,10 @@ impl Component {
             self.respond(env, exchange, routes::sign_out_answer());
         }
     }
-    pub(super) fn close_listener(&mut self, out: &mut Queue<Request>) {
-        if self.stopping()
-            && !self.listener_closing
-            && let Some(listener) = self.listener
-        {
-            self.listener_closing = true;
-            let request = if self.aborting() {
-                skein_io::Request::Abort { entity: listener }
-            } else {
-                skein_io::Request::Close { entity: listener }
-            };
-            out.push(Request::Io(request));
-        }
-    }
-    pub(super) fn stop(&mut self, out: &mut Queue<Request>) {
+    pub(super) fn stop(&mut self, _out: &mut Queue<Request>) {
         if self.phase == Phase::Active {
             self.phase = Phase::Stopped;
         }
-        self.close_listener(out);
     }
     pub(super) fn close(&mut self, out: &mut Queue<Request>) {
         if !self.aborting() {
@@ -192,12 +173,7 @@ impl Component {
         }
     }
     pub(super) fn settled(&self) -> bool {
-        !self.closed()
-            && !self.listening
-            && self.listener.is_none()
-            && self.connections.is_empty()
-            && self.streams.is_empty()
-            && self.pending.mints.is_empty()
+        !self.closed() && self.connections.is_empty() && self.streams.is_empty() && self.pending.mints.is_empty()
     }
     pub(super) fn close_up(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
         if !self.closing() {
@@ -238,7 +214,6 @@ impl Component {
         if let Some(owner) = finish {
             let stream = self.streams.get_mut(&owner).expect("finishing stream");
             stream.phase = crate::stream::Phase::Finishing;
-            stream.deadline = env.now.saturating_add(env.limits.stall);
             skein_http::sse::writer::down(
                 &mut stream.writer,
                 &crate::stream::writer_env(env),

@@ -4,16 +4,14 @@ use alloc::boxed::Box;
 use skein_http::server as http;
 use skein_lib::{
     Env, Intake, Queue, Time, Token, bytes,
-    stream::{Down, Read, Up},
+    stream::{Down, Read},
 };
 #[derive(Debug)]
 pub(crate) struct Connection {
     pub socket: Token,
     pub stream: Option<Token>,
-    pub http: http::Server,
     pub events: Queue<http::Event>,
     pub requests: Queue<http::Request>,
-    pub below: Queue<Down>,
     pub call: Option<http::Call>,
     pub body: Intake,
     pub route: Route,
@@ -22,19 +20,15 @@ pub(crate) struct Connection {
     pub offset: usize,
     pub closing: bool,
     pub draining: bool,
-    pub deadline: Time,
 }
 impl Connection {
-    pub fn new(socket: Token, limits: &Limits, now: Time) -> Self {
-        let mut requests = Queue::with_capacity(8);
-        requests.push(http::Request::Next);
+    pub fn new(socket: Token, limits: &Limits, _now: Time) -> Self {
+        let requests = Queue::with_capacity(8);
         Self {
             socket,
             stream: None,
-            http: http::Server::new(&limits.http),
             events: Queue::with_capacity(8),
             requests,
-            below: Queue::with_capacity(8),
             call: None,
             body: Intake::with_capacity(u32::try_from(limits.http.body).expect("checked body cap")),
             route: Route::Missing,
@@ -43,20 +37,11 @@ impl Connection {
             offset: 0,
             closing: false,
             draining: false,
-            deadline: now.saturating_add(limits.stall),
         }
     }
-    pub fn feed(&mut self, env: &Env<Limits>, up: Up) {
-        self.deadline = env.now.saturating_add(env.limits.stall);
-        http::up(&mut self.http, &http_env(env), up, &mut self.events, &mut self.below);
-    }
-    pub fn progress(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
-        if let Some(down) = self.below.pop() {
-            out.push(Request::Io(skein_io::Request::Stream { stream: self.socket, down }));
-            return true;
-        }
+    pub fn progress(&mut self, _env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
         if let Some(request) = self.requests.pop() {
-            http::down(&mut self.http, &http_env(env), request, &mut self.events, &mut self.below);
+            out.push(Request::Http { call: self.socket, request });
             return true;
         }
         false
@@ -116,17 +101,14 @@ impl Connection {
         if !self.closing {
             self.closing = true;
             self.draining = true;
-            out.push(Request::Io(skein_io::Request::Close { entity: self.socket }));
+            out.push(Request::Done { call: self.socket });
         }
     }
     pub fn close(&mut self, out: &mut Queue<Request>) {
         if !self.closing || self.draining {
             self.closing = true;
             self.draining = false;
-            out.push(Request::Io(skein_io::Request::Abort { entity: self.socket }));
+            out.push(Request::Done { call: self.socket });
         }
     }
-}
-fn http_env(env: &Env<Limits>) -> Env<http::Limits> {
-    Env { now: env.now, wall: env.wall, limits: env.limits.http }
 }

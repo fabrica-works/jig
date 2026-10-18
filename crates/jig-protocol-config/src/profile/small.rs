@@ -254,7 +254,6 @@ pub(super) const LIMITS: Limits = Limits {
 
 /// Native client HTTP: 4 sockets, 8 exchanges, 5 minute link, 30 second stall.
 pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_engine_clients::Limits {
-    connections: 4,
     streams: 2,
     watches_per_stream: 4,
     queued_bytes: 65536,
@@ -267,7 +266,6 @@ pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_eng
     http: skein_http::server::Limits { head: 4096, headers: 32, body: 65536, read: 16384, response: 1024, send: 16384 },
     wire: jig_client_protocol_wire::v8::CEILINGS,
     link_span: Duration::from_secs(300),
-    stall: Duration::from_secs(30),
 };
 
 /// Accounts use bounded OAuth exchanges and the shared socket limits.

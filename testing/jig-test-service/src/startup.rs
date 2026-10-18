@@ -111,6 +111,14 @@ pub(super) fn parse(input: &[u8]) -> Result<Parsed, Problems> {
     parse_in(&document)
 }
 
+fn link_enabled(document: &Document, at: u32) -> bool {
+    let Ok(mut engine) = read::Object::new(document, at) else { return false };
+    let Some(at) = engine.member(document, b"clients") else { return false };
+    let Ok(mut clients) = read::Object::new(document, at) else { return false };
+    let Some(at) = clients.member(document, b"link") else { return false };
+    read::boolean(document, at) == Ok(true)
+}
+
 fn parse_in(document: &Document) -> Result<Parsed, Problems> {
     let length = document.text_len();
     let mut problems = Problems::empty();
@@ -128,11 +136,18 @@ fn parse_in(document: &Document) -> Result<Parsed, Problems> {
         return Err(problems);
     }
     let at = at.expect("required engine checked");
+    let link_enabled = link_enabled(document, at);
     let engine = match config::engine(document, at) {
         Ok(value) => value,
         Err(found) => {
             for found in &found.problems {
                 problems.push(engine_path(&found.path), found.what);
+                if link_enabled
+                    && found.path == Path::root().member(b"clients").member(b"listener")
+                    && found.what == What::Plaintext
+                {
+                    problems.push(Path::root().member(b"engine").member(b"clients").member(b"link"), found.what);
+                }
             }
             problems.past = problems.past.saturating_add(found.past);
             return Err(problems);
@@ -148,6 +163,21 @@ fn parse_in(document: &Document) -> Result<Parsed, Problems> {
         b"standard" => Profile::Standard,
         _ => return Err(problem(path, What::Form)),
     };
+    if engine.clients.link {
+        let loopback = match &engine.clients.listener {
+            config::Address::Addr(addr) => match addr.socket() {
+                Some(addr) => addr.ip().is_loopback(),
+                None => false,
+            },
+            config::Address::Host { .. } => false,
+        };
+        if !loopback {
+            let path = Path::root().member(b"engine").member(b"clients");
+            problems.push(path.member(b"link"), What::Refers);
+            problems.push(path.member(b"listener"), What::Refers);
+            return Err(problems);
+        }
+    }
     let limits = limits::for_profile(profile, &engine.limits);
     let path = Path::root().member(b"application");
     let mut application = object(document, application.expect("required application checked"), &path)?;
@@ -423,6 +453,7 @@ fn clients_child(parsed: &Parsed, seeds: &Seeds, max: u32) -> Result<Option<crat
                 .expect("engine routes")
                 .checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)
                 .expect("client routing room"),
+            &parsed.limits.server,
         )?)
     } else {
         None

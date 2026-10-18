@@ -136,6 +136,8 @@ impl Side {
 }
 pub(super) struct Bytes {
     component: clients::Component,
+    server: jig_test_service::server::Server,
+    server_out: Queue<jig_test_service::server::Routed>,
     env: Env<clients::Limits>,
     out: Queue<clients::Request>,
     net: Net,
@@ -179,6 +181,8 @@ impl Bytes {
         let component = clients::Component::new(settings, &env, &mut out).expect("Ops clients component");
         Self {
             component,
+            server: fixtures::server(),
+            server_out: Queue::with_capacity(512),
             env,
             out,
             net: Net::new(seed),
@@ -297,6 +301,7 @@ fn callback(event: &Event) -> Option<Callback> {
 }
 impl Bytes {
     pub fn pump(&mut self, joint: &mut Joint, now: Time, wall: Wall) -> Vec<(ClientId, d::Event)> {
+        self.server.clock(now, wall);
         self.env.now = now;
         self.env.wall = wall;
         self.net.clock(now);
@@ -315,6 +320,24 @@ impl Bytes {
         let mut quiet = 0;
         for _ in 0..100_000 {
             let mut active = false;
+            self.server.fire(&mut self.server_out);
+            active |= self.server.advance(&mut self.server_out);
+            while let Some(routed) = self.server_out.pop() {
+                active = true;
+                match routed {
+                    jig_test_service::server::Routed::Io(request) => {
+                        if let Some(event) = self.net.io(request) {
+                            self.server.up(event, &mut self.server_out);
+                        }
+                    }
+                    jig_test_service::server::Routed::Call { call, head } => {
+                        self.event(clients::Event::Call { call, head });
+                    }
+                    jig_test_service::server::Routed::Http { call, event } => {
+                        self.event(clients::Event::Http { call, event });
+                    }
+                }
+            }
             self.component.fire(&self.env, &mut self.out);
             while self.component.up(&self.env, &mut self.out) {
                 active = true;
@@ -359,14 +382,14 @@ impl Bytes {
                 while let Some((conn, down)) = side.down.pop() {
                     active = true;
                     if let Some(event) = self.net.down(*client, conn, down) {
-                        self.component.down(&self.env, clients::Event::Io(event), &mut self.out);
+                        self.server.up(event, &mut self.server_out);
                     }
                 }
             }
             let (events, clients, changed) = self.net.advance(&mut self.rules);
             active |= changed;
             for event in events {
-                self.event(clients::Event::Io(event));
+                self.server.up(event, &mut self.server_out);
             }
             for (client, conn, up) in clients {
                 let side = self.sides.get_mut(&client).expect("original byte route");
@@ -393,11 +416,8 @@ impl Bytes {
     }
     fn request(&mut self, joint: &mut Joint, request: clients::Request) {
         match request {
-            clients::Request::Io(request) => {
-                if let Some(event) = self.net.io(request) {
-                    self.event(clients::Event::Io(event));
-                }
-            }
+            clients::Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
+            clients::Request::Done { call } => self.server.done(call, &mut self.server_out),
             clients::Request::Link { secret } => self.link = jig_client_protocol_world::fixtures::printed(&secret),
             clients::Request::Secrets(request) => {
                 let answer = match request {
@@ -558,6 +578,8 @@ impl Bytes {
     pub(super) fn restart(&mut self, joint: &Joint, until: Time) {
         let fresh = Self::new(joint.seed, joint.story, joint.limits.jig.rows);
         self.component = fresh.component;
+        self.server = fresh.server;
+        self.server_out = fresh.server_out;
         self.out = fresh.out;
         self.subjects.clear();
         self.reads.clear();

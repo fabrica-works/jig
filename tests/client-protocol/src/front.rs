@@ -147,7 +147,13 @@ impl Protocol {
                 if let Some(request) = self.engine.request(request)
                     && let Some(event) = self.net.io(request)
                 {
-                    self.engine.event(jig_protocol_engine_clients::Event::Io(event));
+                    self.engine.io_event(event);
+                }
+            }
+            while let Some(request) = self.engine.io() {
+                active = true;
+                if let Some(event) = self.net.io(request) {
+                    self.engine.io_event(event);
                 }
             }
             for (client, side) in &mut self.clients {
@@ -189,14 +195,14 @@ impl Protocol {
                 while let Some((conn, down)) = side.below.pop() {
                     active = true;
                     if let Some(event) = self.net.down(*client, conn, down) {
-                        self.engine.event(jig_protocol_engine_clients::Event::Io(event));
+                        self.engine.io_event(event);
                     }
                 }
             }
             let (events, clients, changed) = self.net.advance(&mut self.engine.rules);
             active |= changed;
             for event in events {
-                self.engine.event(jig_protocol_engine_clients::Event::Io(event));
+                self.engine.io_event(event);
             }
             for (client, conn, up) in clients {
                 self.up(client, conn, now, up);
@@ -261,6 +267,7 @@ impl Front<Test> for Protocol {
             .values()
             .filter_map(|side| side.connections.next_deadline())
             .chain(self.engine.component.next_deadline())
+            .chain(self.engine.server.next_deadline())
             .chain(self.engine.driver.world.next_due())
             .chain(self.release)
             .chain(self.restart)

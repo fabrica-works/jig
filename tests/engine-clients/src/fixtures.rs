@@ -23,7 +23,7 @@ pub fn settings() -> Settings {
     providers.push(APPLICATION_PROVIDER).expect("application provider");
     Settings {
         deployment_provider: 2,
-        listener: skein_io::Addr::Ip("127.0.0.1:8080".parse().expect("loopback")),
+
         link: Some(first_owner()),
         heartbeat: Duration::from_secs(5),
         rows: jig_protocol_config::profile(jig_protocol_config::Profile::Small).core.documents.rows,
@@ -36,7 +36,6 @@ pub fn settings() -> Settings {
 #[must_use]
 pub fn limits() -> Limits {
     Limits {
-        connections: 8,
         streams: 2,
         watches_per_stream: 4,
         queued_bytes: 65536,
@@ -49,7 +48,6 @@ pub fn limits() -> Limits {
         http: skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 256, response: 1024, send: 32 },
         wire: jig_client_protocol_wire::v8::CEILINGS,
         link_span: Duration::from_secs(300),
-        stall: Duration::from_secs(30),
     }
 }
 #[must_use]
@@ -140,4 +138,16 @@ pub fn printed(secret: &skein_lib::Secret) -> Box<[u8]> {
     bytes.put(PREFIX).expect("prefix fits");
     skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, secret.expose(), &mut bytes).expect("secret fits");
     bytes.finish()
+}
+
+#[must_use]
+pub fn address() -> skein_io::Addr {
+    skein_io::Addr::Ip("127.0.0.1:8080".parse().expect("loopback"))
+}
+#[must_use]
+pub fn server() -> jig_test_service::server::Server {
+    let mut limits = jig_test_service::limits::profile_limits(jig_protocol_config::Profile::Small).server;
+    limits.connections = 8;
+    limits.http = self::limits().http;
+    jig_test_service::server::Server::new(address(), &limits)
 }

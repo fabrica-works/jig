@@ -54,6 +54,7 @@ pub struct Limits {
     pub accounts: skein_oauth_accounts::Limits,
     pub workers: jig_protocol_engine_workers::Limits,
     pub clients: jig_protocol_engine_clients::Limits,
+    pub server: crate::server::Limits,
 }
 #[must_use]
 pub fn for_profile(name: Profile, jig: &jig_protocol_config::Limits) -> Limits {
@@ -70,6 +71,14 @@ pub fn for_profile(name: Profile, jig: &jig_protocol_config::Limits) -> Limits {
         accounts,
         workers: workers(jig),
         clients: jig.clients,
+        server: crate::server::Limits {
+            connections: match name {
+                Profile::Small => 4,
+                Profile::Standard => 16,
+            },
+            http: jig.clients.http,
+            stall: Duration::from_secs(30),
+        },
     }
 }
 #[must_use]
@@ -114,6 +123,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(skein_lib::List::<(skein_lib::Token, Option<skein_lib::Token>)>::worst_case(limits.io.sockets)?)?
         .checked_add(Queue::<jig_protocol_engine_workers::Request>::worst_case(
             jig_protocol_engine_workers::MAX_OUT_DOWN,
+        )?)?
+        .checked_add(crate::server::worst_case(&limits.server)?)?
+        .checked_add(Queue::<crate::server::Routed>::worst_case(
+            queue.checked_mul(jig_protocol_engine_clients::MAX_OUT_DOWN)?,
         )?)?
         .checked_add(crate::clients::worst_case(
             &limits.clients,

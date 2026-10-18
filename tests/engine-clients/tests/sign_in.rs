@@ -1,7 +1,6 @@
 use jig_client_protocol_wire::v8 as w;
 use jig_engine_clients_world::fixtures::{self, Peer};
-use jig_protocol_engine_clients::{Component, Event, MintRefusal, Unusable};
-use skein_lib::{Env, Queue, Time, Wall};
+use jig_protocol_engine_clients::{Event, MintRefusal};
 fn peer() -> Peer {
     Peer::started(&fixtures::settings())
 }
@@ -73,13 +72,6 @@ fn two_tokens_drawn_in_turn_differ() {
     assert_ne!(first.token(), second.token());
 }
 #[test]
-fn a_link_on_a_non_loopback_listener_refuses_the_start() {
-    let mut settings = fixtures::settings();
-    settings.listener = skein_io::Addr::Ip("192.0.2.1:8080".parse().expect("address"));
-    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: fixtures::limits() };
-    assert!(matches!(Component::new(settings, &env, &mut Queue::with_capacity(8)), Err(Unusable::Listener)));
-}
-#[test]
 fn a_sign_in_refused_above_the_fill_mark_is_answered_refused() {
     let mut peer = peer();
     let link = peer.printed_link();
@@ -94,7 +86,7 @@ fn no_core_event_holds_a_token_or_digest() {
     peer.post_link(&link);
     assert_eq!(
         peer.core_record(),
-        "SignIn { reply_to: ReplyTo(Token(2)), identity: Identity { key: IdentityKey { provider: 0, subject: [111, 119, 110, 101, 114] }, login: [111, 119, 110, 101, 114], name: [79, 119, 110, 101, 114] } }"
+        "SignIn { reply_to: ReplyTo(Token(1)), identity: Identity { key: IdentityKey { provider: 0, subject: [111, 119, 110, 101, 114] }, login: [111, 119, 110, 101, 114], name: [79, 119, 110, 101, 114] } }"
     );
 }
 

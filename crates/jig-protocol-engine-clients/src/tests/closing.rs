@@ -5,17 +5,11 @@ fn stopping_keeps_the_printed_link_live_and_unspent() {
     let env = fixtures::env();
     let mut out = Queue::with_capacity(8);
     let mut component = Component::new(fixtures::linked_settings(), &env, &mut out).expect("start");
-    let Some(Request::Io(skein_io::Request::Listen { .. })) = out.pop() else { panic!("listen") };
     let Some(Request::Link { .. }) = out.pop() else { panic!("link") };
     let secret = component.link.as_ref().expect("live link").secret.clone();
     let until = component.link.as_ref().expect("live link").until;
-    let socket = Token::new(99);
-    component.down(
-        &env,
-        Event::Io(skein_io::Event::Accepted { owner: Token::new(0), socket, peer: fixtures::settings().listener }),
-        &mut out,
-    );
-    let Some(Request::Io(skein_io::Request::Bind { owner, .. })) = out.pop() else { panic!("bind") };
+    let owner = Token::new(99);
+    component.connections.insert(owner, Connection::new(owner, &env.limits, env.now)).expect("call");
     let record =
         w::LinkSignIn::new(&env.limits.wire, w::LinkSignInParts { secret: secret.expose().into() }).expect("link");
     let mut body = skein_lib::Writer::new(usize::try_from(record.measure()).expect("size"));

@@ -6,6 +6,7 @@ mod accounts;
 mod boundary;
 mod clients;
 pub mod family;
+pub mod server;
 mod tools;
 mod values;
 mod worker;

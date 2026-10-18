@@ -6,6 +6,7 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 [dependencies]
+jig-test-service.workspace = true
 skein-world.workspace = true
 jig-protocol-engine-clients.workspace = true
 jig-client-protocol-wire.workspace = true
