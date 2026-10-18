@@ -194,10 +194,118 @@ pub(crate) fn chat_templates() -> skein_lib::List<jig_client::contract::Template
         .unwrap();
     let mut goal = values.get(0).unwrap().clone();
     goal.number = jig_client::shapes::GOAL;
+    goal.executor = c::TemplateExecutor::Chosen;
+    goal.budget = c::TemplateBudget::Given;
+    goal.deadline = c::TemplateDeadline::Given;
     goal.label = 2;
     goal.tracked = Some(0);
     goal.flags.conversation = false;
     goal.flags.listed = true;
     values.push(goal).unwrap();
     values
+}
+
+pub(crate) fn creating() -> jig_client::contract::Creating {
+    use jig_client::contract::*;
+    let mut charters = skein_lib::List::with_capacity(2);
+    charters.push(1).unwrap();
+    charters.push(2).unwrap();
+    Creating {
+        within: CreateBounds {
+            authority: Box::new(super::cards_objects::owner_authority()),
+            pool_left: 20,
+            charters,
+            procedures: skein_lib::List::with_capacity(0),
+            latest: None,
+            budget: 20,
+            maximum_budget: 100,
+            maximum_deadline: None,
+        },
+        beyond: Beyond::Proposed { to: Recipient::Party(9) },
+    }
+}
+
+pub(crate) fn set_creating(fixture: &mut Fixture, project: u32, offer: &jig_client::contract::Admission) {
+    use jig_client::contract::*;
+    let mut me = fixture.frame().document.unwrap().clone();
+    let mut membership = None;
+    for index in 0..me.projects.len() {
+        if me.projects.get(index).unwrap().project == project {
+            membership = Some(index);
+            break;
+        }
+    }
+    let membership = membership.expect("fixture has the project");
+    me.projects.get_mut(membership).unwrap().creating = match offer {
+        Admission::Bounded { within: Bounds::Create(within), beyond } => {
+            Some(Creating { within: within.clone(), beyond: beyond.clone() })
+        }
+        Admission::Refused(why) => {
+            let mut creating = me.projects.get(membership).unwrap().creating.clone().unwrap();
+            creating.within.budget = 0;
+            creating.within.maximum_deadline = None;
+            creating.beyond = Beyond::Refused(why.clone());
+            Some(creating)
+        }
+        Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => None,
+    };
+    let watch = fixture.frame_watch.unwrap();
+    fixture.drive(fixture.now, Watched { watch, event: WatchEvent::Delivered(Delivery::Me(Box::new(me))) });
+}
+pub(crate) fn chat_request(project: u32, words: Text) -> jig_client::contract::Ask {
+    use jig_client::contract::*;
+    let mut authority = super::cards_objects::owner_authority().authority;
+    authority.spend = 0;
+    let mut tasks = skein_lib::List::with_capacity(1);
+    tasks
+        .push(NewTask {
+            executor: OwnerExecutor::Agent { charter: 1 },
+            spec: Specification {
+                words,
+                parameters: skein_lib::List::with_capacity(0),
+                inputs: skein_lib::List::with_capacity(0),
+            },
+            contract: NewContract::Report { words: 32 },
+            authority,
+            budget: NewBudget::AsAllowed { cap: None },
+            wake: None,
+            dependencies: skein_lib::List::with_capacity(0),
+            named: skein_lib::List::with_capacity(0),
+            tracked: None,
+            label: 1,
+            flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
+        })
+        .unwrap();
+    Ask::Create { project, tasks }
+}
+pub(crate) fn goal_request(form: crate::page::project::goals::GoalForm, words: Text) -> jig_client::contract::Ask {
+    use jig_client::contract::*;
+    let mut authority = super::cards_objects::owner_authority().authority;
+    authority.spend = form.budget;
+    authority.deadline = form.deadline;
+    let mut tasks = skein_lib::List::with_capacity(1);
+    tasks
+        .push(NewTask {
+            executor: form.executor,
+            spec: Specification {
+                words,
+                parameters: skein_lib::List::with_capacity(0),
+                inputs: skein_lib::List::with_capacity(0),
+            },
+            contract: NewContract::Report { words: 32 },
+            authority,
+            budget: NewBudget::Named,
+            wake: None,
+            dependencies: skein_lib::List::with_capacity(0),
+            named: skein_lib::List::with_capacity(0),
+            tracked: Some(form.priority),
+            label: 2,
+            flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        })
+        .unwrap();
+    Ask::Propose {
+        project: form.project,
+        action: ProposeAction::Batch { tasks },
+        reason: Text::new(Box::from([]), 32).unwrap(),
+    }
 }

@@ -130,3 +130,39 @@ pub fn offer_proposal(world: &mut World<Test, Scripted>) {
         )
         .expect("fixture admitted");
 }
+
+pub(super) fn creating() -> Creating {
+    Creating {
+        within: CreateBounds {
+            authority: Box::new(owner_authority()),
+            pool_left: 1,
+            charters: list([1]),
+            procedures: list([]),
+            latest: None,
+            budget: 1,
+            maximum_budget: 100,
+            maximum_deadline: None,
+        },
+        beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
+    }
+}
+pub(super) fn ask(me: &Me, executor: OwnerExecutor) -> Ask {
+    match jig_client::shapes::set_goal(
+        me,
+        1,
+        jig_client::shapes::GoalDraft {
+            words: text(b"Resolve incident"),
+            executor,
+            budget: 2,
+            deadline: None,
+            priority: Some(0),
+        },
+        text(b""),
+        Wall::EPOCH,
+    ) {
+        jig_client::shapes::Judged::Propose { ask, .. } => ask,
+        value @ (jig_client::shapes::Judged::Create(_)
+        | jig_client::shapes::Judged::Refused(_)
+        | jig_client::shapes::Judged::NotOffered(_)) => panic!("fixture goal must be proposed: {value:?}"),
+    }
+}

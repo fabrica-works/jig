@@ -28,28 +28,12 @@ pub fn fits(frame: &Me, limits: &crate::Limits) -> bool {
     if !frame.party.name.bytes.fits(limits.text)
         || !frame.party.login.bytes.fits(limits.text)
         || frame.projects.capacity() > limits.projects
-        || frame.charters.capacity() > limits.projects
     {
         return false;
     }
     for project in &frame.projects {
         if !name_fits(project.name.as_ref(), limits.text) {
             return false;
-        }
-    }
-    for project in &frame.charters {
-        if project.chats.capacity() > limits.charters || project.goals.capacity() > limits.charters {
-            return false;
-        }
-        for charter in &project.chats {
-            if !name_fits(charter.name.as_ref(), limits.text) {
-                return false;
-            }
-        }
-        for charter in &project.goals {
-            if !name_fits(charter.name.as_ref(), limits.text) {
-                return false;
-            }
         }
     }
     true

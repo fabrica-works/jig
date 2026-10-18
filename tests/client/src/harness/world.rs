@@ -848,10 +848,6 @@ impl<A: App, F: Front<A>> World<A, F> {
             self.dropped += 1;
         }
     }
-    #[cfg(test)]
-    pub(crate) fn referee(&self) -> &Referee<super::referee::Rules> {
-        &self.referee
-    }
     pub fn run(&mut self, until: Until) -> Outcome {
         let mut iterations = 0;
         for _ in 0..self.settings.iterations {

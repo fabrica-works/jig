@@ -8,7 +8,7 @@ mod status;
 use crate::intents::Progress;
 use crate::phrases::jig::JigPhrase;
 use alloc::boxed::Box;
-use jig_client::contract::{Actor, Decision, Ending, Executor, GoalExecutor, Made, Outcome, ProposalKey, Proposer};
+use jig_client::contract::{Actor, Decision, Ending, Executor, Made, Outcome, OwnerExecutor, ProposalKey, Proposer};
 use jig_client::{Link, contract::Phase, words::Word};
 use skein_lib::{Duration, Wall, bytes::copy_of};
 use skein_ui::phrases::{Hole, Phrasebook};
@@ -91,14 +91,17 @@ impl Words {
         self.text(b, phrase, &[]);
     }
     /// Say the complete requested goal executor, with only supplied numbers.
-    pub fn goal_executor(&self, b: &mut Builder, executor: GoalExecutor) {
+    pub fn goal_executor(&self, b: &mut Builder, executor: OwnerExecutor) {
         match executor {
-            GoalExecutor::Charter(number) => self.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(number))]),
-            GoalExecutor::Procedure { connector, code } => self.text(
+            OwnerExecutor::Agent { charter: number } => {
+                self.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(number))]);
+            }
+            OwnerExecutor::Procedure { connector, code } => self.text(
                 b,
                 JigPhrase::CreateProcedure,
                 &[Hole::Number(u64::from(connector)), Hole::Number(u64::from(code))],
             ),
+            OwnerExecutor::Person(_) => {}
         }
     }
     /// Show an amount in the engine's units.

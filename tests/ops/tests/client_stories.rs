@@ -11,6 +11,8 @@ use skein_ui::Role;
 use skein_world::domain::{Verdict, heap::Counting};
 #[global_allocator]
 static HEAP: Counting = Counting;
+#[path = "client_stories/creating.rs"]
+mod creating;
 const WITHIN: Duration = Duration::from_secs(1);
 
 #[test]

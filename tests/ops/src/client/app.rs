@@ -48,7 +48,6 @@ pub fn limits() -> domain::Limits {
             drafts: 1,
             projects: 2,
             roles: 2,
-            charters: 2,
             text: 32,
             rows: 2,
             segments: 4,

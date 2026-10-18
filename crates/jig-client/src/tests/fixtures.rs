@@ -26,7 +26,6 @@ pub fn domain_limits() -> DomainLimits {
         segments: 4,
         text: 32,
         projects: 2,
-        charters: 2,
         fields: 4,
         delegates: 2,
         records: 2,
@@ -384,7 +383,6 @@ pub fn me() -> contract::Me {
             pool: None,
             templates,
             creating: Some(creating()),
-            chat_budget: 0,
         })
         .unwrap();
     me

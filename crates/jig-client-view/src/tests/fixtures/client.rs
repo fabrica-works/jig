@@ -74,7 +74,6 @@ impl Fixture {
             segments: limits.segments,
             text: limits.text,
             projects: limits.projects,
-            charters: limits.charters,
             fields: limits.fields,
             delegates: limits.delegates,
             records: limits.records,

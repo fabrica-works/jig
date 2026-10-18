@@ -635,10 +635,8 @@ record MeParty { number: u64 kind: PartyKind login: DocumentText name: DocumentT
 record Needs { questions: u32 proposals: u32 escalations: u32 person_tasks: u32 }
 record CreatingBounds { within: BoundsCreate beyond: Beyond }
 record Template { number: u32 name: DocumentText executor: TemplateExecutor contract: TaskContractDocument shallower: u32 budget: TemplateBudget deadline: TemplateDeadline tracked: option u32 flags: TaskFlags label: u32 grace: option duration }
-record MeProject { project: u32 name: option DocumentText role: HeldRole pool: option PoolLedger templates: bytes 16777216 creating: option CreatingBounds chat_budget: u64 }
-record Charter { number: u32 name: option DocumentText }
-record OfferedCharters { project: u32 chats: list 4 Charter goals: list 4 Charter cut: bool }
-record Me { party: MeParty projects: bytes 16777216 needs: Needs needs_total: u32 updates: Count results_seen: u64 charters: bytes 16777216 cut: bool retention: duration deployment_role: option HeldRole }
+record MeProject { project: u32 name: option DocumentText role: HeldRole pool: option PoolLedger templates: bytes 16777216 creating: option CreatingBounds }
+record Me { party: MeParty projects: bytes 16777216 needs: Needs needs_total: u32 updates: Count results_seen: u64 cut: bool retention: duration deployment_role: option HeldRole }
 record WriterSlot { resource: Part task: u64 attempt: option u64 }
 record LiveDelegate { chip: Chip takeover_budget: u64 }
 record Steering { addressed: option Recipient person_revision: option Revision taken_by: option u64 revision: Revision spec: SpecificationDocument instructions: option DocumentText wake: OwnerWakePolicy dependencies: list 32 u64 authority: OwnerAuthorityDocument budget: Budget }

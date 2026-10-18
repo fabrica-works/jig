@@ -1,3 +1,5 @@
+#[path = "stories/closing.rs"]
+mod closing;
 #[path = "stories/goals.rs"]
 mod goals;
 use jig_client_world::{Until, stories, test};
@@ -270,7 +272,7 @@ fn a_goal_beyond_the_allotment_is_proposed_as_the_confirmation_said() {
         let requests: Vec<_> = commits.iter().filter_map(|c| c.ask.as_ref()).collect();
         assert_eq!(requests.len(), 1);
         assert!(
-            matches!(requests[0], jig_client_domain::contract::Ask::SetGoal { budget: 2, spec, .. } if spec.bytes() == b"Resolve incident")
+            matches!(requests[0], jig_client_domain::contract::Ask::Propose { action: jig_client_domain::contract::ProposeAction::Batch { tasks }, .. } if tasks.len() == 1 && tasks.get(0).is_some_and(|task| task.authority.spend == 2 && task.spec.words.bytes() == b"Resolve incident"))
         );
         assert!(matches!(
             commits.iter().find(|c| c.key.is_some()).expect("incident fixture fits and exists").answer,
@@ -314,13 +316,44 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
         assert_eq!(requests.len(), 1);
         assert_eq!(
             requests[0],
-            &jig_client_domain::contract::Ask::SetGoal {
+            &jig_client_domain::contract::Ask::Propose {
                 project: 1,
-                spec: stories::text(b"Resolve incident"),
-                executor: jig_client_domain::contract::GoalExecutor::Procedure { connector: 2, code: 7 },
-                budget: 2,
-                priority: 0,
-                deadline: None,
+                reason: stories::text(b""),
+                action: jig_client_domain::contract::ProposeAction::Batch {
+                    tasks: jig_client_world::test::list([jig_client_domain::contract::NewTask {
+                        executor: jig_client_domain::contract::OwnerExecutor::Procedure { connector: 2, code: 7 },
+                        spec: jig_client_domain::contract::Specification {
+                            words: stories::text(b"Resolve incident"),
+                            parameters: jig_client_world::test::list([]),
+                            inputs: jig_client_world::test::list([])
+                        },
+                        contract: jig_client_domain::contract::NewContract::Report { words: 32 },
+                        authority: jig_client_domain::contract::OwnerAuthority {
+                            tools: 0,
+                            grants: jig_client_world::test::list([]),
+                            delegation: jig_client_domain::contract::OwnerDelegation {
+                                kinds: jig_client_world::test::list([]),
+                                tasks: 1,
+                                depth: 1
+                            },
+                            spend: 2,
+                            deadline: None,
+                            notes: 0,
+                            note_resources: jig_client_world::test::list([])
+                        },
+                        budget: jig_client_domain::contract::NewBudget::Named,
+                        wake: None,
+                        dependencies: jig_client_world::test::list([]),
+                        named: jig_client_world::test::list([]),
+                        tracked: Some(0),
+                        label: 2,
+                        flags: jig_client_domain::contract::TaskFlags {
+                            conversation: false,
+                            listed: true,
+                            retention: jig_client_domain::contract::Retention::Kept
+                        },
+                    }])
+                },
             }
         );
         assert!(matches!(

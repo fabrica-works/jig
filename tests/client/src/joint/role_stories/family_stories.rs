@@ -80,7 +80,7 @@ fn a_persons_procedure_goal_shows_the_actual_live_connector_panel_on_its_task_pa
         .values()
         .filter_map(|row| {
             if let jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
-                outcome: people::Outcome::GoalStarted { task },
+                outcome: people::Outcome::Created { first: task, .. },
                 ..
             })) = row
             {

@@ -293,7 +293,6 @@ pub fn client_limits() -> jig_client::Limits {
             segments: 4,
             text: 32,
             projects: 2,
-            charters: 2,
             fields: 4,
             delegates: 2,
             records: 2,

@@ -60,7 +60,6 @@ pub(crate) fn project_role_fields(value: &w::MeProject, limits: &Limits) -> Resu
             }),
             None => None,
         },
-        chat_budget: value.chat_budget(),
     })
 }
 
@@ -77,68 +76,6 @@ pub(crate) fn count_fields(value: &w::Count, _limits: &Limits) -> c::Count {
     c::Count { value: value.value(), limited: value.limited() }
 }
 
-pub(crate) fn charter_fields(value: &w::Charter, limits: &Limits) -> Result<c::Charter, w::Problem> {
-    let opt0 = match value.name() {
-        Some(item) => Some(crate::translate::facts::document_text(item, limits)?),
-        None => None,
-    };
-    Ok(c::Charter { number: value.number(), name: opt0 })
-}
-
-pub(crate) fn offered_charters_fields(
-    value: &w::OfferedCharters,
-    limits: &Limits,
-) -> Result<c::OfferedCharters, w::Problem> {
-    if value.chats().len() > limits.client.charters {
-        return Err(too_large());
-    }
-    let mut list0 = List::with_capacity(value.chats().len());
-    for item in value.chats() {
-        list0.push(charter_fields(item, limits)?).expect("reserved supplied list");
-    }
-    if value.goals().len() > limits.client.charters {
-        return Err(too_large());
-    }
-    let mut list1 = List::with_capacity(value.goals().len());
-    for item in value.goals() {
-        list1.push(charter_fields(item, limits)?).expect("reserved supplied list");
-    }
-    Ok(c::OfferedCharters { project: value.project(), chats: list0, goals: list1, cut: value.cut() })
-}
-
-pub(crate) fn offered_charters_piece(
-    bytes: &[u8],
-    limits: &Limits,
-    bound: u32,
-) -> Result<List<c::OfferedCharters>, w::Problem> {
-    let mut reader = Reader::new(bytes);
-    let mut rows = List::with_capacity(bound);
-    let mut sum = 0_u64;
-    for _ in 0..=bound {
-        let item = match skein_codec::piece::split(&mut reader) {
-            Ok(value) => value,
-            Err(reason) => return Err(piece_problem(reason)),
-        };
-        let Some(item) = item else {
-            return Ok(rows);
-        };
-        sum = sum
-            .checked_add(u64::try_from(item.len()).expect("piece fits u64"))
-            .ok_or(too_large())?
-            .checked_add(4)
-            .ok_or(too_large())?;
-        if sum > limits.client.document_bytes {
-            return Err(too_large());
-        }
-        let row = w::OfferedCharters::decode(&limits.wire, &mut Reader::new(&item))?;
-        let row = offered_charters_fields(&row, limits)?;
-        if rows.push(row).is_err() {
-            return Err(too_large());
-        }
-    }
-    Err(too_large())
-}
-
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 pub(crate) fn frame_fields(value: &w::Me, limits: &Limits) -> Result<c::Me, w::Problem> {
     let list0 = super::me::projects(value.projects(), limits)?;
@@ -153,7 +90,6 @@ pub(crate) fn frame_fields(value: &w::Me, limits: &Limits) -> Result<c::Me, w::P
         needs_total: value.needs_total(),
         updates: count_fields(value.updates(), limits),
         results_seen: value.results_seen(),
-        charters: offered_charters_piece(value.charters(), limits, limits.client.projects)?,
         cut: value.cut(),
         retention: value.retention(),
         deployment_role: opt1,

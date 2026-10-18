@@ -65,7 +65,6 @@ pub(super) fn ready() -> Domain {
                         needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
                         needs_total: 0,
                         results_seen: 0,
-                        charters: List::with_capacity(0),
                         cut: false,
                         updates: Count { value: 0, limited: false },
                         retention: Duration::from_secs(1000),

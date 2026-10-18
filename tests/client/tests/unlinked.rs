@@ -27,7 +27,6 @@ fn limits() -> jig_client::Limits {
             segments: l.segments,
             text: l.text,
             projects: l.projects,
-            charters: l.charters,
             fields: l.fields,
             delegates: l.delegates,
             records: l.records,

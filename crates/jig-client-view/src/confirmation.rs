@@ -219,6 +219,7 @@ fn action(
                 impact_words(b, impact, words);
             }
             delegates(b, client, object, open, words, bindings);
+            common::field(b, client, Purpose::Reason, JigPhrase::ReasonField, words, bindings);
         }
         ActKind::Move => {
             words.text(b, JigPhrase::WillTakeOver, &[]);
@@ -526,20 +527,16 @@ fn delegates(
             Act::Dispose { task: delegate.chip.task, take_over: true },
         );
         for disposal in &open.choices.disposals {
-            match disposal {
-                jig_client::contract::Disposal::Cancel { task } => {
-                    if *task == delegate.chip.task {
-                        words.text(b, JigPhrase::DelegateCancel, &[Hole::Number(*task)]);
+            if disposal.task == delegate.chip.task {
+                match disposal.fate {
+                    jig_client::shapes::Fate::Cancel => {
+                        words.text(b, JigPhrase::DelegateCancel, &[Hole::Number(disposal.task)]);
                     }
-                }
-                jig_client::contract::Disposal::TakeOver { task } => {
-                    if *task == delegate.chip.task {
-                        words.text(
-                            b,
-                            JigPhrase::DelegateTake,
-                            &[Hole::Number(*task), Hole::Amount(delegate.takeover_budget)],
-                        );
-                    }
+                    jig_client::shapes::Fate::Move => words.text(
+                        b,
+                        JigPhrase::DelegateTake,
+                        &[Hole::Number(disposal.task), Hole::Amount(delegate.takeover_budget)],
+                    ),
                 }
             }
         }

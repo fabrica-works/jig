@@ -29,9 +29,11 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::CompoundRefused { at, why } => return Outcome::CompoundRefused { at: *at, why: *why },
         people::Outcome::Proposed { proposal, .. } => client::OwnerOutcome::Proposed { proposal: *proposal },
         people::Outcome::Withdrawn { proposal } => client::OwnerOutcome::Withdrawn { proposal: *proposal },
-        people::Outcome::Created { .. } => {
-            unreachable!("no v8 ask leads to these outcomes")
-        }
+        people::Outcome::Created { first, last, given } => client::OwnerOutcome::Created {
+            first: *first,
+            last: *last,
+            given: given.map(|value| client::CreatedGiven { task: value.task, amount: value.amount }),
+        },
         people::Outcome::GoalStarted { task } => client::OwnerOutcome::GoalStarted { task: *task },
         people::Outcome::Stopped { task } => client::OwnerOutcome::Stopped { task: *task },
         people::Outcome::Cancelled { task } => client::OwnerOutcome::Cancelled { task: *task },
@@ -108,6 +110,29 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
 mod tests {
     use super::*;
     use skein_lib::Wall;
+    const FIRST_CREATED: u64 = 17;
+    const LAST_CREATED: u64 = 19;
+    const GIVEN_AMOUNT: u64 = 23;
+    const GIVEN_CASES: [(Option<people::Given>, Option<client::CreatedGiven>); 2] = [
+        (None, None),
+        (
+            Some(people::Given { task: FIRST_CREATED, amount: GIVEN_AMOUNT }),
+            Some(client::CreatedGiven { task: FIRST_CREATED, amount: GIVEN_AMOUNT }),
+        ),
+    ];
+    #[test]
+    fn created_answers_keep_the_whole_batch_range() {
+        for (before, after) in GIVEN_CASES {
+            assert_eq!(
+                outcome(&people::Outcome::Created { first: FIRST_CREATED, last: LAST_CREATED, given: before }),
+                Outcome::Owner(client::OwnerOutcome::Created {
+                    first: FIRST_CREATED,
+                    last: LAST_CREATED,
+                    given: after,
+                })
+            );
+        }
+    }
 
     #[test]
     fn committed_choices_keep_equal_number_makers_full_winner_clocks_and_every_closed_result_kind() {

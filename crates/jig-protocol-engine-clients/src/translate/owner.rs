@@ -157,30 +157,14 @@ fn project(value: &d::FrameProjectRole, limits: &w::Limits) -> Result<w::MeProje
                 Some(value) => Some(super::me::creating(value, limits)?),
                 None => None,
             },
-            chat_budget: value.chat_budget,
         },
     )
-}
-fn charters(value: &d::OfferedCharter, limits: &w::Limits) -> Result<w::OfferedCharters, w::Problem> {
-    let mut chats = List::with_capacity(1);
-    chats.push(w::Charter::new(limits, w::CharterParts { number: value.chat, name: None })?).expect("one chat");
-    let mut goals = List::with_capacity(value.goals.len());
-    for number in &value.goals {
-        goals.push(w::Charter::new(limits, w::CharterParts { number: *number, name: None })?).expect("supplied goals");
-    }
-    w::OfferedCharters::new(limits, w::OfferedChartersParts { project: value.project, chats, goals, cut: value.cut })
 }
 pub fn frame(value: &d::Frame, limits: &w::Limits) -> Result<w::Me, w::Problem> {
     let mut projects = List::with_capacity(value.projects.len());
     for item in &value.projects {
         projects.push(project(item, limits)?).expect("supplied projects");
     }
-    let mut charters_rows = List::with_capacity(value.charters.len());
-    for item in &value.charters {
-        charters_rows.push(charters(item, limits)?).expect("supplied charter rows");
-    }
-    let charters =
-        offered_charters_pieces(&charters_rows, limits.me_charters.min(w::CEILINGS.me_charters), w::Path::MeCharters)?;
     let updates = match value.updates {
         d::Count::Known(value) => w::Count::new(limits, w::CountParts { value, limited: false })?,
         d::Count::AtLeast(value) => w::Count::new(limits, w::CountParts { value, limited: true })?,
@@ -213,7 +197,6 @@ pub fn frame(value: &d::Frame, limits: &w::Limits) -> Result<w::Me, w::Problem> 
             needs_total: value.needs,
             updates,
             results_seen: value.results_seen,
-            charters,
             cut: value.cut,
             retention: value.retention,
             deployment_role: match value.deployment_role {
@@ -224,22 +207,6 @@ pub fn frame(value: &d::Frame, limits: &w::Limits) -> Result<w::Me, w::Problem> 
     )
 }
 
-pub fn offered_charters_pieces(
-    rows: &List<w::OfferedCharters>,
-    bound: u32,
-    path: w::Path,
-) -> Result<Box<[u8]>, w::Problem> {
-    let mut encoded = List::with_capacity(rows.len());
-    for row in rows {
-        let mut out = skein_lib::Writer::new(usize::try_from(row.measure()).expect("u32 record measure fits usize"));
-        match row.encode(&mut out) {
-            Ok(()) => (),
-            Err(_) => return Err(problem(skein_codec::Reason::Bound)),
-        }
-        encoded.push(out.finish()).expect("supplied piece count");
-    }
-    pieces(&encoded, bound, path)
-}
 pub fn part_kind(value: t::PartKind, _limits: &w::Limits) -> Result<w::OwnerPartKind, w::Problem> {
     Ok(match value {
         t::PartKind::Resource => w::OwnerPartKind::Resource,

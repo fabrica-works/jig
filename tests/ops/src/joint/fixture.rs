@@ -24,13 +24,11 @@ pub fn limits() -> client::Limits {
     limits.client.domain.document_bytes = 262_144;
     limits.client.domain.rows = 32;
     limits.client.domain.projects = 7;
-    limits.client.domain.charters = 4;
     limits.client.domain.delegates = 8;
     limits.jig.text = 4096;
     limits.jig.document_bytes = 262_144;
     limits.jig.rows = 32;
     limits.jig.roles = 8;
-    limits.jig.charters = 32;
     limits.jig.projects = 32;
     limits.jig.delegates = 8;
     limits.jig.objects = 16;

@@ -265,15 +265,9 @@ fn inbox_committed_read_position(words: &crate::words::Words) {
 fn conversations_domain() -> Fixture {
     let (mut d, f) = start();
     let mut frame = document();
-    frame.charters.get_mut(0).unwrap().chats = List::with_capacity(1);
-    frame
-        .charters
-        .get_mut(0)
-        .unwrap()
-        .chats
-        .push(Charter { number: 2, name: Some(DocumentText::complete(text(b"guide"))) })
-        .unwrap();
-    frame.projects.get_mut(0).unwrap().chat_budget = 20;
+    let template = frame.projects.get_mut(0).unwrap().templates.get_mut(0).unwrap();
+    template.executor = TemplateExecutor::Charter(2);
+    template.budget = TemplateBudget::Amount(20);
     deliver(&mut d, f, Delivery::Me(Box::new(frame)));
     drive(&mut d, Event::Went { place: Place::Jig(Address::Conversations { project: Some(4) }) });
     d

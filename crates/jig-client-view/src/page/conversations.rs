@@ -54,19 +54,6 @@ pub fn start(
     let Some(scope) = domain.confirmed else {
         return;
     };
-    let mut offered = false;
-    if let Some(frame) = &domain.frame(lent).document {
-        for role in &frame.charters {
-            if role.project == project && !role.chats.is_empty() {
-                offered = true;
-            }
-        }
-    }
-    if !offered {
-        domain.chats.refusal = Some(Refusal::NotOffered);
-        domain.changed();
-        return;
-    }
     let Some(field) = domain.fields.get(Purpose::NewChat) else {
         return;
     };
@@ -74,7 +61,15 @@ pub fn start(
         return;
     }
     let words = field.text.clone();
-    let ask = Box::new(Ask::StartChat { project, words: words.clone() });
+    let Some(me) = domain.frame(lent).document else { return };
+    let ask = match jig_client::shapes::chat(me, project, words.clone(), domain.borrow(lent).wall()) {
+        Ok(ask) => Box::new(ask),
+        Err(_) => {
+            domain.chats.refusal = Some(Refusal::NotOffered);
+            domain.changed();
+            return;
+        }
+    };
     match domain.intents.ask(
         scope,
         Origin::Page { handle: domain.page_handle(), purpose: IntentPurpose::StartChat },
@@ -175,7 +170,7 @@ pub(crate) fn answered(
             match answer {
                 Answer::Refused { refusal, .. } => domain.chats.refusal = Some(refusal),
                 Answer::Done(outcome) => match crate::outcome::route(&outcome) {
-                    crate::outcome::Route::Chat { task } => {
+                    crate::outcome::Route::Created { task } | crate::outcome::Route::Chat { task } => {
                         let same = match &domain.chats.words {
                             Some(words) => match domain.fields.get(Purpose::NewChat) {
                                 Some(field) => field.text == *words,

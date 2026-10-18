@@ -115,18 +115,8 @@ pub(crate) fn section(
 fn forms(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut JigBindings) {
     let mut field_built = false;
     if let Some(frame) = &client.frame().document {
-        for offers in &frame.charters {
-            let mut membership = None;
-            for project in &frame.projects {
-                if project.project == offers.project {
-                    membership = Some(project);
-                    break;
-                }
-            }
-            let Some(project) = membership else {
-                continue;
-            };
-            if !offers.chats.is_empty() {
+        for project in &frame.projects {
+            if let Some(template) = jig_client::shapes::template(frame, project.project, jig_client::shapes::CHAT) {
                 if !field_built {
                     b.open(Role::Form);
                     b.region(crate::regions::JigRegion::NewChat.region());
@@ -137,11 +127,23 @@ fn forms(b: &mut Builder, client: &Borrowed<'_>, words: &Words, bindings: &mut J
                 b.open(Role::Region);
                 b.name(&crate::frame_facts::project_label(words, project));
                 crate::frame_facts::project_loss(b, words, project);
-                for charter in &offers.chats {
-                    words.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(charter.number))]);
-                    crate::frame_facts::charter_name(b, words, charter);
+                if let jig_client::contract::TemplateExecutor::Charter(number) = template.executor {
+                    words.text(b, JigPhrase::Charter, &[Hole::Number(u64::from(number))]);
                 }
-                words.text(b, JigPhrase::Budget, &[Hole::Amount(project.chat_budget)]);
+                match template.budget {
+                    jig_client::contract::TemplateBudget::Amount(amount) => {
+                        words.text(b, JigPhrase::Budget, &[Hole::Amount(amount)]);
+                    }
+                    jig_client::contract::TemplateBudget::AsAllowed { .. } => words.text(
+                        b,
+                        JigPhrase::PoolLeft,
+                        &[Hole::Amount(match &project.creating {
+                            Some(creating) => creating.within.pool_left,
+                            None => 0,
+                        })],
+                    ),
+                    jig_client::contract::TemplateBudget::Given => {}
+                }
                 crate::frame::control(
                     b,
                     words,

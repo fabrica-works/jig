@@ -48,17 +48,10 @@ fn frame(number: u64) -> Me {
                 began: None,
                 next: None,
             }),
-            chat_budget: 100,
         }]),
         needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
         needs_total: 0,
         results_seen: 0,
-        charters: list(vec![OfferedCharters {
-            project: 1,
-            chats: list(vec![Charter { number: 1, name: Some(DocumentText::complete(text(b"chat"))) }]),
-            goals: list(vec![]),
-            cut: false,
-        }]),
         cut: false,
         updates: Count { value: 0, limited: false },
 

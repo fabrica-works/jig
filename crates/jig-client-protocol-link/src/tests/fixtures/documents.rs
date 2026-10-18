@@ -39,7 +39,6 @@ pub fn frame() -> c::Me {
         needs_total: 7,
         updates: c::Count { value: 7, limited: false },
         results_seen: 7,
-        charters: List::with_capacity(0),
         cut: false,
         retention: Duration::from_nanos(19),
         deployment_role: None,

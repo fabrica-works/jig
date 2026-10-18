@@ -37,7 +37,6 @@ fn live() -> Client {
                 needs_total: 0,
                 updates: contract::Count { value: 0, limited: false },
                 results_seen: 0,
-                charters: List::with_capacity(0),
                 cut: false,
                 retention: RETENTION,
                 deployment_role: None,

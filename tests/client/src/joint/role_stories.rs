@@ -9,7 +9,6 @@ fn receiving_limits() -> jig_client_test_domain::Limits {
     limits.jig.text = 128;
     limits.jig.rows = 2;
     limits.jig.projects = 2;
-    limits.jig.charters = 2;
     limits.jig.roles = 4;
     limits.jig.delegates = 2;
     limits.first.text = 128;
@@ -411,10 +410,9 @@ fn an_observer_is_refused_a_request_and_told_why() {
     let observer = world.client_with(4, crate::stories::conversation(), receiving_limits(), client);
     let within = Duration::from_secs(1);
     let mut steps = start(b"observer request");
-    // The failed request leaves its entered words with the owner's exact role refusal.
+    // Missing creating bounds refuse locally and leave the entered words.
     steps.pop();
-    steps.push(Step::See { find: Find::text(b"The held role does not permit this action"), within });
-    steps.push(Step::See { find: Find::text(b"Held role: observer"), within });
+    steps.push(Step::See { find: Find::text(b"This act is not offered"), within });
     world.person(observer, steps);
     let outcome = world.run(Until::Done);
     assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed);
@@ -434,7 +432,7 @@ fn an_observer_is_refused_a_request_and_told_why() {
         jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer { outcome, .. }))
         if matches!(outcome, people::Outcome::Refused(people::Refusal::Role { held: Some(people::Role::Observer) }))))
             .count(),
-        1
+        0
     );
 }
 

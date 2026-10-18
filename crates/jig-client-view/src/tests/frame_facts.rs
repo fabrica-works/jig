@@ -80,8 +80,6 @@ fn frame_tree_uses_supplied_totals_goal_list_loss_and_all_pool_ledger_facts() {
     source.needs_total = 17;
     source.results_seen = u64::MAX;
     source.cut = true;
-    source.charters.get_mut(0).unwrap().project = u32::MAX;
-    source.charters.get_mut(0).unwrap().cut = true;
     source.projects.get_mut(0).unwrap().role = HeldRole::Policy { role: u32::MAX };
     let ledger = PoolLedger {
         source: Funder::Pool { project: u32::MAX, person: u64::MAX, period: u64::MAX },
@@ -100,7 +98,6 @@ fn frame_tree_uses_supplied_totals_goal_list_loss_and_all_pool_ledger_facts() {
         b"Questions: 1; proposals: 2; escalations: 3; person tasks: 4",
         b"Results read through 18446744073709551615",
         b"More project memberships than shown",
-        b"More goal charters in project 4294967295",
         b"Budget: 101",
         b"Spent directly: 7",
         b"Settled spend below: 11",
@@ -117,36 +114,6 @@ fn frame_tree_uses_supplied_totals_goal_list_loss_and_all_pool_ledger_facts() {
     assert!(contains(&zero, b"Left: 0"));
     assert!(!contains(&zero, b"Pool ledger not supplied"));
 }
-#[test]
-fn chat_forms_join_membership_only_by_supplied_project_and_preserve_optional_charter_names() {
-    let mut source = document();
-    let mut chats = List::with_capacity(2);
-    chats.push(Charter { number: u32::MAX, name: None }).unwrap();
-    chats.push(Charter { number: 0, name: Some(DocumentText { bytes: text(b"actual-charter"), cut: true }) }).unwrap();
-    source.charters.get_mut(0).unwrap().chats = chats;
-    source.projects.get_mut(0).unwrap().chat_budget = 123;
-    let mut domain = ready(source.clone());
-    drive(
-        &mut domain,
-        Event::Went { place: crate::address::Place::Jig(crate::address::Address::Conversations { project: None }) },
-    );
-    let shown = super::pages::build(&domain, 1, words()).0;
-    for bytes in
-        [b"Charter 4294967295".as_slice(), b"actual-charter", b"Budget 123", b"Only part of this text was supplied"]
-    {
-        assert!(contains(&shown, bytes));
-    }
-    source.charters.get_mut(0).unwrap().project = 9;
-    let mut mismatched = ready(source);
-    drive(
-        &mut mismatched,
-        Event::Went { place: crate::address::Place::Jig(crate::address::Address::Conversations { project: None }) },
-    );
-    let shown = super::pages::build(&mismatched, 1, words()).0;
-    assert!(!contains(&shown, b"Budget 123"));
-    assert!(!contains(&shown, b"actual-charter"));
-}
-
 #[test]
 fn a_service_frame_offers_no_sign_out() {
     let mut domain = ready(sign_out_frame(PartyKind::Service));
@@ -180,7 +147,6 @@ fn sign_out_frame(kind: PartyKind) -> Me {
     let mut source = document();
     source.party.kind = kind;
     source.projects = List::with_capacity(0);
-    source.charters = List::with_capacity(0);
     source.updates = Count { value: 0, limited: false };
     source
 }

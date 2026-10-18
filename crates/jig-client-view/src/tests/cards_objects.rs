@@ -958,28 +958,29 @@ fn escalation_reasons_confirmation_choices_changed_revisions_and_notices_keep_se
     assert!(deadline(b"1969-12-31 23:59").is_none());
     assert!(deadline(b"9999-12-31 00:00").is_none());
 }
+const CONFIRMATION_ACTS: [(ActKind, bool); 19] = [
+    (ActKind::Message, false),
+    (ActKind::Take, false),
+    (ActKind::HandBack, false),
+    (ActKind::Release, false),
+    (ActKind::LeaveHeld, false),
+    (ActKind::Amend, false),
+    (ActKind::Amend, true),
+    (ActKind::Stop, false),
+    (ActKind::Cancel, false),
+    (ActKind::Close, false),
+    (ActKind::Move, false),
+    (ActKind::Prioritise, false),
+    (ActKind::SetGoal, false),
+    (ActKind::Seen, false),
+    (ActKind::Adopt, false),
+    (ActKind::ChangePolicy, false),
+    (ActKind::SetRoles, false),
+    (ActKind::MakeService, false),
+    (ActKind::SetPool, false),
+];
 fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBindings) {
-    for (act, composed) in [
-        (ActKind::Message, false),
-        (ActKind::Take, false),
-        (ActKind::HandBack, false),
-        (ActKind::Release, false),
-        (ActKind::LeaveHeld, false),
-        (ActKind::Amend, false),
-        (ActKind::Amend, true),
-        (ActKind::Stop, false),
-        (ActKind::Cancel, false),
-        (ActKind::Close, false),
-        (ActKind::Move, false),
-        (ActKind::Prioritise, false),
-        (ActKind::SetGoal, false),
-        (ActKind::Seen, false),
-        (ActKind::Adopt, false),
-        (ActKind::ChangePolicy, false),
-        (ActKind::SetRoles, false),
-        (ActKind::MakeService, false),
-        (ActKind::SetPool, false),
-    ] {
+    for (act, composed) in CONFIRMATION_ACTS {
         let task = task_doc(&[act]);
         let (mut d, id) = loaded(ObjectKey::Task(8), ReadValue::Task(Box::new(task)));
         let action = if composed {
@@ -1006,7 +1007,10 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
         if act == ActKind::Close {
             let choose = press(&tree, b"Take over delegate 8, reserving 13", bindings);
             drive(&mut d, Event::Act { action: choose });
-            assert_eq!(d.confirmation().unwrap().choices.disposals.as_slice(), &[Disposal::TakeOver { task: 8 }]);
+            assert_eq!(
+                d.confirmation().unwrap().choices.disposals.as_slice(),
+                &[jig_client::shapes::Delegate { task: 8, fate: jig_client::shapes::Fate::Move }]
+            );
             let tree = dialog(&d, words, bindings);
             assert_eq!(press(&tree, b"Confirm", bindings), Action::Confirm);
         }
@@ -1063,9 +1067,7 @@ fn confirmation_act_scenarios(words: &crate::words::Words, bindings: &mut JigBin
 fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings) {
     use crate::address::{Address, Place, ProjectSection};
     let (mut d, frame) = start();
-    let mut doc = document();
-    doc.charters.get_mut(0).unwrap().goals =
-        list([Charter { number: 1, name: Some(DocumentText::complete(text(b"lead"))) }]);
+    let doc = document();
     drive(&mut d, Watched { watch: frame, event: WatchEvent::Delivered(Delivery::Me(Box::new(doc))) });
     let out = drive(
         &mut d,
@@ -1115,7 +1117,7 @@ fn goal_dialog_scenario(words: &crate::words::Words, bindings: &mut JigBindings)
             action: Action::GoalForm {
                 form: crate::page::project::goals::GoalForm {
                     project: 4,
-                    executor: GoalExecutor::Charter(1),
+                    executor: OwnerExecutor::Agent { charter: 1 },
                     budget: 21,
                     deadline: Some(Wall::EPOCH),
                     priority: 2,

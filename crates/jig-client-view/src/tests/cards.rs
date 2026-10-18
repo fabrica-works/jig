@@ -43,7 +43,6 @@ pub(crate) const CLIENT: crate::Limits = crate::Limits {
     drafts: 1,
     projects: 2,
     roles: 2,
-    charters: 2,
     text: 128,
     rows: 2,
     segments: 4,
@@ -85,7 +84,7 @@ pub(super) fn document() -> Me {
     projects
         .push(MeProject {
             templates: crate::tests::fixtures::chat_templates(),
-            creating: None,
+            creating: Some(crate::tests::fixtures::creating()),
             project: 4,
             name: Some(DocumentText::complete(text(b"One"))),
             role: HeldRole::Policy { role: 1 },
@@ -98,7 +97,6 @@ pub(super) fn document() -> Me {
                 began: None,
                 next: None,
             }),
-            chat_budget: 0,
         })
         .unwrap();
     Me {
@@ -112,17 +110,6 @@ pub(super) fn document() -> Me {
         needs: Needs { questions: 1, proposals: 2, escalations: 3, person_tasks: 4 },
         needs_total: 10,
         results_seen: 0,
-        charters: {
-            let mut rows = List::with_capacity(2);
-            rows.push(OfferedCharters {
-                project: 4,
-                chats: List::with_capacity(0),
-                goals: List::with_capacity(0),
-                cut: false,
-            })
-            .unwrap();
-            rows
-        },
         cut: false,
         updates: Count { value: 120, limited: false },
 

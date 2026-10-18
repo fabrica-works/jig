@@ -1,7 +1,7 @@
 use super::{
     confirmation::{change, reread, task},
     objects::{chip, live, text},
-    pages::{offers, project},
+    pages::project,
     spine::{LIMITS, delivered, drain, drive, frame},
 };
 use crate::tests::fixtures::refusal_answer;
@@ -164,12 +164,18 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
 #[test]
 fn closing_names_each_live_delegate_once_and_chat_about_sends_only_the_named_first_words() {
     let (mut domain, _) = live();
+    let mut me = frame(7);
+    me.projects = List::with_capacity(1);
+    me.projects.push(project(1, true)).unwrap();
+    let watch = domain.frame_watch.unwrap();
+    delivered(&mut domain, Time::ZERO, watch, me);
     let mut document = steering_document(ActKind::Close);
     document.delegates = List::with_capacity(2);
     document.delegates.push(LiveDelegate { chip: chip(10), takeover_budget: 6 }).unwrap();
     document.delegates.push(LiveDelegate { chip: chip(11), takeover_budget: 7 }).unwrap();
     let id = install(&mut domain, document);
     intend(&mut domain, id, ActKind::Close);
+    assert!(domain.confirmation().unwrap().dangerous, "closing includes cancellation");
     assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Delegates));
     for task in [10, 10, 99] {
         drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dispose { task, take_over: false } });
@@ -181,24 +187,23 @@ fn closing_names_each_live_delegate_once_and_chat_about_sends_only_the_named_fir
     intend(&mut domain, id, ActKind::Close);
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dispose { task: 10, take_over: false } });
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Dispose { task: 11, take_over: true } });
-    let mut disposals = List::with_capacity(2);
-    disposals.push(Disposal::Cancel { task: 10 }).unwrap();
-    disposals.push(Disposal::TakeOver { task: 11 }).unwrap();
+    let mut operations = List::with_capacity(3);
+    operations.push(Operation::Cancel { project: 1, task: 10, reason: text(b""), grace: None }).unwrap();
+    operations.push(Operation::Move { project: 1, task: 11, reason: text(b"") }).unwrap();
+    operations.push(Operation::Cancel { project: 1, task: 8, reason: text(b""), grace: None }).unwrap();
     assert_eq!(
         only_send(&drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm })).1,
-        &Ask::Close { project: 1, chat: 8, disposals }
+        &Ask::Compound { project: 1, operations }
     );
     let (mut domain, _) = live();
     let id = install(&mut domain, task());
     let mut current = frame(7);
     current.projects = List::with_capacity(1);
     current.projects.push(project(1, true)).unwrap();
-    current.charters = List::with_capacity(1);
-    current.charters.push(offers(1, true)).unwrap();
     let watch = domain.frame_watch.unwrap();
     delivered(&mut domain, Time::ZERO, watch, current);
     let rows = drive(&mut domain, Time::ZERO, Event::Act { action: Act::ChatAbout { object: id.token() } });
-    assert_eq!(only_send(&rows).1, &Ask::StartChat { project: 1, words: text(b"title") });
+    assert_eq!(only_send(&rows).1, &crate::tests::fixtures::chat_request(1, text(b"title")));
 }
 fn custom(
     domain: &mut Fixture,

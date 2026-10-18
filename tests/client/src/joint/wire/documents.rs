@@ -694,7 +694,6 @@ pub(crate) mod tests {
         assert!(read.party.login.cut);
         assert!(read.cut);
         assert_eq!(read.projects.capacity(), 2);
-        assert_eq!(read.charters.capacity(), 3);
         assert_eq!(read.needs_total, 17);
         assert_eq!(frame_read(&source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
         assert_eq!(frame_delivery(&source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));

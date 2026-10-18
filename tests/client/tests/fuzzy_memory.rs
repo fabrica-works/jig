@@ -155,21 +155,6 @@ fn full_world() -> jig_client_world::World<jig_client_world::Test, jig_client_wo
     other.project = 2;
     other.role = jig_client_domain::contract::HeldRole::Policy { role: 2 };
     frame.projects = jig_client_world::test::list([project, other]);
-    let mut offer = frame.charters.iter().next().expect("charter offers exist").clone();
-    offer.chats = jig_client_world::test::list([
-        jig_client_domain::contract::Charter {
-            number: 1,
-            name: Some(jig_client_domain::contract::DocumentText::complete(stories::text(&[b'c'; 32]))),
-        },
-        jig_client_domain::contract::Charter {
-            number: 2,
-            name: Some(jig_client_domain::contract::DocumentText::complete(stories::text(&[b'c'; 32]))),
-        },
-    ]);
-    offer.goals = offer.chats.clone();
-    let mut other_offer = offer.clone();
-    other_offer.project = 2;
-    frame.charters = jig_client_world::test::list([offer, other_offer]);
     w.front()
         .engine
         .act(Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Me(frame))

@@ -7,7 +7,7 @@ use skein_ui::Builder;
 use skein_ui::phrases::Hole;
 
 use alloc::boxed::Box;
-use jig_client::contract::{Charter, Me, MeParty, MeProject, PartyKind};
+use jig_client::contract::{Me, MeParty, MeProject, PartyKind};
 
 pub(crate) fn project_label(words: &Words, project: &MeProject) -> Box<[u8]> {
     match &project.name {
@@ -18,11 +18,6 @@ pub(crate) fn project_label(words: &Words, project: &MeProject) -> Box<[u8]> {
 pub(crate) fn project_loss(b: &mut Builder, words: &Words, project: &MeProject) {
     if let Some(value) = &project.name {
         document_text::loss(b, value, words);
-    }
-}
-pub(crate) fn charter_name(b: &mut Builder, words: &Words, charter: &Charter) {
-    if let Some(value) = &charter.name {
-        document_text::plain(b, value, words);
     }
 }
 pub(crate) fn identity(b: &mut Builder, words: &Words, party: &MeParty) {
@@ -57,10 +52,5 @@ pub(crate) fn counts(b: &mut Builder, words: &Words, frame: &Me) {
     words.text(b, JigPhrase::FrameResultsSeen, &[Hole::Number(frame.results_seen)]);
     if frame.cut {
         words.text(b, JigPhrase::FrameProjectsCut, &[]);
-    }
-    for offers in &frame.charters {
-        if offers.cut {
-            words.text(b, JigPhrase::MeChartersCut, &[Hole::Number(u64::from(offers.project))]);
-        }
     }
 }

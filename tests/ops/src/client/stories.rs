@@ -381,14 +381,15 @@ pub fn environment_world(seed: u64) -> ClientWorld {
     p.action =
         ProposalAction::Effect { part: Part::Effect { connector: number(Connector::Infrastructure), proposal: p.key } };
     chat.proposals = list([p.key]);
-    let ask = Ask::StartChat { project: 1, words: text(b"staging for one week") };
+    let ask = jig_client::shapes::chat(&truth.frames[&7], 1, text(b"staging for one week"), Wall::EPOCH)
+        .expect("fixture offers the chat template");
     let mut accepted = p.clone();
     accepted.ending =
         Some(Ending::Decided { by: 7, party: Some(party(7)), how: Some(Decision::Accepted), at: Wall::EPOCH });
     let rule = jig_client_scripted_engine::Rule {
         party: Some(7),
         ask,
-        answer: Answer::Done(Outcome::Made { what: Made::Chat { task: 9 } }),
+        answer: Answer::Done(Outcome::Made { what: Made::Tasks { tasks: list([9]) } }),
         changes: vec![
             jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                 party: 7,

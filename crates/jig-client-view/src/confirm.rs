@@ -19,8 +19,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_client::contract::{
-    ActKind, Admission, Amendment, Disposal, HoldReason, Limit, ObjectKey, PersonContract, Recipient, Refusal,
-    Revision, Text,
+    ActKind, Admission, Amendment, HoldReason, Limit, ObjectKey, PersonContract, Recipient, Refusal, Revision, Text,
 };
 use skein_lib::{Env, Id, List, Queue};
 /// The person choices, bounded independently of the incoming document.
@@ -29,7 +28,7 @@ pub struct Choices {
     pub option: Option<u32>,
     pub cannot: bool,
     pub again: Option<bool>,
-    pub disposals: List<Disposal>,
+    pub disposals: List<jig_client::shapes::Delegate>,
     pub change: Option<Amendment>,
     pub release: bool,
     pub priority: Option<u32>,
@@ -92,7 +91,7 @@ pub struct Confirmation {
 /// The one confirmation's bounded choices, prior refusal and amendment payloads.
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
-    List::<Disposal>::worst_case(limits.delegates)?
+    List::<jig_client::shapes::Delegate>::worst_case(limits.delegates)?
         .checked_add(limits.document_bytes.checked_mul(2)?)?
         .checked_add(List::<u16>::worst_case(limits.rows)?)
 }
@@ -205,7 +204,7 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
             return;
         }
     }
-    let dangerous = jig_client::facts::dangerous(act);
+    let dangerous = act == ActKind::Close || jig_client::facts::dangerous(act);
     let choices = Choices {
         option: None,
         cannot: false,
@@ -353,9 +352,7 @@ fn delegates_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
     for delegate in &task.delegates {
         let mut chosen = false;
         for disposal in &open.choices.disposals {
-            let task = match disposal {
-                Disposal::Cancel { task } | Disposal::TakeOver { task } => *task,
-            };
+            let task = disposal.task;
             if task == delegate.chip.task {
                 chosen = true;
             }
@@ -630,12 +627,13 @@ pub(crate) fn dispose(domain: &mut Ui, task: u64, take_over: bool) {
     let Some(open) = &mut domain.confirming else {
         return;
     };
-    let value = if take_over { Disposal::TakeOver { task } } else { Disposal::Cancel { task } };
+    let value = jig_client::shapes::Delegate {
+        task,
+        fate: if take_over { jig_client::shapes::Fate::Move } else { jig_client::shapes::Fate::Cancel },
+    };
     for index in 0..open.choices.disposals.len() {
         let existing = open.choices.disposals.get_mut(index).expect("bounded disposal index exists");
-        let named = match existing {
-            Disposal::Cancel { task } | Disposal::TakeOver { task } => *task,
-        };
+        let named = existing.task;
         if named == task {
             *existing = value;
             domain.changed();
@@ -686,6 +684,23 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client:
     };
     let ask = if open.act == ActKind::Prioritise && domain.shown_project().is_some() {
         crate::page::project::moving::ask(domain, &object, open.choices.priority.expect("complete priority"), lent)
+    } else if open.act == ActKind::Close {
+        let Some(me) = domain.frame(lent).document else { return };
+        let Some(project) = acts::request_project(&object) else { return };
+        let ObjectKey::Task(task) = object.key else { return };
+        let reason = match acts::words(&domain.fields, Purpose::Reason) {
+            Some(reason) => reason,
+            None => Text::new(Box::from([]), domain.text_limit).expect("empty reason fits"),
+        };
+        match jig_client::shapes::close_chat(me, project, task, open.choices.disposals.as_slice(), reason) {
+            Ok(ask) => Some(ask),
+            Err(_) => {
+                domain.confirming.as_mut().expect("open confirmation").missing =
+                    Some(Missing::Refused { why: Refusal::NotOffered });
+                domain.changed();
+                return;
+            }
+        }
     } else {
         acts::ask(&object, open, &domain.fields)
     };

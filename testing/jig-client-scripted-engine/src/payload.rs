@@ -4,21 +4,21 @@ use crate::Bounds;
 use core::mem::size_of;
 use jig_client_domain::contract::{
     Account, ActKind, ActiveRun, Activity, ActivityLine, ActivityPage, Actor, AddressChange, Admission, AdmissionLimit,
-    Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Bytes, Call, Capacity, Charter, Chip,
-    ChipPhase, Closing, ClosingStage, Count, CreateProcedure, CurrentCall, CurrentHold, Cursor, Decider, Decision,
-    Delivery, Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, EndedGroup, Ending, Escalation,
-    Executor, FailureClass, FieldRule, GoalExecutor, Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine,
-    HistoryPage, Hold, HoldCategory, HoldFailure, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup,
-    InboxPage, Lacking, Limit, LiveCall, LiveDelegate, Made, Me, MeParty, MeProject, Message, Moved, Needs, Note,
-    NoteAuthor, NotePage, NoteScope, ObjectKey, ObjectPage, Offered, OfferedCharters, OptionLine, Outcome,
-    OwnerChipPhase, Parameter, ParameterDocument, Part, PartScope, Party, PartyKind, Passed, PersonAnswer,
-    PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool, Priority, Project, Proposal, ProposalAction,
-    ProposalKey, ProposedTask, Proposer, ProvisionalTurnName, Question, Read, ReadNone, ReadPosition, ReadResult,
-    ReadValue, Recipient, Recurring, Refusal, Result, ResultContract, ResultField, ResultValue, RetryNotice, Revision,
-    RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage, RunState, RunText, RunWork, Runtime, SeenThrough,
-    Speaker, Specification, SpecificationDocument, SpendLine, SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task,
-    TaskContext, TaskHold, TaskLine, TaskPage, TaskSpend, Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName,
-    Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent, WriterSlot,
+    Amendment, Answer, Ask, AttemptFailure, Authority, Beyond, Block, Budget, Bytes, Call, Capacity, Chip, ChipPhase,
+    Closing, ClosingStage, Count, CreateProcedure, CurrentCall, CurrentHold, Cursor, Decider, Decision, Delivery,
+    Deployment, Disposal, DisposalIssue, DocumentSpecification, DocumentText, EndedGroup, Ending, Escalation, Executor,
+    FailureClass, FieldRule, GoalExecutor, Grant, HeldRole, HeldRuntime, HistoryChange, HistoryLine, HistoryPage, Hold,
+    HoldCategory, HoldFailure, HoldReason, Holding, Host, Impact, Inbox, InboxEntry, InboxGroup, InboxPage, Lacking,
+    Limit, LiveCall, LiveDelegate, Made, Me, MeParty, MeProject, Message, Moved, Needs, Note, NoteAuthor, NotePage,
+    NoteScope, ObjectKey, ObjectPage, Offered, OptionLine, Outcome, OwnerChipPhase, Parameter, ParameterDocument, Part,
+    PartScope, Party, PartyKind, Passed, PersonAnswer, PersonContract, PersonTask, Phase, PhaseCounts, Policy, Pool,
+    Priority, Project, Proposal, ProposalAction, ProposalKey, ProposedTask, Proposer, ProvisionalTurnName, Question,
+    Read, ReadNone, ReadPosition, ReadResult, ReadValue, Recipient, Recurring, Refusal, Result, ResultContract,
+    ResultField, ResultValue, RetryNotice, Revision, RolePolicy, RunBeginning, RunEnding, RunObservation, RunStage,
+    RunState, RunText, RunWork, Runtime, SeenThrough, Speaker, Specification, SpecificationDocument, SpendLine,
+    SpendPage, SpendPeriod, Steering, Subject, TakenBy, Task, TaskContext, TaskHold, TaskLine, TaskPage, TaskSpend,
+    Tasks, Text, Tree, TreeNode, Turn, TurnLimits, TurnName, Usage, VersionRange, WakePolicy, WatchEnd, WatchEvent,
+    WriterSlot,
 };
 use skein_lib::{Duration, List, Token, Wall};
 
@@ -387,12 +387,10 @@ impl Payload for Decision {
 }
 fields!(TurnName { attempt, number });
 fields!(Count { value, limited });
-fields!(Me { party, projects, needs, needs_total, updates, results_seen, charters, cut, retention, deployment_role });
+fields!(Me { party, projects, needs, needs_total, updates, results_seen, cut, retention, deployment_role });
 fields!(MeParty { number, kind, login, name });
 fields!(Needs { questions, proposals, escalations, person_tasks });
-fields!(MeProject { templates, creating, project, name, role, pool, chat_budget });
-fields!(OfferedCharters { project, chats, goals, cut });
-fields!(Charter { number, name });
+fields!(MeProject { templates, creating, project, name, role, pool });
 fields!(Budget { total, own, ended, reserved, left, funder });
 fields!(Chip { task, title, executor, phase, details });
 fields!(ActiveRun { stage, phase_since, attempt, placement, retry, observation });

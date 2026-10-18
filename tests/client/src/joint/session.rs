@@ -891,7 +891,6 @@ mod tests {
         limits.jig.rows = 32;
         limits.jig.projects = 64;
         limits.jig.roles = 64;
-        limits.jig.charters = 64;
         limits.jig.text = 4096;
         limits.jig.document_bytes = 1_048_576;
         let codec = jig_protocol_transcript::Limits {

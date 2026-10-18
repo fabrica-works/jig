@@ -641,11 +641,11 @@ fn me_deployment_role_is_independent_of_project_rows() {
             projects: rows(
                 1,
                 [documents::FrameProjectRole {
+                    chat_budget: u64::MAX,
                     project: 1,
                     name: None,
                     role: people::Role::Owner,
                     pool: None,
-                    chat_budget: u64::MAX,
                     creating: None,
                     templates: List::with_capacity(0),
                 }],

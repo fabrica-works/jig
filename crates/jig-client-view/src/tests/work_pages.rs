@@ -44,8 +44,6 @@ pub(super) fn entered(address: Address) -> (Fixture, Vec<Request>) {
 pub(super) fn entered_arranged(address: Address, arrangement: crate::page::Arrangement) -> (Fixture, Vec<Request>) {
     let (mut d, f) = super::cards::start_arranged(arrangement);
     let mut frame = document();
-    frame.charters.get_mut(0).unwrap().goals =
-        list([Charter { number: 2, name: Some(DocumentText::complete(text(b"Guide"))) }]);
     frame.projects.get_mut(0).unwrap().pool.as_mut().unwrap().left = 20;
     let initial = deliver(&mut d, f, Delivery::Me(Box::new(frame)));
     for request in &initial {
@@ -469,7 +467,7 @@ fn goal_form(words: &Words) {
     let (mut d, _) = project(ProjectSection::Goals);
     let form = crate::page::project::goals::GoalForm {
         project: 4,
-        executor: GoalExecutor::Charter(2),
+        executor: OwnerExecutor::Agent { charter: 2 },
         budget: 30,
         deadline: None,
         priority: 1,
@@ -607,6 +605,7 @@ fn recurring_times_use_supplied_boundaries_without_inferred_cadence(words: &Word
             recurring.next = next;
             recurring.current_period = 9;
             recurring.began = began;
+            crate::tests::fixtures::set_creating(&mut d, doc.number, &doc.acts.get(0).unwrap().admission);
             drive(&mut d, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
             let (tree, _) = build(&d, 3, words);
             assert!(contains(&tree, b"Daily work"));
@@ -625,8 +624,7 @@ fn procedure_goal_choices_preserve_pairs_without_me_charters() {
     use crate::page::project::goals::GoalForm;
     let words = words();
     let (mut d, f) = start();
-    let mut frame = document();
-    frame.charters.get_mut(0).unwrap().goals = List::with_capacity(0);
+    let frame = document();
     deliver(&mut d, f, Delivery::Me(Box::new(frame)));
     let out = drive(
         &mut d,
@@ -662,14 +660,15 @@ fn procedure_goal_choices_preserve_pairs_without_me_charters() {
             beyond: Beyond::Proposed { to: Recipient::Party(9) },
         },
     }]);
+    crate::tests::fixtures::set_creating(&mut d, doc.number, &doc.acts.get(0).unwrap().admission);
     drive(&mut d, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
     let (tree, mut bindings) = build(&d, 3, words);
     for (label, executor) in [
-        (b"Charter 99".as_slice(), GoalExecutor::Charter(99)),
-        (b"Connector 7, procedure 4294967295".as_slice(), GoalExecutor::Procedure { connector: 7, code: u32::MAX }),
+        (b"Charter 99".as_slice(), OwnerExecutor::Agent { charter: 99 }),
+        (b"Connector 7, procedure 4294967295".as_slice(), OwnerExecutor::Procedure { connector: 7, code: u32::MAX }),
         (
             b"Connector 65535, procedure 4294967295".as_slice(),
-            GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
+            OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX },
         ),
     ] {
         let action = crate::decode(&mut bindings, named_binding(&tree, label), skein_ui::Act::Press).unwrap();
@@ -693,7 +692,7 @@ fn procedure_goal_choices_preserve_pairs_without_me_charters() {
         skein_ui::Act::Input { value: Box::from(b"4".as_slice()) },
     )
     .unwrap();
-    let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    let exact = OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
     assert_eq!(
         edit,
         Act::GoalForm { form: GoalForm { project: 4, executor: exact, budget: 4, deadline: None, priority: 0 } }

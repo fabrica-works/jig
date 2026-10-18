@@ -230,21 +230,12 @@ impl Engine {
         std::mem::take(&mut self.observed)
     }
     pub fn chats_made(&self) -> usize {
-        self.driver
-            .world
-            .store
-            .rows
-            .values()
-            .filter(|record| {
-                matches!(
-                    record,
-                    root::Record::Core(core::Record::People(jig_domain_people::Stored::Answer {
-                        outcome: jig_domain_people::Outcome::Started { .. },
-                        ..
-                    }))
-                )
-            })
-            .count()
+        let label = jig_core_world::fixtures::templates()
+            .iter()
+            .find(|template| template.number == jig_client::shapes::CHAT)
+            .expect("chat template")
+            .label;
+        self.driver.world.store.rows.values().filter(|record| matches!(record, root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Live(task) | jig_domain_tasks::Stored::Ended(task))) if task.label == label)).count()
     }
 }
 #[must_use]

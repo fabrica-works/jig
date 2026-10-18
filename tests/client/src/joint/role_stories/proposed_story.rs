@@ -42,21 +42,12 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
         member,
         vec![
             Step::Press { find: Find::exactly_named(Role::Button, b"Confirm") },
-            Step::See { find: Find::text(b"Your pool has"), within },
+            Step::See { find: Find::text(b"Proposed"), within },
         ],
     );
-    // Until jig-16.3 sends shapes::set_goal's request, the goal act breaks its proposal offer.
-    let stopped = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| world.run(Until::Done)));
-    assert!(stopped.is_err());
-    assert_eq!(
-        world.referee().verdict(),
-        skein_world::domain::Verdict::Failed(skein_world::domain::Failure {
-            at: Time::from_nanos(8_416_106),
-            why: "offers kept: draft answer differs from its offer".to_owned(),
-            pending: vec![],
-        })
-    );
-    assert!(world.referee().judged().0 > 0);
+    let outcome = world.run(Until::Done);
+    assert_eq!(outcome.verdict, skein_world::domain::Verdict::Passed, "{outcome:?}");
+    assert!(outcome.judged.0 > 0);
     let answers: Vec<_> = world
         .front()
         .session
@@ -72,12 +63,6 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
             jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
         })
         .collect();
-    assert_eq!(
-        answers,
-        vec![people::Outcome::Refused(people::Refusal::Authority {
-            lacking: people::Lack::Budget { needs: 150, left: 50 },
-            proposable: Some(people::Accepter::Role(0)),
-        })]
-    );
+    assert_eq!(answers, vec![people::Outcome::Proposed { proposal: 1, to: 0 }]);
     assert!(world.front().session.driver.world.peers.as_ref().expect("actual worker").workers[0].seen.is_empty());
 }

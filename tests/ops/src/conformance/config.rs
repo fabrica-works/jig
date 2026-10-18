@@ -110,6 +110,13 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
             identity: jig_domain_people::IdentityKey { provider: 0, subject: 8_u64.to_be_bytes().into() },
         }]);
     }
+    if environment_chat {
+        for template in &mut config.core.settings.templates {
+            if template.flags.conversation {
+                template.contract = jig_domain_tasks::Contract::Report { words: limits.core.tasks.result_bytes };
+            }
+        }
+    }
     config.core.settings.charters[0].hosts = jig_domain_fleet::Kinds::Engine;
     config.core.settings.charters[0].policy.resume = true;
     config.core.settings.resume_bytes = 32768;

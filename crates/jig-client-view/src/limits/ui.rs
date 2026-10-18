@@ -32,7 +32,6 @@ pub struct Limits {
     pub drafts: u32,
     pub projects: u32,
     pub roles: u32,
-    pub charters: u32,
     pub text: u32,
     pub rows: u32,
     pub segments: u32,

@@ -1,7 +1,7 @@
 //! The signed-in party document (contract.md, 5.1).
 use super::{
-    Beyond, Count, DocumentText, HeldRole, Needs, OfferedCharters, PartyKind, PoolLedger, TaskContractDocument,
-    TaskFlags, TemplateBudget, TemplateDeadline, TemplateExecutor,
+    Beyond, Count, DocumentText, HeldRole, Needs, PartyKind, PoolLedger, TaskContractDocument, TaskFlags,
+    TemplateBudget, TemplateDeadline, TemplateExecutor,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
@@ -14,7 +14,6 @@ pub struct Me {
     pub needs_total: u32,
     pub updates: Count,
     pub results_seen: u64,
-    pub charters: List<OfferedCharters>,
     pub cut: bool,
     pub retention: Duration,
     pub deployment_role: Option<HeldRole>,
@@ -38,9 +37,6 @@ pub struct MeProject {
     pub pool: Option<PoolLedger>,
     pub templates: List<Template>,
     pub creating: Option<Creating>,
-    /// Transitional: jig 16.3 removes this field.
-    /// The owner-configured chat budget for this supplied membership.
-    pub chat_budget: u64,
 }
 
 /// One actual procedure alternative supplied for the fixed goal form.

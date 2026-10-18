@@ -29,7 +29,6 @@ const CLIENT: jig_client_domain::Limits = jig_client_domain::Limits {
     records: 2,
     kept: 4,
     projects: 2,
-    charters: 2,
     text: 32,
     rows: 2,
     segments: 4,

@@ -59,7 +59,6 @@ pub enum JigPhrase {
     FrameResultsSeen,
     FrameNeedsKinds,
     FrameProjectsCut,
-    MeChartersCut,
     FramePoolUnopened,
     PolicyPeriodSpend,
     PolicyEditRole,
@@ -1080,7 +1079,6 @@ impl JigPhrase {
             Self::FrameResultsSeen => 614,
             Self::FrameNeedsKinds => 615,
             Self::FrameProjectsCut => 616,
-            Self::MeChartersCut => 617,
             Self::FramePoolUnopened => 618,
             Self::PolicyPeriodSpend => 590,
             Self::PolicyEditRole => 591,
@@ -2071,7 +2069,6 @@ impl JigPhrase {
             Self::TurnUnreadVersion
             | Self::FrameProjectNumber
             | Self::FrameResultsSeen
-            | Self::MeChartersCut
             | Self::PolicyEditRole
             | Self::PolicyRequests
             | Self::PolicyDecides
@@ -2301,7 +2298,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 602] = [
+pub const ALL: [JigPhrase; 601] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2338,7 +2335,6 @@ pub const ALL: [JigPhrase; 602] = [
     JigPhrase::FrameResultsSeen,
     JigPhrase::FrameNeedsKinds,
     JigPhrase::FrameProjectsCut,
-    JigPhrase::MeChartersCut,
     JigPhrase::FramePoolUnopened,
     JigPhrase::PolicyPeriodSpend,
     JigPhrase::PolicyEditRole,

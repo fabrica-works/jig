@@ -876,7 +876,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
     use crate::{Event, Request, action::Act, address::ProjectSection, fields::Purpose};
     let mut value = source();
     value.number = 4;
-    let executor = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    let executor = OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
     let recipient = Recipient::Roles { project: 4, roles: list(4, [u32::MAX, 0, u32::MAX]) };
     value.acts = list(
         4,
@@ -899,6 +899,7 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         }],
     );
     let mut domain = native_owner_at(value.clone(), ProjectSection::Goals);
+    crate::tests::fixtures::set_creating(&mut domain, value.number, &value.acts.get(0).unwrap().admission);
     assert!(domain.project_page().document.is_none());
     let (tree, mut bindings) = owner_page(&domain);
     let choice = tree
@@ -974,14 +975,16 @@ fn owner_project_public_goal_form_decodes_whole_bounded_procedure_and_keeps_prop
         .collect();
     assert_eq!(
         asks,
-        [&Ask::SetGoal {
-            project: 4,
-            spec: Text::new(copy_of(UTF8_TEXTS[0]), limits().text).unwrap(),
-            executor,
-            budget: 23,
-            priority: u32::MAX,
-            deadline: None
-        }]
+        [&crate::tests::fixtures::goal_request(
+            crate::page::project::goals::GoalForm {
+                project: 4,
+                executor,
+                budget: 23,
+                priority: u32::MAX,
+                deadline: None
+            },
+            Text::new(copy_of(UTF8_TEXTS[0]), limits().text).unwrap()
+        )]
     );
     assert!(native_drive(&mut domain, Event::Act { action: Act::Confirm }).is_empty());
     assert_eq!(domain.project_page().owner.as_deref(), Some(&value));

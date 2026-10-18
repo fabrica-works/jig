@@ -1,5 +1,6 @@
 //! Requests are decided once in the party's key space and released after durability.
 //! Revision and decided-first checks precede scripted outcomes; contract.md, 3–4.
+mod creating;
 mod priorities;
 use crate::{Engine, Envelope, Invalid, Keyed, RequestIdentity, Retained, Up, payload};
 use jig_client_domain::contract::{
@@ -92,10 +93,7 @@ impl<A: crate::Application> Engine<A> {
         {
             return self.priorities(party, *project, operations, wall);
         }
-        if let Ask::Create { .. }
-        | Ask::Withdraw { .. }
-        | Ask::Propose { action: jig_client_domain::contract::ProposeAction::Batch { .. }, .. } = ask
-        {
+        if let Ask::Withdraw { .. } = ask {
             return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
         }
         if let Ask::Compound { project, operations } = ask
@@ -303,11 +301,20 @@ impl<A: crate::Application> Engine<A> {
                 .or_else(|| project.and_then(|p| self.truth.owner_projects.get(&p).map(|p| &p.acts)))
                 .or_else(|| project.and_then(|p| self.truth.projects.get(&p).map(|p| &p.acts)))
         });
-        let admission =
-            offer.and_then(|acts| acts.iter().find(|offered| offered.act == kind).map(|offered| &offered.admission));
+        let creating = self.creating_admission(party, ask);
+        let admission = match &creating {
+            Some(value) => Some(value),
+            None => {
+                offer.and_then(|acts| acts.iter().find(|offered| offered.act == kind).map(|offered| &offered.admission))
+            }
+        };
         let bounded = matches!(admission, Some(Admission::Bounded { .. }));
         let prediction = admission.map(|offer| match offer {
             Admission::Bounded { .. } => match ask {
+                Ask::Create { tasks, .. }
+                | Ask::Propose { action: jig_client_domain::contract::ProposeAction::Batch { tasks }, .. } => {
+                    Self::batch_admission(offer, tasks)
+                }
                 Ask::SetGoal { executor, budget, deadline, .. } => {
                     jig_client_domain::contract::admission::goal(offer, *executor, *budget, *deadline)
                 }
@@ -341,9 +348,7 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::ChangePolicy { .. }
                 | Ask::SetRoles { .. }
                 | Ask::MakeService { .. }
-                | Ask::Propose { .. }
                 | Ask::Withdraw { .. }
-                | Ask::Create { .. }
                 | Ask::SetPool { .. } => Admission::Refused(Refusal::NotOffered),
             },
             Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) => offer.clone(),
@@ -351,13 +356,6 @@ impl<A: crate::Application> Engine<A> {
         let admission = prediction.as_ref();
         if let Some(Admission::Refused(refusal)) = admission {
             return Ok((Answer::Refused { refusal: refusal.clone(), at: None }, Vec::new()));
-        }
-        if let Ask::StartChat { project, .. } = ask
-            && !self.truth.frames.get(&party).is_some_and(|frame| {
-                frame.charters.iter().any(|offer| offer.project == *project && !offer.chats.is_empty())
-            })
-        {
-            return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
         }
         if let Some(rule) = self
             .rules
@@ -687,6 +685,10 @@ fn compound_target(project: u32, operations: &List<Operation>) -> Option<Target>
         ] if *first == project && *last == project && task == released => {
             Some((Some(project), Some(ObjectKey::Task(*task)), ActKind::Amend, revision.map(|v| (v, Moved::Spec))))
         }
-        _ => None,
+        operations => {
+            let Operation::Cancel { project: named, task, .. } = operations.last()? else { return None };
+            if *named != project || !operations.iter().all(|op| matches!(op, Operation::Cancel { project: named, .. } | Operation::Move { project: named, .. } if *named == project)) { return None; }
+            Some((Some(project), Some(ObjectKey::Task(*task)), ActKind::Close, None))
+        }
     }
 }

@@ -11,7 +11,7 @@ pub fn frame_two_projects_record() -> w::Me {
         .expect("literal UTF-8 login");
     parts.party = w::MeParty::new(&lim, identity).expect("literal frame party");
     let mut projects = List::with_capacity(2);
-    for (project, role, chat_budget) in [(3, w::HeldRole::Owner, 11), (5, w::HeldRole::Observer, 13)] {
+    for (project, role) in [(3, w::HeldRole::Owner), (5, w::HeldRole::Observer)] {
         projects
             .push(
                 w::MeProject::new(
@@ -23,7 +23,6 @@ pub fn frame_two_projects_record() -> w::Me {
                         name: None,
                         role,
                         pool: None,
-                        chat_budget,
                     },
                 )
                 .expect("literal fixture fits"),
@@ -41,23 +40,6 @@ pub fn frame_two_projects_record() -> w::Me {
         skein_codec::piece::write(&mut out, &encoded.finish()).expect("fixture piece");
     }
     parts.projects = out.finish();
-    let mut chats = List::with_capacity(1);
-    chats
-        .push(w::Charter::new(&lim, w::CharterParts { number: 17, name: None }).expect("literal chat charter"))
-        .expect("one chat");
-    let mut goals = List::with_capacity(1);
-    goals
-        .push(w::Charter::new(&lim, w::CharterParts { number: 19, name: None }).expect("literal goal charter"))
-        .expect("one goal");
-    let row = w::OfferedCharters::new(&lim, w::OfferedChartersParts { project: 3, chats, goals, cut: true })
-        .expect("literal offered charters");
-    let mut encoded = skein_lib::Writer::new(usize::try_from(row.measure()).expect("literal size"));
-    row.encode(&mut encoded).expect("literal record");
-    let mut framed = skein_lib::Writer::new(
-        usize::try_from(row.measure()).expect("literal size").checked_add(4).expect("literal piece size"),
-    );
-    skein_codec::piece::write(&mut framed, &encoded.finish()).expect("literal piece");
-    parts.charters = framed.finish();
     w::Me::new(&lim, parts).expect("literal fixture fits")
 }
 #[must_use]

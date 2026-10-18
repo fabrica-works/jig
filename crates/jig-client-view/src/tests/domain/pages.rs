@@ -1,5 +1,6 @@
 //! Page policies exercised through the client boundary.
 use jig_client::thread::window::End;
+mod creating;
 mod owner_effect_proposals;
 mod task_proposals;
 use super::spine::{LIMITS, delivered, drive, frame, open_token, start};
@@ -22,11 +23,10 @@ fn text(value: &[u8]) -> Text {
 pub(super) fn project(number: u32, chats: bool) -> MeProject {
     MeProject {
         templates: if chats { crate::tests::fixtures::chat_templates() } else { List::with_capacity(0) },
-        creating: None,
+        creating: Some(crate::tests::fixtures::creating()),
         project: number,
         name: Some(DocumentText::complete(text(b"shop"))),
         role: HeldRole::Policy { role: 1 },
-        chat_budget: 10,
         pool: Some(PoolLedger {
             source: Funder::Pool { project: number, person: 7, period: 1 },
             parent: None,
@@ -37,13 +37,6 @@ pub(super) fn project(number: u32, chats: bool) -> MeProject {
             next: None,
         }),
     }
-}
-pub(super) fn offers(number: u32, chats: bool) -> OfferedCharters {
-    let mut charters = List::with_capacity(1);
-    if chats {
-        charters.push(Charter { number: 1, name: Some(DocumentText::complete(text(b"guide"))) }).unwrap();
-    }
-    OfferedCharters { project: number, chats: charters, goals: List::with_capacity(0), cut: false }
 }
 fn budget() -> Budget {
     Budget { total: 20, own: 0, ended: 0, reserved: 0, left: 20, funder: Actor::Party(7) }
@@ -100,9 +93,6 @@ fn navigation_keeps_the_application_order_and_leaves_out_inapplicable_pages() {
     value.projects = List::with_capacity(2);
     value.projects.push(project(1, false)).unwrap();
     value.projects.push(project(2, true)).unwrap();
-    value.charters = List::with_capacity(2);
-    value.charters.push(offers(1, false)).unwrap();
-    value.charters.push(offers(2, true)).unwrap();
     value.deployment_role = Some(HeldRole::Policy { role: 1 });
     delivered(&mut domain, Time::ZERO, f, value);
     assert!(domain.navigation().offered(chat, domain.frame().document));
@@ -429,8 +419,6 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
     let mut value = frame(7);
     value.projects = List::with_capacity(1);
     value.projects.push(project(1, true)).unwrap();
-    value.charters = List::with_capacity(1);
-    value.charters.push(offers(1, true)).unwrap();
     let page = open_token(&delivered(&mut about, Time::ZERO, f, value));
     let mut rows = List::with_capacity(1);
     rows.push(entry(8, InboxGroup::Escalations, 10)).unwrap();
@@ -450,14 +438,12 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
     else {
         panic!("chat about the held task");
     };
-    assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"held checkout") });
+    assert_eq!(**ask, crate::tests::fixtures::chat_request(1, text(b"held checkout")));
     let mut domain = Fixture::new(&LIMITS);
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
     value.projects = List::with_capacity(1);
     value.projects.push(project(1, true)).unwrap();
-    value.charters = List::with_capacity(1);
-    value.charters.push(offers(1, true)).unwrap();
     delivered(&mut domain, Time::ZERO, f, value);
     drive(
         &mut domain,
@@ -472,7 +458,7 @@ fn starting_a_chat_joins_refuses_and_opens_only_after_its_durable_answer() {
                 asked: jig_client::Event::Send { key: sent, request: jig_client::Ask::Jig(ask), .. },
             } = request
             {
-                assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"help") });
+                assert_eq!(**ask, crate::tests::fixtures::chat_request(1, text(b"help")));
                 token = Some(*sent);
             }
         }
@@ -727,11 +713,6 @@ fn project_open(section: ProjectSection) -> (Fixture, Box<[Request]>) {
     let f = start(&mut domain, List::with_capacity(0));
     let mut value = frame(7);
     let role = project(1, true);
-    let mut offered = offers(1, true);
-    offered.goals = List::with_capacity(1);
-    offered.goals.push(Charter { number: 1, name: Some(DocumentText::complete(text(b"lead"))) }).unwrap();
-    value.charters = List::with_capacity(1);
-    value.charters.push(offered).unwrap();
     value.projects = List::with_capacity(1);
     value.projects.push(role).unwrap();
     let out = delivered(&mut domain, Time::ZERO, f, value);
@@ -880,7 +861,8 @@ fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
         Time::ZERO,
         Event::Act { action: Act::Edit { field: Purpose::NewGoal, text: text(b"new goal") } },
     );
-    let form = GoalForm { project: 1, executor: GoalExecutor::Charter(1), budget: 21, deadline: None, priority: 2 };
+    let form =
+        GoalForm { project: 1, executor: OwnerExecutor::Agent { charter: 1 }, budget: 21, deadline: None, priority: 2 };
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::GoalForm { form } });
     let opened = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
     assert!(opened.is_empty());
@@ -908,14 +890,16 @@ fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
     };
     assert_eq!(
         **ask,
-        Ask::SetGoal {
-            project: 1,
-            spec: text(b"new goal"),
-            executor: GoalExecutor::Charter(1),
-            budget: 21,
-            priority: 2,
-            deadline: None
-        }
+        crate::tests::fixtures::goal_request(
+            GoalForm {
+                project: 1,
+                executor: OwnerExecutor::Agent { charter: 1 },
+                budget: 21,
+                priority: 2,
+                deadline: None
+            },
+            text(b"new goal")
+        )
     );
     assert_eq!(sent.len(), 1);
     assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
@@ -964,6 +948,7 @@ fn goal_bounds_control_choices_without_me_authority_inference() {
         }),
         beyond: Beyond::Refused(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) }),
     };
+    crate::tests::fixtures::set_creating(&mut domain, doc.number, &doc.acts.get(0).unwrap().admission);
     drive(&mut domain, Time::ZERO, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
     drive(
         &mut domain,
@@ -978,7 +963,7 @@ fn goal_bounds_control_choices_without_me_authority_inference() {
         (99, 3, Some(Wall::from_nanos(101)), false),
         (99, 3, None, false),
     ] {
-        let form = GoalForm { project: 1, executor: GoalExecutor::Charter(charter), budget, deadline, priority: 1 };
+        let form = GoalForm { project: 1, executor: OwnerExecutor::Agent { charter }, budget, deadline, priority: 1 };
         drive(&mut domain, Time::ZERO, Event::Act { action: Act::GoalForm { form } });
         drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
         assert_eq!(domain.project_page().form.confirmation.is_some(), allowed);
@@ -999,8 +984,13 @@ fn goal_bounds_control_choices_without_me_authority_inference() {
             assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
         }
     }
-    let form =
-        GoalForm { project: 1, executor: GoalExecutor::Charter(99), budget: 3, deadline: Some(latest), priority: 1 };
+    let form = GoalForm {
+        project: 1,
+        executor: OwnerExecutor::Agent { charter: 99 },
+        budget: 3,
+        deadline: Some(latest),
+        priority: 1,
+    };
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::GoalForm { form } });
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
     assert!(domain.project_page().form.confirmation.is_some());
@@ -1014,6 +1004,7 @@ fn goal_bounds_control_choices_without_me_authority_inference() {
         }
     }
     let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::tests::fixtures::set_creating(&mut domain, moved.number, &moved.acts.get(0).unwrap().admission);
     crate::page::project::document(&mut domain.ui, &super::spine::env(Time::ZERO), moved, &mut out, &domain.client);
     assert!(domain.project_page().form.confirmation.is_none());
     assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
@@ -1021,6 +1012,7 @@ fn goal_bounds_control_choices_without_me_authority_inference() {
     let mut refused = domain.project_page().document.as_ref().unwrap().clone();
     refused.acts.get_mut(0).unwrap().admission =
         Admission::Refused(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) });
+    crate::tests::fixtures::set_creating(&mut domain, refused.number, &refused.acts.get(0).unwrap().admission);
     crate::page::project::document(&mut domain.ui, &super::spine::env(Time::ZERO), refused, &mut out, &domain.client);
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
     assert_eq!(domain.project_page().form.refusal, Some(Refusal::Role { held: Some(HeldRole::Policy { role: 2 }) }));
@@ -1119,6 +1111,7 @@ fn project_notes_keep_revisions_and_settings_deployment_keep_facts_and_parts() {
     let resource = Part::Resource { connector: 1, path: resource_path(b"resource") };
     doc.resources = List::with_capacity(1);
     doc.resources.push(resource.clone()).unwrap();
+    crate::tests::fixtures::set_creating(&mut domain, doc.number, &doc.acts.get(0).unwrap().admission);
     let shown =
         drive(&mut domain, Time::ZERO, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
     assert_eq!(shown.as_ref(), &[Request::ShowPart { part: resource, scope: PartScope::Project(1) }]);
@@ -1415,13 +1408,15 @@ fn bounded_goal_keeps_every_supplied_policy_recipient_in_order() {
         panic!("bounded goal offer");
     };
     *beyond = Beyond::Proposed { to: recipient.clone() };
+    crate::tests::fixtures::set_creating(&mut domain, doc.number, &doc.acts.get(0).unwrap().admission);
     drive(&mut domain, Time::ZERO, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
     drive(
         &mut domain,
         Time::ZERO,
         Event::Act { action: Act::Edit { field: Purpose::NewGoal, text: text(b"collective") } },
     );
-    let form = GoalForm { project: 1, executor: GoalExecutor::Charter(1), budget: 21, deadline: None, priority: 1 };
+    let form =
+        GoalForm { project: 1, executor: OwnerExecutor::Agent { charter: 1 }, budget: 21, deadline: None, priority: 1 };
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::GoalForm { form } });
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
     let projected = domain.project_page();
@@ -1436,14 +1431,16 @@ fn bounded_goal_keeps_every_supplied_policy_recipient_in_order() {
     };
     assert_eq!(
         **ask,
-        Ask::SetGoal {
-            project: 1,
-            spec: text(b"collective"),
-            executor: GoalExecutor::Charter(1),
-            budget: 21,
-            priority: 1,
-            deadline: None,
-        }
+        crate::tests::fixtures::goal_request(
+            GoalForm {
+                project: 1,
+                executor: OwnerExecutor::Agent { charter: 1 },
+                budget: 21,
+                priority: 1,
+                deadline: None
+            },
+            text(b"collective")
+        )
     );
 }
 
@@ -1476,9 +1473,15 @@ fn bounded_goal_nobody_accepts(domain: &mut Fixture, latest: skein_lib::Wall, ou
         }),
         beyond: Beyond::Refused(nobody.clone()),
     };
+    crate::tests::fixtures::set_creating(domain, refused.number, &refused.acts.get(0).unwrap().admission);
     crate::page::project::document(&mut domain.ui, &super::spine::env(Time::ZERO), refused, out, &domain.client);
-    let form =
-        GoalForm { project: 1, executor: GoalExecutor::Charter(99), budget: 4, deadline: Some(latest), priority: 1 };
+    let form = GoalForm {
+        project: 1,
+        executor: OwnerExecutor::Agent { charter: 99 },
+        budget: 4,
+        deadline: Some(latest),
+        priority: 1,
+    };
     drive(domain, Time::ZERO, Event::Act { action: Act::GoalForm { form } });
     let emitted = drive(domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
     assert!(emitted.is_empty());
@@ -1682,9 +1685,10 @@ fn procedure_goal_pairs_and_current_bounds_control_confirmation_and_exact_depart
     use crate::{action::Act, fields::Purpose, page::project::goals::GoalForm};
     let (mut domain, opened) = project_open(ProjectSection::Goals);
     let read = project_read(&opened);
-    let exact = GoalExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
+    let exact = OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX };
     let until = skein_lib::Wall::from_nanos(100);
     let doc = procedure_goal_document(until);
+    crate::tests::fixtures::set_creating(&mut domain, doc.number, &doc.acts.get(0).unwrap().admission);
     drive(&mut domain, Time::ZERO, ReadPage { read, result: ReadResult::Value(ReadValue::Project(Box::new(doc))) });
     drive(
         &mut domain,
@@ -1696,18 +1700,18 @@ fn procedure_goal_pairs_and_current_bounds_control_confirmation_and_exact_depart
         (exact, 4, Some(until), Admission::Proposed { to: Recipient::Party(9) }),
         (exact, 3, Some(skein_lib::Wall::from_nanos(101)), Admission::Proposed { to: Recipient::Party(9) }),
         (
-            GoalExecutor::Procedure { connector: 6, code: u32::MAX },
+            OwnerExecutor::Procedure { connector: 6, code: u32::MAX },
             3,
             Some(until),
             Admission::Refused(Refusal::NotOffered),
         ),
         (
-            GoalExecutor::Procedure { connector: u16::MAX, code: 7 },
+            OwnerExecutor::Procedure { connector: u16::MAX, code: 7 },
             3,
             Some(until),
             Admission::Refused(Refusal::NotOffered),
         ),
-        (GoalExecutor::Charter(1), 3, Some(until), Admission::Refused(Refusal::NotOffered)),
+        (OwnerExecutor::Agent { charter: 1 }, 3, Some(until), Admission::Refused(Refusal::NotOffered)),
         (exact, 11, Some(until), Admission::Refused(Refusal::NotOffered)),
         (exact, 3, None, Admission::Refused(Refusal::NotOffered)),
     ] {
@@ -1741,6 +1745,7 @@ fn procedure_goal_pairs_and_current_bounds_control_confirmation_and_exact_depart
     procedures.clear();
     procedures.push(CreateProcedure { connector: 7, code: u32::MAX }).unwrap();
     let mut out = skein_lib::Queue::with_capacity(crate::max_out(&LIMITS));
+    crate::tests::fixtures::set_creating(&mut domain, moved.number, &moved.acts.get(0).unwrap().admission);
     crate::page::project::document(&mut domain.ui, &super::spine::env(Time::ZERO), moved, &mut out, &domain.client);
     assert!(domain.project_page().form.confirmation.is_none());
     assert_eq!(domain.project_page().form.refusal, Some(Refusal::NotOffered));
@@ -1752,6 +1757,7 @@ fn procedure_goal_pairs_and_current_bounds_control_confirmation_and_exact_depart
         panic!("goal bounds");
     };
     procedures.push(CreateProcedure { connector: u16::MAX, code: u32::MAX }).unwrap();
+    crate::tests::fixtures::set_creating(&mut domain, restored.number, &restored.acts.get(0).unwrap().admission);
     crate::page::project::document(&mut domain.ui, &super::spine::env(Time::ZERO), restored, &mut out, &domain.client);
     drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
     let sent = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
@@ -1761,14 +1767,10 @@ fn procedure_goal_pairs_and_current_bounds_control_confirmation_and_exact_depart
     };
     assert_eq!(
         **ask,
-        Ask::SetGoal {
-            project: 1,
-            spec: text(b"numeric procedure"),
-            executor: exact,
-            budget: 4,
-            priority: 8,
-            deadline: Some(until)
-        }
+        crate::tests::fixtures::goal_request(
+            GoalForm { project: 1, executor: exact, budget: 4, priority: 8, deadline: Some(until) },
+            text(b"numeric procedure")
+        )
     );
     assert!(drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm }).is_empty());
 }
@@ -1805,8 +1807,6 @@ fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers
         let mut value = frame(7);
         value.projects = List::with_capacity(1);
         value.projects.push(project(1, true)).unwrap();
-        value.charters = List::with_capacity(1);
-        value.charters.push(offers(1, true)).unwrap();
         delivered(&mut domain, Time::ZERO, token, value);
         drive(
             &mut domain,
@@ -1820,7 +1820,7 @@ fn owner_started_chat_navigates_from_the_original_request_and_keeps_late_answers
                 asked: jig_client::Event::Send { key: sent, request: jig_client::Ask::Jig(ask), .. },
             } = row
             {
-                assert_eq!(**ask, Ask::StartChat { project: 1, words: text(b"start") });
+                assert_eq!(**ask, crate::tests::fixtures::chat_request(1, text(b"start")));
                 assert!(request.replace(*sent).is_none(), "one original start request");
             }
         }
@@ -1865,8 +1865,13 @@ fn owner_goal_answers_preserve_numeric_proposals_and_late_started_task_facts() {
                 Time::ZERO,
                 Event::Act { action: Act::Edit { field: Purpose::NewGoal, text: text(b"goal") } },
             );
-            let form =
-                GoalForm { project: 1, executor: GoalExecutor::Charter(1), budget: 21, deadline: None, priority: 2 };
+            let form = GoalForm {
+                project: 1,
+                executor: OwnerExecutor::Agent { charter: 1 },
+                budget: 21,
+                deadline: None,
+                priority: 2,
+            };
             drive(&mut domain, Time::ZERO, Event::Act { action: Act::GoalForm { form } });
             drive(&mut domain, Time::ZERO, Event::Act { action: Act::Submit { field: Purpose::NewGoal } });
             let sent = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });

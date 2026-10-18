@@ -209,9 +209,6 @@ pub fn document_limits() -> Limits {
     let mut limits = CEILINGS;
     limits.document_text_bytes = 4;
     limits.me_projects = 512;
-    limits.offered_charters_chats = 2;
-    limits.offered_charters_goals = 2;
-    limits.me_charters = 146;
     check_limits(&limits).expect("document fixtures below ceilings");
     limits
 }
@@ -285,7 +282,6 @@ pub fn project_role(limits: &Limits) -> MeProject {
             name: Some(document_text(limits)),
             role: HeldRole::Policy(held_role_policy(limits)),
             pool: Some(pool_ledger(limits)),
-            chat_budget: u64::MAX,
         },
     )
     .expect("bounded project_role")
@@ -314,23 +310,6 @@ pub fn needs(limits: &Limits) -> Needs {
 
 pub fn count(limits: &Limits) -> Count {
     Count::new(limits, CountParts { value: u32::MAX, limited: true }).expect("bounded count")
-}
-
-pub fn charter(limits: &Limits) -> Charter {
-    Charter::new(limits, CharterParts { number: u32::MAX, name: Some(document_text(limits)) }).expect("bounded charter")
-}
-
-pub fn offered_charters(limits: &Limits) -> OfferedCharters {
-    OfferedCharters::new(
-        limits,
-        OfferedChartersParts {
-            project: u32::MAX,
-            chats: repeated(charter(limits), limits.offered_charters_chats),
-            goals: repeated(charter(limits), limits.offered_charters_goals),
-            cut: true,
-        },
-    )
-    .expect("bounded offered_charters")
 }
 
 pub fn run_state(limits: &Limits) -> RunState {
@@ -543,9 +522,6 @@ pub fn hold_reason_budget_fields(limits: &Limits) -> HoldReasonBudgetFields {
 }
 
 pub fn frame_at_ceilings(limits: &Limits) -> Me {
-    let charters = repeated(offered_charters(limits), 2);
-    let charters = piece_items(&charters, OfferedCharters::measure, OfferedCharters::encode);
-    assert_eq!(charters.len(), usize::try_from(limits.me_charters).expect("small piece"));
     Me::new(
         limits,
         MeParts {
@@ -555,7 +531,6 @@ pub fn frame_at_ceilings(limits: &Limits) -> Me {
             needs_total: u32::MAX,
             updates: count(limits),
             results_seen: u64::MAX,
-            charters,
             cut: true,
             retention: skein_lib::Duration::from_nanos(u64::MAX),
             deployment_role: Some(HeldRole::Owner),

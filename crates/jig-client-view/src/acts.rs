@@ -173,10 +173,10 @@ pub fn hold_revision(object: &Object) -> Option<Revision> {
         | None => None,
     }
 }
-fn words(fields: &Fields, purpose: Purpose) -> Option<Text> {
+pub(crate) fn words(fields: &Fields, purpose: Purpose) -> Option<Text> {
     Some(fields.get(purpose)?.text.clone())
 }
-fn request_project(object: &Object) -> Option<u32> {
+pub(crate) fn request_project(object: &Object) -> Option<u32> {
     match &object.body {
         Some(Body::OwnerPersonTask(document)) => document.project(),
         Some(Body::OwnerEscalation(document)) => Some(document.task.project),
@@ -244,7 +244,6 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
         }
         ActKind::Stop => Some(Ask::Stop { project, task }),
         ActKind::Cancel => Some(Ask::Cancel { project, task, reason: words(fields, Purpose::Reason)?, grace: None }),
-        ActKind::Close => Some(Ask::Close { project, chat: task, disposals: choices.disposals.clone() }),
         ActKind::Move => Some(Ask::Move { project, task, reason: words(fields, Purpose::Reason)? }),
         ActKind::Prioritise => Some(priority(project, task, choices.priority?)),
         ActKind::EditNote | ActKind::DeleteNote => {
@@ -277,7 +276,8 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
                 })
             }
         }
-        ActKind::SetGoal
+        ActKind::Close
+        | ActKind::SetGoal
         | ActKind::Seen
         | ActKind::Adopt
         | ActKind::ChangePolicy

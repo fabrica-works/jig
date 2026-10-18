@@ -17,13 +17,13 @@ use crate::{
     page::IntentPurpose,
 };
 use alloc::boxed::Box;
-use jig_client::contract::{ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, Outcome, Recipient, Refusal, Text};
+use jig_client::contract::{Admission, Answer, Outcome, OwnerExecutor, Recipient, Refusal, Text};
 use skein_lib::{Env, Queue, Token, Wall};
 /// Goal options chosen from the project's offered executors and party pool.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct GoalForm {
     pub project: u32,
-    pub executor: GoalExecutor,
+    pub executor: OwnerExecutor,
     pub budget: u64,
     pub deadline: Option<Wall>,
     pub priority: u32,
@@ -119,62 +119,39 @@ pub(crate) fn open(domain: &mut Ui, lent: &jig_client::Client) {
     });
     domain.changed();
 }
-fn prediction(domain: &Ui, form: GoalForm, scope: u64, lent: &jig_client::Client) -> Option<(Admission, u64)> {
-    if domain.project_page.owner.is_some() {
-        return super::owner_goals::prediction(domain, form, scope, lent);
+pub(crate) fn draft(form: GoalForm, words: Text) -> jig_client::shapes::GoalDraft {
+    jig_client::shapes::GoalDraft {
+        words,
+        executor: form.executor,
+        budget: form.budget,
+        deadline: form.deadline,
+        priority: Some(form.priority),
     }
-    let mut offered = false;
-    let mut pool = None;
-    if let Some(frame) = &domain.frame(lent).document {
-        for project in &frame.projects {
-            if project.project == form.project
-                && let Some(ledger) = &project.pool
-            {
-                pool = Some(ledger.left);
-            }
-        }
-        for project in &frame.charters {
-            if project.project == form.project {
-                match form.executor {
-                    GoalExecutor::Charter(number) => {
-                        for charter in &project.goals {
-                            if charter.number == number {
-                                offered = true;
-                            }
-                        }
-                    }
-                    GoalExecutor::Procedure { .. } => {}
-                }
-            }
+}
+fn prediction(domain: &Ui, form: GoalForm, _scope: u64, lent: &jig_client::Client) -> Option<(Admission, u64)> {
+    let Some(me) = domain.frame(lent).document else {
+        return Some((Admission::Refused(Refusal::NotOffered), 0));
+    };
+    if crate::queries::goal_template(me, form.project).is_none() {
+        return Some((Admission::Refused(Refusal::NotOffered), 0));
+    }
+    let mut creating = None;
+    for project in &me.projects {
+        if project.project == form.project {
+            creating = project.creating.as_ref();
         }
     }
-    let mut admission = Admission::Refused(Refusal::NotOffered);
-    if let Some(doc) = &domain.project_page.document {
-        for act in &doc.acts {
-            if act.act == ActKind::SetGoal {
-                admission = act.admission.clone();
-            }
-        }
-        for party in &doc.pools {
-            if party.party == scope {
-                pool = Some(party.budget.left);
-            }
-        }
-    }
-    // Bounded offers own these facts; frame facts remain for fixed admissions.
-    match &admission {
-        Admission::Bounded { within, .. } => match within {
-            Bounds::Create(jig_client::contract::CreateBounds { pool_left, .. }) => pool = Some(*pool_left),
-            Bounds::Amend { .. } => {}
-        },
-        Admission::Refused(why) => return Some((Admission::Refused(why.clone()), pool.unwrap_or(0))),
-        Admission::Allowed | Admission::Proposed { .. } => {
-            if !offered {
-                return Some((Admission::Refused(Refusal::NotOffered), pool.unwrap_or(0)));
-            }
-        }
-    }
-    Some((jig_client::contract::admission::goal(&admission, form.executor, form.budget, form.deadline), pool?))
+    let Some(creating) = creating else {
+        return Some((Admission::Refused(Refusal::NotOffered), 0));
+    };
+    let words = domain.fields.get(Purpose::NewGoal)?.text.clone();
+    let admission = match jig_client::shapes::fall(creating, &draft(form, words)) {
+        jig_client::shapes::Fall::Within => Admission::Allowed,
+        jig_client::shapes::Fall::Proposable(to) => Admission::Proposed { to },
+        jig_client::shapes::Fall::Refused(why) => Admission::Refused(why),
+        jig_client::shapes::Fall::NotOffered(_) => Admission::Refused(Refusal::NotOffered),
+    };
+    Some((admission, creating.within.pool_left))
 }
 /// Refresh an unsent draft when the supplied project facts move.
 pub(crate) fn sync(domain: &mut Ui, lent: &jig_client::Client) {
@@ -215,13 +192,29 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client:
     if open.scope != domain.confirmed.unwrap_or(0) || open.handle != domain.page_handle() {
         return;
     }
-    let ask = Ask::SetGoal {
-        project: open.form.project,
-        spec: open.words.clone(),
-        executor: open.form.executor,
-        budget: open.form.budget,
-        priority: open.form.priority,
-        deadline: open.form.deadline,
+    let Some(me) = domain.frame(lent).document else { return };
+    let reason = match crate::acts::words(&domain.fields, Purpose::Reason) {
+        Some(reason) => reason,
+        None => Text::new(Box::from([]), domain.text_limit).expect("empty reason fits"),
+    };
+    let ask = match jig_client::shapes::set_goal(
+        me,
+        open.form.project,
+        draft(open.form, open.words.clone()),
+        reason,
+        domain.borrow(lent).wall(),
+    ) {
+        jig_client::shapes::Judged::Create(ask) | jig_client::shapes::Judged::Propose { ask, .. } => ask,
+        jig_client::shapes::Judged::Refused(why) => {
+            domain.project_page.form.refusal = Some(why);
+            domain.changed();
+            return;
+        }
+        jig_client::shapes::Judged::NotOffered(_) => {
+            domain.project_page.form.refusal = Some(Refusal::NotOffered);
+            domain.changed();
+            return;
+        }
     };
     match domain.intents.ask(
         open.scope,
@@ -283,7 +276,7 @@ pub(crate) fn answered(
             }
             domain.project_page.form.answer = Some(outcome.clone());
             match crate::outcome::route(&outcome) {
-                crate::outcome::Route::Goal { task } => {
+                crate::outcome::Route::Created { task } | crate::outcome::Route::Goal { task } => {
                     if handle == domain.page_handle() && domain.confirmed == Some(pending.scope) {
                         crate::page::routing::navigate(domain, env, Place::Jig(Address::task(task)), false, out, lent);
                     } else {

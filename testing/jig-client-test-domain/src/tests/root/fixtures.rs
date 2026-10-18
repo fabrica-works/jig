@@ -27,7 +27,6 @@ const JIG: jig_client_view::Limits = jig_client_view::Limits {
     drafts: 1,
     projects: 2,
     roles: 2,
-    charters: 2,
     text: 32,
     rows: 2,
     segments: 4,
@@ -82,7 +81,6 @@ pub(super) fn limits() -> Limits {
                 segments: 4,
                 text: 32,
                 projects: 2,
-                charters: 2,
                 fields: 4,
                 delegates: 2,
                 records: 2,
@@ -189,7 +187,6 @@ pub(super) fn confirm(root: &mut Domain, watch: Token, party: u64) -> Vec<Reques
         needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
         needs_total: 0,
         results_seen: 0,
-        charters: List::with_capacity(0),
         cut: false,
         updates: contract::Count { value: 0, limited: false },
 

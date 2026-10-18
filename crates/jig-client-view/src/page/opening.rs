@@ -45,62 +45,69 @@ pub(crate) fn section(
                 | TaskSection::Panels => {}
             }
         }
-        Section::Project { project, section } => {
-            match section {
-                ProjectSection::Overview => {
-                    if let Some(me) = domain.frame(lent).document
-                        && crate::queries::goal_template(me, project).is_some()
-                    {
-                        open_goals(domain, project, env.limits.rows, owner, out);
-                    }
-                    open_once(domain, Subject::Inbox { window: env.limits.rows }, owner, out);
-                    domain.inbox.filter = super::inbox::Filter { project: Some(project), kind: None, goal: None };
-                }
-                ProjectSection::Goals => {
-                    if let Some(me) = domain.frame(lent).document
-                        && let Some(template) = crate::queries::goal_template(me, project)
-                    {
-                        open_goals(domain, project, env.limits.rows, owner, out);
-                        project::ask(
-                            domain,
-                            project::GOALS_READ,
-                            Read::Tasks {
-                                query: crate::queries::ended_goals(project, template.label),
-                                live: None,
-                                ended: None,
-                            },
-                            out,
-                        );
-                    }
-                }
-                ProjectSection::Tasks => {
-                    let subject = Subject::Tasks {
-                        query: contract::TaskQuery { project: Some(project), ..domain.project_page.task_filter },
-                        window: env.limits.rows,
-                    };
-                    open_once(domain, subject, owner, out);
-                    domain.changed();
-                }
-                ProjectSection::Notes => project::notes::filter(
-                    domain,
-                    project::NoteFilter { scope: contract::NoteScope::Project(project), description: None },
-                    out,
-                ),
-                ProjectSection::Spend => {
-                    project::ask(domain, project::SPEND_READ, Read::Spend { project, after: None }, out);
-                }
-                ProjectSection::Settings
-                | ProjectSection::Resources
-                | ProjectSection::Policy
-                | ProjectSection::Roles
-                | ProjectSection::Recurring => {}
-            }
-            project::ask(domain, project::PROJECT_READ, Read::Project { project }, out);
-        }
+        Section::Project { project, section } => project_section(domain, env, project, section, owner, out, lent),
         Section::Deployment => {
             open_once(domain, Subject::Deployment, owner, out);
         }
     }
+}
+
+fn project_section(
+    domain: &mut Ui,
+    env: &Env<crate::Limits>,
+    project: u32,
+    section: ProjectSection,
+    owner: Owner,
+    out: &mut Queue<Request>,
+    lent: &jig_client::Client,
+) {
+    match section {
+        ProjectSection::Overview => {
+            if let Some(me) = domain.frame(lent).document
+                && crate::queries::goal_template(me, project).is_some()
+            {
+                open_goals(domain, project, env.limits.rows, owner, out);
+            }
+            open_once(domain, Subject::Inbox { window: env.limits.rows }, owner, out);
+            domain.inbox.filter = super::inbox::Filter { project: Some(project), kind: None, goal: None };
+        }
+        ProjectSection::Goals => {
+            if let Some(me) = domain.frame(lent).document
+                && let Some(template) = crate::queries::goal_template(me, project)
+            {
+                let label = template.label;
+                open_goals(domain, project, env.limits.rows, owner, out);
+                project::ask(
+                    domain,
+                    project::GOALS_READ,
+                    Read::Tasks { query: crate::queries::ended_goals(project, label), live: None, ended: None },
+                    out,
+                );
+            }
+        }
+        ProjectSection::Tasks => {
+            let subject = Subject::Tasks {
+                query: contract::TaskQuery { project: Some(project), ..domain.project_page.task_filter },
+                window: env.limits.rows,
+            };
+            open_once(domain, subject, owner, out);
+            domain.changed();
+        }
+        ProjectSection::Notes => project::notes::filter(
+            domain,
+            project::NoteFilter { scope: contract::NoteScope::Project(project), description: None },
+            out,
+        ),
+        ProjectSection::Spend => {
+            project::ask(domain, project::SPEND_READ, Read::Spend { project, after: None }, out);
+        }
+        ProjectSection::Settings
+        | ProjectSection::Resources
+        | ProjectSection::Policy
+        | ProjectSection::Roles
+        | ProjectSection::Recurring => {}
+    }
+    project::ask(domain, project::PROJECT_READ, Read::Project { project }, out);
 }
 
 fn open_goals(domain: &mut Ui, project: u32, rows: u32, owner: Owner, out: &mut Queue<Request>) {

@@ -1,6 +1,8 @@
 //! Ops's two proof-of-concept stories on jig's independent conformance loop.
 mod application;
 mod config;
+#[cfg(test)]
+mod creating;
 mod documents;
 mod observations;
 mod protocol;

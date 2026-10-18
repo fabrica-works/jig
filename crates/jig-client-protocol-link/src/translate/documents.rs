@@ -240,7 +240,6 @@ fn receiving_part0(checked: &mut Limits, limits: &Limits) {
     checked.wire.ending_withdrawn_fields_reason = limits.client.text;
     checked.wire.escalation_trail = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.escalation_acts = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
-    checked.wire.me_charters = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.held_runtime_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.hold_spend = limits.client.rows;
     checked.wire.hold_reason_rows = u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");

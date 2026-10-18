@@ -15,12 +15,12 @@ pub enum NotOffered {
     Ceiling,
     Creating,
 }
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fate {
     Cancel,
     Move,
 }
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Delegate {
     pub task: u64,
     pub fate: Fate,

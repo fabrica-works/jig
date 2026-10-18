@@ -21,7 +21,6 @@ pub struct Limits {
     pub segments: u32,
     pub text: u32,
     pub projects: u32,
-    pub charters: u32,
     pub fields: u32,
     pub delegates: u32,
     pub records: u32,

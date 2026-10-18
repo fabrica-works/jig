@@ -7,6 +7,7 @@ use jig_client_test_domain::Address as RootAddress;
 use jig_client_view::address::Address;
 use skein_lib::{Duration, Wall};
 pub mod client_construction;
+pub mod closing;
 pub mod conversations;
 pub mod goals;
 pub mod own_proposal;
@@ -29,7 +30,7 @@ pub fn frame(party: u64) -> Me {
         },
         projects: list([MeProject {
             templates: conversations::templates(),
-            creating: None,
+            creating: Some(goals::creating()),
             project: 1,
             name: Some(DocumentText::complete(text(b"First"))),
             role: HeldRole::Policy { role: 1 },
@@ -42,18 +43,11 @@ pub fn frame(party: u64) -> Me {
                 began: None,
                 next: None,
             }),
-            chat_budget: 10,
         }]),
         needs: Needs { questions: 0, proposals: 0, escalations: 0, person_tasks: 0 },
         needs_total: 0,
         results_seen: 0,
         cut: false,
-        charters: list([OfferedCharters {
-            project: 1,
-            chats: list([Charter { number: 1, name: Some(DocumentText::complete(text(b"Chat"))) }]),
-            goals: list([Charter { number: 1, name: Some(DocumentText::complete(text(b"Goal"))) }]),
-            cut: false,
-        }]),
         updates: Count { value: 0, limited: false },
 
         retention: Duration::from_secs(1000),
@@ -260,8 +254,8 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
         .engine
         .script(jig_client_scripted_engine::Rule {
             party: Some(7),
-            ask: Ask::StartChat { project: 1, words: text(b"Hello") },
-            answer: Answer::Done(Outcome::Made { what: Made::Chat { task: 9 } }),
+            ask: jig_client::shapes::chat(&frame(7), 1, text(b"Hello"), Wall::EPOCH).expect("chat recipe"),
+            answer: Answer::Done(Outcome::Made { what: Made::Tasks { tasks: list([9]) } }),
             changes: vec![
                 jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {
                     party: 7,
@@ -740,6 +734,20 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
             beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
         },
     }]);
+    let mut me = frame(7);
+    let Admission::Bounded { within: jig_client_domain::contract::Bounds::Create(within), beyond } =
+        &doc.acts.get(0).expect("goal offer").admission
+    else {
+        unreachable!()
+    };
+    me.projects.get_mut(0).expect("project").creating =
+        Some(Creating { within: within.clone(), beyond: beyond.clone() });
+    let ask = goals::ask(&me, OwnerExecutor::Agent { charter: 1 });
+    world
+        .front()
+        .engine
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Me(me))
+        .expect("creating offer fits");
     world
         .front()
         .engine
@@ -751,14 +759,7 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
         .engine
         .script(jig_client_scripted_engine::Rule {
             party: Some(7),
-            ask: Ask::SetGoal {
-                project: 1,
-                spec: text(b"Resolve incident"),
-                executor: GoalExecutor::Charter(1),
-                budget: 2,
-                priority: 0,
-                deadline: None,
-            },
+            ask,
             answer: Answer::Done(Outcome::Proposed { proposal: p.key }),
             changes: vec![jig_client_scripted_engine::Change::Object {
                 project: 1,
@@ -774,8 +775,8 @@ pub fn goal_world(seed: u64) -> World<Test, Scripted> {
 #[must_use]
 pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
     let mut world = world(seed);
-    let mut procedure_frame = frame(7);
-    procedure_frame.charters.get_mut(0).expect("charter offers exist").goals = list([]);
+    let procedure_frame = frame(7);
+
     world
         .front()
         .engine
@@ -799,6 +800,20 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
             beyond: Beyond::Proposed { to: Recipient::Role { project: 1, role: 1 } },
         },
     }]);
+    let mut me = frame(7);
+    let Admission::Bounded { within: jig_client_domain::contract::Bounds::Create(within), beyond } =
+        &doc.acts.get(0).expect("goal offer").admission
+    else {
+        unreachable!()
+    };
+    me.projects.get_mut(0).expect("project").creating =
+        Some(Creating { within: within.clone(), beyond: beyond.clone() });
+    let ask = goals::ask(&me, OwnerExecutor::Procedure { connector: 2, code: 7 });
+    world
+        .front()
+        .engine
+        .act(skein_lib::Time::ZERO, Wall::EPOCH, jig_client_scripted_engine::Change::Me(me))
+        .expect("creating offer fits");
     world
         .front()
         .engine
@@ -824,14 +839,7 @@ pub fn procedure_goal_world(seed: u64) -> World<Test, Scripted> {
         .engine
         .script(jig_client_scripted_engine::Rule {
             party: Some(7),
-            ask: Ask::SetGoal {
-                project: 1,
-                spec: text(b"Resolve incident"),
-                executor: GoalExecutor::Procedure { connector: 2, code: 7 },
-                budget: 2,
-                priority: 0,
-                deadline: None,
-            },
+            ask,
             answer: Answer::Done(Outcome::Proposed { proposal: p.key }),
             changes: vec![jig_client_scripted_engine::Change::Object {
                 project: 1,

@@ -70,7 +70,7 @@ pub(super) fn project_pages(words: &Words) {
                     action: Act::GoalForm {
                         form: crate::page::project::goals::GoalForm {
                             project: 4,
-                            executor: GoalExecutor::Charter(1),
+                            executor: OwnerExecutor::Agent { charter: 1 },
                             budget: u64::MAX,
                             deadline: Some(Wall::from_nanos(u64::MAX)),
                             priority: u32::MAX,

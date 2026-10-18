@@ -20,6 +20,9 @@ pub fn templates() -> List<Template> {
     };
     let mut goal = chat.clone();
     goal.number = jig_client::shapes::GOAL;
+    goal.executor = TemplateExecutor::Chosen;
+    goal.budget = TemplateBudget::Given;
+    goal.deadline = TemplateDeadline::Given;
     goal.label = 2;
     goal.tracked = Some(0);
     goal.flags.conversation = false;

@@ -97,10 +97,6 @@ pub fn language() -> Language {
                 Segment::Hole { index: 3, kind: HoleKind::Number },
             ]),
             JigPhrase::FrameProjectsCut => Box::new([Segment::Text(copy_of(b"More project memberships than shown"))]),
-            JigPhrase::MeChartersCut => Box::new([
-                Segment::Text(copy_of(b"More goal charters in project ")),
-                Segment::Hole { index: 0, kind: HoleKind::Number },
-            ]),
             JigPhrase::FramePoolUnopened => Box::new([Segment::Text(copy_of(b"Pool ledger not supplied"))]),
             JigPhrase::PolicyPeriodSpend => Box::new([
                 Segment::Text(copy_of(b"Period spend: ")),

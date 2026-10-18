@@ -265,7 +265,6 @@ fn full_limits() -> Limits {
         records: 1,
         projects: 1,
         roles: 1,
-        charters: 1,
         parts: 1,
         text: 4,
         ..limits()

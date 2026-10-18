@@ -101,7 +101,6 @@ pub fn frame_record() -> w::Me {
             needs_total: 7,
             updates: w::Count::new(&lim, w::CountParts { value: 7, limited: false }).expect("literal fixture fits"),
             results_seen: 7,
-            charters: Box::from([]),
             cut: false,
             retention: Duration::from_nanos(19),
             deployment_role: None,

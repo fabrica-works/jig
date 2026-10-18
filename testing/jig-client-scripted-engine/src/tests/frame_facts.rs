@@ -11,17 +11,8 @@ fn me_prices_memberships_offers_and_optional_document_text() {
     row.party.login = DocumentText { bytes: text(&[b'l'; 32]), cut: true };
     row.party.name = DocumentText::complete(text(&[b'n'; 32]));
     row.projects.get_mut(0).unwrap().name = Some(DocumentText::complete(text(&[b'p'; 32])));
-    let mut chats = List::with_capacity(2);
-    chats.push(Charter { number: u32::MAX, name: Some(DocumentText { bytes: text(&[b'c'; 32]), cut: true }) }).unwrap();
-    row.charters.get_mut(0).unwrap().chats = chats;
-    row.charters.get_mut(0).unwrap().goals = List::with_capacity(2);
-    row.charters.get_mut(0).unwrap().cut = true;
     let mut bounds = Bounds { rows: 2, text: 32, document_bytes: u64::MAX, ..Bounds::default() };
-    let expected = u64::try_from(core::mem::size_of::<Me>()).unwrap()
-        + List::<MeProject>::worst_case(1).unwrap()
-        + List::<OfferedCharters>::worst_case(1).unwrap()
-        + List::<Charter>::worst_case(2).unwrap() * 2
-        + 128;
+    let expected = u64::try_from(core::mem::size_of::<Me>()).unwrap() + List::<MeProject>::worst_case(1).unwrap() + 96;
     assert_eq!(row.heap(&bounds).unwrap() + u64::try_from(core::mem::size_of::<Me>()).unwrap(), expected);
     bounds.document_bytes = expected;
     assert!(fits(&row, &bounds));
@@ -30,9 +21,6 @@ fn me_prices_memberships_offers_and_optional_document_text() {
     bounds.document_bytes += 2;
     assert!(fits(&row, &bounds));
     bounds.document_bytes = u64::MAX;
-    row.charters.get_mut(0).unwrap().goals = List::with_capacity(3);
-    assert!(!fits(&row, &bounds));
-    row.charters.get_mut(0).unwrap().goals = List::with_capacity(2);
     row.projects.get_mut(0).unwrap().name = Some(DocumentText::complete(text(&[b'p'; 33])));
     assert!(!fits(&row, &bounds));
     bounds.text = 33;

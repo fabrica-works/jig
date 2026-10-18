@@ -18,22 +18,6 @@ pub struct Needs {
     pub person_tasks: u32,
 }
 
-/// Offers associated with their supplied project, with independent goal-list loss.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct OfferedCharters {
-    pub project: u32,
-    pub chats: List<Charter>,
-    pub goals: List<Charter>,
-    pub cut: bool,
-}
-
-/// An offered charter for a chat or goal.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Charter {
-    pub number: u32,
-    pub name: Option<DocumentText>,
-}
-
 /// Funding and spend, in the engine amounts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Budget {

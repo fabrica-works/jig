@@ -35,7 +35,7 @@ fn conversations_in(l: &Limits, card: u32, chip: u32, slot_nodes: u32) -> Option
         .checked_add(crate::owner_budget::budget_nodes())?
         .checked_add(20)?
         .checked_mul(l.rows)?;
-    let forms = l.charters.max(l.rows).checked_mul(3)?.checked_add(9)?.checked_mul(l.projects.max(l.rows))?;
+    let forms = l.rows.checked_mul(3)?.checked_add(9)?.checked_mul(l.projects.max(l.rows))?;
     row.checked_add(forms)?.checked_add(70)?.checked_add(slot_nodes)
 }
 fn call_in(l: &Limits, card: u32) -> Option<u32> {
@@ -163,7 +163,7 @@ fn goals_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
         .checked_mul(l.rows)?
         .checked_mul(2)?;
     // A bounded goal offers whole charter and procedure lists independently.
-    let choices = l.charters.max(l.rows).checked_add(l.rows)?;
+    let choices = l.rows.checked_add(l.rows)?;
     let form = choices
         .checked_mul(4)?
         .checked_add(l.rows.checked_mul(3)?)?

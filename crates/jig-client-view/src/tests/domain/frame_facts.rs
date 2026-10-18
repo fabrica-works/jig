@@ -11,15 +11,7 @@ fn text(bytes: &[u8]) -> DocumentText {
     DocumentText::complete(Text::new(bytes.into(), 32).unwrap())
 }
 fn member(role: HeldRole) -> MeProject {
-    MeProject {
-        templates: List::with_capacity(0),
-        creating: None,
-        project: u32::MAX,
-        name: None,
-        role,
-        pool: None,
-        chat_budget: u64::MAX,
-    }
+    MeProject { templates: List::with_capacity(0), creating: None, project: u32::MAX, name: None, role, pool: None }
 }
 #[test]
 fn me_preserves_roles_pools_and_independent_owner_counts() {
@@ -56,29 +48,6 @@ fn me_preserves_roles_pools_and_independent_owner_counts() {
         ));
         assert!(!nav.offered(Destination::Jig(Address::Deployment), Some(&source)));
     }
-}
-#[test]
-fn charter_offers_keep_their_own_project_and_reserved_capacity_is_bounded() {
-    let mut source = frame(7);
-    source.projects = List::with_capacity(1);
-    source.projects.push(member(HeldRole::Observer)).unwrap();
-    source.charters = List::with_capacity(1);
-    let mut chats = List::with_capacity(1);
-    chats.push(Charter { number: u32::MAX, name: Some(text(b"")) }).unwrap();
-    source.charters.push(OfferedCharters { project: 17, chats, goals: List::with_capacity(1), cut: true }).unwrap();
-    let nav = Navigation::new(0);
-    assert!(!nav.offered(Destination::Jig(Address::Conversations { project: Some(17) }), Some(&source)));
-    assert!(!nav.offered(Destination::Jig(Address::Conversations { project: Some(u32::MAX) }), Some(&source)));
-    assert!(crate::frame::me::fits(&source, &LIMITS));
-    source.projects = List::with_capacity(LIMITS.projects + 1);
-    assert!(!crate::frame::me::fits(&source, &LIMITS));
-    source.projects = List::with_capacity(0);
-    source.charters.get_mut(0).unwrap().goals = List::with_capacity(LIMITS.charters + 1);
-    assert!(!crate::frame::me::fits(&source, &LIMITS));
-    source.charters = List::with_capacity(0);
-    assert_eq!(LIMITS.text, 32);
-    source.party.login = DocumentText::complete(Text::new(Box::from([0; 33]), 33).unwrap());
-    assert!(!crate::frame::me::fits(&source, &LIMITS));
 }
 #[test]
 fn pending_words_keep_the_local_name_loss_without_inventing_historical_loss_or_blocking_send() {

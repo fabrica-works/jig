@@ -153,7 +153,7 @@ impl NativeClient {
                     Received::Answer {
                         answer:
                             jig_client::contract::Answer::Done(jig_client::contract::Outcome::Owner(
-                                jig_client::contract::OwnerOutcome::Started { .. },
+                                jig_client::contract::OwnerOutcome::Created { .. },
                             )),
                         ..
                     } => self.chats_made += 1,

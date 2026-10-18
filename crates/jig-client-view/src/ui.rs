@@ -774,6 +774,7 @@ pub(crate) fn frame_delivery(
         }
     }
     domain.confirmed = if mismatch { None } else { Some(party) };
+    crate::page::project::goals::sync(domain, lent);
     domain.changed();
     if mismatch || foreign_kept_requests(domain, party) {
         domain.leave_handles(false, out);

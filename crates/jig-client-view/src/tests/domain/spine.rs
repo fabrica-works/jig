@@ -29,7 +29,6 @@ pub(crate) const LIMITS: Limits = Limits {
     drafts: 1,
     projects: 2,
     roles: 2,
-    charters: 2,
     text: 32,
     rows: 2,
     segments: 4,
@@ -73,7 +72,6 @@ pub(crate) fn frame(party: u64) -> Me {
         needs: needs(),
         needs_total: 0,
         results_seen: 0,
-        charters: List::with_capacity(0),
         cut: false,
         updates: Count { value: 0, limited: false },
 

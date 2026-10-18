@@ -58,7 +58,6 @@ fn me_overflow_reports_the_wire_bound_it_exceeds() {
     let limits = fixtures::wire_limits();
     let rows = [
         (w::Limits { me_projects: 1, ..limits }, w::Path::MeProjects),
-        (w::Limits { me_charters: 0, ..limits }, w::Path::MeCharters),
         (w::Limits { document_text_bytes: 1, ..limits }, w::Path::DocumentTextBytes),
     ];
     for (limits, path) in rows {

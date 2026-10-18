@@ -66,7 +66,7 @@ pub fn held_role(value: jig_domain_people::Role) -> client::HeldRole {
 /// # Errors
 /// Refuses inconsistent executor or specification resource facts, any whole text/list allocation above bounds.
 pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Me, Invalid> {
-    if value.projects.capacity() > limits.projects || value.charters.capacity() > limits.projects {
+    if value.projects.capacity() > limits.projects {
         return Err(Invalid::TooLarge);
     }
     let projects = list(&value.projects, limits, |row| {
@@ -77,20 +77,6 @@ pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Me, In
             name: row.name.as_ref().map(|value| text(value, limits)).transpose()?,
             role: held_role(row.role),
             pool: row.pool.as_ref().map(ledger),
-            chat_budget: row.chat_budget,
-        })
-    })?;
-    let charters = list(&value.charters, limits, |row| {
-        if limits.charters == 0 || row.goals.capacity() > limits.charters {
-            return Err(Invalid::TooLarge);
-        }
-        let mut chats = List::with_capacity(1);
-        chats.push(client::Charter { number: row.chat, name: None }).map_err(|_| Invalid::TooLarge)?;
-        Ok(client::OfferedCharters {
-            project: row.project,
-            chats,
-            goals: list(&row.goals, limits, |number| Ok(client::Charter { number: *number, name: None }))?,
-            cut: row.cut,
         })
     })?;
     Ok(client::Me {
@@ -116,7 +102,6 @@ pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Me, In
             documents::Count::AtLeast(value) => client::Count { value, limited: true },
         },
         results_seen: value.results_seen,
-        charters,
         cut: value.cut,
         retention: value.retention,
         deployment_role: value.deployment_role.map(held_role),
@@ -806,11 +791,11 @@ pub(super) mod tests {
         for (role, _) in roles {
             projects
                 .push(documents::FrameProjectRole {
+                    chat_budget: u64::MAX,
                     project: u32::MAX,
                     role,
                     name: None,
                     pool: None,
-                    chat_budget: u64::MAX,
                     creating: None,
                     templates: List::with_capacity(0),
                 })
@@ -842,7 +827,7 @@ pub(super) mod tests {
             charters: offers,
             cut: true,
         };
-        let limits = Limits { projects: 7, charters: 4, rows: 7, text: 2, ..crate::test::limits().jig };
+        let limits = Limits { projects: 7, rows: 7, text: 2, ..crate::test::limits().jig };
         let translated = frame(&source, &limits).expect("the complete supplied fixture is admitted");
         assert_eq!(translated.party.number, u64::MAX);
         assert_eq!(translated.party.kind, client::PartyKind::Service);
@@ -866,24 +851,8 @@ pub(super) mod tests {
             assert_eq!(row.project, u32::MAX);
             assert_eq!(row.name, None);
             assert_eq!(row.pool, None);
-            assert_eq!(row.chat_budget, u64::MAX);
         }
-        let row = &translated.charters.get(0).expect("the complete supplied row is retained");
-        assert_eq!(translated.charters.capacity(), 3);
-        assert_eq!(row.project, 0);
-        assert!(row.cut);
-        assert_eq!(row.chats.len(), 1);
-        assert_eq!(
-            row.chats.get(0).expect("the complete supplied row is retained"),
-            &client::Charter { number: 17, name: None }
-        );
-        assert_eq!(row.goals.capacity(), 4);
-        assert_eq!(
-            row.goals.get(0).expect("the complete supplied row is retained"),
-            &client::Charter { number: u32::MAX, name: None }
-        );
         assert_eq!(frame(&source, &Limits { projects: 6, ..limits }), Err(Invalid::TooLarge));
-        assert_eq!(frame(&source, &Limits { charters: 3, ..limits }), Err(Invalid::TooLarge));
         assert_eq!(frame(&source, &Limits { text: 1, ..limits }), Err(Invalid::TooLarge));
         let mut known = source;
         known.updates = documents::Count::Known(0);

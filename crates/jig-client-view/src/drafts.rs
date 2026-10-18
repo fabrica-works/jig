@@ -248,7 +248,8 @@ pub(crate) fn sent(
         Answer::Done(jig_client::contract::Outcome::Owner(jig_client::contract::OwnerOutcome::Compound { .. })) => task,
         Answer::Done(outcome) => match crate::outcome::route(outcome) {
             crate::outcome::Route::Words { task, .. } => task,
-            crate::outcome::Route::Chat { .. }
+            crate::outcome::Route::Created { .. }
+            | crate::outcome::Route::Chat { .. }
             | crate::outcome::Route::Goal { .. }
             | crate::outcome::Route::Proposed
             | crate::outcome::Route::Other => return,
