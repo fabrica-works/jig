@@ -182,7 +182,8 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   7.3).
 - **No time crosses, only walls.** Documents carry wall times, which the
   store keeps (`../client/domain/contract.md`, 5.3); durations (a
-  retention, a heartbeat, a grace) cross as durations. A deadline the
+  retention, a heartbeat, a grace, a deadline a request gives as a span,
+  `../client/domain/contract.md`, 3.2) cross as durations. A deadline the
   engine keeps on its own clock (an account's next ask, a grace's end)
   crosses as the wall it falls at, which the engine's translation makes
   from its clock and its wall when it makes the document, so a client

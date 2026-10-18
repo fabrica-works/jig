@@ -155,8 +155,10 @@ the application's main (its shell)
   - the budget: an amount; `AsAllowed`, with a cap or none
     (`../domain/authority.md`, section 7); or *given*, the creator's,
     within their allotment;
-  - the deadline: none; a span from creation; or *given*, the
-    creator's, or none;
+  - the deadline: none; a span from creation, which the client sends
+    as a span and the engine makes a wall when it makes the task
+    (`../domain/authority.md`, section 7); or *given*, the creator's,
+    or none;
   - tracked, with a default priority, or untracked;
   - the flags: *conversation*, *listed*, and the retention class,
     *kept* or *forgotten once read* (`../domain/tasks.md`, section 3);

@@ -268,6 +268,15 @@ deployment's rules       the most any project may have; requirements on effects
   is left. A proposal names amounts, since what it needs is known before
   anyone covers it: a proposed batch giving `AsAllowed` is refused as
   not well formed (section 9).
+- **A deadline given as a span.** A batch may give a task's deadline as
+  a span: that long after the decision that makes the task, a batch's
+  admission or the acceptance of the proposal that asks for it. This
+  child makes it a wall from that decision's wall time as it checks the
+  batch (8.1), before the deadline is checked against the creator's,
+  and the task keeps the wall, as it would one given by hand. A
+  proposal keeps the span until it is accepted. So a request names no
+  clock of its sender's, and is the same ask each time it is sent
+  (`../client/domain/contract.md`, 3.1).
 - **When a task ends,** in the commit that ends it, its reservation is
   released: its unspent budget goes back to its funder, and what it and
   the tasks it funded spent is added to its funder's "spent by ended

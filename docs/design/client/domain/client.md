@@ -940,7 +940,10 @@ with a person in front of a tree, are view.md's, 18.10.
     one level below the role, made one level shallower again for each
     level of the template's `shallower` past the first, its spend the
     budget named (any for `AsAllowed`, whose amount the engine gives)
-    and its deadline the task's; no wake policy, so the executor's own;
+    and its deadline the task's: the template's span sent as a span,
+    which the engine makes a wall (contract.md, 3.2), or the creator's
+    wall where the template has it given, so that no shape reads a
+    clock; no wake policy, so the executor's own;
     no parameters, inputs, dependencies or grants named after it;
   - a template it cannot fill gives `NotOffered::Template`, and nothing
     is sent: a contract no `Create` names (an approval, or a verdict

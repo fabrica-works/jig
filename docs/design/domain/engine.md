@@ -205,7 +205,7 @@ step its last answer arrives.
 | a procedure's step | its connector → authority (each effect, its judges; each batch) → tasks | commit; effects made; tasks started |
 | a connector's news | classified by the connector → tasks (inboxes, wakes) | commit; due tasks run, procedures step |
 | an outbox outcome | its connector → tasks (settled; closing advances) | commit |
-| a party's request | people → authority (their role and pool; a budget given `AsAllowed` resolved) → tasks | commit; the party answered, with what an `AsAllowed` budget was given |
+| a party's request | people → authority (their role and pool; a budget given `AsAllowed` resolved; a deadline given as a span made a wall) → tasks | commit; the party answered, with what an `AsAllowed` budget was given |
 | a party's compound request | people (one project, within operations per request) → for each operation in order: authority, one pool counted across them → tasks | one commit, or none; one answer: all made, or the first operation refused and why |
 | a task due | tasks → authority (the run may start) → brief, with its connectors gathering, and its transcript's current window loading → tasks (claim, with its inbox's messages for the start) → fleet (place) | commit the claim; assign |
 | a task closing | tasks → its connectors (release) | commit; releases made |

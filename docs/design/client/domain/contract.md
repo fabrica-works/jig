@@ -146,7 +146,10 @@ Section 9 lists what the engine's domain owes the client, and where
   (sixteen bytes of a digest of an agent's key, say). The engine treats
   it as any key: a name sent again is answered as above, within the
   retention, and one sent with another ask is refused as a conflict,
-  which for a name is no bug of the client's. A client holds one request under a name at a
+  which for a name is no bug of the client's. The application builds a
+  named request from its own inputs and `me` alone, never from a clock,
+  so that the name sent again makes the same ask: a template's deadline
+  goes as a span (3.2). A client holds one request under a name at a
   time: a `Send` under a name its request table holds is answered held
   at once, and nothing is kept or sent (client.md, section 6).
 - **A compound request is one keyed request** (3.4): one key, one ask,
@@ -164,7 +167,7 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 
 | Operation | Names | Becomes |
 |---|---|---|
-| `Create` | a project; a batch: for each task its executor (an agent's charter, a procedure and its parameters, a person, or a role, which is the project's: roles are per project, `../../domain/people.md`, section 1), spec, result contract (a report, a change or a verdict: an approval is a procedure's, `../../domain/people.md`, section 8), authority, whose spend and deadline are the task's budget and deadline (`../../domain/authority.md`, section 3), that budget as named there or `AsAllowed`, wake policy, or none for its executor's default (`../../domain/tasks.md`, 8.3), as an agent's delegate may leave it, dependencies and inputs, the grants named after it (`../../domain/authority.md`, section 4), tracked and priority, label and flags; and the dependencies among its tasks. The other resources a task will write are those its connectors name from its executor and spec (`../../domain/tasks.md`, section 4) | the batch checked whole and made at once (`../../domain/tasks.md`, section 4), its tasks numbered consecutively in the batch's order, the first and the last answered, and the `AsAllowed` task, if any, with what it was given |
+| `Create` | a project; a batch: for each task its executor (an agent's charter, a procedure and its parameters, a person, or a role, which is the project's: roles are per project, `../../domain/people.md`, section 1), spec, result contract (a report, a change or a verdict: an approval is a procedure's, `../../domain/people.md`, section 8), authority, whose spend and deadline are the task's budget and deadline (`../../domain/authority.md`, section 3), that budget as named there or `AsAllowed`, that deadline a wall or a span (below), wake policy, or none for its executor's default (`../../domain/tasks.md`, 8.3), as an agent's delegate may leave it, dependencies and inputs, the grants named after it (`../../domain/authority.md`, section 4), tracked and priority, label and flags; and the dependencies among its tasks. The other resources a task will write are those its connectors name from its executor and spec (`../../domain/tasks.md`, section 4) | the batch checked whole and made at once (`../../domain/tasks.md`, section 4), its tasks numbered consecutively in the batch's order, the first and the last answered, and the `AsAllowed` task, if any, with what it was given |
 | `Propose` | a project; the action: a batch, or an amendment (a widening of a task's authority among them); a party makes no effect (`../../domain/people.md`, 5.1); a reason | a proposal to whoever may accept it, its number answered (3.5) |
 | `Withdraw` | the party's own pending proposal | withdrawn |
 | `Message` | a task; the words | words in its inbox, their message number answered |
@@ -196,8 +199,15 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
   the engine resolves it, and the answer says what was given. At most one
   task of a batch gives it; it is resolved after the batch's named
   amounts are counted, and refused as lacking budget where it would give
-  nothing (`../../domain/tasks.md`, section 4). It is the one piece of
-  plumbing templates need (3.6).
+  nothing (`../../domain/tasks.md`, section 4). It and a deadline given
+  as a span are the plumbing templates need (3.6).
+- **A deadline given as a span** is "this long after the task is
+  made". The engine makes it a wall from the wall time of the decision
+  that makes the task, a `Create`'s admission or the acceptance of the
+  proposal that asks for it, as it checks the batch
+  (`../../domain/authority.md`, section 7), and the task keeps that
+  wall. A request so carries no clock of its sender's, and is the same
+  ask each time it is sent, under its key or its name (3.1).
 - **Where a party may reach.** A party's `Create` may depend on a live
   task, or take an ended task's result as an input, in their tree, or
   any task of the project for a maintainer; its tasks' requester is the
@@ -341,10 +351,11 @@ this environment) is the application's (`../../domain/people.md`, 5.1):
 - **The engine never expands or checks one.** It keeps the
   configuration's templates and each policy's overrides only to serve
   each project's merged templates in `me` (5.1). The client fills a
-  template into an ordinary `Create` or `Propose`, and the engine checks
-  that request as it checks one written by hand: a template grants
-  nothing, and a client that ignores one only makes its own lists
-  inconsistent, while authority and limits still hold.
+  template into an ordinary `Create` or `Propose`, a deadline's span
+  sent as a span (3.2), and the engine checks that request as it checks
+  one written by hand: a template grants nothing, and a client that
+  ignores one only makes its own lists inconsistent, while authority and
+  limits still hold.
 - **Permissions stay primitive,** with no "may use template", and a
   task keeps the values it was made with
   (`../../protocol/configuration.md`, 3.1).

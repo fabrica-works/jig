@@ -144,6 +144,7 @@ system.
 | compound request | one keyed request holding several operations, admitted in order and committed in one decision, all or none, within operations per request (people.md, 5.1) |
 | grace | how long a task cancelled with one has to finish before it is cancelled (tasks.md, section 7) |
 | `AsAllowed` | a budget given as much as fits under its creator at admission, capped; the answer says what was given (authority.md, section 7) |
+| deadline as a span | a deadline given as how long after the task is made, which the engine makes a wall when it makes it (authority.md, section 7) |
 | escalation role | the role a project's policy names to hold escalations past every holder in a tree (authority.md, section 6) |
 | a party's role | what a party may do in a project: owner, maintainer, member, observer, or the policy's own |
 | a resource's role | owned, fork, or context, in a project |
@@ -338,9 +339,9 @@ where each is answered:
   filled in by the client; the engine never expands or checks one, and
   permissions stay primitive (`../protocol/configuration.md`, 3.1;
   authority.md, section 6).
-- **`AsAllowed`,** the one piece of plumbing templates need: resolved by
-  the engine at admission, the answer saying what was given
-  (authority.md, section 7).
+- **`AsAllowed` and a deadline as a span,** the plumbing templates need:
+  resolved by the engine as it makes the task, the answer saying what
+  `AsAllowed` gave (authority.md, section 7).
 - **Refusals with facts,** and **acts offered** in each object's
   document, so a client never computes authority; creating and amending
   are offered with bounds, made, proposable and to whom, or refused, and

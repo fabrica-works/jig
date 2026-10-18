@@ -217,6 +217,10 @@ dependencies among them.
   authority child resolves as it checks the batch (authority.md,
   section 7); the task keeps the amount, and the batch's answer names
   it.
+- **A deadline as a span.** A creator gives each task's deadline as a
+  wall, as a span from the decision that makes the task, or none;
+  authority makes a span a wall as it checks the batch (authority.md,
+  section 7), and the task keeps the wall.
 - **Checked whole,** before anything of it exists:
   - every task well formed: a known executor kind, a charter or
     procedure the deployment has, a result contract its executor can
