@@ -243,6 +243,13 @@ run it is not held to it.
   on every tree a person acted on, the reference UI's or an
   application's on skein's UI kit, so an application that presents
   jig's objects itself is held to what jig's cards show.
+  - *Said in the application's words:* the referee says each fact as
+    `words` says it in the phrasebook the application's world gives
+    it: jig's English for the facts, with the application's overrides,
+    phrase by phrase. A world that gives none is held to jig's English.
+    The referee holds no words of the reference UI's, so an application
+    that words a fact its own way is held to its own wording, and to
+    no other.
 
 ### 6.3 On what the person saw
 

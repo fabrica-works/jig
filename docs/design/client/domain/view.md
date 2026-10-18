@@ -382,14 +382,15 @@ The machinery is skein-ui's (skein's `ui.md`, section 9). What is jig's:
   name, a resource's words.
 - **jig's enums, in `words`.** The helper `words` (client.md, section
   19) holds jig's phrases for its enums (phases, holds, executors,
-  outcomes, refusals) and their English, a phrasebook the reference UI
-  says every enum with, loaded into skein-ui's machinery beside its own
-  phrases. An application overrides it phrase by phrase: its own
-  wording, or another language, as data, which the reference UI then
-  says.
+  outcomes, refusals) and for a decision's facts ("Funds 40; 120 left
+  now, 80 after"), and their English, a phrasebook the reference UI
+  says every enum and every decision's fact with, loaded into skein-ui's
+  machinery beside its own phrases. An application overrides it phrase
+  by phrase: its own wording, or another language, as data, which the
+  reference UI then says.
 - **The reference UI's phrases** (`JigPhrase`, `phrases/jig.rs`) are the
-  sentences of its pages and cards ("funds 40 from your pool: 120 left
-  this period, 80 after"), with typed holes: a number, an amount, a
+  other sentences of its pages and cards ("Question from task 12"),
+  with typed holes: a number, an amount, a
   span, a wall time, a name, and skein-ui's reference hole, which jig
   uses for a task: its title with its number as the reference, copied
   unchanged, whose span jig builds as a chip linking to its page

@@ -956,13 +956,21 @@ with a person in front of a tree, are view.md's, 18.10.
   - *whether an act is dangerous:* a cancel, a proposal's rejection and
     a note's deletion are, and no other act. A presentation that
     confirms marks a dangerous act so (the reference UI: objects.md,
-    section 2).
+    section 2);
+  - *a decision's facts:* what a deciding act on an object would do, as
+    data read from its document: whether the act is dangerous; its
+    effect, where the act is offered with one; and, for accepting a
+    proposal, what it needs and who funds it, with what the funder has
+    left and will have after (contract.md, 5.4). jig's check holds a
+    tree a person decided on to them (testing.md, 6.2).
 - **`thread`:** a conversation's thread (section 10).
 - **`words`:** jig's English for its enums (phases, holds, refusals, what
-  a task waits on), as phrases with holes an application overrides
-  phrase by phrase, built with skein-ui's phrasebook types,
-  `jig-client`'s one use of skein-ui (section 3); the reference UI says
-  them through skein-ui's phrasebook (view.md, section 7).
+  a task waits on) and for a decision's facts, as phrases with holes an
+  application overrides phrase by phrase, built with skein-ui's
+  phrasebook types, `jig-client`'s one use of skein-ui (section 3); the
+  reference UI says them through skein-ui's phrasebook (view.md,
+  section 7), and jig's check says a decision's facts in them, with the
+  application's overrides (testing.md, 6.2).
 - **What jig adopts.** Sugar starts in an application. jig adopts it
   when a second consumer uses it, or early when it is hard to interpret
   consistently (what "waiting for you" means, how committed turns and
