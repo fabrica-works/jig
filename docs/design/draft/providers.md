@@ -8,8 +8,10 @@ what may be stored, lent or shared, and what a person must be shown.
 Sections 2 and 3 state the providers' rules; section 4 notes where
 today's designs disagree with them; section 5 lists what is still to
 settle; section 6 gives the sources; section 7 records the approach
-taken for Claude: Claude Code, spawned by smith's agent. Providers
-change these rules: read them again before a design relies on them.
+taken for Claude: Claude Code, spawned by smith's agent. How the
+stack meets these rules, its accounts and their sources, is
+`llm-accounts.md`. Providers change these rules: read them again before
+a design relies on them.
 
 ## 1. In one page
 
@@ -346,9 +348,8 @@ legal and compliance page:
 ## 5. Open questions
 
 - **"Open-source project":** what OpenAI counts as one ("pure OSS
-  clients"), and whether these repositories qualify: none carries a
-  licence file today. Otherwise a distributed tool asks OpenAI through
-  its interest form.
+  clients"). These repositories take the MIT licence
+  (`llm-accounts.md`, section 11); none carries it yet.
 - **Unattended agents on a plan:** OpenAI's plan usage documents do not
   address background or unattended use; Anthropic's limits assume
   ordinary, individual use (3.4).
@@ -359,22 +360,12 @@ legal and compliance page:
   the Agent SDK "should use API key authentication" (3.1). Anthropic's
   legal page offers a contact for questions about permitted
   authentication methods.
-- **The ID token's signature:** OpenAI's guide verifies it against its
-  published keys (2.2); OpenID Connect Core, 3.1.3.7, allows TLS
-  validation of the token endpoint in its place for a token received
-  directly from it.
 - **Go plans:** the developer documentation names Plus and Pro, the
   help center Go, Plus and Pro (2.1).
-- **Claude Code's configuration directory** (7.3, 7.4): one of the
-  application's own on each host, a settings layer it controls at the
-  cost of one more sign-in; or the person's `~/.claude`, whose hooks and
-  plugins would then load into the runs.
 - **Claude Code's built-in tools** (7.4): kept, each call that would
   prompt answered by smith's policy through the permission tool; or
   none, with smith's own tools alone over MCP, more control and less of
   Claude Code's own harness.
-- **The per-host cap** on Claude Code runs at once, and the default
-  order of an Anthropic account's sources (7.2, 7.5).
 
 ## 6. Sources
 
@@ -433,33 +424,42 @@ itself, as for any provider (3.1).
   cancel, a drop or the host's stop ends Claude Code with the run.
 - **A run in an engine's own process,** `smith-inline-agent`'s (smith's
   `domain/host.md`, 9.1), has no child process and no workspace, so it
-  runs on the direct backend only. A charter whose runs use Claude Code
-  runs them on spawned agents.
+  runs on the direct backend only. A run whose account's source is
+  Claude Code runs on a spawned agent (`llm-accounts.md`, 3.4).
 
 ### 7.2 Choosing the backend
 
-- **From the charter:** its model names an endpoint, and the endpoint
-  an account (`../protocol/llm.md`, section 4). An Anthropic account
-  lists its sources in order; by default Claude Code first, then an API
-  key.
-- **Claude Code,** when `claude auth status`, run with the account's
+- **From the run's account:** the account that pays for the run is
+  chosen with its task's first run's claim (`llm-accounts.md`, 4.3). An
+  Anthropic account lists its sources in order; by default Claude Code
+  first, then an API key.
+- **Claude Code,** when `claude auth status`, run with the source's
   Claude Code configuration directory (`CLAUDE_CONFIG_DIR`), exits 0
   with `authMethod` `claude.ai` (3.3). Otherwise the direct backend, with
   the API key the run was granted. Otherwise the account is unusable on
   that host.
-- **The check is smith's, made twice:** by the host's half, for its
-  hello, so that the fleet places a run on Claude Code only on a host
-  whose login is usable (`../domain/engine.md`, section 8); and by the
-  agent at the run's start, since a login may lapse in between.
-- **The order is configuration,** since it decides who pays: the plan,
-  or the Console account that owns the key.
+- **The check is smith's:** by the host's half, at its hello, when told
+  of a new source, on its holder's request and at an interval, so that
+  the fleet places a run on Claude Code only on a host whose login is
+  usable (`llm-accounts.md`, 3.4); and by the agent at the run's start,
+  since a login may lapse in between.
+- **The order is the holder's,** since it decides who pays: the plan,
+  or the Console account that owns the key. A limited or refused plan
+  holds the account's runs rather than passing them to the key
+  (`llm-accounts.md`, 3.4).
 
 ### 7.3 The person's sign-in
 
 - **Claude Code's own flow,** once per machine: `claude auth login`,
-  with the account's configuration directory (3.3). An application's
+  with the source's configuration directory (3.3). An application's
   setup may hand that command the terminal; over SSH the person pastes
   the code Claude Code shows.
+- **The application's own directory:** each source's configuration
+  directory on a host is the application's, never the person's
+  `~/.claude`, at the cost of one more sign-in, so that the person's
+  hooks and plugins never load into a run; a source per directory, named
+  by the source's name, so that a person may sign in several
+  subscriptions (`llm-accounts.md`, sections 2, 3.3 and 3.4).
 - **Never held by jig or smith:** no grant, record, store, log or
   environment of theirs holds the login, nor a `claude setup-token`
   token (3.1, 3.3). The only thing read is `claude auth status`'s
@@ -491,7 +491,7 @@ itself, as for any provider (3.1).
   - the child's environment holds no `ANTHROPIC_API_KEY`,
     `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN` or cloud
     provider's variables, so that the subscription is what pays;
-  - `--setting-sources user`, with the account's configuration
+  - `--setting-sources user`, with the source's configuration
     directory, so that a repository's hooks and `.mcp.json` servers
     never run;
   - never `--bare`, which reads no subscription login (3.5).
@@ -508,8 +508,9 @@ itself, as for any provider (3.1).
   (3.2).
 - **Named in plain text only:** an application may say that it runs
   Claude Code, and never names a product or feature after it (3.2).
-- **A cap per host** on Claude Code runs at once keeps a deployment near
-  the ordinary, individual use Anthropic's limits assume (3.4).
+- **A host's slots bound its runs at once,** Claude Code's as any smith
+  run's: a run on Claude Code counts as one run, as any other does
+  (`llm-accounts.md`, 3.4).
 - **What is still to settle** with Anthropic is section 5's question on
   a product that runs Claude Code for its person.
 
