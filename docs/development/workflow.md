@@ -34,7 +34,7 @@ A branch that changes only Markdown files (the documents under `docs/`,
 and lands with `land --docs`. Doc comments in `.rs` files are not
 documentation in this sense: they are code, and clippy checks them.
 
-## 2. The two test suites
+## 2. The three test suites
 
 The suites are those of skein's `docs/foundation/testing-strategy.md`
 (section 8); `docs/design/domain/testing.md` (section 9) says what they
@@ -50,6 +50,38 @@ hold in jig.
   such as sweeps of random worlds and domains driven at random, over many
   seeds. It is not run by default, only with `--profile fuzzy`, as the
   gate before merging to main, and it takes at most **1 minute**.
+
+- **The browser suite** is Chromium against `jig-test`, run with
+  `--profile browser`, within **60 seconds**. Missing Chromium or a bundle
+  fails and names its setup command. The gate builds and bundles the test
+  application first:
+
+```sh
+cargo build --target wasm32-unknown-unknown -p jig-client-test-shell-web
+cargo build -p skein-ui-bundle
+target/debug/skein-ui-bundle \
+    --module target/wasm32-unknown-unknown/debug/jig_client_test_shell_web.wasm \
+    --name jig_client_test_shell_web --prefix /bundle/ \
+    --stylesheet crates/jig-client-shell-web/jig.css \
+    --stylesheet testing/jig-client-test-shell-web/jig_client_test_shell_web.css \
+    --pictures jig=crates/jig-client-shell-web/pictures \
+    --pictures jig-test=testing/jig-client-test-shell-web/pictures \
+    --files testing/jig-client-test-shell-web/files \
+    --noscript 'jig needs WebAssembly and scripts.' \
+    --out target/jig-test-bundle
+cargo build -p jig-test
+JIG_TEST_BUNDLE="$(pwd)/target/jig-test-bundle"
+export JIG_TEST_BUNDLE
+cargo nextest run --workspace --profile browser
+```
+
+The test application's module, built once with `--profile web`, is
+3,395,581 bytes before compression, within the 4 MiB guide of
+`docs/design/protocol/browser.md`, 4.2. Reproduce its build and size with:
+
+```sh
+heavy sh -c 'cargo build --target wasm32-unknown-unknown --profile web -p jig-client-test-shell-web && stat -c %s target/wasm32-unknown-unknown/web/jig_client_test_shell_web.wasm'
+```
 
 Tests cost what they check, with unoptimized test builds except for the
 repository's tools, `jig-boundary` and `skein-codegen`, which are built

@@ -1,0 +1,90 @@
+//! Small browser application capacities.
+use jig_client_test_domain::first;
+use skein_lib::{Duration, RequestLimits};
+const LINGER: Duration = Duration::from_millis(25);
+const AUTHORITY_ENTRIES: u32 = 8;
+pub fn limits() -> jig_client_test_domain::Limits {
+    jig_client_test_domain::Limits {
+        jig: jig_client_view::Limits {
+            watches: 8,
+            notices: 2,
+            notice_life: Duration::from_secs(5),
+            linger: LINGER,
+            save_delay: Duration::from_millis(10),
+            intents: 2,
+            fields: 4,
+
+            objects: 3,
+            sources: 8,
+            reads: 8,
+            parts: 8,
+            delegates: 2,
+            document_bytes: 65536,
+            records: 2,
+            kept: 4,
+            drafts: 1,
+            projects: 2,
+            roles: 2,
+            text: 32,
+            rows: 2,
+            segments: 4,
+            conversation_words: 2,
+            navigation_entries: 8,
+            updates_count: 99,
+        },
+        first: first::Limits {
+            connector: jig_client_test_domain::connector_values::ConnectorLimits {
+                rows: 4,
+                paths: 0,
+                segments: 0,
+                segment_bytes: 0,
+                bytes: 4096,
+            },
+            parts: 8,
+            objects: 8,
+            reads: 16,
+            watches: 16,
+            requests: 4,
+            rows: 2,
+            segments: 4,
+            text: 32,
+            retry: Duration::from_millis(10),
+        },
+        second_parts: 8,
+        client: jig_client::Limits {
+            domain: jig_client::DomainLimits {
+                owners: &[
+                    jig_client::Spoken { family: 1, version: jig_client_test_protocol_wire::VERSION },
+                    jig_client::Spoken { family: 2, version: jig_client_test_protocol_wire::VERSION },
+                ],
+                requests: RequestLimits {
+                    requests: 4,
+                    bytes: 65536,
+                    out: 16,
+                    first: Duration::from_millis(10),
+                    most: Duration::from_millis(80),
+                    margin: Duration::from_secs(1),
+                },
+                ask_bytes: 16384,
+                handles: 32,
+                watches: 32,
+                reads: 32,
+                turn_bytes: 32,
+                document_bytes: 65536,
+                backoff: jig_client::Backoff { first: Duration::from_millis(10), most: Duration::from_millis(80) },
+                rows: 2,
+                segments: 4,
+                text: 32,
+                projects: 2,
+                fields: 4,
+                delegates: 2,
+                records: 2,
+                kept: 4,
+                parts: 10,
+                authority: AUTHORITY_ENTRIES,
+                heartbeat: Duration::from_millis(100),
+            },
+            exchanges: 8,
+        },
+    }
+}

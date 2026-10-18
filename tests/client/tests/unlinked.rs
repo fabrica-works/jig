@@ -48,7 +48,7 @@ fn drain(client: &mut Client, front: &mut Joint, out: &mut Queue<Request>) {
     while let Some(request) = out.pop() {
         match request {
             Request::Down { down } => front.down(CLIENT, NOW, WALL, down).expect("Jig transport operation"),
-            Request::Told { .. } => {}
+            Request::Told { .. } | Request::ServiceCredential { .. } => {}
             Request::Exchange { .. }
             | Request::OpenStream { .. }
             | Request::CloseStream

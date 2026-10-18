@@ -28,14 +28,33 @@ pub enum Event {
 }
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
-    Exchange { exchange: Token, credential: Option<Secret>, message: Message },
-    OpenStream { credential: Option<Secret> },
+    Exchange {
+        exchange: Token,
+        credential: Option<Secret>,
+        message: Message,
+    },
+    OpenStream {
+        credential: Option<Secret>,
+    },
     CloseStream,
-    Save { records: List<Record> },
-    Erase { records: List<Box<[u8]>> },
-    Told { told: Told },
-    Down { down: Down },
+    Save {
+        records: List<Record>,
+    },
+    Erase {
+        records: List<Box<[u8]>>,
+    },
+    Told {
+        told: Told,
+    },
+    Down {
+        down: Down,
+    },
     SignOut,
+    /// Shown once by the host; the client never retains it.
+    ServiceCredential {
+        party: u64,
+        credential: Secret,
+    },
 }
 #[derive(Debug)]
 pub struct LinkView<'a> {
@@ -423,7 +442,10 @@ impl Client {
                 self.domain.restore_record(env, kept, &mut self.domain_out);
             }
             link::Request::Dropped => out.push(Request::Told { told: Told::Dropped { count: 1 } }),
-            link::Request::Fact { .. } | link::Request::ServiceCredential { .. } => {}
+            link::Request::ServiceCredential { party, credential } => {
+                out.push(Request::ServiceCredential { party, credential });
+            }
+            link::Request::Fact { .. } => {}
         }
     }
 }

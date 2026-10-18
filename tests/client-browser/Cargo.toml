@@ -1,0 +1,25 @@
+[package]
+name = "jig-client-browser-world"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+[dependencies]
+skein-fake-person-browser.workspace = true
+skein-fake-person.workspace = true
+skein-ui-bundle.workspace = true
+skein-scratch.workspace = true
+skein-lib.workspace = true
+skein-ui.workspace = true
+serde_json = "1"
+jig-client-view.workspace = true
+[dev-dependencies]
+jig-client-protocol-http.workspace = true
+jig-client-protocol-link.workspace = true
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"

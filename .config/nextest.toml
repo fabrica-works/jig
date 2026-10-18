@@ -1,11 +1,11 @@
-# The two test suites (docs/development/workflow.md): the focused one, every
+# The three test suites (docs/development/workflow.md): the focused one, every
 # test but the fuzzy ones, within 15 seconds; and the fuzzy one, the test
 # binaries named fuzzy_* beside each world's focused tests, within 1 minute. A
 # suite past its budget fails, naming the tests it stopped; a test past its
 # slow period is flagged SLOW as it runs.
 
 [profile.default]
-default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
+default-filter = "not binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^browser_/)"
 # Doubled for temper's client-api run (ruling 275); 15s again after the test-cost pass that follows it.
 global-timeout = "30s"
 slow-timeout = { period = "500ms" }
@@ -17,7 +17,7 @@ filter = "kind(test)"
 priority = 10
 
 [profile.fuzzy]
-default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/)"
+default-filter = "binary(/^fuzzy_/) & not binary(/^(process|live)$/) & not binary(/^browser_/)"
 global-timeout = "60s"
 slow-timeout = { period = "5s" }
 
@@ -38,3 +38,10 @@ default-filter = "binary(=live)"
 global-timeout = "5m"
 test-threads = 1
 retries = 0
+
+# Chromium against jig-test, within one minute.
+[profile.browser]
+default-filter = "package(jig-client-browser-world) & binary(/^browser_/)"
+global-timeout = "60s"
+slow-timeout = { period = "20s", terminate-after = 3 }
+test-threads = 1

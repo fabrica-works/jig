@@ -3,6 +3,8 @@
 [workspace]
 resolver = "3"
 members = [
+    "testing/jig-client-test-shell-web",
+    "tests/client-browser",
     "tests/one-process",
     "testing/jig-test",
     "crates/jig-client-shell-native",
@@ -92,6 +94,9 @@ rust-version = "1.95"
 publish = false
 
 [workspace.dependencies]
+skein-fake-person-browser = { git = "https://github.com/forgetic/skein.git" }
+skein-ui-bundle = { git = "https://github.com/forgetic/skein.git" }
+skein-scratch = { git = "https://github.com/forgetic/skein.git" }
 jig-client-shell-web = { path = "crates/jig-client-shell-web" }
 skein-ui-web = { git = "https://github.com/forgetic/skein.git" }
 wasm-bindgen = "=0.2.126"
@@ -294,3 +299,6 @@ partial_pub_fields = "deny"           # a struct is plain data or opaque, not bo
 mod_module_files = "deny"
 tests_outside_test_module = "deny"
 iter_over_hash_type = "deny"
+
+[profile.dev.package.skein-ui-bundle]
+opt-level = 3

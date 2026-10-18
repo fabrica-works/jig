@@ -1,0 +1,2 @@
+/* The test family owns its regions and stylesheet. */
+[data-owner="jig-test"] { font: inherit; }

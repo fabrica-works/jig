@@ -123,7 +123,7 @@ impl Shell {
             request @ client::Request::CloseStream => {
                 self.connections.down(self.env.now, request, &mut self.below);
             }
-            client::Request::Told { .. } => {}
+            client::Request::Told { .. } | client::Request::ServiceCredential { .. } => {}
             client::Request::Down { .. } | client::Request::SignOut => panic!("linked hosts emit wire work"),
         }
     }

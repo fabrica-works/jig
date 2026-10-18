@@ -318,6 +318,7 @@ impl Fixture {
                 }
                 jig_client::Request::Exchange { .. }
                 | jig_client::Request::OpenStream { .. }
+                | jig_client::Request::ServiceCredential { .. }
                 | jig_client::Request::CloseStream
                 | jig_client::Request::Save { .. }
                 | jig_client::Request::Erase { .. }

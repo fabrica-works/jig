@@ -184,6 +184,7 @@ fn a_sign_out_that_did_not_reach_the_engine_tells_the_link() {
             Request::Told { told: Told::Link { link } } => links.push(*link).unwrap(),
             Request::Exchange { .. }
             | Request::OpenStream { .. }
+            | Request::ServiceCredential { .. }
             | Request::CloseStream
             | Request::Save { .. }
             | Request::Erase { .. }
@@ -194,4 +195,52 @@ fn a_sign_out_that_did_not_reach_the_engine_tells_the_link() {
     }
     assert_eq!(links.as_slice(), &[Link::Live]);
     assert!(c.machine.link().sign_out_lost);
+}
+
+const MADE_PARTY: u64 = 7;
+const CREDENTIALS_PER_REPLY: u32 = 1;
+#[test]
+fn the_link_s_service_credential_leaves_once_as_a_host_duty() {
+    let mut c = Client::signed_in();
+    c.step(Event::Send { key: STOP, request: fixtures::stop() });
+    c.step(Event::Stored);
+    let exchange = c.exchange();
+    let reply = service_answer();
+    c.step(Event::Reply { exchange, message: reply.clone() });
+    let mut credentials = skein_lib::List::with_capacity(CREDENTIALS_PER_REPLY);
+    for request in c.requests() {
+        match request {
+            Request::ServiceCredential { party, credential } => credentials.push((*party, credential.clone())).unwrap(),
+            Request::Exchange { .. }
+            | Request::OpenStream { .. }
+            | Request::CloseStream
+            | Request::Save { .. }
+            | Request::Erase { .. }
+            | Request::Told { .. }
+            | Request::Down { .. }
+            | Request::SignOut => {}
+        }
+    }
+    assert_eq!(credentials.as_slice(), &[(MADE_PARTY, fixtures::credential(&SERVICE_CREDENTIAL))]);
+    c.step(Event::Reply { exchange, message: reply });
+    assert!(c.requests().is_empty());
+}
+fn service_answer() -> Box<[u8]> {
+    let limits = w::CEILINGS;
+    let service = w::MadeService::new(
+        &limits,
+        w::MadeServiceParts { party: MADE_PARTY, credential: fixtures::credential(&SERVICE_CREDENTIAL) },
+    )
+    .unwrap();
+    let made = w::OutcomeMade::new(&limits, w::OutcomeMadeParts { what: w::Made::Service(service) }).unwrap();
+    let done = w::Done::new(&limits, w::DoneParts { outcome: w::Outcome::Made(made) }).unwrap();
+    let value = w::Final::Done(done);
+    let mut bytes = skein_lib::Writer::new(usize::try_from(value.measure()).unwrap());
+    value.encode(&mut bytes).unwrap();
+    let owned = w::Owned::new(
+        &limits,
+        w::OwnedParts { owner: w::Owner::Jig, version: jig_client_protocol_wire::VERSION, record: bytes.finish() },
+    )
+    .unwrap();
+    fixtures::answer(&w::KeyedAnswer::FinalAnswer(owned))
 }

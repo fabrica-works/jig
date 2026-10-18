@@ -237,7 +237,8 @@ impl App for Ops {
                     jig_client::Request::Exchange { exchange, .. } => jig_client::Event::Lost { exchange },
                     jig_client::Request::OpenStream { .. } => jig_client::Event::StreamGone,
                     jig_client::Request::SignOut => jig_client::Event::SignOutLost,
-                    jig_client::Request::CloseStream
+                    jig_client::Request::ServiceCredential { .. }
+                    | jig_client::Request::CloseStream
                     | jig_client::Request::Save { .. }
                     | jig_client::Request::Erase { .. }
                     | jig_client::Request::Told { .. }

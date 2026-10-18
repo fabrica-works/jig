@@ -468,6 +468,7 @@ fn client_engine_breaches(manifests: &[CrateManifest]) -> Vec<String> {
                     | "jig-client-protocol-link"
                     | "jig-client-shell-native"
                     | "jig-client-shell-web"
+                    | "jig-client-test-shell-web"
             )
         ) {
             continue;

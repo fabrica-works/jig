@@ -88,3 +88,42 @@ fn a_second_digest_directory_refuses_the_bundle() {
     assert!(error.contains(directory.to_str().expect("path")), "{error}");
     fs::remove_dir_all(directory).expect("scratch cleanup");
 }
+
+const DEV_MODULE_BYTES: usize = 9 << 20;
+const MODULE_FILL: u8 = 0;
+#[test]
+fn a_module_above_four_mebibytes_is_read() {
+    let directory = scratch("dev-module");
+    fixture_bundle(&directory);
+    fs::write(directory.join("0123456789abcdef/test_bg.wasm"), vec![MODULE_FILL; DEV_MODULE_BYTES])
+        .expect("dev-sized module");
+    let result = super::bundle::read(&directory)
+        .map(|bundle| bundle.files.get(b"test_bg.wasm".as_slice()).expect("module").bytes.len());
+    fs::remove_dir_all(directory).expect("scratch cleanup");
+    assert_eq!(result, Ok(DEV_MODULE_BYTES));
+}
+
+const OVERSIZED_FILE_BYTES: u64 = 4_194_305;
+#[test]
+fn another_oversized_file_is_refused_naming_it() {
+    let directory = scratch("oversized-script");
+    fixture_bundle(&directory);
+    let path = directory.join("0123456789abcdef/boot.js");
+    fs::File::create(&path).expect("script").set_len(OVERSIZED_FILE_BYTES).expect("oversized script");
+    let error = super::bundle::read(&directory).expect_err("oversized script refused");
+    fs::remove_dir_all(directory).expect("scratch cleanup");
+    assert!(error.contains(path.to_str().expect("path")), "{error}");
+    assert!(error.contains("TooLarge"), "{error}");
+}
+
+const FULL_BUNDLE_MODULE_BYTES: u64 = 16_777_216;
+#[test]
+fn a_bundle_above_sixteen_mebibytes_is_refused() {
+    let directory = scratch("oversized-bundle");
+    fixture_bundle(&directory);
+    let path = directory.join("0123456789abcdef/test_bg.wasm");
+    fs::File::create(&path).expect("module").set_len(FULL_BUNDLE_MODULE_BYTES).expect("full bundle module");
+    let error = super::bundle::read(&directory).expect_err("oversized bundle refused");
+    fs::remove_dir_all(directory).expect("scratch cleanup");
+    assert!(error.contains("bundle exceeds its limits"), "{error}");
+}

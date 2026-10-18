@@ -15,8 +15,8 @@ const ENTRIES: usize = 256;
 fn refusal(path: &Path, why: impl std::fmt::Display) -> String {
     format!("bundle {}: {why}", path.display())
 }
-fn read_file(path: &Path) -> Result<Box<[u8]>, String> {
-    skein_shell::read_file(path, FILE_BYTES).map_err(|why| refusal(path, format!("{why:?}")))
+fn read_file(path: &Path, cap: u32) -> Result<Box<[u8]>, String> {
+    skein_shell::read_file(path, cap).map_err(|why| refusal(path, format!("{why:?}")))
 }
 fn entries(directory: &Path, count: &mut usize) -> Result<Vec<fs::DirEntry>, String> {
     let mut found = Vec::new();
@@ -32,7 +32,7 @@ fn entries(directory: &Path, count: &mut usize) -> Result<Vec<fs::DirEntry>, Str
 }
 
 pub fn read(directory: &Path) -> Result<Bundle, String> {
-    let page = read_file(&directory.join("index.html"))?;
+    let page = read_file(&directory.join("index.html"), FILE_BYTES)?;
     let mut digest = None;
     for entry in fs::read_dir(directory).map_err(|why| refusal(directory, why))? {
         let entry = entry.map_err(|why| refusal(directory, why))?;
@@ -71,7 +71,12 @@ pub fn read(directory: &Path) -> Result<Bundle, String> {
             } else if kind.is_file() {
                 let name = name.to_str().ok_or_else(|| refusal(&path, "path is not UTF-8"))?.as_bytes();
                 let kind = server::kind(name).ok_or_else(|| refusal(&path, "file type is not on the closed list"))?;
-                let content = read_file(&path)?;
+                let cap = if !name.contains(&b'/') && name.ends_with(b"_bg.wasm") {
+                    u32::try_from(BUNDLE_BYTES).expect("bundle byte limit fits u32")
+                } else {
+                    FILE_BYTES
+                };
+                let content = read_file(&path, cap)?;
                 bytes += content.len();
                 if bytes > BUNDLE_BYTES || files.len() >= FILES {
                     return Err(refusal(&path, "bundle exceeds its limits"));

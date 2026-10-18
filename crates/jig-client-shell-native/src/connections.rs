@@ -109,7 +109,10 @@ impl Connections {
                 }
             }
             client::Request::CloseStream => self.close(now, None, below),
-            client::Request::Save { .. } | client::Request::Erase { .. } | client::Request::Told { .. } => {}
+            client::Request::Save { .. }
+            | client::Request::Erase { .. }
+            | client::Request::Told { .. }
+            | client::Request::ServiceCredential { .. } => {}
             client::Request::Down { .. } | client::Request::SignOut => panic!("linked hosts emit wire work"),
         }
         self.flush(now, below);
