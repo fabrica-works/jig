@@ -331,7 +331,11 @@ across windows and gaps (client.md, section 19):
 - **its calls to the engine, as cards:** a delegation as the chips of the
   tasks it made; a proposal as its card; a message to a delegate; an
   effect and what it made; a note and a link to it; a decision and what
-  was decided (`../../domain/engine.md`, 7.3);
+  was decided (`../../domain/engine.md`, 7.2 and 7.3);
+- **the proposals waiting in its subtree** (its task's document,
+  contract.md, 5.1) that no call or decision of it shows, as their cards
+  after its lines: a delegate's proposal, which none of the
+  conversation's calls made, and one whose call names nothing;
 - **what it heard besides parties:** its delegates' results as result
   cards, and the news it was woken by;
 - **where its runs begin and end,** as quiet lines: parked; resumed;

@@ -586,8 +586,10 @@ for any presentation of a chat or of any agent task's activity.
   with `jig-protocol-transcript` into the client's own turn: its
   messages; their blocks of text, calls and results, each call named by
   its tool with its input as written and its outcome summarised; what
-  it used and spent. Neither the application nor the helpers link
-  smith.
+  it used and spent. A call to the engine carries, as its objects and
+  parts, what the core wrote beside the turn under its name
+  (`../../domain/engine.md`, 7.2), never what its answer's words say.
+  Neither the application nor the helpers link smith.
 - **A turn that does not decode** reaches the application as such, with
   why: another version of smith's transcript (naming the one found),
   malformed, or past the client's bounds (`../../protocol/client.md`,

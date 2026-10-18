@@ -437,7 +437,11 @@ tests feed it agents' replies and results kept as files beside them.
   outcome, opened on demand to its input and its result. Turns are
   decoded below the client (client.md, section 10), so the reference UI
   links nothing of smith's.
-- **Calls to the engine** show as the cards of what they made, live.
+- **Calls to the engine** show as the cards of what they made, live:
+  what the core wrote beside their turn (`../../domain/engine.md`,
+  7.2). A proposal waiting in the task's subtree that no call or
+  decision shows has its card after the conversation (objects.md,
+  section 10).
 - **Provisional text** is said to be provisional in words: its region
   holds a status in jig's phrase for it, and carries jig's style token
   `jig-provisional`, its look (section 13). There is no provisional

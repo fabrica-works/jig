@@ -545,6 +545,18 @@ When an agent task is due (tasks.md, 5.2), the core:
   conversation vocabulary, bounded, which a client's protocol layer
   renders. The core reads only its size, its spend, what it took and
   whether it opens a window, which the turn carries beside its bytes.
+- **What a turn's calls to the engine made is the core's to say.** As
+  it commits a turn, the core writes beside it, from the parts of the
+  answers it committed for the turn's calls (7.3), what each call made,
+  under the call's name (its completion and its position,
+  `../protocol/channel.md`, section 7), as
+  `../client/domain/objects.md`, section 10, shows them: the tasks a
+  delegation made, the proposal a `propose` made, a decision's object,
+  what an effect made, a note. A call it holds no part for names
+  nothing. No layer reads what a call made from its answer's words,
+  which its protocol layer renders for the LLM (hosts.md, section 8):
+  smith's transcript keeps a host tool's answer as text alone (smith's
+  `protocol/transcript.md`, section 2).
 - **Resuming.** A run that resumes is given its current window only,
   within the resume limit (the deployment's bound on the current
   window's bytes, across the attempts it spans, as the window crosses to
