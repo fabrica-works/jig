@@ -337,11 +337,11 @@ pub enum Parameter {
         /** Numeric parameter value, carried without interpretation here. */
         value: u64,
     },
-    /// Bounded byte specification carrier; current chat construction supplies no parameters.
+    /// Bounded UTF-8 text specification carrier; current chat construction supplies no parameters.
     Bytes {
         /** Opaque semantic parameter name, carried without interpretation by tasks. */
         name: u32,
-        /** Owned parameter bytes; these and `Spec::words` share `Limits::spec_bytes`. */
+        /** Owned UTF-8 text bytes; these and `Spec::words` share `Limits::spec_bytes`. */
         value: Box<[u8]>,
     },
     /// Connector/resource carrier; no connector lookup or effect is performed by tasks.
@@ -359,7 +359,7 @@ pub enum Parameter {
 /// inputs. (domain/tasks.md, section 3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Spec {
-    /// Owned specification words; combined with byte-valued parameters, bounded by
+    /// Owned UTF-8 specification words; combined with text-valued parameters, bounded by
     /// `Limits::spec_bytes`.
     pub words: Box<[u8]>,
     /// Parameters bounded by `Limits::parameters`; tasks does not interpret their names, and

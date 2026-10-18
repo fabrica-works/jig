@@ -361,6 +361,7 @@ pub(crate) fn contains(numbers: &[u64], number: u64) -> bool {
 pub fn valid_spec(limits: &Limits, spec: &Spec) -> bool {
     if spec.parameters.len() > usize::try_from(limits.parameters).expect("u32 fits usize")
         || spec.inputs.len() > usize::try_from(limits.inputs).expect("u32 fits usize")
+        || !text(&spec.words)
     {
         return false;
     }
@@ -375,6 +376,9 @@ pub fn valid_spec(limits: &Limits, spec: &Spec) -> bool {
     for parameter in &spec.parameters {
         match parameter {
             Parameter::Bytes { value, .. } => {
+                if !text(value) {
+                    return false;
+                }
                 let Some(total) = bytes.checked_add(value.len()) else {
                     return false;
                 };
@@ -384,6 +388,11 @@ pub fn valid_spec(limits: &Limits, spec: &Spec) -> bool {
         }
     }
     bytes <= usize::try_from(limits.spec_bytes).expect("u32 fits usize")
+}
+
+#[expect(clippy::disallowed_methods, reason = "client/domain/contract.md, 5.3 requires UTF-8 text validation")]
+fn text(bytes: &[u8]) -> bool {
+    core::str::from_utf8(bytes).is_ok()
 }
 
 /// Pure bounded result-contract shape check before retaining a call body.

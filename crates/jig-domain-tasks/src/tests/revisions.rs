@@ -212,6 +212,10 @@ impl Harness {
     }
 }
 
+fn spec(words: &[u8]) -> Spec {
+    Spec { words: words.into(), parameters: Box::new([]), inputs: Box::new([]) }
+}
+
 fn amendment() -> Amendment {
     Amendment {
         tracked: None,
@@ -880,3 +884,5 @@ mod positions;
 mod tracking;
 
 mod compound;
+
+mod text;
