@@ -80,11 +80,14 @@ What the store keeps of a task, and the tasks child domain holds while
 it is live:
 
 - **Its number,** given by the core, never reused, and its project.
-- **Its spec:** words, bounded; the resources it reads and writes, by
-  name; the ended tasks whose results it takes as **inputs**; and what
-  its executor needs: a charter's number for an agent, the question for a
-  person. A procedure's parameters are its connector's, kept by the
-  connector under the task's number (core.md, section 5).
+- **Its spec:** words, bounded; its typed parameters, numbers and texts,
+  each text UTF-8 as the words are, never other bytes; the resources it
+  reads and writes, by name; the ended tasks whose results it takes as
+  **inputs**; and what its executor needs: a charter's number for an
+  agent, the question for a person. A procedure's parameters are its
+  connector's, kept by the connector under the task's number (core.md,
+  section 5). A value that is not text, such as a commit's id, goes in
+  as text its application spells (`../client/domain/contract.md`, 5.3).
 - **Its result contract:**
   - *a report:* words, bounded;
   - *a verdict:* one of a closed list the spec gives, each with a
@@ -217,8 +220,8 @@ dependencies among them.
 - **Checked whole,** before anything of it exists:
   - every task well formed: a known executor kind, a charter or
     procedure the deployment has, a result contract its executor can
-    produce, its spec within its limits, the conversation flag on an
-    agent's task only;
+    produce, its spec within its limits, its words and text parameters
+    UTF-8 (section 3), the conversation flag on an agent's task only;
   - at most one task giving `AsAllowed`;
   - no cycle;
   - within the limits: live tasks in the deployment, tasks in the tree,

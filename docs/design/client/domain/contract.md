@@ -599,13 +599,19 @@ served is held, kept and unsent, for its owner's version (client.md,
   document's bound on its short lists is not an authority's.
 - **Texts are UTF-8,** words for showing. A source's text is UTF-8 where
   it enters the engine: a party's words, refused at their request's
-  entrance when they are not; an identity's login and name, refused
-  where they are minted; a run's output; an application's words through
-  its own documents. A text cut to its bound is cut at a character's
-  boundary, never inside a character, and says it was cut. So every text
-  a document carries is UTF-8, as the wire's text fields check
-  (`../../protocol/client.md`, section 3), and the engine never makes a
-  document its wire refuses.
+  entrance when they are not; a task's spec, its words and its text
+  parameters, refused with a spec's other faults wherever the tasks
+  child admits a spec, a batch's, an amendment's or a proposal's,
+  whoever made it: a party, an agent's tool, a procedure's step, a
+  recurring task (`../../domain/tasks.md`, sections 3 and 4); an
+  identity's login and name, refused where they are minted; a run's
+  output; an application's words through its own documents. A value
+  that is not text, such as a commit's id, is a task's parameter only as
+  text its application spells, such as its hexadecimal digits. A text
+  cut to its bound is cut at a character's boundary, never inside a
+  character, and says it was cut. So every text a document carries is
+  UTF-8, as the wire's text fields check (`../../protocol/client.md`,
+  section 3), and the engine never makes a document its wire refuses.
 
 ### 5.4 A decision's effect
 
