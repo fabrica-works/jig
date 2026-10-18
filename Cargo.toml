@@ -205,6 +205,16 @@ opt-level = 3
 panic = "abort"
 overflow-checks = true
 
+# The browser's release module (protocol/browser.md, 4.1).
+[profile.web]
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
+strip = true
+
 # The lints for the step crates (every domain, protocol and io layer: lib is skein's).
 # Disallowed types, macros and methods are listed in clippy.toml. Ordinary Rust
 # (simulators, test harnesses) declares its own [lints] table.
