@@ -128,9 +128,9 @@ Section 9 lists what the engine's domain owes the client, and where
 
 ### 3.1 The keyed request
 
-- **The key** is sixteen bytes the client draws, scoped to the party:
-  the same key from two of their sign-ins is one request
-  (`../../domain/people.md`, 5.1).
+- **The key** is sixteen bytes, scoped to the party: the same key from
+  two of their sign-ins is one request (`../../domain/people.md`, 5.1).
+  The client draws it, or the application gives it as a name (below).
 - **Answered once durable:** the answer waits for the commit of the
   decision it reports, as every output that someone outside could act on
   does (`../../domain/engine.md`, 5.2).
@@ -141,6 +141,14 @@ Section 9 lists what the engine's domain owes the client, and where
   client sends the request again, under its key.
 - **One key, one ask:** a key sent again with a different ask is refused
   as a conflict.
+- **A name** is a key the application gives in place of one the client
+  draws, for a request that comes from outside the application
+  (sixteen bytes of a digest of an agent's key, say). The engine treats
+  it as any key: a name sent again is answered as above, within the
+  retention, and one sent with another ask is refused as a conflict,
+  which for a name is no bug of the client's. A client holds one request under a name at a
+  time: a `Send` under a name its request table holds is answered held
+  at once, and nothing is kept or sent (client.md, section 6).
 - **A compound request is one keyed request** (3.4): one key, one ask,
   one answer.
 
@@ -380,7 +388,8 @@ Every request has one answer, of one of these kinds:
     batch giving `AsAllowed`; the conversation flag on a task that is not
     an agent's; a proposed batch giving `AsAllowed`; a cycle among a
     batch's dependencies);
-  - *key conflict:* the key names another ask, which is a client's bug;
+  - *key conflict:* the key names another ask, which is a client's bug
+    where the client drew the key (3.1);
 - **busy** or **not ready:** nothing was made and nothing kept; send it
   again, under its key, after a backoff;
 - **signed out:** the sign-in has ended; sign in, then send it again;
@@ -652,6 +661,7 @@ party reads is therefore never lost by a crash.
 | a result | the store, or live state while a stub names it |
 | a task's history, a page, for it or its subtree | the store |
 | `activity{n}`: a task's activity, a page, from its end | the store: words, run boundaries, turns, what it heard |
+| `turn{n, attempt, turn}`: one committed turn of a task's activity | the store: the task's transcript (`../../protocol/store.md`, 8.3) |
 | `inbox`: a group of it, a page, filtered by project, kind or root | live state, then the store past the engine's limit |
 | `tasks{query}`: a task query's page (6.1) | live state, then the store's indexes of ended tasks |
 | a project; its spend, a page; its notes, a page | live state; the store; the notes child |
@@ -668,6 +678,22 @@ party reads is therefore never lost by a crash.
   the question: a delegate is in its requester's project, and the
   answer's words are those of the task the question was put to
   (`../../domain/engine.md`, 7.2; `../../protocol/store.md`, 7.3).
+- **A turn** is named by its task, its attempt and its number within it
+  (7.3). It is read once and never watched: a committed turn does not
+  change. It is read with the access of `activity{n}`. Its answer is:
+  - *the turn:* smith's bytes, which the client decodes as it decodes
+    activity's turns (client.md, section 10);
+  - *unknown,* when it is not there or the party may not see it;
+  - *gone,* past its transcript's horizon, as a dropped transcript is
+    (`../../protocol/store.md`, 8.5 and 11.1);
+  - *busy,* as any read;
+  - *too large,* with its size in bytes: from the engine, past the
+    single read's bound, the store's per-read byte budget
+    (`../../protocol/store.md`, 7.3); from the client, past its limit
+    for one document (client.md, section 14). On activity's pages the
+    client keeps the size the wire carries for a turn too large for a
+    page (5.3);
+  - *malformed,* when it does not decode, as a page's turn is (5.3).
 
 ### 6.1 Task queries
 
@@ -733,7 +759,8 @@ party reads is therefore never lost by a crash.
 The objects a client shows apart from these (a proposal, an escalation,
 a question, a person task, a result, a task's activity, a project, a
 note) are read (section 6), and read again when a watch that names them
-says they moved.
+says they moved. A turn is a read and not a subject: a committed turn
+does not change, so it is read once (section 6).
 
 ### 7.2 Level-triggered
 

@@ -552,7 +552,9 @@ the committed length. The next open cuts the file to its committed length
   and names the turn that opens it, as it keeps it (`../domain/engine.md`,
   5.4); a window that starts at another turn fails the read as unread.
 - **A turn,** for a party's read: from its attempt's first turn, walking
-  frames forwards to its number.
+  frames forwards to its number. A turn read alone is bounded by the
+  read's byte bound (7.3): past it, the read answers the turn's size in
+  place of its bytes (`../client/domain/contract.md`, section 6).
 - **A page's turns,** for a party's page of a task's activity (7.3):
   backwards, one frame for each turn line, from the frame of the page's
   newest turn: the transcript's last frame when the page reads from the

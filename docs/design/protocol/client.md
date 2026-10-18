@@ -380,6 +380,10 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **An application's read** names its scope and its window, and its
   connector's read, in the application's wire, and is answered with the
   application's document, or unknown, or not allowed.
+- **A turn read** (`turn{n, attempt, turn}`) is answered with the
+  turn's bytes, or its size where the turn alone passes the read's byte
+  bound, or gone past its transcript's horizon, or why there is none, as
+  above (`../client/domain/contract.md`, section 6; `store.md`, 8.3).
 - **Held until durable** on the engine's side, as every read's answer is
   (`../domain/engine.md`, 5.2); the exchange waits for it.
 

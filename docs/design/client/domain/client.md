@@ -146,7 +146,7 @@ Event, in
     SignIn { with } | SignOut                     with: Link(secret) | Service(credential) | Held(credential) | Transport
     Watch { handle, subject, window } | Unwatch { handle }
     Read { handle, read, cursor }
-    Send { key, request }                         an operation, a compound request, or a family's request as bytes
+    Send { key, name, request }                   an operation, a compound request, or a family's request as bytes; name optional
   from the transport:
     Reply { exchange, message } | Lost { exchange }
     Streamed { message } | StreamGone
@@ -180,8 +180,8 @@ read by the application: client.document(handle), client.text(handle), client.pe
     window its document holds (section 8);
   - *`Read { handle, read, cursor }`:* one document, or one page of a
     list from a cursor (section 7);
-  - *`Send { key, request }`:* an operation, a compound request, or a
-    family's request as bytes (section 6).
+  - *`Send { key, name, request }`:* an operation, a compound request,
+    or a family's request as bytes, with a name or none (section 6).
 - **From the transport:**
   - *`Reply { exchange, message }`:* the one record that answers an
     exchange; *`Lost { exchange }`:* none came whole;
@@ -276,10 +276,28 @@ handles, as every presentation does (sections 7 and 8).
   when it carries the same request, so a double press or a retry makes
   one request; with another request, it is a key conflict, a mistake of
   the application's, and loud (`../../README.md`, 6.5). The engine knows
-  the request by the key the table draws, scoped to the party
-  (contract.md, 3.1), which the client keeps beside the application's
-  key in the request's record, so a kept request comes back under its
-  key (section 11).
+  the request by its engine key, scoped to the party (contract.md,
+  3.1): the key the table draws, or a name (next bullet). The client
+  keeps it beside the application's key in the request's record, so a
+  kept request comes back under its key (section 11).
+- **A `Send` may carry a name:** an engine key the application gives,
+  which the table admits in place of a drawn one (skein's `lib.md`,
+  section 12). The request's record keeps it as the engine's key beside
+  the application's key. Any ask may carry a name, a family's included.
+  - *Held.* A named `Send` whose engine key the table already holds (the
+    same ask under another application key, another ask, or a restored
+    record of another asker) is answered held at once: nothing is kept
+    and nothing is sent. The key stays held until its holder's record is
+    erased; the application asks again then. Within the engine's
+    retention the engine answers the same name and ask with its first
+    answer: a request sent again within the retention gets its answer
+    again (contract.md, 3.1).
+  - *Never loud.* A name comes from outside the application (an agent's
+    key), so a name held is never the application's mistake. The same
+    application key with the same request is still joined, and with
+    another request is still a key conflict, loud.
+  - *Not joined.* The table keeps one asker per entry, and the engine
+    already answers a repeated name with its first answer.
 - **Through skein-lib's request table** (skein's `lib.md`, section 12),
   which the client holds. It is the client's only way out for a keyed
   request, as the journal is the engine's root's (`../../README.md`,
@@ -323,6 +341,9 @@ handles, as every presentation does (sections 7 and 8).
   - *unconfirmed,* the client's own: sent before `me` named the party,
     so no record could say whose it is. It is answered at once, and
     nothing of it is kept or sent (section 11).
+  - *held,* the client's own: the name the `Send` carries is held by
+    another request. It is answered at once, and nothing of it is kept
+    or sent (above).
 
   Done and refused come only once the engine's commit is durable
   (`../../domain/core.md`, section 11), so the client never says done
@@ -357,8 +378,10 @@ handles, as every presentation does (sections 7 and 8).
   family's) or one page of a list (a task query's lines, a task's
   activity or history, the inbox's group), and has one terminal, `Page
   { handle, page }`: the document, or the page with its cursors, or why
-  there is none: unknown, refused, busy, signed out, version not served,
-  or unreachable, when its exchange is lost. A read is one attempt
+  there is none: unknown, gone, too large with its size, malformed,
+  refused, busy, signed out, version not served, or unreachable, when
+  its exchange is lost (gone, too large and malformed for a turn read
+  alone, contract.md, section 6). A read is one attempt
   (`../../protocol/client.md`, section 6): the application reads again
   if it wants.
 - **What is live is watched; what is past is read.** The engine holds
@@ -590,6 +613,13 @@ for any presentation of a chat or of any agent task's activity.
   parts, what the core wrote beside the turn under its name
   (`../../domain/engine.md`, 7.2), never what its answer's words say.
   Neither the application nor the helpers link smith.
+- **A job is a call's outcome,** worded like any other call's. A call
+  that answered `running` reads "started as job N", never "is running":
+  a job ends with its activation (smith's `protocol/transcript.md`,
+  section 4). A `job` call names its job by number and what it
+  answered. `JobsFull` and `UnknownJob` read as invalid calls. A call
+  not run reads with its why: stopped, outside the choice, or after a
+  failed write. The turn's count of jobs is not shown.
 - **A turn that does not decode** reaches the application as such, with
   why: another version of smith's transcript (naming the one found),
   malformed, or past the client's bounds (`../../protocol/client.md`,

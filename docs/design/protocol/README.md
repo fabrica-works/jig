@@ -424,7 +424,7 @@ Each is generic, and says nothing about jig.
 
 - **What smith gives:** charter v2, with each model's window, output and
   prices with cache writes, and the budget's reserve (smith's
-  `protocol/charter.md`, section 2); transcript v3,
+  `protocol/charter.md`, section 2); transcript v5,
   whose turns say whether they open a window (smith's
   `protocol/transcript.md`, section 3); channel v2, with a start's
   messages and the run's identity, messages refused at the kit's
