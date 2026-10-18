@@ -11,20 +11,16 @@ pub fn credential() -> Secret {
     Secret::new(bytes.finish())
 }
 pub fn credential_digest() -> Secret {
-    let words = skein_io::digest::digest(credential().expose()).0;
-    let mut bytes = Writer::new(32);
-    for word in words {
-        bytes.put(&word.to_be_bytes()).expect("digest word");
-    }
-    Secret::new(bytes.finish())
+    Secret::new(Box::new(skein_lib::sha256::digest(credential().expose())))
 }
+
 pub fn service_kept() -> Kept {
     Kept { digest: credential_digest(), expires: Wall::from_nanos(u64::MAX) }
 }
 impl Exchange {
     pub fn make_service(&mut self) -> (Token, ReplyTo) {
         let (ask, expected) = make_service_case(&wire());
-        let owner = self.post(keyed(w::Owner::Jig, 8, encode_ask(&ask)));
+        let owner = self.send(crate::Message::Request(keyed(w::Owner::Jig, 8, encode_ask(&ask))));
         self.authenticate();
         let Some(Request::Core(event)) = self.out.pop() else { panic!("core ask") };
         let core::Event::People(people::Event::Ask { reply_to, ask, .. }) = *event else { panic!("people ask") };
@@ -61,7 +57,7 @@ impl Exchange {
     }
     pub fn sign_in_service(&mut self) -> (Token, ReplyTo) {
         self.token = credential().expose().into();
-        let owner = self.post_to(b"/jig/v1/sign-in/deployment", Box::new([]));
+        let owner = self.send(crate::Message::SignInService(Box::new([])));
         let Some(Request::Secrets(SecretsRequest::Get { owner: who })) = self.out.pop() else {
             panic!("credential get")
         };

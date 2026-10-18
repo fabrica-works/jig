@@ -8,7 +8,7 @@ fn a_made_service_answers_its_credential_once_with_its_digest_kept() {
     exchange.service_made(to);
     exchange.service_got(None);
     exchange.keep_service();
-    assert!(exchange.component.connections.get(&owner).expect("owner").response.is_empty());
+    assert!(exchange.component.connections.get(&owner).expect("owner").response.is_none());
     exchange.component.down(
         &exchange.env,
         Event::Secrets(SecretsAnswer::Kept { owner: SecretOwner::Service(f::SERVICE) }),

@@ -3,8 +3,7 @@ use crate::{Limits, translate::watches as translate};
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
-use skein_http::sse::writer as sse;
-use skein_lib::{Env, Map, Queue, Time, Token, stream::Down};
+use skein_lib::{Env, Map, Time, Token};
 #[derive(Debug)]
 pub(crate) struct Watch {
     pub name: u64,
@@ -31,27 +30,25 @@ pub(crate) enum Taken {
 }
 #[derive(Debug)]
 pub(crate) struct Packet {
-    pub event: sse::Outgoing,
+    pub event: Box<[u8]>,
     pub taken: Taken,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Phase {
     Open,
-    Finishing,
     Closing,
 }
 #[derive(Debug)]
 pub(crate) struct Stream {
     pub name: [u8; 16],
     pub sign_in: u64,
-    pub writer: sse::Writer,
     pub watches: Map<Token, Watch>,
     pub waiting: bool,
     pub phase: Phase,
     pub closed_connection: bool,
     pub deadline: Time,
-    pub above: Queue<sse::Event>,
-    pub below: Queue<Down>,
+    pub message: Option<crate::Streamed>,
+    pub ending: crate::Ended,
     pub taken: Taken,
     pub bytes: u32,
 }
@@ -59,56 +56,39 @@ impl Stream {
     pub fn closing(&self) -> bool {
         self.phase == Phase::Closing
     }
-    pub fn finishing(&self) -> bool {
-        self.phase == Phase::Finishing
-    }
-
     pub fn new(name: [u8; 16], sign_in: u64, env: &Env<Limits>) -> Self {
         Self {
             name,
             sign_in,
-            writer: sse::Writer::new(&limits(&env.limits)),
             watches: Map::with_capacity(env.limits.watches_per_stream),
             waiting: false,
             phase: Phase::Open,
             closed_connection: false,
             deadline: env.now,
-            above: Queue::with_capacity(2),
-            below: Queue::with_capacity(2),
+            message: None,
+            ending: crate::Ended::Stopping,
             taken: Taken::None,
             bytes: 0,
         }
     }
-    pub fn write(&mut self, env: &Env<Limits>, packet: Packet) {
+    pub fn write(&mut self, _env: &Env<Limits>, packet: Packet) {
         assert!(!self.waiting, "one SSE event at a time");
-        self.bytes = u32::try_from(packet.event.data.len()).expect("bounded packet");
+        self.bytes = u32::try_from(packet.event.len()).expect("bounded packet");
         self.taken = packet.taken;
         self.waiting = true;
-        sse::down(
-            &mut self.writer,
-            &writer_env(env),
-            sse::Request::Event(packet.event),
-            &mut self.above,
-            &mut self.below,
-        );
+        self.message = Some(crate::Streamed::Record(packet.event));
     }
-    pub fn heartbeat(&mut self, env: &Env<Limits>) {
+    pub fn heartbeat(&mut self, _env: &Env<Limits>) {
         self.waiting = true;
         self.taken = Taken::None;
-        sse::down(
-            &mut self.writer,
-            &writer_env(env),
-            sse::Request::Comment(Box::new([])),
-            &mut self.above,
-            &mut self.below,
-        );
+        self.message = Some(crate::Streamed::Heartbeat);
     }
     pub fn queue(&mut self, packet: Packet, bound: u32) -> bool {
-        let length = u32::try_from(packet.event.data.len()).expect("bounded packet");
+        let length = u32::try_from(packet.event.len()).expect("bounded packet");
         let mut held = self.bytes;
         for (_, watch) in &self.watches {
             for packet in [&watch.delivery, &watch.text, &watch.ended].into_iter().flatten() {
-                held = held.saturating_add(u32::try_from(packet.event.data.len()).expect("bounded packet"));
+                held = held.saturating_add(u32::try_from(packet.event.len()).expect("bounded packet"));
             }
         }
         if length > bound.saturating_sub(held) {
@@ -196,7 +176,7 @@ impl Stream {
             }
             return false;
         }
-        if !self.above.is_empty() || !self.below.is_empty() {
+        if self.message.is_some() {
             return true;
         }
         if !self.waiting {
@@ -220,10 +200,4 @@ pub(crate) fn taken(taken: Taken) -> Option<core::Event> {
         Taken::Text(watcher) => Some(core::Event::StreamDelivered { watcher }),
         Taken::None | Taken::Ended { .. } => None,
     }
-}
-pub(crate) fn limits(limits: &Limits) -> sse::Limits {
-    sse::Limits { event: limits.queued_bytes.checked_add(32).expect("checked framed bound"), chunk: limits.http.send }
-}
-pub(crate) fn writer_env(env: &Env<Limits>) -> Env<sse::Limits> {
-    Env { now: env.now, wall: env.wall, limits: limits(&env.limits) }
 }

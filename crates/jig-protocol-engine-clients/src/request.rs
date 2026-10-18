@@ -24,7 +24,10 @@ impl Component {
         let keyed = match w::Keyed::decode(&env.limits.wire, &mut skein_lib::Reader::new(body)) {
             Ok(value) => value.into_parts(),
             Err(_) => {
-                self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                self.connections
+                    .get_mut(&owner)
+                    .expect("exchange owner")
+                    .respond(crate::Reply::NotARecord, &env.limits);
                 return;
             }
         };
@@ -51,7 +54,10 @@ impl Component {
                     Err(problem) => Err(crate::translate::Untranslatable { path: problem.path }),
                 };
                 let Ok(ask) = ask else {
-                    self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                    self.connections
+                        .get_mut(&owner)
+                        .expect("exchange owner")
+                        .respond(crate::Reply::NotARecord, &env.limits);
                     return;
                 };
                 Request::Core(Box::new(core::Event::People(people::Event::Ask {
@@ -65,7 +71,10 @@ impl Component {
                 let Ok(record) =
                     w::FamilyRequest::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request))
                 else {
-                    self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                    self.connections
+                        .get_mut(&owner)
+                        .expect("exchange owner")
+                        .respond(crate::Reply::NotARecord, &env.limits);
                     return;
                 };
                 let scope = crate::served::scope(record.scope());

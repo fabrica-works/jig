@@ -131,26 +131,10 @@ pub(crate) fn owned(value: w::DeliveryValue, version: u32, limits: &w::Limits) -
     value.encode(&mut record).expect("measured delivery");
     w::Owned::new(limits, w::OwnedParts { owner: w::Owner::Jig, version, record: record.finish() })
 }
-pub(crate) fn packet(value: &w::StreamEvent) -> skein_http::sse::writer::Outgoing {
-    let name: &[u8] = match value {
-        w::StreamEvent::Hello(_) => b"hello",
-        w::StreamEvent::Delivery(_) => b"delivery",
-        w::StreamEvent::Text(_) => b"text",
-        w::StreamEvent::Ended(_) => b"ended",
-    };
+pub(crate) fn packet(value: &w::StreamEvent) -> Box<[u8]> {
     let mut record = Writer::new(usize::try_from(value.measure()).expect("wire measure fits"));
     value.encode(&mut record).expect("measured stream record");
-    let length = skein_lib::base64::encoded_len(skein_lib::base64::Alphabet::Standard, value.measure())
-        .expect("bounded stream record");
-    let mut data = Writer::new(usize::try_from(length).expect("wire size fits"));
-    skein_lib::base64::encode(skein_lib::base64::Alphabet::Standard, &record.finish(), &mut data)
-        .expect("measured base64");
-    skein_http::sse::writer::Outgoing {
-        name: skein_lib::bytes::copy_of(name),
-        data: data.finish(),
-        id: None,
-        retry: None,
-    }
+    record.finish()
 }
 
 pub(crate) fn document_packet(

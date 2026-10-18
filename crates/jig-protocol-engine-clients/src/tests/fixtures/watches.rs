@@ -5,7 +5,7 @@ use jig_domain_core as core;
 use skein_lib::{Token, Writer};
 impl Exchange {
     pub fn open_stream(&mut self) -> [u8; 16] {
-        self.post_to_method(b"/jig/v1/stream", Box::new([]), skein_http::Method::Get);
+        self.stream_open();
         self.authenticate();
         self.component.streams.first().expect("stream opened").1.name
     }
@@ -13,7 +13,7 @@ impl Exchange {
         let value = w::Open::new(&wire(), w::OpenParts { stream, watch: name, subject }).expect("open");
         let mut bytes = Writer::new(usize::try_from(value.measure()).expect("wire size"));
         value.encode(&mut bytes).expect("open");
-        let owner = self.post_to(b"/jig/v1/watch", bytes.finish());
+        let owner = self.send(crate::Message::Watch(bytes.finish()));
         self.authenticate();
         owner
     }
@@ -21,7 +21,7 @@ impl Exchange {
         let value = w::WatchClose::new(&wire(), w::WatchCloseParts { stream, watch }).expect("close");
         let mut body = Writer::new(usize::try_from(value.measure()).expect("wire size"));
         value.encode(&mut body).expect("close");
-        let owner = self.post_to(b"/jig/v1/unwatch", body.finish());
+        let owner = self.send(crate::Message::Unwatch(body.finish()));
         self.authenticate();
         owner
     }

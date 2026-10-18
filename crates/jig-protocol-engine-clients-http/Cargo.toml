@@ -1,0 +1,18 @@
+[package]
+name = "jig-protocol-engine-clients-http"
+description = "The default client HTTP mapping's engine end"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+skein-lib.workspace = true
+skein-http.workspace = true
+jig-protocol-engine-clients.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+jig-protocol-config.workspace = true

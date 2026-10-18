@@ -12,25 +12,17 @@ pub(crate) enum Route {
     Unwatch,
     Gone,
     Stream,
-    Missing,
 }
-pub(crate) fn route(call: &skein_http::server::Call) -> Route {
-    if call.method == skein_http::Method::Get && call.target.as_ref() == b"/jig/v1/stream" {
-        return Route::Stream;
-    }
-    if call.method != skein_http::Method::Post {
-        return Route::Missing;
-    }
-    match call.target.as_ref() {
-        b"/jig/v1/sign-in/link" => Route::Link,
-        b"/jig/v1/sign-in/deployment" => Route::Service,
-        b"/jig/v1/request" => Route::Request,
-        b"/jig/v1/sign-out" => Route::SignOut,
-        b"/jig/v1/read" => Route::Read,
-        b"/jig/v1/watch" => Route::Watch,
-        b"/jig/v1/unwatch" => Route::Unwatch,
-        b"/jig/v1/stream-gone" => Route::Gone,
-        _ => Route::Missing,
+pub(crate) fn message(message: crate::Message) -> (Route, Box<[u8]>) {
+    match message {
+        crate::Message::Request(body) => (Route::Request, body),
+        crate::Message::Read(body) => (Route::Read, body),
+        crate::Message::Watch(body) => (Route::Watch, body),
+        crate::Message::Unwatch(body) => (Route::Unwatch, body),
+        crate::Message::Gone(body) => (Route::Gone, body),
+        crate::Message::SignInLink(body) => (Route::Link, body),
+        crate::Message::SignInService(body) => (Route::Service, body),
+        crate::Message::SignOut(body) => (Route::SignOut, body),
     }
 }
 pub(crate) fn refused(_limits: &w::Limits) -> Box<[u8]> {
@@ -92,7 +84,7 @@ pub(crate) fn unauthenticated(route: Route, limits: &w::Limits) -> Box<[u8]> {
         Route::Read => read_none(jig_domain_core::reads::Why::SignedOut, limits),
         Route::Watch => open_answer(Some(jig_domain_core::WatchRefusal::SignedOut), limits),
         Route::Unwatch => close_answer(true),
-        Route::Gone | Route::Stream | Route::Missing => Box::new([]),
+        Route::Gone | Route::Stream => Box::new([]),
         Route::Link | Route::Service => refused(limits),
         Route::SignOut => sign_out_answer(),
         Route::Request => signed_out(limits),
@@ -126,7 +118,7 @@ pub(crate) fn stopped(route: Route) -> Option<Box<[u8]>> {
         Route::Link | Route::Service => Some(sign_in_not_ready()),
         Route::SignOut => Some(sign_out_not_ready()),
         Route::Request => Some(not_ready()),
-        Route::Read | Route::Watch | Route::Unwatch | Route::Gone | Route::Stream | Route::Missing => None,
+        Route::Read | Route::Watch | Route::Unwatch | Route::Gone | Route::Stream => None,
     }
 }
 

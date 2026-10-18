@@ -188,8 +188,6 @@ fn engine_clients_link_only_their_boundary_wire_and_foundation() {
             "jig-domain-views",
             "jig-protocol-store",
             "skein-codec",
-            "skein-http",
-            "skein-io",
             "skein-lib"
         ]
     );
@@ -248,4 +246,16 @@ fn the_native_shell_links_only_the_clients_components_and_foundation() {
         dependencies,
         ["jig-client", "jig-client-protocol-http", "jig-client-protocol-wire", "skein-http", "skein-io", "skein-lib"]
     );
+}
+
+#[test]
+fn engine_http_links_only_its_component_and_foundation() {
+    let selected: Vec<_> = manifests()
+        .into_iter()
+        .filter(|manifest| manifest.name.as_deref() == Some("jig-protocol-engine-clients-http"))
+        .collect();
+    assert_eq!(selected.len(), 1, "one engine HTTP mapping");
+    let mut dependencies = selected[0].dependencies.clone();
+    dependencies.sort();
+    assert_eq!(dependencies, ["jig-protocol-engine-clients", "skein-http", "skein-lib"]);
 }

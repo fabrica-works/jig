@@ -1,5 +1,3 @@
-#[path = "tests/arrived.rs"]
-mod arrived;
 #[path = "tests/asks.rs"]
 mod asks;
 #[path = "tests/fixtures.rs"]
@@ -36,3 +34,6 @@ mod create;
 mod effects;
 #[path = "tests/queries.rs"]
 mod queries;
+
+#[path = "tests/limits.rs"]
+mod limits;

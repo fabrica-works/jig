@@ -9,6 +9,7 @@ members = [
     "tests/client-protocol",
     "testing/jig-client-test-records",
     "crates/jig-protocol-engine-clients",
+    "crates/jig-protocol-engine-clients-http",
     "tests/engine-clients",
     "crates/jig-client-protocol-link",
     "crates/jig-client-protocol-http",
@@ -108,6 +109,7 @@ skein-shell = { git = "https://github.com/forgetic/skein.git" }
 smith-host-protocol = { git = "https://github.com/forgetic/smith.git" }
 jig-test-service = { path = "testing/jig-test-service" }
 jig-client-test-protocol-wire = { path = "testing/jig-client-test-protocol-wire" }
+jig-protocol-engine-clients-http = { path = "crates/jig-protocol-engine-clients-http" }
 jig-protocol-engine-clients = { path = "crates/jig-protocol-engine-clients" }
 smith-protocol-channel = { git = "https://github.com/forgetic/smith.git" }
 smith-domain = { git = "https://github.com/forgetic/smith.git" }

@@ -85,7 +85,7 @@ fn an_ask_that_does_not_translate_reaches_no_core() {
         out.put(&[0]).expect("tail");
         out.finish()
     }] {
-        let owner = exchange.post(f::keyed(w::Owner::Jig, 8, bytes));
+        let owner = exchange.send(crate::Message::Request(f::keyed(w::Owner::Jig, 8, bytes)));
         exchange.authenticate();
         assert!(exchange.out.is_empty());
         assert_eq!(exchange.response(owner), (400, b"".as_slice()));
@@ -95,7 +95,7 @@ fn an_ask_that_does_not_translate_reaches_no_core() {
 fn an_application_record_is_routed_with_its_digest() {
     let mut exchange = Exchange::new();
     let family = w::Owner::Family(w::Family::new(&f::wire(), w::FamilyParts { number: 9 }).expect("family"));
-    exchange.post(f::keyed(family, 2, Box::from(b"abc".as_slice())));
+    exchange.send(crate::Message::Request(f::keyed(family, 2, Box::from(b"abc".as_slice()))));
     exchange.authenticate();
     let Some(Request::Application(ToApplication::Request { sign_in, key, family, version, record, digest, .. })) =
         exchange.out.pop()
@@ -116,13 +116,13 @@ fn a_third_exchange_past_the_client_s_bound_is_busy() {
     let mut exchange = Exchange::new();
     let body = f::keyed(w::Owner::Jig, 8, f::encode_ask(&f::start(&f::wire())));
     for _ in 0..2_u32 {
-        exchange.post(body.clone());
+        exchange.send(crate::Message::Request(body.clone()));
         exchange.authenticate();
         let Some(Request::Core(_)) = exchange.out.pop() else {
             panic!("admitted ask");
         };
     }
-    let owner = exchange.post(body);
+    let owner = exchange.send(crate::Message::Request(body));
     exchange.authenticate();
     assert!(exchange.out.is_empty());
     assert_eq!(exchange.response(owner), (200, b"\x02".as_slice()));
@@ -155,7 +155,7 @@ fn a_piece_past_its_decoded_sum_is_refused() {
 fn an_undecodable_application_record_is_answered_bad_request() {
     let mut exchange = Exchange::new();
     let family = w::Owner::Family(w::Family::new(&f::wire(), w::FamilyParts { number: 9 }).expect("family"));
-    let owner = exchange.post(f::keyed(family, 2, Box::new([255])));
+    let owner = exchange.send(crate::Message::Request(f::keyed(family, 2, Box::new([255]))));
     exchange.authenticate();
     let Some(Request::Application(ToApplication::Request { reply_to, .. })) = exchange.out.pop() else {
         panic!("application request");

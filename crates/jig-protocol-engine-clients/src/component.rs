@@ -1,7 +1,7 @@
 //! Calls, exchanges, and durable sign-in sequencing (protocol/client.md, 8).
 use crate::{
     Event, Kept, Limits, Request, SecretOwner, SecretsAnswer, SecretsRequest, Settings,
-    connection::Connection,
+    exchange::Exchange,
     routes::{self, Route},
     sign_in::{self, Link, Pending, Waiting},
 };
@@ -9,11 +9,7 @@ use alloc::boxed::Box;
 use jig_client_protocol_wire::v8 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
-use skein_http::server as http;
-use skein_lib::{
-    CryptoRng, Env, Map, Queue, ReplyTo, Time, Token,
-    stream::{Read, Up},
-};
+use skein_lib::{CryptoRng, Env, Map, Queue, ReplyTo, Time, Token};
 #[path = "closing.rs"]
 mod closing;
 #[path = "mint.rs"]
@@ -34,7 +30,7 @@ pub struct Component {
     settings: Settings,
     rng: CryptoRng,
     link: Option<Link>,
-    connections: Map<Token, Connection>,
+    connections: Map<Token, Exchange>,
     pending: Pending,
     streams: Map<Token, crate::stream::Stream>,
     next: u64,
@@ -53,9 +49,7 @@ impl Component {
         let Ok(hello) = crate::translate::watches::hello([0; 16], &settings, &env.limits.wire) else {
             return Err(Unusable::Limits);
         };
-        let length = skein_lib::base64::encoded_len(skein_lib::base64::Alphabet::Standard, hello.measure())
-            .ok_or(Unusable::Limits)?;
-        if length > env.limits.queued_bytes {
+        if hello.measure() > env.limits.queued_bytes {
             return Err(Unusable::Limits);
         }
         if let Some(identity) = &settings.link {
@@ -100,16 +94,7 @@ impl Component {
     pub fn down(&mut self, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
         assert!(!self.closed(), "the owner sends nothing after Closed");
         match event {
-            Event::Call { call, head } => {
-                let mut connection = Connection::new(call, &env.limits, env.now);
-                self.http(env, &mut connection, http::Event::Call(head), out);
-                self.connections.insert(call, connection).expect("server bounds active calls");
-            }
-            Event::Http { call, event } => {
-                if let Some(connection) = self.connections.get_mut(&call) {
-                    connection.events.push(event);
-                }
-            }
+            Event::Transport(message) => self.transport(env, message, out),
             Event::Reply { to, reply } => self.reply(env, to.into_token(), reply, out),
             Event::SignInRefused { to } => {
                 let exchange = to.into_token();
@@ -123,7 +108,10 @@ impl Component {
                 let exchange = to.into_token();
                 self.pending.exchanges.remove(&exchange);
                 if let Some(owner) = self.owner(exchange) {
-                    self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                    self.connections
+                        .get_mut(&owner)
+                        .expect("exchange owner")
+                        .respond(crate::Reply::NotARecord, &env.limits);
                 }
             }
             Event::SignInEnded { sign_in } => self.ended(env, sign_in, out),
@@ -201,7 +189,7 @@ impl Component {
                     }
                     Route::Request => self.request(env, exchange, sign_in, &body, out),
                     Route::SignOut => self.sign_out(env, exchange, sign_in, &body, out),
-                    Route::Link | Route::Service | Route::Missing => {}
+                    Route::Link | Route::Service => {}
                 },
                 Waiting::Core
                 | Waiting::SignOut { .. }
@@ -217,7 +205,7 @@ impl Component {
         }
         let mut selected = None;
         for (owner, connection) in &self.connections {
-            if connection.closing || !connection.requests.is_empty() || !connection.events.is_empty() {
+            if connection.closing || connection.response.is_some() || connection.ended.is_some() {
                 selected = Some(*owner);
                 break;
             }
@@ -228,91 +216,87 @@ impl Component {
             }
             return self.close_up(env, out);
         };
-        let mut connection = self.connections.remove(&owner).expect("selected connection");
-        if !connection.closing
-            && !connection.progress(env, out)
-            && let Some(event) = connection.events.pop()
-        {
-            self.http(env, &mut connection, event, out);
+        let mut connection = self.connections.remove(&owner).expect("selected exchange");
+        if let Some(reply) = connection.response.take() {
+            out.push(Request::Transport(crate::ToTransport::Reply { exchange: owner, reply }));
+        } else if let Some(why) = connection.ended {
+            out.push(Request::Transport(crate::ToTransport::StreamEnded { stream: owner, why }));
         }
-        if connection.closing {
-            if let Some(exchange) = connection.exchange {
-                self.pending.exchanges.remove(&exchange);
-            }
-            if let Some(stream) = self.streams.get_mut(&owner) {
-                stream.phase = crate::stream::Phase::Closing;
-                stream.closed_connection = true;
-            }
-        } else {
-            self.connections.insert(owner, connection).expect("same slot");
+        if let Some(exchange) = connection.name {
+            self.pending.exchanges.remove(&exchange);
+        }
+        if let Some(stream) = self.streams.get_mut(&owner) {
+            stream.phase = crate::stream::Phase::Closing;
+            stream.closed_connection = true;
         }
         true
     }
-    fn http(&mut self, env: &Env<Limits>, connection: &mut Connection, event: http::Event, out: &mut Queue<Request>) {
-        match event {
-            http::Event::Call(call) => {
-                connection.route = routes::route(&call);
-                connection.exchange = Some(self.name());
-                connection.call = Some(call);
-                match connection.route {
-                    Route::Missing => connection.respond(404, Box::new([]), &env.limits),
-                    Route::Link
-                    | Route::Service
-                    | Route::SignOut
-                    | Route::Request
-                    | Route::Read
-                    | Route::Watch
-                    | Route::Unwatch
-                    | Route::Gone
-                    | Route::Stream => connection.read(&env.limits),
+    fn transport(&mut self, env: &Env<Limits>, message: crate::FromTransport, out: &mut Queue<Request>) {
+        match message {
+            crate::FromTransport::Exchange { exchange, credential, message } => {
+                let (route, body) = routes::message(message);
+                self.receive(env, exchange, credential, route, body, out);
+            }
+            crate::FromTransport::StreamOpen { stream, credential } => {
+                self.receive(env, stream, credential, Route::Stream, Box::new([]), out);
+            }
+            crate::FromTransport::StreamTaken { stream } => {
+                if let Some(stream) = self.streams.get_mut(&stream)
+                    && stream.waiting
+                {
+                    let taken = stream.sent(env, self.settings.heartbeat);
+                    if let Some(event) = crate::stream::taken(taken) {
+                        out.push(Request::Core(Box::new(event)));
+                    }
                 }
             }
-            http::Event::Body(Up::Bytes(bytes)) => {
-                if connection.body.append(&bytes).is_err() {
-                    connection.respond(413, Box::new([]), &env.limits);
-                } else {
-                    connection.read(&env.limits);
+            crate::FromTransport::StreamGone { stream } => {
+                self.connections.remove(&stream);
+                if let Some(value) = self.streams.get_mut(&stream) {
+                    value.phase = crate::stream::Phase::Closing;
+                    value.closed_connection = true;
                 }
             }
-            http::Event::Body(Up::End) => self.body(env, connection, out),
-            http::Event::Reply(up) if connection.stream.is_some() => {
-                if let Some(stream) = self.streams.get_mut(&connection.stream.expect("stream connection")) {
-                    skein_http::sse::writer::up(
-                        &mut stream.writer,
-                        &crate::stream::writer_env(env),
-                        up,
-                        &mut stream.above,
-                        &mut stream.below,
-                    );
-                }
-            }
-            http::Event::Reply(Up::Room) => connection.send(&env.limits),
-            http::Event::Done(_) => connection.finish(out),
-            http::Event::Ended
-            | http::Event::Failed(_)
-            | http::Event::Refused(_)
-            | http::Event::Body(Up::Failed(_) | Up::Room)
-            | http::Event::Reply(Up::Failed(_) | Up::End | Up::Bytes(_))
-            | http::Event::Closed => connection.close(out),
         }
     }
-    fn body(&mut self, env: &Env<Limits>, connection: &mut Connection, out: &mut Queue<Request>) {
-        let length = connection.body.len();
-        let body = match connection.body.meet(Read::Fill(length)) {
-            Some(body) => body,
-            None => Box::new([]),
-        };
-        let exchange = connection.exchange.expect("call owns exchange");
-        if self.stopping()
-            && let Some(answer) = routes::stopped(connection.route)
-        {
-            connection.respond(200, answer, &env.limits);
+    fn receive(
+        &mut self,
+        env: &Env<Limits>,
+        owner: Token,
+        credential: Option<skein_lib::Secret>,
+        route: Route,
+        body: Box<[u8]>,
+        out: &mut Queue<Request>,
+    ) {
+        let exchange = self.name();
+        let mut connection = Exchange::new(exchange, route == Route::Stream);
+        self.body(env, &mut connection, route, body, credential, out);
+        self.connections.insert(owner, connection).expect("transport bounds active exchanges");
+    }
+    fn body(
+        &mut self,
+        env: &Env<Limits>,
+        connection: &mut Exchange,
+        route: Route,
+        body: Box<[u8]>,
+        credential: Option<skein_lib::Secret>,
+        out: &mut Queue<Request>,
+    ) {
+        let exchange = connection.name.expect("call owns exchange");
+        if body.len() > usize::try_from(env.limits.message_bytes).expect("message bound fits") {
+            connection.respond(crate::Reply::NotARecord, &env.limits);
             return;
         }
-        match connection.route {
+        if self.stopping()
+            && let Some(answer) = routes::stopped(route)
+        {
+            connection.respond(crate::Reply::Record(answer), &env.limits);
+            return;
+        }
+        match route {
             Route::Link => {
                 let Ok(record) = w::LinkSignIn::decode(&env.limits.wire, &mut skein_lib::Reader::new(&body)) else {
-                    connection.respond(400, Box::new([]), &env.limits);
+                    connection.respond(crate::Reply::NotARecord, &env.limits);
                     return;
                 };
                 let live = match &self.link {
@@ -326,11 +310,11 @@ impl Component {
                         self.link = None;
                     }
                     self.fresh_link(env, out);
-                    connection.respond(200, routes::refused(&env.limits.wire), &env.limits);
+                    connection.respond(crate::Reply::Record(routes::refused(&env.limits.wire)), &env.limits);
                     return;
                 }
                 if self.admitted() >= env.limits.exchanges {
-                    connection.respond(200, routes::refused(&env.limits.wire), &env.limits);
+                    connection.respond(crate::Reply::Record(routes::refused(&env.limits.wire)), &env.limits);
                     return;
                 }
                 self.link = None;
@@ -348,24 +332,23 @@ impl Component {
             | Route::Unwatch
             | Route::Gone
             | Route::Stream => {
-                let call = connection.call.as_ref().expect("call retained");
-                let Some((sign_in, digest)) = sign_in::bearer(call.header(b"authorization")) else {
-                    let answer = routes::unauthenticated(connection.route, &env.limits.wire);
-                    connection.respond(if connection.route == Route::Stream { 401 } else { 200 }, answer, &env.limits);
+                let Some((sign_in, digest)) = sign_in::credential(credential.as_ref()) else {
+                    let answer = routes::unauthenticated(route, &env.limits.wire);
+                    if route == Route::Stream {
+                        connection.ended = Some(crate::Ended::SignedOut);
+                    } else {
+                        connection.respond(crate::Reply::Record(answer), &env.limits);
+                    }
                     return;
                 };
-                let owner = if connection.route == Route::Service {
-                    SecretOwner::Service(sign_in)
-                } else {
-                    SecretOwner::SignIn(sign_in)
-                };
+                let owner =
+                    if route == Route::Service { SecretOwner::Service(sign_in) } else { SecretOwner::SignIn(sign_in) };
                 self.pending
                     .exchanges
-                    .insert(exchange, Waiting::Get { owner, digest, body, route: connection.route })
+                    .insert(exchange, Waiting::Get { owner, digest, body, route })
                     .expect("admitted exchange");
                 out.push(Request::Secrets(SecretsRequest::Get { owner }));
             }
-            Route::Missing => {}
         }
     }
     fn reply(&mut self, env: &Env<Limits>, exchange: Token, reply: people::Reply, out: &mut Queue<Request>) {
@@ -450,7 +433,7 @@ impl Component {
             Ok(answer) => {
                 let mut body = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
                 answer.encode(&mut body).expect("measured answer");
-                connection.respond(200, body.finish(), &env.limits);
+                connection.respond(crate::Reply::Record(body.finish()), &env.limits);
             }
             Err(_) => connection.close(out),
         }
@@ -497,7 +480,7 @@ impl Component {
     }
     fn owner(&self, exchange: Token) -> Option<Token> {
         for (owner, connection) in &self.connections {
-            if connection.exchange == Some(exchange) && !connection.closing {
+            if connection.name == Some(exchange) && !connection.closing {
                 return Some(*owner);
             }
         }
@@ -505,17 +488,17 @@ impl Component {
     }
     fn respond(&mut self, env: &Env<Limits>, exchange: Token, body: Box<[u8]>) {
         if let Some(owner) = self.owner(exchange) {
-            self.connections.get_mut(&owner).expect("exchange owner").respond(200, body, &env.limits);
+            self.connections.get_mut(&owner).expect("exchange owner").respond(crate::Reply::Record(body), &env.limits);
         }
     }
     fn denied(&mut self, env: &Env<Limits>, exchange: Token, route: Route) {
         if let Some(owner) = self.owner(exchange) {
-            let status = if route == Route::Stream { 401 } else { 200 };
-            self.connections.get_mut(&owner).expect("exchange owner").respond(
-                status,
-                routes::unauthenticated(route, &env.limits.wire),
-                &env.limits,
-            );
+            let connection = self.connections.get_mut(&owner).expect("exchange owner");
+            if route == Route::Stream {
+                connection.ended = Some(crate::Ended::SignedOut);
+            } else {
+                connection.respond(crate::Reply::Record(routes::unauthenticated(route, &env.limits.wire)), &env.limits);
+            }
         }
     }
     fn admitted(&self) -> u32 {
@@ -545,7 +528,7 @@ impl Component {
             None => None,
         };
         for (_, stream) in &self.streams {
-            if !stream.closing() && !stream.waiting && !stream.finishing() {
+            if !stream.closing() && !stream.waiting {
                 next = Some(match next {
                     Some(next) => next.min(stream.deadline),
                     None => stream.deadline,
@@ -561,14 +544,14 @@ impl Component {
         }
         let mut due = None;
         for (owner, stream) in &self.streams {
-            if !stream.closing() && !stream.waiting && !stream.finishing() && stream.deadline <= env.now {
+            if !stream.closing() && !stream.waiting && stream.deadline <= env.now {
                 due = Some(*owner);
                 break;
             }
         }
         if let Some(owner) = due {
             let stream = self.streams.get_mut(&owner).expect("due stream");
-            if stream.waiting || stream.finishing() {
+            if stream.waiting {
                 stream.phase = crate::stream::Phase::Closing;
             } else {
                 stream.heartbeat(env);

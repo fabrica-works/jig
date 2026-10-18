@@ -10,6 +10,15 @@ use super::super::*;
 pub use envelope::*;
 use skein_lib::{Duration, List, Secret, Wall, Writer};
 pub const NUMBER: u64 = 41;
+// Keep the old intake's 256-byte cap, enough for these small message records.
+pub const MESSAGE_BYTES: u32 = 256;
+pub fn message_bytes(size: usize) -> Box<[u8]> {
+    let mut bytes = Writer::new(size);
+    for _ in 0..size {
+        bytes.put(&[0]).expect("bounded bytes");
+    }
+    bytes.finish()
+}
 pub fn wire() -> w::Limits {
     w::Limits {
         keyed_request: 256,
@@ -49,7 +58,7 @@ pub fn env() -> Env<Limits> {
             mints: 2,
             exchanges: 4,
             exchanges_per_client: 2,
-            http: http::Limits { head: 512, headers: 4, body: 256, read: 32, response: 256, send: 32 },
+            message_bytes: MESSAGE_BYTES,
             wire: wire(),
             link_span: Duration::from_secs(300),
         },
@@ -122,34 +131,29 @@ impl Exchange {
         token.put(&[7; 32]).expect("random bytes");
         Self { component, env, out, token: token.finish() }
     }
-    pub fn post(&mut self, body: Box<[u8]>) -> Token {
-        self.post_to(b"/jig/v1/request", body)
-    }
-    pub fn post_to(&mut self, target: &[u8], body: Box<[u8]>) -> Token {
-        self.post_to_method(target, body, skein_http::Method::Post)
-    }
-    pub fn post_to_method(&mut self, target: &[u8], body: Box<[u8]>, method: skein_http::Method) -> Token {
+    pub fn send(&mut self, message: crate::Message) -> Token {
         let owner = self.component.name();
-        let mut connection = Connection::new(owner, &self.env.limits, self.env.now);
-        connection.requests.pop();
-        let encoded = url(&self.token);
-        let mut bearer = Writer::new(encoded.len().checked_add(7).expect("bearer size"));
-        bearer.put(b"Bearer ").expect("prefix");
-        bearer.put(&encoded).expect("token");
-        let call = http::Call {
-            method,
-            target: Box::from(target),
-            headers: Box::new([skein_http::Header {
-                name: Box::from(b"authorization".as_slice()),
-                value: bearer.finish(),
-            }]),
-            body: http::Body::Length(u64::try_from(body.len()).expect("short body")),
-            version: skein_http::Version::Http11,
-        };
-        self.component.http(&self.env, &mut connection, http::Event::Call(call), &mut self.out);
-        connection.body.append(&body).expect("body fits");
-        self.component.http(&self.env, &mut connection, http::Event::Body(Up::End), &mut self.out);
-        self.component.connections.insert(owner, connection).expect("test connection");
+        self.component.down(
+            &self.env,
+            Event::Transport(crate::FromTransport::Exchange {
+                exchange: owner,
+                credential: Some(Secret::new(self.token.clone())),
+                message,
+            }),
+            &mut self.out,
+        );
+        owner
+    }
+    pub fn stream_open(&mut self) -> Token {
+        let owner = self.component.name();
+        self.component.down(
+            &self.env,
+            Event::Transport(crate::FromTransport::StreamOpen {
+                stream: owner,
+                credential: Some(Secret::new(self.token.clone())),
+            }),
+            &mut self.out,
+        );
         owner
     }
     pub fn authenticate(&mut self) {
@@ -172,19 +176,16 @@ impl Exchange {
     }
     pub fn response(&self, owner: Token) -> (u16, &[u8]) {
         let connection = self.component.connections.get(&owner).expect("connection");
-        let mut status = None;
-        for request in &connection.requests {
-            match request {
-                http::Request::Respond(response) => status = Some(response.status),
-                http::Request::Next
-                | http::Request::Body(_)
-                | http::Request::Discard
-                | http::Request::Reply(_)
-                | http::Request::Close => {}
-            }
+        match connection.response.as_ref() {
+            Some(crate::Reply::Record(body)) => (200, body),
+            Some(crate::Reply::NotARecord) => (400, &[]),
+            Some(crate::Reply::Conflict) => (409, &[]),
+            None => match connection.ended {
+                Some(crate::Ended::SignedOut) => (401, &[]),
+                Some(crate::Ended::Busy | crate::Ended::Stopping) => (409, &[]),
+                None => panic!("response"),
+            },
         }
-        let status = status.expect("response");
-        (status, &connection.response)
     }
 }
 
@@ -628,7 +629,7 @@ pub use answers::*;
 impl Exchange {
     pub fn ask(&mut self) -> (Token, ReplyTo) {
         let body = keyed(w::Owner::Jig, 8, encode_ask(&start(&self.env.limits.wire)));
-        let owner = self.post(body);
+        let owner = self.send(crate::Message::Request(body));
         self.authenticate();
         let Some(Request::Core(event)) = self.out.pop() else {
             panic!("core ask");
@@ -652,7 +653,7 @@ impl Exchange {
     pub fn application(&mut self) -> (Token, ReplyTo) {
         let family =
             w::Owner::Family(w::Family::new(&self.env.limits.wire, w::FamilyParts { number: 9 }).expect("family"));
-        let owner = self.post(keyed(family, 2, Box::from(b"abc".as_slice())));
+        let owner = self.send(crate::Message::Request(keyed(family, 2, Box::from(b"abc".as_slice()))));
         self.authenticate();
         let Some(Request::Application(crate::ToApplication::Request { reply_to, .. })) = self.out.pop() else {
             panic!("application ask");
@@ -713,15 +714,4 @@ pub fn final_record(record: w::KeyedAnswer, limits: &w::Limits) -> w::Final {
             panic!("expected final, got {other:?}")
         }
     }
-}
-
-pub fn url(bytes: &[u8]) -> Box<[u8]> {
-    let length = skein_lib::base64::encoded_len(
-        skein_lib::base64::Alphabet::Url,
-        u32::try_from(bytes.len()).expect("short secret"),
-    )
-    .expect("encoded secret");
-    let mut out = Writer::new(usize::try_from(length).expect("u32 fits"));
-    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, bytes, &mut out).expect("measured base64");
-    out.finish()
 }

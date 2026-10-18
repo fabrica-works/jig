@@ -6,14 +6,7 @@ use jig_domain_views as views;
 use skein_lib::{Duration, List, ReplyTo, Secret, Token, Wall};
 #[derive(Debug)]
 pub enum Event {
-    Call {
-        call: Token,
-        head: skein_http::server::Call,
-    },
-    Http {
-        call: Token,
-        event: skein_http::server::Event,
-    },
+    Transport(FromTransport),
     Reply {
         to: ReplyTo,
         reply: people::Reply,
@@ -64,8 +57,7 @@ pub enum Event {
 }
 #[derive(Debug)]
 pub enum Request {
-    Http { call: Token, request: skein_http::server::Request },
-    Done { call: Token },
+    Transport(ToTransport),
     Core(Box<core::Event>),
     Application(ToApplication),
     Secrets(SecretsRequest),
@@ -161,4 +153,47 @@ pub struct Served {
     pub family: Option<u16>,
     pub first: u32,
     pub last: u32,
+}
+
+/// Messages from an opaque transport (protocol/client.md, 4.2).
+#[derive(Debug, PartialEq)]
+pub enum FromTransport {
+    Exchange { exchange: Token, credential: Option<Secret>, message: Message },
+    StreamOpen { stream: Token, credential: Option<Secret> },
+    StreamTaken { stream: Token },
+    StreamGone { stream: Token },
+}
+#[derive(Debug, PartialEq)]
+pub enum Message {
+    Request(Box<[u8]>),
+    Read(Box<[u8]>),
+    Watch(Box<[u8]>),
+    Unwatch(Box<[u8]>),
+    Gone(Box<[u8]>),
+    SignInLink(Box<[u8]>),
+    SignInService(Box<[u8]>),
+    SignOut(Box<[u8]>),
+}
+#[derive(Debug)]
+pub enum ToTransport {
+    Reply { exchange: Token, reply: Reply },
+    Streamed { stream: Token, message: Streamed },
+    StreamEnded { stream: Token, why: Ended },
+}
+#[derive(Debug)]
+pub enum Reply {
+    Record(Box<[u8]>),
+    NotARecord,
+    Conflict,
+}
+#[derive(Debug)]
+pub enum Streamed {
+    Record(Box<[u8]>),
+    Heartbeat,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ended {
+    SignedOut,
+    Stopping,
+    Busy,
 }

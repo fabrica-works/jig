@@ -2,10 +2,7 @@
 use crate::{Kept, SecretOwner, routes::Route};
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v8 as w;
-use skein_lib::{
-    CryptoRng, Map, Secret, Time, Token, Writer,
-    base64::{self, Alphabet},
-};
+use skein_lib::{CryptoRng, Map, Secret, Time, Token, Writer};
 #[derive(Debug)]
 pub(crate) struct Link {
     pub secret: Secret,
@@ -47,19 +44,15 @@ pub(crate) fn token(rng: &mut CryptoRng, number: u64) -> Secret {
     Secret::new(out.finish())
 }
 pub(crate) fn digest(bytes: &[u8]) -> Secret {
-    let mut out = Writer::new(32);
-    for word in skein_io::digest::digest(bytes).0 {
-        out.put(&word.to_be_bytes()).expect("four words");
-    }
-    Secret::new(out.finish())
+    Secret::new(Box::new(skein_lib::sha256::digest(bytes)))
 }
-pub(crate) fn bearer(header: Option<&[u8]>) -> Option<(u64, Secret)> {
-    let bytes = base64::decode(Alphabet::Url, header?.strip_prefix(b"Bearer ")?, 40).ok()?;
+pub(crate) fn credential(value: Option<&Secret>) -> Option<(u64, Secret)> {
+    let bytes = value?.expose();
     if bytes.len() != 40 {
         return None;
     }
     let number = u64::from_be_bytes(bytes.get(..8)?.try_into().ok()?);
-    Some((number, digest(&bytes)))
+    Some((number, digest(bytes)))
 }
 pub(crate) fn accepted(value: Option<&Kept>, digest: &Secret, wall: skein_lib::Wall) -> bool {
     match value {

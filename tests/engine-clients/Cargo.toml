@@ -9,6 +9,7 @@ publish.workspace = true
 jig-test-service.workspace = true
 skein-world.workspace = true
 jig-protocol-engine-clients.workspace = true
+jig-protocol-engine-clients-http.workspace = true
 jig-client-protocol-wire.workspace = true
 jig-domain-core.workspace = true
 jig-domain-authority.workspace = true

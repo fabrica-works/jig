@@ -62,10 +62,9 @@ fn an_application_watch_keeps_its_owner_and_rejects_foreign_deliveries() {
         &mut world.out,
     );
     let packet =
-        &world.stream().watches.get(&watcher).expect("watch").delivery.as_ref().expect("family delivery").event.data;
-    let bytes = skein_lib::base64::decode(skein_lib::base64::Alphabet::Standard, packet, 256).expect("record");
+        &world.stream().watches.get(&watcher).expect("watch").delivery.as_ref().expect("family delivery").event;
     let w::StreamEvent::Delivery(value) =
-        w::StreamEvent::decode(&fixtures::wire(), &mut Reader::new(&bytes)).expect("event")
+        w::StreamEvent::decode(&fixtures::wire(), &mut Reader::new(packet)).expect("event")
     else {
         panic!("delivery");
     };
@@ -91,7 +90,7 @@ fn a_watch_admission_or_refusal_cannot_answer_another_exchange() {
             .component
             .pending
             .exchanges
-            .get(&world.component.connections.get(&second).expect("second").exchange.expect("exchange"))
+            .get(&world.component.connections.get(&second).expect("second").name.expect("exchange"))
             .is_some()
     );
 }
@@ -110,7 +109,7 @@ fn waiting_for_room_keeps_one_delivery_per_watch() {
     }
     assert!(world.stream().waiting);
     assert!(world.stream().watches.get(&watcher).expect("watch").delivery.is_some());
-    assert_eq!(world.stream().below.len(), 1);
+    assert_eq!(world.stream().message.iter().count(), 1);
     assert!(world.out.is_empty());
 }
 
@@ -152,7 +151,7 @@ fn unwatch_answers_only_after_its_released_ending() {
         panic!("unwatch");
     };
     assert_eq!(actual, watcher);
-    let exchange = world.component.connections.get(&owner).expect("connection").exchange.expect("exchange");
+    let exchange = world.component.connections.get(&owner).expect("connection").name.expect("exchange");
     world.component.down(&world.env, Event::Admitted { watcher }, &mut world.out);
     assert!(world.component.pending.exchanges.get(&exchange).is_some());
     world.component.down(
@@ -202,7 +201,7 @@ fn a_run_watch_keeps_the_complete_provisional_position() {
 #[test]
 fn an_absent_stream_digest_is_answered_signed_out() {
     let mut world = fixtures::Exchange::new();
-    let owner = world.post_to_method(b"/jig/v1/stream", Box::new([]), skein_http::Method::Get);
+    let owner = world.stream_open();
     let Some(Request::Secrets(crate::SecretsRequest::Get { owner: wanted })) = world.out.pop() else {
         panic!("digest get");
     };

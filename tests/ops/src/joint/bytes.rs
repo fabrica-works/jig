@@ -9,6 +9,7 @@ use jig_domain_core as core;
 use jig_ops_client_domain as d;
 use jig_ops_domain as root;
 use jig_protocol_engine_clients::{self as clients, FromApplication, SecretsAnswer, SecretsRequest};
+use jig_protocol_engine_clients_http as http;
 use skein_lib::{Env, Queue, Time, Token, Wall};
 use std::collections::BTreeMap;
 #[derive(PartialEq, Eq)]
@@ -138,6 +139,8 @@ pub(super) struct Bytes {
     component: clients::Component,
     server: jig_test_service::server::Server,
     server_out: Queue<jig_test_service::server::Routed>,
+    mount: http::Mount,
+    mount_out: Queue<http::Request>,
     env: Env<clients::Limits>,
     out: Queue<clients::Request>,
     net: Net,
@@ -174,8 +177,6 @@ impl Bytes {
         // A page change overlaps its old closes with new watches and reads.
         limits.exchanges = connections_limits().exchanges;
         limits.exchanges_per_client = connections_limits().exchanges;
-        limits.http.body = 262_144;
-        limits.http.response = 262_144;
         let env = Env { now: Time::ZERO, wall: fixtures::wall(Time::ZERO), limits };
         let mut out = Queue::with_capacity(512);
         let component = clients::Component::new(settings, &env, &mut out).expect("Ops clients component");
@@ -183,6 +184,8 @@ impl Bytes {
             component,
             server: fixtures::server(),
             server_out: Queue::with_capacity(512),
+            mount: fixtures::mount(),
+            mount_out: Queue::with_capacity(512),
             env,
             out,
             net: Net::new(seed),
@@ -196,6 +199,23 @@ impl Bytes {
             pending_admissions: Vec::new(),
             ready_admissions: Vec::new(),
         }
+    }
+    fn mount_env(&self) -> Env<http::Limits> {
+        Env { now: self.env.now, wall: self.env.wall, limits: fixtures::http_limits() }
+    }
+    fn mount_event(&mut self, event: http::Event) {
+        self.mount.down(&self.mount_env(), event, &mut self.mount_out);
+    }
+    fn mount_step(&mut self) -> bool {
+        let mut active = self.mount.up(&self.mount_env(), &mut self.mount_out);
+        while let Some(request) = self.mount_out.pop() {
+            active = true;
+            match request {
+                http::Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
+                http::Request::Component(message) => self.event(clients::Event::Transport(message)),
+            }
+        }
+        active
     }
     fn event(&mut self, event: clients::Event) {
         self.component.down(&self.env, event, &mut self.out);
@@ -321,6 +341,7 @@ impl Bytes {
         for _ in 0..100_000 {
             let mut active = false;
             self.server.fire(&mut self.server_out);
+            active |= self.mount_step();
             active |= self.server.advance(&mut self.server_out);
             while let Some(routed) = self.server_out.pop() {
                 active = true;
@@ -331,10 +352,10 @@ impl Bytes {
                         }
                     }
                     jig_test_service::server::Routed::Call { call, head } => {
-                        self.event(clients::Event::Call { call, head });
+                        self.mount_event(http::Event::Call { call, head });
                     }
                     jig_test_service::server::Routed::Http { call, event } => {
-                        self.event(clients::Event::Http { call, event });
+                        self.mount_event(http::Event::Http { call, event });
                     }
                 }
             }
@@ -416,8 +437,7 @@ impl Bytes {
     }
     fn request(&mut self, joint: &mut Joint, request: clients::Request) {
         match request {
-            clients::Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
-            clients::Request::Done { call } => self.server.done(call, &mut self.server_out),
+            clients::Request::Transport(message) => self.mount_event(http::Event::Component(message)),
             clients::Request::Link { secret } => self.link = jig_client_protocol_world::fixtures::printed(&secret),
             clients::Request::Secrets(request) => {
                 let answer = match request {
@@ -580,6 +600,8 @@ impl Bytes {
         self.component = fresh.component;
         self.server = fresh.server;
         self.server_out = fresh.server_out;
+        self.mount = fresh.mount;
+        self.mount_out = fresh.mount_out;
         self.out = fresh.out;
         self.subjects.clear();
         self.reads.clear();

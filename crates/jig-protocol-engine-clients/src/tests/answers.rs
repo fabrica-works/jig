@@ -69,23 +69,6 @@ fn an_application_outcome_is_carried_under_its_family() {
     assert!(exchange.out.is_empty());
 }
 #[test]
-fn a_lost_connection_drops_the_answer_and_nothing_else() {
-    let mut exchange = Exchange::new();
-    let (owner, to) = exchange.ask();
-    let (other_owner, other_to) = exchange.ask();
-    exchange.component.down(
-        &exchange.env,
-        Event::Http { call: owner, event: skein_http::server::Event::Closed },
-        &mut exchange.out,
-    );
-    exchange.reply(to, p::Reply::Outcome(p::Outcome::Said { task: 8, message: 9 }));
-    assert_eq!(exchange.component.pending.exchanges.len(), 1);
-    assert!(exchange.out.is_empty());
-    exchange.reply(other_to, p::Reply::Outcome(p::Outcome::Said { task: 8, message: 9 }));
-    assert_eq!(exchange.final_answer(other_owner), f::started());
-    assert!(exchange.component.pending.exchanges.is_empty());
-}
-#[test]
 fn owner_outcomes_keep_every_supplied_fact() {
     let limits = f::wire();
     for cases in [f::owner_outcomes().as_slice(), f::decision_outcomes().as_slice(), f::seen_outcomes().as_slice()] {
@@ -105,7 +88,7 @@ fn a_service_result_contains_its_party_and_no_credential() {
     assert_eq!(out.finish().as_ref(), &f::SERVICE_ANSWER);
 }
 fn unanswered(exchange: &Exchange, owner: Token) -> bool {
-    exchange.component.connections.get(&owner).expect("owner").response.is_empty()
+    exchange.component.connections.get(&owner).expect("owner").response.is_none()
 }
 
 #[test]
@@ -168,10 +151,6 @@ fn an_answer_past_its_bound_is_lost_without_a_partial_response() {
             Some(expected) => assert_eq!(exchange.answer(owner), expected),
             None => {
                 assert!(unanswered(&exchange, owner));
-                let Some(Request::Done { call: entity }) = exchange.out.pop() else {
-                    panic!("lost answer");
-                };
-                assert_eq!(entity, owner);
             }
         }
         assert!(exchange.out.is_empty());
@@ -244,7 +223,7 @@ const REFUSED_WATCH: u64 = 71;
 #[test]
 fn a_keyed_request_outside_its_owners_range_is_answered_not_served() {
     let mut exchange = Exchange::new();
-    let owner = exchange.post(f::keyed(w::Owner::Jig, UNSERVED_VERSION, Box::new([255])));
+    let owner = exchange.send(crate::Message::Request(f::keyed(w::Owner::Jig, UNSERVED_VERSION, Box::new([255]))));
     exchange.authenticate();
     assert_eq!(exchange.answer(owner), w::KeyedAnswer::NotServed(f::not_served(w::Owner::Jig)));
     assert!(exchange.out.is_empty());
@@ -252,7 +231,7 @@ fn a_keyed_request_outside_its_owners_range_is_answered_not_served() {
 #[test]
 fn a_read_outside_its_owners_range_names_the_served_ranges() {
     let mut exchange = Exchange::new();
-    let owner = exchange.post_to(b"/jig/v1/read", f::owned_read(w::Owner::Jig, UNSERVED_VERSION, Box::new([255])));
+    let owner = exchange.send(crate::Message::Read(f::owned_read(w::Owner::Jig, UNSERVED_VERSION, Box::new([255]))));
     exchange.authenticate();
     assert_eq!(exchange.read_answer(owner), w::ReadAnswer::NotServed(f::not_served(w::Owner::Jig)));
     assert!(exchange.out.is_empty());

@@ -9,20 +9,24 @@ fn stopping_keeps_the_printed_link_live_and_unspent() {
     let secret = component.link.as_ref().expect("live link").secret.clone();
     let until = component.link.as_ref().expect("live link").until;
     let owner = Token::new(99);
-    component.connections.insert(owner, Connection::new(owner, &env.limits, env.now)).expect("call");
     let record =
         w::LinkSignIn::new(&env.limits.wire, w::LinkSignInParts { secret: secret.expose().into() }).expect("link");
     let mut body = skein_lib::Writer::new(usize::try_from(record.measure()).expect("size"));
     record.encode(&mut body).expect("body");
-    let connection = component.connections.get_mut(&owner).expect("connection");
-    connection.route = Route::Link;
-    connection.exchange = Some(Token::new(2));
-    connection.body.append(&body.finish()).expect("body fits");
     component.down(&env, Event::Stop, &mut out);
-    let mut connection = component.connections.remove(&owner).expect("connection");
-    component.body(&env, &mut connection, &mut out);
+    component.down(
+        &env,
+        Event::Transport(crate::FromTransport::Exchange {
+            exchange: owner,
+            credential: None,
+            message: crate::Message::SignInLink(body.finish()),
+        }),
+        &mut out,
+    );
+    let connection = component.connections.get(&owner).expect("exchange");
+    let Some(crate::Reply::Record(answer)) = &connection.response else { panic!("answer") };
     assert_eq!(
-        w::SignInAnswer::decode(&env.limits.wire, &mut skein_lib::Reader::new(&connection.response)),
+        w::SignInAnswer::decode(&env.limits.wire, &mut skein_lib::Reader::new(answer)),
         Ok(w::SignInAnswer::NotReady)
     );
     let live = component.link.as_ref().expect("still live");

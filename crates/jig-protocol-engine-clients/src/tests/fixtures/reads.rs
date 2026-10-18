@@ -71,7 +71,7 @@ pub fn held_reads() -> [(&'static str, w::Read, reads::Read, reads::Answer, w::R
 }
 impl Exchange {
     pub fn read(&mut self, value: &w::Read) -> (Token, ReplyTo, reads::Read) {
-        let owner = self.post_to(b"/jig/v1/read", owned_read(w::Owner::Jig, 8, encoded_read(value)));
+        let owner = self.send(crate::Message::Read(owned_read(w::Owner::Jig, 8, encoded_read(value))));
         self.authenticate();
         let Some(Request::Core(event)) = self.out.pop() else { panic!("core read") };
         let core::Event::Read { reply, sign_in, read } = *event else { panic!("read") };
@@ -82,7 +82,7 @@ impl Exchange {
         self.component.down(&self.env, Event::Read { reply, answer }, &mut self.out);
     }
     pub fn read_unanswered(&self, owner: Token) -> bool {
-        self.component.connections.get(&owner).expect("read owner").response.is_empty()
+        self.component.connections.get(&owner).expect("read owner").response.is_none()
     }
     pub fn read_answer(&self, owner: Token) -> w::ReadAnswer {
         let (status, body) = self.response(owner);
@@ -91,7 +91,7 @@ impl Exchange {
     }
     pub fn application_read(&mut self) -> (Token, ReplyTo) {
         let owner = w::Owner::Family(w::Family::new(&wire(), w::FamilyParts { number: 9 }).expect("family"));
-        let socket = self.post_to(b"/jig/v1/read", owned_read(owner, 2, Box::from([255, 0, 1])));
+        let socket = self.send(crate::Message::Read(owned_read(owner, 2, Box::from([255, 0, 1]))));
         self.authenticate();
         let Some(Request::Application(crate::ToApplication::Read { reply, sign_in, family, version, record, .. })) =
             self.out.pop()

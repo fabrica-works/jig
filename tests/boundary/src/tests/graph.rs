@@ -571,8 +571,14 @@ fn configuration_links_only_its_vocabulary_and_foundation() {
             ["skein-lib", "skein-json", "skein-io", "skein-oauth", "skein-oauth-accounts", "skein-tls"]
                 .contains(&dependency.as_str())
                 || CORE_FAMILY.contains(&dependency.as_str())
-                || ["jig-domain-host", "jig-protocol-engine-clients", "jig-client-protocol-wire", "skein-http"]
-                    .contains(&dependency.as_str())
+                || [
+                    "jig-domain-host",
+                    "jig-protocol-engine-clients",
+                    "jig-protocol-engine-clients-http",
+                    "jig-client-protocol-wire",
+                    "skein-http"
+                ]
+                .contains(&dependency.as_str())
                 || ["jig-protocol-store", "skein-kv"].contains(&dependency.as_str()),
             "configuration dependency: {dependency}"
         );

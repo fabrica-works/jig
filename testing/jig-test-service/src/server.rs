@@ -168,7 +168,11 @@ impl Server {
         }
         None
     }
-    pub fn answer(&mut self, call: Token, request: http::Request, _out: &mut Queue<Routed>) {
+    pub fn answer(&mut self, call: Token, request: http::Request, out: &mut Queue<Routed>) {
+        if let http::Request::Next = request {
+            self.done(call, out);
+            return;
+        }
         if let Some(owner) = self.owner(call) {
             let connection = self.connections.get_mut(&owner).expect("call owner");
             if !connection.closing {

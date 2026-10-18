@@ -1,4 +1,5 @@
 //! io's stream records joined to an actual HTTP client, with scripted durability.
+use jig_protocol_engine_clients_http as mapping;
 mod closing;
 use crate::fixtures;
 use jig_client_protocol_wire::v8 as w;
@@ -134,7 +135,7 @@ impl Exchange {
         if let Some(up) = self.to_client.answer() {
             http::up(&mut self.client, &Self::env(), up, &mut self.events, &mut self.below);
         }
-        if self.pause_after.is_some_and(|limit| self.to_engine.received.len() >= limit) {
+        if self.pause_after.is_some_and(|limit| self.body.len() >= limit) {
             self.paused = true;
         }
         let up = if self.paused || self.state != ExchangeState::Active { None } else { self.to_engine.answer() };
@@ -143,11 +144,7 @@ impl Exchange {
     }
     fn read(&mut self) {
         self.down(http::Request::Body(Down::Demand {
-            read: if self.streaming {
-                Read::Line { max: 256 }
-            } else {
-                Read::Arrived { max: fixtures::client_limits().read }
-            },
+            read: Read::Arrived { max: fixtures::client_limits().read },
             room: 0,
         }));
     }
@@ -156,6 +153,8 @@ impl Exchange {
 pub struct Peer {
     server: jig_test_service::server::Server,
     server_out: Queue<jig_test_service::server::Routed>,
+    mount: mapping::Mount,
+    mount_out: Queue<mapping::Request>,
     component: Component,
     env: Env<Limits>,
     out: Queue<Request>,
@@ -197,6 +196,8 @@ impl Peer {
             component,
             server: fixtures::server(),
             server_out: Queue::with_capacity(64),
+            mount: fixtures::mount(),
+            mount_out: Queue::with_capacity(64),
             env,
             out,
             sockets: BTreeMap::new(),
@@ -243,22 +244,42 @@ impl Peer {
         self.component.down(&self.env, event, &mut self.out);
         self.pump();
     }
+    fn mount_env(&self) -> Env<mapping::Limits> {
+        Env { now: self.env.now, wall: self.env.wall, limits: fixtures::http_limits() }
+    }
+    fn mount_event(&mut self, event: mapping::Event) {
+        self.mount.down(&self.mount_env(), event, &mut self.mount_out);
+    }
+    fn mount_step(&mut self) -> bool {
+        let mut active = self.mount.up(&self.mount_env(), &mut self.mount_out);
+        while let Some(request) = self.mount_out.pop() {
+            active = true;
+            match request {
+                mapping::Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
+                mapping::Request::Component(message) => {
+                    if self.closed == 0 {
+                        self.component.down(&self.env, Event::Transport(message), &mut self.out);
+                    }
+                }
+            }
+        }
+        active
+    }
     fn server_step(&mut self) -> bool {
         let mut active = false;
         self.server.clock(self.env.now, self.env.wall);
         self.server.fire(&mut self.server_out);
+        active |= self.mount_step();
         active |= self.server.advance(&mut self.server_out);
         if let Some(routed) = self.server_out.pop() {
             active = true;
             match routed {
                 jig_test_service::server::Routed::Io(request) => self.io(request),
                 jig_test_service::server::Routed::Call { call, head } => {
-                    self.component.down(&self.env, Event::Call { call, head }, &mut self.out);
+                    self.mount_event(mapping::Event::Call { call, head });
                 }
                 jig_test_service::server::Routed::Http { call, event } => {
-                    if self.closed == 0 {
-                        self.component.down(&self.env, Event::Http { call, event }, &mut self.out);
-                    }
+                    self.mount_event(mapping::Event::Http { call, event });
                 }
             }
         }
@@ -276,8 +297,7 @@ impl Peer {
             if let Some(request) = self.out.pop() {
                 active = true;
                 match request {
-                    Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
-                    Request::Done { call } => self.server.done(call, &mut self.server_out),
+                    Request::Transport(message) => self.mount_event(mapping::Event::Component(message)),
                     Request::Core(event) => {
                         if let core::Event::Delivered { watcher } = event.as_ref() {
                             self.in_flight.remove(watcher);
@@ -513,6 +533,8 @@ impl Peer {
         self.component = Component::new(settings.clone(), &self.env, &mut self.out).expect("restart");
         self.server = fixtures::server();
         self.server_out = Queue::with_capacity(64);
+        self.mount = fixtures::mount();
+        self.mount_out = Queue::with_capacity(64);
         self.closed = 0;
         self.pump();
     }
@@ -556,7 +578,7 @@ impl Peer {
     }
     pub fn read_one_piece(&mut self, stream: [u8; 16]) {
         let exchange = self.sockets.get_mut(&self.streams[&stream]).expect("stream");
-        exchange.pause_after = Some(exchange.to_engine.received.len() + 1);
+        exchange.pause_after = Some(exchange.body.len() + 1);
     }
     pub fn cut_stream(&mut self, stream: [u8; 16]) {
         let exchange = self.sockets.get_mut(&self.streams[&stream]).expect("stream");

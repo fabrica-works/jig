@@ -121,7 +121,10 @@ impl Component {
         let mut reader = Reader::new(body);
         if w::SignOut::decode(&env.limits.wire, &mut reader).is_err() || !reader.is_empty() {
             if let Some(owner) = self.owner(exchange) {
-                self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                self.connections
+                    .get_mut(&owner)
+                    .expect("exchange owner")
+                    .respond(crate::Reply::NotARecord, &env.limits);
             }
             return;
         }
@@ -175,7 +178,7 @@ impl Component {
     pub(super) fn settled(&self) -> bool {
         !self.closed() && self.connections.is_empty() && self.streams.is_empty() && self.pending.mints.is_empty()
     }
-    pub(super) fn close_up(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
+    pub(super) fn close_up(&mut self, _env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
         if !self.closing() {
             return false;
         }
@@ -195,7 +198,7 @@ impl Component {
             if unwatch.is_some() {
                 break;
             }
-            if stream.watches.is_empty() && !stream.waiting && !stream.finishing() {
+            if stream.watches.is_empty() && !stream.waiting {
                 finish = Some(*owner);
                 break;
             }
@@ -213,25 +216,8 @@ impl Component {
         }
         if let Some(owner) = finish {
             let stream = self.streams.get_mut(&owner).expect("finishing stream");
-            stream.phase = crate::stream::Phase::Finishing;
-            skein_http::sse::writer::down(
-                &mut stream.writer,
-                &crate::stream::writer_env(env),
-                skein_http::sse::writer::Request::Finish,
-                &mut stream.above,
-                &mut stream.below,
-            );
-            return true;
-        }
-        let mut idle = None;
-        for (owner, connection) in &self.connections {
-            if connection.exchange.is_none() && !connection.closing {
-                idle = Some(*owner);
-                break;
-            }
-        }
-        if let Some(owner) = idle {
-            self.connections.get_mut(&owner).expect("idle connection").finish(out);
+            stream.phase = crate::stream::Phase::Closing;
+            stream.ending = crate::Ended::Stopping;
             return true;
         }
         if self.settled() {

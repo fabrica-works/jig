@@ -1,0 +1,193 @@
+//! The default HTTP mapping's engine end (protocol/client.md, 17.2 and 17.4).
+#![cfg_attr(not(test), no_std)]
+#![forbid(unsafe_code)]
+extern crate alloc;
+use alloc::boxed::Box;
+use jig_protocol_engine_clients as kit;
+use skein_http::server as http;
+use skein_lib::{Env, Map, Queue, Secret, Time, Token};
+mod call;
+mod credential;
+mod dispatch;
+mod stream;
+#[derive(Debug)]
+pub struct Settings {
+    pub prefix: Box<[u8]>,
+    pub loopback: bool,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Limits {
+    pub calls: u32,
+    pub streams: u32,
+    pub body: u32,
+    pub read: u32,
+    pub send: u32,
+    pub event: u32,
+}
+#[derive(Debug)]
+pub enum Event {
+    Call { call: Token, head: http::Call },
+    Http { call: Token, event: http::Event },
+    Component(kit::ToTransport),
+}
+#[derive(Debug)]
+pub enum Request {
+    Http { call: Token, request: http::Request },
+    Component(kit::FromTransport),
+}
+#[derive(Debug)]
+pub struct Mount {
+    settings: Settings,
+    calls: Map<Token, call::Call>,
+}
+impl Mount {
+    #[must_use]
+    pub fn new(settings: Settings, limits: &Limits) -> Self {
+        Self { settings, calls: Map::with_capacity(limits.calls) }
+    }
+    pub fn down(&mut self, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
+        match event {
+            Event::Call { call, head } => {
+                let mut value = call::Call::new(call, &env.limits);
+                value.route = dispatch::route(&self.settings.prefix, &head);
+                value.body_kind = head.body;
+                value.credential = credential::read(&head);
+                let mut streams = 0_u32;
+                for (_, call) in &self.calls {
+                    if call.streaming {
+                        streams = streams.saturating_add(1);
+                    }
+                }
+                if value.route == dispatch::Route::Stream && streams >= env.limits.streams {
+                    value.route = dispatch::Route::Missing;
+                    value.respond(409, Box::new([]), &env.limits);
+                } else if value.route == dispatch::Route::Missing {
+                    value.respond(404, Box::new([]), &env.limits);
+                } else {
+                    value.read(&env.limits);
+                }
+                self.calls.insert(call, value).expect("server bounds mounted calls");
+            }
+            Event::Http { call, event } => {
+                if let Some(value) = self.calls.get_mut(&call) {
+                    value.events.push(event);
+                }
+            }
+            Event::Component(message) => self.component(env, message, out),
+        }
+    }
+    pub fn up(&mut self, env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
+        let mut ready = None;
+        for (name, call) in &self.calls {
+            if !call.requests.is_empty() || !call.events.is_empty() || call.stream_ready() {
+                ready = Some(*name);
+                break;
+            }
+        }
+        let Some(name) = ready else {
+            return false;
+        };
+        let mut call = self.calls.remove(&name).expect("ready call");
+        if let Some(request) = call.requests.pop() {
+            out.push(Request::Http { call: name, request });
+        } else if let Some(event) = call.events.pop() {
+            call.http(env, event, out);
+        } else {
+            call.stream_up(env, out);
+        }
+        if !call.closed {
+            self.calls.insert(name, call).expect("same call slot");
+        }
+        true
+    }
+    fn component(&mut self, env: &Env<Limits>, message: kit::ToTransport, _out: &mut Queue<Request>) {
+        let name = match &message {
+            kit::ToTransport::Reply { exchange, .. } => *exchange,
+            kit::ToTransport::Streamed { stream, .. } | kit::ToTransport::StreamEnded { stream, .. } => *stream,
+        };
+        let Some(call) = self.calls.get_mut(&name) else {
+            return;
+        };
+        match message {
+            kit::ToTransport::Reply { reply, .. } => {
+                let (status, body): (u16, Box<[u8]>) = match reply {
+                    kit::Reply::Record(body) => (200, body),
+                    kit::Reply::NotARecord => (400, Box::new([])),
+                    kit::Reply::Conflict => (409, Box::new([])),
+                };
+                call.respond(status, body, &env.limits);
+            }
+            kit::ToTransport::Streamed { message, .. } => call.stream(env, message),
+            kit::ToTransport::StreamEnded { why, .. } => call.end(env, why),
+        }
+    }
+    #[must_use]
+    pub fn next_deadline(&self) -> Option<Time> {
+        None
+    }
+    pub fn fire(&mut self, _env: &Env<Limits>, _out: &mut Queue<Request>) {}
+}
+#[must_use]
+pub fn claims(settings: &Settings, call: &http::Call) -> bool {
+    let Some(path) = call.target.strip_prefix(settings.prefix.as_ref()) else {
+        return false;
+    };
+    path.starts_with(b"/") && !(call.method == skein_http::Method::Get && path.starts_with(b"/v1/sign-in/link"))
+}
+#[must_use]
+pub fn link_path(settings: &Settings, secret: &Secret) -> Box<[u8]> {
+    let encoded = skein_lib::base64::encoded_len(
+        skein_lib::base64::Alphabet::Url,
+        u32::try_from(secret.expose().len()).expect("bounded secret"),
+    )
+    .expect("bounded base64");
+    let route = b"/v1/sign-in/link?secret=";
+    let mut path = skein_lib::Writer::new(
+        settings
+            .prefix
+            .len()
+            .checked_add(route.len())
+            .expect("path")
+            .checked_add(usize::try_from(encoded).expect("u32 fits"))
+            .expect("path"),
+    );
+    path.put(&settings.prefix).expect("prefix");
+    path.put(route).expect("route");
+    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, secret.expose(), &mut path).expect("secret");
+    path.finish()
+}
+#[cfg(test)]
+mod tests;
+
+/// Owned HTTP intake and SSE framing; the component prices the opaque reply records it supplies.
+#[must_use]
+pub fn worst_case(limits: &Limits) -> Option<u64> {
+    if limits.calls == 0
+        || limits.streams > limits.calls
+        || limits.body == 0
+        || limits.read == 0
+        || limits.send == 0
+        || limits.event == 0
+    {
+        return None;
+    }
+    Map::<Token, call::Call>::worst_case(limits.calls)?
+        .checked_add(
+            u64::from(limits.calls).checked_mul(
+                skein_lib::Intake::worst_case(limits.body)?
+                    .checked_add(Queue::<http::Event>::worst_case(8)?)?
+                    .checked_add(Queue::<http::Request>::worst_case(8)?)?
+                    .checked_add(u64::from(limits.read).checked_mul(8)?)?
+                    .checked_add(u64::from(limits.send).checked_mul(8)?)?
+                    .checked_add(40)?,
+            )?,
+        )?
+        .checked_add(
+            u64::from(limits.streams).checked_mul(
+                u64::from(limits.event)
+                    .checked_mul(2)?
+                    .checked_add(Queue::<skein_http::sse::writer::Event>::worst_case(2)?)?
+                    .checked_add(Queue::<skein_lib::stream::Down>::worst_case(2)?)?,
+            )?,
+        )
+}

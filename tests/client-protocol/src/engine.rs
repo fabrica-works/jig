@@ -5,6 +5,7 @@ use jig_client_world::{
 };
 use jig_domain_core as core;
 use jig_protocol_engine_clients::{self as clients, Event, Request, SecretOwner, SecretsAnswer, SecretsRequest};
+use jig_protocol_engine_clients_http as http;
 use jig_test_domain as root;
 use skein_lib::{Env, Queue, Time, Token, Wall};
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,6 +14,8 @@ pub(super) struct Engine {
     pub component: clients::Component,
     pub server: jig_test_service::server::Server,
     server_out: Queue<jig_test_service::server::Routed>,
+    mount: http::Mount,
+    mount_out: Queue<http::Request>,
     pub env: Env<clients::Limits>,
     pub out: Queue<Request>,
     pub link: Box<[u8]>,
@@ -53,6 +56,8 @@ impl Engine {
             component,
             server: crate::fixtures::server(),
             server_out: Queue::with_capacity(256),
+            mount: crate::fixtures::mount(),
+            mount_out: Queue::with_capacity(256),
             env,
             out,
             link: Box::new([]),
@@ -68,6 +73,23 @@ impl Engine {
             taken: BTreeMap::new(),
         }
     }
+    fn mount_env(&self) -> Env<http::Limits> {
+        Env { now: self.env.now, wall: self.env.wall, limits: crate::fixtures::http_limits() }
+    }
+    fn mount_event(&mut self, event: http::Event) {
+        self.mount.down(&self.mount_env(), event, &mut self.mount_out);
+    }
+    fn mount_step(&mut self) -> bool {
+        let mut active = self.mount.up(&self.mount_env(), &mut self.mount_out);
+        while let Some(request) = self.mount_out.pop() {
+            active = true;
+            match request {
+                http::Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
+                http::Request::Component(message) => self.event(Event::Transport(message)),
+            }
+        }
+        active
+    }
     pub fn clock(&mut self, now: Time, wall: Wall) {
         self.server.clock(now, wall);
         self.env.now = now;
@@ -79,8 +101,7 @@ impl Engine {
     }
     pub fn request(&mut self, request: Request) -> Option<skein_io::Request> {
         match request {
-            Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
-            Request::Done { call } => self.server.done(call, &mut self.server_out),
+            Request::Transport(message) => self.mount_event(http::Event::Component(message)),
             Request::Link { secret } => self.link = crate::fixtures::printed(&secret),
             Request::Secrets(request) => {
                 let answer = match request {
@@ -124,8 +145,12 @@ impl Engine {
         while let Some(routed) = self.server_out.pop() {
             match routed {
                 jig_test_service::server::Routed::Io(request) => return Some(request),
-                jig_test_service::server::Routed::Call { call, head } => self.event(Event::Call { call, head }),
-                jig_test_service::server::Routed::Http { call, event } => self.event(Event::Http { call, event }),
+                jig_test_service::server::Routed::Call { call, head } => {
+                    self.mount_event(http::Event::Call { call, head });
+                }
+                jig_test_service::server::Routed::Http { call, event } => {
+                    self.mount_event(http::Event::Http { call, event });
+                }
             }
         }
         None
@@ -244,6 +269,7 @@ impl Engine {
             self.observed.extend(self.truth.applied(snapshot));
         }
         self.server.fire(&mut self.server_out);
+        active |= self.mount_step();
         active |= self.server.advance(&mut self.server_out) || !self.server_out.is_empty();
         self.component.fire(&self.env, &mut self.out);
         while self.component.up(&self.env, &mut self.out) {}

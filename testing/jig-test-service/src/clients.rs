@@ -5,6 +5,7 @@ use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_protocol_config::{self as config, Path, Problems, What};
 use jig_protocol_engine_clients as kit;
+use jig_protocol_engine_clients_http as http;
 use jig_test_domain as root;
 use skein_io as io;
 use skein_lib::{Env, List, Map, Queue, Time, Token, Wall};
@@ -16,6 +17,9 @@ const PREFIX: u64 = 4_u64 << 60;
 pub(super) struct Clients {
     component: kit::Component,
     server: crate::server::Server,
+    mount: http::Mount,
+    mount_env: Env<http::Limits>,
+    mount_out: Queue<http::Request>,
     server_out: Queue<crate::server::Routed>,
     component_closed: bool,
     secret: Option<skein_lib::Secret>,
@@ -44,8 +48,7 @@ pub(super) enum Routed {
     Root(Box<root::Event>),
     Application(kit::ToApplication),
     Secrets(kit::SecretsRequest),
-    Http { call: Token, request: skein_http::server::Request },
-    Done { call: Token },
+    Transport(kit::ToTransport),
     Link(skein_lib::Secret),
     Closed,
 }
@@ -54,8 +57,7 @@ pub(super) fn to_root(request: kit::Request) -> Routed {
         kit::Request::Core(event) => Routed::Root(Box::new(root::Event::Core(*event))),
         kit::Request::Application(value) => Routed::Application(value),
         kit::Request::Secrets(value) => Routed::Secrets(value),
-        kit::Request::Http { call, request } => Routed::Http { call, request },
-        kit::Request::Done { call } => Routed::Done { call },
+        kit::Request::Transport(message) => Routed::Transport(message),
         kit::Request::Link { secret } => Routed::Link(secret),
         kit::Request::Minted { .. } | kit::Request::MintRefused { .. } => {
             unreachable!("the test service mints no application sign-ins")
@@ -138,6 +140,9 @@ impl Clients {
         Ok(Self {
             component,
             server: crate::server::Server::new(listener, transport),
+            mount: http::Mount::new(http_settings(), &config.limits.clients_http),
+            mount_env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients_http },
+            mount_out: Queue::with_capacity(room),
             server_out: Queue::with_capacity(room),
             component_closed: false,
             secret: None,
@@ -225,11 +230,11 @@ impl Clients {
             }
             match self.server_out.pop().expect("server requests") {
                 crate::server::Routed::Io(request) => self.io.push(tag(request)),
-                crate::server::Routed::Call { call, head } => self.down(kit::Event::Call { call, head }),
+                crate::server::Routed::Call { call, head } => {
+                    self.mount.down(&self.mount_env, http::Event::Call { call, head }, &mut self.mount_out);
+                }
                 crate::server::Routed::Http { call, event } => {
-                    if !self.component_closed {
-                        self.down(kit::Event::Http { call, event });
-                    }
+                    self.mount.down(&self.mount_env, http::Event::Http { call, event }, &mut self.mount_out);
                 }
             }
         }
@@ -253,8 +258,9 @@ impl Clients {
                 break;
             }
             match to_root(self.out.pop().expect("client requests")) {
-                Routed::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
-                Routed::Done { call } => self.server.done(call, &mut self.server_out),
+                Routed::Transport(message) => {
+                    self.mount.down(&self.mount_env, http::Event::Component(message), &mut self.mount_out);
+                }
                 Routed::Link(value) => {
                     self.secret = Some(value);
                     self.print_link();
@@ -279,6 +285,8 @@ impl Clients {
     ) {
         self.env.now = now;
         self.env.wall = wall;
+        self.mount_env.now = now;
+        self.mount_env.wall = wall;
         self.server.clock(now, wall);
         if self.closed || !self.room(1) || self.early.room() < kit::MAX_OUT_DOWN || events.room() < kit::MAX_OUT_DOWN {
             return;
@@ -296,6 +304,14 @@ impl Clients {
         }
         self.advance(events, bound, rows);
         self.pending = server_pending || !self.server_out.is_empty();
+        self.pending |= self.mount.up(&self.mount_env, &mut self.mount_out);
+        if let Some(request) = self.mount_out.pop() {
+            self.pending = true;
+            match request {
+                http::Request::Component(message) => self.down(kit::Event::Transport(message)),
+                http::Request::Http { call, request } => self.server.answer(call, request, &mut self.server_out),
+            }
+        }
         if !self.component_closed {
             self.pending |= self.component.up(&self.env, &mut self.out);
         }
@@ -346,13 +362,21 @@ pub(super) fn untag(mut event: io::Event) -> io::Event {
     event
 }
 
-pub(super) fn worst_case(limits: &kit::Limits, room: u32, journal: &skein_lib::JournalLimits) -> Option<u64> {
+pub(super) fn worst_case(
+    limits: &kit::Limits,
+    transport: &crate::server::Limits,
+    mapping: &http::Limits,
+    room: u32,
+    journal: &skein_lib::JournalLimits,
+) -> Option<u64> {
     kit::worst_case(limits)?
+        .checked_add(http::worst_case(mapping)?)?
+        .checked_add(Queue::<http::Request>::worst_case(room)?)?
         .checked_add(Queue::<kit::Request>::worst_case(room)?)?
         .checked_add(Queue::<io::Request>::worst_case(room)?)?
         .checked_add(Queue::<root::Event>::worst_case(room)?)?
-        .checked_add(limits.http.body.checked_mul(64)?.checked_mul(u64::from(room).checked_mul(2)?)?)?
-        .checked_add(u64::from(limits.http.send).checked_mul(u64::from(room))?)?
+        .checked_add(u64::from(limits.message_bytes).checked_mul(64)?.checked_mul(u64::from(room).checked_mul(2)?)?)?
+        .checked_add(u64::from(transport.http.send).checked_mul(u64::from(room))?)?
         .checked_add(Queue::<Box<[u8]>>::worst_case(room)?)?
         .checked_add(u64::from(room).checked_mul(512)?)?
         .checked_add(Queue::<kit::SecretsRequest>::worst_case(room)?)?
@@ -613,8 +637,8 @@ fn kept(value: skein_lib::Secret) -> Option<kit::Kept> {
 }
 pub(super) fn printed(address: ::core::net::SocketAddr, secret: &skein_lib::Secret) -> Box<[u8]> {
     let host = address_text(address).expect("bound listener address");
-    let encoded = kit_url(secret.expose());
-    let parts: [&[u8]; 4] = [b"http://", &host, b"/jig/v1/sign-in/link?secret=", &encoded];
+    let path = http::link_path(&http_settings(), secret);
+    let parts: [&[u8]; 3] = [b"http://", &host, &path];
     let mut length = 0_usize;
     for part in parts {
         length = length.checked_add(part.len()).expect("short printed URL");
@@ -650,13 +674,6 @@ fn address_text(address: ::core::net::SocketAddr) -> Option<Box<[u8]>> {
     text.meet(skein_lib::stream::Read::Fill(text.len()))
 }
 
-fn kit_url(bytes: &[u8]) -> Box<[u8]> {
-    let length = skein_lib::base64::encoded_len(
-        skein_lib::base64::Alphabet::Url,
-        u32::try_from(bytes.len()).expect("short secret"),
-    )
-    .expect("encoded secret");
-    let mut out = skein_lib::Writer::new(usize::try_from(length).expect("u32 fits"));
-    skein_lib::base64::encode(skein_lib::base64::Alphabet::Url, bytes, &mut out).expect("short secret");
-    out.finish()
+fn http_settings() -> http::Settings {
+    http::Settings { prefix: Box::from(b"/jig".as_slice()), loopback: true }
 }

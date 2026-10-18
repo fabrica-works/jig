@@ -138,6 +138,14 @@ pub(super) const LIMITS: Limits = Limits {
         ..small::DRIVER
     },
     clients: CLIENTS,
+    clients_http: jig_protocol_engine_clients_http::Limits {
+        calls: 16,
+        streams: 8,
+        body: CLIENTS.message_bytes,
+        read: 16384,
+        send: 16384,
+        event: 87416,
+    },
     io: skein_io::Limits { sockets: 64, names: 64, ..small::IO },
     journal: JOURNAL,
     routes: 2048,

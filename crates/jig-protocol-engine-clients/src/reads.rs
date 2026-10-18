@@ -50,7 +50,10 @@ impl Component {
         let record = match w::Owned::decode(&env.limits.wire, &mut reader) {
             Ok(value) if reader.is_empty() => value.into_parts(),
             Ok(_) | Err(_) => {
-                self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                self.connections
+                    .get_mut(&owner)
+                    .expect("exchange owner")
+                    .respond(crate::Reply::NotARecord, &env.limits);
                 return;
             }
         };
@@ -83,11 +86,17 @@ impl Component {
             }
             w::Owner::Family(value) => {
                 let Ok(body) = w::FamilyRecord::decode(&env.limits.wire, &mut Reader::new(&record.record)) else {
-                    self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                    self.connections
+                        .get_mut(&owner)
+                        .expect("exchange owner")
+                        .respond(crate::Reply::NotARecord, &env.limits);
                     return;
                 };
                 let Some(window) = crate::served::window(body.window()) else {
-                    self.connections.get_mut(&owner).expect("exchange owner").respond(400, Box::new([]), &env.limits);
+                    self.connections
+                        .get_mut(&owner)
+                        .expect("exchange owner")
+                        .respond(crate::Reply::NotARecord, &env.limits);
                     return;
                 };
                 let scope = crate::served::scope(body.scope());
@@ -197,7 +206,10 @@ impl Component {
             Ok(value) => {
                 let mut bytes = Writer::new(usize::try_from(value.measure()).expect("wire measure fits"));
                 value.encode(&mut bytes).expect("measured read answer");
-                self.connections.get_mut(&owner).expect("exchange owner").respond(200, bytes.finish(), &env.limits);
+                self.connections
+                    .get_mut(&owner)
+                    .expect("exchange owner")
+                    .respond(crate::Reply::Record(bytes.finish()), &env.limits);
             }
             Err(_) => self.connections.get_mut(&owner).expect("exchange owner").close(out),
         }
