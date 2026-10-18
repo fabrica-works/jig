@@ -155,7 +155,10 @@ impl Engine {
             );
         }
         let mut next = crate::accounts::earliest(self.store.next_deadline(), self.values.accounts.next_expiry());
-        for (_, deadline) in self.domain.core_deadlines() {
+        for (timer, deadline) in self.domain.core_deadlines() {
+            if self.domain.stopping() && timer.waits_while_stopping() {
+                continue;
+            }
             if let Some(deadline) = deadline {
                 next = Some(match next {
                     Some(previous) => deadline.min(previous),
@@ -416,6 +419,9 @@ fn release(engine: &mut Engine) {
 
 fn fire(engine: &mut Engine) {
     for (timer, deadline) in engine.domain.core_deadlines() {
+        if engine.domain.stopping() && timer.waits_while_stopping() {
+            continue;
+        }
         if let Some(deadline) = deadline
             && deadline <= engine.env.now
         {

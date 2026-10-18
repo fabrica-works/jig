@@ -142,6 +142,14 @@ fn people_gate(event: people::Event) -> Result<Event, Requests> {
         | people::Event::Restored) => Ok(Event::People(event)),
     }
 }
+impl Timer {
+    /// Whether the core pauses this child timer while the service stops.
+    #[must_use]
+    pub fn waits_while_stopping(self) -> bool {
+        waits(self)
+    }
+}
+
 pub(crate) fn waits(timer: Timer) -> bool {
     match timer {
         Timer::People | Timer::Tasks | Timer::Fleet | Timer::Brief => true,

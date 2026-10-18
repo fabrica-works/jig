@@ -164,3 +164,37 @@ fn the_service_ends_once_io_holds_nothing() {
     assert_eq!(service.end(), Some(&End::Drained));
     assert!(service.is_empty());
 }
+
+#[test]
+fn a_paused_core_timer_does_not_pin_the_service_while_stopping() {
+    use jig_domain_core as core;
+    use skein_lib::{Duration, Secret, Time, Wall};
+    const EXPIRE_VALUES: Time = Time::from_nanos(u64::MAX);
+    const LIVE_GAP: Duration = Duration::from_secs(1);
+    const ACCOUNT: u32 = 1;
+    const GENERATION: u64 = 1;
+    let mut driven = fixtures::Driven::started(&fixtures::engine_document());
+    let engine = fixtures::engine(&mut driven.service);
+    engine.values.accounts.expire(EXPIRE_VALUES);
+    let timers = engine.domain.core_deadlines();
+    let mut people = None;
+    for (timer, deadline) in timers {
+        if timer == core::Timer::People {
+            people = deadline;
+        }
+    }
+    let due = people.expect("sign-in timer");
+    let live = due.saturating_add(LIVE_GAP);
+    let value = jig_protocol_accounts::table::Value {
+        token: Secret::new(fixtures::TOKEN.into()),
+        account_id: Secret::new(b"acc".as_slice().into()),
+    };
+    engine.values.accounts.granted(ACCOUNT, GENERATION, value, live).unwrap();
+    engine.env.now = due;
+    engine.env.wall = Wall::from_nanos(due.as_nanos());
+    assert_eq!(engine.next_deadline(), Some(due));
+    engine.step(root::Event::Stop);
+    assert!(engine.domain.stopping());
+    assert_eq!(engine.domain.core_deadlines(), timers, "paused timers keep their values");
+    assert_eq!(engine.next_deadline(), Some(live), "only a live timer asks the service to fire");
+}
