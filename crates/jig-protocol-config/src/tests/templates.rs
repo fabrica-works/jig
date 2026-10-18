@@ -107,7 +107,7 @@ fn a_seeded_policy_overriding_a_template_twice_refuses_the_start() {
             .member(b"templates")
             .child(Segment::Index(1))
             .member(b"template"),
-        What::Duplicate,
+        What::Unique,
     );
 }
 

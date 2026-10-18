@@ -329,7 +329,7 @@ pub(crate) fn overrides(
         if let Some(number) = template {
             for previous in &entries {
                 if previous.template == number {
-                    problems.push(path.member(b"template"), What::Duplicate);
+                    problems.push(path.member(b"template"), What::Unique);
                     break;
                 }
             }

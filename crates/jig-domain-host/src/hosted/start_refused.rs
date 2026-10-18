@@ -1,4 +1,4 @@
-//! A refused start frees its slot without keeping an unstarted agent (hosts.md, 8).
+//! A refused start frees its slot without keeping an unstarted agent (hosts.md, 6.2 and 6.3).
 use super::{Hosted, State, conclude, tail};
 use crate::{Answer, Domain, Ending, Invalid, Limits, LinkUp, Refusal, Request};
 use alloc::boxed::Box;

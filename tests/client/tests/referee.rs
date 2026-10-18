@@ -475,7 +475,7 @@ fn a_tree_breaking_the_outline_fails_the_referee() {
         referee.verdict(),
         skein_world::domain::Verdict::Failed(skein_world::domain::Failure {
             at: Time::ZERO,
-            why: "the page's outline: a tree broke view.md 3.1".to_owned(),
+            why: "the page's outline: a tree broke skein's ui.md, 14".to_owned(),
             pending: vec![],
         })
     );
