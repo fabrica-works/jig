@@ -196,8 +196,10 @@ the application's main (its shell)
   standing for each it leaves `null` (section 10). Never another field,
   and never the flags, the label or tracked: they are the shape's
   identity, which lists and the engine's behaviour key on. An override
-  naming a template the configuration does not define is refused when
-  the policy is changed, and a seeded policy's refuses the start.
+  naming a template the configuration does not define, or one another
+  override of the same policy names, is refused when the policy is
+  changed (as unknown, or as a repeated identity), and a seeded
+  policy's refuses the start.
 - **Merged for `me`:** a project's merged templates are the
   configuration's, in its order, each with that project's override
   applied: its executor, budget and deadline where the override gives
@@ -227,8 +229,8 @@ the application's main (its shell)
   configured; each contract within the tasks child's bounds; each grace
   within the tasks child's limit on a grace's span
   (`../domain/tasks.md`, section 11); each seeded policy's overrides
-  naming configured templates, and no more of them than the limit on
-  templates.
+  naming configured templates, each at most once, and no more of them
+  than the limit on templates.
 
 ## 4. jig's part for a worker
 
