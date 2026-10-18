@@ -176,7 +176,7 @@ pub(crate) fn task_line(
 
 pub(crate) fn chat_templates() -> skein_lib::List<jig_client::contract::Template> {
     use jig_client::contract as c;
-    let mut values = skein_lib::List::with_capacity(1);
+    let mut values = skein_lib::List::with_capacity(2);
     values
         .push(c::Template {
             number: jig_client::shapes::CHAT,
@@ -192,5 +192,12 @@ pub(crate) fn chat_templates() -> skein_lib::List<jig_client::contract::Template
             grace: None,
         })
         .unwrap();
+    let mut goal = values.get(0).unwrap().clone();
+    goal.number = jig_client::shapes::GOAL;
+    goal.label = 2;
+    goal.tracked = Some(0);
+    goal.flags.conversation = false;
+    goal.flags.listed = true;
+    values.push(goal).unwrap();
     values
 }

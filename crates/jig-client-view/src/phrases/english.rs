@@ -802,6 +802,12 @@ pub fn language() -> Language {
             JigPhrase::Unknown => {
                 Box::new([Segment::Text(copy_of(b"Outcome unknown: inspect the current object before acting again"))])
             }
+            JigPhrase::MoveGoalUp => Box::new([Segment::Text(copy_of(b"Move up"))]),
+            JigPhrase::MoveGoalDown => Box::new([Segment::Text(copy_of(b"Move down"))]),
+            JigPhrase::ProposeInstead => Box::new([Segment::Text(copy_of(b"Propose instead"))]),
+            JigPhrase::NoGoalTemplate => {
+                Box::new([Segment::Text(copy_of(b"No goal template is offered in this project"))])
+            }
             JigPhrase::LookAgain => Box::new([Segment::Text(copy_of(b"Inspect current object"))]),
             JigPhrase::Looking => Box::new([Segment::Text(copy_of(b"Finding how this ended"))]),
             JigPhrase::GoneUnknown => {

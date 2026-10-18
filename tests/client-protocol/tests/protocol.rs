@@ -258,3 +258,5 @@ fn cancelling_a_task_says_what_ends_before_it_is_sent() {
 
 #[path = "client/conversations.rs"]
 mod conversations;
+#[path = "client/goals.rs"]
+mod goals;

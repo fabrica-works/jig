@@ -34,6 +34,10 @@ pub enum Act {
     Change { change: Box<jig_client::contract::Amendment> },
     /// Write words and release a task stopped by this party in the same request.
     WriteRelease { release: bool },
+    /// Move a goal by one place in the board.
+    MoveGoal { task: u64, up: bool },
+    /// Review proposing an amendment refused for authority.
+    ProposeInstead { object: Token },
     /// Set the one goal priority in the open confirmation.
     Priority { priority: u32 },
     /// Start a new chat naming a card by its committed title.

@@ -292,6 +292,7 @@ pub(crate) fn answered(
                     | ObjectKey::Note { .. } => {}
                 }
             }
+            crate::confirm::proposal::remember(domain, object, receipt.ask, &receipt.answer);
             crate::objects::answer::answered(domain, object, act, receipt.answer, out, lent);
         }
     }

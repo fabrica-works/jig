@@ -9,8 +9,7 @@ use crate::{
 };
 use alloc::boxed::Box;
 use jig_client::contract::{
-    ActKind, Admission, Ask, Decision, Note, ObjectKey, Offered, PersonAnswer, PersonContract, Priority, Refusal,
-    Revision, Text,
+    ActKind, Admission, Ask, Decision, Note, ObjectKey, Offered, PersonAnswer, PersonContract, Refusal, Revision, Text,
 };
 use jig_client::contract::{AnswerOn, DecideOn};
 use skein_lib::List;
@@ -247,11 +246,7 @@ pub fn ask(object: &Object, confirmation: &Confirmation, fields: &Fields) -> Opt
         ActKind::Cancel => Some(Ask::Cancel { project, task, reason: words(fields, Purpose::Reason)?, grace: None }),
         ActKind::Close => Some(Ask::Close { project, chat: task, disposals: choices.disposals.clone() }),
         ActKind::Move => Some(Ask::Move { project, task, reason: words(fields, Purpose::Reason)? }),
-        ActKind::Prioritise => {
-            let mut goals = List::with_capacity(1);
-            goals.push(Priority { task, priority: choices.priority? }).expect("one priority fits");
-            Some(Ask::Prioritise { project, goals })
-        }
+        ActKind::Prioritise => Some(priority(project, task, choices.priority?)),
         ActKind::EditNote | ActKind::DeleteNote => {
             let note = match object.key {
                 ObjectKey::Note { note, .. } => note,
@@ -490,4 +485,26 @@ fn amend(confirmation: &Confirmation, fields: &Fields, project: u32, task: u64) 
     } else {
         Some(Ask::Amend { project, task, revision, change, reason })
     }
+}
+
+fn priority(project: u32, task: u64, priority: u32) -> Ask {
+    let mut operations = List::with_capacity(1);
+    operations
+        .push(jig_client::contract::Operation::Amend {
+            project,
+            task,
+            revision: None,
+            change: Box::new(jig_client::contract::Amendment {
+                addressed: None,
+                spec: None,
+                wake: None,
+                dependencies: None,
+                authority: None,
+                instructions: None,
+                tracked: Some(jig_client::contract::Tracking::Tracked { priority }),
+            }),
+            reason: Text::new(Box::from([]), 0).expect("empty reason fits"),
+        })
+        .expect("one operation fits");
+    Ask::Compound { project, operations }
 }

@@ -481,6 +481,11 @@ impl<A: App, F: Front<A>> World<A, F> {
     pub fn front(&mut self) -> &mut F {
         &mut self.front
     }
+    /// The application's root, for fixture setup through its public client.
+    #[must_use]
+    pub fn root(&self, id: ClientId) -> &A::Root {
+        &self.clients[id.0].root
+    }
     /// Returns the visible accessibility tree.
     #[must_use]
     pub fn tree(&self, id: ClientId) -> &Tree {

@@ -17,10 +17,8 @@ use crate::{
     page::IntentPurpose,
 };
 use alloc::boxed::Box;
-use jig_client::contract::{
-    ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, GoalLine, Outcome, Phase, Recipient, Refusal, Text,
-};
-use skein_lib::{Env, List, Queue, Token, Wall};
+use jig_client::contract::{ActKind, Admission, Answer, Ask, Bounds, GoalExecutor, Outcome, Recipient, Refusal, Text};
+use skein_lib::{Env, Queue, Token, Wall};
 /// Goal options chosen from the project's offered executors and party pool.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct GoalForm {
@@ -315,30 +313,5 @@ pub(crate) fn unknown(domain: &mut Ui, request: Token) {
     {
         domain.project_page.form.pending = None;
         domain.changed();
-    }
-}
-/// Running goals precede waiting goals; priority descends within each group.
-pub(crate) fn order(rows: &mut List<GoalLine>) {
-    for first in 0..rows.len() {
-        for second in first.checked_add(1).expect("row index fits")..rows.len() {
-            let a = rows.get(first).expect("row exists");
-            let b = rows.get(second).expect("row exists");
-            let a_live = crate::page::conversations::live(a.chip.phase);
-            let b_live = crate::page::conversations::live(b.chip.phase);
-            let before = if a_live != b_live {
-                b_live
-            } else if !a_live {
-                b.changed > a.changed || (b.changed == a.changed && b.chip.task < a.chip.task)
-            } else {
-                (a.chip.phase == Phase::Waiting && b.chip.phase != Phase::Waiting)
-                    || (a.chip.phase == Phase::Waiting) == (b.chip.phase == Phase::Waiting)
-                        && (b.priority > a.priority || (b.priority == a.priority && b.chip.task < a.chip.task))
-            };
-            if before {
-                let b = b.clone();
-                let a = core::mem::replace(rows.get_mut(first).expect("row exists"), b);
-                *rows.get_mut(second).expect("row exists") = a;
-            }
-        }
     }
 }

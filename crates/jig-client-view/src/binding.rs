@@ -145,6 +145,8 @@ impl JigBindings {
                         | crate::action::Act::Change { .. }
                         | crate::action::Act::WriteRelease { .. }
                         | crate::action::Act::Priority { .. }
+                        | crate::action::Act::MoveGoal { .. }
+                        | crate::action::Act::ProposeInstead { .. }
                         | crate::action::Act::ChatAbout { .. }
                         | crate::action::Act::LookAgain { .. }
                         | crate::action::Act::Confirm

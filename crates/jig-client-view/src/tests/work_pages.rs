@@ -333,21 +333,34 @@ pub(super) fn project_rows(d: &mut Fixture, out: &[Request]) {
         match r {
             Request::Client {
                 asked:
-                    jig_client::Event::Watch { handle: watch, subject: jig_client::Watchable::Jig(Subject::Goals { .. }) },
+                    jig_client::Event::Watch {
+                        handle: watch,
+                        subject:
+                            jig_client::Watchable::Jig(Subject::Tasks {
+                                query: TaskQuery { tracked: Some(true), .. }, ..
+                            }),
+                    },
             } => {
                 let doc = super::cards_objects::task_doc(&[]);
                 deliver(
                     d,
                     *watch,
-                    Delivery::Goals(Box::new(Goals {
-                        project: 4,
-                        rows: list([GoalLine {
+                    Delivery::Tasks(Box::new(Tasks {
+                        rows: list([TaskLine {
                             chip: chip(8),
-                            priority: 2,
-                            progress: OwnerPhaseCounts::ZERO,
+                            tracked: Some(2),
+                            phases: OwnerPhaseCounts::ZERO,
                             budget: OwnerBudget { deadline: Some(Wall::EPOCH), ..doc.budget },
                             held_below: 1,
-                            changed: Some(Wall::EPOCH),
+                            changed: Wall::EPOCH,
+                            last_activity: Wall::EPOCH,
+                            ended_at: None,
+                            project: 1,
+                            requester: OwnerRequester::Person(7),
+                            label: 2,
+                            flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+                            waits_on: WaitsOn::Nothing,
+                            conversation: None,
                         }]),
                         more: true,
                     })),

@@ -25,6 +25,7 @@ use jig_client::Link;
 use jig_client::contract::{Delivery, Limit, Me, Subject};
 use skein_lib::{Deadlines, Duration, Env, Id, List, Map, Queue, Time, Wall};
 
+use alloc::boxed::Box;
 pub mod borrowed;
 pub(crate) mod client;
 pub use borrowed::Borrowed;
@@ -51,6 +52,8 @@ pub struct Ui {
     pub(crate) started: bool,
     pub(crate) drafts: crate::drafts::Drafts,
     pub(crate) confirming: Option<crate::confirm::Confirmation>,
+    pub(crate) proposing: Option<Id<crate::objects::Object>>,
+    pub(crate) refused_amendments: Map<jig_client::contract::ObjectKey, Box<jig_client::contract::Ask>>,
     pub(crate) now: Time,
     pub(crate) clock: crate::clock::State,
     pub(crate) notices: crate::notices::kept::Notices,
@@ -139,6 +142,8 @@ impl Ui {
             started: false,
             drafts: crate::drafts::Drafts::new(limits.drafts),
             confirming: None,
+            proposing: None,
+            refused_amendments: Map::with_capacity(limits.objects),
             now: Time::ZERO,
             clock: crate::clock::State { page_times: false, armed: false },
             notices: crate::notices::kept::Notices::new(limits.notices, limits.notice_life),
@@ -596,7 +601,7 @@ fn act_event(domain: &mut Ui, env: &Env<Limits>, act: Act, out: &mut Queue<Reque
             crate::activity::routing::more(domain, window, end, out);
             crate::page::conversations::more(domain, window, end, out, lent);
             crate::page::task::more(domain, window, end, out);
-            crate::page::project::more(domain, window, end, out);
+            crate::page::project::more(domain, window, end, out, lent);
         }
         Act::GoalForm { form } => crate::page::project::goals::configure(domain, form),
         Act::FilterTasks { filter } => crate::page::project::tasks(domain, env, filter, out),
@@ -617,6 +622,8 @@ fn act_event(domain: &mut Ui, env: &Env<Limits>, act: Act, out: &mut Queue<Reque
             }
         }
         Act::WriteRelease { release } => crate::confirm::write_release(domain, release),
+        Act::MoveGoal { task, up } => crate::page::project::moving::open(domain, env, task, up, lent),
+        Act::ProposeInstead { object } => crate::confirm::proposal::open(domain, env, Id::from_token(object), lent),
         Act::Priority { priority } => crate::confirm::priority(domain, priority),
         Act::ChatAbout { object } => {
             if let Some(object) = domain.borrow(lent).objects().get(Id::from_token(object)) {

@@ -5,7 +5,7 @@ use skein_lib::{List, Wall};
 
 #[must_use]
 pub fn templates() -> List<Template> {
-    list([Template {
+    let chat = Template {
         number: jig_client::shapes::CHAT,
         name: DocumentText::complete(text(b"Chat")),
         executor: TemplateExecutor::Charter(1),
@@ -17,7 +17,14 @@ pub fn templates() -> List<Template> {
         flags: TaskFlags { conversation: true, listed: false, retention: Retention::Kept },
         label: 31,
         grace: None,
-    }])
+    };
+    let mut goal = chat.clone();
+    goal.number = jig_client::shapes::GOAL;
+    goal.label = 2;
+    goal.tracked = Some(0);
+    goal.flags.conversation = false;
+    goal.flags.listed = true;
+    list([chat, goal])
 }
 #[must_use]
 pub fn chat(number: u64, title: &[u8], activity: Wall) -> Task {

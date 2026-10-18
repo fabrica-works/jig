@@ -47,7 +47,7 @@ fn frame_of_card(limits: &Limits) -> Option<u32> {
         .checked_add(markdown(limits)?.checked_add(6)?)?
         .checked_add(outcome(limits)?.checked_mul(2)?)?
         .checked_add(offered_nodes(limits)?)?
-        .checked_add(12)
+        .checked_add(13)
 }
 fn amendment(limits: &Limits) -> Option<u32> {
     // Recipient, spec, instructions, wake, dependencies, authority, separator.

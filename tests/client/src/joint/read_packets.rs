@@ -38,7 +38,7 @@ pub fn read_with_codec(
     let client = *client;
     let read = *read;
     let result = match answer {
-        reads::Answer::Tasks(_) => return Err(Invalid::PendingValue),
+        reads::Answer::Tasks(page) => task_page(what, page, limits)?,
         reads::Answer::None(why) => client::ReadResult::None(missing(*why)),
         reads::Answer::Page(value) => {
             let value = match what {
@@ -140,6 +140,15 @@ fn escalation(
         return Err(Invalid::OwnerRoute);
     }
     Ok(client::ReadResult::Value(wire::documents::escalation_read(value, limits).map_err(Invalid::Document)?))
+}
+
+fn task_page(what: &client::Read, page: &reads::TaskPage, limits: &Limits) -> Result<client::ReadResult, Invalid> {
+    if !matches!(what, client::Read::Tasks { .. }) {
+        return Err(Invalid::OwnerRoute);
+    }
+    Ok(client::ReadResult::Value(
+        wire::queries::page(page, limits).map_err(|why| Invalid::Page(wire::pages::Invalid::Owner(why)))?,
+    ))
 }
 
 fn project(what: &client::Read, value: &documents::Project, limits: &Limits) -> Result<client::ReadResult, Invalid> {
@@ -727,4 +736,29 @@ fn question(what: &client::Read, value: &documents::Question, limits: &Limits) -
         return Err(Invalid::OwnerRoute);
     }
     Ok(client::ReadResult::Value(wire::documents::question_read(value, limits).map_err(Invalid::Document)?))
+}
+
+#[cfg(test)]
+mod goal_query {
+    use super::*;
+    const READ: Token = Token::new(9040);
+    #[test]
+    fn a_task_query_answer_preserves_an_unrelated_read_route() {
+        let mut transport = super::tests::transport();
+        let to = transport
+            .reply_to(Reply::Read {
+                client: crate::ClientId(0),
+                read: READ,
+                what: client::Read::Project { project: 1 },
+            })
+            .into_token();
+        let answer = reads::Answer::Tasks(Box::new(reads::TaskPage {
+            live: skein_lib::List::with_capacity(0),
+            live_next: None,
+            ended: reads::EndedGroup::Rows { rows: skein_lib::List::with_capacity(0), next: None, cut: false },
+        }));
+        let translated = read(&mut transport, to, &answer, &wire::rows::tests::limits());
+        assert_eq!(translated.err(), Some(Invalid::OwnerRoute));
+        assert!(transport.reply(to).is_some(), "the unrelated route remains available");
+    }
 }

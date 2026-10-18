@@ -122,9 +122,19 @@ fn prepare_steering(domain: &mut Fixture, act: ActKind) -> Ask {
         ActKind::Prioritise => {
             assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Priority));
             drive(domain, Time::ZERO, Event::Act { action: Act::Priority { priority: 2 } });
-            let mut goals = List::with_capacity(1);
-            goals.push(Priority { task: 8, priority: 2 }).unwrap();
-            Ask::Prioritise { project: 1, goals }
+            Ask::Compound {
+                project: 1,
+                operations: super::super::work_pages::list([Operation::Amend {
+                    project: 1,
+                    task: 8,
+                    revision: None,
+                    change: Box::new(Amendment {
+                        tracked: Some(Tracking::Tracked { priority: 2 }),
+                        ..Amendment { spec: None, ..change() }
+                    }),
+                    reason: text(b""),
+                }]),
+            }
         }
         ActKind::Release => {
             assert_eq!(domain.confirmation().unwrap().missing, Some(Missing::Again));

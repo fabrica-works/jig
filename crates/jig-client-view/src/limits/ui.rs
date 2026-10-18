@@ -2,6 +2,7 @@
 //! Every retained container is sized from these at new; jig 21–23 add their
 //! own entities. See client/domain/client.md, 14.
 use crate::{store::Record, ui::Timer};
+use alloc::boxed::Box;
 use skein_lib::{Deadlines, Duration, List, Map};
 
 /// Configured capacities, payload bounds and durations for the client spine.
@@ -87,10 +88,14 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     total = total.checked_add(crate::fields::worst_case(limits)?)?;
     total = total.checked_add(crate::drafts::worst_case(limits)?)?;
     total = total.checked_add(List::<u64>::worst_case(limits.records)?)?;
+    total = total.checked_add(List::<jig_client::contract::ObjectKey>::worst_case(limits.objects)?)?;
     total = total.checked_add(Map::<jig_client::Key, u64>::worst_case(limits.kept)?)?;
     total = total.checked_add(crate::confirm::worst_case(limits)?)?;
     total = total.checked_add(List::<crate::objects::Context>::worst_case(limits.rows.checked_mul(2)?)?)?;
     total = total.checked_add(crate::objects::worst_case(limits)?)?;
+    total = total.checked_add(Map::<jig_client::contract::ObjectKey, Box<jig_client::contract::Ask>>::worst_case(
+        limits.objects,
+    )?)?;
     total = total.checked_add(Map::<jig_client::Handle, crate::handles::Reading>::worst_case(limits.reads)?)?;
     total = total.checked_add(u64::from(limits.reads).checked_mul(limits.document_bytes)?)?;
     total = total.checked_add(crate::windows::worst_case(limits)?)?;

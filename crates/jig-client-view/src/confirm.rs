@@ -10,6 +10,7 @@
 //! | changed/incomplete | confirm | refused in place | nothing |
 //! | complete | confirm | closed; card pending | one send |
 //! | open | dismiss/navigation | closed; prior card | nothing |
+pub(crate) mod proposal;
 use crate::{
     Request, Ui, acts,
     fields::Purpose,
@@ -113,6 +114,7 @@ fn clear_fields(domain: &mut Ui) {
 }
 /// Closes and clears fields, restoring a card only while no request exists yet.
 pub(crate) fn close(domain: &mut Ui) {
+    domain.proposing = None;
     let Some(open) = domain.confirming.take() else {
         return;
     };
@@ -149,7 +151,11 @@ pub(crate) fn open(domain: &mut Ui, env: &Env<crate::Limits>, id: Id<Object>, ac
         Card::Open | Card::NotSent { .. } | Card::Refused { .. } => {}
         Card::Deciding { .. } | Card::Unknown { .. } | Card::Leaving { .. } => return,
     }
-    let proposed = match acts::offered(&object, act) {
+    let proposed = match if act == ActKind::Prioritise && domain.shown_project().is_some() {
+        crate::page::project::moving::admission(domain)
+    } else {
+        acts::offered(&object, act)
+    } {
         Admission::Allowed | Admission::Bounded { .. } => None,
         Admission::Proposed { to } => Some(to),
         Admission::Refused(refusal) => {
@@ -256,7 +262,7 @@ pub(crate) fn sync(domain: &mut Ui, lent: &jig_client::Client) {
     };
     let release_changed = open.release_changed || hold_now != open.release_revision;
     let changed = open.changed || now != open.revision || release_changed;
-    let proposed = match draft_admission(&object, open) {
+    let proposed = match draft_admission(domain, &object, open) {
         Admission::Proposed { to } => Some(to),
         Admission::Allowed | Admission::Bounded { .. } | Admission::Refused(_) => None,
     };
@@ -411,7 +417,13 @@ fn release_missing(open: &Confirmation, object: &Object) -> Option<Missing> {
     None
 }
 
-fn draft_admission(object: &Object, open: &Confirmation) -> Admission {
+fn draft_admission(domain: &Ui, object: &Object, open: &Confirmation) -> Admission {
+    if domain.proposing == Some(open.object) {
+        return match proposal::recipient(object) {
+            Some(to) => Admission::Proposed { to },
+            None => Admission::Refused(Refusal::NotOffered),
+        };
+    }
     if open.act == ActKind::Amend
         && open.choices.release
         && let Admission::Refused(why) = acts::offered(object, ActKind::Release)
@@ -504,7 +516,11 @@ fn missing(domain: &Ui, open: &Confirmation, object: &Object) -> Option<Missing>
     {
         return Some(Missing::Context);
     }
-    match draft_admission(object, open) {
+    match if open.act == ActKind::Prioritise && domain.shown_project().is_some() {
+        crate::page::project::moving::admission(domain)
+    } else {
+        draft_admission(domain, object, open)
+    } {
         Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => {}
         Admission::Refused(why) => return Some(Missing::Refused { why }),
     }
@@ -668,9 +684,12 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client:
     let Some(object) = domain.borrow(lent).objects().get(open.object) else {
         return;
     };
-    let Some(ask) = acts::ask(&object, open, &domain.fields) else {
-        return;
+    let ask = if open.act == ActKind::Prioritise && domain.shown_project().is_some() {
+        crate::page::project::moving::ask(domain, &object, open.choices.priority.expect("complete priority"), lent)
+    } else {
+        acts::ask(&object, open, &domain.fields)
     };
+    let Some(ask) = ask else { return };
     let key = object.key;
     let act = open.act;
     if crate::intents::send_card(domain, key, act, Box::new(ask), out, lent).is_some() {

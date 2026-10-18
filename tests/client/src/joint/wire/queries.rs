@@ -99,3 +99,45 @@ pub(super) fn line(value: &d::TaskLine, limits: &Limits) -> Result<c::TaskLine, 
         }),
     })
 }
+
+pub(crate) fn page(value: &jig_domain_core::reads::TaskPage, limits: &Limits) -> Result<c::ReadValue, owner::Invalid> {
+    use jig_domain_core::reads;
+    fn lines(
+        rows: &skein_lib::List<d::TaskLine>,
+        limits: &Limits,
+    ) -> Result<skein_lib::List<c::TaskLine>, owner::Invalid> {
+        if rows.len() > limits.rows {
+            return Err(owner::Invalid::TooLarge);
+        }
+        let mut out = skein_lib::List::with_capacity(rows.len());
+        for row in rows {
+            out.push(line(row, limits)?).expect("same length");
+        }
+        Ok(out)
+    }
+    let cursor = |value: &Option<reads::Cursor>| {
+        value.as_ref().map(|v| super::cursor::encode(v, limits.text).map_err(|_| owner::Invalid::TooLarge)).transpose()
+    };
+    let ended = match &value.ended {
+        reads::EndedGroup::None => c::EndedGroup::None,
+        reads::EndedGroup::Rows { rows, next, cut } => {
+            c::EndedGroup::Rows { rows: lines(rows, limits)?, after: cursor(next)?, cut: *cut }
+        }
+    };
+    let result = c::ReadValue::Tasks(Box::new(c::TaskPage {
+        live: lines(&value.live, limits)?,
+        live_after: cursor(&value.live_next)?,
+        ended,
+    }));
+    let bounds = jig_client_scripted_engine::Bounds {
+        text: limits.text,
+        rows: limits.rows,
+        segments: limits.segments,
+        document_bytes: limits.document_bytes,
+        ..Default::default()
+    };
+    if jig_client_scripted_engine::admit_read_value(&result, &bounds).is_err() {
+        return Err(owner::Invalid::TooLarge);
+    }
+    Ok(result)
+}

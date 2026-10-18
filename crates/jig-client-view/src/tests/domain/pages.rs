@@ -738,14 +738,14 @@ fn project_read(requests: &[Request]) -> jig_client::Handle {
     }
     panic!("project read")
 }
-fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine {
+fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> TaskLine {
     let mut chip = super::objects::chip(number);
     chip.phase = phase;
     *chip.details = super::objects::phase_details(phase);
-    GoalLine {
+    TaskLine {
         chip,
-        priority,
-        progress: OwnerPhaseCounts::ZERO,
+        tracked: Some(priority),
+        phases: OwnerPhaseCounts::ZERO,
         budget: OwnerBudget {
             numbers: OwnerNumbers { budget: 20, spent: 0, spent_below: 0, reserved: 0 },
             left: 20,
@@ -753,7 +753,15 @@ fn goal_line(number: u64, priority: u32, phase: Phase, changed: u64) -> GoalLine
             deadline: None,
         },
         held_below: 2,
-        changed: Some(skein_lib::Wall::from_nanos(changed)),
+        changed: skein_lib::Wall::from_nanos(changed),
+        last_activity: skein_lib::Wall::from_nanos(changed),
+        ended_at: None,
+        project: 1,
+        requester: OwnerRequester::Person(7),
+        label: 2,
+        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        waits_on: WaitsOn::Nothing,
+        conversation: None,
     }
 }
 fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
@@ -767,15 +775,12 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
     );
     let watch = open_token(&opened);
     let mut rows = List::with_capacity(2);
-    rows.push(goal_line(9, 20, Phase::Waiting, 1)).unwrap();
     rows.push(goal_line(8, 1, Phase::Running, 2)).unwrap();
+    rows.push(goal_line(9, 20, Phase::Waiting, 1)).unwrap();
     let facts = drive(
         &mut domain,
         Time::ZERO,
-        Watched {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows, more: true }))),
-        },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows, more: true }))) },
     );
     assert_eq!(domain.project_page().goals.as_slice()[0].chip.task, 8);
     assert_eq!(domain.project_page().goals.as_slice()[1].chip.task, 9);
@@ -797,15 +802,12 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
     assert_eq!(crate::acts::offered(&domain.objects().get(id).unwrap(), ActKind::Prioritise), Admission::Allowed);
 
     let mut rows = List::with_capacity(2);
-    rows.push(goal_line(8, 1, Phase::Running, 2)).unwrap();
     rows.push(goal_line(9, 2, Phase::Running, 1)).unwrap();
+    rows.push(goal_line(8, 1, Phase::Running, 2)).unwrap();
     drive(
         &mut domain,
         Time::ZERO,
-        Watched {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows, more: false }))),
-        },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows, more: false }))) },
     );
     assert_eq!(domain.project_page().goals.as_slice()[0].chip.task, 9);
     let Request::Client { asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(what) } } =
@@ -813,22 +815,21 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
     else {
         panic!("goals read from start")
     };
-    assert_eq!(*what, Read::Goals { project: 1, after: None });
+    assert_eq!(*what, Read::Tasks { query: crate::queries::ended_goals(1, 2), live: None, ended: None });
     let read = *read;
     let mut rows = List::with_capacity(2);
-    rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
     rows.push(goal_line(9, 2, Phase::Done, 2)).unwrap();
+    rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
     let cursor = Cursor::new(Box::from(b"ended goals edge".as_slice()), 1024).expect("bounded opaque cursor");
     drive(
         &mut domain,
         Time::ZERO,
         ReadPage {
             read,
-            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
-                cut: false,
-                rows,
-                before: None,
-                after: Some(cursor.clone()),
+            result: ReadResult::Value(ReadValue::Tasks(Box::new(TaskPage {
+                live: List::with_capacity(0),
+                live_after: None,
+                ended: EndedGroup::Rows { rows, after: Some(cursor.clone()), cut: false },
             }))),
         },
     );
@@ -836,7 +837,7 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
     assert_eq!(domain.project_page().listed_goals.len(), 2);
     let winner = domain.project_page().listed_goals.as_slice()[0].clone();
     assert_eq!(winner.chip.task, 9);
-    assert_eq!(winner.priority, 2, "live watch row wins over the read duplicate");
+    assert_eq!(winner.tracked, Some(2), "live watch row wins over the read duplicate");
     assert_eq!(winner.chip.phase, Phase::Running);
     domain.reclaim();
     let more = drive(
@@ -848,7 +849,7 @@ fn project_board_orders_live_waiting_and_ended_goals_and_names_task_cards() {
     else {
         panic!("ended goals continuation")
     };
-    assert_eq!(*what, Read::Goals { project: 1, after: Some(cursor) });
+    assert_eq!(*what, Read::Tasks { query: crate::queries::ended_goals(1, 2), live: None, ended: Some(cursor) });
     project_task_filters_and_spend_pages();
 }
 fn a_goal_past_the_pool_is_confirmed_as_proposed_and_sent_once() {
@@ -1479,12 +1480,9 @@ fn goal_read_from_start_merges_live_watch_by_key() {
     drive(
         &mut domain,
         Time::ZERO,
-        Watched {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows: live, more: false }))),
-        },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows: live, more: false }))) },
     );
-    let query = Read::Goals { project: 1, after: None };
+    let query = Read::Tasks { query: crate::queries::ended_goals(1, 2), live: None, ended: None };
     let mut rows = List::with_capacity(2);
     rows.push(goal_line(9, 99, Phase::Running, 1)).unwrap();
     rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
@@ -1493,17 +1491,16 @@ fn goal_read_from_start_merges_live_watch_by_key() {
         Time::ZERO,
         ReadPage {
             read: read_named(&opened, &query),
-            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
-                cut: false,
-                rows,
-                before: None,
-                after: None,
+            result: ReadResult::Value(ReadValue::Tasks(Box::new(TaskPage {
+                live: List::with_capacity(0),
+                live_after: None,
+                ended: EndedGroup::Rows { rows, after: None, cut: false },
             }))),
         },
     );
     assert_eq!(domain.project_page().listed_goals.len(), 2);
     assert_eq!(domain.project_page().listed_goals.get(0).unwrap().chip.task, 9);
-    assert_eq!(domain.project_page().listed_goals.get(0).unwrap().priority, 2);
+    assert_eq!(domain.project_page().listed_goals.get(0).unwrap().tracked, Some(2));
     assert_eq!(domain.project_page().listed_goals.get(1).unwrap().chip.phase, Phase::Done);
     let Some(crate::objects::Body::Chip(chip)) =
         &domain.objects().get(domain.objects().find(ObjectKey::Task(9)).unwrap()).unwrap().body
@@ -2300,9 +2297,9 @@ fn owner_goal_read_and_watch_keep_all_ten_counters_absent_clock_and_exact_budget
     let (mut domain, opened) = project_open(ProjectSection::Goals);
     let watch = open_token(&opened);
     let mut row = goal_line(9, u32::MAX, Phase::Running, 9);
-    row.changed = None;
+    row.changed = skein_lib::Wall::EPOCH;
     row.held_below = u32::MAX;
-    row.progress = OwnerPhaseCounts {
+    row.phases = OwnerPhaseCounts {
         waiting: u32::MAX,
         idle: u32::MAX - 1,
         starting: u32::MAX - 2,
@@ -2321,14 +2318,11 @@ fn owner_goal_read_and_watch_keep_all_ten_counters_absent_clock_and_exact_budget
     drive(
         &mut domain,
         Time::ZERO,
-        Watched {
-            watch,
-            event: WatchEvent::Delivered(Delivery::Goals(Box::new(Goals { project: 1, rows, more: false }))),
-        },
+        Watched { watch, event: WatchEvent::Delivered(Delivery::Tasks(Box::new(Tasks { rows, more: false }))) },
     );
     let mut duplicate = row.clone();
-    duplicate.changed = Some(skein_lib::Wall::EPOCH);
-    duplicate.progress = OwnerPhaseCounts::ZERO;
+    duplicate.changed = skein_lib::Wall::EPOCH;
+    duplicate.phases = OwnerPhaseCounts::ZERO;
     let mut rows = List::with_capacity(2);
     rows.push(duplicate).unwrap();
     rows.push(goal_line(8, 1, Phase::Done, 1)).unwrap();
@@ -2336,12 +2330,14 @@ fn owner_goal_read_and_watch_keep_all_ten_counters_absent_clock_and_exact_budget
         &mut domain,
         Time::ZERO,
         ReadPage {
-            read: read_named(&opened, &Read::Goals { project: 1, after: None }),
-            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
-                rows,
-                cut: false,
-                before: None,
-                after: None,
+            read: read_named(
+                &opened,
+                &Read::Tasks { query: crate::queries::ended_goals(1, 2), live: None, ended: None },
+            ),
+            result: ReadResult::Value(ReadValue::Tasks(Box::new(TaskPage {
+                live: List::with_capacity(0),
+                live_after: None,
+                ended: EndedGroup::Rows { rows, after: None, cut: false },
             }))),
         },
     );
@@ -2657,7 +2653,9 @@ fn an_arranged_project_page_opens_the_goals_watch_once() {
     let mut domain = Fixture::new(&LIMITS);
     domain.configure_arrangement(arrangement(&[], &[ProjectSection::Goals, ProjectSection::Overview])).unwrap();
     let f = start(&mut domain, List::with_capacity(0));
-    let initial = delivered(&mut domain, Time::ZERO, f, frame(7));
+    let mut me = frame(7);
+    me.projects = super::super::work_pages::list([project(1, true)]);
+    let initial = delivered(&mut domain, Time::ZERO, f, me);
     finish_initial_inbox_reads(&mut domain, &initial);
     let requests = drive(
         &mut domain,
@@ -2665,8 +2663,20 @@ fn an_arranged_project_page_opens_the_goals_watch_once() {
         Event::Went { place: Place::Jig(Address::Project { project: 1, section: ProjectSection::Overview }) },
     );
     let (watches, reads) = source_requests(&requests);
-    assert_eq!(watches.as_slice(), &[Subject::Goals { project: 1 }, Subject::Inbox { window: LIMITS.rows }]);
-    assert_eq!(reads.as_slice(), &[Read::Project { project: 1 }, Read::Goals { project: 1, after: None }]);
+    assert_eq!(
+        watches.as_slice(),
+        &[
+            Subject::Tasks { query: crate::queries::goals(1), window: LIMITS.rows },
+            Subject::Inbox { window: LIMITS.rows }
+        ]
+    );
+    assert_eq!(
+        reads.as_slice(),
+        &[
+            Read::Project { project: 1 },
+            Read::Tasks { query: crate::queries::ended_goals(1, 2), live: None, ended: None }
+        ]
+    );
 }
 #[test]
 fn an_arranged_task_document_opens_its_parts_once() {

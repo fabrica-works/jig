@@ -70,6 +70,20 @@ pub fn open(
         Place::Conversation | Place::TaskPage => {}
     }
     state(b, &facts.card, object, words, bindings);
+    if client.ui.refused_amendments.get(&facts.key).is_some()
+        && let Card::Refused { refusal: jig_client::contract::Refusal::Authority { proposable: Some(true), .. } } =
+            facts.card
+    {
+        crate::frame::control(
+            b,
+            words,
+            bindings,
+            Role::Button,
+            JigPhrase::ProposeInstead,
+            &[],
+            Act::ProposeInstead { object: object.token() },
+        );
+    }
     true
 }
 /// Build the card's authoritative state, including full refusal and departure facts.

@@ -27,3 +27,30 @@ pub(crate) fn chats(me: &jig_client::contract::Me, project: Option<u32>) -> Opti
     }
     None
 }
+
+/// The project's live tracked tasks, in the owner's priority order.
+#[must_use]
+pub const fn goals(project: u32) -> TaskQuery {
+    TaskQuery {
+        project: Some(project),
+        requester: None,
+        root: None,
+        parent: None,
+        label: None,
+        phase: None,
+        executor: None,
+        tracked: Some(true),
+        order: QueryOrder::Priority,
+    }
+}
+/// The project's ended tasks of its goal template, latest first.
+#[must_use]
+pub const fn ended_goals(project: u32, goal_label: u32) -> TaskQuery {
+    TaskQuery {
+        label: Some(goal_label),
+        phase: Some(jig_client::contract::PhaseClass::Ended),
+        tracked: None,
+        order: QueryOrder::Ended,
+        ..goals(project)
+    }
+}

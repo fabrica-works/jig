@@ -159,7 +159,7 @@ fn goals_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
     let board = card
         .checked_add(chip)?
         .checked_add(crate::owner_budget::budget_nodes())?
-        .checked_add(15)?
+        .checked_add(17)?
         .checked_mul(l.rows)?
         .checked_mul(2)?;
     // A bounded goal offers whole charter and procedure lists independently.

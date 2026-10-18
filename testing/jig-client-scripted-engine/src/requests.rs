@@ -1,5 +1,6 @@
 //! Requests are decided once in the party's key space and released after durability.
 //! Revision and decided-first checks precede scripted outcomes; contract.md, 3–4.
+mod priorities;
 use crate::{Engine, Envelope, Invalid, Keyed, RequestIdentity, Retained, Up, payload};
 use jig_client_domain::contract::{
     ActKind, Actor, Admission, Answer, Ask, ChipPhase, CurrentHold, Decision, Ending, Moved, ObjectKey, Offered,
@@ -86,6 +87,11 @@ impl<A: crate::Application> Engine<A> {
         ask: &Ask,
         wall: Wall,
     ) -> core::result::Result<(Answer, Vec<crate::Change>), Invalid> {
+        if let Ask::Compound { project, operations } = ask
+            && priorities::only(operations)
+        {
+            return self.priorities(party, *project, operations, wall);
+        }
         if let Ask::Create { .. }
         | Ask::Withdraw { .. }
         | Ask::Propose { action: jig_client_domain::contract::ProposeAction::Batch { .. }, .. } = ask

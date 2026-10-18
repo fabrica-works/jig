@@ -1,3 +1,5 @@
+#[path = "stories/goals.rs"]
+mod goals;
 use jig_client_world::{Until, stories, test};
 use skein_fake_person::{Find, Step, Target};
 use skein_lib::Duration;

@@ -31,7 +31,7 @@ fn read(out: &[Request], kind: u8) -> jig_client::Handle {
                 | (2, Read::Activity { .. })
                 | (3, Read::Inbox { group: InboxReadGroup::Needs, .. })
                 | (4, Read::Tasks { .. })
-                | (5, Read::Goals { .. })
+                | (5, Read::Tasks { .. })
                 | (6, Read::Spend { .. })
                 | (7, Read::Notes { .. }) => Some(*read),
                 _ => None,
@@ -137,7 +137,11 @@ fn value(kind: u8, cut: bool, after: Option<Cursor>) -> ReadValue {
             live_after: None,
             ended: EndedGroup::Rows { rows: List::with_capacity(2), cut, after },
         })),
-        5 => ReadValue::Goals(Box::new(GoalPage { cut, rows: List::with_capacity(2), before: None, after })),
+        5 => ReadValue::Tasks(Box::new(TaskPage {
+            live: List::with_capacity(0),
+            live_after: None,
+            ended: EndedGroup::Rows { rows: List::with_capacity(2), after, cut },
+        })),
         6 => ReadValue::Spend(Box::new(SpendPage { cut, rows: List::with_capacity(2), before: None, after })),
         7 => ReadValue::Notes(Box::new(NotePage { cut, rows: List::with_capacity(2), before: None, after })),
         _ => panic!("eight page kinds"),
@@ -284,10 +288,10 @@ fn row_selected_words() -> crate::words::Words {
 #[test]
 fn owner_goal_rows_render_every_distinct_stage_without_generic_ended_and_keep_public_finite_capacity() {
     let (mut domain, read) = ready(5);
-    let row = GoalLine {
+    let row = TaskLine {
         chip: super::work_pages::chip(9),
-        priority: u32::MAX,
-        progress: OwnerPhaseCounts {
+        tracked: Some(u32::MAX),
+        phases: OwnerPhaseCounts {
             waiting: u32::MAX,
             idle: u32::MAX - 1,
             starting: u32::MAX - 2,
@@ -301,17 +305,24 @@ fn owner_goal_rows_render_every_distinct_stage_without_generic_ended_and_keep_pu
         },
         budget: super::cards_objects::task_doc(&[]).budget,
         held_below: u32::MAX,
-        changed: None,
+        changed: skein_lib::Wall::EPOCH,
+        last_activity: skein_lib::Wall::EPOCH,
+        ended_at: None,
+        project: 1,
+        requester: OwnerRequester::Person(7),
+        label: 2,
+        flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },
+        waits_on: WaitsOn::Nothing,
+        conversation: None,
     };
     drive(
         &mut domain,
         ReadPage {
             read,
-            result: ReadResult::Value(ReadValue::Goals(Box::new(GoalPage {
-                rows: list([row.clone()]),
-                cut: false,
-                before: None,
-                after: Some(cursor()),
+            result: ReadResult::Value(ReadValue::Tasks(Box::new(TaskPage {
+                live: List::with_capacity(0),
+                live_after: None,
+                ended: EndedGroup::Rows { rows: list([row.clone()]), after: Some(cursor()), cut: false },
             }))),
         },
     );

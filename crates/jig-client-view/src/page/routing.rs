@@ -116,6 +116,7 @@ pub(crate) fn leave_page(domain: &mut Ui, out: &mut Queue<Request>) {
     out.push(Request::PartsLeft);
     domain.sections.clear();
     domain.objects.clear();
+    crate::confirm::proposal::forget(domain);
     domain.task_page.clear();
     domain.project_page.clear();
     domain.deployment_page.document = None;
@@ -327,7 +328,7 @@ pub(crate) fn delivery(
 ) {
     let source = Source::Watch(watch);
     match value {
-        Delivery::Me(_) | Delivery::OwnerProject(_) | Delivery::Conversations(_) => {}
+        Delivery::Me(_) | Delivery::OwnerProject(_) | Delivery::Conversations(_) | Delivery::Goals(_) => {}
         Delivery::Run(_) | Delivery::RunState(_) => crate::activity::routing::text(domain, env, watch, out, lent),
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
@@ -377,7 +378,6 @@ pub(crate) fn delivery(
             domain.timed_page(timed);
             domain.changed();
         }
-        Delivery::Goals(goals) => crate::page::project::live(domain, env, source, *goals, out, lent),
         Delivery::Tasks(tasks) => {
             if let Source::Watch(handle) = source
                 && let Some(watch) = domain.handles.watches.get(&handle)
@@ -532,7 +532,8 @@ fn read_value(
     lent: &jig_client::Client,
 ) {
     match value {
-        ReadValue::Conversations(_)
+        ReadValue::Goals(_)
+        | ReadValue::Conversations(_)
         | ReadValue::Me(_)
         | ReadValue::OwnerInbox(_)
         | ReadValue::OwnerEnded(_)
@@ -578,6 +579,9 @@ fn read_value(
             }
             domain.changed();
         }
+        ReadValue::Tasks(page) if source == (Source::Window { number: super::project::GOALS_READ }) => {
+            crate::page::project::ended(domain, env, source, *page, out, lent);
+        }
         ReadValue::Tasks(page) => {
             crate::page::conversations::read_page(domain, source, *page, lent);
             crate::page::replies::conversations(domain, env, source, out, lent);
@@ -614,7 +618,6 @@ fn read_value(
                 }
             }
         }
-        ReadValue::Goals(page) => crate::page::project::ended(domain, env, source, *page, out, lent),
         ReadValue::Project(project) => crate::page::project::document(domain, env, project, out, lent),
         ReadValue::Deployment(deployment) => crate::page::deployment::document(domain, env, deployment, out, lent),
         ReadValue::OwnerDeployment(document) => {

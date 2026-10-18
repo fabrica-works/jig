@@ -550,6 +550,9 @@ pub(super) fn section(
             ledgers(b, value, client, words, bindings);
         }
         ProjectSection::Goals => {
+            if !super::goals::available(b, client, value.number, words) {
+                return;
+            }
             words.text(b, JigPhrase::PriorityMeaning, &[]);
             b.open(Role::List);
             for goal in &project_page.listed_goals {

@@ -457,7 +457,7 @@ fn retained(object: &Object) -> bool {
 #[must_use]
 pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
     let slots = limits.objects.checked_mul(2)?;
-    let payload = Set::<Source>::worst_case(limits.sources)?.checked_add(limits.document_bytes.checked_mul(4)?)?;
+    let payload = Set::<Source>::worst_case(limits.sources)?.checked_add(limits.document_bytes.checked_mul(5)?)?;
     Slab::<Object>::worst_case(slots)?
         .checked_add(Map::<ObjectKey, Id<Object>>::worst_case(limits.objects)?)?
         .checked_add(List::<ObjectKey>::worst_case(limits.objects)?)?

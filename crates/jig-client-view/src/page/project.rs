@@ -16,10 +16,11 @@ use crate::{
     objects::{Object, Source},
 };
 use alloc::boxed::Box;
-use jig_client::contract::{self, Cursor, GoalLine, NoteScope, Part, Project, Read, TaskLine, TaskQuery, Text};
+use jig_client::contract::{self, Cursor, NoteScope, Part, Project, Read, TaskLine, TaskQuery, Text};
 use jig_client::thread::window::End;
 use skein_lib::{Env, Id, List, Queue, Token};
 pub mod goals;
+pub(crate) mod moving;
 pub mod notes;
 pub mod owner_form;
 mod owner_goals;
@@ -38,7 +39,7 @@ pub struct ProjectPage {
     /// Whole owner facts, with no fabricated earlier document.
     pub owner: Option<Box<contract::OwnerProject>>,
     /// The current read window, which may include both live and ended goals.
-    pub ended: List<GoalLine>,
+    pub ended: List<TaskLine>,
     /// Keyed display merge; the board's current row wins over a read row.
     pub ended_cut: bool,
     pub ended_before: Option<Cursor>,
@@ -241,7 +242,13 @@ pub(crate) fn tasks(domain: &mut Ui, env: &Env<crate::Limits>, filter: TaskQuery
     for (id, watch) in &domain.handles.watches {
         match watch.subject {
             contract::Subject::Tasks { .. } => {
-                if watch.owner == (crate::page::shown::owner(domain)) {
+                if watch.owner == (crate::page::shown::owner(domain))
+                    && watch.subject
+                        == (contract::Subject::Tasks {
+                            query: TaskQuery { project: Some(project), ..domain.project_page.task_filter },
+                            window: env.limits.rows,
+                        })
+                {
                     old.push(*id).expect("watch IDs fit");
                 }
             }
@@ -281,7 +288,7 @@ pub const SPEND_WINDOW: u64 = 22;
 pub(crate) const SPEND_READ: u16 = 23;
 /// The project document read source.
 pub(crate) const PROJECT_READ: u16 = 0;
-pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Request>) {
+pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Request>, lent: &jig_client::Client) {
     let Some(project) = number(domain) else {
         return;
     };
@@ -290,8 +297,20 @@ pub(crate) fn more(domain: &mut Ui, window: Token, end: End, out: &mut Queue<Req
             End::Before => domain.project_page.ended_before.clone(),
             End::After => domain.project_page.ended_after.clone(),
         };
-        if let Some(cursor) = cursor {
-            ask(domain, GOALS_READ, Read::Goals { project, after: Some(cursor) }, out);
+        if let Some(cursor) = cursor
+            && let Some(me) = domain.frame(lent).document
+            && let Some(template) = jig_client::shapes::template(me, project, jig_client::shapes::GOAL)
+        {
+            ask(
+                domain,
+                GOALS_READ,
+                Read::Tasks {
+                    query: crate::queries::ended_goals(project, template.label),
+                    live: None,
+                    ended: Some(cursor),
+                },
+                out,
+            );
         }
     } else if window == Token::new(NOTES_WINDOW) {
         let cursor = match end {
@@ -327,7 +346,7 @@ pub fn worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_mul(6)?
         .checked_add(limits.document_bytes.checked_mul(4)?)?
         .checked_add(List::<u16>::worst_case(limits.rows)?)?
-        .checked_add(List::<GoalLine>::worst_case(limits.rows)?.checked_mul(4)?)?
+        .checked_add(List::<TaskLine>::worst_case(limits.rows)?.checked_mul(4)?)?
         .checked_add(List::<TaskLine>::worst_case(limits.rows)?)?
         .checked_add(List::<Id<Object>>::worst_case(limits.rows)?)?
         .checked_add(List::<contract::SpendPeriod>::worst_case(limits.rows)?)?
@@ -339,21 +358,21 @@ pub(crate) fn ended(
     domain: &mut Ui,
     env: &Env<crate::Limits>,
     source: Source,
-    page: contract::GoalPage,
+    page: contract::TaskPage,
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
-    domain.project_page.ended_cut = page.cut;
-    domain.project_page.ended_before = page.before;
-    domain.project_page.ended_after = page.after;
+    let contract::EndedGroup::Rows { rows, after, cut } = page.ended else { return };
+    domain.project_page.ended_cut = cut;
+    domain.project_page.ended_before = None;
+    domain.project_page.ended_after = after;
     domain.project_page.ended.clear();
-    for row in page.rows.into_boxed() {
+    for row in rows.into_boxed() {
         if domain.project_page.ended.room() == 0 {
             break;
         }
         domain.project_page.ended.push(row).expect("ended row fits");
     }
-    goals::order(&mut domain.project_page.ended);
     let mut keys = List::with_capacity(env.limits.rows);
     for goal in &domain.project_page.ended {
         keys.push(contract::ObjectKey::Task(goal.chip.task)).expect("keys fit row window");
@@ -409,25 +428,6 @@ fn order_spend(rows: &mut List<contract::TaskSpend>) {
             }
         }
     }
-}
-
-pub(crate) fn live(
-    domain: &mut Ui,
-    env: &Env<crate::Limits>,
-    source: Source,
-    mut goals: contract::Goals,
-    out: &mut Queue<Request>,
-    lent: &jig_client::Client,
-) {
-    goals::order(&mut goals.rows);
-    let mut keys = List::with_capacity(env.limits.rows);
-    for row in &goals.rows {
-        match keys.push(contract::ObjectKey::Task(row.chip.task)) {
-            Ok(()) => {}
-            Err(_) => break,
-        }
-    }
-    crate::page::routing::names(domain, env, source, keys, out, lent);
 }
 
 /// Install the complete historical source page in supplied order.

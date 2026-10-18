@@ -30,11 +30,15 @@ pub(super) fn project_pages(words: &Words) {
                     asked:
                         jig_client::Event::Watch {
                             handle: watch,
-                            subject: jig_client::Watchable::Jig(Subject::Goals { .. }),
+                            subject:
+                                jig_client::Watchable::Jig(Subject::Tasks {
+                                    query: TaskQuery { tracked: Some(true), .. },
+                                    ..
+                                }),
                         },
                 } => fill_goals(&mut d, watch, &doc),
                 Request::Client {
-                    asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Goals { .. }) },
+                    asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Tasks { .. }) },
                 } => fill_ended_goals(&mut d, read, &doc),
                 Request::Client {
                     asked:

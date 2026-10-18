@@ -6,7 +6,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, State};
 
 use crate::{Borrowed, action::Act, fields::Purpose, page::project::goals::GoalForm};
-use jig_client::contract::{ActKind, Admission, Bounds, GoalExecutor, GoalLine, ObjectKey, Project};
+use jig_client::contract::{ActKind, Admission, Bounds, GoalExecutor, ObjectKey, Project, TaskLine};
 /// The one typed form property changed by an input's complete value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Field {
@@ -31,6 +31,9 @@ pub fn edit(form: GoalForm, field: Field, value: &[u8]) -> Option<Act> {
     Some(Act::GoalForm { form })
 }
 pub(super) fn goals(b: &mut Builder, client: &Borrowed<'_>, doc: &Project, words: &Words, bindings: &mut JigBindings) {
+    if !available(b, client, doc.number, words) {
+        return;
+    }
     let project_page = client.project_page();
     words.text(b, JigPhrase::PriorityMeaning, &[]);
     b.open(Role::List);
@@ -312,15 +315,18 @@ fn inputs(
         );
     }
 }
-pub(super) fn line(b: &mut Builder, client: &Borrowed<'_>, goal: &GoalLine, words: &Words, bindings: &mut JigBindings) {
+pub(super) fn line(b: &mut Builder, client: &Borrowed<'_>, goal: &TaskLine, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Item);
     b.key(crate::pages::object_key(ObjectKey::Task(goal.chip.task)));
     cards::chip::chip(b, client, &goal.chip, words, bindings);
     if let Some(id) = client.objects().find(ObjectKey::Task(goal.chip.task)) {
         cards::card(b, client, id, &cards::Place::Elsewhere, words, bindings);
     }
-    words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(goal.priority))]);
-    crate::pages::work::owner_counts(b, goal.progress, words);
+    if let Some(priority) = goal.tracked {
+        words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(priority))]);
+    }
+    crate::pages::work::owner_counts(b, goal.phases, words);
+    arrows(b, client, goal, words, bindings);
     words.text(b, JigPhrase::HeldBelow, &[Hole::Number(u64::from(goal.held_below))]);
     crate::owner_budget::render(b, &goal.budget, words);
     b.close();
@@ -368,4 +374,42 @@ pub(super) fn date(at: skein_lib::Wall) -> [u8; 16] {
         }
     }
     bytes
+}
+
+fn arrows(b: &mut Builder, client: &Borrowed<'_>, goal: &TaskLine, words: &Words, bindings: &mut JigBindings) {
+    if goal.ended_at.is_some() {
+        return;
+    }
+    match crate::page::project::moving::admission(client.ui) {
+        Admission::Refused(_) => return,
+        Admission::Allowed | Admission::Bounded { .. } | Admission::Proposed { .. } => {}
+    }
+    let rows = client.project_page().goals;
+    let Some(index) = crate::page::project::moving::index(&rows, goal.chip.task) else { return };
+    for (up, phrase, offered) in [
+        (true, JigPhrase::MoveGoalUp, index > 0),
+        (false, JigPhrase::MoveGoalDown, index.saturating_add(1) < rows.len()),
+    ] {
+        if offered {
+            crate::frame::control(
+                b,
+                words,
+                bindings,
+                Role::Button,
+                phrase,
+                &[],
+                Act::MoveGoal { task: goal.chip.task, up },
+            );
+        }
+    }
+}
+
+pub(super) fn available(b: &mut Builder, client: &Borrowed<'_>, project: u32, words: &Words) -> bool {
+    if let Some(me) = client.frame().document
+        && jig_client::shapes::template(me, project, jig_client::shapes::GOAL).is_some()
+    {
+        return true;
+    }
+    words.text(b, JigPhrase::NoGoalTemplate, &[]);
+    false
 }

@@ -8,6 +8,7 @@ use jig_client_view::address::Address;
 use skein_lib::{Duration, Wall};
 pub mod client_construction;
 pub mod conversations;
+pub mod goals;
 pub mod own_proposal;
 pub mod person_confirmation;
 pub mod text_pages;

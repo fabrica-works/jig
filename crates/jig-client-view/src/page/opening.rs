@@ -48,13 +48,44 @@ pub(crate) fn section(
         Section::Project { project, section } => {
             match section {
                 ProjectSection::Overview => {
-                    open_once(domain, Subject::Goals { project }, owner, out);
+                    if let Some(me) = domain.frame(lent).document
+                        && jig_client::shapes::template(me, project, jig_client::shapes::GOAL).is_some()
+                    {
+                        open_once(
+                            domain,
+                            Subject::Tasks { query: crate::queries::goals(project), window: env.limits.rows },
+                            owner,
+                            out,
+                        );
+                    }
                     open_once(domain, Subject::Inbox { window: env.limits.rows }, owner, out);
                     domain.inbox.filter = super::inbox::Filter { project: Some(project), kind: None, goal: None };
                 }
                 ProjectSection::Goals => {
-                    open_once(domain, Subject::Goals { project }, owner, out);
-                    project::ask(domain, project::GOALS_READ, Read::Goals { project, after: None }, out);
+                    if let Some(me) = domain.frame(lent).document
+                        && jig_client::shapes::template(me, project, jig_client::shapes::GOAL).is_some()
+                    {
+                        open_once(
+                            domain,
+                            Subject::Tasks { query: crate::queries::goals(project), window: env.limits.rows },
+                            owner,
+                            out,
+                        );
+                    }
+                    if let Some(me) = domain.frame(lent).document
+                        && let Some(template) = jig_client::shapes::template(me, project, jig_client::shapes::GOAL)
+                    {
+                        project::ask(
+                            domain,
+                            project::GOALS_READ,
+                            Read::Tasks {
+                                query: crate::queries::ended_goals(project, template.label),
+                                live: None,
+                                ended: None,
+                            },
+                            out,
+                        );
+                    }
                 }
                 ProjectSection::Tasks => {
                     let subject = Subject::Tasks {

@@ -156,6 +156,10 @@ pub enum JigPhrase {
     Unknown,
     /// Inspect current object.
     LookAgain,
+    NoGoalTemplate,
+    ProposeInstead,
+    MoveGoalDown,
+    MoveGoalUp,
     /// Finding how this ended.
     Looking,
     /// Ended; its final facts are no longer available.
@@ -1172,6 +1176,10 @@ impl JigPhrase {
             Self::Parked => 28,
             Self::Unknown => 29,
             Self::LookAgain => 30,
+            Self::NoGoalTemplate => 1003,
+            Self::ProposeInstead => 1002,
+            Self::MoveGoalDown => 1001,
+            Self::MoveGoalUp => 1000,
             Self::Looking => 31,
             Self::GoneUnknown => 32,
             Self::Changed => 33,
@@ -1877,6 +1885,10 @@ impl JigPhrase {
             | Self::Parked
             | Self::Unknown
             | Self::LookAgain
+            | Self::NoGoalTemplate
+            | Self::ProposeInstead
+            | Self::MoveGoalDown
+            | Self::MoveGoalUp
             | Self::Looking
             | Self::GoneUnknown
             | Self::Changed
@@ -2289,7 +2301,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 598] = [
+pub const ALL: [JigPhrase; 602] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2420,6 +2432,10 @@ pub const ALL: [JigPhrase; 598] = [
     JigPhrase::Parked,
     JigPhrase::Unknown,
     JigPhrase::LookAgain,
+    JigPhrase::NoGoalTemplate,
+    JigPhrase::ProposeInstead,
+    JigPhrase::MoveGoalDown,
+    JigPhrase::MoveGoalUp,
     JigPhrase::Looking,
     JigPhrase::GoneUnknown,
     JigPhrase::Changed,
