@@ -67,6 +67,7 @@ fn a_request_parked_offline_is_sent_once_me_returns() {
     );
     c.stream(fixtures::hello(jig_client_protocol_wire::VERSION));
     let watch = c.opened_watch();
+    c.step(Event::Stored);
     c.stream(fixtures::frame(watch));
     assert_eq!(c.machine.link().state, Link::Live);
     c.step(Event::Stored);

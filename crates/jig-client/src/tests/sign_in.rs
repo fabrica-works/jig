@@ -6,6 +6,7 @@ use jig_client_protocol_wire::v8 as w;
 use skein_lib::{Duration, Time};
 const FIRST_BACKOFF: Duration = Duration::from_millis(10);
 const LEAST_BACKOFF: Duration = Duration::from_millis(5);
+const HELD_WATCHES: u32 = 2;
 
 #[test]
 fn a_watch_asked_before_signing_in_opens_once_signed_in() {
@@ -21,6 +22,13 @@ fn a_watch_asked_before_signing_in_opens_once_signed_in() {
     assert_eq!(*told, Told::Link { link: Link::Starting });
     assert_eq!(credential, &Some(fixtures::credential(&CREDENTIAL)));
     c.stream(fixtures::hello(jig_client_protocol_wire::VERSION));
+    assert_eq!(c.requests.len(), 3);
+    let Request::Save { records } = c.requests.last().expect("hello saves its stream") else {
+        panic!("hello saves its stream");
+    };
+    assert_eq!(records.len(), 1);
+    assert_eq!(records.as_slice().first().unwrap().key.as_ref(), STREAM_KEY);
+    c.requests.truncate(HELD_WATCHES);
     assert_eq!(c.requests().len(), 2);
     for request in c.requests() {
         let Request::Exchange { credential, message: Message::Watch(_), .. } = request else {

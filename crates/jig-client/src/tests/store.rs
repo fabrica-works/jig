@@ -116,6 +116,7 @@ fn a_record_carried_again_is_decided_by_its_later_write() {
     c.step(Event::NotStored);
     assert_eq!(c.machine.pending(STOP).unwrap().progress, Progress::Retrying { why: Retry::Lost });
     assert_eq!(fixtures::answers(c.requests()).as_slice(), &[]);
+    c.step(Event::Stored); // The reconnect's stream-name write precedes the later request write.
     c.step(Event::Stored);
     c.fire(Time::from_nanos(110_000_000));
     assert_eq!(fixtures::keyed_count(c.requests()), 1);

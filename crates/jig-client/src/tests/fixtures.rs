@@ -136,6 +136,7 @@ impl Client {
         self.stream(hello(jig_client_protocol_wire::VERSION));
         let watch = self.opened_watch();
         self.stream(frame(watch));
+        self.step(Event::Stored);
         self.requests.clear();
     }
     pub fn step(&mut self, event: Event) {
