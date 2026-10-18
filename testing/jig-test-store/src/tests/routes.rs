@@ -82,7 +82,7 @@ fn a_connectors_step_restores_its_records() {
     }
 }
 #[test]
-fn a_seen_chat_is_answered_from_the_store() {
+fn a_seen_conversation_is_answered_from_the_store() {
     let mut component = fixtures::component();
     let mut routes = fixtures::routes();
     let row = fixtures::ended_chat();
@@ -103,10 +103,12 @@ fn a_seen_chat_is_answered_from_the_store() {
     let outputs = fixtures::routed(
         &mut component,
         &mut routes,
-        StoreOut::Now(core::Now::SeenChat { request: Token::new(17), task }),
+        StoreOut::Now(core::Now::SeenConversation { request: Token::new(17), task }),
     );
     match outputs.as_ref() {
-        [Up::Root(root::Event::Core(core::Event::SeenChatLoaded { request, row: Some(found), busy: false }))] => {
+        [
+            Up::Root(root::Event::Core(core::Event::SeenConversationLoaded { request, row: Some(found), busy: false })),
+        ] => {
             assert_eq!(*request, Token::new(17));
             assert_eq!(*found, row);
         }

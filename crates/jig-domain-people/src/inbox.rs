@@ -1,6 +1,6 @@
 //! Task-derived inbox census, one shared recent prefix, and explicit read marks
 //! (`domain/people.md`, section 6). Owner rows rebuild volatile counts after
-//! positions restore. Ended chats retain positions until the owner forgets them.
+//! positions restore. Ended conversations retain positions until the owner forgets them.
 #[path = "inbox/moving.rs"]
 mod moving;
 pub(super) use moving::move_chat;
@@ -181,11 +181,11 @@ impl Domain {
         Some(chat.party)
     }
 
-    /// Last position explicitly marked seen over one chat, zero before any mark.
+    /// Last position explicitly marked seen over one conversation, zero before any mark.
     #[must_use]
-    pub fn chat_seen(&self, person: u64, task: u64) -> Option<u64> {
+    pub fn conversation_seen(&self, person: u64, task: u64) -> Option<u64> {
         self.identity(person)?;
-        Some(*self.chats_seen.get(&(person, task)).unwrap_or(&0))
+        Some(*self.conversations_seen.get(&(person, task)).unwrap_or(&0))
     }
 
     /// Exact reply count of a live chat, capped for its conversation line.
@@ -196,7 +196,7 @@ impl Domain {
             Some(chat) if chat.party == person => chat.last_reply,
             Some(_) | None => 0,
         };
-        let unseen = last_reply.saturating_sub(self.chat_seen(person, task)?);
+        let unseen = last_reply.saturating_sub(self.conversation_seen(person, task)?);
         Some(Counts {
             needs: 0,
             unread: u32::try_from(unseen.min(u64::from(limits.inbox_entries))).expect("capped reply count"),
@@ -413,7 +413,7 @@ fn chat_state(domain: &mut Domain, state: State) {
     if !domain.ready() || !domain.people.contains_key(&party) || !domain.has_project(project) {
         return;
     }
-    let seen = seen.unwrap_or(*domain.chats_seen.get(&(party, task)).unwrap_or(&0));
+    let seen = seen.unwrap_or(*domain.conversations_seen.get(&(party, task)).unwrap_or(&0));
     let old = match domain.chat_totals.get(&task) {
         Some(old) => {
             assert!(
@@ -443,7 +443,7 @@ fn chat_state(domain: &mut Domain, state: State) {
     }
 }
 
-pub(super) fn chat_seen_decision(
+pub(super) fn conversation_seen_decision(
     domain: &mut Domain,
     env: &Env<Limits>,
     request: Token,
@@ -451,14 +451,14 @@ pub(super) fn chat_seen_decision(
     last_reply: u64,
     out: &mut Queue<Request>,
 ) {
-    let Some((party, seen @ Seen::Chat { task, through })) = domain.seen_context(request) else { return };
-    if !domain.chats_seen.contains_key(&(party, task))
-        && domain.chats_seen.len() == domain.chats_seen.capacity()
+    let Some((party, seen @ Seen::Conversation { task, through })) = domain.seen_context(request) else { return };
+    if !domain.conversations_seen.contains_key(&(party, task))
+        && domain.conversations_seen.len() == domain.conversations_seen.capacity()
         && through != 0
     {
         return decided(domain, env, Id::<Pending>::from_token(request), Outcome::Again(Again::Busy), out);
     }
-    let old = *domain.chats_seen.get(&(party, task)).unwrap_or(&0);
+    let old = *domain.conversations_seen.get(&(party, task)).unwrap_or(&0);
     let delta = last_reply
         .saturating_sub(old)
         .checked_sub(last_reply.saturating_sub(old.max(through)))
@@ -480,7 +480,9 @@ pub(super) fn chat_seen_decision(
 fn unread_reply(domain: &Domain, person: u64, entry: Entry) -> bool {
     let (message, seen) = match entry.kind {
         EntryKind::Reply { message } => (message, *domain.results_seen.get(&person).unwrap_or(&0)),
-        EntryKind::ChatReply { message } => (message, *domain.chats_seen.get(&(person, entry.task)).unwrap_or(&0)),
+        EntryKind::ChatReply { message } => {
+            (message, *domain.conversations_seen.get(&(person, entry.task)).unwrap_or(&0))
+        }
         EntryKind::Proposal { .. }
         | EntryKind::Escalation { .. }
         | EntryKind::Question { .. }
@@ -525,12 +527,15 @@ pub(super) fn mark_seen(domain: &mut Domain, limits: &Limits, party: u64, seen: 
             }
             out.push(Request::Save { record: Stored::ReadResults { party, through } });
         }
-        Seen::Chat { task, through } => {
-            if through <= *domain.chats_seen.get(&(party, task)).unwrap_or(&0) {
+        Seen::Conversation { task, through } => {
+            if through <= *domain.conversations_seen.get(&(party, task)).unwrap_or(&0) {
                 return;
             }
-            assert!(domain.chats_seen.insert((party, task), through).is_ok(), "bounded live chat positions");
-            out.push(Request::Save { record: Stored::ReadChat { party, task, through } });
+            assert!(
+                domain.conversations_seen.insert((party, task), through).is_ok(),
+                "bounded live conversation positions"
+            );
+            out.push(Request::Save { record: Stored::ReadConversation { party, task, through } });
         }
     }
 }
@@ -554,7 +559,7 @@ fn forget_chat(domain: &mut Domain, limits: &Limits, task: u64, out: &mut Queue<
         assert!(domain.recent.insert(party, kept.into_boxed()).is_ok(), "existing prefix");
     }
     if let Some(chat) = domain.chat_totals.remove(&task) {
-        let unseen = chat.last_reply.saturating_sub(*domain.chats_seen.get(&(chat.party, task)).unwrap_or(&0));
+        let unseen = chat.last_reply.saturating_sub(*domain.conversations_seen.get(&(chat.party, task)).unwrap_or(&0));
         let count = *domain.chat_updates.get(&(chat.party, chat.project)).unwrap_or(&0);
         assert!(
             domain
@@ -568,14 +573,14 @@ fn forget_chat(domain: &mut Domain, limits: &Limits, task: u64, out: &mut Queue<
         );
     }
     let mut parties = List::with_capacity(limits.people);
-    for ((party, chat), _) in &domain.chats_seen {
-        if *chat == task {
-            parties.push(*party).expect("at most one position per party and chat");
+    for ((party, conversation), _) in &domain.conversations_seen {
+        if *conversation == task {
+            parties.push(*party).expect("at most one position per party and conversation");
         }
     }
     for party in parties.into_boxed() {
-        let _old = domain.chats_seen.remove(&(party, task));
-        out.push(Request::Erase { key: Key::ReadChat { party, task } });
+        let _old = domain.conversations_seen.remove(&(party, task));
+        out.push(Request::Erase { key: Key::ReadConversation { party, task } });
     }
     drop(domain.replies.remove(&task));
 }
@@ -730,7 +735,7 @@ pub(super) fn chat_state_event(
     replies: Box<[ReplyRef]>,
     out: &mut Queue<Request>,
 ) {
-    let through = seen.unwrap_or(*domain.chats_seen.get(&(party, task)).unwrap_or(&0));
+    let through = seen.unwrap_or(*domain.conversations_seen.get(&(party, task)).unwrap_or(&0));
     chat_state(domain, State { party, project, task, last_reply, live, seen });
     assert!(
         replies.len() <= usize::try_from(env.limits.inbox_recipients).expect("reply projection bound"),

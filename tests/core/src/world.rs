@@ -534,7 +534,7 @@ impl World {
                     | core::Now::HistoricalProposal { .. }
                     | core::Now::DecidedProposal { .. }
                     | core::Now::HistoricalEscalation { .. }
-                    | core::Now::SeenChat { .. }
+                    | core::Now::SeenConversation { .. }
                     | core::Now::LoadEndedRead { .. }
                     | core::Now::StartPreparation { from: Some(_), .. }),
                 ) => self.store.ask(jig_test_store::StoreOut::Now(now)),

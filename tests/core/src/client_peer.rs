@@ -154,7 +154,7 @@ impl ClientPeer {
             | core::Now::Activate { .. }
             | core::Now::PrepareAgent { .. }
             | core::Now::StartPreparation { .. }
-            | core::Now::SeenChat { .. }
+            | core::Now::SeenConversation { .. }
             | core::Now::LoadEndedRead { .. }
             | core::Now::HistoricalProposal { .. }
             | core::Now::DecidedProposal { .. }

@@ -323,7 +323,7 @@ impl World {
                         self.account_request(request);
                     }
                     root::Request::Now(
-                        now @ (core::Now::SeenChat { .. }
+                        now @ (core::Now::SeenConversation { .. }
                         | core::Now::LoadEndedRead { .. }
                         | core::Now::HistoricalPersonTask { .. }
                         | core::Now::PartyInputs { .. }

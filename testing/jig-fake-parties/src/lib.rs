@@ -60,7 +60,7 @@ pub enum Ask {
         through: u64,
     },
     /// Mark one chat's replies read without affecting another chat.
-    SeeChat {
+    SeeConversation {
         task: Task,
         through: u64,
     },
@@ -406,7 +406,7 @@ impl Party {
                 Ask::Close { task: self.task(task)?, disposals: resolved.into_boxed_slice() }
             }
             Ask::Say { task, words, release, .. } => Ask::Say { task: self.task(task)?, words, release },
-            Ask::SeeChat { task, through } => Ask::SeeChat { task: self.task(task)?, through },
+            Ask::SeeConversation { task, through } => Ask::SeeConversation { task: self.task(task)?, through },
             Ask::Cancel { task, grace } => Ask::Cancel { task: self.task(task)?, grace },
             Ask::Stop { task } => Ask::Stop { task: self.task(task)? },
             Ask::Release { task, revision, again } => Ask::Release { task: self.task(task)?, revision, again },

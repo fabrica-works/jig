@@ -489,7 +489,7 @@ fn a_restart_reads_no_ended_task_whose_result_was_read() {
     jig_core_world::stories::reads::request(
         &mut world,
         99,
-        jig_domain_people::Ask::MarkSeen { seen: jig_domain_people::Seen::Chat { task: chat, through: 1 } },
+        jig_domain_people::Ask::MarkSeen { seen: jig_domain_people::Seen::Conversation { task: chat, through: 1 } },
     );
     let through = census_result(&world, chat).result_position;
     census_mark_results(&mut world, through, 100);
@@ -641,7 +641,7 @@ fn a_generation_renewed_before_a_waiting_chat_is_placed_reaches_its_host() {
 }
 
 #[test]
-fn a_restart_keeps_an_unread_goal_older_than_an_unread_chat() {
+fn a_restart_keeps_an_unread_goal_older_than_an_unread_conversation() {
     let mut world = census_world(839);
     finish_census_task(&mut world, 0);
     let goal = census_goal(&mut world, FIRST_GOAL);

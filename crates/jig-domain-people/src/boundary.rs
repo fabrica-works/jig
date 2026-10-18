@@ -29,7 +29,7 @@ pub enum EntryKind {
     PersonTask,
     /// A reply in a task requested by the person.
     Reply { message: u64 },
-    /// A committed reply belonging to one chat's independent read position.
+    /// A committed reply belonging to one conversation's independent read position.
     ChatReply { message: u64 },
 }
 
@@ -214,7 +214,7 @@ pub enum Ask {
     Compound { project: u32, operations: List<crate::Operation> },
     /// Make these roots together (domain/people.md, 5.1).
     Create { project: u32, batch: Box<[crate::Member]> },
-    /// Mark results or one chat's replies seen under this party's key.
+    /// Mark results or one conversation's replies seen under this party's key.
     MarkSeen { seen: Seen },
     /// Application-owned request metadata; the root carries the value, and the protocol supplies its digest.
     Application { scope: crate::ApplicationScope, connector: u16, digest: [u8; 32] },
@@ -466,8 +466,8 @@ pub enum Key {
     Person(u64),
     /// One person's durable position in committed result order.
     ReadResults { party: u64 },
-    /// One party's durable position over a chat's replies.
-    ReadChat { party: u64, task: u64 },
+    /// One party's durable position over a conversation's replies.
+    ReadConversation { party: u64, task: u64 },
     /// Logical secret-free sign-in-record key.
     SignIn(/** Root-issued deployment sign-in number; cookie secrets and token digests stay below the domain. */ u64),
     /// Logical per-project roles-record key.
@@ -488,7 +488,7 @@ impl Key {
             Self::EndedRead { .. } => false,
             Self::Person(_)
             | Self::ReadResults { .. }
-            | Self::ReadChat { .. }
+            | Self::ReadConversation { .. }
             | Self::SignIn(_)
             | Self::Roles(_)
             | Self::Policy(_)
@@ -510,8 +510,8 @@ pub enum Stored {
     },
     /// Monotonic read position for the named person; no result is copied here.
     ReadResults { party: u64, through: u64 },
-    /// Monotonic replies position, erased once an ended chat and its replies are gone.
-    ReadChat { party: u64, task: u64, through: u64 },
+    /// Monotonic replies position, erased once an ended conversation and its replies are gone.
+    ReadConversation { party: u64, task: u64, through: u64 },
     /// An ended conversation's position, joined on demand.
     EndedRead { task: u64, party: u64, through: u64 },
     /// Persistent secret-free sign-in; expired restored entries are erased when restore completes.
@@ -554,7 +554,7 @@ impl Stored {
         match self {
             Stored::Person { number, .. } => Key::Person(*number),
             Stored::ReadResults { party, .. } => Key::ReadResults { party: *party },
-            Stored::ReadChat { party, task, .. } => Key::ReadChat { party: *party, task: *task },
+            Stored::ReadConversation { party, task, .. } => Key::ReadConversation { party: *party, task: *task },
             Stored::EndedRead { task, party, .. } => Key::EndedRead { task: *task, party: *party },
             Stored::SignIn { number, .. } => Key::SignIn(*number),
             Stored::Roles { project, .. } => Key::Roles(*project),
@@ -584,8 +584,8 @@ pub enum Event {
         seen: Option<u64>,
         replies: Box<[ReplyRef]>,
     },
-    /// Authorized keyed chat mark, with the owner's complete reply count.
-    ChatSeen { request: Token, project: u32, last_reply: u64 },
+    /// Authorized keyed conversation mark, with the owner's complete reply count.
+    ConversationSeen { request: Token, project: u32, last_reply: u64 },
     /// The owner forgot an ended chat and its reply references; retire its positions.
     Forget { task: u64, project: u32, party: Option<u64>, last_reply: u64 },
     /// Apply an authorized owner request to make a service with a fresh party number.

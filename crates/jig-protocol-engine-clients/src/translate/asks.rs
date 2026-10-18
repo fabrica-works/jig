@@ -166,7 +166,7 @@ pub(super) fn person_answer(value: w::PersonAnswer) -> p::PersonResult {
 fn seen(value: w::SeenThrough) -> p::Seen {
     match value {
         w::SeenThrough::Results(v) => p::Seen::Results { through: v.through() },
-        w::SeenThrough::Conversation(v) => p::Seen::Chat { task: v.task(), through: v.through() },
+        w::SeenThrough::Conversation(v) => p::Seen::Conversation { task: v.task(), through: v.through() },
     }
 }
 fn role(value: w::HeldRole) -> p::Role {

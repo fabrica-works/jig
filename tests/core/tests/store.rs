@@ -218,13 +218,13 @@ fn a_fill_below_the_mark_admits_a_chat_again() {
 }
 
 #[test]
-fn a_seen_chat_is_read_back_through_the_store_after_restart() {
+fn a_seen_conversation_is_read_back_through_the_store_after_restart() {
     let mut world = World::new(127, false);
     let task = world.assigned.as_ref().expect("the world's chat").task;
     world.turn(1, 3, None, b"the chat's reply");
     finish_chat(&mut world, 3, b"done");
     world.restart(127, false);
-    let seen = jig_domain_people::Seen::Chat { task, through: 1 };
+    let seen = jig_domain_people::Seen::Conversation { task, through: 1 };
     jig_core_world::stories::reads::request(&mut world, 62, jig_domain_people::Ask::MarkSeen { seen });
     assert_eq!(
         world.people_answers.last(),

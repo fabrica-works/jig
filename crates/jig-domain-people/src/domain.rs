@@ -11,7 +11,7 @@ mod ended;
 mod inbox;
 pub use ended::EndedMark;
 mod parties;
-use inbox::{chat_seen_decision, mark_seen, prune_unheld_roles, replace_waiting};
+use inbox::{conversation_seen_decision, mark_seen, prune_unheld_roles, replace_waiting};
 
 use crate::{
     Again, Ask, Entry, EntryKind, Event, Fact, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, LimitKind,
@@ -81,7 +81,7 @@ pub struct Domain {
     deployment_provider: u16,
     people: Map<u64, Identity>,
     results_seen: Map<u64, u64>,
-    chats_seen: Map<(u64, u64), u64>,
+    conversations_seen: Map<(u64, u64), u64>,
     replies: Map<u64, Box<[Entry]>>,
     chat_totals: Map<u64, ChatTotal>,
     chat_updates: Map<(u64, u32), u128>,
@@ -136,8 +136,8 @@ impl Domain {
             deployment_provider,
             people: Map::with_capacity(limits.people),
             results_seen: Map::with_capacity(limits.people),
-            chats_seen: Map::with_capacity(
-                limits.people.checked_mul(limits.inbox_tasks).expect("bounded chat positions"),
+            conversations_seen: Map::with_capacity(
+                limits.people.checked_mul(limits.inbox_tasks).expect("bounded conversation positions"),
             ),
             replies: Map::with_capacity(limits.inbox_tasks),
             chat_totals: Map::with_capacity(limits.inbox_tasks),
@@ -429,8 +429,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::ChatState { party, project, task, last_reply, live, seen, replies } => {
             inbox::chat_state_event(domain, env, party, project, task, last_reply, live, seen, replies, out);
         }
-        Event::ChatSeen { request, project, last_reply } => {
-            chat_seen_decision(domain, env, request, project, last_reply, out);
+        Event::ConversationSeen { request, project, last_reply } => {
+            conversation_seen_decision(domain, env, request, project, last_reply, out);
         }
         Event::Forget { task, project, party, last_reply } => {
             inbox::forget_event(domain, env, task, project, party, last_reply, out);
@@ -1039,7 +1039,7 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
         Ask::Compound { operations, .. } => crate::compound::refusal(limits, operations).is_none(),
         Ask::MarkSeen { seen } => match seen {
             Seen::Results { .. } => true,
-            Seen::Chat { task, .. } => *task != 0,
+            Seen::Conversation { task, .. } => *task != 0,
         },
         Ask::Application { .. } => true,
         Ask::EditNote { name, scope, change, .. } => valid_note(limits, *name, scope, change),
@@ -1501,12 +1501,12 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
                 && !domain.results_seen.contains_key(person)
                 && domain.results_seen.len() < env.limits.people
         }
-        Stored::ReadChat { party, task, through } => {
+        Stored::ReadConversation { party, task, through } => {
             *party != 0
                 && *task != 0
                 && *through != 0
-                && !domain.chats_seen.contains_key(&(*party, *task))
-                && domain.chats_seen.len() < domain.chats_seen.capacity()
+                && !domain.conversations_seen.contains_key(&(*party, *task))
+                && domain.conversations_seen.len() < domain.conversations_seen.capacity()
         }
         Stored::SignIn { number, .. } => {
             !domain.sign_ins.contains_key(number) && domain.sign_ins.len() < env.limits.sign_ins
@@ -1536,8 +1536,11 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
             let saved = domain.results_seen.insert(person, position);
             assert!(saved == Ok(None), "restored read position admitted");
         }
-        Stored::ReadChat { party, task, through } => {
-            assert!(domain.chats_seen.insert((party, task), through) == Ok(None), "restored chat position admitted");
+        Stored::ReadConversation { party, task, through } => {
+            assert!(
+                domain.conversations_seen.insert((party, task), through) == Ok(None),
+                "restored conversation position admitted"
+            );
         }
         Stored::SignIn { number, person, expires } => {
             let saved = domain.sign_ins.insert(number, SignIn { person, expires, due: deadline(env, expires) });
@@ -1672,9 +1675,9 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             return restore_failed(domain, Key::ReadResults { party: *person }, Refusal::Unknown, out);
         }
     }
-    for ((party, task), _) in &domain.chats_seen {
+    for ((party, task), _) in &domain.conversations_seen {
         if !domain.people.contains_key(party) {
-            return restore_failed(domain, Key::ReadChat { party: *party, task: *task }, Refusal::Unknown, out);
+            return restore_failed(domain, Key::ReadConversation { party: *party, task: *task }, Refusal::Unknown, out);
         }
     }
     domain.phase = Phase::Ready;

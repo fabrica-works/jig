@@ -24,8 +24,9 @@ fn world() -> Test {
 #[test]
 fn an_ended_conversation_moves_its_position_to_the_ended_family() {
     let mut test = world();
-    let request = route(&test.request(SIGN_IN, MARK, Ask::MarkSeen { seen: Seen::Chat { task: TASK, through: 1 } }));
-    test.send(Event::ChatSeen { request, project: PROJECT, last_reply: 2 });
+    let request =
+        route(&test.request(SIGN_IN, MARK, Ask::MarkSeen { seen: Seen::Conversation { task: TASK, through: 1 } }));
+    test.send(Event::ConversationSeen { request, project: PROJECT, last_reply: 2 });
     let out = test.send(Event::ChatState {
         party: PARTY,
         project: PROJECT,
@@ -36,8 +37,8 @@ fn an_ended_conversation_moves_its_position_to_the_ended_family() {
         replies: Box::new([]),
     });
     assert!(out.contains(&Request::Save { record: Stored::EndedRead { task: TASK, party: PARTY, through: 1 } }));
-    assert!(out.contains(&Request::Erase { key: Key::ReadChat { party: PARTY, task: TASK } }));
-    assert_eq!(test.d.chat_seen(PARTY, TASK), Some(0));
+    assert!(out.contains(&Request::Erase { key: Key::ReadConversation { party: PARTY, task: TASK } }));
+    assert_eq!(test.d.conversation_seen(PARTY, TASK), Some(0));
 }
 
 #[test]
@@ -74,7 +75,7 @@ fn a_mark_on_an_ended_conversation_saves_its_ended_position() {
         seen: None,
         replies: Box::new([]),
     });
-    let seen = Seen::Chat { task: TASK, through: 1 };
+    let seen = Seen::Conversation { task: TASK, through: 1 };
     let request = route(&test.request(SIGN_IN, MARK, Ask::MarkSeen { seen }));
     let mut out = Queue::with_capacity(max_out(&LIMITS));
     test.d.mark_ended(&test.env, EndedMark { request, project: PROJECT, last_reply: 2, seen: 0 }, &mut out);
@@ -84,5 +85,5 @@ fn a_mark_on_an_ended_conversation_saves_its_ended_position() {
     }
     assert!(requests.contains(&Request::Save { record: Stored::EndedRead { task: TASK, party: PARTY, through: 1 } }));
     assert_eq!(reply(&requests), Reply::Outcome(Outcome::MarkedSeen { seen }));
-    assert_eq!(test.d.chat_seen(PARTY, TASK), Some(0));
+    assert_eq!(test.d.conversation_seen(PARTY, TASK), Some(0));
 }

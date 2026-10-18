@@ -10,7 +10,7 @@ pub fn key(now: &Now) -> Option<Key> {
         Now::LoadEndedRead { task, party, .. } => {
             Some(Key::People(jig_domain_people::Key::EndedRead { task: *task, party: *party }))
         }
-        Now::SeenChat { task, .. } | Now::HistoricalPersonTask { task, .. } => {
+        Now::SeenConversation { task, .. } | Now::HistoricalPersonTask { task, .. } => {
             Some(Key::Tasks(tasks::Key::Ended(*task)))
         }
         Now::DecidedProposal { key, .. } => Some(Key::Tasks(tasks::Key::Live(key.task))),
@@ -68,7 +68,9 @@ pub fn answer(now: Now, row: Option<Record>) -> Option<core::Event> {
             };
             core::Event::EndedReadLoaded { request, task, party, through, busy: false }
         }
-        Now::SeenChat { request, .. } => core::Event::SeenChatLoaded { request, row: ended(row), busy: false },
+        Now::SeenConversation { request, .. } => {
+            core::Event::SeenConversationLoaded { request, row: ended(row), busy: false }
+        }
         Now::HistoricalPersonTask { request, person, project, task } => {
             core::Event::HistoricalPersonTask { request, person, project, task, row: ended(row), busy: false }
         }

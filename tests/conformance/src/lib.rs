@@ -454,7 +454,7 @@ impl Application for Testing {
                 }
                 Delivery::Now(
                     now @ (core::Now::StartPreparation { from: Some(_), .. }
-                    | core::Now::SeenChat { .. }
+                    | core::Now::SeenConversation { .. }
                     | core::Now::LoadEndedRead { .. }
                     | core::Now::HistoricalPersonTask { .. }
                     | core::Now::PartyInputs { .. }

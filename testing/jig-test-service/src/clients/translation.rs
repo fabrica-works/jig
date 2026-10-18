@@ -74,7 +74,7 @@ pub(crate) fn immediate(now: core::Now, admission: &mut Option<Token>) -> Option
         | core::Now::Activate { .. }
         | core::Now::PrepareAgent { .. }
         | core::Now::StartPreparation { .. }
-        | core::Now::SeenChat { .. }
+        | core::Now::SeenConversation { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::DecidedProposal { .. }
@@ -164,7 +164,7 @@ pub(crate) fn watcher(value: &core::Event) -> Option<Token> {
         | core::Event::PreparedAgent { .. }
         | core::Event::Forget { .. }
         | core::Event::EndedReadLoaded { .. }
-        | core::Event::SeenChatLoaded { .. }
+        | core::Event::SeenConversationLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::DecidedProposal { .. }
         | core::Event::HistoricalPersonTask { .. }
@@ -240,7 +240,7 @@ pub(crate) fn starting(value: core::Event) -> Option<kit::Event> {
         | core::Event::PreparedAgent { .. }
         | core::Event::Forget { .. }
         | core::Event::EndedReadLoaded { .. }
-        | core::Event::SeenChatLoaded { .. }
+        | core::Event::SeenConversationLoaded { .. }
         | core::Event::HistoricalProposal { .. }
         | core::Event::DecidedProposal { .. }
         | core::Event::HistoricalPersonTask { .. }

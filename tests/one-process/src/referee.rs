@@ -164,7 +164,7 @@ fn snapshot(rows: &BTreeMap<root::Key, root::Record>) -> rules::Snapshot {
             snapshot.receipts.insert(rules::Receipt::Terminal(end.task, end.attempt));
         }
         if let root::Record::Core(core::Record::People(
-            jig_domain_people::Stored::ReadChat { party, task, through }
+            jig_domain_people::Stored::ReadConversation { party, task, through }
             | jig_domain_people::Stored::EndedRead { party, task, through },
         )) = row
         {

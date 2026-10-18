@@ -49,7 +49,7 @@ pub(super) fn route_people(
         }
         other @ (people::Event::ChatState { .. }
         | people::Event::MoveChat { .. }
-        | people::Event::ChatSeen { .. }
+        | people::Event::ConversationSeen { .. }
         | people::Event::Forget { .. }
         | people::Event::MakeService { .. }
         | people::Event::Seed { .. }
@@ -133,7 +133,7 @@ pub(super) fn tag_people(
                     people::Key::Person(_)
                     | people::Key::ReadResults { .. }
                     | people::Key::EndedRead { .. }
-                    | people::Key::ReadChat { .. }
+                    | people::Key::ReadConversation { .. }
                     | people::Key::SignIn(_)
                     | people::Key::Roles(_)
                     | people::Key::Policy(_) => {}
@@ -303,7 +303,7 @@ pub(super) fn tag_people(
                             for result in core.people.cached_results(person).unwrap_or(&[]) {
                                 loading |= result.position <= through
                                     && result.forgettable.is_some()
-                                    && core.people.chat_mark_loading(result.task, request);
+                                    && core.people.conversation_mark_loading(result.task, request);
                             }
                             if loading {
                                 work.push(Event::People(people::Event::Decided {
@@ -341,18 +341,20 @@ pub(super) fn tag_people(
                                 }
                             }
                         }
-                        people::Seen::Chat { task, .. } if core.people.chat_mark_loading(task, request) => {
+                        people::Seen::Conversation { task, .. }
+                            if core.people.conversation_mark_loading(task, request) =>
+                        {
                             work.push(Event::People(people::Event::Decided {
                                 request,
                                 outcome: people::Outcome::Again(people::Again::Busy),
                             }));
                         }
-                        people::Seen::Chat { task, .. } => match core.tasks.task(task) {
+                        people::Seen::Conversation { task, .. } => match core.tasks.task(task) {
                             Some(row) => {
                                 if core.conversation_requester(row) == Some(person)
                                     && core.people.role(person, row.project).is_some()
                                 {
-                                    work.push(Event::People(people::Event::ChatSeen {
+                                    work.push(Event::People(people::Event::ConversationSeen {
                                         project: row.project,
                                         request,
                                         last_reply: row.last_reply,
@@ -367,7 +369,7 @@ pub(super) fn tag_people(
                                 }
                             }
                             None => {
-                                out.push(Request::Held(Box::new(Held::Load(Box::new(Now::SeenChat {
+                                out.push(Request::Held(Box::new(Held::Load(Box::new(Now::SeenConversation {
                                     request,
                                     task,
                                 })))));

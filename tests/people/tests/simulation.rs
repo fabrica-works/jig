@@ -662,7 +662,7 @@ fn reading_the_inbox_moves_no_position_until_the_party_marks_it_seen() {
 }
 
 #[test]
-fn a_chat_marked_seen_leaves_other_chats_unread() {
+fn marking_a_conversation_leaves_other_conversations_unread() {
     let mut world = World::new(Settings::calm(81));
     let person = member(&mut world);
     let mut chats = Vec::new();
@@ -683,14 +683,14 @@ fn a_chat_marked_seen_leaves_other_chats_unread() {
         );
     }
     assert_eq!(world.counts(person).unread, 2);
-    let seen = jig_domain_people::Seen::Chat { task: chats[0], through: 1 };
+    let seen = jig_domain_people::Seen::Conversation { task: chats[0], through: 1 };
     let call = world.request(10, [3; 16], Ask::MarkSeen { seen });
     assert!(world.reply(call).is_none());
     world.commit_all();
     assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::MarkedSeen { seen })));
     assert_eq!(world.counts(person).unread, 1);
     assert_eq!(world.inbox(person).len(), 1);
-    assert_eq!(world.chat_seen(person, chats[1]), 0);
+    assert_eq!(world.conversation_seen(person, chats[1]), 0);
     let other_call = world.signin(20, 2);
     world.commit_all();
     let Some(Reply::SignedIn { person: other, .. }) = world.reply(other_call) else { panic!("other party") };
@@ -702,13 +702,13 @@ fn a_chat_marked_seen_leaves_other_chats_unread() {
         world.reply(refused),
         Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: Some(Role::Member) })))
     );
-    assert_eq!(world.chat_seen(other, chats[0]), 0);
+    assert_eq!(world.conversation_seen(other, chats[0]), 0);
     world.restart();
-    assert_eq!(world.chat_seen(person, chats[0]), 1);
+    assert_eq!(world.conversation_seen(person, chats[0]), 1);
     world.forget_chat(chats[0]);
     world.commit_all();
-    assert_eq!(world.chat_seen(person, chats[0]), 0);
-    assert!(!world.records().contains_key(&jig_domain_people::Key::ReadChat { party: person, task: chats[0] }));
+    assert_eq!(world.conversation_seen(person, chats[0]), 0);
+    assert!(!world.records().contains_key(&jig_domain_people::Key::ReadConversation { party: person, task: chats[0] }));
     world.assert_settled();
 }
 
@@ -748,15 +748,15 @@ fn a_conversations_read_position_moves_to_the_ended_family_and_reads_back_after_
     let first = world.request(
         SIGN_IN,
         [FIRST_MARK; 16],
-        Ask::MarkSeen { seen: jig_domain_people::Seen::Chat { task, through: 1 } },
+        Ask::MarkSeen { seen: jig_domain_people::Seen::Conversation { task, through: 1 } },
     );
     world.commit_all();
     assert!(world.reply(first).is_some());
     world.end_conversation(person, task, LAST_REPLY);
     world.commit_all();
     world.restart();
-    assert_eq!(world.chat_seen(person, task), 0);
-    let seen = jig_domain_people::Seen::Chat { task, through: LAST_REPLY };
+    assert_eq!(world.conversation_seen(person, task), 0);
+    let seen = jig_domain_people::Seen::Conversation { task, through: LAST_REPLY };
     let second = world.request(SIGN_IN, [SECOND_MARK; 16], Ask::MarkSeen { seen });
     world.commit_all();
     assert_eq!(world.reply(second), Some(Reply::Outcome(Outcome::MarkedSeen { seen })));
@@ -764,5 +764,5 @@ fn a_conversations_read_position_moves_to_the_ended_family_and_reads_back_after_
         world.records().get(&jig_domain_people::Key::EndedRead { task, party: person }),
         Some(&jig_domain_people::Stored::EndedRead { task, party: person, through: LAST_REPLY })
     );
-    assert!(!world.records().contains_key(&jig_domain_people::Key::ReadChat { task, party: person }));
+    assert!(!world.records().contains_key(&jig_domain_people::Key::ReadConversation { task, party: person }));
 }

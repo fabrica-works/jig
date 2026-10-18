@@ -170,7 +170,7 @@ fn window(now: core::Now) -> Option<(u64, u64, u32)> {
         | core::Now::RunPreparationFailed { .. }
         | core::Now::RunPrepared { .. }
         | core::Now::RestoreRefused
-        | core::Now::SeenChat { .. }
+        | core::Now::SeenConversation { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }

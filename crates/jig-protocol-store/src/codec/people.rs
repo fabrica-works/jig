@@ -121,10 +121,12 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, 
             limits,
             wire::StoredReadResultsParts { party: *party, through: *through },
         )?),
-        domain::Stored::ReadChat { party, task, through } => wire::Value::ReadChat(wire::StoredReadChat::new(
-            limits,
-            wire::StoredReadChatParts { party: *party, task: *task, through: *through },
-        )?),
+        domain::Stored::ReadConversation { party, task, through } => {
+            wire::Value::ReadConversation(wire::StoredReadConversation::new(
+                limits,
+                wire::StoredReadConversationParts { party: *party, task: *task, through: *through },
+            )?)
+        }
         domain::Stored::EndedRead { task, party, through } => wire::Value::EndedRead(wire::EndedRead::new(
             limits,
             wire::EndedReadParts { task: *task, party: *party, through: *through },
@@ -167,9 +169,9 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wir
             let wire::StoredReadResultsParts { party, through } = value.into_parts();
             domain::Stored::ReadResults { party, through }
         }
-        wire::Value::ReadChat(value) => {
-            let wire::StoredReadChatParts { party, task, through } = value.into_parts();
-            domain::Stored::ReadChat { party, task, through }
+        wire::Value::ReadConversation(value) => {
+            let wire::StoredReadConversationParts { party, task, through } = value.into_parts();
+            domain::Stored::ReadConversation { party, task, through }
         }
         wire::Value::EndedRead(value) => {
             let wire::EndedReadParts { task, party, through } = value.into_parts();

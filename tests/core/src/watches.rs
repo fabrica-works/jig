@@ -261,7 +261,7 @@ impl Parties {
                     people::Stored::Person { number, .. }
                     | people::Stored::ReadResults { party: number, .. }
                     | people::Stored::EndedRead { party: number, .. }
-        | people::Stored::ReadChat { party: number, .. },
+        | people::Stored::ReadConversation { party: number, .. },
                 ))) => party_subject(&consumer.subject, *number),
                 root::Write::Save(root::Record::Core(core::Record::People(people::Stored::Roles {
                     project,
@@ -283,7 +283,7 @@ impl Parties {
                         project_subject(&consumer.subject, project, &self.task_projects, &self.proposal_projects),
                     tasks::Funder::Task(_) => false,
                 },
-                root::Write::Erase(root::Key::Core(core::Key::People(people::Key::ReadChat { party, .. }))) => {
+                root::Write::Erase(root::Key::Core(core::Key::People(people::Key::ReadConversation { party, .. }))) => {
                     party_subject(&consumer.subject, *party)
                 }
                 root::Write::Save(root::Record::Connector {

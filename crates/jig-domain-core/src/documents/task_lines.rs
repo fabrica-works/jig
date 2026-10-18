@@ -67,7 +67,7 @@ pub fn task_line(
     });
     let conversation = match row.requester {
         tasks::Party::Person(requester) if row.flags.conversation => {
-            let seen = if ended { ended_read } else { core.people.chat_seen(requester, row.number) }
+            let seen = if ended { ended_read } else { core.people.conversation_seen(requester, row.number) }
                 .ok_or(Missing::Unknown)?;
             let unread = row.last_reply.saturating_sub(seen);
             let count = u32::try_from(unread.min(u64::from(limits.people.inbox_entries))).expect("bounded unread");

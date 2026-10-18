@@ -133,7 +133,7 @@ fn archived_conversation(core: &Core, limits: &Limits, party: u64, task: u64) ->
     }
     let mut line = archive.line.as_ref()?.clone();
     let conversation = line.conversation.as_mut()?;
-    conversation.seen = core.people.chat_seen(party, task)?;
+    conversation.seen = core.people.conversation_seen(party, task)?;
     let unread = archive.last_reply.saturating_sub(conversation.seen);
     let capped = u32::try_from(unread.min(u64::from(limits.people.inbox_entries))).expect("bounded unread");
     conversation.unread =

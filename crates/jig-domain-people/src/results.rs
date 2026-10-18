@@ -44,6 +44,6 @@ pub enum Update {
 pub enum Seen {
     /// Results committed through this position.
     Results { through: u64 },
-    /// Replies of one chat through this position.
-    Chat { task: u64, through: u64 },
+    /// Replies of one conversation through this position.
+    Conversation { task: u64, through: u64 },
 }

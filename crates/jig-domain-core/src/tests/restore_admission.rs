@@ -170,7 +170,7 @@ fn restore_ranges_admit_each_live_family_once() {
         Key::Tasks(tasks::Key::PersonProposal(0)),
         Key::People(people::Key::Person(0)),
         Key::People(people::Key::ReadResults { party: 0 }),
-        Key::People(people::Key::ReadChat { party: 0, task: 0 }),
+        Key::People(people::Key::ReadConversation { party: 0, task: 0 }),
         Key::People(people::Key::SignIn(0)),
         Key::People(people::Key::Roles(0)),
         Key::People(people::Key::Policy(0)),

@@ -1373,7 +1373,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
             };
             work.push(Work::Core(core::Event::RefusedPayload { request, problem, payload }));
         }
-        load @ (core::Now::SeenChat { .. }
+        load @ (core::Now::SeenConversation { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalProposal { .. }
         | core::Now::DecidedProposal { .. }

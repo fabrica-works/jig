@@ -262,7 +262,7 @@ pub enum Now {
     /// Load the current window in key order from its first turn; None loads nothing.
     StartPreparation { task: u64, transcript_waiter: Option<Token>, from: Option<(u64, u32)> },
     /// Load one proposal decision that has left live task memory.
-    SeenChat { request: Token, task: u64 },
+    SeenConversation { request: Token, task: u64 },
     /// Load the durable position of one ended conversation for its mark.
     LoadEndedRead { request: Token, task: u64, party: u64 },
     /// Load one proposal decision that has left live task memory.
@@ -505,8 +505,8 @@ pub enum Event {
     PreparedAgent { context: Box<tasks::RunContext>, transcript_waiter: Option<Token>, busy: bool },
     /// Forget a fully read ended task and its read marker in one decision.
     Forget { owner: crate::forget::Owner },
-    /// Return the ended owner header for an authenticated chat mark.
-    SeenChatLoaded { request: Token, row: Option<Box<tasks::TaskRecord>>, busy: bool },
+    /// Return the ended owner header for an authenticated conversation mark.
+    SeenConversationLoaded { request: Token, row: Option<Box<tasks::TaskRecord>>, busy: bool },
     /// The ended position loaded for an authenticated mark, zero if absent.
     EndedReadLoaded { request: Token, task: u64, party: u64, through: u64, busy: bool },
     /// The proposal loaded from its task proposer's durable history.

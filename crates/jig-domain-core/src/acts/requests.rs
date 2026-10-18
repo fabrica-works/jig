@@ -58,7 +58,7 @@ pub(crate) fn request(
         people::Ask::Move { task, .. } => (Act::Move, documents::Subject::Task { task: *task }),
         people::Ask::MarkSeen { seen } => match seen {
             people::Seen::Results { .. } => (Act::Seen, documents::Subject::Inbox { party: person }),
-            people::Seen::Chat { task, .. } => (Act::Seen, documents::Subject::Task { task: *task }),
+            people::Seen::Conversation { task, .. } => (Act::Seen, documents::Subject::Task { task: *task }),
         },
         people::Ask::EditNote { scope, change, .. } => {
             return super::note(

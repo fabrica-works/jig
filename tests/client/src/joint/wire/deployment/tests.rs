@@ -455,7 +455,7 @@ fn deployment_person_capacity_actions_keep_every_original_kind_and_address() {
             client::OwnerPersonCapacityAction::MarkSeen { seen: client::SeenThrough::Results { through: u64::MAX } },
         ),
         (
-            people::CapacityAction::MarkSeen { seen: people::Seen::Chat { task: u64::MAX, through: 0 } },
+            people::CapacityAction::MarkSeen { seen: people::Seen::Conversation { task: u64::MAX, through: 0 } },
             client::OwnerPersonCapacityAction::MarkSeen {
                 seen: client::SeenThrough::Conversation { task: u64::MAX, through: 0 },
             },

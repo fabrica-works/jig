@@ -152,7 +152,7 @@ pub(super) fn system(engine: &mut Engine, number: u16) -> &mut crate::system::Sy
 
 fn immediate(engine: &mut Engine, now: core::Now) {
     match now {
-        value @ (core::Now::SeenChat { .. }
+        value @ (core::Now::SeenConversation { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }

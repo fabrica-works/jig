@@ -332,7 +332,7 @@ fn mark_seen_case(limits: &w::Limits) -> (w::Ask, people::Ask) {
             )
             .expect("MarkSeen"),
         ),
-        p::Ask::MarkSeen { seen: p::Seen::Chat { task: 8, through: u64::MAX } },
+        p::Ask::MarkSeen { seen: p::Seen::Conversation { task: 8, through: u64::MAX } },
     )
 }
 fn answer_person_case(limits: &w::Limits) -> (w::Ask, people::Ask) {

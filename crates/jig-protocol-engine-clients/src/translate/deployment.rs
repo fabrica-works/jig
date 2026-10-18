@@ -190,7 +190,7 @@ fn seen_record(value: people::Seen, limits: &w::Limits) -> Result<w::SeenThrough
         people::Seen::Results { through } => {
             w::SeenThrough::Results(w::SeenResults::new(limits, w::SeenResultsParts { through })?)
         }
-        people::Seen::Chat { task, through } => {
+        people::Seen::Conversation { task, through } => {
             w::SeenThrough::Conversation(w::SeenConversation::new(limits, w::SeenConversationParts { task, through })?)
         }
     })

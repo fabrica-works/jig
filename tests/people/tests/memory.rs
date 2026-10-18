@@ -184,16 +184,18 @@ fn full_people_roles_signins_pending_waiters_answers_and_expiry_fit() {
             test.drain();
         }
 
-        full_chat_positions_and_replies_fit(limits);
+        full_conversation_positions_and_replies_fit(limits);
     }
 }
 
-fn full_chat_positions_and_replies_fit(limits: Limits) {
-    // Every per-chat position and the complete reply census fit with restore inputs and outputs.
+fn full_conversation_positions_and_replies_fit(limits: Limits) {
+    // Every per-conversation position and the complete reply census fit with restore inputs and outputs.
     let mut restored = Measured::new(limits);
     for party in 1..=u64::from(limits.people) {
         for task in 1..=u64::from(limits.inbox_tasks) {
-            restored.event(Event::Restore { record: jig_domain_people::Stored::ReadChat { party, task, through: 1 } });
+            restored.event(Event::Restore {
+                record: jig_domain_people::Stored::ReadConversation { party, task, through: 1 },
+            });
         }
         restored.event(Event::Restore {
             record: jig_domain_people::Stored::Person {

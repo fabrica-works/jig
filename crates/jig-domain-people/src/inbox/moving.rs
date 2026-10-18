@@ -14,6 +14,6 @@ pub(crate) fn move_chat(
     let chat = domain.chat_totals.get(&task).expect("a moved conversation has a live census");
     assert!(chat.party == from && chat.project == project, "authentic move retires its previous requester");
     forget_chat(domain, limits, task, out);
-    assert!(domain.chats_seen.insert((to, task), 0).is_ok(), "one position replaces the old requester's");
-    out.push(Request::Save { record: Stored::ReadChat { party: to, task, through: 0 } });
+    assert!(domain.conversations_seen.insert((to, task), 0).is_ok(), "one position replaces the old requester's");
+    out.push(Request::Save { record: Stored::ReadConversation { party: to, task, through: 0 } });
 }

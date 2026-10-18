@@ -505,8 +505,8 @@ fn each_kind_of_ask_reads_back() {
     }
 }
 
-fn a_read_chat_position_reads_back() {
-    people_round_trip(jig_domain_people::Stored::ReadChat { party: 3, task: 4, through: u64::MAX });
+fn a_read_conversation_position_reads_back() {
+    people_round_trip(jig_domain_people::Stored::ReadConversation { party: 3, task: 4, through: u64::MAX });
 }
 
 fn a_sign_in_reads_back_with_its_wall_expiry() {

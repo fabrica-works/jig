@@ -348,25 +348,29 @@ fn assert_moved_read(world: &mut jig_core_world::effects::World, task: u64, ask:
     request(
         world,
         MARK_BEFORE_MOVE,
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: u64::from(FIRST_MOVE_TURN) } },
+        people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: u64::from(FIRST_MOVE_TURN) } },
     );
     assert!(
         world
             .store
             .rows
-            .contains_key(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: OWNER, task })))
+            .contains_key(&root::Key::Core(core::Key::People(people::Key::ReadConversation { party: OWNER, task })))
     );
     world.sign_in = Some(second);
     request(world, MOVE, ask);
     let tasks::Party::Person(to) = live_row(world, task).requester else { panic!("new requester") };
     assert_ne!(to, OWNER, "{:?}", world.people_answers.last());
     assert_eq!(
-        world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: OWNER, task }))),
+        world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::ReadConversation { party: OWNER, task }))),
         None
     );
     assert_eq!(
-        world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::ReadChat { party: to, task }))),
-        Some(&root::Record::Core(core::Record::People(people::Stored::ReadChat { party: to, task, through: 0 })))
+        world.store.rows.get(&root::Key::Core(core::Key::People(people::Key::ReadConversation { party: to, task }))),
+        Some(&root::Record::Core(core::Record::People(people::Stored::ReadConversation {
+            party: to,
+            task,
+            through: 0
+        })))
     );
     let decision = world
         .commits
@@ -374,7 +378,7 @@ fn assert_moved_read(world: &mut jig_core_world::effects::World, task: u64, ask:
         .find(|commit| {
             commit.iter().any(|write| {
                 *write
-                    == root::Write::Erase(root::Key::Core(core::Key::People(people::Key::ReadChat {
+                    == root::Write::Erase(root::Key::Core(core::Key::People(people::Key::ReadConversation {
                         party: OWNER,
                         task,
                     })))
@@ -382,6 +386,6 @@ fn assert_moved_read(world: &mut jig_core_world::effects::World, task: u64, ask:
         })
         .expect("one move decision");
     assert!(decision.contains(&root::Write::Save(root::Record::Core(core::Record::People(
-        people::Stored::ReadChat { party: to, task, through: 0 }
+        people::Stored::ReadConversation { party: to, task, through: 0 }
     )))));
 }

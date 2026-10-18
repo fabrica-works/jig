@@ -164,7 +164,7 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
         domain::Outcome::CompoundRefused { at: 2, why: domain::Refusal::Unknown },
         domain::Outcome::Created { first: 2, last: 3, given: None },
         domain::Outcome::Created { first: 2, last: 3, given: Some(domain::Given { task: 3, amount: 70 }) },
-        domain::Outcome::MarkedSeen { seen: domain::Seen::Chat { task: 3, through: 7 } },
+        domain::Outcome::MarkedSeen { seen: domain::Seen::Conversation { task: 3, through: 7 } },
         domain::Outcome::Applied { connector: 2, token: Token::new(17) },
         domain::Outcome::Again(domain::Again::Busy),
         domain::Outcome::SignedOut,

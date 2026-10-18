@@ -246,14 +246,18 @@ impl Application for OpsApplication {
                 return Ops::deliver(&mut peers.conformance, systems, store, clock, other);
             }
         };
-        if let root::Output::CoreLoad(core::Now::SeenChat { request, task }) = delivery {
+        if let root::Output::CoreLoad(core::Now::SeenConversation { request, task }) = delivery {
             let row = store.rows.values().find_map(|record| match record {
                 root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Ended(row))) if row.number == task => {
                     Some(row.clone())
                 }
                 root::Record::Core(_) | root::Record::Infrastructure(_) | root::Record::Observability(_) => None,
             });
-            return vec![Input::Event(root::Event::Core(core::Event::SeenChatLoaded { request, row, busy: false }))];
+            return vec![Input::Event(root::Event::Core(core::Event::SeenConversationLoaded {
+                request,
+                row,
+                busy: false,
+            }))];
         }
         if let root::Output::Core(core::Held::ReadLoad { load, range }) = delivery {
             let loaded = read_page(store, &range, peers.tree_tasks);
@@ -352,7 +356,7 @@ impl Application for OpsApplication {
                 | core::Now::Activate { .. }
                 | core::Now::PrepareAgent { .. }
                 | core::Now::StartPreparation { .. }
-                | core::Now::SeenChat { .. }
+                | core::Now::SeenConversation { .. }
                 | core::Now::LoadEndedRead { .. }
                 | core::Now::HistoricalProposal { .. }
                 | core::Now::DecidedProposal { .. }

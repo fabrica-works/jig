@@ -52,7 +52,7 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::MarkedSeen { seen } => client::OwnerOutcome::MarkedSeen {
             seen: match seen {
                 people::Seen::Results { through } => client::SeenThrough::Results { through: *through },
-                people::Seen::Chat { task, through } => {
+                people::Seen::Conversation { task, through } => {
                     client::SeenThrough::Conversation { task: *task, through: *through }
                 }
             },
@@ -202,7 +202,7 @@ mod tests {
         );
 
         assert_eq!(
-            outcome(&people::Outcome::MarkedSeen { seen: people::Seen::Chat { task: 11, through: u64::MAX } }),
+            outcome(&people::Outcome::MarkedSeen { seen: people::Seen::Conversation { task: 11, through: u64::MAX } }),
             Outcome::Owner(client::OwnerOutcome::MarkedSeen {
                 seen: client::SeenThrough::Conversation { task: 11, through: u64::MAX }
             })

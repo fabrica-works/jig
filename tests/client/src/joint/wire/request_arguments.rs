@@ -47,7 +47,7 @@ pub fn person_answer(value: &client::PersonAnswer) -> people::PersonResult {
 pub fn seen(value: client::SeenThrough) -> people::Seen {
     match value {
         client::SeenThrough::Results { through } => people::Seen::Results { through },
-        client::SeenThrough::Conversation { task: chat, through } => people::Seen::Chat { task: chat, through },
+        client::SeenThrough::Conversation { task: chat, through } => people::Seen::Conversation { task: chat, through },
     }
 }
 
@@ -136,7 +136,7 @@ mod tests {
         );
         assert_eq!(
             seen(client::SeenThrough::Conversation { task: u64::MAX, through: u64::MAX }),
-            people::Seen::Chat { task: u64::MAX, through: u64::MAX }
+            people::Seen::Conversation { task: u64::MAX, through: u64::MAX }
         );
     }
 }

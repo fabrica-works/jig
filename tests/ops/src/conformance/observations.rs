@@ -211,7 +211,8 @@ pub fn snapshot(store: &Store) -> r::Snapshot {
                 }
             }
             root::Record::Core(core::Record::People(
-                people::Stored::ReadChat { party, task, through } | people::Stored::EndedRead { party, task, through },
+                people::Stored::ReadConversation { party, task, through }
+                | people::Stored::EndedRead { party, task, through },
             )) => {
                 snapshot.read_positions.insert((*party, *task), *through);
             }

@@ -190,7 +190,7 @@ impl Core {
             people::Stored::Person { .. }
             | people::Stored::ReadResults { .. }
             | people::Stored::EndedRead { .. }
-            | people::Stored::ReadChat { .. }
+            | people::Stored::ReadConversation { .. }
             | people::Stored::SignIn { .. }
             | people::Stored::Roles { .. }
             | people::Stored::Policy { .. } => true,

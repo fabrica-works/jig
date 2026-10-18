@@ -15,7 +15,9 @@ pub(crate) struct Loaded {
 pub(crate) fn loaded(core: &mut Core, env: &Env<Limits>, work: &mut Queue<Event>, answer: Answer) -> Requests {
     let Answer { request, task, party, through, busy } = answer;
     let Some(mark) = core.ended_marks.remove(&request) else { return Requests::Out(Queue::with_capacity(0)) };
-    let Some((person, people::Seen::Chat { task: number, through: wanted })) = core.people.seen_context(request) else {
+    let Some((person, people::Seen::Conversation { task: number, through: wanted })) =
+        core.people.seen_context(request)
+    else {
         return Requests::Out(Queue::with_capacity(0));
     };
     assert!(person == party && number == task && mark.task == task && mark.party == party, "correlated ended position");

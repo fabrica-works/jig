@@ -125,7 +125,7 @@ impl Core {
         }
         let seen = match seen {
             Some(through) => Some(through),
-            None => self.people.chat_seen(party, row.number),
+            None => self.people.conversation_seen(party, row.number),
         };
         let line = if self.conversation_requester(row) == Some(party) && row.last_reply > 0 {
             Some(crate::documents::task_line(self, limits, party, row, seen).expect("authorized archive owner"))
@@ -365,7 +365,7 @@ pub(crate) fn valid_header(core: &Core, limits: &Limits, row: &tasks::TaskRecord
     row.last_reply == 0 || !row.replies.is_empty()
 }
 
-pub(crate) fn seen_chat_loaded(
+pub(crate) fn seen_conversation_loaded(
     core: &mut Core,
     env: &skein_lib::Env<Limits>,
     work: &mut skein_lib::Queue<crate::Event>,
@@ -373,7 +373,7 @@ pub(crate) fn seen_chat_loaded(
     row: Option<Box<tasks::TaskRecord>>,
     busy: bool,
 ) -> crate::Requests {
-    let Some((party, people::Seen::Chat { task, .. })) = core.people.seen_context(request) else {
+    let Some((party, people::Seen::Conversation { task, .. })) = core.people.seen_context(request) else {
         return crate::Requests::Out(skein_lib::Queue::with_capacity(0));
     };
     let event = if busy {

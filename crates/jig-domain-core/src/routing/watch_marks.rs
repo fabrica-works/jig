@@ -232,7 +232,7 @@ pub(super) fn touch_people_row(core: &mut Core, row: &people::Stored) {
         people::Stored::Person { number, .. }
         | people::Stored::ReadResults { party: number, .. }
         | people::Stored::EndedRead { party: number, .. }
-        | people::Stored::ReadChat { party: number, .. } => {
+        | people::Stored::ReadConversation { party: number, .. } => {
             core.touch_party(*number);
         }
         people::Stored::Roles { holdings, .. } => {
@@ -253,7 +253,7 @@ pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &peopl
             core.touch_party(*from);
             core.touch_party(*to);
         }
-        people::Event::ChatSeen { request, .. } => {
+        people::Event::ConversationSeen { request, .. } => {
             if let Some((party, _)) = core.people.seen_context(*request) {
                 core.touch_party(party);
             }

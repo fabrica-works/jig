@@ -1147,7 +1147,7 @@ fn reply_update(
         tasks::Line::Turn { reply, .. } => {
             if core.conversation_requester(owner) != Some(party)
                 || *reply > owner.last_reply
-                || *reply <= row.ended_read.unwrap_or(core.people.chat_seen(party, owner.number).unwrap_or(0))
+                || *reply <= row.ended_read.unwrap_or(core.people.conversation_seen(party, owner.number).unwrap_or(0))
             {
                 return Ok(None);
             }

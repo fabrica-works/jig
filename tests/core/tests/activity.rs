@@ -107,7 +107,7 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
     jig_core_world::stories::reads::request(
         &mut world,
         61,
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task: parent.0, through: 2 } },
+        people::Ask::MarkSeen { seen: people::Seen::Conversation { task: parent.0, through: 2 } },
     );
     world.send(root::Event::Answer {
         read: None,
@@ -232,11 +232,11 @@ fn all_replies_read_then_ended_survive_restart_and_forgetting(
 }
 
 #[test]
-fn a_chat_ended_with_its_result_unread_keeps_its_read_position() {
+fn an_ended_conversation_keeps_its_unread_results_position() {
     let mut world = jig_core_world::stories::reads::world(507);
     let task = world.assigned.as_ref().expect("chat").task;
     world.turn(1, 1, None, b"reply");
-    mark_chat(&mut world, task);
+    mark_conversation(&mut world, task);
     finish_chat(&mut world);
     let ended_key = root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)));
     let read_key = root::Key::Core(core::Key::People(people::Key::EndedRead { party: 1, task }));
@@ -252,7 +252,7 @@ fn a_chat_ended_with_its_result_unread_keeps_its_read_position() {
 }
 
 #[test]
-fn marking_an_ended_chats_replies_after_its_result_forgets_it() {
+fn reading_an_ended_conversations_replies_then_forgets_it() {
     let mut world = jig_core_world::stories::reads::forgettable_world(508);
     let task = world.assigned.as_ref().expect("chat").task;
     world.turn(1, 1, None, b"reply");
@@ -268,7 +268,7 @@ fn marking_an_ended_chats_replies_after_its_result_forgets_it() {
         people::Ask::MarkSeen { seen: people::Seen::Results { through } },
     );
     assert!(world.store.rows.contains_key(&ended_key));
-    mark_chat(&mut world, task);
+    mark_conversation(&mut world, task);
     let read_key = root::Key::Core(core::Key::People(people::Key::EndedRead { party: 1, task }));
     assert!(!world.store.rows.contains_key(&ended_key));
     assert!(!world.store.rows.contains_key(&read_key));
@@ -279,11 +279,11 @@ fn marking_an_ended_chats_replies_after_its_result_forgets_it() {
     assert_eq!(jig_core_world::reads::latest(&world), &core::reads::Answer::None(core::reads::Why::Unknown));
 }
 
-fn mark_chat(world: &mut World, task: u64) {
+fn mark_conversation(world: &mut World, task: u64) {
     jig_core_world::stories::reads::request(
         world,
         61,
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } },
+        people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } },
     );
 }
 
@@ -309,7 +309,7 @@ fn assert_ended_position(world: &mut World, task: u64, through: u64, unread: u32
         !world
             .store
             .rows
-            .contains_key(&root::Key::Core(core::Key::People(people::Key::ReadChat { task, party: PARTY })))
+            .contains_key(&root::Key::Core(core::Key::People(people::Key::ReadConversation { task, party: PARTY })))
     );
     let query = core::documents::TaskQuery {
         phase: Some(core::documents::PhaseClass::Ended),
@@ -325,7 +325,7 @@ fn assert_ended_position(world: &mut World, task: u64, through: u64, unread: u32
     assert_eq!(position.unread, core::documents::Count::Known(unread));
 }
 #[test]
-fn an_ended_chats_read_position_is_read_back_after_a_restart() {
+fn a_restart_restores_an_ended_conversations_read_position() {
     let mut world = jig_core_world::stories::reads::world(834);
     let task = world.assigned.as_ref().expect("chat").task;
     world.turn(FIRST_TURN, 1, None, b"first");
@@ -333,7 +333,7 @@ fn an_ended_chats_read_position_is_read_back_after_a_restart() {
     jig_core_world::stories::reads::request(
         &mut world,
         FIRST_MARK,
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } },
+        people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } },
     );
     jig_core_world::fixtures::finish_chat(&mut world, 2, b"done");
     assert_ended_position(&mut world, task, 1, 1);
@@ -341,7 +341,7 @@ fn an_ended_chats_read_position_is_read_back_after_a_restart() {
     assert_ended_position(&mut world, task, 1, 1);
 }
 #[test]
-fn a_mark_sent_as_its_chat_ends_waits_for_the_end() {
+fn a_conversation_mark_waits_for_its_concurrent_ending() {
     let mut world = jig_core_world::stories::reads::world(835);
     let task = world.assigned.as_ref().expect("chat").task;
     world.turn(FIRST_TURN, 1, None, b"first");
@@ -349,7 +349,7 @@ fn a_mark_sent_as_its_chat_ends_waits_for_the_end() {
     jig_core_world::stories::reads::request(
         &mut world,
         FIRST_MARK,
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } },
+        people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } },
     );
     world.store_delay = 3;
     let end = world.end_event(
@@ -359,14 +359,14 @@ fn a_mark_sent_as_its_chat_ends_waits_for_the_end() {
         },
         2,
     );
-    let seen = people::Seen::Chat { task, through: 2 };
+    let seen = people::Seen::Conversation { task, through: 2 };
     let mark = jig_core_world::stories::reads::request_event(&world, SECOND_MARK, people::Ask::MarkSeen { seen });
     world.send_all(vec![end, mark]);
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::MarkedSeen { seen })));
     assert_ended_position(&mut world, task, 2, 0);
 }
 #[test]
-fn a_second_mark_on_an_ended_chat_while_the_first_loads_is_busy() {
+fn a_second_conversation_mark_is_busy_while_loading() {
     let mut world = jig_core_world::stories::reads::world(836);
     let task = world.assigned.as_ref().expect("chat").task;
     world.turn(FIRST_TURN, 1, None, b"first");
@@ -377,12 +377,12 @@ fn a_second_mark_on_an_ended_chat_while_the_first_loads_is_busy() {
     let first = jig_core_world::stories::reads::request_event(
         &world,
         FIRST_MARK,
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 2 } },
+        people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 2 } },
     );
     let second = jig_core_world::stories::reads::request_event(
         &world,
         SECOND_MARK,
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } },
+        people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } },
     );
     world.send_all(vec![first, second]);
     assert!(
@@ -391,7 +391,7 @@ fn a_second_mark_on_an_ended_chat_while_the_first_loads_is_busy() {
         world.people_answers,
         world.busy_events
     );
-    let seen = people::Seen::Chat { task, through: 1 };
+    let seen = people::Seen::Conversation { task, through: 1 };
     jig_core_world::stories::reads::request(&mut world, SECOND_MARK, people::Ask::MarkSeen { seen });
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Outcome(people::Outcome::MarkedSeen { seen })));
     assert_ended_position(&mut world, task, 2, 1);

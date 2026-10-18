@@ -211,7 +211,7 @@ fn seen(value: p::Seen, limits: &w::Limits) -> Result<w::SeenThrough, w::Problem
         p::Seen::Results { through } => {
             w::SeenThrough::Results(w::SeenResults::new(limits, w::SeenResultsParts { through })?)
         }
-        p::Seen::Chat { task, through } => {
+        p::Seen::Conversation { task, through } => {
             w::SeenThrough::Conversation(w::SeenConversation::new(limits, w::SeenConversationParts { task, through })?)
         }
     })

@@ -523,7 +523,7 @@ fn route_now(
             unreachable!("this route awaits the testing application's scripted peer");
         }
 
-        other @ (core::Now::SeenChat { .. }
+        other @ (core::Now::SeenConversation { .. }
         | core::Now::LoadEndedRead { .. }
         | core::Now::HistoricalPersonTask { .. }
         | core::Now::PartyInputs { .. }

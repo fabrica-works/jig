@@ -509,7 +509,7 @@ pub fn people_asks() -> Box<[people::Ask]> {
         people_propose(),
         people_amend_proposal(),
         Ask::Withdraw { project: 1, proposal: 43 },
-        Ask::MarkSeen { seen: people::Seen::Chat { task: 2, through: 3 } },
+        Ask::MarkSeen { seen: people::Seen::Conversation { task: 2, through: 3 } },
         Ask::Application { scope: jig_domain_people::ApplicationScope::Project(1), connector: 2, digest: [3; 32] },
         Ask::EditNote {
             project: 1,

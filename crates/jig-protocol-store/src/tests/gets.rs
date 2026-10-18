@@ -58,8 +58,8 @@ fn an_application_get_answers_its_bytes() {
     assert_eq!(value.as_ref(), &[42, 43]);
 }
 
-fn seen_chat() -> Now {
-    Now::SeenChat { request: HISTORICAL, task: ENDED }
+fn seen_conversation() -> Now {
+    Now::SeenConversation { request: HISTORICAL, task: ENDED }
 }
 
 fn person_task() -> Now {
@@ -94,9 +94,9 @@ fn historical_answer(now: Now, record: Record) -> core::Event {
 }
 
 #[test]
-fn a_seen_chat_is_answered_with_its_ended_task() {
-    let event = historical_answer(seen_chat(), fixtures::ended_task(ENDED));
-    let core::Event::SeenChatLoaded { request, row, busy } = event else { panic!("seen chat event") };
+fn a_seen_conversation_is_answered_with_its_ended_task() {
+    let event = historical_answer(seen_conversation(), fixtures::ended_task(ENDED));
+    let core::Event::SeenConversationLoaded { request, row, busy } = event else { panic!("seen chat event") };
     assert_eq!(request, HISTORICAL);
     assert_eq!(row, Some(ended_record()));
     assert!(!busy);
@@ -140,7 +140,7 @@ fn a_historical_person_task_is_answered_with_its_ended_task() {
 #[test]
 fn the_four_historical_reads_name_their_store_keys() {
     for (now, expected) in [
-        (seen_chat(), Key::Tasks(tasks::Key::Ended(ENDED))),
+        (seen_conversation(), Key::Tasks(tasks::Key::Ended(ENDED))),
         (person_task(), Key::Tasks(tasks::Key::Ended(ENDED))),
         (proposal(), Key::Core(CoreKey::ProposalDecision { proposer: people::Proposer::Party(12), proposal: 13 })),
         (escalation(), Key::Core(CoreKey::EscalationDecision { task: 11, revision: 3 })),
@@ -151,8 +151,8 @@ fn the_four_historical_reads_name_their_store_keys() {
 
 #[test]
 fn a_missing_historical_record_answers_none_without_busy() {
-    let event = historical::answer(seen_chat(), None).expect("seen chat answer");
-    let core::Event::SeenChatLoaded { request, row: None, busy: false } = event else {
+    let event = historical::answer(seen_conversation(), None).expect("seen chat answer");
+    let core::Event::SeenConversationLoaded { request, row: None, busy: false } = event else {
         panic!("missing row is not busy");
     };
     assert_eq!(request, HISTORICAL);

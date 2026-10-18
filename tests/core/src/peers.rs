@@ -100,8 +100,8 @@ impl Peers {
                     parties::Ask::SeeResults { through } => {
                         people::Ask::MarkSeen { seen: people::Seen::Results { through } }
                     }
-                    parties::Ask::SeeChat { task, through } => {
-                        people::Ask::MarkSeen { seen: people::Seen::Chat { task: task_number(task), through } }
+                    parties::Ask::SeeConversation { task, through } => {
+                        people::Ask::MarkSeen { seen: people::Seen::Conversation { task: task_number(task), through } }
                     }
                     parties::Ask::Chat { words } => crate::fixtures::create_chat(
                         self.creating.as_ref().expect("fixture creating authority"),

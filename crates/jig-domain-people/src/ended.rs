@@ -15,11 +15,11 @@ pub struct EndedMark {
 impl Domain {
     /// A different pending mark on this conversation owns its point loads.
     #[must_use]
-    pub fn chat_mark_loading(&self, task: u64, except: Token) -> bool {
+    pub fn conversation_mark_loading(&self, task: u64, except: Token) -> bool {
         for (_, id) in &self.flights {
             let flight = self.pending.get(*id).expect("pending flight");
             if id.token() != except
-                && let Ask::MarkSeen { seen: Seen::Chat { task: number, .. } } = flight.ask
+                && let Ask::MarkSeen { seen: Seen::Conversation { task: number, .. } } = flight.ask
                 && number == task
             {
                 return true;
@@ -30,7 +30,9 @@ impl Domain {
 
     /// Decide the mark against its durable position without caching that position.
     pub fn mark_ended(&mut self, env: &Env<Limits>, mark: EndedMark, out: &mut Queue<Request>) {
-        let Some((party, seen @ Seen::Chat { task, through })) = self.seen_context(mark.request) else { return };
+        let Some((party, seen @ Seen::Conversation { task, through })) = self.seen_context(mark.request) else {
+            return;
+        };
         let next = mark.seen.max(through);
         let delta = mark
             .last_reply
@@ -55,9 +57,9 @@ pub(super) fn ended_state(
     ending: bool,
     out: &mut Queue<Request>,
 ) {
-    let _old = domain.chats_seen.remove(&(party, task));
+    let _old = domain.conversations_seen.remove(&(party, task));
     if ending {
-        out.push(Request::Erase { key: Key::ReadChat { party, task } });
+        out.push(Request::Erase { key: Key::ReadConversation { party, task } });
         out.push(Request::Save { record: Stored::EndedRead { task, party, through } });
     }
     mark_cached(domain, party, task, through, u64::MAX);

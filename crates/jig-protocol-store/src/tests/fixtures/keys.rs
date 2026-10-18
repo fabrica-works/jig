@@ -60,7 +60,7 @@ pub fn people_key(rng: &mut Rng) -> people::Key {
     match rng.below(8) {
         0 => people::Key::Person(number(rng)),
         1 => people::Key::ReadResults { party: number(rng) },
-        2 => people::Key::ReadChat { party: number(rng), task: number(rng) },
+        2 => people::Key::ReadConversation { party: number(rng), task: number(rng) },
         3 => people::Key::SignIn(number(rng)),
         4 => people::Key::Roles(narrow(rng)),
         5 => people::Key::Policy(narrow(rng)),

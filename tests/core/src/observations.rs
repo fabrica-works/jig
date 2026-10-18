@@ -560,7 +560,7 @@ impl Observer {
             for write in &pending.writes {
                 if let root::Write::Erase(root::Key::Core(core::Key::Tasks(tasks::Key::Ended(task)))) = write {
                     for key in store.rows.keys() {
-                        if matches!(key, root::Key::Core(core::Key::People(people::Key::ReadChat { task: chat, .. })) if chat == task)
+                        if matches!(key, root::Key::Core(core::Key::People(people::Key::ReadConversation { task: chat, .. })) if chat == task)
                         {
                             assert!(
                                 pending.writes.contains(&root::Write::Erase(key.clone())),
@@ -720,7 +720,7 @@ impl Observer {
                     }
                 }
                 root::Record::Core(core::Record::People(
-                    people::Stored::ReadChat { party, task, through }
+                    people::Stored::ReadConversation { party, task, through }
                     | people::Stored::EndedRead { party, task, through },
                 )) => {
                     snapshot.read_positions.insert((*party, *task), *through);

@@ -654,7 +654,7 @@ pub struct Inbox {
     pub more: bool,
 }
 
-/// The read position for one chat.
+/// The read position for one conversation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ReadPosition {
     pub task: u64,

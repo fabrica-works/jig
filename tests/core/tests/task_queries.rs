@@ -314,7 +314,7 @@ fn seen_over_a_conversations_turns_clears_its_lines_unread_count() {
     request(
         &mut world,
         QUERY_REQUEST,
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: SEEN_CONVERSATION } },
+        people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: SEEN_CONVERSATION } },
     );
     ask(&mut world, QUERY_NEXT_READ, reads::Read::Tasks { query, live: None, ended: None });
     let reads::Answer::Tasks(page) = latest(&world) else { panic!("task query") };

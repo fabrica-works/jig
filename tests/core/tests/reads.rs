@@ -190,7 +190,7 @@ fn a_forgotten_chats_result_leaves_the_updates_index() {
     let mut world = jig_core_world::stories::reads::forgettable_world(781);
     let task = world.assigned.as_ref().expect("chat").task;
     world.turn(1, 1, None, b"reply");
-    request(&mut world, 71, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    request(&mut world, 71, people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } });
     world.end(
         tasks::End::Finished {
             result: tasks::TaskResult::Report { words: b"done".as_slice().into() },

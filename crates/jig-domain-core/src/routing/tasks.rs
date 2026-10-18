@@ -796,7 +796,10 @@ pub(super) fn tag_tasks(
                                             .then_some(people::Forgettable {
                                                 label: task.label,
                                                 listed: task.flags.listed,
-                                                turns_read: core.people.chat_seen(person, task.number).unwrap_or(0)
+                                                turns_read: core
+                                                    .people
+                                                    .conversation_seen(person, task.number)
+                                                    .unwrap_or(0)
                                                     >= task.last_reply,
                                                 last_reply: task.flags.conversation.then_some(task.last_reply),
                                             }),
@@ -866,7 +869,7 @@ pub(super) fn tag_tasks(
                         );
                     }
                     let seen = match core.conversation_requester(task) {
-                        Some(party) => core.people.chat_seen(party, task.number),
+                        Some(party) => core.people.conversation_seen(party, task.number),
                         None => None,
                     };
                     if let Some(party) = core.conversation_requester(task) {

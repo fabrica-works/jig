@@ -1,5 +1,5 @@
 //! A task's retention class decides what its reading erases (people.md, 6).
-const CHAT_MARK: u8 = 63;
+const CONVERSATION_MARK: u8 = 63;
 use jig_core_world::{
     effects::World,
     stories::reads::{forgettable_world, request, world},
@@ -38,7 +38,7 @@ fn finish(world: &mut World) -> (u64, u64) {
 fn a_conversation_forgotten_once_read_leaves_no_row_once_read() {
     let mut world = forgettable_world(830);
     let (task, through) = finish(&mut world);
-    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } });
     assert!(world.store.rows.contains_key(&ended(task)));
     request(&mut world, MARK_RESULTS, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
     assert!(!world.store.rows.contains_key(&ended(task)));
@@ -56,7 +56,7 @@ fn a_conversation_forgotten_once_read_leaves_no_row_once_read() {
 fn a_kept_chat_stays_after_its_party_read_it() {
     let mut world = world(831);
     let (task, through) = finish(&mut world);
-    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } });
     request(&mut world, MARK_RESULTS, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
     assert!(world.store.rows.contains_key(&ended(task)));
     assert!(world.store.rows.keys().any(|key| matches!(key, root::Key::Core(core::Key::Tasks(tasks::Key::EndedByParty { task: number, .. })) if *number == task)));
@@ -68,7 +68,7 @@ fn a_forgettable_conversation_read_in_the_other_order_is_forgotten() {
     let (task, through) = finish(&mut world);
     request(&mut world, MARK_RESULTS, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
     assert!(world.store.rows.contains_key(&ended(task)));
-    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } });
     assert!(!world.store.rows.contains_key(&ended(task)));
 }
 
@@ -76,7 +76,7 @@ fn a_forgettable_conversation_read_in_the_other_order_is_forgotten() {
 fn a_results_mark_forgets_in_the_commit_that_moves_its_position() {
     let mut world = forgettable_world(833);
     let (task, through) = finish(&mut world);
-    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } });
     request(&mut world, MARK_RESULTS, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
     let erases: Vec<_> =
         world.commits.iter().filter(|commit| commit.contains(&root::Write::Erase(ended(task)))).collect();
@@ -90,7 +90,7 @@ fn a_results_mark_forgets_in_the_commit_that_moves_its_position() {
 fn a_conversation_read_before_a_restart_is_forgotten_by_its_results_mark() {
     let mut world = forgettable_world(837);
     let (task, through) = finish(&mut world);
-    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } });
     world.restart(837, false);
     request(&mut world, MARK_RESULTS, people::Ask::MarkSeen { seen: people::Seen::Results { through } });
     assert!(!world.store.rows.contains_key(&ended(task)));
@@ -102,15 +102,15 @@ fn a_conversation_read_before_a_restart_is_forgotten_by_its_results_mark() {
     );
 }
 #[test]
-fn a_results_mark_while_a_chat_mark_loads_is_busy() {
+fn a_results_mark_is_busy_while_a_conversation_loads() {
     let mut world = forgettable_world(838);
     let (task, through) = finish(&mut world);
-    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } });
+    request(&mut world, MARK_TURNS, people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } });
     world.store_delay = 3;
     let chat = jig_core_world::stories::reads::request_event(
         &world,
-        CHAT_MARK,
-        people::Ask::MarkSeen { seen: people::Seen::Chat { task, through: 1 } },
+        CONVERSATION_MARK,
+        people::Ask::MarkSeen { seen: people::Seen::Conversation { task, through: 1 } },
     );
     let results = jig_core_world::stories::reads::request_event(
         &world,

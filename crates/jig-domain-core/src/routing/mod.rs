@@ -378,7 +378,7 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
         | Event::PreparedAgent { .. }
         | Event::Forget { .. }
         | Event::EndedReadLoaded { .. }
-        | Event::SeenChatLoaded { .. }
+        | Event::SeenConversationLoaded { .. }
         | Event::HistoricalProposal { .. }
         | Event::DecidedProposal { .. }
         | Event::HistoricalPersonTask { .. }
@@ -547,8 +547,8 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
             work,
             crate::ended_marks::Answer { request, task, party, through, busy },
         ),
-        Event::SeenChatLoaded { request, row, busy } => {
-            crate::inbox::seen_chat_loaded(core, env, work, request, row, busy)
+        Event::SeenConversationLoaded { request, row, busy } => {
+            crate::inbox::seen_conversation_loaded(core, env, work, request, row, busy)
         }
         Event::DecidedProposal { to, key, proposal, row, busy } => {
             historical::decided_proposal(core, to, key, proposal, row, busy)

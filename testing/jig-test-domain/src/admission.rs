@@ -17,7 +17,7 @@ pub fn try_step(domain: &mut Domain, env: &Env<Limits>, event: Event) -> Result<
         | Event::Core(
             core::Event::ReadLoaded { .. }
             | core::Event::EndedReadLoaded { .. }
-            | core::Event::SeenChatLoaded { .. }
+            | core::Event::SeenConversationLoaded { .. }
             | core::Event::HistoricalPersonTask { .. }
             | core::Event::PartyInputsLoaded { .. }
             | core::Event::HistoricalProposal { .. }

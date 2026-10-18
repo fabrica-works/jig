@@ -683,7 +683,7 @@ fn put_people_key(w: &mut Writer, value: &people::Key) -> Option<()> {
             w.byte(1)?;
             w.u64(*party)?;
         }
-        people::Key::ReadChat { party, task } => {
+        people::Key::ReadConversation { party, task } => {
             w.byte(2)?;
             w.u64(*party)?;
             w.u64(*task)?;
@@ -716,7 +716,7 @@ fn take_people_key(r: &mut Reader<'_>) -> Option<people::Key> {
     Some(match r.byte()? {
         0 => people::Key::Person(r.u64()?),
         1 => people::Key::ReadResults { party: r.u64()? },
-        2 => people::Key::ReadChat { party: r.u64()?, task: r.u64()? },
+        2 => people::Key::ReadConversation { party: r.u64()?, task: r.u64()? },
         7 => people::Key::EndedRead { task: r.u64()?, party: r.u64()? },
         3 => people::Key::SignIn(r.u64()?),
         4 => people::Key::Roles(r.u32()?),

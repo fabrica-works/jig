@@ -621,73 +621,7 @@ fn offered_proposal_decisions_are_made_at_the_named_holder_and_another_holder_is
     }
 }
 
-#[test]
-fn leaving_an_escalation_held_closing_a_chat_and_marking_it_seen_are_admitted() {
-    let (mut core, limits) = tree_core();
-    sign_in(&mut core, &limits);
-    let mut chat = new_row(&core, 1, tasks::Funder::Period { project: 1, period: 1 }, None);
-    chat.flags.conversation = true;
-    send_task(
-        &mut core,
-        &limits,
-        tasks::Event::Make {
-            reply_to: ReplyTo::new(Token::new(110)),
-            creator: tasks::Party::Person(1),
-            batch: Box::new([chat]),
-        },
-    );
-    let task = Subject::Task { task: 1 };
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Seen, &task), Admission::Allowed);
-    assert_eq!(
-        ask_now(&mut core, &limits, 1, people::Ask::MarkSeen { seen: people::Seen::Chat { task: 1, through: 0 } }),
-        people::Outcome::MarkedSeen { seen: people::Seen::Chat { task: 1, through: 0 } }
-    );
-    core.reclaim();
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Cancel, &task), Admission::Allowed);
-    send_task(&mut core, &limits, tasks::Event::Hold { task: 1, why: tasks::Hold::Uncertain { entry: 1 } });
-    let Admission::Bounded { .. } = offers::admit(&core, &limits, 1, Act::Amend, &task) else {
-        panic!("amend and release remains bounded with an explicit uncertainty choice")
-    };
-    let revision = core.tasks.escalation(1).unwrap().escalation.revision();
-    send_task(
-        &mut core,
-        &limits,
-        tasks::Event::RoutedEscalation { task: 1, revision, holder: tasks::EscalationHolder::Person(1), entry: 1 },
-    );
-    assert_eq!(offers::admit(&core, &limits, 1, Act::LeaveHeld, &Subject::Escalation { task: 1 }), Admission::Allowed);
-    assert_eq!(offers::escalation(&core, &limits, 2, Act::LeaveHeld, 1), Err(people::Refusal::Unknown));
-    assert_eq!(
-        ask_now(
-            &mut core,
-            &limits,
-            2,
-            people::Ask::DecideEscalation {
-                project: 1,
-                task: 1,
-                revision,
-                decision: people::EscalationDecision::Reject { reason: b"leave held".as_slice().into() },
-            }
-        ),
-        people::Outcome::EscalationDecided {
-            task: 1,
-            revision,
-            by: 1,
-            at: Wall::EPOCH,
-            choice: people::EscalationChoice::Rejected
-        }
-    );
-    core.reclaim();
-    assert_eq!(offers::admit(&core, &limits, 1, Act::Cancel, &task), Admission::Allowed);
-    assert_eq!(
-        ask_now(
-            &mut core,
-            &limits,
-            3,
-            people::Ask::Cancel { project: 1, task: 1, reason: b"Finish this chat.".as_slice().into(), grace: None }
-        ),
-        people::Outcome::Cancelled { task: 1 }
-    );
-}
+mod conversations;
 
 #[test]
 fn a_move_offer_tracks_requester_changes_after_adoption() {

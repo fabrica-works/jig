@@ -344,8 +344,8 @@ impl World {
     }
 
     #[must_use]
-    pub fn chat_seen(&self, person: u64, task: u64) -> u64 {
-        self.domain.chat_seen(person, task).expect("known party chat position")
+    pub fn conversation_seen(&self, person: u64, task: u64) -> u64 {
+        self.domain.conversation_seen(person, task).expect("known party conversation position")
     }
 
     pub fn forget_chat(&mut self, task: u64) {
@@ -432,7 +432,7 @@ impl World {
                 | Stored::Person { .. }
                 | Stored::ReadResults { .. }
                 | Stored::EndedRead { .. }
-                | Stored::ReadChat { .. }
+                | Stored::ReadConversation { .. }
                 | Stored::Roles { .. }
                 | Stored::Answer { .. }
                 | Stored::Policy { .. } => None,
@@ -572,7 +572,7 @@ impl World {
                             Ask::MarkSeen { seen } => {
                                 let allowed = match seen {
                                     people::Seen::Results { .. } => true,
-                                    people::Seen::Chat { task, .. } => self
+                                    people::Seen::Conversation { task, .. } => self
                                         .durable_tasks
                                         .iter()
                                         .any(|(key, number)| key.person == person && *number == task),
@@ -583,7 +583,7 @@ impl World {
                                     Outcome::Refused(Refusal::Role { held: self.domain.role(person, 1) })
                                 };
                                 if allowed
-                                    && let people::Seen::Chat { task, .. } = seen
+                                    && let people::Seen::Conversation { task, .. } = seen
                                     && self.mark_ended(request, person, task)
                                 {
                                     continue;
@@ -592,8 +592,8 @@ impl World {
                                     &mut self.domain,
                                     &self.env,
                                     match (allowed, seen) {
-                                        (true, people::Seen::Chat { task: _, through }) => {
-                                            Event::ChatSeen { request, project: 1, last_reply: through }
+                                        (true, people::Seen::Conversation { task: _, through }) => {
+                                            Event::ConversationSeen { request, project: 1, last_reply: through }
                                         }
                                         _ => Event::Decided { request, outcome },
                                     },

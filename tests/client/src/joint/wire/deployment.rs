@@ -229,7 +229,7 @@ fn person_action(value: people::CapacityAction) -> client::OwnerPersonCapacityAc
         people::CapacityAction::MarkSeen { seen } => client::OwnerPersonCapacityAction::MarkSeen {
             seen: match seen {
                 people::Seen::Results { through } => client::SeenThrough::Results { through },
-                people::Seen::Chat { task, through } => client::SeenThrough::Conversation { task, through },
+                people::Seen::Conversation { task, through } => client::SeenThrough::Conversation { task, through },
             },
         },
     }

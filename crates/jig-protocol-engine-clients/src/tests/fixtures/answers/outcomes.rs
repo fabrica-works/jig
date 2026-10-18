@@ -222,7 +222,7 @@ pub fn seen_outcomes() -> [(p::Reply, w::Final); 2] {
             )),
         ),
         (
-            p::Reply::Outcome(p::Outcome::MarkedSeen { seen: p::Seen::Chat { task: 8, through: 15 } }),
+            p::Reply::Outcome(p::Outcome::MarkedSeen { seen: p::Seen::Conversation { task: 8, through: 15 } }),
             owner(w::OwnerOutcome::MarkedSeen(
                 w::OwnerOutcomeMarkedSeen::new(
                     &limits,

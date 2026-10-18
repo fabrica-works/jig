@@ -7,7 +7,7 @@ fn people_rows_read_back_as_written() {
         ("a_person_reads_back_with_its_identity", a_person_reads_back_with_its_identity),
         ("a_projects_policy_reads_back", a_projects_policy_reads_back),
         ("a_policy_larger_than_one_amendment_reads_back", a_policy_larger_than_one_amendment_reads_back),
-        ("a_read_chat_position_reads_back", a_read_chat_position_reads_back),
+        ("a_read_conversation_position_reads_back", a_read_conversation_position_reads_back),
         ("a_sign_in_reads_back_with_its_wall_expiry", a_sign_in_reads_back_with_its_wall_expiry),
         ("every_role_reads_back_in_a_roster", every_role_reads_back_in_a_roster),
         ("a_read_results_position_reads_back", a_read_results_position_reads_back),

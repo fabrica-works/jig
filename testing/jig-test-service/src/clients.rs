@@ -426,7 +426,7 @@ fn ended(key: &root::Key) -> Option<u64> {
                 people::Key::Person(..)
                 | people::Key::ReadResults { .. }
                 | people::Key::EndedRead { .. }
-                | people::Key::ReadChat { .. }
+                | people::Key::ReadConversation { .. }
                 | people::Key::Roles(..)
                 | people::Key::Policy(..)
                 | people::Key::Answer(..),

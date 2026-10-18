@@ -51,7 +51,7 @@ impl Census {
             | Key::Core(_)
             | Key::People(
                 jig_domain_people::Key::Person(_)
-                | jig_domain_people::Key::ReadChat { .. }
+                | jig_domain_people::Key::ReadConversation { .. }
                 | jig_domain_people::Key::ReadResults { .. }
                 | jig_domain_people::Key::SignIn(_)
                 | jig_domain_people::Key::Roles(_)

@@ -9,9 +9,10 @@ pub(super) fn encode_seen(value: &domain::Seen, limits: &wire::Limits) -> Result
         domain::Seen::Results { through } => {
             wire::Seen::Results(wire::SeenResults::new(limits, wire::SeenResultsParts { through: *through })?)
         }
-        domain::Seen::Chat { task, through } => {
-            wire::Seen::Chat(wire::SeenChat::new(limits, wire::SeenChatParts { task: *task, through: *through })?)
-        }
+        domain::Seen::Conversation { task, through } => wire::Seen::Conversation(wire::SeenConversation::new(
+            limits,
+            wire::SeenConversationParts { task: *task, through: *through },
+        )?),
     })
 }
 pub(super) fn decode_seen(value: wire::Seen) -> domain::Seen {
@@ -20,9 +21,9 @@ pub(super) fn decode_seen(value: wire::Seen) -> domain::Seen {
             let wire::SeenResultsParts { through } = value.into_parts();
             domain::Seen::Results { through }
         }
-        wire::Seen::Chat(value) => {
-            let wire::SeenChatParts { task, through } = value.into_parts();
-            domain::Seen::Chat { task, through }
+        wire::Seen::Conversation(value) => {
+            let wire::SeenConversationParts { task, through } = value.into_parts();
+            domain::Seen::Conversation { task, through }
         }
     }
 }

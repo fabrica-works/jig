@@ -3,7 +3,7 @@ use super::*;
 
 const FIRST_SIGN_IN: u64 = 10;
 const SECOND_SIGN_IN: u64 = 20;
-const MARK_CHAT: u8 = 1;
+const MARK_CONVERSATION: u8 = 1;
 
 fn moving_chat() -> (Test, Vec<Request>) {
     let mut test = Test::new(LIMITS);
@@ -22,21 +22,24 @@ fn moving_chat() -> (Test, Vec<Request>) {
         seen: None,
         replies: Box::new([]),
     });
-    let request =
-        route(&test.request(FIRST_SIGN_IN, MARK_CHAT, Ask::MarkSeen { seen: Seen::Chat { task: 9, through: 3 } }));
-    test.send(Event::ChatSeen { request, project: 1, last_reply: 3 });
+    let request = route(&test.request(
+        FIRST_SIGN_IN,
+        MARK_CONVERSATION,
+        Ask::MarkSeen { seen: Seen::Conversation { task: 9, through: 3 } },
+    ));
+    test.send(Event::ConversationSeen { request, project: 1, last_reply: 3 });
     let moved = test.send(Event::MoveChat { task: 9, project: 1, from: 1, to: 2 });
     (test, moved)
 }
 #[test]
-fn a_moved_chats_old_requester_loses_its_read_position() {
+fn a_moved_conversations_old_requester_loses_its_read_position() {
     let (test, out) = moving_chat();
-    assert_eq!(test.d.chat_seen(1, 9), Some(0));
-    assert_eq!(out[0], Request::Erase { key: Key::ReadChat { party: 1, task: 9 } });
+    assert_eq!(test.d.conversation_seen(1, 9), Some(0));
+    assert_eq!(out[0], Request::Erase { key: Key::ReadConversation { party: 1, task: 9 } });
 }
 #[test]
-fn a_moved_chats_new_requester_starts_with_nothing_read() {
+fn a_moved_conversations_new_requester_starts_with_nothing_read() {
     let (test, out) = moving_chat();
-    assert_eq!(test.d.chat_seen(2, 9), Some(0));
-    assert_eq!(out[1], Request::Save { record: Stored::ReadChat { party: 2, task: 9, through: 0 } });
+    assert_eq!(test.d.conversation_seen(2, 9), Some(0));
+    assert_eq!(out[1], Request::Save { record: Stored::ReadConversation { party: 2, task: 9, through: 0 } });
 }

@@ -348,7 +348,7 @@ fn saved_answer(rows: &[Request]) -> Stored {
                 Stored::Person { .. }
                 | Stored::ReadResults { .. }
                 | Stored::EndedRead { .. }
-                | Stored::ReadChat { .. }
+                | Stored::ReadConversation { .. }
                 | Stored::SignIn { .. }
                 | Stored::Roles { .. }
                 | Stored::Policy { .. } => None,
@@ -936,7 +936,7 @@ fn is_answer(request: &Request) -> bool {
             Stored::Person { .. }
             | Stored::ReadResults { .. }
             | Stored::EndedRead { .. }
-            | Stored::ReadChat { .. }
+            | Stored::ReadConversation { .. }
             | Stored::SignIn { .. }
             | Stored::Roles { .. }
             | Stored::Policy { .. } => false,
@@ -958,7 +958,7 @@ fn is_roles(request: &Request) -> bool {
             Stored::Person { .. }
             | Stored::ReadResults { .. }
             | Stored::EndedRead { .. }
-            | Stored::ReadChat { .. }
+            | Stored::ReadConversation { .. }
             | Stored::SignIn { .. }
             | Stored::Answer { .. }
             | Stored::Policy { .. } => false,
@@ -1493,7 +1493,7 @@ fn zero_room_history_counts_omissions_without_changing_busy_or_key_admission() {
 fn read_position_room_pressure_keeps_scoped_identity_without_a_project() {
     let mut test = Test::new(Limits { pending: 0, room_refusals: 1, ..LIMITS });
     test.member();
-    let seen = Seen::Chat { task: 91, through: 8 };
+    let seen = Seen::Conversation { task: 91, through: 8 };
     test.env.wall = Wall::from_nanos(17);
     assert_eq!(reply(&test.request(10, 3, Ask::MarkSeen { seen })), Reply::Again(Again::Busy));
     let facts = test.d.capacity_refusals();

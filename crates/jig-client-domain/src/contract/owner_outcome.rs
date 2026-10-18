@@ -37,7 +37,7 @@ pub enum OwnerOutcome {
     Created { first: u64, last: u64, given: Option<super::CreatedGiven> },
     /// Operations committed together, taking consecutive message numbers.
     Compound { project: u32, operations: u32, first_message: u64 },
-    /// A results or chat-replies position was marked seen.
+    /// A results or conversation-replies position was marked seen.
     MarkedSeen { seen: SeenThrough },
     /// A note correction or deletion was committed.
     NoteEdited { name: u64 },
