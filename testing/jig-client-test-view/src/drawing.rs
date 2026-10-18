@@ -1,4 +1,4 @@
-//! Fixed owner-written bytes and ordinary readable children (view.md, section 3).
+//! Fixed owner-written bytes and ordinary readable children (skein's ui.md, 3.5).
 use crate::words::{Word, Words};
 use jig_client_view::Owner;
 use skein_ui::phrases::Hole;

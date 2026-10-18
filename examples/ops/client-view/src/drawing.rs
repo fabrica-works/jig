@@ -1,4 +1,4 @@
-//! Keep: owner-written bounded data and readable fallback (view.md, 3).
+//! Keep: owner-written bounded data and readable fallback (skein's ui.md, 3.5).
 //! Replace: observability's error-rate drawing.
 use crate::words::{Word, Words};
 use jig_client_view::Owner;

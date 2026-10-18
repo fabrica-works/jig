@@ -1,4 +1,4 @@
-//! The one named review dialog, from recalled facts (client.md, 9; objects.md, 2).
+//! The one named review dialog, from recalled facts (view.md, 18.5; objects.md, 2).
 //! Adoption belongs to the application slot rather than this jig form (client/domain/pages.md, 6.5).
 use crate::cards::{common, person, proposal};
 use crate::phrases::jig::JigPhrase;

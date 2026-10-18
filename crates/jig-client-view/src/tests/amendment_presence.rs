@@ -1,4 +1,4 @@
-//! Selected amendments are independent of displayed source facts (client.md, 9).
+//! Selected amendments are independent of displayed source facts (view.md, 18.5).
 use super::*;
 use crate::objects::Body;
 use crate::tests::fixtures::Fixture;

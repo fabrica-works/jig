@@ -4,7 +4,8 @@
 //! Documents carry facts, never authority judgments or phrases computed here.
 //! Entry points name, put, reply and replace preserve one card per object;
 //! `dropping` and `read_card` obtain terminal facts without ending a pending request.
-//! See client/domain/client.md, 5, and client/domain/objects.md, 2–8.
+//! See client/domain/client.md, 5, client/domain/objects.md, 2–8, and
+//! client/domain/view.md, 18.3.
 //!
 //! | Card | Event | Next | Emits |
 //! |---|---|---|---|
@@ -600,7 +601,7 @@ pub(crate) fn dropping(domain: &mut crate::Ui, watch: jig_client::Handle, value:
 }
 /// A genuine ending can remove a source without a replacement delivery. Keep
 /// each shown waiting card until its own final read supplies the explanation
-/// (objects.md, 1–2; Q34).
+/// (objects.md, 1; view.md, 18.3; Q34).
 pub(crate) fn ending_source(domain: &mut crate::Ui, watch: jig_client::Handle) {
     let source = Source::Watch(watch);
     for (_, id) in &domain.objects.index {

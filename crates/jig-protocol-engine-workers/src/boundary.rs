@@ -33,7 +33,7 @@ pub enum Event {
         parts: Box<[Part]>,
         values: Box<[Option<GrantValue>]>,
     },
-    /// The fleet's busy answer, handled below the hub (protocol/channel.md, 5.2).
+    /// The fleet's busy answer, handled below the hub (protocol/channel.md, 5.2; domain/hosts.md, 6.1).
     TurnBusy {
         channel: Token,
         run: Token,

@@ -1,4 +1,4 @@
-//! Whether a root has someone to receive its escalations (domain/authority.md, 6 and 8.4).
+//! Whether a root has someone to receive its escalations (domain/authority.md, 6; domain/people.md, 5.1).
 
 use crate::{Domain, ProposalKind};
 

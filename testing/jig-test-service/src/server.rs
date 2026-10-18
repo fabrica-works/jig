@@ -9,7 +9,7 @@ pub mod policy;
 pub use bundle::{Bundle, File, kind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-/// Which part answers a request head (protocol/browser.md, 12).
+/// Which part answers a request head (protocol/service.md, 7).
 pub enum Answer {
     Mount,
     File,

@@ -1,4 +1,4 @@
-//! Fields retain text and count domain writes; client/domain/client.md, 9.
+//! Fields retain text and count domain writes; client/domain/view.md, 18.5.
 //! Jig 21 adds draft and confirmation policies. Person edits never advance writes.
 use jig_client::contract::Text;
 /// Why a person is typing into a field.

@@ -13,7 +13,7 @@ impl Flags {
     /// Ordinary work: no conversation, not listed, kept.
     pub const PLAIN: Flags = Flags { conversation: false, listed: false, retention: Retention::Kept };
 }
-/// How long an ended task is retained (protocol/store.md, section 11.1).
+/// How long an ended task is retained (domain/people.md, section 6; protocol/store.md, section 11.1).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Retention {
     /// Kept to the deployment's retention horizon.

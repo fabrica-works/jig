@@ -1,4 +1,5 @@
-//! jig's owner mapping onto the opaque tree owner (client/domain/view.md, section 3).
+//! jig's owner mapping onto the opaque tree owner (client/domain/view.md, section 3;
+//! client/domain/root.md, section 15).
 
 /// The view child that interprets a token, key, style, region, picture or phrase.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]

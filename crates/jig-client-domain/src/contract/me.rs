@@ -65,7 +65,7 @@ pub struct Creating {
     pub within: CreateBounds,
     pub beyond: Beyond,
 }
-/// A configured template merged with its project's overrides (contract.md, 3.6).
+/// A configured template merged with its project's overrides (protocol/configuration.md, 3.1).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Template {
     pub number: u32,

@@ -1,4 +1,4 @@
-//! Bounded typed amendment fields; no authority judgment (client.md, 9).
+//! Bounded typed amendment fields; no authority judgment (view.md, 18.5).
 use crate::cards::proposal;
 use crate::phrases::jig::JigPhrase;
 use crate::words::Words;

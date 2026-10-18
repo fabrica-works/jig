@@ -148,7 +148,7 @@ fn word_key(state: &Thread, message: u64) -> Key {
     }
     Key { owner: Owner::Jig.opaque(), kind: 25, a: state.task, b: message }
 }
-// Keys are matched only below matched parents (view.md, 6). The log's enclosing item
+// Keys are matched only below matched parents (skein's ui.md, 7). The log's enclosing item
 // task key supplies the first identity; these two words keep full attempt/turn.
 fn turn_key(name: TurnName) -> Key {
     Key { owner: Owner::Jig.opaque(), kind: 24, a: name.attempt, b: u64::from(name.number) }

@@ -1,6 +1,6 @@
 //! One confirmation keeps the revision read, choices made and the prior card state.
 //! Words and authority judgments remain the object's document and the fields;
-//! no request key or retry is known. See client/domain/client.md, 9.
+//! no request key or retry is known. See client/domain/view.md, 18.5.
 //!
 //! | Confirmation | Event | Next | Emits |
 //! |---|---|---|---|
