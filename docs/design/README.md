@@ -846,3 +846,29 @@ open (`domain/README.md`, section 5), and the client's on its own
   crate of its own for them: a terminal presents the client with
   `skein-ui-text`, and the reference UI with jig's settings
   (`client/domain/view.md`, section 15).
+- **How `jig-boundary` finds client crates,** in the crate graph of the
+  project it checks: a crate is a client crate when its own name has a
+  client crate's shape, when it depends on a client crate, or when every
+  crate that uses it is one. Each it finds outside the project's prefix,
+  taken by the project's whole name (`jig-ops-client` for `jig-ops`), is a
+  breach, unless the check's caller exempts it by name. A dependency is a
+  client crate by its name in two cases only:
+  - under a prefix this section gives, `<project>-client` or
+    `<project>-<application>-client`, where `<project>` is jig or the
+    checked project, by its whole name, and `<application>` is never a
+    layer's or a kind's word; but not the records both ends read, whose
+    names end in `-client-protocol-wire`, `-client-test-protocol-wire` or
+    `-client-test-records`;
+  - one of the UI kit's crates a client is built and tested on, by its
+    name: `skein-ui`, `skein-ui-text`, `skein-ui-web`, `skein-fake-person`
+    and `skein-fake-person-browser`; not the bundler, a tool.
+
+  A name in any other namespace, skein's among them, follows its own
+  repository's rules, and says nothing here: a `<kit>-<service>-client`
+  there is a client of a service, which a crate in the engine's process
+  may use, and makes no crate that depends on it a client crate. Another
+  UI kit counts only once this section names its crates, as it names
+  skein's; never from a `-client` or a `-ui` in a name. A crate that
+  presents an application's client is found without that, by its use of
+  `jig-client` or of the project's own client crates, and a helper that
+  only client crates use, by its users.
