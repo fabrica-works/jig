@@ -58,12 +58,12 @@ pub fn limits() -> Limits {
     Limits { hub, agent, bounds, stop_bound: Duration::from_secs(20), workstreams: Box::new([1]) }
 }
 
-// Smith's smallest v2 golden, used by its agent-process world's charter fixture.
-const SMALLEST: [u8; 119] = [
-    0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+// Smith's smallest v3 golden, used by its agent-process world's charter fixture.
+const SMALLEST: [u8; 120] = [
+    0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0,
 ];
 
 pub fn charter_bytes() -> Box<[u8]> {
@@ -101,6 +101,7 @@ pub fn charter_bytes() -> Box<[u8]> {
     )
     .expect("contract");
     let mut llm = parts.main.into_parts();
+    llm.account = Some(0);
     llm.model = Box::from(&b"fake"[..]);
     llm.window = 1_048_576;
     llm.output = 512;
@@ -119,7 +120,7 @@ pub fn charter_bytes() -> Box<[u8]> {
 pub fn charter_value() -> smith::Charter {
     let mut endpoints = List::with_capacity(1);
     endpoints
-        .push(smith_protocol_channel::Endpoint { name: Box::new([]), number: 0, dialect: 0, account: 0 })
+        .push(smith_protocol_channel::Endpoint { name: Box::new([]), number: 0, dialect: 1 })
         .expect("one endpoint");
     let endpoints = smith_protocol_channel::Endpoints::new(endpoints);
     let charter = smith_protocol_channel::decode_charter(&charter_bytes(), &smith_charter::CEILINGS, &endpoints)
@@ -174,7 +175,7 @@ pub fn turn() -> smith::Turn {
         effort: None,
         version: record::VERSION,
         kind: record::Kind::Ordinary,
-        endpoint: llm::Endpoint(0),
+        endpoint: Some(llm::Endpoint(0)),
         dialect: 0,
         sequence: 1,
         usage: llm::Usage {

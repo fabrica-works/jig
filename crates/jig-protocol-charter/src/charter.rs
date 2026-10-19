@@ -21,7 +21,7 @@ fn model(model: boundary::Model) -> run::charter::Llm {
             unit: model.prices.unit,
         },
         dialect: model.dialect,
-        account: model.account,
+        account: Some(model.account),
         endpoint: run::charter::Endpoint(model.endpoint),
         model: model.name,
         effort: None,

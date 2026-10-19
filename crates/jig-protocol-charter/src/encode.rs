@@ -4,7 +4,7 @@
 
 use alloc::boxed::Box;
 use skein_lib::{List, Writer};
-use smith_charter::v2 as wire;
+use smith_charter::v3 as wire;
 use smith_domain_run as run;
 
 /// One configured endpoint name and its domain-visible identities.
@@ -22,7 +22,7 @@ fn count(length: usize) -> Option<u32> {
 
 fn endpoint(value: &run::charter::Llm, names: &[EndpointName]) -> Option<Box<[u8]>> {
     for name in names {
-        if name.number == value.endpoint.0 && name.dialect == value.dialect && name.account == value.account {
+        if name.number == value.endpoint.0 && name.dialect == value.dialect && Some(name.account) == value.account {
             return Some(name.name.clone());
         }
     }
@@ -46,6 +46,7 @@ fn llm(value: run::charter::Llm, names: &[EndpointName], limits: &wire::Limits) 
         limits,
         wire::LlmParts {
             endpoint: name,
+            account: value.account,
             model: value.model,
             effort: value.effort,
             window: value.window,

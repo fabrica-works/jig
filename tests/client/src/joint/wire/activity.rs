@@ -379,7 +379,7 @@ pub(crate) mod tests {
     }
     pub(crate) fn codec() -> jig_protocol_transcript::Limits {
         jig_protocol_transcript::Limits {
-            smith: smith_transcript::v5::CEILINGS,
+            smith: smith_transcript::v6::CEILINGS,
             bytes: 146,
             turn: client::TurnLimits { messages: 1, blocks: 1, text: 3 },
         }

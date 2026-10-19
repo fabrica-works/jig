@@ -312,7 +312,7 @@ fn a_turn_past_the_document_bound_keeps_its_size() {
 }
 #[test]
 fn an_undecodable_single_turn_is_malformed() {
-    for body in [&[0, 4][..], &[0, 5][..], &[255][..]] {
+    for body in [&[0, 4][..], &[0, 6][..], &[255][..]] {
         let value = w::ReadValue::Turn(fixtures::single_turn_record(body));
         let harness = fixtures::answered_turn(&fixtures::limits(), &fixtures::jig_read_value_answer(&value));
         assert_eq!(

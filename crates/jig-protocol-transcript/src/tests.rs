@@ -1,4 +1,7 @@
 use super::*;
+
+// The fixture uses one numbered dialect, as transcript v6 requires.
+const DIALECT: u32 = 1;
 use smith::{Block as SBlock, CEILINGS, MessageParts, TurnParts, UsageParts};
 
 fn limits() -> Limits {
@@ -45,9 +48,9 @@ fn source(messages: &[smith::Message]) -> smith::Turn {
             model: b"model".as_slice().into(),
             effort: None,
             kind: smith::TurnKind::Ordinary,
-            affinity: None,
+            opening: None,
             endpoint: Box::from(&b"endpoint"[..]),
-            dialect: Box::from(&b"dialect"[..]),
+            dialect: DIALECT,
             place: 1,
             usage: smith::Usage::new(
                 &CEILINGS,
@@ -85,7 +88,7 @@ fn whole_turn_preserves_blocks_and_joins_results_to_calls() {
                 SBlock::Opaque(
                     smith::Opaque::new(
                         &CEILINGS,
-                        smith::OpaqueParts { dialect: Box::from(&b"secret"[..]), bytes: Box::from(&[0xff, 0x00][..]) },
+                        smith::OpaqueParts { dialect: DIALECT, bytes: Box::from(&[0xff, 0x00][..]) },
                     )
                     .unwrap(),
                 ),
@@ -145,7 +148,7 @@ fn whole_turn_preserves_blocks_and_joins_results_to_calls() {
     }
     match &turn.messages.get(0).unwrap().blocks.get(3).unwrap() {
         Block::Opaque { dialect, size } => {
-            assert_eq!(dialect.bytes(), b"secret");
+            assert_eq!(dialect.bytes(), b"1");
             assert_eq!(*size, 2);
         }
         Block::Text(_) | Block::Call(_) | Block::Result { .. } => panic!("opaque expected"),
@@ -362,7 +365,7 @@ fn tool_text_and_invalid_calls_remain_distinct() {
 fn admission_errors_are_explicit_and_whole_records_are_required() {
     assert_eq!(decode(&limits(), &[0, 4]), Err(Undecodable::Version { found: 4 }));
     assert_eq!(decode(&limits(), &[0]), Err(Undecodable::Malformed));
-    assert_eq!(decode(&limits(), &[0, 5, 0, 0, 0, 0, 0, 65]), Err(Undecodable::TooLarge));
+    assert_eq!(decode(&limits(), &[0, 6, 0, 0, 0, 0, 0, 65]), Err(Undecodable::TooLarge));
     let source = source(&[message(smith::Role::Assistant, &[SBlock::Text(text(b"hello"))])]);
     let mut bytes = encode(&source);
     let mut small = limits();

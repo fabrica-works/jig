@@ -2,7 +2,7 @@
 //! domain/hosts.md, section 8). The routing maps these into domain values.
 use alloc::boxed::Box;
 use skein_lib::{List, Reader};
-use smith_charter::{Form, v2};
+use smith_charter::{Form, v3};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Field {
@@ -25,7 +25,7 @@ pub enum Unreadable {
 
 pub fn result(bytes: &[u8]) -> Result<RunResult, Unreadable> {
     let mut reader = Reader::new(bytes);
-    let Ok(value) = smith_charter::RunResult::decode(&v2::CEILINGS, &mut reader) else {
+    let Ok(value) = smith_charter::RunResult::decode(&v3::CEILINGS, &mut reader) else {
         return Err(Unreadable::Malformed);
     };
     if !reader.is_empty() {

@@ -47,7 +47,7 @@ fn world() -> World<Test, Joint> {
     );
     let driver = Driver::new(config, owner, Peers::new(Vec::new(), Vec::new()), Time::ZERO, clock(Time::ZERO));
     let codec = jig_protocol_transcript::Limits {
-        smith: smith_transcript::v5::CEILINGS,
+        smith: smith_transcript::v6::CEILINGS,
         bytes: 1_048_576,
         turn: client::TurnLimits { messages: 2, blocks: 2, text: 32 },
     };

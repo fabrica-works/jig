@@ -37,23 +37,34 @@ pub fn up(event: driver::Event, now: Time) -> Up {
         driver::Event::Failed { account, ends, failure } => {
             match ends {
                 driver::Ends::Grant => (),
-                driver::Ends::SignIn => unreachable!("the engine runs no sign-in"),
+                driver::Ends::SignIn | driver::Ends::SignOut | driver::Ends::Refresh => {
+                    unreachable!("the engine runs no sign-in")
+                }
             }
             failed(account, classify(failure))
         }
         driver::Event::Refused { account, asked, why } => {
             match asked {
                 driver::Asked::Grant => (),
-                driver::Asked::SignIn | driver::Asked::Redirected => unreachable!("the engine runs no sign-in"),
+                driver::Asked::SignIn
+                | driver::Asked::Redirected
+                | driver::Asked::SignOut
+                | driver::Asked::Want
+                | driver::Asked::Add
+                | driver::Asked::Remove => unreachable!("the engine runs no sign-in"),
                 driver::Asked::HandIn => unreachable!("the layer checks each handed-in record before handing it in"),
             }
             failed(account, refused(why))
         }
         driver::Event::Closed => Up::Child(accounts::FromComponent::Closed),
-        driver::Event::Visit { account: _, url: _ } | driver::Event::SignedIn { account: _, generation: _ } => {
+        driver::Event::Visit { account: _, url: _ } | driver::Event::SignedIn { .. } => {
             unreachable!("the engine runs no sign-in")
         }
-        driver::Event::Keep { account: _, record: _ } => unreachable!("the engine's accounts use the private keeper"),
+        driver::Event::Removed { .. }
+        | driver::Event::SignedOut { .. }
+        | driver::Event::Lock { .. }
+        | driver::Event::Unlock { .. }
+        | driver::Event::Keep { account: _, record: _ } => unreachable!("the engine's accounts use the private keeper"),
     }
 }
 
@@ -63,9 +74,11 @@ fn failed(account: u32, failure: accounts::Failure) -> Up {
 
 fn classify(failure: driver::Failure) -> accounts::Failure {
     match failure {
-        driver::Failure::NotKept => accounts::Failure::Later { after: None },
+        driver::Failure::Busy | driver::Failure::NotKept => accounts::Failure::Later { after: None },
         driver::Failure::Exchange(failure) => exchange(failure),
-        driver::Failure::Expired => accounts::Failure::SignInAgain,
+        driver::Failure::NotGranted | driver::Failure::AnotherSubject | driver::Failure::Expired => {
+            accounts::Failure::SignInAgain
+        }
         driver::Failure::Unloaded { at, why } => accounts::Failure::Unloaded { at: place(at), why: unread(why) },
     }
 }
@@ -79,15 +92,20 @@ fn exchange(failure: oauth::Failure) -> accounts::Failure {
         oauth::Failure::Refused => accounts::Failure::SignInAgain,
         oauth::Failure::ClientRejected => accounts::Failure::Misconfigured,
         oauth::Failure::Cancelled => accounts::Failure::Cancelled,
-        oauth::Failure::InvalidRedirect => unreachable!("the engine runs no sign-in or redirect exchange"),
+        oauth::Failure::Incomplete | oauth::Failure::Unverified { .. } | oauth::Failure::InvalidRedirect => {
+            unreachable!("the engine runs no sign-in or redirect exchange")
+        }
     }
 }
 
 fn refused(why: driver::Refusal) -> accounts::Failure {
     match why {
+        driver::Refusal::NoRecord => accounts::Failure::SignInAgain,
         driver::Refusal::Closed => accounts::Failure::Cancelled,
         driver::Refusal::Full { bound: _ } => accounts::Failure::Later { after: None },
-        driver::Refusal::Busy
+        driver::Refusal::Taken
+        | driver::Refusal::Unusable(_)
+        | driver::Refusal::Busy
         | driver::Refusal::NotWaiting
         | driver::Refusal::Redirect
         | driver::Refusal::Account

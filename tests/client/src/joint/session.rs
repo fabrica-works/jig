@@ -911,7 +911,7 @@ mod tests {
         limits.jig.text = 4096;
         limits.jig.document_bytes = 1_048_576;
         let codec = jig_protocol_transcript::Limits {
-            smith: smith_transcript::v5::CEILINGS,
+            smith: smith_transcript::v6::CEILINGS,
             bytes: 1_048_576,
             turn: client::TurnLimits { messages: 64, blocks: 16, text: 65_536 },
         };

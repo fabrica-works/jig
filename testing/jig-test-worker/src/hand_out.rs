@@ -23,7 +23,7 @@ impl Finish {
         match result {
             smith::RunResult::Accepted { .. } => Self::Ended,
             smith::RunResult::Parked => Self::Parked,
-            smith::RunResult::Failed { failure } => Self::Failed(crate::translate::failure(*failure)),
+            smith::RunResult::Failed { failure } => Self::Failed(crate::translate::failure(failure)),
             smith::RunResult::Refused { .. } => Self::Refused,
         }
     }

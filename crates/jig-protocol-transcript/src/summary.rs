@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use skein_lib::stream::Read;
 use skein_lib::{Decimal, Intake, Reader};
-use smith_transcript::v5 as smith;
+use smith_transcript::v6 as smith;
 
 use crate::Undecodable;
 

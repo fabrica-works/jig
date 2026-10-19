@@ -20,7 +20,7 @@ mod tests {
 
     fn limits() -> Limits {
         Limits {
-            smith: smith_transcript::v5::CEILINGS,
+            smith: smith_transcript::v6::CEILINGS,
             bytes: 146,
             turn: TurnLimits { messages: 1, blocks: 1, text: 3 },
         }

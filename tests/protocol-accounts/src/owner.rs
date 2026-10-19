@@ -147,6 +147,8 @@ impl Owner {
                     driver::Account::HandedIn
                 } else {
                     driver::Account::SignIn {
+                        shared: false,
+                        origins: List::with_capacity(0),
                         registration: fixtures::registration(),
                         endpoint: driver::Endpoint {
                             address: self.address.expect("issuer address"),
@@ -239,6 +241,7 @@ impl Owner {
         while let Some(lower) = self.files.pop() {
             match lower {
                 driver::FileLower::Request { request, deadline } => self.file_driver.request(request, deadline),
+                driver::FileLower::Remove { .. } => unreachable!("the owner never signs out or removes an account"),
                 driver::FileLower::Cancel { owner } => self.file_driver.cancel(owner),
             }
         }

@@ -40,10 +40,10 @@ pub fn world(seed: u64) -> World<Test, Scripted> {
         spent: 2,
         read: None,
         at: Wall::EPOCH,
-        transcript: Box::from([0_u8, 5, 255]),
+        transcript: Box::from([0_u8, 6, 255]),
     };
     let codec = jig_protocol_transcript::Limits {
-        smith: smith_transcript::v5::CEILINGS,
+        smith: smith_transcript::v6::CEILINGS,
         bytes: 128,
         turn: TurnLimits { messages: 2, blocks: 2, text: 32 },
     };

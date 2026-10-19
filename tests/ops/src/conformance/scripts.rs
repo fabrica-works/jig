@@ -29,10 +29,13 @@
 //! read: smith's inline agent heard the stop in the same step. If its task
 //! stays live, the unread messages wake it again according to their policy.
 use jig_conformance::{Clock, Input};
+
+// The fixture uses one numbered dialect, as transcript v6 requires.
+const DIALECT: u32 = 1;
 use jig_domain_host as host;
 use jig_ops_domain as root;
 use skein_lib::{Duration, List, Token, Writer};
-use smith_transcript::v5 as transcript;
+use smith_transcript::v6 as transcript;
 use std::collections::BTreeMap;
 
 pub struct Agents {
@@ -495,9 +498,9 @@ fn turn(agent: &Agent, texts: &[Vec<u8>], step: &Step) -> Box<[u8]> {
             model: b"model".as_slice().into(),
             effort: None,
             kind: transcript::TurnKind::Ordinary,
-            affinity: None,
+            opening: None,
             endpoint: b"fake".as_slice().into(),
-            dialect: b"fake".as_slice().into(),
+            dialect: DIALECT,
             place: agent.said,
             usage: transcript::Usage::new(
                 &limits,
@@ -546,7 +549,7 @@ fn verdict(code: &str, text: &str, fields: &[(&str, &str)]) -> Box<[u8]> {
 }
 /// The run's accepted result, in the record its outcome carries.
 fn result(form: smith_charter::Form, label: Option<&[u8]>, text: &[u8], fields: &[(&str, &str)]) -> Box<[u8]> {
-    let limits = smith_charter::v2::CEILINGS;
+    let limits = smith_charter::v3::CEILINGS;
     let mut list = List::with_capacity(u32::try_from(fields.len()).expect("few fields"));
     for (name, value) in fields {
         list.push(

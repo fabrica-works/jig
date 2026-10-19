@@ -1,4 +1,4 @@
-Smith transcript-v5 goldens copied from smith revision
-`a277e9226273bf71c845db98b62a59b9ca4c9bfd`, from
-`crates/smith-transcript/golden/v5/`. When jig repins smith, refresh changed
+Smith transcript-v6 goldens copied from smith revision
+`13d845cb7095e0079ab1e8de37ae53ab0bf26a16`, from
+`crates/smith-transcript/golden/v6/`. When jig repins smith, refresh changed
 fixtures and their expectations together.

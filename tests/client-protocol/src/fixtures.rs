@@ -240,7 +240,7 @@ pub const TURN_INPUT: &[u8] = b"{ \"path\": \"a\" }";
 // The source text and call fields together fit the ordinary 32-byte text budget.
 pub const TURN_TEXT: &[u8] = b"abc";
 // The measured single row fits this budget; its joined activity line does not.
-pub const TURN_OVERLAP_BYTES: u64 = 2317;
+pub const TURN_OVERLAP_BYTES: u64 = 2320;
 #[must_use]
 pub fn turn_overlap_limits() -> jig_test_domain::Limits {
     let mut limits = owner_limits();
@@ -249,7 +249,7 @@ pub fn turn_overlap_limits() -> jig_test_domain::Limits {
 }
 #[must_use]
 pub fn callable_turn() -> Box<[u8]> {
-    use smith_transcript::v5 as s;
+    use smith_transcript::v6 as s;
     let mut blocks = List::with_capacity(2);
     blocks
         .push(s::Block::Text(
@@ -272,25 +272,26 @@ pub fn callable_turn() -> Box<[u8]> {
         .expect("source call block");
     turn_with_blocks(blocks)
 }
-fn turn_with_blocks(blocks: List<smith_transcript::v5::Block>) -> Box<[u8]> {
-    use smith_transcript::v5 as s;
+fn turn_with_blocks(blocks: List<smith_transcript::v6::Block>) -> Box<[u8]> {
+    use smith_transcript::v6 as s;
     let mut turn =
-        s::Turn::decode(&s::CEILINGS, &mut skein_lib::Reader::new(TURN_BYTES)).expect("v5 fixture").into_parts();
+        s::Turn::decode(&s::CEILINGS, &mut skein_lib::Reader::new(TURN_BYTES)).expect("v6 fixture").into_parts();
     let mut message = turn.messages.get(0).expect("person message").clone().into_parts();
     message.blocks = blocks;
     turn.messages = List::with_capacity(1);
     turn.messages.push(s::Message::new(&s::CEILINGS, message).expect("source message")).expect("one message");
     let turn = s::Turn::new(&s::CEILINGS, turn).expect("source turn");
     let mut writer = skein_lib::Writer::new(usize::try_from(turn.measure()).expect("turn size"));
-    turn.encode(&mut writer).expect("v5 encoding");
+    turn.encode(&mut writer).expect("v6 encoding");
     writer.finish()
 }
 
 // Eight KiB fits the committed marker and its owner; an extra byte cannot fit whole.
 pub const TURN_PAGE_BYTES: u32 = 8192;
 pub const LARGE_TURN_TEXT_BYTES: u32 = TURN_PAGE_BYTES + 1;
-// The source text plus 129 bytes of the golden's v5 metadata and field framing.
-pub const LARGE_TURN_BYTES: u64 = 8322;
+// The v6 fixture's metadata and field framing measure 132 bytes.
+const TURN_FRAMING_BYTES: u64 = 132;
+pub const LARGE_TURN_BYTES: u64 = LARGE_TURN_TEXT_BYTES as u64 + TURN_FRAMING_BYTES;
 #[must_use]
 pub fn turn_page_limits() -> jig_test_domain::Limits {
     let mut limits = owner_limits();
@@ -299,7 +300,7 @@ pub fn turn_page_limits() -> jig_test_domain::Limits {
 }
 #[must_use]
 pub fn large_turn() -> Box<[u8]> {
-    use smith_transcript::v5 as s;
+    use smith_transcript::v6 as s;
     let mut blocks = List::with_capacity(1);
     blocks
         .push(s::Block::Text(

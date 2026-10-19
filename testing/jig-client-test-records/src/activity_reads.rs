@@ -1,14 +1,7 @@
 //! Shared activity wire records; original client values remain independent.
 use super::w;
 use skein_lib::Writer;
-pub const FULL_TURN: &[u8] = &[
-    0, 5, 0, 1, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 255, 255, 255, 255, 0,
-    0, 0, 3, 97, 98, 99, 0, 0, 0, 3, 97, 98, 99, 1, 0, 0, 0, 3, 97, 98, 99, 0, 0, 0, 3, 97, 98, 99, 255, 255, 255, 255,
-    1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255,
-    255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3, 97, 98, 99, 1, 0, 0, 0, 3,
-    97, 98, 99, 0, 0, 0, 3, 0, 127, 255,
-];
+pub const FULL_TURN: &[u8] = include_bytes!("../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin");
 const UTF8_TEXTS: [&[u8]; 1] = [b"~\0\x01"];
 fn wire_cursor(value: &[u8]) -> w::Cursor {
     w::Cursor::new(&w::CEILINGS, w::CursorParts { value: Box::from(value) }).expect("literal fixture fits")

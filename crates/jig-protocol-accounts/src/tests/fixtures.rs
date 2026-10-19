@@ -17,6 +17,7 @@ pub fn driver_limits() -> driver::Limits {
     driver::Limits {
         accounts: 2,
         file_stall: Duration::from_secs(1),
+        lock_wait: Duration::from_secs(1),
         exchanges: 2,
         listeners: 1,
         server: skein_http::server::Limits {
@@ -52,6 +53,11 @@ pub fn driver_limits() -> driver::Limits {
             parameter_bytes: 0,
             resource_bytes: 0,
             nonce_bytes: 0,
+            metadata_bytes: 0,
+            key_set_bytes: 0,
+            keys: 0,
+            modulus_bits: 2048,
+            skew: Duration::ZERO,
             sign_in_time: Duration::from_secs(120),
             request_time: Duration::from_secs(10),
             backoff_base: Duration::from_secs(1),

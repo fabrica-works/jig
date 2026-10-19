@@ -1,7 +1,10 @@
 //! Completed calls show the worker's job start and end on the person's page.
 use super::*;
+
+// The fixture uses one numbered transcript dialect.
+const DIALECT: u32 = 1;
 use skein_fake_person::Target;
-use smith_transcript::v5 as source;
+use smith_transcript::v6 as source;
 
 fn call(id: &[u8], name: &[u8]) -> source::Block {
     source::Block::Call(
@@ -99,9 +102,9 @@ fn turn() -> Box<[u8]> {
             model: b"model".as_slice().into(),
             effort: None,
             kind: source::TurnKind::Ordinary,
-            affinity: None,
+            opening: None,
             endpoint: b"fixture".as_slice().into(),
-            dialect: b"fixture".as_slice().into(),
+            dialect: DIALECT,
             place: 1,
             usage,
             spent: 1,

@@ -106,6 +106,7 @@ fn issuer(story: Story) -> Process {
             observation_bytes: 4096,
         },
         fake::Config {
+            terms: None,
             authorization_url: bytes::copy_of(fixtures::AUTHORIZE),
             token_endpoint: bytes::copy_of(fixtures::TOKEN),
             client_id: bytes::copy_of(b"client"),
@@ -119,9 +120,17 @@ fn issuer(story: Story) -> Process {
             request_bytes: 1024,
             codes: 1,
             rotations: 2,
+            carried: 0,
             plans: 2,
         },
-        profile.server,
+        skein_http::server::Limits {
+            // skein-fake-peers' issuer response bounds the redirect URL,
+            // six escaped strings, and 267 bytes of framing.
+            response: profile.client.uri_bytes
+                + profile.client.document.string_bytes * fixtures::ISSUER_ESCAPED_STRINGS
+                + fixtures::ISSUER_REDIRECT_FRAMING_BYTES,
+            ..profile.server
+        },
     )
     .expect("issuer");
     for plan in fixtures::issuer_plans(story) {

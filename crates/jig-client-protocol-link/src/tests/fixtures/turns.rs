@@ -45,8 +45,8 @@ pub fn unread_activity_page(why: c::TurnProblem) -> c::ActivityPage {
 pub fn unread_pages() -> [(w::ActivityPage, c::ActivityPage); 3] {
     [
         (unread_activity_record(&[0, 4]), unread_activity_page(c::TurnProblem::Version { found: 4 })),
-        (unread_activity_record(&[0, 5]), unread_activity_page(c::TurnProblem::Malformed)),
-        (unread_activity_record(&[0, 5, 255]), unread_activity_page(c::TurnProblem::Malformed)),
+        (unread_activity_record(&[0, 6]), unread_activity_page(c::TurnProblem::Malformed)),
+        (unread_activity_record(&[0, 6, 255]), unread_activity_page(c::TurnProblem::Malformed)),
     ]
 }
 pub fn cut_activity_record() -> w::ActivityPage {
@@ -165,7 +165,7 @@ pub fn reading_turn(limits: &Limits) -> (Harness, Token) {
     let exchange = harness.read(Readable::Jig(turn_read()));
     (harness, exchange)
 }
-// The existing v5 golden occupies 146 bytes; v9's Some(read) archive and tag add 51.
+// The existing v6 golden occupies 146 bytes; v9's Some(read) archive and tag add 51.
 pub const TURN_PAYLOAD_BYTES: u64 = 146;
 pub const TURN_DOCUMENT_BYTES: u64 = TURN_PAYLOAD_BYTES + 51;
 pub fn answered_turn(limits: &Limits, answer: &[u8]) -> Harness {

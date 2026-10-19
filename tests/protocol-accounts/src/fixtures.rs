@@ -4,6 +4,9 @@ use skein_io as io;
 use skein_lib::{Duration, Wall, bytes};
 use skein_oauth as oauth;
 use skein_oauth_accounts as accounts;
+// skein-fake-peers' OAuth response bound: six escaped strings and redirect framing.
+pub const ISSUER_ESCAPED_STRINGS: u32 = 6;
+pub const ISSUER_REDIRECT_FRAMING_BYTES: u32 = 267;
 pub const ACCOUNT_CHAT: u32 = 0;
 pub const ROOM: u32 = 64;
 pub const TOKEN_FIRST: &[u8] = b"access-first";
@@ -16,6 +19,7 @@ pub fn limits() -> accounts::Limits {
     accounts::Limits {
         accounts: 2,
         file_stall: Duration::from_secs(1),
+        lock_wait: Duration::from_secs(1),
         exchanges: 2,
         listeners: 1,
         server: skein_http::server::Limits {
@@ -51,6 +55,11 @@ pub fn limits() -> accounts::Limits {
             parameter_bytes: 0,
             resource_bytes: 0,
             nonce_bytes: 0,
+            metadata_bytes: 0,
+            key_set_bytes: 0,
+            keys: 0,
+            modulus_bits: 2048,
+            skew: Duration::ZERO,
             sign_in_time: Duration::from_secs(120),
             request_time: Duration::from_secs(10),
             backoff_base: Duration::from_secs(1),

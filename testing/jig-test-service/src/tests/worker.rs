@@ -66,12 +66,7 @@ fn a_turn_is_encoded_against_the_worker_s_endpoints() {
     assert!(skein_lib::bytes::find(&encoded.body, b"fake").is_some());
     let mut entries = skein_lib::List::with_capacity(1);
     entries
-        .push(smith_protocol_channel::Endpoint {
-            name: b"different".as_slice().into(),
-            number: 1,
-            dialect: 1,
-            account: 1,
-        })
+        .push(smith_protocol_channel::Endpoint { name: b"different".as_slice().into(), number: 1, dialect: 1 })
         .expect("endpoint");
     agent.endpoints = smith_protocol_channel::Endpoints::new(entries);
     let root::Encoded::Turn(encoded) =

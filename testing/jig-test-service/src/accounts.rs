@@ -157,6 +157,8 @@ impl Accounts {
                         None => None,
                     };
                     driver::Account::SignIn {
+                        shared: false,
+                        origins: List::with_capacity(0),
                         registration: oauth::Registration {
                             authorization_url: source.authorization.clone(),
                             token_endpoint: source.token.clone(),
@@ -353,6 +355,7 @@ impl Accounts {
                     }
                     self.pending.push((request, deadline));
                 }
+                driver::FileLower::Remove { .. } => unreachable!("the owner never signs out or removes an account"),
                 driver::FileLower::Cancel { owner } => {
                     for _ in 0..self.pending.len() {
                         let (request, deadline) = self.pending.pop().expect("queued files");

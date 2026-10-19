@@ -419,7 +419,7 @@ pub fn assignment(config: &jig_protocol_config::Engine) -> jig_test_domain::Assi
 pub fn endpoints() -> smith_protocol_channel::Endpoints {
     let mut entries = List::with_capacity(1);
     entries
-        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 1, dialect: 1, account: 1 })
+        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 1, dialect: 1 })
         .expect("endpoint");
     smith_protocol_channel::Endpoints::new(entries)
 }
@@ -573,10 +573,14 @@ pub fn concrete_turn() -> smith_host_domain::Turn {
         model: b"model".as_slice().into(),
         effort: None,
         version: record::VERSION,
-        endpoint: llm::Endpoint(1),
+        endpoint: Some(llm::Endpoint(1)),
         dialect: 1,
         sequence: 1,
-        kind: record::Kind::First { affinity: llm::Affinity { key: [3; 16], thread: 1 } },
+        kind: record::Kind::First {
+            affinity: llm::Affinity { key: [3; 16], thread: 1 },
+            account: Some(1),
+            backend: record::Backend::Direct,
+        },
         usage: llm::Usage {
             input_tokens: Some(1),
             output_tokens: Some(1),

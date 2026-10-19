@@ -13,8 +13,8 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use jig_client_domain::contract::{Block, Call, Message, Speaker, Text, Turn, TurnLimits, Usage};
-use skein_lib::{List, Reader};
-use smith_transcript::v5 as smith;
+use skein_lib::{Decimal, List, Reader};
+use smith_transcript::v6 as smith;
 
 mod summary;
 #[cfg(test)]
@@ -125,7 +125,7 @@ fn translate_block(source: &smith::Turn, block: &smith::Block, budget: &mut Budg
     match block {
         smith::Block::Text(text) | smith::Block::Refusal(text) => Block::Text(budget.text(text.text())),
         smith::Block::Opaque(opaque) => Block::Opaque {
-            dialect: budget.text(opaque.dialect()),
+            dialect: budget.text(Decimal::of(u64::from(opaque.dialect())).as_bytes()),
             size: u64::try_from(opaque.bytes().len()).expect("schema byte ceiling fits u64"),
         },
         smith::Block::Call(call) => {

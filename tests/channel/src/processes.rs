@@ -403,6 +403,7 @@ pub(crate) fn window_provider(scripts: Box<[skein_fake_llm_domain::api::Script]>
         skein_fake_peers::Transport::Plaintext,
         agent_fixture::fake::limits(),
         provider::Config {
+            without_credential: false,
             echo: skein_llm::openai::Echo::NONE,
             usage_fields: documents::UsageFields::ALL,
             provider: documents::Provider::OpenAi,

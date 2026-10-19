@@ -154,7 +154,7 @@ pub fn seeds() -> Seeds {
 pub(crate) fn endpoints() -> smith_protocol_channel::Endpoints {
     let mut entries = List::with_capacity(1);
     entries
-        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 0, dialect: 1, account: 1 })
+        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 0, dialect: 1 })
         .expect("one endpoint");
     smith_protocol_channel::Endpoints::new(entries)
 }
@@ -239,14 +239,12 @@ pub fn agent_configuration() -> smith_agent_service::Config {
         Box::new([smith_protocol_llm::ConfiguredEndpoint {
             name: smith_domain::llm::Endpoint(0),
             destination,
-            account: 1,
             connect: Duration::from_secs(1),
             handshake: Duration::from_secs(1),
             identity: smith_protocol_llm::IdentityProfile::Plain,
             models: Box::default(),
         }]),
         1,
-        2,
     )
     .expect("provider account");
     config
