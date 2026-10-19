@@ -59,7 +59,7 @@ pub(crate) fn active(b: &mut Builder, value: &ActiveRun, words: &Words) {
         RunWork::Writing => words.text(b, JigPhrase::WorkWriting, &[]),
         RunWork::Tool { call, tool } => {
             let phrase = crate::live_call_words::LiveCallPhrase::ObservedCurrentCall;
-            let label = words.book.say(words.language, phrase.id(), &[]).expect("checked observed call label").text;
+            let label = words.book().say(words.language(), phrase.id(), &[]).expect("checked observed call label").text;
             b.text(Run::Plain, &label);
             crate::literal_segment::render(b, tool.bytes());
             crate::literal_segment::render(b, call.id.bytes());

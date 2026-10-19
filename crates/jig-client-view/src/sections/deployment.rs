@@ -110,5 +110,5 @@ fn region(
 ) {
     b.open(Role::Region);
     b.region(region.region());
-    b.name(&words.book.say(words.language, phrase.id(), &[]).expect("deployment region phrase checked").text);
+    b.name(&words.book().say(words.language(), phrase.id(), &[]).expect("deployment region phrase checked").text);
 }

@@ -17,7 +17,7 @@ use jig_client::contract::{
 };
 use skein_lib::{Duration, Wall};
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
-    let saying = words.book.say(words.language, phrase.id(), holes).expect("deployment sayings checked");
+    let saying = words.book().say(words.language(), phrase.id(), holes).expect("deployment sayings checked");
     b.text(Run::Plain, &saying.text);
 }
 fn field_number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
@@ -31,12 +31,12 @@ fn region(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole], key: Option
         }
         None => b.open(Role::Region),
     }
-    let saying = words.book.say(words.language, phrase.id(), holes).expect("deployment region name checked");
+    let saying = words.book().say(words.language(), phrase.id(), holes).expect("deployment region name checked");
     b.name(&saying.text);
 }
 fn list(b: &mut Builder, words: &Words, phrase: P) {
     b.open(Role::List);
-    let saying = words.book.say(words.language, phrase.id(), &[]).expect("deployment list name checked");
+    let saying = words.book().say(words.language(), phrase.id(), &[]).expect("deployment list name checked");
     b.name(&saying.text);
 }
 fn wall(b: &mut Builder, words: &Words, phrase: P, absent: P, value: Option<Wall>) {
@@ -672,7 +672,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn limits(l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
     let nodes = max_nodes(l)?;
-    let phrase = crate::phrases::jig_capacity(&words.book)?;
+    let phrase = words.jig_capacity()?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).max(64).checked_mul(2)?;
     Some(skein_ui::Limits {
         nodes,

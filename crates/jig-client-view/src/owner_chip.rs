@@ -191,7 +191,7 @@ pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Opt
             }
         }
     }
-    let phrase_bytes = crate::phrases::jig_capacity(&words.book)?;
+    let phrase_bytes = words.jig_capacity()?;
     // A card node can carry a title and text together; each literal byte can
     // need four escaped display bytes. Both costs are included, never narrowed.
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase_bytes).checked_mul(2)?;
@@ -205,7 +205,8 @@ pub fn required(value: &OwnerChipDetails, limits: &Limits, words: &Words) -> Opt
     })
 }
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
-    let saying = words.book.say(words.language, phrase.id(), holes).expect("checked chip words and exact typed holes");
+    let saying =
+        words.book().say(words.language(), phrase.id(), holes).expect("checked chip words and exact typed holes");
     b.text(Run::Plain, &saying.text);
 }
 fn number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
@@ -223,8 +224,8 @@ fn document(b: &mut Builder, value: &DocumentText, words: &Words) {
 pub(crate) fn resource(b: &mut Builder, value: &OwnerResourceLine, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Region);
     let name = words
-        .book
-        .say(words.language, P::Kind.id(), &[Hole::Number(u64::from(value.kind))])
+        .book()
+        .say(words.language(), P::Kind.id(), &[Hole::Number(u64::from(value.kind))])
         .expect("checked resource kind and exact supplied number");
     b.name(&name.text);
     crate::proposed_task::part(b, &value.part, words, bindings);
@@ -395,7 +396,7 @@ pub fn observation_required(value: &OwnerChipObservation, limits: &Limits, words
         P::Started,
         P::StartUnknown,
     ] {
-        phrase_bytes = phrase_bytes.max(words.book.capacity(phrase.id())?);
+        phrase_bytes = phrase_bytes.max(words.book().capacity(phrase.id())?);
     }
     let nodes = observation_nodes();
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase_bytes).checked_mul(2)?;
@@ -507,8 +508,8 @@ pub fn render(
 ) {
     b.open(Role::Region);
     let name = words
-        .book
-        .say(words.language, P::Project.id(), &[Hole::Number(u64::from(value.project))])
+        .book()
+        .say(words.language(), P::Project.id(), &[Hole::Number(u64::from(value.project))])
         .expect("checked chip project and exact supplied number");
     b.name(&name.text);
     number(b, words, P::Project, u64::from(value.project));
@@ -542,7 +543,7 @@ pub fn render(
         }
         None => {}
     }
-    crate::owner_wake::policy(b, &value.wake, &words.book, words.language);
+    crate::owner_wake::policy(b, &value.wake, words.book(), words.language());
     if let Some(wait) = &value.person_wait {
         person_wait(b, wait, words);
     }

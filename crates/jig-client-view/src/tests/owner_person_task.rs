@@ -379,12 +379,12 @@ fn person_storage_dimension(selected_dimension: Option<usize>) {
         text_bytes: 100_000,
         hole_bytes: 128,
     };
-    let w = Words {
-        book: Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([normal, selected]), &phrase_limits)
+    let w = Words::new(
+        Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([normal, selected]), &phrase_limits)
             .unwrap(),
-        language: 1,
-        offset_minutes: 0,
-    };
+        1,
+        0,
+    );
     let l = crate::Limits { rows: 3, ..client_limits() };
     let value = full_value(&l);
     let untouched = value.clone();

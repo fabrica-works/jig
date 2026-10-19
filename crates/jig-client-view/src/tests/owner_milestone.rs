@@ -47,8 +47,8 @@ fn words(selected: bool) -> Words {
     } else {
         Box::new([english])
     };
-    Words {
-        book: Phrasebook::load(
+    Words::new(
+        Phrasebook::load(
             crate::phrases::jig::shapes(256),
             languages,
             &PhraseLimits {
@@ -61,9 +61,9 @@ fn words(selected: bool) -> Words {
             },
         )
         .unwrap(),
-        language: u16::from(selected),
-        offset_minutes: 0,
-    }
+        u16::from(selected),
+        0,
+    )
 }
 fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view::MilestoneFragment) {
     let f = view::required(value, &limits(), words).unwrap();
@@ -90,7 +90,7 @@ fn build(value: &OwnerMilestoneLine, words: &Words) -> (Tree, JigBindings, view:
     assert_eq!(region.role, skein_ui::Role::Region);
     assert_eq!(
         region.name.as_deref(),
-        Some(if words.language == 0 { b"Lifecycle milestone".as_slice() } else { b"second ".as_slice() })
+        Some(if words.language() == 0 { b"Lifecycle milestone".as_slice() } else { b"second ".as_slice() })
     );
     assert!(tree.len() <= f.nodes);
     let mut total = 0_u64;
@@ -449,9 +449,9 @@ fn owner_milestone_second_checked_language_and_full_fragment_preserve_raw_slots_
     }
     assert_eq!(slots, 2);
     let id = crate::owner_milestone_words::MilestonePhrase::Position.id();
-    let saying = w.book.say(1, id, &[Hole::Number(u64::MAX)]).expect("checked numeric hole");
+    let saying = w.book().say(1, id, &[Hole::Number(u64::MAX)]).expect("checked numeric hole");
     assert_eq!(saying.text.as_ref(), b"second 18446744073709551615");
-    assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::from_nanos(0))]).err(), Some(Invalid::Values { id }));
+    assert_eq!(w.book().say(1, id, &[Hole::Wall(Wall::from_nanos(0))]).err(), Some(Invalid::Values { id }));
 }
 
 const UTF8_TEXTS: [&[u8]; 2] = [&[b'~'; 8], &[b'!'; 8]];

@@ -27,7 +27,7 @@ pub struct HistoricalFragment {
     pub slots: u32,
 }
 fn saying(words: &Words, phrase: P, holes: &[Hole]) -> Box<[u8]> {
-    words.book.say(words.language, phrase.id(), holes).expect("checked historical sayings and typed holes").text
+    words.book().say(words.language(), phrase.id(), holes).expect("checked historical sayings and typed holes").text
 }
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
     b.text(Run::Plain, &saying(words, phrase, holes));
@@ -98,7 +98,7 @@ fn goal(b: &mut Builder, value: &OwnerPersonProposalGoal, words: &Words, binding
         );
         b.close();
     }
-    crate::owner_wake::policy(b, &value.wake, &words.book, words.language);
+    crate::owner_wake::policy(b, &value.wake, words.book(), words.language());
     match value.tracked {
         Some(number_) => number(b, words, P::Tracked, u64::from(number_)),
         None => label(b, words, P::TrackedAbsent),
@@ -331,8 +331,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<HistoricalFragment> {
     let nodes = max_nodes(l)?;
-    let text_per_node =
-        crate::phrases::jig_capacity(&words.book)?.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
+    let text_per_node = words.jig_capacity()?.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(HistoricalFragment {
         nodes,
         text_bytes: nodes.checked_mul(text_per_node)?,

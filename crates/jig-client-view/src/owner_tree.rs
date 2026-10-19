@@ -51,7 +51,7 @@ pub(crate) fn max_nodes_with_card(l: &Limits, card: u32) -> Option<u32> {
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<TreeFragment> {
     let nodes = max_nodes(l)?;
-    let phrase = crate::phrases::jig_capacity(&words.book)?;
+    let phrase = words.jig_capacity()?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(TreeFragment {
         nodes,
@@ -115,12 +115,12 @@ fn chip_fits(chip: &Chip, limits: &Limits, words: &Words) -> Option<()> {
 }
 
 fn text(b: &mut Builder, words: &Words, p: P, holes: &[Hole]) {
-    let saying = words.book.say(words.language, p.id(), holes).expect("checked subtree words and typed holes");
+    let saying = words.book().say(words.language(), p.id(), holes).expect("checked subtree words and typed holes");
     b.text(Run::Plain, &saying.text);
 }
 fn fold(b: &mut Builder, parent: u64, counts: OwnerPhaseCounts, held: u32, words: &Words) {
     b.open(Role::Region);
-    let name = words.book.say(words.language, P::Fold.id(), &[]).expect("checked fold caption");
+    let name = words.book().say(words.language(), P::Fold.id(), &[]).expect("checked fold caption");
     b.name(&name.text);
     text(b, words, P::Parent, &[Hole::Number(parent)]);
     for (p, value) in [
@@ -207,8 +207,8 @@ fn row(
                 Proposer::Task(n) | Proposer::Party(n) => n,
             };
             let saying = words
-                .book
-                .say(words.language, phrase.id(), &[Hole::Number(maker), Hole::Number(key.number)])
+                .book()
+                .say(words.language(), phrase.id(), &[Hole::Number(maker), Hole::Number(key.number)])
                 .expect("proposal identity words");
             b.text(Run::Plain, &saying.text);
             if let Some(id) = client.objects().find(ObjectKey::Proposal(*key)) {
@@ -231,7 +231,7 @@ pub fn render(
     bindings: &mut JigBindings,
 ) {
     b.open(Role::Tree);
-    let name = words.book.say(words.language, P::Tree.id(), &[]).expect("checked tree caption");
+    let name = words.book().say(words.language(), P::Tree.id(), &[]).expect("checked tree caption");
     b.name(&name.text);
     b.open(Role::TreeItem);
     b.key(crate::pages::object_key(ObjectKey::Task(value.root.task)));

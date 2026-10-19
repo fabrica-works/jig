@@ -27,7 +27,7 @@ impl Limits {
         let application_nodes = fragment_nodes.checked_add(cards.checked_mul(3)?)?.checked_add(9)?;
         let mut tree = jig_client_view::limits::envelope(
             &domain.jig,
-            jig_client_view::phrases::jig_capacity(&jig.book)?,
+            jig.jig_capacity()?,
             &jig_client_view::page::Arrangement::none(),
             0,
             0,
@@ -120,8 +120,8 @@ pub fn worst_case(
     jig_client_view::limits::jig_worst_case(&limits.tree)?
         .checked_add(jig_client_view::jig_bindings_worst_case(limits.tree.bindings, &domain.jig)?)?
         .checked_add(bindings::worst_case(limits.tree.bindings)?)?
-        .checked_add(skein_ui::phrases::worst_case(jig.book.limits())?)?
+        .checked_add(skein_ui::phrases::worst_case(jig.book().limits())?)?
         .checked_add(skein_ui::phrases::worst_case(first.book.limits())?)?
-        .checked_add(u64::from(jig.book.capacity(jig_client_view::phrases::jig::JigPhrase::LoadingPart.id())?))?
+        .checked_add(u64::from(jig.book().capacity(jig_client_view::phrases::jig::JigPhrase::LoadingPart.id())?))?
         .checked_add(u64::from(first.capacity()?))
 }

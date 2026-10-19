@@ -134,11 +134,7 @@ fn phrasebooks() -> (jig_client_view::words::Words, words::Words, words::Words) 
     WORDS
         .get_or_init(|| {
             (
-                jig_client_view::words::Words {
-                    book: jig_client_view::phrases::english::english(32).unwrap(),
-                    language: 0,
-                    offset_minutes: 0,
-                },
+                jig_client_view::words::Words::new(jig_client_view::phrases::english::english(32).unwrap(), 0, 0),
                 words::Words::english(1, 32).unwrap(),
                 words::Words::english(2, 32).unwrap(),
             )
@@ -892,11 +888,7 @@ fn moving_an_environment_end_names_the_end_revision_and_waits_for_the_final_enve
 }
 #[test]
 fn extreme_capacity_and_wall_overflow_are_refused_before_building() {
-    let jig = jig_client_view::words::Words {
-        book: jig_client_view::phrases::english::english(32).unwrap(),
-        language: 0,
-        offset_minutes: 0,
-    };
+    let jig = jig_client_view::words::Words::new(jig_client_view::phrases::english::english(32).unwrap(), 0, 0);
     let obs = words::Words::english(1, 32).unwrap();
     let infra = words::Words::english(2, 32).unwrap();
     let mut limits = limits();

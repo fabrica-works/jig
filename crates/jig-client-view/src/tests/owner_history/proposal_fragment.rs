@@ -90,9 +90,9 @@ fn states(action: OwnerRetainedAction) {
             }
             OwnerProposalHistoryState::Withdrawn => saying(&tree, words, P::Withdrawn, &[]),
         }
-        let history_name = words.book.say(words.language, P::History.id(), &[]).unwrap();
+        let history_name = words.book().say(words.language(), P::History.id(), &[]).unwrap();
         assert!(!tree.nodes().iter().any(|node| node.name.as_deref() == Some(history_name.text.as_ref())));
-        let absent_clock = words.book.say(words.language, P::AtAbsent.id(), &[]).unwrap();
+        let absent_clock = words.book().say(words.language(), P::AtAbsent.id(), &[]).unwrap();
         assert!(!has(&tree, &absent_clock.text));
     }
 }

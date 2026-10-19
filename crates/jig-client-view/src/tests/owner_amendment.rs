@@ -123,11 +123,7 @@ fn words(language: u16, selected: bool) -> Words {
     } else {
         Box::new([english])
     };
-    Words {
-        book: Phrasebook::load(crate::phrases::jig::shapes(8), languages, &phrase_limits()).unwrap(),
-        language,
-        offset_minutes: 0,
-    }
+    Words::new(Phrasebook::load(crate::phrases::jig::shapes(8), languages, &phrase_limits()).unwrap(), language, 0)
 }
 fn build(value: &OwnerAmendmentState, words: &Words) -> Tree {
     let f = view::required(value, &client_limits(), words).unwrap();
@@ -238,7 +234,7 @@ fn owner_amendment_address_taker_spec_wake_and_opaque_authority_keep_full_indepe
     ] {
         value.addressed = Some(address);
         let tree = build(&value, words);
-        let expected = words.book.say(words.language, phrase.id(), &[Hole::Number(number)]).unwrap();
+        let expected = words.book().say(words.language(), phrase.id(), &[Hole::Number(number)]).unwrap();
         assert!(has(&tree, &expected.text));
         assert!(has(&tree, b"Taken by party: 18446744073709551615"));
         for text in [
@@ -360,7 +356,7 @@ fn owner_amendment_selected_normal_words_preserve_checked_captions_numbers_and_n
     let tree = build(&lost, &selected);
     assert!(count(&tree, b"chosen language: ") >= 6);
     for phrase in data::ALL {
-        assert!(selected.book.capacity(phrase.id()).is_some());
+        assert!(selected.book().capacity(phrase.id()).is_some());
     }
     let cloned = selected.clone();
     assert_eq!(

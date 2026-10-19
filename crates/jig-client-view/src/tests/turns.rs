@@ -684,7 +684,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
         },
     )
     .unwrap();
-    let words = Words { book, language: 1, offset_minutes: 0 };
+    let words = Words::new(book, 1, 0);
     let (mut d, _, run, _) = ready();
     deliver(
         &mut d,
@@ -727,7 +727,7 @@ fn raw_live_call_controls_use_selected_normal_language_and_checked_capacity() {
         && node.name.as_deref() == Some(b"Selected language folds actual current input")));
     assert!(contains(&opened, b"input"));
     let limits = crate::limits::of_words(&CLIENT, &words).unwrap();
-    assert!(limits.text_per_node >= words.book.capacity(LiveCallPhrase::OpenCurrentCallInput.id()).unwrap());
+    assert!(limits.text_per_node >= words.book().capacity(LiveCallPhrase::OpenCurrentCallInput.id()).unwrap());
 }
 
 fn full_raw_byte(byte: u8) -> Text {

@@ -294,12 +294,12 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
         text_bytes: 100_000,
         hole_bytes: CLIENT.text,
     };
-    let words = Words {
-        book: Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([english, second]), &phrase_limits)
+    let words = Words::new(
+        Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([english, second]), &phrase_limits)
             .unwrap(),
-        language: 1,
-        offset_minutes: 0,
-    };
+        1,
+        0,
+    );
     let client = domain(empty());
     let maximum = view::required(client.deployment_page().owner.unwrap(), &CLIENT, &words).unwrap();
     let tree = build(&client, &words, maximum);
@@ -708,16 +708,16 @@ fn store_words() -> Words {
         text_bytes: 16_384,
         hole_bytes: CLIENT.text,
     };
-    Words {
-        book: Phrasebook::load(
+    Words::new(
+        Phrasebook::load(
             crate::owner_deployment_words::shapes(),
             Box::new([crate::owner_deployment_words::language()]),
             &limits,
         )
         .unwrap(),
-        language: 0,
-        offset_minutes: 0,
-    }
+        0,
+        0,
+    )
 }
 
 #[test]

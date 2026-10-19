@@ -71,7 +71,7 @@ pub fn required(value: &OwnerMilestoneLine, limits: &Limits, words: &Words) -> O
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<MilestoneFragment> {
     let nodes = max_nodes(limits)?;
-    let phrase = crate::phrases::jig_capacity(&words.book)?;
+    let phrase = words.jig_capacity()?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase).checked_mul(2)?;
     Some(MilestoneFragment {
         nodes,
@@ -83,7 +83,8 @@ pub fn worst_case(limits: &Limits, words: &Words) -> Option<MilestoneFragment> {
     })
 }
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
-    let saying = words.book.say(words.language, phrase.id(), holes).expect("checked milestone words and typed holes");
+    let saying =
+        words.book().say(words.language(), phrase.id(), holes).expect("checked milestone words and typed holes");
     b.text(Run::Plain, &saying.text);
 }
 fn active(b: &mut Builder, stage: RunStage, words: &Words) {
@@ -114,7 +115,7 @@ pub fn render(
     bindings: &mut JigBindings,
 ) {
     b.open(Role::Region);
-    let caption = words.book.say(words.language, P::Milestone.id(), &[]).expect("checked milestone region name");
+    let caption = words.book().say(words.language(), P::Milestone.id(), &[]).expect("checked milestone region name");
     b.name(&caption.text);
     text(b, words, P::Milestone, &[]);
     text(b, words, P::Task, &[Hole::Number(value.task)]);

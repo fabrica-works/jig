@@ -25,8 +25,8 @@ fn words(selected: bool) -> Words {
             }
         }
     }
-    Words {
-        book: Phrasebook::load(
+    Words::new(
+        Phrasebook::load(
             crate::phrases::jig::shapes(CLIENT.text),
             Box::new([english, second]),
             &PhraseLimits {
@@ -39,9 +39,9 @@ fn words(selected: bool) -> Words {
             },
         )
         .unwrap(),
-        language: u16::from(selected),
-        offset_minutes: 0,
-    }
+        u16::from(selected),
+        0,
+    )
 }
 fn row(object: OwnerInboxObject) -> OwnerInboxEntry {
     OwnerInboxEntry {
@@ -176,9 +176,9 @@ fn owner_inbox_second_checked_language_rejects_wrong_holes_without_fallback() {
     assert!(!contains(&tree, b"Stored task"));
     assert!(!contains(&tree, b"More than"));
     let id = crate::owner_inbox_words::InboxPhrase::Result.id();
-    assert_eq!(w.book.say(1, id, &[Hole::Number(u64::MAX)]).unwrap().text.as_ref(), b"second 18446744073709551615");
-    assert_eq!(w.book.say(1, id, &[]).err(), Some(Invalid::Values { id }));
-    assert!(w.book.capacity(id).unwrap() >= u32::try_from(b"second 18446744073709551615".len()).unwrap());
+    assert_eq!(w.book().say(1, id, &[Hole::Number(u64::MAX)]).unwrap().text.as_ref(), b"second 18446744073709551615");
+    assert_eq!(w.book().say(1, id, &[]).err(), Some(Invalid::Values { id }));
+    assert!(w.book().capacity(id).unwrap() >= u32::try_from(b"second 18446744073709551615".len()).unwrap());
 }
 #[test]
 fn owner_inbox_both_full_groups_two_read_windows_counts_source_cuts_fit_the_whole_page_bound() {

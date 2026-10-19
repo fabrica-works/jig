@@ -267,8 +267,8 @@ fn row_selected_words() -> crate::words::Words {
             }
         }
     }
-    crate::words::Words {
-        book: Phrasebook::load(
+    crate::words::Words::new(
+        Phrasebook::load(
             crate::phrases::jig::shapes(super::cards::CLIENT.text),
             Box::new([first, second]),
             &PhraseLimits {
@@ -281,9 +281,9 @@ fn row_selected_words() -> crate::words::Words {
             },
         )
         .unwrap(),
-        language: 1,
-        offset_minutes: 0,
-    }
+        1,
+        0,
+    )
 }
 
 #[test]

@@ -54,14 +54,15 @@ fn profile() -> &'static Profile {
     static PROFILE: std::sync::OnceLock<Profile> = std::sync::OnceLock::new();
     PROFILE.get_or_init(|| {
         let limits = limits();
-        let jig = jig_client_view::words::Words {
-            book: jig_client_view::phrases::english::english(limits.jig.text).expect("jig English fits"),
-            language: 0,
-            offset_minutes: 0,
-        };
+        let jig = jig_client_view::words::Words::new(
+            jig_client_view::phrases::english::english(limits.jig.text).expect("jig English fits"),
+            0,
+            0,
+        );
         let obs = view::words::Words::english(1, limits.observability.text).expect("Obs English fits");
         let infra = view::words::Words::english(2, limits.infrastructure.text).expect("Infra English fits");
-        let text_per_node = jig_client_view::phrases::jig_capacity(&jig.book)
+        let text_per_node = jig
+            .jig_capacity()
             .expect("jig saying bound")
             .max(obs.capacity().expect("Obs saying bound"))
             .max(infra.capacity().expect("Infra saying bound"))

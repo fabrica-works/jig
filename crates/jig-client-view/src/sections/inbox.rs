@@ -252,7 +252,8 @@ fn supplied_entry(
     }
 }
 fn owner_text(b: &mut Builder, words: &Words, phrase: crate::owner_inbox_words::InboxPhrase, holes: &[Hole]) {
-    let saying = words.book.say(words.language, phrase.id(), holes).expect("whole Inbox words and typed holes checked");
+    let saying =
+        words.book().say(words.language(), phrase.id(), holes).expect("whole Inbox words and typed holes checked");
     b.text(Run::Plain, &saying.text);
 }
 fn owner_entry(

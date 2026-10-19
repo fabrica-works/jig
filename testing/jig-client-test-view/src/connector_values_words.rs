@@ -472,5 +472,5 @@ pub fn english(text: u32) -> Result<Words, Invalid> {
         Box::new([english]),
         &PhraseLimits { languages: 1, phrases: count, holes: 4, segments: 3000, text_bytes: 32000, hole_bytes: text },
     )?;
-    Ok(Words { book, language: 0, offset_minutes: 0 })
+    Ok(Words::new(book, 0, 0))
 }

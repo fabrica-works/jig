@@ -76,8 +76,8 @@ pub(crate) fn path<S: Segment>(b: &mut Builder, path: &[S], words: &crate::words
     let mut first = 0;
     if total > bound {
         let mark = words
-            .book
-            .say(words.language, crate::owner_authority_words::AuthorityPhrase::OmittedSegments.id(), &[])
+            .book()
+            .say(words.language(), crate::owner_authority_words::AuthorityPhrase::OmittedSegments.id(), &[])
             .expect("checked path mark")
             .text;
         first = path.len();

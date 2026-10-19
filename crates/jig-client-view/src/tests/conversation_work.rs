@@ -20,8 +20,8 @@ fn words() -> &'static Words {
     WORDS.get_or_init(|| {
         let mut language = crate::phrases::english::language();
         language.wall = skein_ui::phrases::WallFormat::Nanos;
-        Words {
-            book: skein_ui::phrases::Phrasebook::load(
+        Words::new(
+            skein_ui::phrases::Phrasebook::load(
                 crate::phrases::jig::shapes(CLIENT.text),
                 Box::new([language]),
                 &skein_ui::phrases::PhraseLimits {
@@ -34,9 +34,9 @@ fn words() -> &'static Words {
                 },
             )
             .unwrap(),
-            language: 0,
-            offset_minutes: 0,
-        }
+            0,
+            0,
+        )
     })
 }
 fn selected() -> &'static Words {
@@ -55,8 +55,8 @@ fn selected() -> &'static Words {
                 }
             }
         }
-        Words {
-            book: skein_ui::phrases::Phrasebook::load(
+        Words::new(
+            skein_ui::phrases::Phrasebook::load(
                 crate::phrases::jig::shapes(CLIENT.text),
                 Box::new([crate::phrases::english::language(), language]),
                 &skein_ui::phrases::PhraseLimits {
@@ -69,9 +69,9 @@ fn selected() -> &'static Words {
                 },
             )
             .unwrap(),
-            language: 1,
-            offset_minutes: 0,
-        }
+            1,
+            0,
+        )
     })
 }
 fn report(work: OwnerChipWork, started: Option<Wall>) -> OwnerChipObservation {
@@ -155,7 +155,7 @@ fn owner_work_activity_without_synthetic_context_shows_all_seven_reports_and_ind
             assert!(contains(&tree, b"Work reported at: 47"));
             assert_eq!(contains(&tree, b"Actual run start unavailable"), started.is_none());
             if let Some(at) = started {
-                let caption = words().book.say(0, P::Started.id(), &[skein_ui::phrases::Hole::Wall(at)]).unwrap();
+                let caption = words().book().say(0, P::Started.id(), &[skein_ui::phrases::Hole::Wall(at)]).unwrap();
                 assert!(contains(&tree, &caption.text));
             }
             match work {

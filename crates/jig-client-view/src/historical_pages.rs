@@ -39,7 +39,7 @@ pub fn spend_nodes(l: &Limits) -> Option<u32> {
     l.rows.checked_mul(18)?.checked_add(2)
 }
 fn envelope(nodes: u32, l: &Limits, words: &Words) -> Option<HistoricalFragment> {
-    let phrase = crate::phrases::jig_capacity(&words.book)?;
+    let phrase = words.jig_capacity()?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(HistoricalFragment {
         nodes,
@@ -136,7 +136,11 @@ pub fn spend_required(page: &OwnerSpendPage, l: &Limits, words: &Words) -> Optio
     spend_worst_case(l, words)
 }
 fn saying(words: &Words, phrase: P, holes: &[Hole]) -> Box<[u8]> {
-    words.book.say(words.language, phrase.id(), holes).expect("checked historical words and typed source holes").text
+    words
+        .book()
+        .say(words.language(), phrase.id(), holes)
+        .expect("checked historical words and typed source holes")
+        .text
 }
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
     b.text(Run::Plain, &saying(words, phrase, holes));
@@ -186,19 +190,21 @@ pub fn ended_render(
 }
 fn funder_name(value: Funder, words: &Words) -> Box<[u8]> {
     let saying = match value {
-        Funder::Task(task) => words.book.say(words.language, Word::Decision(D::FunderTask).id(), &[Hole::Number(task)]),
-        Funder::Pool { project, person, period } => words.book.say(
-            words.language,
+        Funder::Task(task) => {
+            words.book().say(words.language(), Word::Decision(D::FunderTask).id(), &[Hole::Number(task)])
+        }
+        Funder::Pool { project, person, period } => words.book().say(
+            words.language(),
             Word::Decision(D::FunderPool).id(),
             &[Hole::Number(u64::from(project)), Hole::Number(person), Hole::Number(period)],
         ),
-        Funder::Recurring { project, task, period } => words.book.say(
-            words.language,
+        Funder::Recurring { project, task, period } => words.book().say(
+            words.language(),
             Word::Decision(D::FunderRecurring).id(),
             &[Hole::Number(u64::from(project)), Hole::Number(task), Hole::Number(period)],
         ),
-        Funder::Period { project, period } => words.book.say(
-            words.language,
+        Funder::Period { project, period } => words.book().say(
+            words.language(),
             Word::Decision(D::FunderPeriod).id(),
             &[Hole::Number(u64::from(project)), Hole::Number(period)],
         ),

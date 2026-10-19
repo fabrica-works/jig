@@ -315,8 +315,8 @@ fn card(b: &mut Builder, card: &Card, words: &Words, jig: &jig_client_view::word
             first::Answer::Refused(refusal) => jig.refusal(b, refusal.refusal(), text_limit),
             first::Answer::Connector(value) => {
                 let saying = jig
-                    .book
-                    .say(jig.language, crate::connector_values_words::Word::Answer.id(), &[])
+                    .book()
+                    .say(jig.language(), crate::connector_values_words::Word::Answer.id(), &[])
                     .expect("checked application terminal name");
                 b.open(Role::Status);
                 b.name(&saying.text);

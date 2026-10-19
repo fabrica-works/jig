@@ -19,12 +19,11 @@ fn doc(bytes: &[u8], cut: bool) -> DocumentText {
 fn words() -> Words {
     let mut language = crate::phrases::english::language();
     language.wall = skein_ui::phrases::WallFormat::Nanos;
-    Words {
-        book: Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([language]), &phrase_limits())
-            .unwrap(),
-        language: 0,
-        offset_minutes: 0,
-    }
+    Words::new(
+        Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([language]), &phrase_limits()).unwrap(),
+        0,
+        0,
+    )
 }
 fn phrase_limits() -> PhraseLimits {
     PhraseLimits {
@@ -101,7 +100,7 @@ fn has(tree: &Tree, bytes: &[u8]) -> bool {
     })
 }
 fn caption(tree: &Tree, w: &Words, p: P, holes: &[Hole]) {
-    assert!(has(tree, &w.book.say(w.language, p.id(), holes).unwrap().text));
+    assert!(has(tree, &w.book().say(w.language(), p.id(), holes).unwrap().text));
 }
 #[test]
 fn historical_ended_view_keeps_all_owner_causes_requesters_optional_times_loss_and_empty_title_identity() {
@@ -236,16 +235,12 @@ fn historical_checked_selected_language_has_no_fallback_and_rejects_a_missing_nu
             }
         }
     }
-    let w = Words {
-        book: Phrasebook::load(
-            crate::phrases::jig::shapes(CLIENT.text),
-            Box::new([english, selected]),
-            &phrase_limits(),
-        )
-        .unwrap(),
-        language: 1,
-        offset_minutes: 0,
-    };
+    let w = Words::new(
+        Phrasebook::load(crate::phrases::jig::shapes(CLIENT.text), Box::new([english, selected]), &phrase_limits())
+            .unwrap(),
+        1,
+        0,
+    );
     let page = ended(OwnerChipEnding::Failed(doc(b"source failure", true)), None);
     let tree = ended_tree(&page, &w, None);
     assert!(has(&tree, b"selected history "));

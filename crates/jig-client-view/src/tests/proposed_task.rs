@@ -220,15 +220,15 @@ fn exact_contracts_keep_approval_state_verdict_fields_and_each_result_bound() {
 fn normal_words_adjust_extreme_public_offsets_by_saturating_the_wall_instant() {
     let mut words = words().clone();
     for offset in [i32::MAX, i32::MIN] {
-        words.offset_minutes = offset;
+        words.set_offset_minutes(offset);
         for instant in [skein_lib::Wall::EPOCH, skein_lib::Wall::from_nanos(u64::MAX)] {
             let expected = if offset > 0_i32 { u64::MAX } else { 0 };
             assert_eq!(words.adjusted_wall(instant).as_nanos(), expected);
         }
     }
-    words.offset_minutes = 60_i32;
+    words.set_offset_minutes(60_i32);
     assert_eq!(words.adjusted_wall(skein_lib::Wall::EPOCH).as_nanos(), 3_600_000_000_000);
-    words.offset_minutes = -60_i32;
+    words.set_offset_minutes(-60_i32);
     assert_eq!(words.adjusted_wall(skein_lib::Wall::from_nanos(7_200_000_000_000)).as_nanos(), 3_600_000_000_000);
 }
 
@@ -294,11 +294,11 @@ fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_langu
         .collect::<Vec<_>>()
         .into_boxed_slice();
     Phrasebook::load(shapes(CLIENT.text), Box::new([english::language(), incomplete]), &limits).unwrap_err();
-    let words = crate::words::Words {
-        book: Phrasebook::load(shapes(CLIENT.text), Box::new([english::language(), selected]), &limits).unwrap(),
-        language: 1,
-        offset_minutes: 60,
-    };
+    let words = crate::words::Words::new(
+        Phrasebook::load(shapes(CLIENT.text), Box::new([english::language(), selected]), &limits).unwrap(),
+        1,
+        60,
+    );
     let limits = crate::limits::of_words(&CLIENT, &words).unwrap();
     assert!(limits.text_per_node >= 2048, "owner saying capacities contribute to normal tree limits");
     let mut b = Builder::new(&limits);

@@ -17,7 +17,7 @@ use skein_ui::{Builder, Role, Run};
 use skein_lib::{List, Wall};
 
 fn text(b: &mut Builder, words: &Words, word: Word, holes: &[Hole]) {
-    let saying = words.book.say(words.language, word.id(), holes).expect("checked owner phrase and supplied holes");
+    let saying = words.book().say(words.language(), word.id(), holes).expect("checked owner phrase and supplied holes");
     b.text(Run::Plain, &saying.text);
 }
 fn number(b: &mut Builder, words: &Words, word: Word, value: u64) {
@@ -27,7 +27,7 @@ fn wall(b: &mut Builder, words: &Words, word: Word, value: Wall) {
     text(b, words, word, &[Hole::Wall(value)]);
 }
 fn region(b: &mut Builder, words: &Words, word: Word) {
-    let saying = words.book.say(words.language, word.id(), &[]).expect("checked owner region phrase");
+    let saying = words.book().say(words.language(), word.id(), &[]).expect("checked owner region phrase");
     b.open(Role::Region);
     b.name(&saying.text);
 }
@@ -330,10 +330,10 @@ pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<skein_ui:
     let nodes = document_nodes(limits)?.max(answer_nodes()).checked_add(1)?;
     let mut phrase = jig_client_view::literal_segment::max_bytes(limits.segment_bytes)?;
     for word in ALL {
-        phrase = phrase.max(words.book.capacity(word.id())?);
+        phrase = phrase.max(words.book().capacity(word.id())?);
     }
     for word in jig_client_view::phrases::jig::ALL {
-        phrase = phrase.max(words.book.capacity(word.id())?);
+        phrase = phrase.max(words.book().capacity(word.id())?);
     }
     Some(skein_ui::Limits {
         nodes,
@@ -356,6 +356,6 @@ pub fn requirements(limits: &ConnectorLimits, words: &Words) -> Option<skein_ui:
 #[must_use]
 pub fn worst_case(limits: &ConnectorLimits, words: &Words) -> Option<u64> {
     jig_client_view::limits::jig_worst_case(&requirements(limits, words)?)?
-        .checked_add(skein_ui::phrases::worst_case(words.book.limits())?)?
+        .checked_add(skein_ui::phrases::worst_case(words.book().limits())?)?
         .checked_add(u64::from(jig_client_view::literal_segment::max_bytes(limits.segment_bytes)?))
 }

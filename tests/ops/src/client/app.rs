@@ -90,11 +90,11 @@ fn phrasebooks(limits: &domain::Limits) -> Books {
         .entry((limits.jig.text, limits.observability.text, limits.infrastructure.text))
         .or_insert_with(|| {
             (
-                jig_client_view::words::Words {
-                    book: jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
-                    language: 0,
-                    offset_minutes: 0,
-                },
+                jig_client_view::words::Words::new(
+                    jig_client_view::phrases::english::english(limits.jig.text).expect("English fits"),
+                    0,
+                    0,
+                ),
                 view::words::Words::english(number(Connector::Observability), limits.observability.text)
                     .expect("incident English fits"),
                 view::words::Words::english(number(Connector::Infrastructure), limits.infrastructure.text)

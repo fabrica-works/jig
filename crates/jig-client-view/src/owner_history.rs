@@ -171,7 +171,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<HistoryFragment> {
     let nodes = max_nodes(limits)?;
-    let phrase = crate::phrases::jig_capacity(&words.book)?;
+    let phrase = words.jig_capacity()?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(phrase).checked_mul(2)?;
     let bindings = limits.rows.checked_mul(limits.rows.checked_add(1)?)?.max(1);
     Some(HistoryFragment {
@@ -185,7 +185,7 @@ pub fn worst_case(limits: &Limits, words: &Words) -> Option<HistoryFragment> {
 }
 fn saying(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
     let value =
-        words.book.say(words.language, phrase.id(), holes).expect("checked immutable history sayings and holes");
+        words.book().say(words.language(), phrase.id(), holes).expect("checked immutable history sayings and holes");
     b.text(Run::Plain, &value.text);
 }
 fn change(b: &mut Builder, value: OwnerHistoryChange, words: &Words) {
@@ -258,7 +258,7 @@ fn retained_amendment(b: &mut Builder, value: &OwnerRetainedAmendment, words: &W
     match &value.wake {
         Some(value) => {
             saying(b, words, P::Wake, &[]);
-            crate::owner_wake::policy(b, value, &words.book, words.language);
+            crate::owner_wake::policy(b, value, words.book(), words.language());
         }
         None => saying(b, words, P::WakeAbsent, &[]),
     }
@@ -326,7 +326,7 @@ fn action(b: &mut Builder, value: &OwnerRetainedAction, words: &Words, bindings:
 pub fn render(b: &mut Builder, value: &OwnerHistoryLine, words: &Words, bindings: &mut JigBindings, rows: u32) {
     let text_limit = bindings.text_limit();
     b.open(Role::Region);
-    let name = words.book.say(words.language, P::History.id(), &[]).expect("history heading checked");
+    let name = words.book().say(words.language(), P::History.id(), &[]).expect("history heading checked");
     b.name(&name.text);
     saying(b, words, P::Task, &[Hole::Number(value.task)]);
     saying(b, words, P::Revision, &[Hole::Number(value.revision)]);

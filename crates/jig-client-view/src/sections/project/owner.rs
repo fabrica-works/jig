@@ -136,7 +136,7 @@ fn historical_nodes(l: &Limits, card: u32) -> Option<u32> {
 #[must_use]
 pub fn worst_case(l: &Limits, words: &Words) -> Option<ProjectFragment> {
     let nodes = max_nodes(l)?;
-    let saying = crate::phrases::jig_capacity(&words.book)?;
+    let saying = words.jig_capacity()?;
     let text_per_node = saying.max(crate::literal_segment::max_bytes(l.text)?).checked_mul(2)?;
     Some(ProjectFragment {
         nodes,
@@ -246,12 +246,12 @@ fn chip_fits(value: &jig_client::contract::Chip, l: &Limits, words: &Words) -> O
     Some(())
 }
 fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
-    let text = words.book.say(words.language, phrase.id(), holes).expect("checked project words").text;
+    let text = words.book().say(words.language(), phrase.id(), holes).expect("checked project words").text;
     b.text(Run::Plain, &text);
 }
 fn region(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
     b.open(Role::Region);
-    let text = words.book.say(words.language, phrase.id(), holes).expect("checked project region").text;
+    let text = words.book().say(words.language(), phrase.id(), holes).expect("checked project region").text;
     b.name(&text);
 }
 fn policy(b: &mut Builder, value: &OwnerProjectPolicy, words: &Words, text_limit: u32, rows: u32) {
@@ -615,7 +615,7 @@ fn request_field(b: &mut Builder, ask: &Ask, field: Field, value: u64, words: &W
 }
 fn control(b: &mut Builder, ask: &Ask, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Button);
-    let label = words.book.say(words.language, P::Edit.id(), &[]).expect("project edit label").text;
+    let label = words.book().say(words.language(), P::Edit.id(), &[]).expect("project edit label").text;
     b.name(&label);
     b.bind(bindings.insert(JigMeaning::Action(owner_form::action(ask.clone()))));
     b.close();
@@ -1152,7 +1152,7 @@ fn service_form(
     if let Some(role) = state.service_role {
         words.held_role(b, Some(role));
         b.open(Role::TextField);
-        let name = words.book.say(words.language, P::Name.id(), &[]).expect("checked service name").text;
+        let name = words.book().say(words.language(), P::Name.id(), &[]).expect("checked service name").text;
         b.name(&name);
         if let Some(ask) = &state.review
             && let Some((name, chosen)) = service_request(ask)
@@ -1167,8 +1167,11 @@ fn service_form(
 }
 fn remove_control(b: &mut Builder, ask: &Ask, index: u32, words: &Words, bindings: &mut JigBindings) {
     b.open(Role::Button);
-    let label =
-        words.book.say(words.language, P::Remove.id(), &[Hole::Number(u64::from(index))]).expect("checked remove").text;
+    let label = words
+        .book()
+        .say(words.language(), P::Remove.id(), &[Hole::Number(u64::from(index))])
+        .expect("checked remove")
+        .text;
     b.name(&label);
     b.bind(bindings.insert(JigMeaning::Action(owner_form::action(ask.clone()))));
     b.close();

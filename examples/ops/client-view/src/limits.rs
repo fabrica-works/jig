@@ -85,13 +85,13 @@ pub fn worst_case(
             bindings::worst_case(limits.tree.bindings, domain.infrastructure.text.max(domain.observability.text))?
                 .checked_mul(2)?,
         )?
-        .checked_add(skein_ui::phrases::worst_case(jig.book.limits())?)?
+        .checked_add(skein_ui::phrases::worst_case(jig.book().limits())?)?
         .checked_add(skein_ui::phrases::worst_case(observability.book.limits())?)?
         .checked_add(skein_ui::phrases::worst_case(infrastructure.book.limits())?)?
         .checked_add(u64::from(
             observability
                 .capacity()?
                 .max(infrastructure.capacity()?)
-                .max(jig.book.capacity(jig_client_view::phrases::jig::JigPhrase::LoadingPart.id())?),
+                .max(jig.book().capacity(jig_client_view::phrases::jig::JigPhrase::LoadingPart.id())?),
         ))
 }

@@ -41,9 +41,7 @@ fn phrase_limits(languages: &[Language]) -> PhraseLimits {
 }
 fn words() -> Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
-    WORDS
-        .get_or_init(|| Words { book: crate::phrases::english::english(128).unwrap(), language: 0, offset_minutes: 0 })
-        .clone()
+    WORDS.get_or_init(|| Words::new(crate::phrases::english::english(128).unwrap(), 0, 0)).clone()
 }
 fn chip() -> Chip {
     Chip {
@@ -199,7 +197,7 @@ fn result_words_check_shapes_select_language_and_refuse_insufficient_tree_capaci
     let languages = Box::new([normal, translated]);
     let limits = phrase_limits(languages.as_slice());
     let book = Phrasebook::load(crate::phrases::jig::shapes(128), languages, &limits).unwrap();
-    let words = Words { book, language: 1, offset_minutes: 0 };
+    let words = Words::new(book, 1, 0);
     let tree = build(&details(), &words);
     assert!(has(&tree, b"selected 4294967295"));
     assert!(!has(&tree, b"Follow-up facts unavailable"));

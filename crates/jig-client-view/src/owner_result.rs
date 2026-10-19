@@ -10,7 +10,7 @@ use crate::Borrowed;
 use jig_client::contract::{OwnerRequester, OwnerTaskLink, OwnerTaskStatus, Proposer, ResultDetails};
 
 fn text(b: &mut Builder, words: &Words, phrase: ResultPhrase, holes: &[Hole]) {
-    let saying = words.book.say(words.language, phrase.id(), holes).expect("result words and typed holes checked");
+    let saying = words.book().say(words.language(), phrase.id(), holes).expect("result words and typed holes checked");
     b.text(Run::Plain, &saying.text);
 }
 pub(crate) fn requester(b: &mut Builder, value: OwnerRequester, words: &Words) {
@@ -63,7 +63,7 @@ pub fn render(
     bindings: &mut JigBindings,
 ) {
     b.open(Role::Region);
-    let saying = words.book.say(words.language, ResultPhrase::Details.id(), &[]).expect("result heading checked");
+    let saying = words.book().say(words.language(), ResultPhrase::Details.id(), &[]).expect("result heading checked");
     b.name(&saying.text);
     text(b, words, ResultPhrase::Contract, &[]);
     crate::proposed_task::contract(b, &value.contract, words, bindings);
@@ -116,7 +116,7 @@ pub fn nodes(limits: &crate::Limits) -> Option<u32> {
 #[must_use]
 pub fn limits(client: &crate::Limits, words: &Words) -> Option<skein_ui::Limits> {
     let nodes = nodes(client)?;
-    let phrase = crate::phrases::jig_capacity(&words.book)?;
+    let phrase = words.jig_capacity()?;
     let text_per_node = phrase.checked_mul(2)?.checked_add(crate::literal_segment::max_bytes(client.text)?)?;
     Some(skein_ui::Limits {
         nodes,

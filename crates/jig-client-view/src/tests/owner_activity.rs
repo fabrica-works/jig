@@ -67,11 +67,11 @@ fn words(selected: bool) -> Words {
     } else {
         Box::new([english])
     };
-    Words {
-        book: Phrasebook::load(crate::phrases::jig::shapes(8), languages, &phrase_limits()).unwrap(),
-        language: u16::from(selected),
-        offset_minutes: 0,
-    }
+    Words::new(
+        Phrasebook::load(crate::phrases::jig::shapes(8), languages, &phrase_limits()).unwrap(),
+        u16::from(selected),
+        0,
+    )
 }
 fn tree_limits(f: view::ActivityFragment) -> Limits {
     Limits {
@@ -451,7 +451,7 @@ fn assert_time_presentation() {
         Box::new([(1_i32, b"Recorded at: 60000000123"), (0_i32, b"Recorded at: 123"), (-1_i32, b"Recorded at: 0")]);
     for (offset, label) in presentations {
         let mut words = normal_words().clone();
-        words.offset_minutes = offset;
+        words.set_offset_minutes(offset);
         assert!(has(&build_word(&value, &words), label));
         let line = OwnerActivityLine { at: value.at, ..activity(OwnerActivity::Heard(value.clone())) };
         assert!(has(&build(&line, &words), label));
@@ -590,7 +590,7 @@ fn owner_activity_selected_normal_language_and_full_opaque_tree_envelope_refuse_
     let cloned = selected.clone();
     assert_eq!(build(&value, &cloned).nodes(), tree.nodes());
     for phrase in data::ALL {
-        assert!(selected.book.capacity(phrase.id()).is_some());
+        assert!(selected.book().capacity(phrase.id()).is_some());
     }
     assert!(view::required(&value, &crate::Limits { text: 7, ..client_limits() }, &selected).is_none());
     assert!(view::required(&value, &crate::Limits { rows: 2, ..client_limits() }, &selected).is_none());

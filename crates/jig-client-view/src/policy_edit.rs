@@ -23,12 +23,12 @@ impl PolicyFragment {
         Some(())
     }
     fn phrase(&mut self, words: &Words, phrase: JigPhrase) -> Option<()> {
-        self.leaf(words.book.capacity(phrase.id())?)
+        self.leaf(words.book().capacity(phrase.id())?)
     }
     fn pattern(&mut self, pattern: &OwnerPattern, words: &Words) -> Option<()> {
         self.text_per_node = self
             .text_per_node
-            .max(words.book.capacity(crate::owner_authority_words::AuthorityPhrase::OmittedSegments.id())?);
+            .max(words.book().capacity(crate::owner_authority_words::AuthorityPhrase::OmittedSegments.id())?);
         for segment in &pattern.segments {
             self.leaf(crate::literal_segment::display_bytes(segment)?)?;
         }
@@ -36,7 +36,7 @@ impl PolicyFragment {
             OwnerPatternEnd::Exact(bytes) => (crate::owner_authority_words::AuthorityPhrase::Exact, bytes),
             OwnerPatternEnd::Open(bytes) => (crate::owner_authority_words::AuthorityPhrase::Open, bytes),
         };
-        self.leaf(words.book.capacity(phrase.id())?)?;
+        self.leaf(words.book().capacity(phrase.id())?)?;
         self.leaf(crate::literal_segment::display_bytes(bytes)?)
     }
 }
@@ -51,7 +51,7 @@ pub fn required(value: &PolicyEdit, words: &Words, rows: u32) -> Option<PolicyFr
         PolicyEdit::Projections { .. } => JigPhrase::PolicyProjections,
         PolicyEdit::Permissions { .. } => JigPhrase::PolicyPermissions,
     };
-    let name_bytes = words.book.capacity(phrase.id())?;
+    let name_bytes = words.book().capacity(phrase.id())?;
     let mut result = PolicyFragment { nodes: 1, text_bytes: name_bytes, text_per_node: name_bytes, depth: 3 };
     match value {
         PolicyEdit::Templates { .. } => {}
@@ -114,7 +114,7 @@ fn pattern(b: &mut Builder, value: &OwnerPattern, words: &Words, text_limit: u32
         OwnerPatternEnd::Exact(bytes) => (crate::owner_authority_words::AuthorityPhrase::Exact, bytes),
         OwnerPatternEnd::Open(bytes) => (crate::owner_authority_words::AuthorityPhrase::Open, bytes),
     };
-    let label = words.book.say(words.language, phrase.id(), &[]).expect("checked terminal label").text;
+    let label = words.book().say(words.language(), phrase.id(), &[]).expect("checked terminal label").text;
     let reserved = u32::try_from(label.len())
         .expect("bounded ending")
         .checked_add(crate::literal_segment::display_bytes(bytes).expect("bounded segment"))

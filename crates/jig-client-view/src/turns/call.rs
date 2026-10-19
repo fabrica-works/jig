@@ -88,8 +88,8 @@ pub(super) fn raw(
     let open = client.conversation().current_fold(&call.identity) == Fold::Open;
     b.open(Role::Region);
     let region = words
-        .book
-        .say(words.language, crate::live_call_words::LiveCallPhrase::ObservedCurrentCall.id(), &[])
+        .book()
+        .say(words.language(), crate::live_call_words::LiveCallPhrase::ObservedCurrentCall.id(), &[])
         .expect("checked observed call label")
         .text;
     b.name(&region);
@@ -103,7 +103,7 @@ pub(super) fn raw(
     } else {
         crate::live_call_words::LiveCallPhrase::OpenCurrentCallInput
     };
-    let label = words.book.say(words.language, phrase.id(), &[]).expect("checked live input control").text;
+    let label = words.book().say(words.language(), phrase.id(), &[]).expect("checked live input control").text;
     b.open(Role::Button);
     b.name(&label);
     if open {

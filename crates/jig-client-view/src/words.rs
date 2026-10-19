@@ -21,11 +21,52 @@ use skein_ui::{Builder, Role, Run};
 /// Checked words and the person's time presentation for one tree build.
 #[derive(Clone, Debug)]
 pub struct Words {
-    pub book: Phrasebook,
-    pub language: u16,
-    pub offset_minutes: i32,
+    book: Phrasebook,
+    language: u16,
+    offset_minutes: i32,
+    jig_capacity: Option<u32>,
 }
 impl Words {
+    /// Keep the whole vocabulary envelope with its checked book.
+    #[must_use]
+    pub fn new(book: Phrasebook, language: u16, offset_minutes: i32) -> Self {
+        let jig_capacity = crate::phrases::jig_capacity(&book);
+        Self { book, language, offset_minutes, jig_capacity }
+    }
+    /// The checked book, shared so its envelope cannot become stale.
+    #[must_use]
+    pub fn book(&self) -> &Phrasebook {
+        &self.book
+    }
+    /// Replace the book and its whole vocabulary envelope together.
+    pub fn set_book(&mut self, book: Phrasebook) {
+        let jig_capacity = crate::phrases::jig_capacity(&book);
+        self.book = book;
+        self.jig_capacity = jig_capacity;
+    }
+    /// The complete jig envelope across every loaded language.
+    #[must_use]
+    pub fn jig_capacity(&self) -> Option<u32> {
+        self.jig_capacity
+    }
+    /// The language selected for sayings.
+    #[must_use]
+    pub fn language(&self) -> u16 {
+        self.language
+    }
+    /// Select a language without changing the whole vocabulary envelope.
+    pub fn set_language(&mut self, language: u16) {
+        self.language = language;
+    }
+    /// The person's offset from UTC, in minutes.
+    #[must_use]
+    pub fn offset_minutes(&self) -> i32 {
+        self.offset_minutes
+    }
+    /// Change the person's offset without changing the vocabulary envelope.
+    pub fn set_offset_minutes(&mut self, offset_minutes: i32) {
+        self.offset_minutes = offset_minutes;
+    }
     /// Say one phrase in the selected language; mis-sized facts are a caller bug.
     #[must_use]
     pub fn say(&self, phrase: JigPhrase, holes: &[Hole]) -> Box<[u8]> {
@@ -42,7 +83,7 @@ impl Words {
         b.text(Run::Plain, &text);
     }
     pub(crate) fn node_text(&self, text: u32) -> u32 {
-        let phrase = match crate::phrases::jig_capacity(&self.book) {
+        let phrase = match self.jig_capacity() {
             Some(phrase) => phrase,
             None => {
                 let mut largest = 0;

@@ -109,7 +109,7 @@ fn bounded_world_storage_survives_the_jig_envelopes_text_overflow() {
     let first = super::family_words();
     let envelope = jig_client_view::limits::envelope(
         &domain.jig,
-        jig_client_view::phrases::jig_capacity(&jig.book).unwrap(),
+        jig.jig_capacity().unwrap(),
         &jig_client_view::page::Arrangement::none(),
         0,
         0,

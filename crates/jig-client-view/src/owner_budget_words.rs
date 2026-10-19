@@ -198,7 +198,7 @@ impl OwnerBudgetWords {
             return Err(Invalid::Overflow);
         }
         let book = Phrasebook::load(standalone_shapes(), languages, limits)?;
-        Ok(Self { words: Words { book, language, offset_minutes } })
+        Ok(Self { words: Words::new(book, language, offset_minutes) })
     }
     /// Borrow the same selected language and offset; no second book or fallback.
     #[must_use]

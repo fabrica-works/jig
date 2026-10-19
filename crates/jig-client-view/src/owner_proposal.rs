@@ -130,7 +130,7 @@ pub fn max_nodes(limits: &Limits) -> Option<u32> {
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<ProposalFragment> {
     let nodes = max_nodes(limits)?;
-    let phrase = crate::phrases::jig_capacity(&words.book)?;
+    let phrase = words.jig_capacity()?;
     let text_per_node = phrase.max(crate::literal_segment::max_bytes(limits.text)?).checked_mul(2)?;
     Some(ProposalFragment {
         nodes,
@@ -142,8 +142,10 @@ pub fn worst_case(limits: &Limits, words: &Words) -> Option<ProposalFragment> {
     })
 }
 fn saying(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
-    let value =
-        words.book.say(words.language, phrase.id(), holes).expect("checked pending proposal sayings and typed holes");
+    let value = words
+        .book()
+        .say(words.language(), phrase.id(), holes)
+        .expect("checked pending proposal sayings and typed holes");
     b.text(Run::Plain, &value.text);
 }
 /// Render the five exact supplied action kinds without historical joins or routing guesses.
@@ -223,7 +225,7 @@ pub fn render(
     bindings: &mut JigBindings,
 ) {
     b.open(Role::Region);
-    let name = words.book.say(words.language, P::Proposal.id(), &[]).expect("checked proposal region name");
+    let name = words.book().say(words.language(), P::Proposal.id(), &[]).expect("checked proposal region name");
     b.name(&name.text);
     saying(b, words, P::Number, &[Hole::Number(value.key.number)]);
     saying(b, words, P::Project, &[Hole::Number(u64::from(value.project))]);

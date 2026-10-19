@@ -211,8 +211,8 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
             }
         }
     }
-    let w = Words {
-        book: Phrasebook::load(
+    let w = Words::new(
+        Phrasebook::load(
             crate::phrases::jig::shapes(256),
             Box::new([english, selected]),
             &PhraseLimits {
@@ -225,9 +225,9 @@ fn owner_tree_view_uses_checked_selected_language_and_finite_node_text_scratch_e
             },
         )
         .unwrap(),
-        language: 1,
-        offset_minutes: 0,
-    };
+        1,
+        0,
+    );
     let tree = build(&value, &d, &w, None);
     assert!(contains(&tree, b"selected tree "));
     assert!(!contains(&tree, b"Plan subtree"));

@@ -111,8 +111,8 @@ fn context(b: &mut Builder, client: &Borrowed<'_>, object: &Object, words: &Word
         Some(Body::Historical(_)) => b.text(
             Run::Plain,
             &words
-                .book
-                .say(words.language, crate::owner_historical_words::HistoricalPhrase::Historical.id(), &[])
+                .book()
+                .say(words.language(), crate::owner_historical_words::HistoricalPhrase::Historical.id(), &[])
                 .expect("checked passive historical caption")
                 .text,
         ),

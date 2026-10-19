@@ -431,7 +431,7 @@ fn connector_values_view_selected_checked_language_covers_owner_values_and_reord
         &PhraseLimits { languages: 2, phrases: count, holes: 4, segments, text_bytes, hole_bytes: 64 },
     )
     .unwrap();
-    let mut words = jig_client_view::words::Words { book, language: 1, offset_minutes: 0 };
+    let mut words = jig_client_view::words::Words::new(book, 1, 0);
     let tree = document(
         ClientDocument::Object { object: 1, now: ApplicationObject { revision: 2, value: 3 } },
         Scope::Project(4),
@@ -446,7 +446,7 @@ fn connector_values_view_selected_checked_language_covers_owner_values_and_reord
         },
     };
     expect(&answer(value, &words), &[b"19 requis, 7 disponibles", b"Proposal eligibility not supplied"]);
-    words.language = 0;
+    words.set_language(0);
     expect(
         &document(
             ClientDocument::Object { object: 1, now: ApplicationObject { revision: 2, value: 3 } },
@@ -549,7 +549,7 @@ fn connector_values_view_the_capacity_envelope_covers_full_rows_paths_and_escape
     overflow = limits();
     overflow.segment_bytes = u32::MAX;
     assert!(render::requirements(&overflow, &words).is_none());
-    assert!(words.book.capacity(Word::Value.id()).unwrap() <= bound.text_per_node);
+    assert!(words.book().capacity(Word::Value.id()).unwrap() <= bound.text_per_node);
 }
 #[test]
 fn connector_values_view_exact_core_refusals_cover_all_admission_categories_and_eligibility_states() {

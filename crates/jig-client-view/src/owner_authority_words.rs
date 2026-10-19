@@ -178,17 +178,17 @@ impl OwnerAuthorityWords {
             return Err(Invalid::Overflow);
         }
         let book = Phrasebook::load(shapes(), languages, limits)?;
-        Ok(Self { words: crate::words::Words { book, language, offset_minutes } })
+        Ok(Self { words: crate::words::Words::new(book, language, offset_minutes) })
     }
     /// Maximum saying capacity across all loaded languages.
     #[must_use]
     pub fn capacity(&self, phrase: AuthorityPhrase) -> u32 {
-        self.words.book.capacity(phrase.id()).expect("whole closed phrasebook checked")
+        self.words.book().capacity(phrase.id()).expect("whole closed phrasebook checked")
     }
     /// Say a checked phrase using typed holes in the selected language.
     #[must_use]
     pub fn say(&self, phrase: AuthorityPhrase, holes: &[Hole]) -> Box<[u8]> {
-        self.words.book.say(self.words.language, phrase.id(), holes).expect("checked phrase and typed facts").text
+        self.words.book().say(self.words.language(), phrase.id(), holes).expect("checked phrase and typed facts").text
     }
     /// Apply the person's UTC offset before the language formats the instant.
     #[must_use]

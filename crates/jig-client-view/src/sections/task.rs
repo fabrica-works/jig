@@ -243,8 +243,8 @@ pub(crate) fn overview(b: &mut Builder, client: &Borrowed<'_>, doc: &Task, words
     if doc.cut {
         words.text(b, JigPhrase::TaskListsCut, &[]);
     }
-    crate::owner_wake::policy(b, &doc.wake, &words.book, words.language);
-    crate::owner_wake::subscriptions(b, &doc.subscriptions, &words.book, words.language);
+    crate::owner_wake::policy(b, &doc.wake, words.book(), words.language());
+    crate::owner_wake::subscriptions(b, &doc.subscriptions, words.book(), words.language());
     for link in &doc.dependencies {
         task_link(b, client, link, words, bindings);
     }

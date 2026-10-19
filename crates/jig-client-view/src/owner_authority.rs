@@ -19,7 +19,7 @@ pub struct AuthorityFragment {
 }
 impl AuthorityFragment {
     fn phrase(&mut self, words: &Words, phrase: AuthorityPhrase) -> Option<()> {
-        self.leaf(words.book.capacity(phrase.id())?)
+        self.leaf(words.book().capacity(phrase.id())?)
     }
     fn leaf(&mut self, bytes: u32) -> Option<()> {
         self.nodes = self.nodes.checked_add(1)?;
@@ -28,7 +28,7 @@ impl AuthorityFragment {
         Some(())
     }
     fn pattern(&mut self, pattern: &OwnerPattern, words: &Words) -> Option<()> {
-        self.text_per_node = self.text_per_node.max(words.book.capacity(AuthorityPhrase::OmittedSegments.id())?);
+        self.text_per_node = self.text_per_node.max(words.book().capacity(AuthorityPhrase::OmittedSegments.id())?);
         self.phrase(words, AuthorityPhrase::Segments)?;
         for segment in &pattern.segments {
             self.leaf(crate::literal_segment::display_bytes(segment)?)?;
@@ -104,7 +104,7 @@ pub fn document_required_words(value: &OwnerAuthorityDocument, words: &Words, ro
 pub fn worst_case_words(rows: u32, segments: u32, text: u32, words: &Words) -> Option<AuthorityFragment> {
     let mut phrase = 0;
     for id in crate::owner_authority_words::ALL {
-        phrase = phrase.max(words.book.capacity(id.id())?);
+        phrase = phrase.max(words.book().capacity(id.id())?);
     }
     let patterns = rows.checked_mul(2)?;
     let raw = segments.checked_add(1)?.checked_mul(patterns)?;
@@ -115,7 +115,7 @@ pub fn worst_case_words(rows: u32, segments: u32, text: u32, words: &Words) -> O
     Some(AuthorityFragment { nodes, text_bytes, text_per_node: text.max(phrase), depth: 2 })
 }
 fn text(b: &mut Builder, words: &Words, phrase: AuthorityPhrase, holes: &[Hole]) {
-    let saying = words.book.say(words.language, phrase.id(), holes).expect("checked authority words and facts");
+    let saying = words.book().say(words.language(), phrase.id(), holes).expect("checked authority words and facts");
     b.text(Run::Plain, &saying.text);
 }
 fn number(b: &mut Builder, words: &Words, phrase: AuthorityPhrase, value: u64) {
@@ -127,7 +127,7 @@ pub(crate) fn pattern(b: &mut Builder, words: &Words, value: &OwnerPattern, text
         OwnerPatternEnd::Exact(bytes) | OwnerPatternEnd::Open(bytes) => bytes,
     };
     let reserved = u32::try_from(
-        words.book.say(words.language, AuthorityPhrase::Segments.id(), &[]).expect("checked segments").text.len(),
+        words.book().say(words.language(), AuthorityPhrase::Segments.id(), &[]).expect("checked segments").text.len(),
     )
     .expect("bounded phrase")
     .checked_add(crate::literal_segment::display_bytes(last).expect("bounded ending"))

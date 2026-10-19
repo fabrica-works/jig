@@ -91,11 +91,7 @@ fn render(root: &Domain) -> (Tree, JigBindings) {
         scene_marks: 0,
         scene_bytes: 0,
     };
-    let words = jig_client_view::words::Words {
-        book: jig_client_view::phrases::english::english(TEXT).unwrap(),
-        language: 0,
-        offset_minutes: 0,
-    };
+    let words = jig_client_view::words::Words::new(jig_client_view::phrases::english::english(TEXT).unwrap(), 0, 0);
     let mut bindings = JigBindings::new(bounds.bindings, TEXT);
     let mut builder = Builder::new(&bounds);
     builder.open(Role::Page);

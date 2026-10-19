@@ -255,8 +255,8 @@ fn make_words(selected: bool) -> Words {
             }
         }
     }
-    Words {
-        book: Phrasebook::load(
+    Words::new(
+        Phrasebook::load(
             crate::phrases::jig::shapes(32),
             Box::new([first, second]),
             &PhraseLimits {
@@ -269,9 +269,9 @@ fn make_words(selected: bool) -> Words {
             },
         )
         .unwrap(),
-        language: u16::from(selected),
-        offset_minutes: 0,
-    }
+        u16::from(selected),
+        0,
+    )
 }
 fn words(selected: bool) -> &'static Words {
     static NORMAL: std::sync::OnceLock<Words> = std::sync::OnceLock::new();

@@ -488,8 +488,8 @@ fn historical_selected_language_uses_checked_native_captions_and_preserves_opaqu
             }
         }
     }
-    let words = crate::words::Words {
-        book: Phrasebook::load(
+    let words = crate::words::Words::new(
+        Phrasebook::load(
             crate::phrases::jig::shapes(CLIENT.text),
             Box::new([english, selected]),
             &PhraseLimits {
@@ -502,9 +502,9 @@ fn historical_selected_language_uses_checked_native_captions_and_preserves_opaqu
             },
         )
         .unwrap(),
-        language: 1,
-        offset_minutes: 0,
-    };
+        1,
+        0,
+    );
     let value = person();
     let (tree, _) = build(&value, &words);
     assert_eq!(tree.nodes().first().unwrap().name.as_deref(), Some(b"Selected historical source".as_slice()));
@@ -514,7 +514,7 @@ fn historical_selected_language_uses_checked_native_captions_and_preserves_opaqu
     assert!(tree.len() <= f.nodes);
     assert!(tree.nodes().iter().map(crate::tests::text_bytes).sum::<u32>() <= f.text_bytes);
     for phrase in crate::owner_historical_words::ALL {
-        assert!(words.book.capacity(phrase.id()).is_some());
+        assert!(words.book().capacity(phrase.id()).is_some());
     }
 }
 

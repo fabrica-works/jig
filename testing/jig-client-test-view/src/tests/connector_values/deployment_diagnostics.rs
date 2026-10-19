@@ -92,7 +92,7 @@ fn deployment_diagnostic_captions_select_the_checked_language_and_require_both_n
     let bounds = PhraseLimits { languages: 2, phrases: count, holes: 4, segments, text_bytes, hole_bytes: 64 };
     let book =
         Phrasebook::load(words::shapes(phrases::jig::shapes(64)), Box::new([normal, selected]), &bounds).unwrap();
-    let selected_words = jig_client_view::words::Words { book, language: 1, offset_minutes: 0 };
+    let selected_words = jig_client_view::words::Words::new(book, 1, 0);
     let tree = document(value(list(3, [entry()])), Scope::Deployment, &selected_words);
     expect(
         &tree,

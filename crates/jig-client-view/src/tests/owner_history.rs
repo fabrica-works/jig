@@ -190,8 +190,8 @@ pub(super) fn words(selected: bool) -> Words {
     } else {
         Box::new([english])
     };
-    Words {
-        book: Phrasebook::load(
+    Words::new(
+        Phrasebook::load(
             crate::phrases::jig::shapes(8),
             languages,
             &PhraseLimits {
@@ -204,9 +204,9 @@ pub(super) fn words(selected: bool) -> Words {
             },
         )
         .unwrap(),
-        language: u16::from(selected),
-        offset_minutes: 0,
-    }
+        u16::from(selected),
+        0,
+    )
 }
 fn normal_words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
@@ -260,7 +260,7 @@ fn count(tree: &Tree, bytes: &[u8]) -> usize {
     tree.nodes().iter().flat_map(|node| &node.text).filter(|run| run.text.as_ref() == bytes).count()
 }
 fn saying(tree: &Tree, words: &Words, phrase: P, holes: &[Hole]) {
-    let expected = words.book.say(words.language, phrase.id(), holes).unwrap();
+    let expected = words.book().say(words.language(), phrase.id(), holes).unwrap();
     assert!(has(tree, &expected.text));
 }
 #[test]
@@ -542,9 +542,9 @@ fn owner_history_normal_selected_language_checks_all_holes_and_nested_tree_bindi
             };
             holes.push(value).unwrap();
         }
-        assert!(words.book.say(1, phrase.id(), holes.as_slice()).unwrap().text.starts_with(b"selected history: "));
+        assert!(words.book().say(1, phrase.id(), holes.as_slice()).unwrap().text.starts_with(b"selected history: "));
         assert_eq!(
-            words.book.say(1, phrase.id(), &[Hole::Name(copy_of(b"wrong"))]).unwrap_err(),
+            words.book().say(1, phrase.id(), &[Hole::Name(copy_of(b"wrong"))]).unwrap_err(),
             Invalid::Values { id: phrase.id() }
         );
     }

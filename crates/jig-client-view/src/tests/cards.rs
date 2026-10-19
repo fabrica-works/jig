@@ -68,7 +68,7 @@ pub(super) fn limits() -> skein_ui::Limits {
 }
 pub(crate) fn shared_words() -> &'static Words {
     static WORDS: std::sync::OnceLock<Words> = std::sync::OnceLock::new();
-    WORDS.get_or_init(|| Words { book: english::english(CLIENT.text).unwrap(), language: 0, offset_minutes: 60 })
+    WORDS.get_or_init(|| Words::new(english::english(CLIENT.text).unwrap(), 0, 60))
 }
 pub(super) fn words() -> &'static Words {
     shared_words()

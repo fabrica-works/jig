@@ -205,7 +205,7 @@ fn sign_out_words() -> crate::words::Words {
         },
     )
     .unwrap();
-    crate::words::Words { book, language: 0, offset_minutes: 60 }
+    crate::words::Words::new(book, 0, 60)
 }
 
 #[test]

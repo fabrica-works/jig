@@ -13,7 +13,7 @@ use jig_client::contract::{
 };
 
 pub fn text(b: &mut Builder, words: &Words, phrase: ProposedPhrase, holes: &[Hole]) {
-    let saying = words.book.say(words.language, phrase.id(), holes).expect("exact member words were checked");
+    let saying = words.book().say(words.language(), phrase.id(), holes).expect("exact member words were checked");
     b.text(skein_ui::Run::Plain, &saying.text);
 }
 pub fn executor(b: &mut Builder, value: OwnerExecutor, words: &Words) {
@@ -66,7 +66,7 @@ pub fn funder_phrase_bytes(words: &Words) -> Option<u32> {
         Word::Decision(D::FunderRecurring),
         Word::Decision(D::FunderPeriod),
     ] {
-        largest = largest.max(words.book.capacity(phrase.id())?);
+        largest = largest.max(words.book().capacity(phrase.id())?);
     }
     Some(largest)
 }
@@ -82,7 +82,7 @@ pub fn part(b: &mut Builder, value: &OwnerPart, words: &Words, bindings: &mut Ji
         OwnerPartKind::Outbox => ProposedPhrase::PartOutbox,
         OwnerPartKind::Hold => ProposedPhrase::PartHold,
     };
-    let name = words.book.say(words.language, kind.id(), &[]).expect("exact part kind words were checked");
+    let name = words.book().say(words.language(), kind.id(), &[]).expect("exact part kind words were checked");
     b.name(&name.text);
     text(b, words, kind, &[]);
     match &value.key {

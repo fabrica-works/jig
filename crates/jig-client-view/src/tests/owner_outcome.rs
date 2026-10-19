@@ -12,11 +12,7 @@ fn phrase_limits() -> PhraseLimits {
     PhraseLimits { languages: 2, phrases: 55, holes: 1, segments: 200, text_bytes: 8192, hole_bytes: 0 }
 }
 fn words() -> Words {
-    Words {
-        book: Phrasebook::load(phrases::shapes(), Box::new([phrases::english()]), &phrase_limits()).unwrap(),
-        language: 0,
-        offset_minutes: 0,
-    }
+    Words::new(Phrasebook::load(phrases::shapes(), Box::new([phrases::english()]), &phrase_limits()).unwrap(), 0, 0)
 }
 fn render(value: &OwnerOutcome, words: &Words) -> Tree {
     let required = view::required(words).expect("closed fragment fits");
@@ -279,7 +275,7 @@ fn selected_outcome_language_is_checked_and_maximum_fragment_fits() {
     let book =
         Phrasebook::load(phrases::shapes(), Box::new([phrases::english(), selected_language()]), &phrase_limits())
             .unwrap();
-    let words = Words { book, language: 1, offset_minutes: 1 };
+    let words = Words::new(book, 1, 1);
     let value = OwnerOutcome::ProposalDecided {
         proposal: ProposalKey { proposer: Proposer::Party(u64::MAX), number: u64::MAX },
         by: u64::MAX,
@@ -291,9 +287,9 @@ fn selected_outcome_language_is_checked_and_maximum_fragment_fits() {
     assert!(has(&tree, b"selected committed outcome language: 18446744073709551615"));
     assert!(has(&tree, b"selected committed outcome language: 60000000000"));
     assert!(!has(&tree, b"Rejected"));
-    assert_eq!(words.book.say(2, phrases::OutcomePhrase::Rejected.id(), &[]).unwrap_err(), Invalid::Language);
+    assert_eq!(words.book().say(2, phrases::OutcomePhrase::Rejected.id(), &[]).unwrap_err(), Invalid::Language);
     assert_eq!(
-        words.book.say(1, phrases::OutcomePhrase::At.id(), &[Hole::Number(7)]).unwrap_err(),
+        words.book().say(1, phrases::OutcomePhrase::At.id(), &[Hole::Number(7)]).unwrap_err(),
         Invalid::Values { id: phrases::OutcomePhrase::At.id() }
     );
     let mut missing = phrases::english();
@@ -348,7 +344,7 @@ fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
     for outcome in phrases::ALL {
         assert!(book.capacity(outcome.id()).is_some());
     }
-    let words = Words { book, language: 1, offset_minutes: 1 };
+    let words = Words::new(book, 1, 1);
     let fragment = view::required(&words).unwrap();
     assert!(fragment.text_per_node >= 2048);
     // This positive language proof needs one row, not every full page window.

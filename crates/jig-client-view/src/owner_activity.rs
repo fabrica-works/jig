@@ -94,7 +94,7 @@ pub fn required(value: &OwnerActivityLine, limits: &Limits, words: &Words) -> Op
 #[must_use]
 pub fn worst_case(limits: &Limits, words: &Words) -> Option<ActivityFragment> {
     let nodes = 100_u32.checked_add(limits.rows.checked_mul(4)?)?;
-    let saying = crate::phrases::jig_capacity(&words.book)?;
+    let saying = words.jig_capacity()?;
     let text_per_node = crate::literal_segment::max_bytes(limits.text)?.max(saying);
     Some(ActivityFragment {
         nodes,
@@ -106,7 +106,8 @@ pub fn worst_case(limits: &Limits, words: &Words) -> Option<ActivityFragment> {
     })
 }
 fn say(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
-    let value = words.book.say(words.language, phrase.id(), holes).expect("checked source activity sayings and holes");
+    let value =
+        words.book().say(words.language(), phrase.id(), holes).expect("checked source activity sayings and holes");
     b.text(Run::Plain, &value.text);
 }
 fn caption(b: &mut Builder, words: &Words, phrase: P) {
@@ -117,7 +118,7 @@ fn number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
 }
 fn region(b: &mut Builder, words: &Words, phrase: P) {
     b.open(Role::Region);
-    let value = words.book.say(words.language, phrase.id(), &[]).expect("checked activity region name");
+    let value = words.book().say(words.language(), phrase.id(), &[]).expect("checked activity region name");
     b.name(&value.text);
 }
 fn identity(b: &mut Builder, value: OwnerRequester, words: &Words) {

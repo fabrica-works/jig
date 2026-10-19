@@ -98,7 +98,7 @@ pub(crate) fn proposed_task(
     crate::owner_authority::document_words(b, &task.authority, words, text_limit, rows);
     words.text(b, JigPhrase::Budget, &[Hole::Amount(task.budget)]);
     crate::proposed_task::funder(b, task.funder, words);
-    crate::owner_wake::policy(b, &task.wake, &words.book, words.language);
+    crate::owner_wake::policy(b, &task.wake, words.book(), words.language());
     if let Some(priority) = task.priority {
         words.text(b, JigPhrase::Priority, &[Hole::Number(u64::from(priority))]);
     }
@@ -126,7 +126,7 @@ pub fn amendment(b: &mut Builder, change: &Amendment, words: &Words, bindings: &
         skein_ui::markdown::read(text.bytes(), 2, b);
     }
     if let Some(wake) = &change.wake {
-        crate::owner_wake::policy(b, wake, &words.book, words.language);
+        crate::owner_wake::policy(b, wake, words.book(), words.language());
     }
     if let Some(dependencies) = &change.dependencies {
         for task in dependencies {

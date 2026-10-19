@@ -193,7 +193,7 @@ fn budget_and_shared_funder_sayings_borrow_selected_normal_words_and_person_offs
     };
     let book = Phrasebook::load(crate::phrases::jig::shapes(256), languages, &limits)
         .expect("normal composed vocabulary checks both supplied languages whole");
-    let words = Words { book, language: 1, offset_minutes: -1 };
+    let words = Words::new(book, 1, -1);
     let tree = budget_tree(&budget(), &words);
     assert!(has(&tree, b"selected 17"));
     assert!(has(&tree, b"selected 00:01"));
@@ -206,7 +206,7 @@ fn budget_and_shared_funder_sayings_borrow_selected_normal_words_and_person_offs
     assert!(has(&tree, b"selected 00:02"));
     assert!(!contains(&tree, b"Ledger source"));
     assert!(
-        crate::owner_words::phrase_bytes(&words.book).expect("whole normal saying envelope")
+        crate::owner_words::phrase_bytes(words.book()).expect("whole normal saying envelope")
             >= view::ledger_worst_case(&words).expect("whole ledger envelope").text_per_node
     );
     let mut value = budget();
@@ -255,7 +255,7 @@ fn budget_words_check_the_whole_closed_language_holes_selection_and_offset_befor
 fn normal_budget_sizing_refuses_a_book_without_shared_funder_sayings() {
     let book = Phrasebook::load(data::shapes(), Box::new([data::language()]), &phrase_limits())
         .expect("budget-only language is checked for its own shapes");
-    let words = Words { book, language: 0, offset_minutes: 0 };
+    let words = Words::new(book, 0, 0);
     assert_eq!(view::required(&budget(), &words), None);
     assert_eq!(view::ledger_required(&ledger(), &words), None);
     assert_eq!(view::worst_case(&words), None);

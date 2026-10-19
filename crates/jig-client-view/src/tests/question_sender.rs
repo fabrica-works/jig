@@ -53,8 +53,8 @@ fn selected() -> Words {
             }
         }
     }
-    Words {
-        book: Phrasebook::load(
+    Words::new(
+        Phrasebook::load(
             shapes(CLIENT.text),
             Box::new([first, second]),
             &PhraseLimits {
@@ -67,9 +67,9 @@ fn selected() -> Words {
             },
         )
         .unwrap(),
-        language: 1,
-        offset_minutes: 60,
-    }
+        1,
+        60,
+    )
 }
 #[test]
 fn question_sender_cards_render_exact_closed_kinds_full_widths_and_no_claim_for_absence() {
@@ -218,7 +218,7 @@ fn question_sender_maximum_card_has_finite_bounds_and_retains_independent_older_
         );
         assert!(
             w.say(phrase, &[skein_ui::phrases::Hole::Number(u64::MAX)]).len()
-                <= usize::try_from(w.book.capacity(phrase.id()).unwrap()).unwrap()
+                <= usize::try_from(w.book().capacity(phrase.id()).unwrap()).unwrap()
         );
     }
     assert!(crate::question_nodes(&crate::Limits { rows: u32::MAX, ..CLIENT }).is_none());

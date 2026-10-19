@@ -126,8 +126,8 @@ fn words(selected: bool) -> Words {
     } else {
         Box::new([first])
     };
-    Words {
-        book: Phrasebook::load(
+    Words::new(
+        Phrasebook::load(
             crate::phrases::jig::shapes(256),
             languages,
             &PhraseLimits {
@@ -140,9 +140,9 @@ fn words(selected: bool) -> Words {
             },
         )
         .unwrap(),
-        language: u16::from(selected),
-        offset_minutes: 0,
-    }
+        u16::from(selected),
+        0,
+    )
 }
 fn capacity(f: view::ProposalFragment) -> skein_ui::Limits {
     skein_ui::Limits {
@@ -412,8 +412,8 @@ fn owner_proposal_exact_checked_envelopes_keep_selected_language_whole_loss_and_
     assert!(view::max_nodes(&crate::Limits { rows: u32::MAX, ..limits() }).is_none());
     assert!(view::worst_case(&crate::Limits { text: u32::MAX, ..limits() }, &w).is_none());
     let id = crate::owner_proposal_words::ProposalPhrase::Attempt.id();
-    assert_eq!(w.book.say(1, id, &[Hole::Wall(Wall::EPOCH)]).unwrap_err(), skein_ui::phrases::Invalid::Values { id });
-    assert_eq!(w.book.say(1, id, &[Hole::Number(u64::MAX)]).unwrap().text.as_ref(), b"second 18446744073709551615");
+    assert_eq!(w.book().say(1, id, &[Hole::Wall(Wall::EPOCH)]).unwrap_err(), skein_ui::phrases::Invalid::Values { id });
+    assert_eq!(w.book().say(1, id, &[Hole::Number(u64::MAX)]).unwrap().text.as_ref(), b"second 18446744073709551615");
     let short = skein_ui::Limits { nodes: tree.len() - 1, ..capacity(f) };
     let _refusal = std::panic::catch_unwind(|| {
         let mut b = Builder::new(&short);

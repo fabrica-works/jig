@@ -20,10 +20,10 @@ pub struct BudgetFragment {
 }
 impl BudgetFragment {
     fn phrase(&mut self, words: &Words, phrase: BudgetPhrase) -> Option<()> {
-        self.leaf(words.book.capacity(phrase.id())?)
+        self.leaf(words.book().capacity(phrase.id())?)
     }
     fn name(&mut self, words: &Words, phrase: BudgetPhrase) -> Option<()> {
-        let bytes = words.book.capacity(phrase.id())?;
+        let bytes = words.book().capacity(phrase.id())?;
         self.text_bytes = self.text_bytes.checked_add(bytes)?;
         self.text_per_node = self.text_per_node.max(bytes);
         Some(())
@@ -118,8 +118,8 @@ pub fn ledger_worst_case(words: &Words) -> Option<BudgetFragment> {
     result.funder(words)?;
     result.phrase(words, BudgetPhrase::Parent)?;
     result.funder(words)?;
-    let open = words.book.capacity(BudgetPhrase::Open.id())?;
-    let closed = words.book.capacity(BudgetPhrase::Closed.id())?;
+    let open = words.book().capacity(BudgetPhrase::Open.id())?;
+    let closed = words.book().capacity(BudgetPhrase::Closed.id())?;
     result.leaf(open.max(closed))?;
     result.phrase(words, BudgetPhrase::Began)?;
     result.phrase(words, BudgetPhrase::Next)?;
@@ -127,8 +127,11 @@ pub fn ledger_worst_case(words: &Words) -> Option<BudgetFragment> {
 }
 
 fn text(b: &mut Builder, words: &Words, phrase: BudgetPhrase, holes: &[Hole]) {
-    let text =
-        words.book.say(words.language, phrase.id(), holes).expect("checked budget phrase and typed owner facts").text;
+    let text = words
+        .book()
+        .say(words.language(), phrase.id(), holes)
+        .expect("checked budget phrase and typed owner facts")
+        .text;
     b.text(Run::Plain, &text);
 }
 fn numbers(b: &mut Builder, value: &OwnerNumbers, left: u64, words: &Words) {
@@ -146,8 +149,8 @@ fn time(b: &mut Builder, words: &Words, phrase: BudgetPhrase, at: Wall) {
 pub fn render(b: &mut Builder, value: &OwnerBudget, words: &Words) {
     b.open(Role::Region);
     let label = words
-        .book
-        .say(words.language, BudgetPhrase::Budget.id(), &[Hole::Amount(value.numbers.budget)])
+        .book()
+        .say(words.language(), BudgetPhrase::Budget.id(), &[Hole::Amount(value.numbers.budget)])
         .expect("checked budget region label")
         .text;
     b.name(&label);
@@ -163,7 +166,7 @@ pub fn render(b: &mut Builder, value: &OwnerBudget, words: &Words) {
 pub fn ledger(b: &mut Builder, value: &PoolLedger, words: &Words) {
     b.open(Role::Region);
     let label =
-        words.book.say(words.language, BudgetPhrase::Source.id(), &[]).expect("checked ledger region label").text;
+        words.book().say(words.language(), BudgetPhrase::Source.id(), &[]).expect("checked ledger region label").text;
     b.name(&label);
     numbers(b, &value.numbers, value.left, words);
     text(b, words, BudgetPhrase::Source, &[]);

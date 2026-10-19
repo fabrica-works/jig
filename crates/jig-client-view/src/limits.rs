@@ -16,7 +16,7 @@ pub fn of(client: &crate::Limits, arrangement: &crate::page::Arrangement) -> Opt
 /// every loaded language; the root may switch language without resizing.
 #[must_use]
 pub fn of_words(client: &crate::Limits, words: &crate::words::Words) -> Option<Limits> {
-    let phrase = crate::phrases::jig_capacity(&words.book)?;
+    let phrase = words.jig_capacity()?;
     with_phrase_bytes(client, phrase, &crate::page::Arrangement::none(), 0, 0, 0)
 }
 
@@ -33,7 +33,7 @@ pub fn compose(
     slot_nodes: u32,
     slot_depth: u32,
 ) -> Option<Limits> {
-    let phrase = crate::phrases::jig_capacity(&words.book)?;
+    let phrase = words.jig_capacity()?;
     with_phrase_bytes(client, phrase, arrangement, application_nodes, slot_nodes, slot_depth)
 }
 fn with_phrase_bytes(

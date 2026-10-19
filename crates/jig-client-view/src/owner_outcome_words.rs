@@ -362,10 +362,10 @@ pub fn english() -> Language {
 /// Capacity across every loaded language for one checked phrase.
 #[must_use]
 pub fn capacity(words: &Words, phrase: OutcomePhrase) -> u32 {
-    words.book.capacity(phrase.id()).expect("outcome vocabulary checked in Words")
+    words.book().capacity(phrase.id()).expect("outcome vocabulary checked in Words")
 }
 /// Say supplied typed facts in the caller's selected checked language.
 #[must_use]
 pub fn say(words: &Words, phrase: OutcomePhrase, holes: &[Hole]) -> Box<[u8]> {
-    words.book.say(words.language, phrase.id(), holes).expect("checked outcome phrase and typed facts").text
+    words.book().say(words.language(), phrase.id(), holes).expect("checked outcome phrase and typed facts").text
 }

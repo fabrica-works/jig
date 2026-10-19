@@ -86,16 +86,16 @@ fn words() -> &'static Words {
         let mut language = crate::phrases::english::language();
         language.wall = skein_ui::phrases::WallFormat::Nanos;
         language.span_unit = skein_ui::phrases::SpanUnit::Nanos;
-        Words {
-            book: skein_ui::phrases::Phrasebook::load(
+        Words::new(
+            skein_ui::phrases::Phrasebook::load(
                 crate::phrases::jig::shapes(256),
                 Box::new([language]),
                 &phrase_limits(),
             )
             .unwrap(),
-            language: 0,
-            offset_minutes: 0,
-        }
+            0,
+            0,
+        )
     })
 }
 fn build(value: &OwnerChipDetails, words: &Words) -> (Tree, JigBindings, view::ChipFragment) {

@@ -578,7 +578,7 @@ impl OwnerChipWords {
             return Err(Invalid::Overflow);
         }
         let book = Phrasebook::load(crate::phrases::jig::shapes(limits.hole_bytes), languages, limits)?;
-        Ok(Self { words: Words { book, language, offset_minutes } })
+        Ok(Self { words: Words::new(book, language, offset_minutes) })
     }
     #[must_use]
     pub fn words(&self) -> &Words {
