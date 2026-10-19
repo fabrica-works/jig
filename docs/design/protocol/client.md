@@ -164,6 +164,13 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   silently (`../client/domain/client.md`, section 16). An authority
   carries no cut mark (`../client/domain/contract.md`, 5.3). The wire's
   generated worst cases price each document at the client's limits.
+- **The schemas' ceilings bound the client's limits.** Each bounded
+  field has a fixed ceiling in its schema, and the client's limits stay
+  within them. A list the client bounds by its rows (a task's
+  dependencies, a role's holdings, a pattern's segments) takes at most
+  32 items, so 32 is the most the client's `rows` may be, and with it
+  the rows of its pages and windows. More is a new version of the wire
+  (section 9).
 - **A document's nested collections cross as pieces.** The client bounds
   a document by its bytes in all, not each list by its count times its
   largest item. So a list whose items hold lists of their own (a page's
