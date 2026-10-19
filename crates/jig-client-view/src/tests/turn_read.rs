@@ -26,7 +26,7 @@ fn an_unreadable_turn_card_says_why() {
     for (why, saying) in [
         (TurnProblem::Version { found: 65535 }, b"Turn could not be read: transcript version 65535".as_slice()),
         (TurnProblem::Malformed, b"Turn could not be read: malformed transcript"),
-        (TurnProblem::TooLarge, b"Turn could not be read: exceeds client bounds"),
+        (TurnProblem::TooLarge { bytes: 1 }, b"Turn could not be read: exceeds client bounds"),
     ] {
         let (mut domain, _, _, read) = ready();
         drive(

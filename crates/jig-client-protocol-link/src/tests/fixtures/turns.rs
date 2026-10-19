@@ -102,13 +102,16 @@ pub fn turn_limits(text: u32, document_bytes: u64) -> Limits {
 
 const UTF8_TEXTS: [&[u8]; 1] = [b"~\0\x01"];
 
+// One byte above the wire's carried-turn ceiling; the marker reports the original size.
+pub const MARKER_BYTES: u64 = 8 * 1024 * 1024 + 1;
+
 pub fn owner_turn_pages() -> [(&'static str, w::ActivityPage, c::ActivityPage); 2] {
-    let large = w::TurnTooLarge::new(&w::CEILINGS, w::TurnTooLargeParts { bytes: 8_388_609 }).unwrap();
+    let large = w::TurnTooLarge::new(&w::CEILINGS, w::TurnTooLargeParts { bytes: MARKER_BYTES }).unwrap();
     [
         (
             "too large",
             owner_turn_activity_record(Some(w::TurnBytes::TooLarge(large))),
-            archived_activity_page_with_problem(c::TurnProblem::TooLarge),
+            archived_activity_page_with_problem(c::TurnProblem::TooLarge { bytes: MARKER_BYTES }),
         ),
         (
             "malformed unread",

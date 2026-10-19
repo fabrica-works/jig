@@ -16,6 +16,7 @@ jig-test-connector.workspace = true
 jig-client-view.workspace = true
 skein-ui-text.workspace = true
 skein-lib.workspace = true
+smith-transcript.workspace = true
 skein-http.workspace = true
 skein-io.workspace = true
 skein-shell.workspace = true

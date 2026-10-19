@@ -228,7 +228,9 @@ pub fn with_archive(
                     jig_protocol_transcript::Undecodable::Malformed | jig_protocol_transcript::Undecodable::Unknown => {
                         client::TurnProblem::Malformed
                     }
-                    jig_protocol_transcript::Undecodable::TooLarge => client::TurnProblem::TooLarge,
+                    jig_protocol_transcript::Undecodable::TooLarge => client::TurnProblem::TooLarge {
+                        bytes: u64::try_from(archive.transcript.len()).expect("bounded transcript"),
+                    },
                 },
             },
         },
@@ -256,7 +258,7 @@ pub fn page_turn(
     };
     match turn {
         jig_domain_core::reads::PageTurn::Carried(record) => with_archive(&value, record, codec, limits),
-        jig_domain_core::reads::PageTurn::TooLarge { spent, read, at, .. } => {
+        jig_domain_core::reads::PageTurn::TooLarge { spent, read, at, bytes } => {
             let tasks::Line::Turn { attempt, turn, .. } = source.line else { return Err(Invalid::Identity) };
             let mut value = value;
             let client::Activity::Owner { decoded, .. } = &mut value.event else { return Err(Invalid::Identity) };
@@ -266,7 +268,7 @@ pub fn page_turn(
                 cumulative: *spent,
                 read: *read,
                 at: *at,
-                turn: client::TurnRead::Undecodable { why: client::TurnProblem::TooLarge },
+                turn: client::TurnRead::Undecodable { why: client::TurnProblem::TooLarge { bytes: *bytes } },
             });
             admission::admit_activity_line(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
             Ok(value)

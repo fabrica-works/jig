@@ -238,17 +238,24 @@ fn a_turns_receiving_cut_stays_on_its_decoded_value() {
     );
 }
 #[test]
+fn a_turn_at_its_admission_bound_is_decoded() {
+    assert_eq!(u64::try_from(fixtures::FULL_TURN.len()).unwrap(), fixtures::TURN_PAYLOAD_BYTES);
+    let limits = fixtures::turn_limits(32, fixtures::TURN_PAYLOAD_BYTES);
+    assert_eq!(translate::pages::turn_fields(fixtures::FULL_TURN, &limits), fixtures::decoded_turn(b"abc", false));
+}
+#[test]
 fn a_turn_past_its_admission_bound_is_carried_as_too_large() {
-    let limits = fixtures::turn_limits(32, 145);
+    let limits = fixtures::turn_limits(32, fixtures::TURN_PAYLOAD_BYTES.checked_sub(1).unwrap());
     assert_eq!(
         translate::pages::turn_fields(fixtures::FULL_TURN, &limits),
-        c::TurnRead::Undecodable { why: c::TurnProblem::TooLarge }
+        c::TurnRead::Undecodable { why: c::TurnProblem::TooLarge { bytes: fixtures::TURN_PAYLOAD_BYTES } }
     );
 }
 
 #[test]
 fn an_owner_turn_without_carried_bytes_crosses_up_with_its_problem() {
     let limits = fixtures::limits();
+    assert_eq!(fixtures::MARKER_BYTES, u64::from(w::CEILINGS.turn_carried_bytes).checked_add(1).unwrap());
     for (name, record, expected) in fixtures::owner_turn_pages() {
         assert_eq!(translate::pages::activity_page(record, &limits), Ok(expected), "{name}");
     }

@@ -25,7 +25,7 @@ pub enum TurnRead {
 pub enum TurnProblem {
     Version { found: u16 },
     Malformed,
-    TooLarge,
+    TooLarge { bytes: u64 },
 }
 impl TurnRead {
     /// The supplied decoded content, when reading succeeded.

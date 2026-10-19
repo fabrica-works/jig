@@ -21,8 +21,7 @@ fn an_absent_turn_is_unknown_through_the_client() {
     assert_eq!(story.pages(TURN), vec![Readout::Jig(c::ReadResult::None(c::ReadNone::Unknown))]);
 }
 
-fn committed_turn() -> (Story, c::ArchivedTurn) {
-    let mut story = Story::reading_chat(fixtures::SEED);
+fn committed_turn(mut story: Story) -> (Story, c::ArchivedTurn) {
     let task = story.running_task();
     let words = c::Text::new(Box::from(b"Please continue".as_slice()), 32).expect("bounded words");
     story.send(WORDS, Ask::Jig(Box::new(c::Ask::Message { project: PROJECT, task, words })));
@@ -51,7 +50,7 @@ fn committed_turn() -> (Story, c::ArchivedTurn) {
 
 #[test]
 fn a_committed_turn_is_read_whole_through_the_client() {
-    let (mut story, archive) = committed_turn();
+    let (mut story, archive) = committed_turn(Story::reading_chat(fixtures::SEED));
     let c::TurnRead::Decoded(turn) = &archive.turn else { panic!("decoded activity turn") };
     assert!(!turn.cut);
     story.read(
@@ -60,4 +59,14 @@ fn a_committed_turn_is_read_whole_through_the_client() {
     );
     assert!(story.run_until(|s| !s.pages(TURN).is_empty(), WAIT));
     assert_eq!(story.pages(TURN), vec![Readout::Jig(c::ReadResult::Value(c::ReadValue::Turn(Box::new(archive))))]);
+}
+
+#[test]
+fn an_activity_size_marker_keeps_its_bytes_through_the_client() {
+    let body = fixtures::large_turn();
+    let bytes = u64::try_from(body.len()).expect("source bytes");
+    assert!(bytes > u64::from(fixtures::TURN_PAGE_BYTES));
+    let story = Story::reading_chat_with(fixtures::SEED, body, fixtures::domain_limits(), fixtures::turn_page_limits());
+    let (_, archive) = committed_turn(story);
+    assert_eq!(archive.turn, c::TurnRead::Undecodable { why: c::TurnProblem::TooLarge { bytes } });
 }

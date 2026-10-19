@@ -77,10 +77,10 @@ pub(crate) fn inspect(
 
 pub(crate) fn archive(record: w::ArchivedTurn, limits: &Limits) -> Result<c::ArchivedTurn, Undecodable> {
     let w::TurnBytes::Carried(carried) = record.turn() else { return Err(Undecodable::TooLarge) };
-    let turn = c::TurnLimits { messages: limits.client.rows, blocks: limits.client.rows, text: limits.client.text };
     let bound = limits.wire.turn_carried_bytes.min(u32::try_from(limits.client.document_bytes).expect("checked limit"));
-    let codec = jig_protocol_transcript::Limits::new(bound, turn);
-    let Ok(turn) = jig_protocol_transcript::decode(&codec, carried.bytes()) else { return Err(Undecodable::Malformed) };
+    let c::TurnRead::Decoded(turn) = decode(carried.bytes(), limits, bound) else {
+        return Err(Undecodable::Malformed);
+    };
     Ok(c::ArchivedTurn {
         task: record.task(),
         name: c::TurnName { attempt: record.name().attempt(), number: record.name().number() },
@@ -89,4 +89,19 @@ pub(crate) fn archive(record: w::ArchivedTurn, limits: &Limits) -> Result<c::Arc
         at: Wall::from_nanos(record.at()),
         turn: c::TurnRead::Decoded(turn),
     })
+}
+
+pub(crate) fn decode(value: &[u8], limits: &Limits, bytes: u32) -> c::TurnRead {
+    let turn = c::TurnLimits { messages: limits.client.rows, blocks: limits.client.rows, text: limits.client.text };
+    let source_bytes = u64::try_from(value.len()).expect("payload length fits u64");
+    let limits = jig_protocol_transcript::Limits::new(bytes, turn);
+    let why = match jig_protocol_transcript::decode(&limits, value) {
+        Ok(turn) => return c::TurnRead::Decoded(turn),
+        Err(jig_protocol_transcript::Undecodable::Version { found }) => c::TurnProblem::Version { found },
+        Err(jig_protocol_transcript::Undecodable::Malformed | jig_protocol_transcript::Undecodable::Unknown) => {
+            c::TurnProblem::Malformed
+        }
+        Err(jig_protocol_transcript::Undecodable::TooLarge) => c::TurnProblem::TooLarge { bytes: source_bytes },
+    };
+    c::TurnRead::Undecodable { why }
 }

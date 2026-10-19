@@ -225,3 +225,42 @@ pub fn mount() -> jig_protocol_engine_clients_http::Mount {
 pub fn server_http() -> skein_http::server::Limits {
     skein_http::server::Limits { head: 4096, headers: 32, body: 65536, read: 1024, response: 65536, send: 1024 }
 }
+
+// Eight KiB fits the committed marker and its owner; an extra byte cannot fit whole.
+pub const TURN_PAGE_BYTES: u32 = 8192;
+pub const LARGE_TURN_TEXT_BYTES: u32 = TURN_PAGE_BYTES + 1;
+#[must_use]
+pub fn turn_page_limits() -> jig_test_domain::Limits {
+    let mut limits = owner_limits();
+    limits.core.load_bytes = u64::from(TURN_PAGE_BYTES);
+    limits
+}
+#[must_use]
+pub fn large_turn() -> Box<[u8]> {
+    use smith_transcript::v5 as s;
+    let bytes = include_bytes!("../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin");
+    let mut reader = skein_lib::Reader::new(bytes);
+    let mut turn = s::Turn::decode(&s::CEILINGS, &mut reader).expect("v5 fixture").into_parts();
+    let mut message = turn.messages.get(0).expect("person message").clone().into_parts();
+    message.blocks = List::with_capacity(1);
+    message
+        .blocks
+        .push(s::Block::Text(
+            s::Text::new(
+                &s::CEILINGS,
+                s::TextParts {
+                    text: vec![b'x'; usize::try_from(LARGE_TURN_TEXT_BYTES).expect("bounded text size")]
+                        .into_boxed_slice(),
+                    replay: None,
+                },
+            )
+            .expect("large bounded text"),
+        ))
+        .expect("one block");
+    turn.messages = List::with_capacity(1);
+    turn.messages.push(s::Message::new(&s::CEILINGS, message).expect("large message")).expect("one message");
+    let turn = s::Turn::new(&s::CEILINGS, turn).expect("large turn");
+    let mut writer = skein_lib::Writer::new(usize::try_from(turn.measure()).expect("turn size"));
+    turn.encode(&mut writer).expect("v5 encoding");
+    writer.finish()
+}

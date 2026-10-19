@@ -461,6 +461,7 @@ dependencies = [
  "skein-ui",
  "skein-ui-text",
  "skein-world",
+ "smith-transcript",
 ]
 
 [[package]]

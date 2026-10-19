@@ -264,6 +264,9 @@ mod tests {
         );
     }
 
+    // A marker reports the fixture's eight-KiB source size.
+    const MARKER_BYTES: u64 = 8192;
+
     fn source() -> reads::Page {
         let mut rows = List::with_capacity(3);
         for position in [u64::MAX, 0] {
@@ -274,7 +277,7 @@ mod tests {
                     at: Wall::EPOCH,
                     line: tasks::Line::Turn { reply: u64::MAX, attempt: u64::MAX, turn: u32::MAX, read: Some(0) },
                 },
-                turn: Some(reads::PageTurn::TooLarge { spent: 0, read: Some(0), at: Wall::EPOCH, bytes: 8192 }),
+                turn: Some(reads::PageTurn::TooLarge { spent: 0, read: Some(0), at: Wall::EPOCH, bytes: MARKER_BYTES }),
             })
             .expect("source row");
         }
@@ -290,13 +293,14 @@ mod tests {
     fn activity_pages_translate_their_supplied_turn_outcomes() {
         let (_, archive, codec, limits) = activity::tests::archive_fixture();
         let mut page = source();
-        for (label, turn) in [
-            ("carried", reads::PageTurn::Carried(archive)),
+        for (label, turn, expected) in [
+            ("carried", reads::PageTurn::Carried(archive), Some(Ok(u64::MAX))),
             (
                 "too large",
-                reads::PageTurn::TooLarge { spent: 19, read: Some(1), at: Wall::from_nanos(42), bytes: 8192 },
+                reads::PageTurn::TooLarge { spent: 19, read: Some(1), at: Wall::from_nanos(42), bytes: MARKER_BYTES },
+                Some(Err(client::TurnProblem::TooLarge { bytes: MARKER_BYTES })),
             ),
-            ("unread", reads::PageTurn::Unread),
+            ("unread", reads::PageTurn::Unread, None),
         ] {
             for index in 0..page.rows.len() {
                 let reads::PageRow::Activity { turn: supplied, .. } = page.rows.get_mut(index).expect("source row")
@@ -311,7 +315,7 @@ mod tests {
                 panic!("{label}")
             };
             for row in &value.rows {
-                assert_supplied_turn(label, &row.event);
+                assert_supplied_turn(label, &row.event, expected);
             }
         }
         if let reads::PageRow::Activity { turn, .. } = page.rows.get_mut(0).expect("source row") {
@@ -323,20 +327,18 @@ mod tests {
             "missing turn carrier"
         );
     }
-    fn assert_supplied_turn(label: &str, value: &client::Activity) {
+    fn assert_supplied_turn(label: &str, value: &client::Activity, expected: Option<Result<u64, client::TurnProblem>>) {
         match value {
             client::Activity::Owner { decoded: Some(turn), .. } => {
                 assert_eq!((turn.cumulative, turn.read, turn.at), (19, Some(1), Wall::from_nanos(42)), "{label}");
-                if label == "too large" {
-                    assert_eq!(turn.turn, client::TurnRead::Undecodable { why: client::TurnProblem::TooLarge });
-                } else {
-                    assert_eq!(label, "carried");
-                    assert_eq!(turn.turn.decoded().expect(label).spent, u64::MAX);
+                match expected.expect("supplied archive") {
+                    Ok(spent) => assert_eq!(turn.turn.decoded().expect(label).spent, spent, "{label}"),
+                    Err(why) => assert_eq!(turn.turn, client::TurnRead::Undecodable { why }, "{label}"),
                 }
             }
             client::Activity::Turn { name, turn } => {
-                assert_eq!(label, "unread");
                 assert_eq!(*name, client::TurnName { attempt: u64::MAX, number: u32::MAX }, "{label}");
+                assert_eq!(expected, None, "{label}");
                 assert_eq!(*turn, client::TurnRead::Undecodable { why: client::TurnProblem::Malformed }, "{label}");
             }
             client::Activity::Owner { .. }
@@ -360,7 +362,7 @@ mod tests {
                 cumulative: 0,
                 read: Some(0),
                 at: Wall::EPOCH,
-                turn: client::TurnRead::Undecodable { why: client::TurnProblem::TooLarge },
+                turn: client::TurnRead::Undecodable { why: client::TurnProblem::TooLarge { bytes: MARKER_BYTES } },
             })
         );
         assert_eq!(source.task, u64::MAX);

@@ -25,7 +25,7 @@ pub(super) fn turn(
                     words.status(b, JigPhrase::TurnUnreadVersion, &[Hole::Number(u64::from(*found))]);
                 }
                 TurnProblem::Malformed => words.status(b, JigPhrase::TurnUnreadMalformed, &[]),
-                TurnProblem::TooLarge => words.status(b, JigPhrase::TurnUnreadTooLarge, &[]),
+                TurnProblem::TooLarge { .. } => words.status(b, JigPhrase::TurnUnreadTooLarge, &[]),
             }
             return;
         }
