@@ -23,7 +23,7 @@ fn private(path: &Path, bytes: &[u8]) {
 }
 pub fn agent_configuration(directory: &Path) {
     let value = serde_json::json!({
-        "profile":{"name":"standard","declared":{"memory":2_147_483_648_u64,"tool_payload":512,"read_window":256},
+        "profile":{"name":"standard","declared":{"tool_payload":512,"read_window":256},
             "policy":{"max_turns":5,"group_stop":10}},
         "endpoints":[{"name":"fake","number":0,"dialect":0,"account":1,"provider":"codex",
             "address":"127.0.0.1:34443","transport":"tls","server_name":"skein.test","trust_der":directory.join("root.der"),"identity":"plain","connect":1000,"handshake":1000,
