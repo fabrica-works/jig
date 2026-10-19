@@ -177,6 +177,7 @@ pub(super) fn decode(run: Token, source: hub::Start, agent: &crate::Agent) -> Re
     }
     Ok(Box::new(smith::Start {
         identity: Some(smith_domain_run::Identity::new(source.identity)),
+        live: None,
         logical_run: run,
         activation: source.activation,
         workspace: source.workspace,
@@ -216,7 +217,7 @@ pub(super) fn process(event: smith_host_protocol::ProcessEvent) -> Option<jig_te
         ProcessEvent::Exited { agent, exit } => smith::process::Event::Exited { owner: agent, exit: exited(exit) },
         ProcessEvent::Reaped { agent, detail } => smith::process::Event::Reaped { owner: agent, detail },
         ProcessEvent::Channel { agent, event } => match *event {
-            OpenEvent::Opened { .. } | OpenEvent::WriteFailed => return None,
+            OpenEvent::Opened { .. } | OpenEvent::Live { .. } | OpenEvent::WriteFailed => return None,
             OpenEvent::Hangup { .. } => smith::process::Event::Hangup { owner: agent },
             OpenEvent::Sent { .. } => smith::process::Event::Sent { owner: agent },
             OpenEvent::Unsent { .. } => smith::process::Event::Unsent { owner: agent },
@@ -259,6 +260,7 @@ fn channel(event: smith_host_protocol::OpenEvent) -> Option<smith::Up> {
         OpenEvent::Call { call, name, deadline, ask } => smith::Up::Call { call, name, deadline, ask },
         OpenEvent::Withdraw { call } => smith::Up::Withdraw { call },
         OpenEvent::Opened { .. }
+        | OpenEvent::Live { .. }
         | OpenEvent::WriteFailed
         | OpenEvent::Hangup { .. }
         | OpenEvent::Sent { .. }

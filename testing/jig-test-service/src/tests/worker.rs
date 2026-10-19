@@ -175,9 +175,15 @@ fn start_on_pipes(service: &mut Service) -> Box<[u8]> {
             }
         }
     }
-    let mut peer =
-        skein_fake_channel::ScriptedPeer::new(schema, skein_channel::Role::Responder, peer_limits, 2, Box::default())
-            .expect("agent peer");
+    let version = u16::try_from(smith_channel::KindRule::FORMAT_VERSION).expect("channel version");
+    let mut peer = skein_fake_channel::ScriptedPeer::new(
+        schema,
+        skein_channel::Role::Responder,
+        peer_limits,
+        version,
+        Box::default(),
+    )
+    .expect("agent peer");
     assign(service);
     let (owner, _) = spawn(service);
     worker(service).up(

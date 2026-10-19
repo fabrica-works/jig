@@ -147,6 +147,7 @@ pub fn assignment(charter: Box<[u8]>) -> host::Assignment {
 pub fn start(source: host::Start) -> smith::Start {
     smith::Start {
         identity: Some(smith_domain_run::Identity::new(source.identity)),
+        live: None,
         logical_run: RUN,
         activation: source.activation,
         messages: Box::new([]),

@@ -100,9 +100,9 @@ impl crate::effects::World {
         let completion = u32::try_from(self.host_answers.len() + 1)
             .expect("bounded story calls")
             .max(self.answers.iter().map(|(_, key, _)| key.completion + 1).max().unwrap_or(1));
-        let name = smith_channel::v2::CallName::new(
-            &smith_channel::v2::CEILINGS,
-            smith_channel::v2::CallNameParts { activation: assignment.attempt, completion, position: 0 },
+        let name = smith_channel::v3::CallName::new(
+            &smith_channel::v3::CEILINGS,
+            smith_channel::v3::CallNameParts { activation: assignment.attempt, completion, position: 0 },
         )
         .expect("bounded call name");
         let mut encoded = skein_lib::Writer::new(name.measure() as usize);

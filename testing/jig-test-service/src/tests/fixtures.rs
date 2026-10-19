@@ -424,9 +424,9 @@ pub fn endpoints() -> smith_protocol_channel::Endpoints {
     smith_protocol_channel::Endpoints::new(entries)
 }
 pub fn call(input: &[u8]) -> jig_domain_fleet::Call {
-    let name = smith_channel::v2::CallName::new(
-        &smith_channel::v2::CEILINGS,
-        smith_channel::v2::CallNameParts { activation: 3, completion: 7, position: 2 },
+    let name = smith_channel::v3::CallName::new(
+        &smith_channel::v3::CEILINGS,
+        smith_channel::v3::CallNameParts { activation: 3, completion: 7, position: 2 },
     )
     .expect("call name");
     let mut writer = Writer::new(usize::try_from(name.measure()).expect("call name length"));

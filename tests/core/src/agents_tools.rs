@@ -84,9 +84,9 @@ fn reconnect(world: &mut World, key: core::CallKey) {
 }
 
 fn replay(world: &mut World, key: core::CallKey, tool: &[u8], input: &[u8]) {
-    let name = smith_channel::v2::CallName::new(
-        &smith_channel::v2::CEILINGS,
-        smith_channel::v2::CallNameParts {
+    let name = smith_channel::v3::CallName::new(
+        &smith_channel::v3::CEILINGS,
+        smith_channel::v3::CallNameParts {
             activation: key.attempt,
             completion: key.completion,
             position: key.position,
