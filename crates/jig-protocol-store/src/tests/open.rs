@@ -29,12 +29,13 @@ fn header_without_format() -> Store {
     planted(&[fixtures::header_put(fixtures::DEPLOYMENT, 1)])
 }
 
-fn version_put(tasks: u16, core: u16) -> skein_kv::Op {
+fn version_put(tasks: u16, people: u16, core: u16) -> skein_kv::Op {
     let skein_kv::Op::Put { key, value } = fixtures::format_put(fixtures::DEPLOYMENT) else {
         panic!("format is a put");
     };
     let mut format = codec::component::Format::decode(&value).expect("format fixture");
     format.tasks = tasks;
+    format.people = people;
     format.core = core;
     skein_kv::Op::Put { key, value: format.encode().expect("format fits") }
 }
@@ -87,8 +88,14 @@ fn a_store_of_another_deployment_refuses_to_open() {
 
 #[test]
 fn a_store_of_another_tasks_version_refuses_naming_tasks() {
-    let mut store = planted(&[version_put(2, 3), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Tasks, found: 2, wanted: 3 });
+    let mut store = planted(&[version_put(3, 4, 3), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Tasks, found: 3, wanted: 4 });
+}
+
+#[test]
+fn a_store_of_another_people_version_refuses_naming_people() {
+    let mut store = planted(&[version_put(4, 3, 3), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::People, found: 3, wanted: 4 });
 }
 
 #[test]
@@ -120,7 +127,7 @@ fn a_format_row_without_its_header_refuses_as_numbers() {
 
 #[test]
 fn an_unknown_core_version_is_refused_before_decoding_its_header() {
-    let mut store = planted(&[version_put(2, 4), corrupt_header()]);
+    let mut store = planted(&[version_put(3, 4, 4), corrupt_header()]);
     assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Core, found: 4, wanted: 3 });
 }
 
