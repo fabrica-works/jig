@@ -355,13 +355,6 @@ fn tool_text_and_invalid_calls_remain_distinct() {
             true,
         );
     }
-    assert_result(
-        smith::Returned::NotRun(
-            smith::NotRun::new(&CEILINGS, smith::NotRunParts { why: smith::NotRunWhy::Stopped }).unwrap(),
-        ),
-        b"Not run",
-        true,
-    );
     assert_result(smith::Returned::Withdrawn, b"Withdrawn", true);
 }
 
@@ -467,4 +460,135 @@ fn smith_full_golden_preserves_maximum_usage_at_its_whole_length() {
             cut: false
         }
     );
+}
+
+#[test]
+fn jobs_read_as_call_outcomes() {
+    let running = smith::Outcome::Running(
+        smith::CommandRunning::new(
+            &CEILINGS,
+            smith::CommandRunningParts {
+                job: 2,
+                head: Box::from(&b"h"[..]),
+                last: Box::from(&b"l"[..]),
+                dropped: 9,
+                timeout: smith::TimeoutClamp::Within,
+                output: smith::BytesClamp::Within,
+                after: smith::TimeoutClamp::Within,
+            },
+        )
+        .unwrap(),
+    );
+    let mut cases: List<(smith::Outcome, &[u8], bool)> = List::with_capacity(8);
+    for row in [
+        (running, &b"Started as job 2; output bytes 2; dropped 9"[..], false),
+        (job(smith::JobEnd::Running), b"Job 1 answered running; output bytes 2; dropped 9", false),
+        (job(smith::JobEnd::Stopped), b"Job 1 stopped; output bytes 2; dropped 9", false),
+        (job(smith::JobEnd::Cancelled), b"Job 1 cancelled; output bytes 2; dropped 9", true),
+    ] {
+        cases.push(row).unwrap();
+    }
+    for (end, expected, failed) in [
+        (
+            exited(smith::Exit::Code(smith::ExitCode::new(&CEILINGS, smith::ExitCodeParts { code: 0 }).unwrap())),
+            &b"Job 1 ended: exit 0; output bytes 2; dropped 9"[..],
+            false,
+        ),
+        (
+            exited(smith::Exit::Code(smith::ExitCode::new(&CEILINGS, smith::ExitCodeParts { code: 1 }).unwrap())),
+            b"Job 1 ended: exit 1; output bytes 2; dropped 9",
+            true,
+        ),
+        (
+            exited(smith::Exit::Signal(
+                smith::ExitSignal::new(&CEILINGS, smith::ExitSignalParts { signal: 9 }).unwrap(),
+            )),
+            b"Job 1 ended: signal 9; output bytes 2; dropped 9",
+            true,
+        ),
+        (exited(smith::Exit::TimedOut), b"Job 1 ended: timed out; output bytes 2; dropped 9", true),
+    ] {
+        let smith::Outcome::Exited(end) = end else { panic!("command end fixture") };
+        let exit = smith::JobExit::new(&CEILINGS, smith::JobExitParts { exit: end.into_parts().exit }).unwrap();
+        cases.push((job(smith::JobEnd::Ended(exit)), expected, failed)).unwrap();
+    }
+    for (outcome, expected, failed) in cases.as_slice() {
+        assert_result(owned(outcome.clone()), expected, *failed);
+    }
+}
+fn job(end: smith::JobEnd) -> smith::Outcome {
+    smith::Outcome::Job(
+        smith::JobRead::new(
+            &CEILINGS,
+            smith::JobReadParts {
+                job: 1,
+                head: Box::from(&b"h"[..]),
+                last: Box::from(&b"l"[..]),
+                dropped: 9,
+                output: smith::BytesClamp::Within,
+                wait: smith::TimeoutClamp::Within,
+                end,
+            },
+        )
+        .unwrap(),
+    )
+}
+
+#[test]
+fn job_problems_read_as_invalid_calls() {
+    for (problem, expected) in [
+        (
+            smith::CallProblem::JobsFull(
+                smith::JobsFullProblem::new(&CEILINGS, smith::JobsFullProblemParts { jobs: 3 }).unwrap(),
+            ),
+            &b"Invalid call: jobs full, at most 3 at once"[..],
+        ),
+        (
+            smith::CallProblem::UnknownJob(
+                smith::UnknownJobProblem::new(&CEILINGS, smith::UnknownJobProblemParts { job: 7 }).unwrap(),
+            ),
+            b"Invalid call: unknown job 7",
+        ),
+    ] {
+        assert_result(
+            smith::Returned::Invalid(smith::Invalid::new(&CEILINGS, smith::InvalidParts { problem }).unwrap()),
+            expected,
+            true,
+        );
+    }
+}
+
+#[test]
+fn a_call_not_run_reads_its_why() {
+    for (why, expected) in [
+        (smith::NotRunWhy::Stopped, &b"Not run: stopped"[..]),
+        (
+            smith::NotRunWhy::OutsideChoice(
+                smith::OutsideChoice::new(&CEILINGS, smith::OutsideChoiceParts { only: None }).unwrap(),
+            ),
+            b"Not run: outside the tool choice",
+        ),
+        (
+            smith::NotRunWhy::AfterFailedWrite(
+                smith::AfterFailedWrite::new(&CEILINGS, smith::AfterFailedWriteParts { call: 9 }).unwrap(),
+            ),
+            b"Not run: after a failed write",
+        ),
+    ] {
+        assert_result(
+            smith::Returned::NotRun(smith::NotRun::new(&CEILINGS, smith::NotRunParts { why }).unwrap()),
+            expected,
+            true,
+        );
+    }
+}
+
+#[test]
+fn a_turns_count_of_jobs_is_not_shown() {
+    let source = source(&[message(smith::Role::Assistant, &[call(b"id")])]);
+    let without_jobs = decode(&limits(), &encode(&source)).unwrap();
+    let mut parts = source.into_parts();
+    parts.jobs = 3;
+    let with_jobs = smith::Turn::new(&CEILINGS, parts).unwrap();
+    assert_eq!(without_jobs, decode(&limits(), &encode(&with_jobs)).unwrap());
 }

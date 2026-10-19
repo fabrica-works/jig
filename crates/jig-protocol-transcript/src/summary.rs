@@ -52,13 +52,13 @@ fn validate_returned(limits: &smith::Limits, returned: &smith::Returned) -> Resu
             smith::Outcome::Found(found) => {
                 hit_count(limits, found.hits())?;
             }
-            // removed by jig-01.2
-            smith::Outcome::Running(_) | smith::Outcome::Job(_) => return Err(Undecodable::Unknown),
             smith::Outcome::Read(_)
             | smith::Outcome::Listed(_)
             | smith::Outcome::Written(_)
             | smith::Outcome::Edited(_)
             | smith::Outcome::Exited(_)
+            | smith::Outcome::Running(_)
+            | smith::Outcome::Job(_)
             | smith::Outcome::NotGranted
             | smith::Outcome::Outside(_)
             | smith::Outcome::ReadOnly(_)
@@ -78,20 +78,10 @@ fn validate_returned(limits: &smith::Limits, returned: &smith::Returned) -> Resu
             | smith::Outcome::Busy
             | smith::Outcome::NulByte => {}
         },
-        smith::Returned::Invalid(invalid) => match invalid.problem() {
-            // removed by jig-01.2
-            smith::CallProblem::JobsFull(_) | smith::CallProblem::UnknownJob(_) => return Err(Undecodable::Unknown),
-            smith::CallProblem::UnknownTool
-            | smith::CallProblem::NotAnObject
-            | smith::CallProblem::Missing(_)
-            | smith::CallProblem::WrongType(_)
-            | smith::CallProblem::BadValue(_)
-            | smith::CallProblem::TooLarge
-            | smith::CallProblem::Oversize(_)
-            | smith::CallProblem::CutOff(_)
-            | smith::CallProblem::Nesting => {}
-        },
-        smith::Returned::Said(_) | smith::Returned::NotRun(_) | smith::Returned::Withdrawn => {}
+        smith::Returned::Invalid(_)
+        | smith::Returned::Said(_)
+        | smith::Returned::NotRun(_)
+        | smith::Returned::Withdrawn => {}
     }
     Ok(())
 }
@@ -140,14 +130,23 @@ pub(super) fn summarize(returned: &smith::Returned) -> Summary {
                     builder.number(cut.bytes());
                     builder.put(b" bytes");
                 }
-                // removed by jig-01.2
-                smith::CallProblem::JobsFull(_) | smith::CallProblem::UnknownJob(_) => {
-                    unreachable!("validate refuses job problems")
+                smith::CallProblem::JobsFull(full) => {
+                    builder.put(b"jobs full, at most ");
+                    builder.number(u64::from(full.jobs()));
+                    builder.put(b" at once");
+                }
+                smith::CallProblem::UnknownJob(unknown) => {
+                    builder.put(b"unknown job ");
+                    builder.number(u64::from(unknown.job()));
                 }
                 smith::CallProblem::Nesting => builder.put(b"nested sub-agent"),
             }
         }
-        smith::Returned::NotRun(_) => builder.put(b"Not run"),
+        smith::Returned::NotRun(not_run) => builder.put(match not_run.why() {
+            smith::NotRunWhy::Stopped => b"Not run: stopped",
+            smith::NotRunWhy::OutsideChoice(_) => b"Not run: outside the tool choice",
+            smith::NotRunWhy::AfterFailedWrite(_) => b"Not run: after a failed write",
+        }),
         smith::Returned::Withdrawn => builder.put(b"Withdrawn"),
     }
     let length = builder.bytes.len();
@@ -217,8 +216,13 @@ impl Builder {
                 self.put(b" matches");
             }
             smith::Outcome::Exited(end) => self.command(end),
-            // removed by jig-01.2
-            smith::Outcome::Running(_) | smith::Outcome::Job(_) => unreachable!("validate refuses job outcomes"),
+            smith::Outcome::Running(running) => {
+                self.failed = false;
+                self.put(b"Started as job ");
+                self.number(u64::from(running.job()));
+                self.output(running.head(), running.last(), running.dropped());
+            }
+            smith::Outcome::Job(job) => self.job(job),
             smith::Outcome::NotGranted => self.put(b"Tool refused: not granted"),
             smith::Outcome::Outside(_) => self.put(b"Tool refused: outside workspace"),
             smith::Outcome::ReadOnly(_) => self.put(b"Tool refused: read only"),
@@ -262,9 +266,33 @@ impl Builder {
             smith::Outcome::NulByte => self.put(b"Tool refused: NUL byte"),
         }
     }
+    fn job(&mut self, job: &smith::JobRead) {
+        self.put(b"Job ");
+        self.number(u64::from(job.job()));
+        match job.end() {
+            smith::JobEnd::Running => {
+                self.failed = false;
+                self.put(b" answered running");
+            }
+            smith::JobEnd::Ended(ended) => {
+                self.put(b" ended: ");
+                self.exit(ended.exit());
+            }
+            smith::JobEnd::Stopped => {
+                self.failed = false;
+                self.put(b" stopped");
+            }
+            smith::JobEnd::Cancelled => self.put(b" cancelled"),
+        }
+        self.output(job.head(), job.last(), job.dropped());
+    }
     fn command(&mut self, end: &smith::CommandEnd) {
         self.put(b"Command ended: ");
-        match end.exit() {
+        self.exit(end.exit());
+        self.output(end.head(), end.last(), end.dropped());
+    }
+    fn exit(&mut self, exit: &smith::Exit) {
+        match exit {
             smith::Exit::Code(code) => {
                 self.failed = code.code() != 0;
                 self.put(b"exit ");
@@ -276,13 +304,15 @@ impl Builder {
             }
             smith::Exit::TimedOut => self.put(b"timed out"),
         }
+    }
+    fn output(&mut self, head: &[u8], last: &[u8], dropped: u64) {
         self.put(b"; output bytes ");
-        let length = u64::try_from(end.head().len())
+        let length = u64::try_from(head.len())
             .expect("schema bounded bytes")
-            .checked_add(u64::try_from(end.last().len()).expect("schema bounded bytes"))
+            .checked_add(u64::try_from(last.len()).expect("schema bounded bytes"))
             .expect("schema bounded bytes");
         self.number(length);
         self.put(b"; dropped ");
-        self.number(end.dropped());
+        self.number(dropped);
     }
 }

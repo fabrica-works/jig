@@ -324,6 +324,7 @@ mod offered_acts;
 
 mod fault_stories;
 
+mod job_stories;
 mod referee_stories;
 
 fn completion() -> jig_domain_fleet::Activity {

@@ -65,6 +65,13 @@ pub struct Session {
     stream_due: BTreeMap<ClientId, Time>,
 }
 impl Session {
+    #[cfg(test)]
+    pub(super) fn transcript_text_limit(&mut self, bytes: u32) {
+        self.codec.turn.text = bytes;
+        self.limits.client.domain.text = bytes;
+        self.limits.client.domain.turn_bytes = bytes;
+    }
+
     #[must_use]
     pub fn new(driver: Driver, limits: Limits, codec: jig_protocol_transcript::Limits) -> Self {
         let truth = Truth::after(driver.world.store.rows.clone());
