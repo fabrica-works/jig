@@ -642,7 +642,11 @@ fn application_read(channel: Channel, local: Token, terminal: std::result::Resul
             result: match reason {
                 ReadNone::SignedOut => obs::ReadResult::SignedOut,
                 ReadNone::Busy | ReadNone::Unreachable => obs::ReadResult::Busy,
-                ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone => obs::ReadResult::Unknown,
+                ReadNone::Unknown
+                | ReadNone::Refused
+                | ReadNone::Gone
+                | ReadNone::TooLarge { .. }
+                | ReadNone::Malformed => obs::ReadResult::Unknown,
             },
         }),
         (Channel::Infrastructure, Err(reason)) => Event::Infrastructure(infra::Event::Read {
@@ -650,7 +654,11 @@ fn application_read(channel: Channel, local: Token, terminal: std::result::Resul
             result: match reason {
                 ReadNone::SignedOut => infra::ReadResult::SignedOut,
                 ReadNone::Busy | ReadNone::Unreachable => infra::ReadResult::Busy,
-                ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone => infra::ReadResult::Unknown,
+                ReadNone::Unknown
+                | ReadNone::Refused
+                | ReadNone::Gone
+                | ReadNone::TooLarge { .. }
+                | ReadNone::Malformed => infra::ReadResult::Unknown,
             },
         }),
         (Channel::Jig, _)

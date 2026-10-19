@@ -87,3 +87,78 @@ fn a_turn_of_another_line_is_unknown() {
         }
     }
 }
+
+fn failure(owner: Box<tasks::TaskRecord>, why: reads::TurnFailure) -> reads::Loaded {
+    reads::Loaded::TurnProblem { task: 1, attempt: 1, turn: 2, owner, why }
+}
+fn turn_load(core: &mut Core, limits: &Limits) -> Token {
+    let Held::ReadLoad { load, .. } = read_start(core, limits, 10, reads::Read::Turn { task: 1, attempt: 1, turn: 2 })
+    else {
+        panic!("turn load")
+    };
+    load
+}
+#[test]
+fn an_invisible_turns_failure_is_unknown() {
+    for why in [reads::TurnFailure::Malformed, reads::TurnFailure::TooLarge { bytes: 8192 }] {
+        let (mut core, limits) = watch_core();
+        let mut owner = Box::new(core.tasks.task(1).expect("owner").clone());
+        owner.project = 2;
+        let load = turn_load(&mut core, &limits);
+        assert_eq!(
+            loaded_answer(&mut core, &limits, load, failure(owner, why)),
+            Some(reads::Answer::None(reads::Why::Unknown)),
+            "{why:?}"
+        );
+    }
+}
+#[test]
+fn a_turn_failure_rechecks_its_sign_in() {
+    let (mut core, limits) = watch_core();
+    let owner = Box::new(core.tasks.task(1).expect("owner").clone());
+    let load = turn_load(&mut core, &limits);
+    watch_outputs(
+        &mut core,
+        &limits,
+        Event::People(people::Event::SignOut { sign_in: 10, reply_to: ReplyTo::new(Token::new(91)) }),
+    );
+    assert_eq!(
+        loaded_answer(&mut core, &limits, load, failure(owner, reads::TurnFailure::Malformed)),
+        Some(reads::Answer::None(reads::Why::SignedOut))
+    );
+}
+#[test]
+fn a_mismatched_turn_failure_is_unknown() {
+    for (label, task, attempt, turn) in [("task", 2, 1, 2), ("attempt", 1, 2, 2), ("turn", 1, 1, 3)] {
+        let (mut core, limits) = watch_core();
+        let owner = Box::new(core.tasks.task(1).expect("owner").clone());
+        let load = turn_load(&mut core, &limits);
+        let result = reads::Loaded::TurnProblem { task, attempt, turn, owner, why: reads::TurnFailure::Malformed };
+        assert_eq!(
+            loaded_answer(&mut core, &limits, load, result),
+            Some(reads::Answer::None(reads::Why::Unknown)),
+            "{label}"
+        );
+    }
+}
+#[test]
+fn a_visible_turn_failure_keeps_its_reason_within_its_bound() {
+    for (why, expected, tiny) in [
+        (reads::TurnFailure::Malformed, reads::Why::Malformed, false),
+        (reads::TurnFailure::TooLarge { bytes: 8192 }, reads::Why::TooLarge { bytes: 8192 }, false),
+        (reads::TurnFailure::Malformed, reads::Why::Busy, true),
+    ] {
+        let (mut core, mut limits) = watch_core();
+        if tiny {
+            limits.load_bytes = 1;
+        }
+        let owner = Box::new(core.tasks.task(1).expect("owner").clone());
+        let load = turn_load(&mut core, &limits);
+        assert_eq!(
+            loaded_answer(&mut core, &limits, load, failure(owner, why)),
+            Some(reads::Answer::None(expected)),
+            "{why:?} tiny={tiny}"
+        );
+        assert_eq!(loaded_answer(&mut core, &limits, load, reads::Loaded::Busy), None);
+    }
+}

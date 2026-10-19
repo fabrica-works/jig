@@ -191,6 +191,10 @@ pub enum ReadValue {
 /// Why one read has no value.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ReadNone {
+    /// Original turn payload bytes, past the engine or client read bound.
+    TooLarge { bytes: u64 },
+    /// The visible turn could not be read or decoded whole.
+    Malformed,
     /// No object the party may see.
     Unknown,
     /// Not admitted.

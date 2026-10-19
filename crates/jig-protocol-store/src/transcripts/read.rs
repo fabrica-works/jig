@@ -6,11 +6,15 @@ use jig_domain_core::{self as domain, TurnRecord};
 use jig_domain_tasks as tasks;
 use skein_io::file;
 use skein_lib::{List, Map, Queue, Reader, Token, Writer};
+mod party;
 pub(crate) const OWNER: Token = Token::new(0x5453);
 #[derive(Debug)]
 pub(crate) struct Party {
     pub activity: Option<u64>,
     pub bytes: u64,
+    pub turn: Option<(u64, u32)>,
+    pub problem: Option<domain::reads::TurnFailure>,
+    pub busy: bool,
 }
 #[derive(Debug)]
 enum Scan {
@@ -52,6 +56,7 @@ pub(crate) fn worst_case(limits: &Limits, codec: &codec::Limits) -> Option<u64> 
                 .checked_mul(u64::from(limits.reads))?,
         )?
         .checked_add(frame.checked_mul(3)?)?
+        .checked_add(u64::try_from(size_of::<domain::reads::Loaded>()).ok()?)?
         .checked_add(limits.core.load_bytes.checked_mul(3)?.checked_mul(u64::from(limits.reads))?)
 }
 pub(crate) fn transcript(
@@ -72,31 +77,7 @@ pub(crate) fn transcript(
     store.transcripts.reads.insert(owner, read).expect("read slot checked at admission");
     fire(store, above, below);
 }
-pub(crate) fn party(
-    store: &mut Store,
-    owner: Token,
-    request: TranscriptRead,
-    party: Party,
-    above: &mut Queue<Event>,
-    below: &mut Below,
-) -> Result<Option<jig_domain_core::reads::Loaded>, reads::Failure> {
-    assert!(!store.transcripts.reads.contains_key(&owner), "one transcript read per owner");
-    if store.transcripts.reads.len() == store.limits.reads {
-        return Ok(Some(jig_domain_core::reads::Loaded::Busy));
-    }
-    let task = match request {
-        TranscriptRead::Window { task, .. } | TranscriptRead::Turn { task, .. } | TranscriptRead::Page { task, .. } => {
-            task
-        }
-    };
-    let Some(mut read) = prepare(store, owner, request, 1, u64::from(store.limits.store.page.bytes)) else {
-        return reads::ready(reads::finish(store, task, party, None));
-    };
-    read.party = Some(party);
-    store.transcripts.reads.insert(owner, read).expect("party read slot checked at admission");
-    fire(store, above, below);
-    Ok(None)
-}
+pub(crate) use party::start as party;
 /// Pending activity lines keep their original page order while one transcript walk joins them.
 #[derive(Debug)]
 struct Activity {
@@ -451,7 +432,7 @@ fn length(
     if start.checked_add(u64::from(length)).ok_or(())? > read.end {
         return Err(());
     }
-    if read.activity.is_some() {
+    if read.activity.is_some() || party::single(read) {
         if length < 48 {
             return Err(());
         }
@@ -502,6 +483,25 @@ fn header(
         u64::try_from(bytes.len()).or(Err(()))?.checked_add(u64::from(size)).ok_or(())?.checked_add(8).ok_or(())?;
     if u64::from(length) != expected || size > store.codec.core.turn_record_transcript {
         return Err(());
+    }
+    if party::single(read) {
+        if party::header(store, read, &turn, size)? {
+            if read.party.as_ref().expect("party").problem.is_some() {
+                read.step = Step::Sized { offset, length, turn, size, bytes: Writer::new(4) };
+                demand(
+                    store,
+                    read,
+                    offset.checked_add(u64::from(length)).ok_or(())?.checked_sub(4).ok_or(())?,
+                    4,
+                    below,
+                )?;
+                return Ok(false);
+            }
+            return Ok(true);
+        }
+        read.step = Step::Frame { offset, length, bytes: Writer::new(usize::try_from(length).expect("bounded frame")) };
+        demand(store, read, offset, length, below)?;
+        return Ok(false);
     }
     let page = read.activity.as_mut().expect("activity header only");
     let identity = (turn.task, turn.attempt, turn.turn);
@@ -554,6 +554,9 @@ fn sized(
     size: u32,
     below: &mut Below,
 ) -> Result<bool, ()> {
+    if read.party.is_some() {
+        return Ok(true);
+    }
     let page = read.activity.as_mut().expect("activity size");
     let row = page.rows.get_mut(page.index).expect("pending turn row");
     row.unjoined = Some(domain::reads::UnjoinedTurn::TooLarge {
@@ -641,10 +644,13 @@ fn accept(
         return older(store, read, offset, below);
     }
     if found {
-        if read.turns.room() == 0 || u64::from(length) > read.budget {
+        let single = party::single(read);
+        if read.turns.room() == 0 || (!single && u64::from(length) > read.budget) {
             return Ok(true);
         }
-        read.budget = read.budget.checked_sub(u64::from(length)).expect("frame within budget");
+        if !single {
+            read.budget = read.budget.checked_sub(u64::from(length)).expect("frame within budget");
+        }
         read.turns.push(turn).expect("next checked row capacity");
     }
     read.position = if read.backwards { offset } else { offset.checked_add(u64::from(length)).ok_or(())? };
@@ -653,7 +659,7 @@ fn accept(
             if found {
                 Ok(true)
             } else if read.position == read.end {
-                Err(())
+                if party::single(read) { Ok(true) } else { Err(()) }
             } else {
                 next(store, read, below)
             }
@@ -678,10 +684,9 @@ fn settle(store: &mut Store, owner: Token, mut read: Read, result: Result<bool, 
             store.transcripts.reads.insert(owner, read).expect("active read retains its slot");
         }
         Ok(true) => {
-            if let Some(party) = read.party {
+            if read.party.is_some() {
                 store.transcripts.reading = None;
-                let turn = read.turns.into_boxed().into_iter().next();
-                let result = reads::finish(store, read.task, party, turn);
+                let result = party::finish(store, read, false);
                 reads::answer(store, owner, reads::ready(result), above);
                 return;
             }
@@ -705,9 +710,9 @@ fn settle(store: &mut Store, owner: Token, mut read: Read, result: Result<bool, 
         }
         Err(()) => {
             store.transcripts.reading = None;
-            match read.party {
-                Some(party) => {
-                    let result = reads::finish(store, read.task, party, None);
+            match &read.party {
+                Some(_) => {
+                    let result = party::finish(store, read, true);
                     reads::answer(store, owner, reads::ready(result), above);
                 }
                 None => above.push(Event::Unread { owner }),

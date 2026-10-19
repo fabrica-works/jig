@@ -156,7 +156,9 @@ pub(crate) fn read_result(
     match result {
         ReadResult::None(why) => match why {
             contract::ReadNone::SignedOut => crate::ui::signed_out(domain, out, lent),
-            contract::ReadNone::Unknown
+            contract::ReadNone::TooLarge { .. }
+            | contract::ReadNone::Malformed
+            | contract::ReadNone::Unknown
             | contract::ReadNone::Gone
             | contract::ReadNone::Refused
             | contract::ReadNone::Busy

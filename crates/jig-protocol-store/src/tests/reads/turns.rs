@@ -5,11 +5,16 @@ use super::{
 };
 
 #[test]
-fn an_unread_turn_is_an_empty_page() {
+fn an_unread_turn_is_malformed() {
     let (mut store, mut disk) = party_store();
     corrupt_disk(&mut disk);
     let below = waiting_party(&mut store, turn_range());
-    assert_empty(&read_disk(&mut store, below, &disk));
+    let reads::Loaded::TurnProblem { task, attempt, turn, owner, why } = read_disk(&mut store, below, &disk) else {
+        panic!("malformed evidence")
+    };
+    assert_eq!((task, attempt, turn), (CHILD, 1, 2));
+    assert_eq!(*owner, super::task_owner());
+    assert_eq!(why, reads::TurnFailure::Malformed);
 }
 
 #[test]
@@ -18,7 +23,7 @@ fn a_turn_row_counts_its_joined_owner_against_the_byte_budget() {
     let mut range = turn_range();
     range.bytes = 1;
     let below = waiting_party(&mut store, range);
-    assert_empty(&read_disk(&mut store, below, &disk));
+    let reads::Loaded::Busy = read_disk(&mut store, below, &disk) else { panic!("evidence must fit") };
 }
 
 #[test]
@@ -59,4 +64,41 @@ fn a_reply_with_no_transcript_place_returns_without_its_turn() {
     let result = read_result(events);
     assert_eq!(one_row(&result).related, None);
     assert!(below.transcripts.is_empty());
+}
+
+#[test]
+fn an_oversized_turn_keeps_its_payload_size() {
+    let (mut store, disk) = party_store();
+    let below = waiting_party(&mut store, turn_range());
+    let carried = read_disk(&mut store, below, &disk);
+    // One byte below this exact complete row excludes the payload, while evidence fits.
+    let row_bytes = one_row(&carried).owned_bytes().expect("row size");
+    let mut range = turn_range();
+    range.bytes = row_bytes.checked_sub(1).expect("complete row");
+    let below = waiting_party(&mut store, range);
+    let reads::Loaded::TurnProblem { task, attempt, turn, owner, why } = read_disk(&mut store, below, &disk) else {
+        panic!("size evidence")
+    };
+    assert_eq!((task, attempt, turn), (CHILD, 1, 2));
+    assert_eq!(*owner, super::task_owner());
+    assert_eq!(why, reads::TurnFailure::TooLarge { bytes: 3 });
+}
+
+#[test]
+fn a_turn_past_the_join_budget_is_busy() {
+    let (mut store, disk) = party_store();
+    store.limits.joins = 1;
+    let below = waiting_party(&mut store, turn_range());
+    let reads::Loaded::Busy = read_disk(&mut store, below, &disk) else { panic!("owner evidence requires two gets") };
+}
+
+#[test]
+fn an_absent_turn_is_an_empty_page() {
+    for turn in [0, 3] {
+        let (mut store, disk) = party_store();
+        let mut range = turn_range();
+        range.scope = reads::Scope::Turn { task: CHILD, attempt: 1, turn };
+        let below = waiting_party(&mut store, range);
+        assert_empty(&read_disk(&mut store, below, &disk));
+    }
 }

@@ -13,19 +13,19 @@ const DELEGATE: u64 = core::ToolFamilies::JIG.delegate.0;
 
 #[must_use]
 pub fn world(seed: u64) -> World {
-    read_world(seed, None, 2, None)
+    read_world(seed, None, 2, None, false)
 }
 
 /// A read fixture with a chosen bounded live page size.
 #[must_use]
 pub fn world_with_rows(seed: u64, rows: u32) -> World {
-    read_world(seed, None, rows, None)
+    read_world(seed, None, rows, None, false)
 }
 
 /// A conversation whose retention releases its durable owner after both marks.
 #[must_use]
 pub fn forgettable_world(seed: u64) -> World {
-    let world = read_world(seed, None, 2, Some(forgettable_conversation()));
+    let world = read_world(seed, None, 2, Some(forgettable_conversation()), false);
     assert!(world.assigned.is_some(), "initial conversation assigned: {:?}", world.people_answers);
     world
 }
@@ -80,12 +80,26 @@ pub fn conversation_member(forgettable: bool) -> people::Member {
     }
 }
 
-fn read_world(seed: u64, reply_bound: Option<u32>, rows: u32, initial: Option<people::Ask>) -> World {
+// Eight KiB admits a task owner and fixed evidence; a payload one byte larger cannot fit.
+pub const TURN_READ_BYTES: u32 = 8192;
+// The transcript admits the payload independently of the complete single-row read bound.
+pub const LARGE_TURN_BYTES: u32 = TURN_READ_BYTES + 1;
+/// The ordinary read world, admitting one transcript larger than its single-read budget.
+#[must_use]
+pub fn world_with_large_turn(seed: u64) -> World {
+    read_world(seed, None, 2, None, true)
+}
+
+fn read_world(seed: u64, reply_bound: Option<u32>, rows: u32, initial: Option<people::Ask>, large_turn: bool) -> World {
     let (configuration, mut limits) = crate::effects::fixture(seed, false);
     if let Some(bound) = reply_bound {
         limits.core.tasks.inbox_messages = bound;
         limits.core.tasks.run_inbox = bound;
         limits.core.people.inbox_entries = bound;
+    }
+    if large_turn {
+        limits.core.load_bytes = u64::from(TURN_READ_BYTES);
+        limits.core.run_bytes = LARGE_TURN_BYTES;
     }
     limits.core.documents.rows = rows;
     if reply_bound.is_none() {
@@ -151,7 +165,7 @@ pub fn conversation(world: &mut World, task: u64, first: u64) -> Vec<tasks::Acti
 
 /// A temporal cache prefix must remain a prefix even when a later turn has an earlier wall time.
 pub fn a_backward_wall_correction_keeps_reply_paging_whole_after_restart() {
-    let mut world = read_world(766, Some(2), 2, None);
+    let mut world = read_world(766, Some(2), 2, None, false);
     let task = world.assigned.as_ref().expect("chat").task;
     world.advance(Duration::from_secs(2));
     world.turn(1, 1, None, b"before correction one");

@@ -780,7 +780,13 @@ pub(crate) fn read_card(
         ReadResult::None(why) => {
             match why {
                 ReadNone::SignedOut => crate::ui::signed_out(domain, out, lent),
-                ReadNone::Unknown | ReadNone::Gone | ReadNone::Refused | ReadNone::Busy | ReadNone::Unreachable => {}
+                ReadNone::TooLarge { .. }
+                | ReadNone::Malformed
+                | ReadNone::Unknown
+                | ReadNone::Gone
+                | ReadNone::Refused
+                | ReadNone::Busy
+                | ReadNone::Unreachable => {}
             }
             None
         }

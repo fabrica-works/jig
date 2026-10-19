@@ -704,7 +704,13 @@ impl Scripted {
                     Ok(d) => family::ReadResult::Value(d),
                     Err(ReadNone::Busy | ReadNone::Unreachable) => family::ReadResult::Busy,
                     Err(ReadNone::SignedOut) => family::ReadResult::SignedOut,
-                    Err(ReadNone::Unknown | ReadNone::Refused | ReadNone::Gone) => family::ReadResult::Unknown,
+                    Err(
+                        ReadNone::Unknown
+                        | ReadNone::Refused
+                        | ReadNone::Gone
+                        | ReadNone::TooLarge { .. }
+                        | ReadNone::Malformed,
+                    ) => family::ReadResult::Unknown,
                 },
             }),
             Up::App { watch: _, document } => {

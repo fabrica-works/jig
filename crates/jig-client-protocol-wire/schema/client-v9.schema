@@ -411,7 +411,8 @@ enum QueryOrder { number, changed, activity, priority, ended }
 record TaskQuery { project: option u32 requester: option OwnerRequester root: option u64 parent: option u64 label: option u32 phase: option PhaseClass executor: option ExecutorKind tracked: option bool order: QueryOrder }
 record ReadTasks { query: TaskQuery live: option Cursor ended: option Cursor }
 enum Read { tasks: ReadTasks, me, task: ReadTask, proposal: ReadProposal, escalation: ReadEscalation, question: ReadQuestion, person_task: ReadPersonTask, result: ReadResult, ended: ReadEnded, history: ReadHistory, activity: ReadActivity, inbox: ReadInbox, spend: ReadSpend, project: ReadProject, notes: ReadNotes, deployment }
-enum ReadNone { unknown, refused, gone, busy, signed_out }
+record TurnTooLarge { bytes: u64 }
+enum ReadNone { unknown, refused, gone, busy, signed_out, too_large: TurnTooLarge, malformed }
 record ReadAnswerNone { value: ReadNone }
 enum ReadAnswer { not_served: NotServed, value: Owned, none: ReadAnswerNone }
 record OwnerPeriodTimes { began: u64 next: option u64 }
@@ -454,7 +455,6 @@ enum OwnerActivity { words: OwnerActivityWords, heard: OwnerActivityHeard, notif
 record OwnerActivityLine { task: u64 position: u64 at: u64 line: OwnerActivity }
 record TurnName { attempt: u64 number: u32 }
 record TurnCarried { bytes: bytes 8388608 }
-record TurnTooLarge { bytes: u64 }
 enum TurnBytes { carried: TurnCarried, too_large: TurnTooLarge }
 record ArchivedTurn { task: u64 name: TurnName cumulative: u64 read: option u64 at: u64 turn: TurnBytes }
 record RunBeginningFresh { tail_count: u32 }

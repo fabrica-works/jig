@@ -58,7 +58,15 @@ fn a_cursor_past_its_bound_is_refused() {
 
 fn each_read_none_round_trips_unchanged() {
     let limits = fixtures::limits();
-    for none in [ReadNone::Unknown, ReadNone::Refused, ReadNone::Gone, ReadNone::Busy, ReadNone::SignedOut] {
+    for none in [
+        ReadNone::Unknown,
+        ReadNone::Refused,
+        ReadNone::Gone,
+        ReadNone::Busy,
+        ReadNone::SignedOut,
+        ReadNone::Malformed,
+        ReadNone::TooLarge(TurnTooLarge::new(&limits, TurnTooLargeParts { bytes: 8192 }).expect("size")),
+    ] {
         let answer = ReadAnswer::None(fixtures::read_none(none));
         let bytes = fixtures::encoded(&answer, ReadAnswer::measure, ReadAnswer::encode);
         assert_eq!(ReadAnswer::decode(&limits, &mut Reader::new(&bytes)), Ok(answer));

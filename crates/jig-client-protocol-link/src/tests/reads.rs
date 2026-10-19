@@ -54,6 +54,13 @@ fn a_family_read_body_keeps_its_opaque_owner_record() {
 #[test]
 fn each_wire_none_keeps_its_reason() {
     for (wire, client) in [
+        (w::ReadNone::Malformed, c::ReadNone::Malformed),
+        (
+            w::ReadNone::TooLarge(
+                w::TurnTooLarge::new(&fixtures::limits().wire, w::TurnTooLargeParts { bytes: 8192 }).expect("size"),
+            ),
+            c::ReadNone::TooLarge { bytes: 8192 },
+        ),
         (w::ReadNone::Unknown, c::ReadNone::Unknown),
         (w::ReadNone::Refused, c::ReadNone::Refused),
         (w::ReadNone::Gone, c::ReadNone::Gone),
@@ -108,6 +115,13 @@ fn a_lost_read_is_answered_once() {
 #[test]
 fn a_read_none_answer_keeps_each_wire_reason_once() {
     for (wire, client) in [
+        (w::ReadNone::Malformed, c::ReadNone::Malformed),
+        (
+            w::ReadNone::TooLarge(
+                w::TurnTooLarge::new(&fixtures::limits().wire, w::TurnTooLargeParts { bytes: 8192 }).expect("size"),
+            ),
+            c::ReadNone::TooLarge { bytes: 8192 },
+        ),
         (w::ReadNone::Unknown, c::ReadNone::Unknown),
         (w::ReadNone::Refused, c::ReadNone::Refused),
         (w::ReadNone::Gone, c::ReadNone::Gone),

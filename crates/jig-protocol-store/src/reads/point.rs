@@ -143,7 +143,7 @@ pub(super) fn reply(
             store,
             token,
             TranscriptRead::Turn { task, attempt, turn },
-            read::Party { activity: Some(activity), bytes: range.bytes },
+            read::Party { activity: Some(activity), bytes: range.bytes, turn: None, problem: None, busy: false },
             above,
             below,
         ),
@@ -176,7 +176,7 @@ pub(super) fn turn(
         store,
         owner,
         TranscriptRead::Turn { task, attempt, turn },
-        read::Party { activity: None, bytes: range.bytes },
+        read::Party { activity: None, bytes: range.bytes, turn: Some((attempt, turn)), problem: None, busy: false },
         above,
         below,
     )
@@ -198,6 +198,18 @@ pub(crate) fn finish(
     turn: Option<core::TurnRecord>,
 ) -> Result<reads::Loaded, Failure> {
     let mut spent = Spent { rows: 1, bytes: u64::MAX, joins: store.limits.joins };
+    if party.busy {
+        return Ok(reads::Loaded::Busy);
+    }
+    if let Some(why) = party.problem {
+        let owner = match joins::owner(store, task, &mut spent) {
+            Ok(Some(owner)) => owner,
+            Ok(None) => return Ok(empty()),
+            Err(Failure::Cut) => return Ok(reads::Loaded::Busy),
+            Err(Failure::Corrupt) => return Err(Failure::Corrupt),
+        };
+        return problem(task, &party, owner, why);
+    }
     let mut related = None;
     let value = match party.activity {
         Some(activity) => {
@@ -218,9 +230,30 @@ pub(crate) fn finish(
     let mut row = joins::row(store, value, Some(&owner), None, &mut spent)?;
     row.related = related;
     if row.owned_bytes().ok_or(Failure::Corrupt)? > party.bytes {
+        if party.turn.is_some() {
+            let core::Record::Core(core::CoreRecord::Turn(turn)) = &row.value else { return Err(Failure::Corrupt) };
+            let why =
+                reads::TurnFailure::TooLarge { bytes: u64::try_from(turn.transcript.len()).or(Err(Failure::Corrupt))? };
+            let owner = row.owner.take().ok_or(Failure::Corrupt)?;
+            return problem(task, &party, owner, why);
+        }
         return Err(Failure::Cut);
     }
     Ok(reads::Loaded::Page { rows: Box::new([row]), next: None })
+}
+
+fn problem(
+    task: u64,
+    party: &read::Party,
+    owner: Box<tasks::TaskRecord>,
+    why: reads::TurnFailure,
+) -> Result<reads::Loaded, Failure> {
+    let (attempt, turn) = party.turn.ok_or(Failure::Corrupt)?;
+    let Some(bytes) = reads::TurnFailure::owned_bytes(&owner) else { return Ok(reads::Loaded::Busy) };
+    if bytes > party.bytes {
+        return Ok(reads::Loaded::Busy);
+    }
+    Ok(reads::Loaded::TurnProblem { task, attempt, turn, owner, why })
 }
 
 /// Exact history key for the newest retained occurrence of a task proposal.

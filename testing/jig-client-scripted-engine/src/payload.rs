@@ -950,7 +950,14 @@ impl Payload for ReadValue {
 impl Payload for ReadNone {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Unknown | Self::Refused | Self::Gone | Self::Unreachable | Self::Busy | Self::SignedOut => Some(0),
+            Self::TooLarge { .. }
+            | Self::Malformed
+            | Self::Unknown
+            | Self::Refused
+            | Self::Gone
+            | Self::Unreachable
+            | Self::Busy
+            | Self::SignedOut => Some(0),
         }
     }
 }

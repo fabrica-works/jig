@@ -164,9 +164,10 @@ pub(crate) mod infrastructure {
                         jig_client::contract::ReadNone::Busy | jig_client::contract::ReadNone::Unreachable => {
                             d::ReadResult::Busy
                         }
-                        jig_client::contract::ReadNone::Unknown | jig_client::contract::ReadNone::Gone => {
-                            d::ReadResult::Unknown
-                        }
+                        jig_client::contract::ReadNone::Unknown
+                        | jig_client::contract::ReadNone::Gone
+                        | jig_client::contract::ReadNone::TooLarge { .. }
+                        | jig_client::contract::ReadNone::Malformed => d::ReadResult::Unknown,
                     },
                     jig_client::Readout::Jig(jig_client::contract::ReadResult::Value(_)) => d::ReadResult::Unknown,
                 };
@@ -289,9 +290,10 @@ pub(crate) mod observability {
                         jig_client::contract::ReadNone::Busy | jig_client::contract::ReadNone::Unreachable => {
                             d::ReadResult::Busy
                         }
-                        jig_client::contract::ReadNone::Unknown | jig_client::contract::ReadNone::Gone => {
-                            d::ReadResult::Unknown
-                        }
+                        jig_client::contract::ReadNone::Unknown
+                        | jig_client::contract::ReadNone::Gone
+                        | jig_client::contract::ReadNone::TooLarge { .. }
+                        | jig_client::contract::ReadNone::Malformed => d::ReadResult::Unknown,
                     },
                     jig_client::Readout::Jig(jig_client::contract::ReadResult::Value(_)) => d::ReadResult::Unknown,
                 };

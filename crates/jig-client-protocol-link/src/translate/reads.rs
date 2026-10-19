@@ -128,6 +128,8 @@ pub fn owned(value: Readable, limits: &w::Limits) -> Result<w::Owned, w::Problem
 #[must_use]
 pub fn none(value: &w::ReadNone) -> c::ReadNone {
     match value {
+        w::ReadNone::TooLarge(value) => c::ReadNone::TooLarge { bytes: value.bytes() },
+        w::ReadNone::Malformed => c::ReadNone::Malformed,
         w::ReadNone::Unknown => c::ReadNone::Unknown,
         w::ReadNone::Refused => c::ReadNone::Refused,
         w::ReadNone::Gone => c::ReadNone::Gone,

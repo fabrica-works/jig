@@ -17,13 +17,14 @@
 mod vocabulary;
 pub use vocabulary::{
     Answer, Cursor, EndedGroup, Filter, Group, Historical, Loaded, Page, PageRow, PageTurn, Past, Position, Range,
-    Read, Row, Scope, TaskPage, UnjoinedTurn, Why,
+    Read, Row, Scope, TaskPage, TurnFailure, UnjoinedTurn, Why,
 };
 pub(crate) mod activity;
 mod answers;
 pub mod ended;
 pub mod indexed;
 mod rows;
+mod turn;
 pub use rows::row_key;
 
 use crate::documents::{self, DocumentClock, Missing, Subject, Window};
@@ -453,6 +454,9 @@ pub(crate) fn loaded(core: &mut Core, env: &Env<Limits>, load: Token, result: Lo
         Answer::None(Why::Unknown)
     } else {
         match result {
+            Loaded::TurnProblem { task, attempt, turn: number, owner, why } => {
+                turn::failure(core, &pending.range, task, attempt, number, &owner, why)
+            }
             Loaded::Busy => Answer::None(Why::Busy),
             Loaded::Gone => Answer::None(Why::Gone),
             Loaded::Page { rows, next } => rows::from_store(core, &env.limits, &pending.range, rows, next),
@@ -550,6 +554,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.load_slots).checked_add(3)?.checked_mul(query_worst_case(limits)?)?)?
         .checked_add(u64::from(limits.load_slots).checked_mul(u64::try_from(size_of::<Position>()).ok()?)?)?
         .checked_add(limits.load_bytes)?
+        // The incoming failure carrier owns its task within load_bytes.
+        .checked_add(u64::try_from(size_of::<Loaded>()).ok()?)?
         .checked_add(u64::from(limits.load_slots).checked_mul(documents::document_with_context_worst_case(limits)?)?)?
         // Reverse live reads retain one bounded tail while making producer pages.
         .checked_add(Queue::<PageRow>::worst_case(limits.documents.rows)?)?

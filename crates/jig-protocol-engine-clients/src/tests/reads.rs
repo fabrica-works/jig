@@ -178,3 +178,22 @@ fn task_query_cursors_preserve_their_keys_orders_and_phases() {
         }
     }
 }
+
+#[test]
+fn turn_failure_terminals_keep_their_reason_after_release() {
+    for (why, expected) in [
+        (reads::Why::Malformed, w::ReadNone::Malformed),
+        (
+            reads::Why::TooLarge { bytes: 8192 },
+            w::ReadNone::TooLarge(
+                w::TurnTooLarge::new(&f::wire(), w::TurnTooLargeParts { bytes: 8192 }).expect("size"),
+            ),
+        ),
+    ] {
+        let mut exchange = f::read_exchange();
+        let (owner, reply, _) = exchange.read(&w::Read::Me);
+        assert!(exchange.read_unanswered(owner));
+        exchange.release_read(reply, reads::Answer::None(why));
+        assert_eq!(exchange.read_answer(owner), f::read_none(expected));
+    }
+}

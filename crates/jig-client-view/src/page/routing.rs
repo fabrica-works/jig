@@ -506,7 +506,11 @@ pub(crate) fn read_result(
                 Source::Window { .. } | Source::Watch(_) | Source::Card(_) => {}
             }
             match why {
-                contract::ReadNone::Unknown | contract::ReadNone::Gone | contract::ReadNone::Refused => {
+                contract::ReadNone::TooLarge { .. }
+                | contract::ReadNone::Malformed
+                | contract::ReadNone::Unknown
+                | contract::ReadNone::Gone
+                | contract::ReadNone::Refused => {
                     if domain.page != Page::Elsewhere {
                         domain.page = Page::Missing;
                     }

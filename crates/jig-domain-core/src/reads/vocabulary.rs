@@ -213,10 +213,29 @@ impl Row {
 pub enum Loaded {
     /// Rows within the range's row and byte caps; continuation is exclusive.
     Page { rows: Box<[Row]>, next: Option<Position> },
+    /// Evidence for a single turn, authenticated against its durable owner.
+    TurnProblem { task: u64, attempt: u64, turn: u32, owner: Box<tasks::TaskRecord>, why: TurnFailure },
     /// Transport admission was full and retained nothing.
     Busy,
     /// This range is no longer available.
     Gone,
+}
+
+/// A selected frame could not be supplied; visibility is checked before its reason leaves.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum TurnFailure {
+    /// Original opaque payload length, past the read budget.
+    TooLarge { bytes: u64 },
+    /// The frame could not be read whole.
+    Malformed,
+}
+
+impl TurnFailure {
+    /// Complete ownership of a failure carrier and its durable task owner.
+    #[must_use]
+    pub fn owned_bytes(owner: &tasks::TaskRecord) -> Option<u64> {
+        u64::try_from(size_of::<Loaded>()).ok()?.checked_add(tasks::task_bytes(owner)?)
+    }
 }
 
 /// An ended object's document and its durable ending facts.
@@ -345,6 +364,10 @@ pub enum Why {
     Busy,
     /// Required historical rows are no longer retained.
     Gone,
+    /// The visible turn could not fit the read budget; original payload bytes.
+    TooLarge { bytes: u64 },
+    /// The visible turn frame could not be read whole.
+    Malformed,
     /// The read's sign-in is unknown to a ready engine, ended or expired.
     SignedOut,
 }

@@ -586,3 +586,16 @@ fn a_subtree_history_reads_each_delegates_rows_found_by_index() {
     assert!(!without_edge.is_empty());
     assert!(without_edge.iter().all(|row| row.1 == goal));
 }
+
+#[test]
+fn a_turn_past_the_read_bound_reports_its_size() {
+    use jig_core_world::stories::reads::{LARGE_TURN_BYTES, TURN_READ_BYTES, world_with_large_turn};
+    let mut world = world_with_large_turn(802);
+    let task = world.assigned.as_ref().expect("chat").task;
+    let body = vec![b'x'; usize::try_from(LARGE_TURN_BYTES).expect("bounded fixture")];
+    assert!(u64::try_from(body.len()).expect("payload length") > u64::from(TURN_READ_BYTES));
+    world.turn(1, 1, None, &body);
+    ask(&mut world, 980, reads::Read::Turn { task, attempt: 1, turn: 1 });
+    assert_eq!(latest(&world), &reads::Answer::None(reads::Why::TooLarge { bytes: u64::from(LARGE_TURN_BYTES) }));
+    assert_eq!(world.reads.as_ref().expect("party").receipts.len(), 1);
+}
