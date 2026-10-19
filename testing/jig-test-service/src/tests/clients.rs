@@ -567,10 +567,7 @@ fn the_printed_url_carries_the_secret_the_component_gave() {
 
 #[test]
 fn a_call_past_the_mounts_room_is_answered_busy() {
-    use skein_lib::{
-        Queue,
-        stream::{Down, Up},
-    };
+    use skein_lib::Queue;
     let mut clients = f::server::retained_clients();
     let capacity = crate::limits::profile_limits(jig_protocol_config::Profile::Small).clients_http.calls;
     let mut peers = skein_lib::List::with_capacity(capacity.checked_add(1).expect("first refused call"));
@@ -588,42 +585,7 @@ fn a_call_past_the_mounts_room_is_answered_busy() {
         clients.server_requests();
     }
     assert_eq!(clients.refused.len(), 1);
-    let response_room = crate::limits::profile_limits(jig_protocol_config::Profile::Small).server.http.response;
-    let mut response = skein_lib::List::with_capacity(response_room);
-    let mut closes = 0_u32;
-    for _ in 0..f::server::SETTLE_STEPS {
-        clients.server.advance(&mut clients.server_out);
-        clients.server_requests();
-        while let Some(request) = clients.io.pop() {
-            match request {
-                io::Request::Stream { stream, down: Down::Demand { room, .. } } if room > 0 => {
-                    let owner = f::server::peer_owner(&peers, stream);
-                    clients.server.up(io::Event::Stream { owner, up: Up::Room }, &mut clients.server_out);
-                }
-                io::Request::Stream { down: Down::Send(bytes), .. } => {
-                    for byte in &bytes {
-                        response.push(*byte).expect("bounded response head");
-                    }
-                }
-                io::Request::Close { entity } => {
-                    closes += 1;
-                    let owner = f::server::peer_owner(&peers, entity);
-                    clients.server.up(io::Event::Closed { owner }, &mut clients.server_out);
-                }
-                io::Request::Listen { .. }
-                | io::Request::Connect { .. }
-                | io::Request::Bind { .. }
-                | io::Request::Reject { .. }
-                | io::Request::Stream { .. }
-                | io::Request::Output { .. }
-                | io::Request::Abort { .. }
-                | io::Request::Spawn { .. }
-                | io::Request::Signal { .. }
-                | io::Request::Usage { .. }
-                | io::Request::Window { .. } => {}
-            }
-        }
-    }
+    let (response, closes) = f::server::retained_response(&mut clients, &peers);
     assert!(response.as_slice().starts_with(b"HTTP/1.1 503 "), "{response:?}");
     let head_end = skein_lib::bytes::find(response.as_slice(), b"\r\n\r\n").expect("response head");
     assert_eq!(response.as_slice().get(head_end + 4..), Some(b"".as_slice()));

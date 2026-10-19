@@ -1,4 +1,5 @@
 use crate::server::{Routed, Server};
+use skein_io as io;
 use skein_lib::{
     List, Queue, Token,
     stream::{Down, Up},
@@ -179,4 +180,48 @@ pub fn retained_clients() -> crate::clients::Clients {
     clients.start(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH).expect("clients start");
     assert!(clients.up(listening()));
     clients
+}
+
+/// Drain retained sockets, collecting response bytes and terminal closes.
+pub fn retained_response(
+    clients: &mut crate::clients::Clients,
+    peers: &List<(Token, Token, Token)>,
+) -> (List<u8>, u32) {
+    let response_room = crate::limits::profile_limits(jig_protocol_config::Profile::Small).server.http.response;
+    let mut response = List::with_capacity(response_room);
+    let mut closes = 0_u32;
+    for _ in 0..SETTLE_STEPS {
+        clients.server.advance(&mut clients.server_out);
+        clients.server_requests();
+        while let Some(request) = clients.io.pop() {
+            match request {
+                io::Request::Stream { stream, down: Down::Demand { room, .. } } if room > 0 => {
+                    let owner = peer_owner(peers, stream);
+                    clients.server.up(io::Event::Stream { owner, up: Up::Room }, &mut clients.server_out);
+                }
+                io::Request::Stream { down: Down::Send(bytes), .. } => {
+                    for byte in &bytes {
+                        response.push(*byte).expect("bounded response head");
+                    }
+                }
+                io::Request::Close { entity } => {
+                    closes = closes.checked_add(1).expect("fixture socket close count");
+                    let owner = peer_owner(peers, entity);
+                    clients.server.up(io::Event::Closed { owner }, &mut clients.server_out);
+                }
+                io::Request::Listen { .. }
+                | io::Request::Connect { .. }
+                | io::Request::Bind { .. }
+                | io::Request::Reject { .. }
+                | io::Request::Stream { .. }
+                | io::Request::Output { .. }
+                | io::Request::Abort { .. }
+                | io::Request::Spawn { .. }
+                | io::Request::Signal { .. }
+                | io::Request::Usage { .. }
+                | io::Request::Window { .. } => {}
+            }
+        }
+    }
+    (response, closes)
 }
