@@ -349,7 +349,8 @@ impl Client {
         self.domain_step(env, domain::Event::Up { up });
     }
     fn drain(&mut self, env: &Env<DomainLimits>, out: &mut Queue<Request>) {
-        for _ in 0..crate::max_out(&self.limits) {
+        let bound = self.domain_out.capacity();
+        for _ in 0..bound {
             if let Some(request) = self.link_out.pop() {
                 self.route_link(env, request, out);
             } else if let Some(request) = self.domain_out.pop() {
@@ -386,15 +387,11 @@ impl Client {
         assert!(self.link_out.is_empty() && self.domain_out.is_empty(), "bounded composition settles");
         if !self.saves.is_empty() {
             self.store.write();
-            out.push(Request::Save {
-                records: core::mem::replace(&mut self.saves, List::with_capacity(crate::max_out(&self.limits))),
-            });
+            out.push(Request::Save { records: core::mem::replace(&mut self.saves, List::with_capacity(bound)) });
         }
         if !self.erases.is_empty() {
             self.store.write();
-            out.push(Request::Erase {
-                records: core::mem::replace(&mut self.erases, List::with_capacity(crate::max_out(&self.limits))),
-            });
+            out.push(Request::Erase { records: core::mem::replace(&mut self.erases, List::with_capacity(bound)) });
         }
     }
     fn route_link(&mut self, env: &Env<DomainLimits>, request: link::Request, out: &mut Queue<Request>) {
