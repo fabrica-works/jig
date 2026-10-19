@@ -1,6 +1,6 @@
 # Tasks
 
-Provisional, 2026-10-07, revised 2026-10-18. The core's tasks: what a
+Provisional, 2026-10-07, revised 2026-10-19. The core's tasks: what a
 task is, how tasks are made, how each moves from asked to ended, the
 resources it holds, what it hears and when it wakes, and how proposals
 and escalations travel the tree. It is the first primitive of core.md
@@ -139,7 +139,8 @@ it is live:
 - **Its flags,** each with the engine's semantics:
   - *conversation:* its turns are entries for its requester, while that
     requester is a party, with their read position and an unread count
-    (people.md, section 6). Only an agent's run has turns, so the flag is
+    (people.md, section 6), and its run is asked for its text as it is
+    written (engine.md, 7.1). Only an agent's run has turns, so the flag is
     refused on any other executor (section 4);
   - *listed:* once ended, it is indexed by its project and its label, so
     its project's lists find it. Every ended task a party requested is

@@ -1,6 +1,6 @@
 # The client's protocol
 
-Provisional, 2026-10-10, revised 2026-10-18. What carries jig's API
+Provisional, 2026-10-10, revised 2026-10-19. What carries jig's API
 (`../client/domain/contract.md`) as messages and bytes, whatever the
 transport: jig's messages; the clients' component's messages toward the
 application's transport and server, and the client's link toward its
@@ -433,14 +433,19 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   watches again (section 4), and its first delivery is the document
   whole.
 - **A run's text** is a watch of the run: its deliveries carry the turn's
-  name, the text after the offset the client has, and the offset it ends
-  at (`../client/domain/contract.md`, 7.3). A watch opened, or opened
+  name, the content's kind, the content after the offset the client has,
+  and the offset it ends at (`../client/domain/contract.md`, 7.3). A watch opened, or opened
   again after its stream dropped, starts from the beginning of the turn
   being written, within its bound; the client keeps what it holds and
   takes what goes past it (`../client/domain/client.md`, 8.3).
   These messages leave without waiting for a commit, marked provisional.
-  Only a run whose host gives its text, and the call it is making, has
-  them (`channel.md`, 6.4); a run in an agent process has neither.
+  **Three kinds,** `text`, `reasoning` and `input` (a tool call's input
+  as it streams, named by the call's provider id and its tool), are in
+  the wire as a run's text is, each from its own offset, so that adding
+  one needs no new version. The engine sends `text` only; a client ignores
+  a kind it has no use for. Only a run asked for its
+  text, a conversation's, has any, and only a run whose host gives the
+  call it is making has that (`channel.md`, 6.4).
 
 ## 8. Signing in
 

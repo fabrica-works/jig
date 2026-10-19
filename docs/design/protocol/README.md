@@ -1,6 +1,6 @@
 # jig's protocol layer
 
-Provisional, 2026-10-10, revised 2026-10-18. The design of what lies
+Provisional, 2026-10-10, revised 2026-10-19. The design of what lies
 between jig's domains and bytes: the components an application's protocol
 layers own to carry jig's vocabularies to the store, to workers, to LLM
 providers and to clients; what an application writes around them; their
@@ -444,17 +444,20 @@ Each is generic, and says nothing about jig.
 - **Not asked: a completion's result contract.** A protocol layer that
   runs `smith-inline-agent` keeps each slot's beside smith's LLM
   component, as smith's own local host does (`llm.md`, section 3).
-- **What jig asks of smith, later:**
-  - **a run's text and its tool calls on smith's channel:** a channel
-    version on which a host asks, at a run's start, for its main
-    conversation's text as content, best effort and counted when
-    dropped, each piece naming the turn it will be told as, its
-    completion's retry and its offset; and a tool begun with its call's
-    name, its tool and its input within a bound. Without it, a run in
-    an agent process shows its activity, and its words as each turn
-    commits (`channel.md`, 6.4; `../domain/hosts.md`, 6.5). A
-    conversation's presentation wants it;
-  - **closing smith's LLM component as an owner closes it:** an abort
+- **What jig asks of smith:**
+  - **a run's live content on smith's channel:** the host asks at a run's
+    start, one boolean per kind (`text`, `reasoning`, `input`), and
+    jig's assignment carries the ask, set for a run whose task is a
+    conversation. smith sends, best effort and counted when dropped, the
+    main conversation's pieces of the kinds it builds (now `text`), each
+    naming the turn it will be told as, its completion's retry, its kind
+    and its offset, all before that turn's record. An ask for a kind
+    smith does not build is not refused, and gets nothing. Without the
+    ask, a run in an agent process shows its activity, and its words as
+    each turn commits (`channel.md`, 6.4; `../domain/hosts.md`, 6.5).
+    A conversation's presentation wants it. A tool begun with its call
+    stays `smith-inline-agent`'s;
+  - **closing smith's LLM component as an owner closes it, later:** an abort
     that ends every completion in flight, for a process that stops
     without draining (`service.md`, section 5), and a completion asked
     while it closes refused as closed, never as a local limit.
@@ -521,7 +524,7 @@ What the store asks of the domain is `store.md`, section 15.
 - **A run's text keeps one contract,** by turn, retry and offset,
   whatever its source (`../domain/hosts.md`, 6.5): a host that drains
   `smith-inline-agent`'s content, or agent processes on a smith channel
-  that carries it (section 11; `channel.md`, 6.4).
+  that carries it at the host's ask (section 11; `channel.md`, 6.4).
 - **Agents are smith's,** both capabilities speaking smith's parent face
   (section 4); jig ships no agent crate.
 - **smith's payloads as bytes in jig, typed only in smith.** Siblings

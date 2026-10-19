@@ -1,6 +1,6 @@
 # The client
 
-Provisional, 2026-10-09, revised 2026-10-18. `jig-client`: the client an
+Provisional, 2026-10-09, revised 2026-10-19. `jig-client`: the client an
 application holds, as a component, to reach jig's engine. It holds the
 link, the watches the application names by handle and the latest
 document of each, the application's keyed requests in skein-lib's
@@ -572,8 +572,14 @@ handles, as every presentation does (sections 7 and 8).
   committed only through its task's activity, read once the task's
   document says the activity has moved (contract.md, 7.3).
   `jig_client::thread` puts the two together (section 10).
-- **Only from a host that gives it.** A run whose host gives no text and
-  names no call has neither, and its words appear as each turn commits.
+- **Kinds.** The wire names a delivery's kind: `text`, `reasoning` or
+  `input` (protocol/client.md, 7.3). `client.text(handle)` is kind `text`
+  only, the one the engine sends; the others are held the same way, by
+  turn, retry and offset, once a producer exists, and no surface for
+  them is added before.
+- **Only for a run asked for it.** A run whose task is not a conversation,
+  or whose host names no call, has no text or no call respectively, and
+  its words appear as each turn commits.
 
 ## 9. Drafts and confirmations
 

@@ -1,6 +1,6 @@
 # jig's domain
 
-Provisional, 2026-10-07, revised 2026-10-18. The design of jig's domain
+Provisional, 2026-10-07, revised 2026-10-19. The design of jig's domain
 layer: the core an application's engine composes, the contract its
 connectors meet, what its root does, where its agents run, and how all
 of it is tested. jig as a whole, and why it is a kit, is `../README.md`;
@@ -280,11 +280,12 @@ where each is answered:
   number and generation, their values its protocol layer's, named by the
   connectors for a run's workspace and granted with the assignment
   (engine.md, 12.1; connectors.md, section 10).
-- **A run's text where its host has it:** activity from every host
-  carries no content; a run's text, and a tool begun with its call, come
-  from a host whose agent runs in its process, and from agent processes
-  over smith's channel, which is what jig asks of smith, later, under the
-  same contract (hosts.md, 6.5; `../protocol/README.md`, section 11).
+- **A run's text at the assignment's ask:** activity from every host
+  carries no content; a run's text comes from any host whose assignment
+  asks for it, a conversation's, from agent processes over smith's
+  channel as from a host whose agent runs in its process; a tool begun
+  with its call comes only from the second (hosts.md, 6.5;
+  `../protocol/README.md`, section 11).
 - **Level-triggered views:** a watch delivers its subject's current
   document, one delivery in flight, changes coalesced, never queued; only
   a run's text as it is written is a stream, from an offset; an

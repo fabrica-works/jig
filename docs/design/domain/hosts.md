@@ -1,6 +1,6 @@
 # Agents and their hosts
 
-Provisional, 2026-10-07, revised 2026-10-18. Where an application's
+Provisional, 2026-10-07, revised 2026-10-19. Where an application's
 agents run, and what hosts them: the contract between the core and a
 host, the three shapes an application may take, the agent as a
 capability of two kinds, both smith's, jig's one host for runs wherever
@@ -59,9 +59,11 @@ and 8. What is still open is listed in section 12.
   start carries the messages waiting in the task's inbox; a refusal
   travels inside the run's next turn, or its answer; a message the run
   refused or left unread stays in the inbox and wakes its task again.
-- **A run's text comes from a host that has it** (6.5): every host tells
-  a run's activity, without content; only one whose agent runs in its own
-  process tells a run's text and the calls it makes.
+- **A run's text comes from a host whose agent gives it** (6.5): every
+  host tells a run's activity, without content; a run's text, when its
+  assignment asks for it, comes from any host, an agent process or
+  `smith-inline-agent`; the calls a run makes, named as they begin, only
+  from the second.
 - **Committed turns survive.** Turns and answers are kept until the core
   acknowledges them, once committed, and sent again after every hello.
   What a host loses before it was committed (its turns, when a worker
@@ -78,7 +80,10 @@ Between the core's fleet and a host, whatever its shape:
     its workstream key; the charter; when it resumes, the transcript's
     current window and the calls committed since its last turn (6.4);
     the start's messages (section 9); the run's identity; credential
-    grants (engine.md, 7.1);
+    grants (engine.md, 7.1); and the **ask** for live content: one
+    boolean per kind, `text`, `reasoning` and `input`, which the core sets
+    for a run whose task is a conversation (engine.md, 7.1) and the hub
+    passes into smith's start (6.2, 6.5);
   - **messages** for the run, named, in order (tasks.md, 8.2);
   - **answers** to the run's relayed calls;
   - **grants** refreshed while the run lives;
@@ -99,9 +104,10 @@ Between the core's fleet and a host, whatever its shape:
     refused since the run's previous turn, each by name with smith's
     reason (6.4);
   - **calls,** named by the run, each answered once;
-  - **facts,** best effort: the run's activity, and, from a host that
-    has them, a run's text, named by its turn, retry and offset, and a
-    tool begun with its call (6.5);
+  - **facts,** best effort: the run's activity; a run's live content,
+    each piece named by its turn, retry, kind and offset, when the
+    assignment asked for it and the host's agent gives it; and, from a
+    host that has them, a tool begun with its call (6.5);
   - one **answer:** finished with its result, parked, or failed with a
     typed failure; with the turns it took, what it spent, the last
     message it read (the unread fence, section 9), the messages refused
@@ -346,7 +352,8 @@ cancel, from any state ──────────────► stop ─►
    any and the root has a workspace.
 3. **Start** the agent through the agent capability (section 5), with
    what the assignment gives it, smith's payloads decoded by hand-out on
-   the way (6.8).
+   the way (6.8), and its ask for live content, which goes into smith's
+   start as it is (6.5).
 4. **Relay** while the run is live:
    - **messages** that arrive after the assignment go down as they
      arrive, each named, in order, a bounded few held until the run is
@@ -469,25 +476,50 @@ Nothing decides on a fact.
   host sends (section 2). The engine shows a run as writing, or as
   running a tool, only on such a fact, never inferring it from an
   attempt being placed.
-- **A run's text, and a tool begun with its call, only from a host that
-  has them:** a hub whose agent is `smith-inline-agent` hands up, from
-  what is drained in its process (5.2), a run's text as it streams, and
-  a tool begun naming its call and its tool, with the call's input within
-  the views' bound, so a run's document shows the call it is making.
-  smith's channel carries no content, so runs in agent processes give
-  neither; what jig asks of smith for them is below.
-- **A run's text names its turn, its retry and its offset,** whatever
+- **A run's text, at the assignment's ask.** A run whose assignment
+  asks for text hands up, as facts, its main conversation's text as the
+  model writes it, from any host: pieces, each naming its turn, its
+  retry, its kind and its offset (below). In an agent process the pieces
+  come up smith's channel, which the host's half decodes (smith's
+  `protocol/channel.md`, sections 3 and 4); in `smith-inline-agent`'s
+  host they are drained in the process (5.2). A run whose assignment does
+  not ask gives none, as every host did before: its words appear as each
+  turn commits. A sub-agent's or a compaction's completion gives no text.
+- **A tool begun with its call, only from a host that has it:** a hub
+  whose agent is `smith-inline-agent` hands up a tool begun naming its
+  call and its tool, with the call's input within the views' bound, so a
+  run's document shows the call it is making. smith's channel carries no
+  such record, so runs in agent processes give none; whether it is asked
+  of smith later is open (section 12).
+- **A piece names its turn, its retry, its kind and its offset,** whatever
   its source: the turn it belongs to, by its attempt and its number
   within it (an attempt is one activation of smith's run, whose turns
   smith numbers); the retry of the turn's completion, which smith
-  retries within the turn, each retry's text starting again at zero; and
-  the offset of its first byte within that retry's text
-  (`../protocol/llm.md`, section 3). The engine's views keep a run's text
-  by turn, retry and offset (engine.md, section 11).
-- **What jig asks of smith, later:** a run's text, and a tool begun with
-  its call, on smith's channel at the host's request
-  (`../protocol/README.md`, section 11). Nothing above the hub changes
-  with it.
+  retries within the turn, each retry's content starting again at zero;
+  its kind: `text`, `reasoning`, or `input`, a tool call's input as it
+  streams, named by the call's provider id and its tool; and the offset
+  of its first byte within that retry's stream of that kind
+  (`../protocol/llm.md`, section 3). Only `text` is produced and kept
+  now: smith builds no other kind, so a host hands up none, and a piece
+  of another kind that reaches the engine is dropped where it enters,
+  counted, until the views keep it (engine.md, section 11).
+- **No piece after its turn.** A piece of a turn goes up before that
+  turn's record; once the turn is sent, none of it follows, and a retry's
+  content starts again at offset 0. The engine's views rely on it, and
+  keep a run's text by turn, retry and offset (engine.md, section 11).
+- **Best effort, and gaps.** A piece goes up only while the link leaves
+  room for everything else, as every fact does; smith holds a bounded
+  amount of unsent content and drops the rest, counted (smith's
+  `protocol/channel.md`, section 7). A drop shows as a gap, a piece
+  whose offset is past the last one's end, which the views mark as cut.
+- **One text, whatever its host.** Above the hub, the core's views, the
+  client and the application see a run's text the same way from an agent
+  process and from `smith-inline-agent`.
+- **What jig still asks of smith, later:** the LLM component's abort and
+  closed terminal (`../protocol/README.md`, section 11).
+- **A conversation's delegated tasks give no text.** Only the run of the
+  conversation's own task is asked; a task it delegates streams nothing
+  (section 12).
 
 ### 6.6 Losing contact
 
@@ -756,6 +788,15 @@ host tools' calls (6.8).
   section 5).
 
 ## 12. Open questions
+
+- **A delegated task's text.** A task a conversation delegates streams no
+  text for now (6.5). Later the conversation's run could ask for it from
+  its parent, so the person sees the delegate write; whether that asks
+  of the assignment, or of the views, is open.
+- **A tool's input and reasoning, as they stream.** Their kinds are in
+  the wire (6.5) and have no producer: each waits for smith to build it
+  and, for reasoning, for the LLM providers to be asked for readable
+  reasoning.
 
 - **Fairness on the engine's loop:** whether runs in the engine need a
   share of each iteration, so many chats never slow the engine's

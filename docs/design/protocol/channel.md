@@ -1,6 +1,6 @@
 # jig's channel
 
-Provisional, 2026-10-10, revised 2026-10-18. The channel between an
+Provisional, 2026-10-10, revised 2026-10-19. The channel between an
 engine and each of its workers: the contract of `../domain/hosts.md`,
 section 2, carried as frames of skein's framed channel (skein's
 `channel.md`) with records generated from schemas (skein's `codec.md`).
@@ -207,7 +207,7 @@ answer, and a **notice** is not answered.
 | turn | task, attempt; its number within the attempt; its cumulative spend; the last message it read, by name, if any; the messages refused since the run's previous turn, each by name with smith's reason: too large as the run reads it, the run's inbox full, a name in use, or the run ending; whether it opens a window; its bytes, smith's (6.1) | notice, kept by the hub until acknowledged |
 | call | task, attempt; the run's name for the call, as bytes (section 7); the host tool's name; whether it writes; its input; the time left on its deadline | call |
 | answer | task, attempt; the turns it took; what it spent; the last message it read, by name, if any: the unread fence; the messages refused since the run's last turn, each by name with smith's reason, as a turn carries them; how it ended: refused (busy, or invalid and what), ended with its result, smith's bytes (6.1), parked, or failed with its typed failure and bounded detail; what it left on resources and what it saved, each the application's bytes (6.2) | answer to an assignment, kept by the hub until acknowledged; a refusal, kept by nothing (below) |
-| fact | task, attempt; activity: the run's phase, a long operation begun (checks, an LLM completion or a command, with its span) or ended, or a count from smith's channel facts (its kind, its time, its count), all jig's typed activity, never smith's bytes; or, from a host that gives them, a tool begun with its call's name, its tool and its input, or text (6.4) | notice, best effort |
+| fact | task, attempt; activity: the run's phase, a long operation begun (checks, an LLM completion or a command, with its span) or ended, or a count from smith's channel facts (its kind, its time, its count), all jig's typed activity, never smith's bytes; or a piece of live content: its turn, retry, kind (`text`, `reasoning` or `input`) and offset, and its bytes, when the assignment asked; or, from a host that gives it, a tool begun with its call's name, its tool and its input (6.4) | notice, best effort |
 | rejected | task, attempt; an LLM account, generation | notice |
 | exhausted | task, attempt; an LLM account; how long until it may be used again | notice |
 
@@ -232,7 +232,7 @@ answer, and a **notice** is not answered.
 
 | Record | Fields | Shape |
 |---|---|---|
-| assignment | task, attempt; the run's identity, 16 bytes (section 7); the workstream key and the workspace's items, the application's bytes; whether to save unfinished work; the charter, smith's bytes; the transcript, when the run resumes: its current window's turns, smith's bytes, from the last that opens a window (6.1); the calls committed since its last turn, each with its name, its tool and its answer; the start's messages: those waiting in the task's inbox, oldest first, as many as the run's inbox takes, each with its name, its sender's label and its words, the rest relayed as message records as the run reads (`../domain/tasks.md`, 8.2); its credential grants, each naming whose table its value comes from, with their values (section 8) | call |
+| assignment | task, attempt; the run's identity, 16 bytes (section 7); the workstream key and the workspace's items, the application's bytes; whether to save unfinished work; the ask for live content, a boolean for each kind (`../domain/hosts.md`, section 2); the charter, smith's bytes; the transcript, when the run resumes: its current window's turns, smith's bytes, from the last that opens a window (6.1); the calls committed since its last turn, each with its name, its tool and its answer; the start's messages: those waiting in the task's inbox, oldest first, as many as the run's inbox takes, each with its name, its sender's label and its words, the rest relayed as message records as the run reads (`../domain/tasks.md`, 8.2); its credential grants, each naming whose table its value comes from, with their values (section 8) | call |
 | message | task, attempt; the message's name; its sender's label; its words | notice |
 | relayed | task, attempt; the call's name; the engine's answer: its text for the LLM and whether it is an error, or busy, to ask again after a backoff | answer to a call |
 | turn kept | task, attempt; the turn's number | notice |
@@ -382,18 +382,31 @@ holds, and neither of its components reads them.
   facts by the worker's hand-out (`../domain/hosts.md`, 6.8). The fact
   record carries jig's activity, never smith's bytes, and the views show
   a run by it.
-- **Text and named calls come only from a host that gives them:** a
-  run's text, and a tool begun with its call's name, its tool and its
-  input within the views' bound. smith drains them only in the host's
-  process, so a hub whose agent capability is `smith-inline-agent` gives
-  them (`llm.md`, section 3), and this channel carries them from such a
-  worker in the fact record. smith's channel carries facts without
-  content, so a worker whose agents are processes gives neither (what
-  jig asks of smith, section 13); the views show its runs by their
-  activity.
-- **A run's text** crosses with its turn, retry and offset as
+- **A run's text comes from any worker, when the assignment asks.** The
+  fact record carries a piece of live content with its kind, from a
+  worker whose agents are processes as from one whose hub composes
+  `smith-inline-agent`: in a process, smith's channel carries it, decoded
+  by the worker's hand-out into jig's typed fact (`../domain/hosts.md`,
+  6.8; smith's `protocol/channel.md`, section 4). The wire carries all
+  three kinds, so that reasoning and a tool's input need no new version;
+  only `text` has a producer now. A worker never sends a piece of a kind
+  its agents do not build; the engine's side drops one that arrives,
+  counted, as it translates the fact record (10.2;
+  `../domain/engine.md`, section 11).
+- **A tool begun with its call comes only from a host that gives it:** a
+  tool begun with its call's name, its tool and its input within the
+  views' bound. smith drains it only in the host's process, so a hub
+  whose agent capability is `smith-inline-agent` gives it (`llm.md`,
+  section 3), and this channel carries it from such a worker in the fact
+  record. A worker whose agents are processes gives none; the views
+  show its runs by their activity and their text.
+- **A piece** crosses with its turn, retry, kind and offset as
   `../domain/hosts.md`, 6.5 names them, and its bytes; the views keep it
-  (`../domain/engine.md`, section 11).
+  (`../domain/engine.md`, section 11). It keeps the order that section
+  gives: pieces of a turn before its turn record, none after.
+- **The ask is not a flow-control matter.** A worker whose assignment
+  asks for nothing sends no piece; one that asks is still best effort,
+  by the rule of this section's first item.
 
 ## 7. Names
 
@@ -640,8 +653,9 @@ suite.
   - a run resumed after a compaction, sent only its current window, with
     its conversation's identity;
   - an assignment whose charter or transcript does not decode;
-  - smith's facts reaching the views as activity, with no text from
-    agent processes.
+  - smith's facts reaching the views as activity, and a conversation's
+    text reaching them from agent processes, by turn, retry and offset,
+    only when its assignment asked.
 
   Its referee is the hub's and the fleet's: every turn, and every answer
   of a run the host started, reaches the engine once and is acknowledged
@@ -679,11 +693,14 @@ suite.
   and facts; and `smith-inline-agent`'s drained content and facts
   (smith's `domain/host.md`, 9.1). No crate of this channel's links
   smith.
-- **What jig asks of smith, later:** a run's text and its tool calls on
-  smith's channel (`README.md`, section 11), so a worker whose agents
-  are processes gives what a host of `smith-inline-agent` gives (6.4).
-  smith's host half and host domain would hand them up as they hand up
-  facts, and this channel's fact record would carry them unchanged.
+- **What jig asks of smith** (`README.md`, section 11): the ask in its
+  start, and a run's live content on its channel, at the ask, best
+  effort, as pieces naming turn, retry, kind and offset, so that a worker
+  whose agents are processes gives a run's text as a host of
+  `smith-inline-agent` does (6.4). smith's host half and host domain hand
+  the pieces up as they hand up facts, and this channel's fact record
+  carries them. What stays for later: the LLM component's abort and
+  closed terminal.
 - **skein owes** in-process addresses, for one process (skein's `io.md`,
   3.5), and, between hosts, TLS's server side with independent output,
   for the engine's listener (skein's `channel.md`, section 12; skein's
@@ -703,7 +720,7 @@ suite.
 - **Large assignments:** a resumed run's transcript crosses in one frame,
   within the resume limit. If transcripts grow to many megabytes, an
   assignment may stream its turns as records of their own after it.
-- **Facts dropped, told:** a text fact past a gap marks the turn cut; a
+- **Facts dropped, told:** a piece past a gap marks the turn cut; a
   count of the activity dropped could cross too, for the deployment's
   document.
 - **The liveness timings** are starting values, to be tuned on real
