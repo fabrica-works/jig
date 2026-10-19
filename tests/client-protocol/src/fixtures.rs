@@ -226,9 +226,67 @@ pub fn server_http() -> skein_http::server::Limits {
     skein_http::server::Limits { head: 4096, headers: 32, body: 65536, read: 1024, response: 65536, send: 1024 }
 }
 
+pub const TURN_BYTES: &[u8] = include_bytes!("../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin");
+// One source call in addition to the golden's text block.
+// Blocks are numbered from one; the call follows the text.
+pub const TURN_CALL_NUMBER: u64 = 2;
+pub const TURN_CALL_ID: &[u8] = b"read-source";
+pub const TURN_TOOL: &[u8] = b"read";
+pub const TURN_INPUT: &[u8] = b"{ \"path\": \"a\" }";
+// The source text and call fields together fit the ordinary 32-byte text budget.
+pub const TURN_TEXT: &[u8] = b"abc";
+// The measured single row fits this budget; its joined activity line does not.
+pub const TURN_OVERLAP_BYTES: u64 = 2317;
+#[must_use]
+pub fn turn_overlap_limits() -> jig_test_domain::Limits {
+    let mut limits = owner_limits();
+    limits.core.load_bytes = TURN_OVERLAP_BYTES;
+    limits
+}
+#[must_use]
+pub fn callable_turn() -> Box<[u8]> {
+    use smith_transcript::v5 as s;
+    let mut blocks = List::with_capacity(2);
+    blocks
+        .push(s::Block::Text(
+            s::Text::new(&s::CEILINGS, s::TextParts { text: TURN_TEXT.into(), replay: None }).expect("source text"),
+        ))
+        .expect("source text block");
+    blocks
+        .push(s::Block::Call(
+            s::Call::new(
+                &s::CEILINGS,
+                s::CallParts {
+                    id: TURN_CALL_ID.into(),
+                    name: TURN_TOOL.into(),
+                    input: TURN_INPUT.into(),
+                    replay: None,
+                },
+            )
+            .expect("source call"),
+        ))
+        .expect("source call block");
+    turn_with_blocks(blocks)
+}
+fn turn_with_blocks(blocks: List<smith_transcript::v5::Block>) -> Box<[u8]> {
+    use smith_transcript::v5 as s;
+    let mut turn =
+        s::Turn::decode(&s::CEILINGS, &mut skein_lib::Reader::new(TURN_BYTES)).expect("v5 fixture").into_parts();
+    let mut message = turn.messages.get(0).expect("person message").clone().into_parts();
+    message.blocks = blocks;
+    turn.messages = List::with_capacity(1);
+    turn.messages.push(s::Message::new(&s::CEILINGS, message).expect("source message")).expect("one message");
+    let turn = s::Turn::new(&s::CEILINGS, turn).expect("source turn");
+    let mut writer = skein_lib::Writer::new(usize::try_from(turn.measure()).expect("turn size"));
+    turn.encode(&mut writer).expect("v5 encoding");
+    writer.finish()
+}
+
 // Eight KiB fits the committed marker and its owner; an extra byte cannot fit whole.
 pub const TURN_PAGE_BYTES: u32 = 8192;
 pub const LARGE_TURN_TEXT_BYTES: u32 = TURN_PAGE_BYTES + 1;
+// The source text plus 129 bytes of the golden's v5 metadata and field framing.
+pub const LARGE_TURN_BYTES: u64 = 8322;
 #[must_use]
 pub fn turn_page_limits() -> jig_test_domain::Limits {
     let mut limits = owner_limits();
@@ -238,13 +296,8 @@ pub fn turn_page_limits() -> jig_test_domain::Limits {
 #[must_use]
 pub fn large_turn() -> Box<[u8]> {
     use smith_transcript::v5 as s;
-    let bytes = include_bytes!("../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin");
-    let mut reader = skein_lib::Reader::new(bytes);
-    let mut turn = s::Turn::decode(&s::CEILINGS, &mut reader).expect("v5 fixture").into_parts();
-    let mut message = turn.messages.get(0).expect("person message").clone().into_parts();
-    message.blocks = List::with_capacity(1);
-    message
-        .blocks
+    let mut blocks = List::with_capacity(1);
+    blocks
         .push(s::Block::Text(
             s::Text::new(
                 &s::CEILINGS,
@@ -257,10 +310,5 @@ pub fn large_turn() -> Box<[u8]> {
             .expect("large bounded text"),
         ))
         .expect("one block");
-    turn.messages = List::with_capacity(1);
-    turn.messages.push(s::Message::new(&s::CEILINGS, message).expect("large message")).expect("one message");
-    let turn = s::Turn::new(&s::CEILINGS, turn).expect("large turn");
-    let mut writer = skein_lib::Writer::new(usize::try_from(turn.measure()).expect("turn size"));
-    turn.encode(&mut writer).expect("v5 encoding");
-    writer.finish()
+    turn_with_blocks(blocks)
 }

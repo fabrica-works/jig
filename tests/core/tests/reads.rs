@@ -134,7 +134,7 @@ fn a_read_when_loads_are_full_is_busy() {
     world.reads.as_mut().expect("party").hold_loads = true;
     ask(&mut world, 200, reads::Read::Task { task: 1000 });
     assert_eq!(world.reads.as_ref().expect("party").loads.len(), 1);
-    ask(&mut world, 201, reads::Read::Task { task: 1001 });
+    ask(&mut world, 201, reads::Read::Turn { task: 1001, attempt: 1, turn: 1 });
     assert_eq!(latest(&world), &reads::Answer::None(reads::Why::Busy));
     assert_eq!(world.reads.as_ref().expect("party").loads.len(), 1, "busy keeps no second load");
     complete(&mut world);
@@ -597,5 +597,17 @@ fn a_turn_past_the_read_bound_reports_its_size() {
     world.turn(1, 1, None, &body);
     ask(&mut world, 980, reads::Read::Turn { task, attempt: 1, turn: 1 });
     assert_eq!(latest(&world), &reads::Answer::None(reads::Why::TooLarge { bytes: u64::from(LARGE_TURN_BYTES) }));
+    assert_eq!(world.reads.as_ref().expect("party").receipts.len(), 1);
+}
+
+#[test]
+fn a_turn_load_preserves_the_gone_terminal() {
+    let mut world = world(803);
+    world.reads.as_mut().expect("party").hold_loads = true;
+    let task = chat_task(&world);
+    ask(&mut world, 981, reads::Read::Turn { task, attempt: 1, turn: 1 });
+    let (load, _) = world.reads.as_mut().expect("party").loads.pop().expect("one turn load");
+    world.send(root::Event::Core(core::Event::ReadLoaded { load, result: reads::Loaded::Gone }));
+    assert_eq!(latest(&world), &reads::Answer::None(reads::Why::Gone));
     assert_eq!(world.reads.as_ref().expect("party").receipts.len(), 1);
 }
