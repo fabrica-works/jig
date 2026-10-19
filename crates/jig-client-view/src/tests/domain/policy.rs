@@ -20,8 +20,9 @@ fn a_whole_policy_edit_enters_as_one_request_and_a_duplicate_joins_that_request(
     delivered(&mut domain, Time::ZERO, f, frame(7));
     let out = drive(&mut domain, Time::ZERO, intent.clone());
     assert_eq!(out.len(), 1);
-    let Request::Client { asked: jig_client::Event::Send { key: request, request: jig_client::Ask::Jig(sent) } } =
-        &out[0]
+    let Request::Client {
+        asked: jig_client::Event::Send { name: None, key: request, request: jig_client::Ask::Jig(sent) },
+    } = &out[0]
     else {
         panic!("whole keyed send")
     };

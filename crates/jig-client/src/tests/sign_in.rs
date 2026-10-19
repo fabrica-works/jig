@@ -45,7 +45,7 @@ fn signed_out_ends_each_handle_once_and_parks_each_request() {
         c.step(Event::Watch { handle: TASK, subject: task() });
         let opening = c.exchange();
         let watch = c.opened_watch();
-        c.step(Event::Send { key: STOP, request: fixtures::stop() });
+        c.step(Event::Send { name: None, key: STOP, request: fixtures::stop() });
         c.step(Event::Stored);
         let request = c.exchange();
         c.step(Event::Read { handle: ME, read: Readable::Jig(contract::Read::Project { project: PROJECT }) });
@@ -128,7 +128,7 @@ fn under_transport_exchanges_carry_no_credential() {
 #[test]
 fn a_held_credential_never_reaches_the_small_store() {
     let mut c = Client::signed_in();
-    c.step(Event::Send { key: STOP, request: fixtures::stop() });
+    c.step(Event::Send { name: None, key: STOP, request: fixtures::stop() });
     let records = fixtures::saved(c.requests());
     assert_eq!(records.len(), 1);
     for record in &records {
@@ -210,7 +210,7 @@ const CREDENTIALS_PER_REPLY: u32 = 1;
 #[test]
 fn the_link_s_service_credential_leaves_once_as_a_host_duty() {
     let mut c = Client::signed_in();
-    c.step(Event::Send { key: STOP, request: fixtures::stop() });
+    c.step(Event::Send { name: None, key: STOP, request: fixtures::stop() });
     c.step(Event::Stored);
     let exchange = c.exchange();
     let reply = service_answer();

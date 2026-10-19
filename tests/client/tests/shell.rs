@@ -28,6 +28,7 @@ fn a_failed_store_stops_the_steps_keyed_sends_and_notifies_the_table() {
         c,
         jig_client_test_domain::Event::Client {
             event: jig_client::Event::Send {
+                name: None,
                 key: jig_client::Key { asker: jig_client::Asker::JIG, number: 99 },
                 request: jig_client::Ask::Jig(Box::new(jig_client_domain::contract::Ask::Message {
                     project: 1,

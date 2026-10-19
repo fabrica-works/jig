@@ -277,7 +277,11 @@ impl Story {
         self.event(Event::Read { handle, read });
     }
     pub fn send(&mut self, key: Key, request: Ask) {
-        self.event(Event::Send { key, request });
+        self.event(Event::Send { name: None, key, request });
+    }
+    /// Sends `request` under the application's `key`, named `name`.
+    pub fn send_named(&mut self, key: Key, name: skein_lib::RequestKey, request: Ask) {
+        self.event(Event::Send { key, name: Some(name), request });
     }
     pub fn event(&mut self, event: Event) {
         self.front.event(self.now, event);
@@ -404,7 +408,7 @@ impl Story {
         self.second.as_ref().expect("second client attached")
     }
     pub fn send_second(&mut self, key: Key, request: Ask) {
-        self.second.as_mut().expect("second client attached").event(self.now, Event::Send { key, request });
+        self.second.as_mut().expect("second client attached").event(self.now, Event::Send { name: None, key, request });
     }
     pub fn start_task(&mut self) -> u64 {
         self.engine.driver.scripted_party(fixtures::starter(), self.now, fixtures::wall(self.now));
@@ -424,6 +428,11 @@ impl Story {
                 jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
             })
             .expect("scripted party started a task")
+    }
+    /// How many durable answers the engine made under the engine key `key`.
+    #[must_use]
+    pub fn made_under(&self, key: skein_lib::RequestKey) -> usize {
+        self.seen.iter().filter(|o| matches!(o, Observed::Made { key: held, .. } if *held == key)).count()
     }
     #[must_use]
     pub fn made(&self, party: u64) -> usize {

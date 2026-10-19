@@ -45,6 +45,7 @@ fn goal(world: &mut bytes::Story, client: jig_client_world::ClientId, words: &[u
         client,
         jig_client_test_domain::Event::Client {
             event: jig_client::Event::Send {
+                name: None,
                 key: jig_client::Key { asker: jig_client::Asker::JIG, number: request },
                 request: jig_client::Ask::Jig(Box::new(ask)),
             },

@@ -17,7 +17,7 @@ pub enum Event {
     Watch { handle: Handle, subject: Watchable },
     Unwatch { handle: Handle },
     Read { handle: Handle, read: Readable },
-    Send { key: Key, request: Ask },
+    Send { key: Key, name: Option<skein_lib::RequestKey>, request: Ask },
     Reply { exchange: Token, message: Box<[u8]> },
     Lost { exchange: Token },
     Streamed { message: Streamed },
@@ -139,7 +139,7 @@ impl Client {
             Event::Watch { handle, subject } => self.domain_step(&env, domain::Event::Watch { handle, subject }),
             Event::Unwatch { handle } => self.domain_step(&env, domain::Event::Unwatch { handle }),
             Event::Read { handle, read } => self.domain_step(&env, domain::Event::Read { handle, read }),
-            Event::Send { key, request } => self.domain_step(&env, domain::Event::Send { key, request }),
+            Event::Send { key, name, request } => self.domain_step(&env, domain::Event::Send { key, name, request }),
             Event::SignIn { with } => {
                 self.service = match &with {
                     With::Service(credential) if credential.len() == 40 => Some(credential.clone()),
@@ -244,7 +244,7 @@ impl Client {
             Event::Watch { handle, subject } => self.domain_step(env, domain::Event::Watch { handle, subject }),
             Event::Unwatch { handle } => self.domain_step(env, domain::Event::Unwatch { handle }),
             Event::Read { handle, read } => self.domain_step(env, domain::Event::Read { handle, read }),
-            Event::Send { key, request } => self.domain_step(env, domain::Event::Send { key, request }),
+            Event::Send { key, name, request } => self.domain_step(env, domain::Event::Send { key, name, request }),
             Event::Up { up } => {
                 match &up {
                     Up::SignedIn | Up::SignedOut => {

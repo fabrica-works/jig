@@ -273,6 +273,7 @@ fn full_documents_tabs_and_all_page_kinds_fit_the_client_and_view_worst_cases() 
             counted,
             jig_client_test_domain::Event::Client {
                 event: jig_client::Event::Send {
+                    name: None,
                     key: jig_client::Key { asker: jig_client::Asker::JIG, number },
                     request: jig_client::Ask::Jig(Box::new(jig_client_domain::contract::Ask::Stop {
                         project: 1,

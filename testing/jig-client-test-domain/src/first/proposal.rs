@@ -39,6 +39,7 @@ pub(super) fn act(side: &mut Side, act: Act, out: &mut Queue<Request>) {
                 };
                 out.push(Request::Client {
                     asked: jig_client::Event::Send {
+                        name: None,
                         key: Key { asker: Asker(3), number: side.proposal_sequence },
                         request: jig_client::Ask::Jig(Box::new(Ask::Decide {
                             project: choice.project,

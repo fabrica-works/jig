@@ -648,6 +648,7 @@ fn restored_requests(count: u32) -> List<crate::store::Record> {
             &mut old,
             Event::Client {
                 event: jig_client::Event::Send {
+                    name: None,
                     key: jig_client::Key { asker: jig_client::Asker::JIG, number: u64::from(n) },
                     request: jig_client::Ask::Jig(Box::new(contract::Ask::Stop { project: 1, task: 9 + u64::from(n) })),
                 },

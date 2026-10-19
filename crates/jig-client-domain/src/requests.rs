@@ -40,12 +40,23 @@ impl Domain {
         }
         None
     }
-    pub(crate) fn send(&mut self, env: &Env<Limits>, key: Key, request: Ask, out: &mut Queue<Request>) {
+    pub(crate) fn send(
+        &mut self,
+        env: &Env<Limits>,
+        key: Key,
+        name: Option<RequestKey>,
+        request: Ask,
+        out: &mut Queue<Request>,
+    ) {
         if let Ask::Family { record, .. } = &request {
             self.family(record);
         }
         if let Some(held) = self.requests.get(&key) {
-            assert!(held.request == request, "request key conflict");
+            let named = match name {
+                None => true,
+                Some(name) => name == held.admission.key,
+            };
+            assert!(held.request == request && named, "request key conflict");
             return;
         }
         let Some((party, _, _)) = self.identity() else {
@@ -55,14 +66,18 @@ impl Domain {
         let size = declared(&env.limits, &request);
         let pending = pending(party, &request);
         let held = Held { key, request: request.clone() };
-        match self.table.ask(key, party, size, held) {
+        let admission = match name {
+            None => self.table.ask(key, party, size, held),
+            Some(name) => self.table.ask_given(key, party, size, name, held),
+        };
+        match admission {
             Ok(admission) => {
                 self.requests
                     .insert(key, PendingRequest { request, pending, attempt: None, admission })
                     .expect("table admitted request");
             }
             Err(RequestRefused::Full(_)) => tell(out, Told::Answered { key, outcome: Outcome::Limit }),
-            Err(RequestRefused::Held(_)) => unreachable!("a drawn key is never held"),
+            Err(RequestRefused::Held(_)) => tell(out, Told::Answered { key, outcome: Outcome::Held }),
         }
     }
     /// Restores decoded records from the small store (client/domain/client.md, 11).

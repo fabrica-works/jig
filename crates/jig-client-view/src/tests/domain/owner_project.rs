@@ -186,8 +186,9 @@ fn owner_project_whole_role_review_keeps_raw_flags_authority_and_other_edited_ch
     assert_eq!(domain.project_page().settings.before.as_deref(), Some(&before));
     assert_eq!(owner_form::draft(&domain.project_page().settings, &before), chosen);
     let out = drive(&mut domain, Time::ZERO, Event::Act { action: Act::Confirm });
-    let Request::Client { asked: jig_client::Event::Send { key: request, request: jig_client::Ask::Jig(ask) } } =
-        &out[0]
+    let Request::Client {
+        asked: jig_client::Event::Send { name: None, key: request, request: jig_client::Ask::Jig(ask) },
+    } = &out[0]
     else {
         panic!("one keyed form request")
     };

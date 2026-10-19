@@ -12,7 +12,7 @@ fn passes_the_client_s_transport_requests_out_in_order() {
     crate::step(
         &mut root,
         &env(),
-        Event::Client { event: jig_client::Event::Send { key, request: ask.clone() } },
+        Event::Client { event: jig_client::Event::Send { name: None, key, request: ask.clone() } },
         &mut out,
     );
     let Some(Request::Save { record: crate::store::Record::Unlinked(record) }) = out.pop() else {

@@ -118,6 +118,7 @@ impl Intents {
                 let ask = self.slab.get(id).expect("inserted intent exists").ask.clone();
                 out.push(Request::Client {
                     asked: jig_client::Event::Send {
+                        name: None,
                         key: jig_client::Key { asker: jig_client::Asker::JIG, number: id.token().raw() ^ self.seed },
                         request: jig_client::Ask::Jig(ask),
                     },

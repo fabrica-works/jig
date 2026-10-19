@@ -151,6 +151,7 @@ fn an_act_past_the_client_s_limit_is_refused_in_place() {
         fixture.drive(
             Time::ZERO,
             jig_client::Event::Send {
+                name: None,
                 key: Key { asker: OUTSIDE, number: u64::from(number) },
                 request: jig_client::Ask::Jig(Box::new(Ask::Stop { project: PROJECT, task: TASK })),
             },

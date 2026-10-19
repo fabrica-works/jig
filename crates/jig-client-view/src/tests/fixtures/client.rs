@@ -466,7 +466,9 @@ fn copy_client_event(event: &jig_client::Event) -> jig_client::Event {
         }
         jig_client::Event::Unwatch { handle } => jig_client::Event::Unwatch { handle: *handle },
         jig_client::Event::Read { handle, read } => jig_client::Event::Read { handle: *handle, read: read.clone() },
-        jig_client::Event::Send { key, request } => jig_client::Event::Send { key: *key, request: request.clone() },
+        jig_client::Event::Send { key, name, request } => {
+            jig_client::Event::Send { key: *key, name: *name, request: request.clone() }
+        }
         jig_client::Event::SignOut => jig_client::Event::SignOut,
         jig_client::Event::Start { .. }
         | jig_client::Event::StartUnlinked { .. }

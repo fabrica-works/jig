@@ -87,7 +87,7 @@ pub enum Why {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event {
     Start { kept: List<RequestRecord<Held>> },
-    Send { key: Key, request: Ask },
+    Send { key: Key, name: Option<RequestKey>, request: Ask },
     Watch { handle: Handle, subject: Watchable },
     Unwatch { handle: Handle },
     Read { handle: Handle, read: Readable },
@@ -152,6 +152,8 @@ pub enum Outcome {
     Unknown,
     Limit,
     Unconfirmed,
+    /// Its name is held by another request in the table; nothing of it kept or sent.
+    Held,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Progress {

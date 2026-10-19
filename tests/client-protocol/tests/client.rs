@@ -1,3 +1,5 @@
+#[path = "client/named.rs"]
+mod named;
 #[path = "client/words.rs"]
 mod words;
 use jig_client::{

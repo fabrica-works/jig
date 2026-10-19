@@ -267,7 +267,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             domain.started = true;
             domain.restore_record(env, kept, out);
         }
-        Event::Send { key, request } => domain.send(env, key, request, out),
+        Event::Send { key, name, request } => domain.send(env, key, name, request, out),
         Event::Watch { handle, subject } => domain.watch(env, handle, subject, out),
         Event::Unwatch { handle } => domain.unwatch(handle, out),
         Event::Read { handle, read } => domain.read(env, handle, read, out),

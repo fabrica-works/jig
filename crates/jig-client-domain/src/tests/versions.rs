@@ -49,8 +49,11 @@ fn a_family_document_past_the_bytes_limit_ends_its_handle() {
 fn a_family_owner_not_served_keeps_its_requests_unsent() {
     let mut client = live();
     served(&mut client, Some(RANGE));
-    client
-        .step(Event::Send { key: fixtures::KEY, request: Ask::Family { scope: Scope::Project(1), record: record() } });
+    client.step(Event::Send {
+        name: None,
+        key: fixtures::KEY,
+        request: Ask::Family { scope: Scope::Project(1), record: record() },
+    });
     let downs = client.downs();
     assert_eq!(downs.len(), 1);
     let [Down::Save { record: saved }] = downs.as_ref() else { panic!("one kept record") };
@@ -94,8 +97,11 @@ fn a_family_owner_not_served_ends_its_watches_not_served() {
 fn a_family_owner_served_again_sends_what_was_kept() {
     let mut client = live();
     served(&mut client, None);
-    client
-        .step(Event::Send { key: fixtures::KEY, request: Ask::Family { scope: Scope::Project(1), record: record() } });
+    client.step(Event::Send {
+        name: None,
+        key: fixtures::KEY,
+        request: Ask::Family { scope: Scope::Project(1), record: record() },
+    });
     let downs = client.downs();
     let [Down::Save { record: saved }] = downs.as_ref() else { panic!("one kept record") };
     served(&mut client, Some(SERVED));
@@ -161,4 +167,17 @@ fn a_kept_family_request_of_another_version_is_dropped_and_told() {
         assert_eq!(client.downs().as_ref(), &[], "{family}/{version}");
         assert_eq!(client.domain.pending(fixtures::KEY), None, "{family}/{version}");
     }
+}
+
+#[test]
+fn a_family_send_under_a_held_name_is_answered_held() {
+    let mut client = live();
+    client.send_as(fixtures::KEY, Some(fixtures::NAME));
+    client.step(Event::Send {
+        key: fixtures::OTHER_KEY,
+        name: Some(fixtures::NAME),
+        request: Ask::Family { scope: Scope::Project(1), record: record() },
+    });
+    assert!(client.downs().is_empty());
+    assert_eq!(client.told().as_ref(), &[Told::Answered { key: fixtures::OTHER_KEY, outcome: Outcome::Held }]);
 }

@@ -17,6 +17,7 @@ pub(crate) fn send(root: &mut Domain, env: &Env<Limits>, token: Token, ask: &fir
         root,
         env,
         jig_client::Event::Send {
+            name: None,
             key: Key { asker: Asker(u32::from(crate::FIRST)), number: token.raw() ^ root.salt },
             request: jig_client::Ask::Family {
                 scope: jig_client::contract::Scope::Project(project),
@@ -180,6 +181,7 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: Told, out: &mut Q
             Outcome::Answered(jig_client::Answered::Jig(_))
             | Outcome::NotKept
             | Outcome::Limit
+            | Outcome::Held
             | Outcome::Unconfirmed
             | Outcome::Unknown => first::Event::Progress {
                 request: Token::new(key.number ^ root.salt),

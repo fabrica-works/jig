@@ -30,6 +30,7 @@ pub(crate) fn send(
         root,
         env,
         jig_client::Event::Send {
+            name: None,
             key: Key { asker: asker(Connector::Infrastructure), number: token.raw() ^ root.salt },
             request: jig_client::Ask::Family {
                 scope: jig_client::contract::Scope::Project(match ask {
@@ -61,6 +62,7 @@ fn answered(root: &mut Domain, env: &Env<Limits>, key: Key, outcome: Outcome, ou
         Outcome::Answered(jig_client::Answered::Jig(_))
         | Outcome::NotKept
         | Outcome::Limit
+        | Outcome::Held
         | Outcome::Unconfirmed
         | Outcome::Unknown => d::Event::Progress { request, progress: RequestProgress::Unknown },
     };
