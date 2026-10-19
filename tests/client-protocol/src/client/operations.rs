@@ -146,6 +146,11 @@ impl Story {
 }
 
 impl Story {
+    /// Whether the named request still has a durable client record.
+    #[must_use]
+    pub fn named_record_kept(&self, name: skein_lib::RequestKey) -> bool {
+        self.front.store.contains_key(name.as_slice())
+    }
     #[must_use]
     pub fn party_proposal(&self, number: u64) -> Option<&tasks::PersonProposal> {
         self.engine.driver.world.store.rows.values().find_map(|row| stored_party_proposal(row, number))
