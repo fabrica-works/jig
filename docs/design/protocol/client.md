@@ -929,6 +929,21 @@ prefix; jig's test application mounts it at `/jig`.
   its record; the stream written as events, `StreamTaken` said as their
   bytes are written. The application's server mounts it at a prefix of
   its listener and hands it the calls under that prefix.
+- **The engine end's room** is its calls in flight, streams among them
+  (section 13), and it owns that bound alone. It holds a call from its
+  head until it has handled the call's end, even once the server has
+  let the call's connection go: until then the call takes room, and
+  nothing tells the server it has let the call go. The application asks
+  for its room before it hands the engine end a call, and answers a call
+  under the prefix that finds none itself, as it answers a call no
+  route claims: `503`, with no body, closing the connection, with
+  nothing of the engine end's set aside. That is skein's server's busy
+  status (skein's `http.md`, section 5: "at its entrance it refuses by
+  not asking, or by answering a busy status"). The client takes it as a
+  lost exchange or a dropped stream, and sends it again after its
+  backoffs. The application's server bounds its own connections, never
+  by the engine end's room, and a call handed with no room is the
+  application's bug, asserted.
 - **Example guards,** in the engine end, which an application uses,
   wraps, or replaces with its own: a `Host` allow-list; the browser's
   required header and the POSTs' content type, which force a preflight,
