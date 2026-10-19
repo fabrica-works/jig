@@ -74,7 +74,9 @@ fn plan_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
         .checked_add(18)?
         .checked_mul(l.rows)?
         .checked_add(26)?;
-    older.max(crate::owner_tree::max_nodes(l)?.checked_add(6)?).checked_add(crate::historical_pages::ended_nodes(l)?)
+    older
+        .max(crate::owner_tree::max_nodes_with_card(l, card)?.checked_add(6)?)
+        .checked_add(crate::historical_pages::ended_nodes(l)?)
 }
 fn overview_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
     crate::owner_chip::max_nodes(l)?
@@ -100,10 +102,10 @@ fn history(l: &Limits) -> Option<u32> {
 pub fn task_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     task_in(l, card_nodes(l)?, chip_nodes(l)?, slot_nodes)
 }
-fn task_in(l: &Limits, _card: u32, _chip: u32, slot_nodes: u32) -> Option<u32> {
-    arranged_task(l, slot_nodes, &Arrangement::none())
+fn task_in(l: &Limits, card: u32, chip: u32, slot_nodes: u32) -> Option<u32> {
+    arranged_task(l, card, chip, slot_nodes, &Arrangement::none())
 }
-fn arranged_task(l: &Limits, slot_nodes: u32, arrangement: &Arrangement) -> Option<u32> {
+fn arranged_task(l: &Limits, card: u32, chip: u32, slot_nodes: u32, arrangement: &Arrangement) -> Option<u32> {
     let mut sum = 0_u32;
     let mut largest = 0_u32;
     for section in [
@@ -114,25 +116,29 @@ fn arranged_task(l: &Limits, slot_nodes: u32, arrangement: &Arrangement) -> Opti
         TaskSection::Budget,
         TaskSection::Panels,
     ] {
-        let nodes = task_section_nodes(l, section)?;
+        let nodes = task_section_in(l, section, card, chip)?;
         if arrangement.task.as_slice().contains(&section) {
             sum = sum.checked_add(nodes)?;
         } else {
             largest = largest.max(nodes);
         }
     }
-    task_header_nodes(l)?.checked_add(sum)?.checked_add(largest)?.checked_add(slot_nodes)
+    task_header_in(l, card, chip)?.checked_add(sum)?.checked_add(largest)?.checked_add(slot_nodes)
 }
 /// Heading, task card, lineage and tabs, shared by every task section.
 #[must_use]
 pub fn task_header_nodes(l: &Limits) -> Option<u32> {
-    card_nodes(l)?.checked_add(chip_nodes(l)?.checked_mul(l.rows)?)?.checked_add(36)
+    task_header_in(l, card_nodes(l)?, chip_nodes(l)?)
+}
+fn task_header_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
+    card.checked_add(chip.checked_mul(l.rows)?)?.checked_add(36)
 }
 /// One whole task section, without its shared header or application fragments.
 #[must_use]
 pub fn task_section_nodes(l: &Limits, section: TaskSection) -> Option<u32> {
-    let card = card_nodes(l)?;
-    let chip = chip_nodes(l)?;
+    task_section_in(l, section, card_nodes(l)?, chip_nodes(l)?)
+}
+fn task_section_in(l: &Limits, section: TaskSection, card: u32, chip: u32) -> Option<u32> {
     match section {
         TaskSection::Overview => overview_in(l, card, chip),
         TaskSection::Plan => plan_in(l, card, chip),
@@ -213,8 +219,8 @@ fn settings_in(l: &Limits, card: u32, chip: u32) -> Option<u32> {
 pub fn project_nodes(l: &Limits, slot_nodes: u32) -> Option<u32> {
     project_in(l, card_nodes(l)?, chip_nodes(l)?, slot_nodes)
 }
-fn project_in(l: &Limits, _card: u32, _chip: u32, slot_nodes: u32) -> Option<u32> {
-    arranged_project(l, slot_nodes, &Arrangement::none())
+fn project_in(l: &Limits, card: u32, chip: u32, slot_nodes: u32) -> Option<u32> {
+    arranged_project(l, card, chip, slot_nodes, &Arrangement::none())
 }
 /// Heading, project identity and tabs shared by every project section.
 #[must_use]
@@ -226,6 +232,10 @@ pub const fn project_header_nodes(_l: &Limits) -> Option<u32> {
 pub fn project_section_nodes(l: &Limits, section: ProjectSection) -> Option<u32> {
     let card = card_nodes(l)?;
     let chip = chip_nodes(l)?;
+    let owner = crate::owner_project::max_nodes_with_card(l, card)?;
+    project_section_in(l, section, card, chip, owner)
+}
+fn project_section_in(l: &Limits, section: ProjectSection, card: u32, chip: u32, owner: u32) -> Option<u32> {
     let nodes = match section {
         ProjectSection::Overview => goals_in(l, card, chip)?.checked_add(inbox_in(l, card, chip, 0)?)?,
         ProjectSection::Goals => goals_in(l, card, chip)?,
@@ -238,9 +248,10 @@ pub fn project_section_nodes(l: &Limits, section: ProjectSection) -> Option<u32>
         | ProjectSection::Spend
         | ProjectSection::Recurring => settings_in(l, card, chip)?,
     };
-    Some(nodes.max(crate::owner_project::max_nodes(l)?))
+    Some(nodes.max(owner))
 }
-fn arranged_project(l: &Limits, slot_nodes: u32, arrangement: &Arrangement) -> Option<u32> {
+fn arranged_project(l: &Limits, card: u32, chip: u32, slot_nodes: u32, arrangement: &Arrangement) -> Option<u32> {
+    let owner = crate::owner_project::max_nodes_with_card(l, card)?;
     let mut sum = 0_u32;
     let mut largest = 0_u32;
     for section in [
@@ -255,7 +266,7 @@ fn arranged_project(l: &Limits, slot_nodes: u32, arrangement: &Arrangement) -> O
         ProjectSection::Spend,
         ProjectSection::Recurring,
     ] {
-        let nodes = project_section_nodes(l, section)?;
+        let nodes = project_section_in(l, section, card, chip, owner)?;
         if arrangement.project.as_slice().contains(&section) {
             sum = sum.checked_add(nodes)?;
         } else if !arrangement.project.as_slice().contains(&ProjectSection::Settings) || outside_settings(section) {
@@ -306,8 +317,8 @@ pub fn arranged_nodes(l: &Limits, slot_nodes: u32, arrangement: &Arrangement) ->
     let chip = chip_nodes(l)?;
     inbox_in(l, card, chip, 0)?
         .max(conversations_in(l, card, chip, 0)?)
-        .max(arranged_task(l, 0, arrangement)?)
-        .max(arranged_project(l, 0, arrangement)?)
+        .max(arranged_task(l, card, chip, 0, arrangement)?)
+        .max(arranged_project(l, card, chip, 0, arrangement)?)
         .max(deployment_in(l, chip, 0)?)
         .max(not_the_work_nodes(l, 0)?)
         .checked_add(slot_nodes)

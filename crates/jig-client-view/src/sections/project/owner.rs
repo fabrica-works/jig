@@ -86,6 +86,9 @@ pub fn edit(before: &Ask, field: Field, bytes: Box<[u8]>, text: u32) -> Option<A
 /// Finite full-field envelope, derived from bounded rows and lower renderers.
 #[must_use]
 pub fn max_nodes(l: &Limits) -> Option<u32> {
+    max_nodes_with_card(l, crate::card_nodes(l)?)
+}
+pub(crate) fn max_nodes_with_card(l: &Limits, card: u32) -> Option<u32> {
     let chip = crate::chip_nodes(l)?.max(crate::owner_chip::max_nodes(l)?);
     let authority = crate::owner_authority::document_nodes(l.rows, l.segments)?;
     let policy = authority
@@ -114,15 +117,14 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_add(crate::sizes::refusal_nodes(l)?.checked_mul(3)?)?
         .checked_add(20)?
         .checked_add(128)?
-        .checked_add(historical_nodes(l)?)
+        .checked_add(historical_nodes(l, card)?)
 }
 // Earlier period rows include their task chips/cards and pool budgets. The
 // original cut and two edge controls cost ten nodes, independently of the
 // shared outer offered-action controls. Retained scalar funding adds its own
 // checked fragment exactly once.
-fn historical_nodes(l: &Limits) -> Option<u32> {
-    crate::card_nodes(l)?
-        .checked_add(crate::chip_nodes(l)?)?
+fn historical_nodes(l: &Limits, card: u32) -> Option<u32> {
+    card.checked_add(crate::chip_nodes(l)?)?
         .checked_add(8)?
         .checked_mul(l.rows)?
         .checked_add(8)?

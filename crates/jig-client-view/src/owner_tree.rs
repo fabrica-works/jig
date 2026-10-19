@@ -35,8 +35,11 @@ pub fn scratch(rows: u32) -> Option<u64> {
 /// Full rows, proposal cards, link chips and independent parent folds.
 #[must_use]
 pub fn max_nodes(l: &Limits) -> Option<u32> {
+    max_nodes_with_card(l, crate::card_nodes(l)?)
+}
+pub(crate) fn max_nodes_with_card(l: &Limits, card: u32) -> Option<u32> {
     let chip = crate::chip_nodes(l)?.max(crate::owner_chip::max_nodes(l)?);
-    let row = crate::card_nodes(l)?
+    let row = card
         .checked_mul(l.rows.checked_add(1)?)?
         .checked_add(chip.checked_add(2)?.checked_mul(l.rows)?)?
         .checked_add(chip)?
