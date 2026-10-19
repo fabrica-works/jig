@@ -151,6 +151,7 @@ pub(crate) fn plain(mut read: Read) -> (Read, Option<Cursor>) {
         Read::Tasks { live, ended, .. } => ended.take().or_else(|| live.take()),
         Read::Activity { before, .. } => before.take(),
         Read::Me
+        | Read::Turn { .. }
         | Read::Task { .. }
         | Read::Proposal { .. }
         | Read::Escalation { .. }
@@ -191,6 +192,7 @@ impl<A: crate::Application> Engine<A> {
             Read::Me => {
                 return self.checked_read(self.truth.frames.get(&party).cloned().map(|v| ReadValue::Me(Box::new(v))));
             }
+            Read::Turn { task, attempt, turn } => return self.read_turn(party, *task, *attempt, *turn),
             Read::Task { task } => Some(ObjectKey::Task(*task)),
             Read::Proposal { proposal } => Some(ObjectKey::Proposal(*proposal)),
             Read::Escalation { task } => Some(ObjectKey::Escalation(*task)),
@@ -282,6 +284,26 @@ impl<A: crate::Application> Engine<A> {
             }
         }
     }
+    fn read_turn(&self, party: u64, task: u64, attempt: u64, turn: u32) -> core::result::Result<ReadValue, ReadNone> {
+        let Rows::Activity(rows) = self.rows_for(party, &Read::Activity { task, before: None }) else {
+            unreachable!("activity rows")
+        };
+        for row in rows {
+            if let jig_client_domain::contract::Activity::Owner { source, decoded } = row.event
+                && source.task == task
+                && matches!(source.line, jig_client_domain::contract::OwnerActivity::Turn { attempt: found_attempt, turn: found_turn, .. } if (found_attempt, found_turn) == (attempt, turn))
+            {
+                let archive = decoded.ok_or(ReadNone::Malformed)?;
+                if (archive.task, archive.name.attempt, archive.name.number) != (task, attempt, turn)
+                    || matches!(archive.turn, jig_client_domain::contract::TurnRead::Undecodable { .. })
+                {
+                    return Err(ReadNone::Malformed);
+                }
+                return self.checked_read(Some(ReadValue::Turn(Box::new(archive))));
+            }
+        }
+        Err(ReadNone::Unknown)
+    }
     pub(crate) fn rows_for(&self, party: u64, query: &Read) -> Rows {
         let broad = if let Read::Inbox { group, .. } = query {
             Read::Inbox { group: *group, project: None, kind: None, goal: None, after: None }
@@ -310,7 +332,7 @@ impl<A: crate::Application> Engine<A> {
                 match query {
                     Read::Inbox { group, project, kind, goal, .. } => *group == InboxReadGroup::of(row.group) && project.is_none_or(|p| p == row.project) && kind.is_none_or(|k| k == row.group) && goal.is_none_or(|g| row.goal == Some(g)),
                     Read::Tasks { .. } | Read::Me | Read::Task { .. } | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. }
-                    | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Deployment => false,
+                    | Read::Turn { .. } | Read::PersonTask { .. } | Read::Result { .. } | Read::Ended { .. } | Read::History { .. } | Read::Activity { .. } | Read::Spend { .. } | Read::Project { .. } | Read::Notes { .. } | Read::Deployment => false,
                 }
             }).collect();
                 rows.sort_by(|a, b| {
@@ -334,6 +356,7 @@ impl<A: crate::Application> Engine<A> {
     pub(crate) fn read_visible(&self, party: u64, read: &Read) -> bool {
         let key = match read {
             Read::Task { task }
+            | Read::Turn { task, .. }
             | Read::Ended { task, .. }
             | Read::History { task, .. }
             | Read::Activity { task, .. } => Some(ObjectKey::Task(*task)),
@@ -379,6 +402,7 @@ fn empty(read: &Read) -> Rows {
         Read::Spend { .. } => Rows::Spend(vec![]),
         Read::Notes { .. } => Rows::Notes(vec![]),
         Read::Me
+        | Read::Turn { .. }
         | Read::Task { .. }
         | Read::Proposal { .. }
         | Read::Escalation { .. }

@@ -124,3 +124,73 @@ pub fn owner_turn_pages() -> [(&'static str, w::ActivityPage, c::ActivityPage); 
         ),
     ]
 }
+
+pub fn turn_read() -> c::Read {
+    c::Read::Turn { task: 7, attempt: 44, turn: 3 }
+}
+pub fn single_turn_record(body: &[u8]) -> w::ArchivedTurn {
+    w::ArchivedTurn::new(
+        &w::CEILINGS,
+        w::ArchivedTurnParts {
+            task: 7,
+            name: w::TurnName::new(&w::CEILINGS, w::TurnNameParts { attempt: 44, number: 3 }).unwrap(),
+            cumulative: 123,
+            read: Some(78),
+            at: 99,
+            turn: w::TurnBytes::Carried(
+                w::TurnCarried::new(&w::CEILINGS, w::TurnCarriedParts { bytes: Box::from(body) }).unwrap(),
+            ),
+        },
+    )
+    .unwrap()
+}
+pub fn single_turn_value() -> w::ReadValue {
+    w::ReadValue::Turn(single_turn_record(FULL_TURN))
+}
+pub fn expected_single_turn() -> c::ArchivedTurn {
+    c::ArchivedTurn {
+        task: 7,
+        name: c::TurnName { attempt: 44, number: 3 },
+        cumulative: 123,
+        read: Some(78),
+        at: Wall::from_nanos(99),
+        turn: decoded_turn(b"abc", false),
+    }
+}
+pub fn reading_turn(limits: &Limits) -> (Harness, Token) {
+    let mut harness = Harness::new(limits);
+    let exchange = harness.read(Readable::Jig(turn_read()));
+    (harness, exchange)
+}
+// The existing v5 golden occupies 146 bytes; v9's Some(read) archive and tag add 51.
+pub const TURN_PAYLOAD_BYTES: u64 = 146;
+pub const TURN_DOCUMENT_BYTES: u64 = TURN_PAYLOAD_BYTES + 51;
+pub fn answered_turn(limits: &Limits, answer: &[u8]) -> Harness {
+    let (mut harness, exchange) = reading_turn(limits);
+    harness.answer(exchange, answer);
+    harness
+}
+
+pub fn malformed_turn_answers() -> [(&'static str, Box<[u8]>); 4] {
+    // Value tag + Jig owner + version precede the owned-record length.
+    const RECORD_LENGTH: usize = 1 + 1 + 4;
+    // Envelope scalars + read-value tag + archive scalars, including Some(read).
+    const PAYLOAD_LENGTH: usize = RECORD_LENGTH + 4 + 1 + 8 + 8 + 4 + 8 + 1 + 8 + 8 + 1;
+    let original = jig_read_value_answer(&single_turn_value());
+    let mut trailing = Writer::new(original.len().checked_add(1).unwrap());
+    trailing.put(&original).unwrap();
+    trailing.put(&[0]).unwrap();
+    [
+        ("truncated", Box::from(&original[..original.len().checked_sub(1).unwrap()])),
+        ("trailing", trailing.finish()),
+        ("record length", false_turn_length(&original, RECORD_LENGTH)),
+        ("payload length", false_turn_length(&original, PAYLOAD_LENGTH)),
+    ]
+}
+fn false_turn_length(original: &[u8], offset: usize) -> Box<[u8]> {
+    let mut writer = Writer::new(original.len());
+    writer.put(&original[..offset]).unwrap();
+    writer.put(&1_u32.to_be_bytes()).unwrap();
+    writer.put(&original[offset.checked_add(4).unwrap()..]).unwrap();
+    writer.finish()
+}

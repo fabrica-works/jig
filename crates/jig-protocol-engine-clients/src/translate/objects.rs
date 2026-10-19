@@ -117,7 +117,16 @@ pub fn document(answer: &reads::Answer, limits: &w::Limits) -> Result<w::ReadVal
                 return Err(w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag });
             }
         },
-        reads::Answer::Historical(value) => w::ReadValue::Historical(Box::new(historical(value, limits)?)),
+        reads::Answer::Historical(value) => match &value.value {
+            reads::Past::Turn(record) => w::ReadValue::Turn(super::activity::archive(record, limits)?),
+            reads::Past::Task { .. }
+            | reads::Past::Proposal(_)
+            | reads::Past::PersonProposal { .. }
+            | reads::Past::Escalation { .. }
+            | reads::Past::Question { .. }
+            | reads::Past::PersonTask { .. }
+            | reads::Past::Reply(_) => w::ReadValue::Historical(Box::new(historical(value, limits)?)),
+        },
         reads::Answer::Tasks(_) | reads::Answer::Page(_) | reads::Answer::None(_) => {
             return Err(w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag });
         }

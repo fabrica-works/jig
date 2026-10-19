@@ -392,6 +392,7 @@ record FamilyRecord { scope: Scope window: Window record: bytes 1048576 }
 record FamilyRequest { scope: Scope record: bytes 1048576 }
 enum InboxReadGroup { needs, updates }
 enum InboxGroup { questions, proposals, escalations, person_tasks, results, replies }
+record ReadTurn { task: u64 attempt: u64 turn: u32 }
 record ReadTask { task: u64 }
 record ReadProposal { proposal: ProposalKey }
 record ReadEscalation { task: u64 }
@@ -410,7 +411,7 @@ enum ExecutorKind { agent, procedure, person }
 enum QueryOrder { number, changed, activity, priority, ended }
 record TaskQuery { project: option u32 requester: option OwnerRequester root: option u64 parent: option u64 label: option u32 phase: option PhaseClass executor: option ExecutorKind tracked: option bool order: QueryOrder }
 record ReadTasks { query: TaskQuery live: option Cursor ended: option Cursor }
-enum Read { tasks: ReadTasks, me, task: ReadTask, proposal: ReadProposal, escalation: ReadEscalation, question: ReadQuestion, person_task: ReadPersonTask, result: ReadResult, ended: ReadEnded, history: ReadHistory, activity: ReadActivity, inbox: ReadInbox, spend: ReadSpend, project: ReadProject, notes: ReadNotes, deployment }
+enum Read { tasks: ReadTasks, me, task: ReadTask, proposal: ReadProposal, escalation: ReadEscalation, question: ReadQuestion, person_task: ReadPersonTask, result: ReadResult, ended: ReadEnded, history: ReadHistory, activity: ReadActivity, inbox: ReadInbox, spend: ReadSpend, project: ReadProject, notes: ReadNotes, deployment, turn: ReadTurn }
 record TurnTooLarge { bytes: u64 }
 enum ReadNone { unknown, refused, gone, busy, signed_out, too_large: TurnTooLarge, malformed }
 record ReadAnswerNone { value: ReadNone }

@@ -20,6 +20,9 @@ pub fn read(read: &c::Read, limits: &w::Limits) -> Result<w::Read, w::Problem> {
                 ended: cursor(ended.as_ref(), limits)?,
             },
         )?),
+        c::Read::Turn { task, attempt, turn } => {
+            w::Read::Turn(w::ReadTurn::new(limits, w::ReadTurnParts { task: *task, attempt: *attempt, turn: *turn })?)
+        }
         c::Read::Me => w::Read::Me,
         c::Read::Task { task } => w::Read::Task(w::ReadTask::new(limits, w::ReadTaskParts { task: *task })?),
         c::Read::Proposal { proposal } => w::Read::Proposal(w::ReadProposal::new(
@@ -158,6 +161,7 @@ pub fn value(bytes: &[u8], limits: &Limits) -> Result<c::ReadValue, Undecodable>
             c::ReadValue::Historical(Box::new(objects::owner_historical(*record, limits)?))
         }
         w::ReadValue::Tasks(record) => c::ReadValue::Tasks(Box::new(pages::task_page(record, limits)?)),
+        w::ReadValue::Turn(record) => c::ReadValue::Turn(Box::new(super::turn::archive(record, limits)?)),
         w::ReadValue::Me(record) => c::ReadValue::Me(Box::new(documents::frame(record, limits)?)),
         w::ReadValue::Task(record) => c::ReadValue::Task(Box::new(documents::task(record, limits)?)),
         w::ReadValue::Proposal(record) => c::ReadValue::Proposal(Box::new(objects::proposal(record, limits)?)),

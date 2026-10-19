@@ -197,3 +197,44 @@ fn turn_failure_terminals_keep_their_reason_after_release() {
         assert_eq!(exchange.read_answer(owner), f::read_none(expected));
     }
 }
+
+#[test]
+fn a_single_turn_read_carries_the_same_archive_as_activity() {
+    let page = f::activity_page();
+    let reads::PageRow::Activity { turn: Some(reads::PageTurn::Carried(record)), .. } = page.rows.get(0).unwrap()
+    else {
+        panic!("carried fixture turn")
+    };
+    let limits = f::wire();
+    let value = w::Read::Turn(
+        w::ReadTurn::new(&limits, w::ReadTurnParts { task: record.task, attempt: record.attempt, turn: record.turn })
+            .unwrap(),
+    );
+    let mut exchange = f::read_exchange();
+    let (owner, reply, read) = exchange.read(&value);
+    assert_eq!(read, reads::Read::Turn { task: record.task, attempt: record.attempt, turn: record.turn });
+    exchange.release_read(
+        reply,
+        reads::Answer::Historical(Box::new(reads::Historical {
+            value: reads::Past::Turn(record.clone()),
+            at: None,
+            by: None,
+        })),
+    );
+    let w::ReadAnswer::Value(envelope) = exchange.read_answer(owner) else { panic!("turn answer") };
+    let w::ReadValue::Turn(archive) =
+        w::ReadValue::decode(&limits, &mut skein_lib::Reader::new(envelope.record())).unwrap()
+    else {
+        panic!("archive")
+    };
+    assert_eq!(
+        (archive.task(), archive.name().attempt(), archive.name().number()),
+        (record.task, record.attempt, record.turn)
+    );
+    assert_eq!(
+        (archive.cumulative(), *archive.read(), archive.at()),
+        (record.spent, record.read, record.at.as_nanos())
+    );
+    let w::TurnBytes::Carried(turn) = archive.turn() else { panic!("carried") };
+    assert_eq!(turn.bytes(), record.transcript.as_ref());
+}

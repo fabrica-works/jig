@@ -59,18 +59,22 @@ fn an_unlinked_client_gives_its_watch_as_the_domain_s_opening() {
 }
 #[test]
 fn an_unlinked_client_takes_an_answer_as_the_domain_s() {
-    let mut c = live();
-    c.step(Event::Read { handle: TASK, read: Readable::Jig(contract::Read::Project { project: fixtures::PROJECT }) });
-    let [Request::Down { down: Down::Read { read, .. } }] = c.requests() else {
-        panic!("one read: {:?}", c.requests());
-    };
-    let read = *read;
-    let page = Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown));
-    c.step(Event::Up { up: Up::ReadDone { read, result: page.clone() } });
-    let [Request::Told { told: Told::Page { handle, page: told_page } }] = c.requests() else {
-        panic!("one page: {:?}", c.requests());
-    };
-    assert_eq!((*handle, told_page), (TASK, &page));
+    for what in
+        [contract::Read::Project { project: fixtures::PROJECT }, contract::Read::Turn { task: 7, attempt: 44, turn: 3 }]
+    {
+        let mut c = live();
+        c.step(Event::Read { handle: TASK, read: Readable::Jig(what) });
+        let [Request::Down { down: Down::Read { read, .. } }] = c.requests() else {
+            panic!("one read: {:?}", c.requests());
+        };
+        let read = *read;
+        let page = Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown));
+        c.step(Event::Up { up: Up::ReadDone { read, result: page.clone() } });
+        let [Request::Told { told: Told::Page { handle, page: told_page } }] = c.requests() else {
+            panic!("one page: {:?}", c.requests());
+        };
+        assert_eq!((*handle, told_page), (TASK, &page));
+    }
 }
 #[test]
 fn an_unlinked_client_s_records_are_the_table_s() {

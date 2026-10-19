@@ -56,6 +56,7 @@ pub fn read_with_codec(
                 client::Read::Spend { project, .. } => wire::ledger_pages::spend(*project, value, limits),
                 client::Read::Tasks { .. }
                 | client::Read::Me
+                | client::Read::Turn { .. }
                 | client::Read::Task { .. }
                 | client::Read::Proposal { .. }
                 | client::Read::Escalation { .. }
@@ -115,7 +116,11 @@ pub fn read_with_codec(
             | documents::Document::Inbox(_) => return Err(Invalid::PendingValue),
         },
         reads::Answer::Historical(value) => {
-            client::ReadResult::Value(wire::historical::read(what, value, limits).map_err(Invalid::Historical)?)
+            if let reads::Past::Turn(record) = &value.value {
+                wire::historical::turn(what, record, limits, codec).map_err(Invalid::Historical)?
+            } else {
+                client::ReadResult::Value(wire::historical::read(what, value, limits).map_err(Invalid::Historical)?)
+            }
         }
     };
     transport.take_reply(to).expect("validated original read route");

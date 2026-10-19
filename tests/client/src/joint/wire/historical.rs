@@ -31,6 +31,7 @@ fn key(query: &client::Read) -> Result<client::ObjectKey, Invalid> {
         client::Read::PersonTask { task } => client::ObjectKey::PersonTask(*task),
         client::Read::Result { task } => client::ObjectKey::Result(*task),
         client::Read::Tasks { .. }
+        | client::Read::Turn { .. }
         | client::Read::Me
         | client::Read::Activity { .. }
         | client::Read::Notes { .. }
@@ -136,6 +137,44 @@ pub fn read(query: &client::Read, source: &reads::Historical, limits: &Limits) -
     )
     .map_err(|_| Invalid::Payload)?;
     Ok(value)
+}
+
+// The v9 discriminator, archive scalars, optional-read tag and carried byte length.
+const ARCHIVE_BYTES: u64 = 43;
+
+/// Preserve a single read's archive identity, complete document admission and decoder terminal.
+/// # Errors
+/// Refuses a response for another original turn identity.
+pub fn turn(
+    query: &client::Read,
+    record: &jig_domain_core::TurnRecord,
+    limits: &Limits,
+    codec: &jig_protocol_transcript::Limits,
+) -> Result<client::ReadResult, Invalid> {
+    let client::Read::Turn { task, attempt, turn } = query else { return Err(Invalid::Query) };
+    if (*task, *attempt, *turn) != (record.task, record.attempt, record.turn) {
+        return Err(Invalid::Identity);
+    }
+    let bytes = u64::try_from(record.transcript.len()).expect("payload fits u64");
+    let overhead = ARCHIVE_BYTES + if record.read.is_some() { 8 } else { 0 };
+    if bytes.saturating_add(overhead) > limits.document_bytes {
+        return Ok(client::ReadResult::None(client::ReadNone::TooLarge { bytes }));
+    }
+    let codec = jig_protocol_transcript::Limits {
+        bytes: u32::try_from(limits.document_bytes).map_err(|_| Invalid::Payload)?,
+        ..*codec
+    };
+    let Ok(turn) = jig_protocol_transcript::decode(&codec, &record.transcript) else {
+        return Ok(client::ReadResult::None(client::ReadNone::Malformed));
+    };
+    Ok(client::ReadResult::Value(client::ReadValue::Turn(Box::new(client::ArchivedTurn {
+        task: record.task,
+        name: client::TurnName { attempt: record.attempt, number: record.turn },
+        cumulative: record.spent,
+        read: record.read,
+        at: record.at,
+        turn: client::TurnRead::Decoded(turn),
+    }))))
 }
 
 fn person_proposal(value: &tasks::PersonProposal, limits: &Limits) -> Result<client::OwnerPersonProposal, Invalid> {

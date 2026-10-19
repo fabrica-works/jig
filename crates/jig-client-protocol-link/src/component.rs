@@ -16,7 +16,7 @@ pub(super) enum ExchangeKind {
     SignIn,
     SignOut { generation: u64 },
     Attempt,
-    Read,
+    Read { turn: Option<(u64, u64, u32)> },
     WatchOpen { name: u64 },
     WatchClose { name: u64 },
 }
@@ -133,6 +133,11 @@ impl Link {
         self.exchange(exchange, Message::Request(writer.finish()), out);
     }
     fn read(&mut self, _now: Time, read: Token, what: Readable, out: &mut Queue<Request>) {
+        let turn = if let Readable::Jig(jig_client_domain::contract::Read::Turn { task, attempt, turn }) = &what {
+            Some((*task, *attempt, *turn))
+        } else {
+            None
+        };
         let owner = match &what {
             Readable::Jig(_) => w::Owner::Jig,
             Readable::Family { record: value, .. } => w::Owner::Family(
@@ -154,7 +159,7 @@ impl Link {
         };
         let exchange = Token::new(self.next);
         self.next = next;
-        let state = Attempt { token: read, owner, version: record.version(), kind: ExchangeKind::Read };
+        let state = Attempt { token: read, owner, version: record.version(), kind: ExchangeKind::Read { turn } };
         self.attempts.insert(exchange, state).expect("checked exchange capacity");
         let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
         record.encode(&mut writer).expect("measured read envelope");
@@ -172,7 +177,7 @@ impl Link {
                 self.watch_answer(attempt, name, body, out);
                 return;
             }
-            ExchangeKind::Read => {
+            ExchangeKind::Read { .. } => {
                 self.read_answer(attempt, body, out);
                 return;
             }
@@ -253,6 +258,19 @@ impl Link {
         out.push(Request::Answer { attempt: attempt.token, envelope, answer: None, why });
     }
     fn read_answer(&mut self, attempt: Attempt, body: &[u8], out: &mut Queue<Request>) {
+        if let ExchangeKind::Read { turn: Some(identity) } = attempt.kind {
+            match translate::turn::inspect(body, identity, &self.limits) {
+                Ok(None) => {}
+                Ok(Some(why)) => {
+                    read_none(attempt.token, &attempt.owner, why, out);
+                    return;
+                }
+                Err(_) => {
+                    read_none(attempt.token, &attempt.owner, jig_client_domain::contract::ReadNone::Malformed, out);
+                    return;
+                }
+            }
+        }
         let result = match w::ReadAnswer::decode(&self.limits.wire, &mut Reader::new(body)) {
             Ok(w::ReadAnswer::NotServed(value)) => {
                 translate::envelope::not_served(&value, out);
@@ -280,7 +298,17 @@ impl Link {
             Ok(result) => out.push(Request::Read { read: attempt.token, result }),
             Err(_) => {
                 out.push(Request::Fact { fact: Fact::UndecodableDocument });
-                failed(attempt, out);
+                match attempt.kind {
+                    ExchangeKind::Read { turn: Some(_) } => {
+                        read_none(attempt.token, &attempt.owner, jig_client_domain::contract::ReadNone::Malformed, out);
+                    }
+                    ExchangeKind::Read { turn: None }
+                    | ExchangeKind::Attempt
+                    | ExchangeKind::SignIn
+                    | ExchangeKind::SignOut { .. }
+                    | ExchangeKind::WatchOpen { .. }
+                    | ExchangeKind::WatchClose { .. } => failed(attempt, out),
+                }
             }
         }
     }
@@ -316,7 +344,7 @@ fn failed(attempt: Attempt, out: &mut Queue<Request>) {
         ExchangeKind::WatchOpen { .. } | ExchangeKind::WatchClose { .. } => {
             unreachable!("watch failure belongs to its map")
         }
-        ExchangeKind::Read => {
+        ExchangeKind::Read { .. } => {
             read_none(attempt.token, &attempt.owner, jig_client_domain::contract::ReadNone::Unreachable, out);
         }
     }
@@ -453,7 +481,10 @@ impl Link {
                         tokens.push(*exchange).expect("bounded exchanges");
                     }
                 }
-                ExchangeKind::Attempt | ExchangeKind::Read | ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {}
+                ExchangeKind::Attempt
+                | ExchangeKind::Read { .. }
+                | ExchangeKind::SignIn
+                | ExchangeKind::SignOut { .. } => {}
             }
         }
         for exchange in &tokens {
@@ -519,7 +550,7 @@ impl Link {
                     Err(_) => self.failure(attempt, out),
                 }
             }
-            ExchangeKind::Attempt | ExchangeKind::Read | ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
+            ExchangeKind::Attempt | ExchangeKind::Read { .. } | ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
                 unreachable!("watch exchange kind")
             }
         }
@@ -543,7 +574,7 @@ impl Link {
             ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
                 out.push(Request::Signing { signing: crate::Signing::Lost });
             }
-            ExchangeKind::Attempt | ExchangeKind::Read => failed(attempt, out),
+            ExchangeKind::Attempt | ExchangeKind::Read { .. } => failed(attempt, out),
         }
     }
     fn streamed(&mut self, now: Time, message: Streamed, out: &mut Queue<Request>) {

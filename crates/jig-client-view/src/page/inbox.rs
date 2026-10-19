@@ -416,6 +416,7 @@ pub const fn query_filter(query: Option<&Read>) -> Option<Filter> {
             | Read::Ended { .. }
             | Read::History { .. }
             | Read::Activity { .. }
+            | Read::Turn { .. }
             | Read::Spend { .. }
             | Read::Project { .. }
             | Read::Notes { .. }

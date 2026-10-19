@@ -406,9 +406,12 @@ pub(crate) fn context_read(domain: &mut Ui, what: &jig_client::contract::Read) {
             }
             _ => Some(Section::Conversations { project: query.project }),
         },
-        Read::Me | Read::Proposal { .. } | Read::Escalation { .. } | Read::Question { .. } | Read::Result { .. } => {
-            None
-        }
+        Read::Turn { .. }
+        | Read::Me
+        | Read::Proposal { .. }
+        | Read::Escalation { .. }
+        | Read::Question { .. }
+        | Read::Result { .. } => None,
     };
     domain.section_context = 0;
     if let Some(section) = section {

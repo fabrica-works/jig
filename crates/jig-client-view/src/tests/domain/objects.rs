@@ -288,6 +288,7 @@ fn documents_keep_whole_object_facts_revisions_and_reply_positions_within_the_wo
             | ReadValue::OwnerEnded(_)
             | ReadValue::History(_)
             | ReadValue::Activity(_)
+            | ReadValue::Turn(_)
             | ReadValue::Inbox(_)
             | ReadValue::OwnerInbox(_)
             | ReadValue::Spend(_)

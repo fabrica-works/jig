@@ -21,6 +21,7 @@ pub fn read(value: &client::Read, cursor_bytes: u32) -> Result<reads::Read, Inva
             live: cursor(live.as_ref(), cursor_bytes)?,
             ended: cursor(ended.as_ref(), cursor_bytes)?,
         },
+        client::Read::Turn { task, attempt, turn } => reads::Read::Turn { task: *task, attempt: *attempt, turn: *turn },
         client::Read::Me => reads::Read::Frame,
         client::Read::Task { task } => reads::Read::Task { task: *task },
         client::Read::Proposal { proposal } => {

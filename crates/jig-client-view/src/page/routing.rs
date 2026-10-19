@@ -424,11 +424,7 @@ pub(crate) fn read_result(
     out: &mut Queue<Request>,
     lent: &jig_client::Client,
 ) {
-    if !owner_escalation_read_valid(domain, token, &result, lent)
-        || !owner_project_read_valid(domain, token, &result)
-        || !owner_inbox_read_valid(domain, env, token, &result)
-        || !historical_read_valid(domain, env, token, &result)
-    {
+    if !original_read_valid(domain, env, token, &result, lent) {
         rejected_read(domain, token);
         refuse(domain, Limit::Reads);
         return;
@@ -476,6 +472,7 @@ pub(crate) fn read_result(
         | Read::PersonTask { .. }
         | Read::Result { .. }
         | Read::Activity { .. }
+        | Read::Turn { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Deployment => false,
@@ -525,6 +522,19 @@ pub(crate) fn read_result(
         ReadResult::Value(value) => received_value(domain, env, receipt.source, receipt.what, value, out, lent),
     }
 }
+fn original_read_valid(
+    domain: &Ui,
+    env: &Env<crate::Limits>,
+    token: Token,
+    result: &ReadResult,
+    lent: &jig_client::Client,
+) -> bool {
+    owner_escalation_read_valid(domain, token, result, lent)
+        && owner_project_read_valid(domain, token, result)
+        && owner_inbox_read_valid(domain, env, token, result)
+        && historical_read_valid(domain, env, token, result)
+}
+
 fn read_value(
     domain: &mut Ui,
     env: &Env<crate::Limits>,
@@ -615,6 +625,7 @@ fn read_value(
                 }
             }
         }
+        ReadValue::Turn(_) => unreachable!("reference pages never request a turn"),
         ReadValue::Project(project) => crate::page::project::document(domain, env, project, out, lent),
         ReadValue::Deployment(deployment) => crate::page::deployment::document(domain, env, deployment, out, lent),
         ReadValue::OwnerDeployment(document) => {
@@ -663,6 +674,7 @@ fn owner_project_read_valid(domain: &Ui, token: Token, result: &ReadResult) -> b
             | ReadValue::Ended(_)
             | ReadValue::History(_)
             | ReadValue::Activity(_)
+            | ReadValue::Turn(_)
             | ReadValue::Inbox(_)
             | ReadValue::OwnerInbox(_)
             | ReadValue::Spend(_)
@@ -689,6 +701,7 @@ fn owner_project_read_valid(domain: &Ui, token: Token, result: &ReadResult) -> b
         | Read::Ended { .. }
         | Read::History { .. }
         | Read::Activity { .. }
+        | Read::Turn { .. }
         | Read::Inbox { .. }
         | Read::Spend { .. }
         | Read::Notes { .. }
@@ -716,6 +729,7 @@ fn owner_inbox_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, r
             | ReadValue::Ended(_)
             | ReadValue::History(_)
             | ReadValue::Activity(_)
+            | ReadValue::Turn(_)
             | ReadValue::Inbox(_)
             | ReadValue::Spend(_)
             | ReadValue::OwnerEnded(_)
@@ -744,6 +758,7 @@ fn owner_inbox_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, r
         | Read::Ended { .. }
         | Read::History { .. }
         | Read::Activity { .. }
+        | Read::Turn { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
         | Read::Notes { .. }
@@ -801,6 +816,7 @@ fn received_value(
             | Read::Ended { .. }
             | Read::History { .. }
             | Read::Activity { .. }
+            | Read::Turn { .. }
             | Read::Inbox { .. }
             | Read::Spend { .. }
             | Read::Notes { .. }
@@ -825,6 +841,7 @@ fn received_value(
                 | Read::Ended { .. }
                 | Read::History { .. }
                 | Read::Activity { .. }
+                | Read::Turn { .. }
                 | Read::Spend { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
@@ -850,6 +867,7 @@ fn received_value(
         | ReadValue::Ended(_)
         | ReadValue::History(_)
         | ReadValue::Activity(_)
+        | ReadValue::Turn(_)
         | ReadValue::Inbox(_)
         | ReadValue::Spend(_)
         | ReadValue::Project(_)
@@ -943,6 +961,7 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
                 | Read::Result { .. }
                 | Read::History { .. }
                 | Read::Activity { .. }
+                | Read::Turn { .. }
                 | Read::Inbox { .. }
                 | Read::Spend { .. }
                 | Read::Project { .. }
@@ -972,6 +991,7 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
                 | Read::Ended { .. }
                 | Read::History { .. }
                 | Read::Activity { .. }
+                | Read::Turn { .. }
                 | Read::Inbox { .. }
                 | Read::Project { .. }
                 | Read::Notes { .. }
@@ -1005,6 +1025,7 @@ fn historical_read_valid(domain: &Ui, env: &Env<crate::Limits>, token: Token, re
         | ReadValue::Ended(_)
         | ReadValue::History(_)
         | ReadValue::Activity(_)
+        | ReadValue::Turn(_)
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
         | ReadValue::Spend(_)
@@ -1050,6 +1071,7 @@ fn owner_escalation_read_valid(domain: &Ui, token: Token, result: &ReadResult, l
             | ReadValue::OwnerEnded(_)
             | ReadValue::History(_)
             | ReadValue::Activity(_)
+            | ReadValue::Turn(_)
             | ReadValue::Inbox(_)
             | ReadValue::OwnerInbox(_)
             | ReadValue::Spend(_)
@@ -1076,6 +1098,7 @@ fn owner_escalation_read_valid(domain: &Ui, token: Token, result: &ReadResult, l
         | Read::Ended { .. }
         | Read::History { .. }
         | Read::Activity { .. }
+        | Read::Turn { .. }
         | Read::Inbox { .. }
         | Read::Spend { .. }
         | Read::Project { .. }

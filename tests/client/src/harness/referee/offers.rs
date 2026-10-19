@@ -70,6 +70,7 @@ impl Offers {
             | ReadValue::OwnerEnded(_)
             | ReadValue::History(_)
             | ReadValue::Activity(_)
+            | ReadValue::Turn(_)
             | ReadValue::Inbox(_)
             | ReadValue::OwnerInbox(_)
             | ReadValue::Spend(_)

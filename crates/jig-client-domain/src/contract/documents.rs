@@ -835,7 +835,7 @@ pub enum Activity {
     /// A recorded decision.
     Decision { object: ObjectKey, by: Actor, how: Decision },
 }
-/// Archived metadata and turn carried by its activity page, never fetched separately.
+/// Archived metadata and turn, carried by activity or fetched as one complete read.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ArchivedTurn {
     pub task: u64,

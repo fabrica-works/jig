@@ -84,27 +84,7 @@ pub fn page_turn(
                     if (record.task, record.attempt, record.turn) != (task, *attempt, *turn) {
                         return Err(invalid);
                     }
-                    let path = w::Path::TurnCarriedBytes;
-                    if record.transcript.len()
-                        > usize::try_from(limits.turn_carried_bytes.min(w::CEILINGS.turn_carried_bytes))
-                            .expect("u32 fits usize")
-                    {
-                        return Err(w::Problem { path, reason: skein_codec::Reason::Bound });
-                    }
-                    Some(w::ArchivedTurn::new(
-                        limits,
-                        w::ArchivedTurnParts {
-                            task,
-                            name: w::TurnName::new(limits, w::TurnNameParts { attempt: *attempt, number: *turn })?,
-                            cumulative: record.spent,
-                            read: record.read,
-                            at: record.at.as_nanos(),
-                            turn: w::TurnBytes::Carried(w::TurnCarried::new(
-                                limits,
-                                w::TurnCarriedParts { bytes: bytes::copy_of(&record.transcript) },
-                            )?),
-                        },
-                    )?)
+                    Some(archive(record, limits)?)
                 }
                 reads::PageTurn::TooLarge { spent, read, at, bytes } => Some(w::ArchivedTurn::new(
                     limits,
@@ -144,6 +124,30 @@ pub fn page_turn(
             event: w::Activity::Owner(w::ActivityOwner::new(
                 limits,
                 w::ActivityOwnerParts { source: line(value, limits)?, decoded },
+            )?),
+        },
+    )
+}
+
+/// The same immutable archive serves a page and a single-turn read.
+pub fn archive(record: &jig_domain_core::TurnRecord, limits: &w::Limits) -> Result<w::ArchivedTurn, w::Problem> {
+    let path = w::Path::TurnCarriedBytes;
+    if record.transcript.len()
+        > usize::try_from(limits.turn_carried_bytes.min(w::CEILINGS.turn_carried_bytes)).expect("u32 fits usize")
+    {
+        return Err(w::Problem { path, reason: skein_codec::Reason::Bound });
+    }
+    w::ArchivedTurn::new(
+        limits,
+        w::ArchivedTurnParts {
+            task: record.task,
+            name: w::TurnName::new(limits, w::TurnNameParts { attempt: record.attempt, number: record.turn })?,
+            cumulative: record.spent,
+            read: record.read,
+            at: record.at.as_nanos(),
+            turn: w::TurnBytes::Carried(w::TurnCarried::new(
+                limits,
+                w::TurnCarriedParts { bytes: bytes::copy_of(&record.transcript) },
             )?),
         },
     )

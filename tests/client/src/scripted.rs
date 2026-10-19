@@ -329,6 +329,7 @@ impl Front<Test> for Scripted {
                     | Read::Ended { .. }
                     | Read::History { .. }
                     | Read::Activity { .. }
+                    | Read::Turn { .. }
                     | Read::Inbox { .. }
                     | Read::Spend { .. }
                     | Read::Project { .. }
@@ -569,6 +570,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::Ended(_)
                 | ReadValue::History(_)
                 | ReadValue::Activity(_)
+                | ReadValue::Turn(_)
                 | ReadValue::Inbox(_)
                 | ReadValue::OwnerInbox(_)
                 | ReadValue::Spend(_)
@@ -600,6 +602,7 @@ fn observe_change(change: &engine::Change, commit: u64, seen: &mut Vec<Observed>
                 | ReadValue::Ended(_)
                 | ReadValue::History(_)
                 | ReadValue::Activity(_)
+                | ReadValue::Turn(_)
                 | ReadValue::Inbox(_)
                 | ReadValue::OwnerInbox(_)
                 | ReadValue::Spend(_)

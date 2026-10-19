@@ -675,6 +675,7 @@ fn read_key(what: &jig_client::contract::Read) -> Option<ObjectKey> {
         | Read::Ended { .. }
         | Read::History { .. }
         | Read::Activity { .. }
+        | Read::Turn { .. }
         | Read::Inbox { .. }
         | Read::Spend { .. }
         | Read::Project { .. }
@@ -889,6 +890,7 @@ pub(crate) fn historical_read(
             | ReadValue::Ended(_)
             | ReadValue::History(_)
             | ReadValue::Activity(_)
+            | ReadValue::Turn(_)
             | ReadValue::Inbox(_)
             | ReadValue::OwnerInbox(_)
             | ReadValue::Spend(_)
@@ -927,6 +929,7 @@ fn read_body(key: ObjectKey, value: jig_client::contract::ReadValue) -> Option<B
         | ReadValue::Inbox(_)
         | ReadValue::OwnerInbox(_)
         | ReadValue::Activity(_)
+        | ReadValue::Turn(_)
         | ReadValue::History(_)
         | ReadValue::Ended(_)
         | ReadValue::Spend(_)

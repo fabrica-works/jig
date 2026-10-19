@@ -47,6 +47,8 @@ pub enum Read {
     Tasks { query: super::TaskQuery, live: Option<Cursor>, ended: Option<Cursor> },
     /// The frame.
     Me,
+    /// One committed turn, with the same access as activity.
+    Turn { task: u64, attempt: u64, turn: u32 },
     /// One task.
     Task { task: u64 },
     /// One proposal.
@@ -144,6 +146,8 @@ pub enum ReadValue {
     Historical(Box<super::OwnerHistorical>),
     /// The frame.
     Me(Box<Me>),
+    /// A complete committed turn archive.
+    Turn(Box<super::ArchivedTurn>),
     /// A task.
     Task(Box<Task>),
     /// A proposal.

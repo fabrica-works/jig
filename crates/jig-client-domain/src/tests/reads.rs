@@ -9,33 +9,37 @@ const FAMILY_PAGE: Handle = Handle { asker: OTHER_ASKER, number: PAGE.number };
 
 #[test]
 fn a_read_is_told_its_one_page_by_its_handle() {
-    let mut c = Client::started();
-    c.step(Event::Read { handle: PAGE, read: project(PROJECT) });
-    let downs = c.downs();
-    let [Down::Read { read, what }] = downs.as_ref() else {
-        panic!("one read");
-    };
-    assert_eq!(*what, project(PROJECT));
-    let page = Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown));
-    c.step(Event::Up { up: Up::ReadDone { read: *read, result: page.clone() } });
-    assert_eq!(c.told().as_ref(), &[Told::Page { handle: PAGE, page: page.clone() }]);
-    c.step(Event::Up { up: Up::ReadDone { read: *read, result: page } });
-    assert!(c.told().is_empty());
+    for what in [project(PROJECT), Readable::Jig(contract::Read::Turn { task: 7, attempt: 44, turn: 3 })] {
+        let mut c = Client::started();
+        c.step(Event::Read { handle: PAGE, read: what.clone() });
+        let downs = c.downs();
+        let [Down::Read { read, what }] = downs.as_ref() else {
+            panic!("one read");
+        };
+        assert_eq!(*what, what.clone());
+        let page = Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown));
+        c.step(Event::Up { up: Up::ReadDone { read: *read, result: page.clone() } });
+        assert_eq!(c.told().as_ref(), &[Told::Page { handle: PAGE, page: page.clone() }]);
+        c.step(Event::Up { up: Up::ReadDone { read: *read, result: page } });
+        assert!(c.told().is_empty());
+    }
 }
 
 #[test]
 fn a_second_read_on_a_handle_drops_the_first_s_page() {
-    let mut limits = super::fixtures::limits();
-    limits.reads = 1;
-    let mut c = Client::new(limits);
-    let first = c.read(PAGE, project(PROJECT));
-    let second = c.read(PAGE, project(PROJECT));
-    assert_ne!(first, second);
-    let page = Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown));
-    c.step(Event::Up { up: Up::ReadDone { read: first, result: page.clone() } });
-    assert!(c.told().is_empty());
-    c.step(Event::Up { up: Up::ReadDone { read: second, result: page.clone() } });
-    assert_eq!(c.told().as_ref(), &[Told::Page { handle: PAGE, page }]);
+    for what in [project(PROJECT), Readable::Jig(contract::Read::Turn { task: 7, attempt: 44, turn: 3 })] {
+        let mut limits = super::fixtures::limits();
+        limits.reads = 1;
+        let mut c = Client::new(limits);
+        let first = c.read(PAGE, what.clone());
+        let second = c.read(PAGE, what.clone());
+        assert_ne!(first, second);
+        let page = Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown));
+        c.step(Event::Up { up: Up::ReadDone { read: first, result: page.clone() } });
+        assert!(c.told().is_empty());
+        c.step(Event::Up { up: Up::ReadDone { read: second, result: page.clone() } });
+        assert_eq!(c.told().as_ref(), &[Told::Page { handle: PAGE, page }]);
+    }
 }
 
 #[test]
@@ -55,14 +59,16 @@ fn a_read_past_the_limit_is_refused_by_the_client_s_limit() {
 
 #[test]
 fn unwatching_a_handle_drops_its_read_s_late_page() {
-    let mut c = Client::started();
-    let read = c.read(PAGE, project(PROJECT));
-    c.step(Event::Unwatch { handle: PAGE });
-    c.step(Event::Up {
-        up: Up::ReadDone { read, result: Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown)) },
-    });
-    assert!(c.told().is_empty());
-    assert!(c.downs().is_empty());
+    for what in [project(PROJECT), Readable::Jig(contract::Read::Turn { task: 7, attempt: 44, turn: 3 })] {
+        let mut c = Client::started();
+        let read = c.read(PAGE, what.clone());
+        c.step(Event::Unwatch { handle: PAGE });
+        c.step(Event::Up {
+            up: Up::ReadDone { read, result: Readout::Jig(contract::ReadResult::None(contract::ReadNone::Unknown)) },
+        });
+        assert!(c.told().is_empty());
+        assert!(c.downs().is_empty());
+    }
 }
 
 #[test]

@@ -9,17 +9,26 @@ impl Story {
     #[must_use]
     pub fn reading_chat(seed: u64) -> Self {
         let body = include_bytes!("../../../../crates/jig-protocol-transcript/tests/data/record_turn_full.bin");
+        Self::reading_chat_with(seed, Box::from(body.as_slice()), fixtures::domain_limits(), fixtures::owner_limits())
+    }
+    #[must_use]
+    pub fn reading_chat_with(
+        seed: u64,
+        body: Box<[u8]>,
+        client: jig_client_domain::Limits,
+        core: jig_test_domain::Limits,
+    ) -> Self {
         let script = Box::new([
             Script::Wait,
             Script::Silence { for_: COMMIT_WAIT },
-            Script::Turn { body: Box::from(body.as_slice()), cost: 1, read: Some(READ_MESSAGE) },
+            Script::Turn { body, cost: 1, read: Some(READ_MESSAGE) },
             Script::Wait,
         ]);
         let peers = jig_core_world::peers::Peers::new(vec![Worker::new(WORKER, 1, vec![script])], Vec::new());
         let mut story = Self {
-            front: Front::new(seed),
+            front: Front::with_limits(seed, client),
             second: None,
-            engine: Engine::with_peers(seed, &fixtures::owner_limits(), jig_core_world::world::config(seed), peers),
+            engine: Engine::with_peers(seed, &core, jig_core_world::world::config(seed), peers),
             net: Net::new(seed),
             now: Time::ZERO,
             seen: Vec::new(),

@@ -37,6 +37,7 @@ fn retained(source: reads::Page, what: &client::Read, wrong: client::Read) {
         client::Read::Spend { project, .. } => wire::ledger_pages::spend(*project, &original, &l),
         client::Read::Tasks { .. }
         | client::Read::Me
+        | client::Read::Turn { .. }
         | client::Read::Task { .. }
         | client::Read::Proposal { .. }
         | client::Read::Escalation { .. }

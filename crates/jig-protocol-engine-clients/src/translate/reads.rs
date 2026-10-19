@@ -15,6 +15,7 @@ pub(crate) fn read(value: w::Read) -> Option<reads::Read> {
                 ended: decode_cursor(value.ended)?,
             }
         }
+        w::Read::Turn(value) => reads::Read::Turn { task: value.task(), attempt: value.attempt(), turn: value.turn() },
         w::Read::Me => reads::Read::Frame,
         w::Read::Task(value) => reads::Read::Task { task: value.task() },
         w::Read::Proposal(value) => reads::Read::Proposal {

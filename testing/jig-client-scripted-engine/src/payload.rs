@@ -889,7 +889,7 @@ impl Payload for Read {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
             Self::Tasks { query, live, ended } => sum(&[query.heap(bounds), live.heap(bounds), ended.heap(bounds)]),
-            Self::Me | Self::Deployment => Some(0),
+            Self::Turn { .. } | Self::Me | Self::Deployment => Some(0),
             Self::Task { task } | Self::Escalation { task } | Self::PersonTask { task } | Self::Result { task } => {
                 sum(&[task.heap(bounds)])
             }
@@ -919,6 +919,7 @@ fields!(NotePage { cut, rows, before, after });
 impl Payload for ReadValue {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
+            Self::Turn(value) => value.heap(bounds),
             Self::Tasks(value0) => value0.heap(bounds),
             Self::Me(value0) => sum(&[value0.heap(bounds)]),
             Self::Task(value0) => sum(&[value0.heap(bounds)]),

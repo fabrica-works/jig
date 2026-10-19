@@ -266,3 +266,98 @@ fn me_s_projects_past_the_document_bytes_are_refused_as_too_large() {
     limits.client.document_bytes = u64::from(value.measure()).checked_sub(1).unwrap();
     assert_eq!(translate::documents::frame(value, &limits), Err(Undecodable::TooLarge));
 }
+
+#[test]
+fn a_turn_read_keeps_all_three_numbers() {
+    let value = translate::reads::read(&fixtures::turn_read(), &fixtures::limits().wire).unwrap();
+    let w::Read::Turn(value) = value else { panic!("turn read") };
+    assert_eq!((value.task(), value.attempt(), value.turn()), (7, 44, 3));
+}
+#[test]
+fn a_turn_read_keeps_its_archive_metadata() {
+    let (mut harness, exchange) = fixtures::reading_turn(&fixtures::limits());
+    let answer = fixtures::jig_read_value_answer(&fixtures::single_turn_value());
+    harness.answer(exchange, &answer);
+    harness.answer(exchange, &answer);
+    assert_eq!(
+        harness.read_answered(),
+        Some(&Readout::Jig(c::ReadResult::Value(c::ReadValue::Turn(Box::new(fixtures::expected_single_turn())))))
+    );
+    assert_eq!(harness.read_terminals(), 1);
+    assert_eq!(harness.link.next_deadline(), None);
+}
+#[test]
+fn a_turn_at_the_document_bound_decodes() {
+    let limits = fixtures::read_byte_limits(fixtures::TURN_DOCUMENT_BYTES);
+    let (mut harness, exchange) = fixtures::reading_turn(&limits);
+    harness.answer(exchange, &fixtures::jig_read_value_answer(&fixtures::single_turn_value()));
+    assert_eq!(
+        harness.read_answered(),
+        Some(&Readout::Jig(c::ReadResult::Value(c::ReadValue::Turn(Box::new(fixtures::expected_single_turn())))))
+    );
+}
+#[test]
+fn a_turn_past_the_document_bound_keeps_its_size() {
+    let limits = fixtures::read_byte_limits(fixtures::TURN_DOCUMENT_BYTES - 1);
+    let (mut harness, exchange) = fixtures::reading_turn(&limits);
+    let answer = fixtures::jig_read_value_answer(&fixtures::single_turn_value());
+    harness.answer(exchange, &answer);
+    harness.answer(exchange, &answer);
+    assert_eq!(
+        harness.read_answered(),
+        Some(&Readout::Jig(c::ReadResult::None(c::ReadNone::TooLarge { bytes: fixtures::TURN_PAYLOAD_BYTES })))
+    );
+    assert_eq!(harness.read_terminals(), 1);
+    assert_eq!(harness.link.next_deadline(), None);
+}
+#[test]
+fn an_undecodable_single_turn_is_malformed() {
+    for body in [&[0, 4][..], &[0, 5][..], &[255][..]] {
+        let value = w::ReadValue::Turn(fixtures::single_turn_record(body));
+        let harness = fixtures::answered_turn(&fixtures::limits(), &fixtures::jig_read_value_answer(&value));
+        assert_eq!(
+            harness.read_answered(),
+            Some(&Readout::Jig(c::ReadResult::None(c::ReadNone::Malformed))),
+            "{body:?}"
+        );
+    }
+}
+#[test]
+fn a_turn_answer_for_another_identity_is_rejected() {
+    for (task, attempt, turn) in [(8, 44, 3), (7, 45, 3), (7, 44, 4)] {
+        let mut record = fixtures::single_turn_record(fixtures::FULL_TURN).into_parts();
+        record.task = task;
+        record.name = w::TurnName::new(&w::CEILINGS, w::TurnNameParts { attempt, number: turn }).unwrap();
+        let value = w::ReadValue::Turn(w::ArchivedTurn::new(&w::CEILINGS, record).unwrap());
+        let harness = fixtures::answered_turn(&fixtures::limits(), &fixtures::jig_read_value_answer(&value));
+        assert_eq!(
+            harness.read_answered(),
+            Some(&Readout::Jig(c::ReadResult::None(c::ReadNone::Malformed))),
+            "{task}/{attempt}/{turn}"
+        );
+    }
+}
+#[test]
+fn the_turn_inspector_rejects_incomplete_or_false_envelopes() {
+    let limits = fixtures::read_byte_limits(fixtures::TURN_DOCUMENT_BYTES - 1);
+    for (label, body) in fixtures::malformed_turn_answers() {
+        let harness = fixtures::answered_turn(&limits, &body);
+        assert_eq!(
+            harness.read_answered(),
+            Some(&Readout::Jig(c::ReadResult::None(c::ReadNone::Malformed))),
+            "{label}"
+        );
+        assert_eq!(harness.read_terminals(), 1, "{label}");
+    }
+}
+
+#[test]
+fn the_single_turn_decoder_uses_the_archive_bound() {
+    // The archive decoder applies its TurnCarriedBytes bound.
+    let mut archive_limits = fixtures::limits();
+    archive_limits.wire.activity_turn_turn = 1;
+    assert_eq!(
+        translate::turn::archive(fixtures::single_turn_record(fixtures::FULL_TURN), &archive_limits),
+        Ok(fixtures::expected_single_turn())
+    );
+}

@@ -47,7 +47,7 @@ versioned record Kept { store_version: u16 record: bytes 65536 }
 record TableEntry { asker: u32 number: u64 key: fixed 16 scope: u64 first_sent: option u64 owner: Owner version: u32 request: bytes 1114240 }
 
 # A read value preserves the contract variant as well as its existing document (ruling 208).
-enum ReadValue { tasks: TaskPage, owner_project: OwnerProject, historical: boxed OwnerHistorical, me: Me, task: Task, proposal: Proposal, owner_proposal: OwnerProposal, escalation: Escalation, owner_escalation: OwnerEscalation, question: Question, person_task: PersonTask, owner_person_task: OwnerPersonTask, result: ResultDocument, ended: ObjectPage, owner_ended: OwnerEndedPage, history: HistoryPage, activity: ActivityPage, inbox: InboxPage, owner_inbox: OwnerInboxPage, spend: SpendPage, owner_spend: OwnerSpendPage, project: Project, notes: NotePage, deployment: Deployment, owner_deployment: OwnerDeployment }
+enum ReadValue { tasks: TaskPage, owner_project: OwnerProject, historical: boxed OwnerHistorical, me: Me, task: Task, proposal: Proposal, owner_proposal: OwnerProposal, escalation: Escalation, owner_escalation: OwnerEscalation, question: Question, person_task: PersonTask, owner_person_task: OwnerPersonTask, result: ResultDocument, ended: ObjectPage, owner_ended: OwnerEndedPage, history: HistoryPage, activity: ActivityPage, inbox: InboxPage, owner_inbox: OwnerInboxPage, spend: SpendPage, owner_spend: OwnerSpendPage, project: Project, notes: NotePage, deployment: Deployment, owner_deployment: OwnerDeployment, turn: ArchivedTurn }
 
 # Chips.rows and OwnerInbox.needs/updates/selection: jig_client_view::Limits::document_bytes; each item is a length-prefixed piece (rulings 182 and 184).
 record Chips { rows: bytes 16777216 }

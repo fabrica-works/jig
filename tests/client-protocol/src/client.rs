@@ -69,7 +69,10 @@ pub struct Front {
 }
 impl Front {
     fn new(seed: u64) -> Self {
-        let limits = client::Limits { domain: fixtures::domain_limits(), exchanges: 8 };
+        Self::with_limits(seed, fixtures::domain_limits())
+    }
+    fn with_limits(seed: u64, domain: jig_client_domain::Limits) -> Self {
+        let limits = client::Limits { domain, exchanges: 8 };
         Self {
             client: client::Client::new(&limits, seed).expect("bounded client"),
             connections: Connections::new(&fixtures::connections_limits(), fixtures::HOST),

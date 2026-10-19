@@ -86,7 +86,7 @@ impl Link {
             ExchangeKind::SignOut { .. }
             | ExchangeKind::SignIn
             | ExchangeKind::Attempt
-            | ExchangeKind::Read
+            | ExchangeKind::Read { .. }
             | ExchangeKind::WatchOpen { .. }
             | ExchangeKind::WatchClose { .. } => {}
         }
@@ -120,7 +120,7 @@ impl Link {
                     Ok(_) | Err(_) => Signing::Lost,
                 },
                 ExchangeKind::Attempt
-                | ExchangeKind::Read
+                | ExchangeKind::Read { .. }
                 | ExchangeKind::WatchOpen { .. }
                 | ExchangeKind::WatchClose { .. } => unreachable!("signing exchange"),
             }

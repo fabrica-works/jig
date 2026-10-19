@@ -545,6 +545,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::History(_)
                 | ReadValue::Historical(_)
                 | ReadValue::Activity(_)
+                | ReadValue::Turn(_)
                 | ReadValue::Inbox(_)
                 | ReadValue::OwnerInbox(_)
                 | ReadValue::OwnerProposal(_)
@@ -578,6 +579,7 @@ fn change_facts(change: &engine::Change, commit: u64, out: &mut Vec<Observed>) {
                 | ReadValue::History(_)
                 | ReadValue::Historical(_)
                 | ReadValue::Activity(_)
+                | ReadValue::Turn(_)
                 | ReadValue::Inbox(_)
                 | ReadValue::OwnerInbox(_)
                 | ReadValue::OwnerProposal(_)
@@ -620,6 +622,7 @@ impl Scripted {
             | Read::Ended { .. }
             | Read::History { .. }
             | Read::Activity { .. }
+            | Read::Turn { .. }
             | Read::Inbox { .. }
             | Read::Spend { .. }
             | Read::Project { .. }
