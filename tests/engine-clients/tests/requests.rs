@@ -1,4 +1,4 @@
-use jig_client_protocol_wire::v8 as w;
+use jig_client_protocol_wire::v9 as w;
 use jig_domain_core as core;
 use jig_domain_people as people;
 use jig_engine_clients_world::fixtures::{self, Peer};
@@ -26,7 +26,7 @@ fn request() -> Box<[u8]> {
     let mut out = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
     ask.encode(&mut out).expect("ask bytes");
     let record =
-        w::Keyed::new(&limits, w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 8, request: out.finish() })
+        w::Keyed::new(&limits, w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 9, request: out.finish() })
             .expect("keyed request");
     let mut out = Writer::new(usize::try_from(record.measure()).expect("record size"));
     record.encode(&mut out).expect("request bytes");
@@ -62,7 +62,7 @@ fn a_native_request_waits_for_the_released_reply_and_takes_its_task() {
         panic!("final answer");
     };
     assert_eq!(answer.owner(), &w::Owner::Jig);
-    assert_eq!(answer.version(), 8);
+    assert_eq!(answer.version(), 9);
     let outcome = w::Outcome::Owner(
         w::OutcomeOwner::new(
             &limits,
@@ -128,7 +128,7 @@ fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
     ask.encode(&mut out).expect("ask bytes");
     let keyed = w::Keyed::new(
         &limits,
-        w::KeyedParts { key: [61; 16], owner: w::Owner::Jig, version: 8, request: out.finish() },
+        w::KeyedParts { key: [61; 16], owner: w::Owner::Jig, version: 9, request: out.finish() },
     )
     .expect("keyed");
     let mut out = Writer::new(usize::try_from(keyed.measure()).expect("keyed size"));
@@ -178,7 +178,7 @@ fn amendment_setup(seed: u64) -> (Peer, jig_core_world::effects::World, Box<[u8]
 }
 
 #[test]
-fn a_v8_propose_beyond_the_role_is_answered_proposed() {
+fn a_v9_propose_beyond_the_role_is_answered_proposed() {
     let (mut peer, mut world, bearer) = amendment_setup(349);
     let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
     let socket = peer.post(b"/jig/v1/request", propose_request(revision, 150), Some(&bearer));
@@ -195,7 +195,7 @@ fn a_v8_propose_beyond_the_role_is_answered_proposed() {
     assert_eq!(jig_core_world::fixtures::live_row(&world, 2).numbers.budget, 20);
 }
 #[test]
-fn a_v8_propose_sent_again_replays_the_same_proposal() {
+fn a_v9_propose_sent_again_replays_the_same_proposal() {
     let (mut peer, mut world, bearer) = amendment_setup(350);
     let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
     let body = propose_request(revision, 150);
@@ -217,7 +217,7 @@ fn a_v8_propose_sent_again_replays_the_same_proposal() {
     assert_eq!(final_answer(&peer, second), original);
 }
 #[test]
-fn a_v8_amend_beyond_the_ceiling_stays_refused() {
+fn a_v9_amend_beyond_the_ceiling_stays_refused() {
     let (mut peer, mut world, bearer) = amendment_setup(351);
     let revision = jig_core_world::fixtures::live_row(&world, 2).revisions.spec;
     let socket = peer.post(b"/jig/v1/request", amend_request(revision, 2000), Some(&bearer));

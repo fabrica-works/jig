@@ -180,16 +180,16 @@ fn a_final_answer_that_does_not_decode_is_told_retrying_as_undecodable() {
     let mut c = Client::signed_in();
     c.step(Event::Send { key: STOP, request: fixtures::stop() });
     c.step(Event::Stored);
-    let record = jig_client_protocol_wire::v8::Owned::new(
-        &jig_client_protocol_wire::v8::CEILINGS,
-        jig_client_protocol_wire::v8::OwnedParts {
-            owner: jig_client_protocol_wire::v8::Owner::Jig,
+    let record = jig_client_protocol_wire::v9::Owned::new(
+        &jig_client_protocol_wire::v9::CEILINGS,
+        jig_client_protocol_wire::v9::OwnedParts {
+            owner: jig_client_protocol_wire::v9::Owner::Jig,
             version: jig_client_protocol_wire::VERSION,
             record: Box::new([255]),
         },
     )
     .unwrap();
-    let message = fixtures::answer(&jig_client_protocol_wire::v8::KeyedAnswer::FinalAnswer(record));
+    let message = fixtures::answer(&jig_client_protocol_wire::v9::KeyedAnswer::FinalAnswer(record));
     c.step(Event::Reply { exchange: c.exchange(), message });
     assert_eq!(c.machine.pending(STOP).unwrap().progress, Progress::Retrying { why: Retry::Undecodable });
     let [Request::Told { told }] = c.requests() else {

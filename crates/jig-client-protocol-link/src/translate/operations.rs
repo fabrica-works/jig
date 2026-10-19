@@ -2,7 +2,7 @@
 use super::asks;
 use alloc::boxed::Box;
 use jig_client_domain::contract as c;
-use jig_client_protocol_wire::v8 as w;
+use jig_client_protocol_wire::v9 as w;
 use skein_lib::{List, bytes};
 
 pub(super) fn answer(value: &c::AnswerOn, limits: &w::Limits) -> Result<w::AnswerOn, w::Problem> {

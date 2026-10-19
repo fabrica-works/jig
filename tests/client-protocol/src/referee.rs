@@ -1,5 +1,5 @@
 //! Independent observations of records, authentication and stream isolation (client.md, 14).
-use jig_client_protocol_wire::v8 as wire;
+use jig_client_protocol_wire::v9 as wire;
 use skein_lib::{Reader, Writer};
 
 macro_rules! same {

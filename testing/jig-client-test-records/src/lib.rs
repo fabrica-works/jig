@@ -1,6 +1,6 @@
 //! Shared literals for client document codec tests (testing-strategy.md, 8).
 pub use jig_client::shapes::{CHAT, GOAL};
-use jig_client_protocol_wire::v8 as w;
+use jig_client_protocol_wire::v9 as w;
 use skein_lib::{Duration, List, Writer};
 mod owner;
 pub use owner::*;

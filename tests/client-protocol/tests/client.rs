@@ -211,7 +211,7 @@ fn a_family_request_is_answered_as_its_owner_s_bytes() {
 #[test]
 fn an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing() {
     let mut story = Story::live(fixtures::SEED);
-    story.serve_jig(u32::MAX);
+    story.serve_jig(8);
     assert!(story.run_until(|s| s.client.link().state == Link::OutOfDate, Duration::from_secs(1)));
     let exchanges = story.exchanges();
     story.send(STOP, stop(TASK));
@@ -224,10 +224,7 @@ fn an_engine_outside_jig_s_version_leaves_the_client_out_of_date_sending_nothing
     assert_eq!(story.client.next_deadline(), None);
     assert_eq!(
         story.pages(PROJECT),
-        vec![Readout::NotServed {
-            family: None,
-            served: Some(contract::VersionRange { first: u32::MAX, last: u32::MAX }),
-        }]
+        vec![Readout::NotServed { family: None, served: Some(contract::VersionRange { first: 8, last: 8 }) }]
     );
 }
 
@@ -257,7 +254,7 @@ fn a_request_pending_across_a_restart_that_stops_serving_its_family_stays_unsent
     assert!(story.run_until(|s| s.made(fixtures::FIRST_OWNER) == 1, PROOF_WAIT));
     assert_eq!(story.answered(FAMILY_REQUEST), vec![]);
     story.restart_serving(jig_client_world::test::list([
-        jig_protocol_engine_clients::Served { family: None, first: 8, last: 8 },
+        jig_protocol_engine_clients::Served { family: None, first: 9, last: 9 },
         jig_protocol_engine_clients::Served { family: Some(1), first: 2, last: 2 },
     ]));
     assert!(story.run_until(|s| s.client.link().state == Link::Live, PROOF_WAIT));

@@ -5,7 +5,7 @@ mod shapes;
 mod thread;
 use crate::{engine::Engine, fixtures, net::Net};
 use jig_client::{self as client, Ask, Event, Handle, Key, Latest, Link, Outcome, Readable, Told, Watchable};
-use jig_client_protocol_wire::v8 as w;
+use jig_client_protocol_wire::v9 as w;
 use jig_client_shell_native::{Conn, Connections};
 use jig_client_world::{ClientId, harness::Observed};
 use skein_lib::Reader;

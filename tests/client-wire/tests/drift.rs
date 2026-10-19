@@ -5,10 +5,10 @@ use std::{fs, path::Path};
 #[test]
 fn client_wire_schema_matches_generated_code_and_goldens() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-client-protocol-wire");
-    let mut source = fs::read_to_string(root.join("schema/client-v8.schema")).expect("client schema");
+    let mut source = fs::read_to_string(root.join("schema/client-v9.schema")).expect("client schema");
     source
-        .push_str(&fs::read_to_string(root.join("schema/client-v8-part1.schema")).expect("client schema continuation"));
-    check(&root, &source, "v8");
+        .push_str(&fs::read_to_string(root.join("schema/client-v9-part1.schema")).expect("client schema continuation"));
+    check(&root, &source, "v9");
 }
 #[test]
 fn view_records_schema_matches_generated_code_and_goldens() {
@@ -25,7 +25,7 @@ fn ops_client_wire_schema_matches_generated_code_and_goldens() {
 fn check(root: &Path, source: &str, version: &str) {
     let output = generate(&parse(source).expect("schema valid"));
     let file = match version {
-        "v8" => "src/generated/v8.rs",
+        "v9" => "src/generated/v9.rs",
         "v1" => "src/generated/v1.rs",
         _ => "src/generated/records_v1.rs",
     };
