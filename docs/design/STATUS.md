@@ -132,7 +132,7 @@ development.md, section 3.3).
   engine named by its TLS server name and trusted roots, the clients'
   listener's certificate and key files, and the Host check's certificate
   name; and contained process trees for workers' agents. Waits for
-  skein's TLS server side and skein's `draft/process.md`.
+  skein's TLS server side and skein's `io.md`, 6.2–6.4.
 - **A connector's request budget** (`domain/connectors.md`, section 13;
   `client/domain/pages.md`, section 7; `examples.md`, 3.1): the budget
   and the reads charged to it, and the deployment's page showing it and

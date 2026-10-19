@@ -360,7 +360,7 @@ Each is generic, and says nothing about jig.
 - **Contained process trees,** for workers' agents: spawned within a
   deadline, with an environment given whole and only named directories
   writable, stopped politely, then terminated, then killed, and proved
-  empty (`../domain/hosts.md`, section 10; skein's `draft/process.md`;
+  empty (`../domain/hosts.md`, section 10; skein's `io.md`, 6.2–6.4;
   smith's `protocol/README.md`, section 9 asks the same). Without them,
   each agent process, command and check runs in a process group of its
   own, which a stop signals whole (skein's `io.md`, section 6).
