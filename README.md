@@ -1,35 +1,56 @@
 # jig
 
-jig is a kit for agentic applications, written in Rust on skein. It
-provides the rails that an application's work runs on: tasks done by
-agents, procedures and people; authority that only narrows as tasks
-delegate; effects on external systems made once; and state that outlives
-processes and machines. An application brings its connectors to external
-systems, its own domain logic and its client's own objects. It owns the
-top of every process, and composes jig's parts beneath it.
+*Engine for agentic applications.*
 
-temper, a software factory, is jig's first application.
+A Rust kit that runs an application's work, done by agents, procedures
+and people, durably and within the authority each task was given.
 
-Everyone who builds jig, or builds on it, reads skein's foundation first:
+## The idea
 
-- `programming-model.md`: how the code is written, in skein, in jig and
-  in every application;
-- `testing-strategy.md`: how it is tested;
-- `notes.md`: the questions still open about both.
-
-jig's design starts at [docs/design/README.md](docs/design/README.md).
-
-## In one page
-
-- **A kit, not a framework.** jig has no application trait, no plug-in
-  points and no callbacks. Nothing in jig calls into an application. An
-  application's root domain calls jig's parts by name and routes between
-  them and its own.
-- **Rails, not boilerplate.** The code an application writes around jig
-  only routes and translates, and has one shape in every application.
-  Whatever is hard to get right is jig's: the commit barrier, restart,
-  authority, and effects made once. jig's conformance world and referee
-  check, in the application's own worlds, that its wiring kept them.
+- **As flexible as an agent at a terminal, and more.** jig adds what such
+  an agent lacks: work that outlives processes and machines, many agents
+  at once, rules no agent can loosen, and effects on other systems made
+  once.
+- **Five primitives.** The task is what is asked; its executor, an
+  agent, a procedure or a person, does it; messages are all it hears
+  once started; authority is what it may do, narrowed whenever it
+  delegates; connectors are the external systems. Plans, coordinators,
+  chats, goals and reviews are built from them.
+- **A kit, not a framework.** The application owns the top of every
+  process: its root composes jig's parts with its own connectors and
+  domain logic. jig has no application trait, no plug-in points and no
+  callbacks, and decides nothing that is the application's: not its
+  server, its URLs or its presentation.
+- **The hard parts are jig's.** The code an application writes around jig
+  only routes and translates. The commit barrier, restart, authority and
+  effects made once are jig's, and its conformance world and referee
+  check, in the application's own worlds, that the wiring kept them.
+- **Agents are optional.** An application may have none, run them in
+  its engine, or run them on workers. jig's core never depends on smith.
 - **Built when pulled,** as skein is. temper's needs decide what jig
-  holds and in what order; a second, small application keeps jig from
-  being temper's in disguise.
+  holds and when; `ops`, a small second application, keeps jig from
+  becoming temper's in disguise.
+
+## Start here
+
+- [`docs/design/README.md`](docs/design/README.md): what jig is, how an
+  application is built around it, and the promises it keeps.
+- [`docs/design/examples.md`](docs/design/examples.md): `ops`, the
+  example application, whose root every application copies.
+- [`docs/design/STATUS.md`](docs/design/STATUS.md): how far the code is
+  from the design.
+- skein's foundation, which jig follows: `programming-model.md`,
+  `testing-strategy.md` and `notes.md`.
+
+Before changing code, read [`AGENTS.md`](AGENTS.md). `main` moves only
+through skein's `land`, which runs the gate, `scripts/check.sh`.
+
+## The family
+
+| Repository | | Builds on |
+|---|---|---|
+| [skein](https://github.com/forgetic/skein) | One thread, one loop, no async | |
+| [smith](https://github.com/forgetic/smith) | Protocol-driven agent loop for AI applications | skein |
+| [jig](https://github.com/forgetic/jig) | Engine for agentic applications | skein, smith |
+| [temper](https://github.com/forgetic/temper) | Agent-driven software development on a forge | skein, smith, jig |
+| [hearth](https://github.com/forgetic/hearth) | Immutable machines, built from a revision | skein |
