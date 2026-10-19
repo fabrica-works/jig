@@ -944,6 +944,20 @@ prefix; jig's test application mounts it at `/jig`.
   backoffs. The application's server bounds its own connections, never
   by the engine end's room, and a call handed with no room is the
   application's bug, asserted.
+- **A peer's end is the call's end.** skein's server lets a response go
+  on after its peer has ended, once the request is all read ("the
+  response still goes, room may still come": skein's `http.md`, 5.5),
+  and says nothing of that end above. No client of the mapping ends its
+  side to read on: jig's client end and a browser end a connection only
+  to leave it, and a process's kernel ends it when the process exits.
+  So the application's server, which reads each connection's events
+  below skein's server, ends a connection whose peer ends while a call
+  it handed the engine end is unfinished, and tells the engine end the
+  call's connection closed, as it does when a connection fails. The
+  engine end takes that as the call's end, and a stream's as its
+  connection's end, `StreamGone` (4.2): section 4's "until the engine
+  sees the stream's connection end" is then the moment the peer's end
+  is read, not a heartbeat's failed write later.
 - **Example guards,** in the engine end, which an application uses,
   wraps, or replaces with its own: a `Host` allow-list; the browser's
   required header and the POSTs' content type, which force a preflight,
