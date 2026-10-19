@@ -585,6 +585,7 @@ pub fn concrete_turn() -> smith_host_domain::Turn {
             reasoning_tokens: Some(0),
         },
         spent: 2,
+        jobs: 0,
         messages: Box::default(),
     };
     smith_host_domain::Turn {

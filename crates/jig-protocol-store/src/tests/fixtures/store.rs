@@ -420,6 +420,8 @@ pub fn written(store: &mut Store, mut below: Below, turns: &[jig_domain_core::Tu
             | file::Request::SyncDirectory { .. }
             | file::Request::Rename { .. }
             | file::Request::Remove { .. }
+            | file::Request::ListPage { .. }
+            | file::Request::Lock { .. }
             | file::Request::List { .. } => panic!("unexpected transcript write"),
         };
         let (events, next) = answer(store, Io::Transcripts(Arrived { event, fd: None }));

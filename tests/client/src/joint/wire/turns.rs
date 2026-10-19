@@ -20,8 +20,8 @@ mod tests {
 
     fn limits() -> Limits {
         Limits {
-            smith: smith_transcript::v3::CEILINGS,
-            bytes: 142,
+            smith: smith_transcript::v5::CEILINGS,
+            bytes: 146,
             turn: TurnLimits { messages: 1, blocks: 1, text: 3 },
         }
     }
@@ -54,10 +54,10 @@ mod tests {
     #[test]
     fn committed_codec_admission_rejects_whole_oversize_trailing_bytes_and_version_without_mutating_the_record() {
         let original = record().to_vec();
-        assert_eq!(turn(&original, &Limits { bytes: 141, ..limits() }), Err(Undecodable::TooLarge));
+        assert_eq!(turn(&original, &Limits { bytes: 145, ..limits() }), Err(Undecodable::TooLarge));
         let mut trailing = original.clone();
         trailing.push(0);
-        assert_eq!(turn(&trailing, &Limits { bytes: 143, ..limits() }), Err(Undecodable::Malformed));
+        assert_eq!(turn(&trailing, &Limits { bytes: 147, ..limits() }), Err(Undecodable::Malformed));
         assert_eq!(turn(&[255, 255], &limits()), Err(Undecodable::Version { found: u16::MAX }));
         assert_eq!(original, record());
     }

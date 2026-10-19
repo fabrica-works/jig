@@ -61,6 +61,7 @@ fn source(messages: &[smith::Message]) -> smith::Turn {
             )
             .unwrap(),
             spent: 15,
+            jobs: 0,
             messages: list,
         },
     )
@@ -354,7 +355,13 @@ fn tool_text_and_invalid_calls_remain_distinct() {
             true,
         );
     }
-    assert_result(smith::Returned::NotRun, b"Not run", true);
+    assert_result(
+        smith::Returned::NotRun(
+            smith::NotRun::new(&CEILINGS, smith::NotRunParts { why: smith::NotRunWhy::Stopped }).unwrap(),
+        ),
+        b"Not run",
+        true,
+    );
     assert_result(smith::Returned::Withdrawn, b"Withdrawn", true);
 }
 
@@ -362,7 +369,7 @@ fn tool_text_and_invalid_calls_remain_distinct() {
 fn admission_errors_are_explicit_and_whole_records_are_required() {
     assert_eq!(decode(&limits(), &[0, 4]), Err(Undecodable::Version { found: 4 }));
     assert_eq!(decode(&limits(), &[0]), Err(Undecodable::Malformed));
-    assert_eq!(decode(&limits(), &[0, 3, 0, 0, 0, 0, 0, 65]), Err(Undecodable::TooLarge));
+    assert_eq!(decode(&limits(), &[0, 5, 0, 0, 0, 0, 0, 65]), Err(Undecodable::TooLarge));
     let source = source(&[message(smith::Role::Assistant, &[SBlock::Text(text(b"hello"))])]);
     let mut bytes = encode(&source);
     let mut small = limits();
@@ -427,7 +434,7 @@ fn receiving_limits_cut_without_growing_or_losing_call_outcomes() {
 #[expect(clippy::disallowed_macros, reason = "fixed wire fixtures belong to decoder unit tests")]
 fn smith_smallest_golden_decodes_at_its_whole_length() {
     let bytes = include_bytes!("../tests/data/record_turn_smallest.bin");
-    assert_eq!(bytes.len(), 38);
+    assert_eq!(bytes.len(), 42);
     let value = decode(&limits(), bytes).unwrap();
     assert_eq!(
         value,
@@ -445,7 +452,7 @@ fn smith_smallest_golden_decodes_at_its_whole_length() {
 #[expect(clippy::disallowed_macros, reason = "fixed wire fixtures belong to decoder unit tests")]
 fn smith_full_golden_preserves_maximum_usage_at_its_whole_length() {
     let bytes = include_bytes!("../tests/data/record_turn_full.bin");
-    assert_eq!(bytes.len(), 142);
+    assert_eq!(bytes.len(), 146);
     let mut blocks = List::with_capacity(1);
     blocks.push(Block::Text(Text::new(Box::from(&b"abc"[..]), 3).unwrap())).unwrap();
     let mut messages = List::with_capacity(1);

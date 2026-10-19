@@ -155,6 +155,8 @@ pub(crate) fn arrival(event: file::Event) -> Option<Arrival> {
         }
         file::Event::Made { .. }
         | file::Event::Refused { .. }
+        | file::Event::Locked { .. }
+        | file::Event::Busy { .. }
         | file::Event::Loaded { .. }
         | file::Event::Scanned { .. }
         | file::Event::Stored { .. }

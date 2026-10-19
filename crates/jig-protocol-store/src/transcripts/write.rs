@@ -205,6 +205,8 @@ fn arrival(arrived: Arrived) -> Option<Arrival> {
             }
         }
         file::Event::Refused { .. }
+        | file::Event::Locked { .. }
+        | file::Event::Busy { .. }
         | file::Event::Loaded { .. }
         | file::Event::Scanned { .. }
         | file::Event::Stored { .. }

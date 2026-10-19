@@ -295,7 +295,7 @@ pub fn fixture(owner_limits: &jig_test_domain::Limits) -> Joint {
     );
     let limits = crate::test::limits();
     let codec = jig_protocol_transcript::Limits {
-        smith: smith_transcript::v3::CEILINGS,
+        smith: smith_transcript::v5::CEILINGS,
         bytes: 1_048_576,
         turn: client::TurnLimits { messages: 64, blocks: 16, text: 65_536 },
     };

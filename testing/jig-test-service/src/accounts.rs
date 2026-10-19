@@ -428,7 +428,9 @@ fn file_owner(request: &file::Request) -> Token {
         | file::Request::SyncDirectory { owner, .. }
         | file::Request::Rename { owner, .. }
         | file::Request::Remove { owner, .. }
-        | file::Request::List { owner, .. } => *owner,
+        | file::Request::List { owner, .. }
+        | file::Request::ListPage { owner, .. }
+        | file::Request::Lock { owner, .. } => *owner,
     }
 }
 

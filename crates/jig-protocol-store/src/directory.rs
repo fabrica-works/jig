@@ -81,6 +81,8 @@ fn made(event: file::Event) -> bool {
         file::Event::Failed { error, .. } => error == skein_io::kernel::Error::Exists,
         file::Event::Opened { .. }
         | file::Event::Refused { .. }
+        | file::Event::Locked { .. }
+        | file::Event::Busy { .. }
         | file::Event::Loaded { .. }
         | file::Event::Scanned { .. }
         | file::Event::Stored { .. }
@@ -104,6 +106,8 @@ fn opened(arrived: Arrived) -> Option<Root> {
         file::Event::Made { .. }
         | file::Event::Failed { .. }
         | file::Event::Refused { .. }
+        | file::Event::Locked { .. }
+        | file::Event::Busy { .. }
         | file::Event::Loaded { .. }
         | file::Event::Scanned { .. }
         | file::Event::Stored { .. }

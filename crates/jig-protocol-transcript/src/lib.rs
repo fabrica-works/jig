@@ -14,7 +14,7 @@ extern crate alloc;
 use alloc::boxed::Box;
 use jig_client_domain::contract::{Block, Call, Message, Speaker, Text, Turn, TurnLimits, Usage};
 use skein_lib::{List, Reader};
-use smith_transcript::v3 as smith;
+use smith_transcript::v5 as smith;
 
 mod summary;
 #[cfg(test)]
@@ -54,7 +54,7 @@ pub fn decode(limits: &Limits, bytes: &[u8]) -> Result<Turn, Undecodable> {
         return Err(Undecodable::TooLarge);
     }
     let version = Reader::new(bytes).u16().ok_or(Undecodable::Malformed)?;
-    if version != 3 {
+    if u64::from(version) != smith::Turn::FORMAT_VERSION {
         return Err(Undecodable::Version { found: version });
     }
     let source = match smith::Turn::decode(&limits.smith, &mut Reader::new(bytes)) {
@@ -215,7 +215,7 @@ fn result_text(returned: &smith::Returned, budget: &mut Budget) -> ResultText {
         smith::Returned::Said(said) => ResultText { text: budget.text(said.text()), failed: said.error() },
         smith::Returned::Outcome(_)
         | smith::Returned::Invalid(_)
-        | smith::Returned::NotRun
+        | smith::Returned::NotRun(_)
         | smith::Returned::Withdrawn => {
             let summary = summary::summarize(returned);
             ResultText { text: budget.text(&summary.bytes), failed: summary.failed }

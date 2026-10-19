@@ -137,7 +137,7 @@ fn configured_with_bounds(
         jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Roles { project: 1, holdings })),
     );
     let codec = jig_protocol_transcript::Limits {
-        smith: smith_transcript::v3::CEILINGS,
+        smith: smith_transcript::v5::CEILINGS,
         bytes: 1_048_576,
         turn: client::TurnLimits { messages: 8, blocks: 8, text: 128 },
     };

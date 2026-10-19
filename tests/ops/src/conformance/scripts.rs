@@ -32,7 +32,7 @@ use jig_conformance::{Clock, Input};
 use jig_domain_host as host;
 use jig_ops_domain as root;
 use skein_lib::{Duration, List, Token, Writer};
-use smith_transcript::v3 as transcript;
+use smith_transcript::v5 as transcript;
 use std::collections::BTreeMap;
 
 pub struct Agents {
@@ -511,6 +511,7 @@ fn turn(agent: &Agent, texts: &[Vec<u8>], step: &Step) -> Box<[u8]> {
             )
             .expect("usage"),
             spent: agent.spent,
+            jobs: 0,
             messages,
         },
     )

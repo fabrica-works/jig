@@ -282,6 +282,8 @@ fn read_answer(store: &mut Store, mut below: Below, disk: &[u8], chunk: u32) -> 
         | file::Request::SyncDirectory { .. }
         | file::Request::Rename { .. }
         | file::Request::Remove { .. }
+        | file::Request::ListPage { .. }
+        | file::Request::Lock { .. }
         | file::Request::List { .. } => panic!("expected transcript read"),
     };
     fixtures::answer(store, Io::Transcripts(Arrived { event, fd: None }))

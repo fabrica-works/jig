@@ -184,6 +184,7 @@ pub fn turn() -> smith::Turn {
             reasoning_tokens: None,
         },
         spent: 2,
+        jobs: 0,
         messages: Box::new([]),
     };
     smith::Turn {

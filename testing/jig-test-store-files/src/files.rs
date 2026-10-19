@@ -101,9 +101,8 @@ impl Files {
                 let result = self.machine.remove(opened(root), &name, directory);
                 terminal(owner, result, file::Event::Removed { owner })
             }
-            file::Request::Rename { owner, root, from, to } => {
-                let root = opened(root);
-                let result = self.machine.rename(root, &from, root, &to);
+            file::Request::Rename { owner, from_root, to_root, from, to } => {
+                let result = self.machine.rename(opened(from_root), &from, opened(to_root), &to);
                 terminal(owner, result, file::Event::Renamed { owner })
             }
             file::Request::OpenPrivate { .. }
@@ -111,6 +110,8 @@ impl Files {
             | file::Request::Scan { .. }
             | file::Request::Store { .. }
             | file::Request::Stat { .. }
+            | file::Request::ListPage { .. }
+            | file::Request::Lock { .. }
             | file::Request::List { .. } => {
                 panic!("the store uses positioned operations and derived paths")
             }

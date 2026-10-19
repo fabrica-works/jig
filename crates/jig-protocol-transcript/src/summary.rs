@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use skein_lib::stream::Read;
 use skein_lib::{Decimal, Intake, Reader};
-use smith_transcript::v3 as smith;
+use smith_transcript::v5 as smith;
 
 use crate::Undecodable;
 
@@ -52,6 +52,8 @@ fn validate_returned(limits: &smith::Limits, returned: &smith::Returned) -> Resu
             smith::Outcome::Found(found) => {
                 hit_count(limits, found.hits())?;
             }
+            // removed by jig-01.2
+            smith::Outcome::Running(_) | smith::Outcome::Job(_) => return Err(Undecodable::Unknown),
             smith::Outcome::Read(_)
             | smith::Outcome::Listed(_)
             | smith::Outcome::Written(_)
@@ -76,10 +78,20 @@ fn validate_returned(limits: &smith::Limits, returned: &smith::Returned) -> Resu
             | smith::Outcome::Busy
             | smith::Outcome::NulByte => {}
         },
-        smith::Returned::Said(_)
-        | smith::Returned::Invalid(_)
-        | smith::Returned::NotRun
-        | smith::Returned::Withdrawn => {}
+        smith::Returned::Invalid(invalid) => match invalid.problem() {
+            // removed by jig-01.2
+            smith::CallProblem::JobsFull(_) | smith::CallProblem::UnknownJob(_) => return Err(Undecodable::Unknown),
+            smith::CallProblem::UnknownTool
+            | smith::CallProblem::NotAnObject
+            | smith::CallProblem::Missing(_)
+            | smith::CallProblem::WrongType(_)
+            | smith::CallProblem::BadValue(_)
+            | smith::CallProblem::TooLarge
+            | smith::CallProblem::Oversize(_)
+            | smith::CallProblem::CutOff(_)
+            | smith::CallProblem::Nesting => {}
+        },
+        smith::Returned::Said(_) | smith::Returned::NotRun(_) | smith::Returned::Withdrawn => {}
     }
     Ok(())
 }
@@ -128,10 +140,14 @@ pub(super) fn summarize(returned: &smith::Returned) -> Summary {
                     builder.number(cut.bytes());
                     builder.put(b" bytes");
                 }
+                // removed by jig-01.2
+                smith::CallProblem::JobsFull(_) | smith::CallProblem::UnknownJob(_) => {
+                    unreachable!("validate refuses job problems")
+                }
                 smith::CallProblem::Nesting => builder.put(b"nested sub-agent"),
             }
         }
-        smith::Returned::NotRun => builder.put(b"Not run"),
+        smith::Returned::NotRun(_) => builder.put(b"Not run"),
         smith::Returned::Withdrawn => builder.put(b"Withdrawn"),
     }
     let length = builder.bytes.len();
@@ -201,6 +217,8 @@ impl Builder {
                 self.put(b" matches");
             }
             smith::Outcome::Exited(end) => self.command(end),
+            // removed by jig-01.2
+            smith::Outcome::Running(_) | smith::Outcome::Job(_) => unreachable!("validate refuses job outcomes"),
             smith::Outcome::NotGranted => self.put(b"Tool refused: not granted"),
             smith::Outcome::Outside(_) => self.put(b"Tool refused: outside workspace"),
             smith::Outcome::ReadOnly(_) => self.put(b"Tool refused: read only"),

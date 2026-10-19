@@ -497,18 +497,18 @@ real side.
 ## 11. Fixtures that move with the code
 
 - **Four copies of smith's goldens:** the transcript files
-  `jig-protocol-transcript/tests/data/record_turn_full.bin` (142 bytes)
-  and `record_turn_smallest.bin` (38); `FULL_TURN`, in
+  `jig-protocol-transcript/tests/data/record_turn_full.bin` (146 bytes)
+  and `record_turn_smallest.bin` (42); `FULL_TURN`, in
   `testing/jig-client-test-records/src/activity_reads.rs:4`; and
   `SMALLEST`, smith's smallest charter, in
   `testing/jig-test-worker/src/tests/fixtures.rs:62`. Literals derive
   from their sizes in `tests/client/src/joint/wire/turns.rs:24,57,60`,
   `activity.rs:381` and `jig-client-protocol-link/src/tests/pages.rs:242`.
-  They equal smith's goldens at the pinned `29fa97c9` today (`cmp`
-  against smith's `crates/smith-transcript/golden/v3/` and
+  They equal smith's goldens at the pinned `a277e922` today (`cmp`
+  against smith's `crates/smith-transcript/golden/v5/` and
   `crates/smith-charter/golden/v2/` in cargo's checkout of that
   revision), but nothing checks it, and the copies' README names
-  `1de54d1b`. Every repin of smith refreshes them by hand. A drift test
+  `a277e922`. Every repin of smith refreshes them by hand. A drift test
   against the pinned crate's goldens, or reading them from it, would pay
   it back.
 - **The one-process world's power-loss cut is placed by a count:**

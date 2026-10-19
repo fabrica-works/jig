@@ -45,8 +45,8 @@ pub fn unread_activity_page(why: c::TurnProblem) -> c::ActivityPage {
 pub fn unread_pages() -> [(w::ActivityPage, c::ActivityPage); 3] {
     [
         (unread_activity_record(&[0, 4]), unread_activity_page(c::TurnProblem::Version { found: 4 })),
-        (unread_activity_record(&[0, 3]), unread_activity_page(c::TurnProblem::Malformed)),
-        (unread_activity_record(&[0, 3, 255]), unread_activity_page(c::TurnProblem::Malformed)),
+        (unread_activity_record(&[0, 5]), unread_activity_page(c::TurnProblem::Malformed)),
+        (unread_activity_record(&[0, 5, 255]), unread_activity_page(c::TurnProblem::Malformed)),
     ]
 }
 pub fn cut_activity_record() -> w::ActivityPage {
