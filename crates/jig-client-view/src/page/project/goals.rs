@@ -128,13 +128,34 @@ pub(crate) fn draft(form: GoalForm, words: Text) -> jig_client::shapes::GoalDraf
         priority: Some(form.priority),
     }
 }
+pub(crate) fn fall(
+    creating: &jig_client::contract::Creating,
+    template: &jig_client::contract::Template,
+    form: GoalForm,
+    words: Text,
+) -> jig_client::shapes::Fall {
+    use jig_client::contract::{NewDeadline, TemplateDeadline};
+    let mut draft = draft(form, words);
+    let deadline = match template.deadline {
+        TemplateDeadline::None => {
+            draft.deadline = None;
+            NewDeadline::Named
+        }
+        TemplateDeadline::Given => NewDeadline::Named,
+        TemplateDeadline::Span(span) => {
+            draft.deadline = None;
+            NewDeadline::Span(span)
+        }
+    };
+    jig_client::shapes::fall(creating, &draft, deadline)
+}
 fn prediction(domain: &Ui, form: GoalForm, _scope: u64, lent: &jig_client::Client) -> Option<(Admission, u64)> {
     let Some(me) = domain.frame(lent).document else {
         return Some((Admission::Refused(Refusal::NotOffered), 0));
     };
-    if crate::queries::goal_template(me, form.project).is_none() {
+    let Some(template) = crate::queries::goal_template(me, form.project) else {
         return Some((Admission::Refused(Refusal::NotOffered), 0));
-    }
+    };
     let mut creating = None;
     for project in &me.projects {
         if project.project == form.project {
@@ -145,7 +166,7 @@ fn prediction(domain: &Ui, form: GoalForm, _scope: u64, lent: &jig_client::Clien
         return Some((Admission::Refused(Refusal::NotOffered), 0));
     };
     let words = domain.fields.get(Purpose::NewGoal)?.text.clone();
-    let admission = match jig_client::shapes::fall(creating, &draft(form, words)) {
+    let admission = match fall(creating, template, form, words) {
         jig_client::shapes::Fall::Within => Admission::Allowed,
         jig_client::shapes::Fall::Proposable(to) => Admission::Proposed { to },
         jig_client::shapes::Fall::Refused(why) => Admission::Refused(why),
@@ -197,13 +218,7 @@ pub(crate) fn send(domain: &mut Ui, out: &mut Queue<Request>, lent: &jig_client:
         Some(reason) => reason,
         None => Text::new(Box::from([]), domain.text_limit).expect("empty reason fits"),
     };
-    let ask = match jig_client::shapes::set_goal(
-        me,
-        open.form.project,
-        draft(open.form, open.words.clone()),
-        reason,
-        domain.borrow(lent).wall(),
-    ) {
+    let ask = match jig_client::shapes::set_goal(me, open.form.project, draft(open.form, open.words.clone()), reason) {
         jig_client::shapes::Judged::Create(ask) | jig_client::shapes::Judged::Propose { ask, .. } => ask,
         jig_client::shapes::Judged::Refused(why) => {
             domain.project_page.form.refusal = Some(why);

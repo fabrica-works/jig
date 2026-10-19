@@ -710,7 +710,7 @@ fn a_goal_past_the_first_bound_is_proposed_to_the_policy_s_role() {
         deadline: None,
         priority: Some(7),
     };
-    let Judged::Propose { ask, to } = shapes::set_goal(&me, PROJECT_NUMBER, draft, words, story.wall()) else {
+    let Judged::Propose { ask, to } = shapes::set_goal(&me, PROJECT_NUMBER, draft, words) else {
         panic!("goal proposed")
     };
     let mut roles = skein_lib::List::with_capacity(1);

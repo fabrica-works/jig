@@ -311,3 +311,67 @@ pub(crate) fn goal_request(form: crate::page::project::goals::GoalForm, words: T
         reason: Text::new(Box::from([]), 32).unwrap(),
     }
 }
+
+/// Shape stories start from the same delivered membership document.
+pub(crate) fn shape_fixture(me: jig_client::contract::Me) -> Fixture {
+    let (mut fixture, watch) = super::cards::start();
+    super::cards::drive(
+        &mut fixture,
+        Watched {
+            watch,
+            event: jig_client::contract::WatchEvent::Delivered(jig_client::contract::Delivery::Me(Box::new(me))),
+        },
+    );
+    fixture
+}
+/// A chat with its creating offer withdrawn, ready to press Begin.
+pub(crate) fn unoffered_chat() -> Fixture {
+    let mut me = super::cards::document();
+    me.projects.get_mut(0).unwrap().creating = None;
+    let mut fixture = shape_fixture(me);
+    super::cards::drive(
+        &mut fixture,
+        crate::Event::Went { place: crate::address::Place::Jig(Address::Conversations { project: Some(4) }) },
+    );
+    super::cards::drive(
+        &mut fixture,
+        crate::Event::Act {
+            action: crate::action::Act::Edit {
+                field: crate::fields::Purpose::NewChat,
+                text: super::cards::text(b"not offered"),
+            },
+        },
+    );
+    fixture
+}
+
+/// The goal form's renderer needs the project document as well as its membership.
+pub(crate) fn shape_goal_fixture(me: jig_client::contract::Me) -> Fixture {
+    use jig_client::contract::{Read, ReadResult, ReadValue};
+    let mut fixture = shape_fixture(me);
+    let out = super::cards::drive(
+        &mut fixture,
+        crate::Event::Went {
+            place: crate::address::Place::Jig(Address::Project {
+                project: 4,
+                section: crate::address::ProjectSection::Goals,
+            }),
+        },
+    );
+    for request in out {
+        if let crate::Request::Client {
+            asked: jig_client::Event::Read { handle: read, read: jig_client::Readable::Jig(Read::Project { .. }) },
+        } = request
+        {
+            super::cards::drive(
+                &mut fixture,
+                ReadPage {
+                    read,
+                    result: ReadResult::Value(ReadValue::Project(Box::new(super::work_pages::project_doc()))),
+                },
+            );
+            return fixture;
+        }
+    }
+    panic!("project read")
+}

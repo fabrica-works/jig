@@ -115,7 +115,7 @@ impl Offers {
         self.recipient(key, &to, judge);
     }
     pub(super) fn sent(&mut self, client: ClientId, ask: &Ask, judge: &mut JudgeOf) -> Option<Fall> {
-        let (project, draft) = match ask {
+        let (project, draft, deadline) = match ask {
             Ask::Create { project, tasks } | Ask::Propose { project, action: ProposeAction::Batch { tasks }, .. }
                 if tasks.len() == 1 =>
             {
@@ -129,6 +129,7 @@ impl Offers {
                         deadline: task.authority.deadline,
                         priority: task.tracked,
                     },
+                    task.deadline,
                 )
             }
             Ask::Create { .. }
@@ -156,7 +157,7 @@ impl Offers {
         if let Some(creating) = self.shown.get(&(client, project)) {
             // A delivered change before sending explicitly permits the newer offer.
             let creating = self.latest.get(&(client, project)).unwrap_or(creating);
-            let offer = shapes::fall(creating, &draft);
+            let offer = shapes::fall(creating, &draft, deadline);
             judge
                 .check(!matches!(offer, Fall::Refused(_) | Fall::NotOffered(_)), "offers kept: refused draft was sent");
             return Some(offer);

@@ -158,7 +158,6 @@ pub(super) fn ask(me: &Me, executor: OwnerExecutor) -> Ask {
             priority: Some(0),
         },
         text(b""),
-        Wall::EPOCH,
     ) {
         jig_client::shapes::Judged::Propose { ask, .. } => ask,
         value @ (jig_client::shapes::Judged::Create(_)

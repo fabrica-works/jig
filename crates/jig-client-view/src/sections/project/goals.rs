@@ -189,13 +189,13 @@ fn inputs(
             for membership in &me.projects {
                 if membership.project == project
                     && let Some(creating) = &membership.creating
+                    && let Some(template) = crate::queries::goal_template(me, project)
                 {
-                    match jig_client::shapes::fall(
+                    match crate::page::project::goals::fall(
                         creating,
-                        &crate::page::project::goals::draft(
-                            form,
-                            jig_client::contract::Text::new(Box::from([]), text_limit).expect("empty draft fits"),
-                        ),
+                        template,
+                        form,
+                        jig_client::contract::Text::new(Box::from([]), text_limit).expect("empty draft fits"),
                     ) {
                         jig_client::shapes::Fall::Proposable(to) => {
                             words.text(

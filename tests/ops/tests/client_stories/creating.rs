@@ -15,7 +15,6 @@ fn the_environment_rule_accepts_the_templates_chat_request() {
         &engine.truth().frames[&PARTY],
         PROJECT,
         jig_client_world::stories::text(b"staging for one week"),
-        Wall::EPOCH,
     )
     .expect("fixture offers the chat template");
     engine.send(Time::ZERO, Wall::EPOCH, PARTY, KEY, ATTEMPT, ask).expect("request fits the fixture");

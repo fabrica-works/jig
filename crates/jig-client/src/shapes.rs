@@ -1,7 +1,7 @@
 //! Template recipes over the public contract (client/domain/client.md, 19).
 use crate::contract::{
-    Ask, Beyond, CreateBounds, Creating, Me, NewBudget, NewContract, NewTask, Operation, OwnerExecutor, ProposeAction,
-    Recipient, Refusal, Specification, TaskContractDocument, Template, TemplateBudget, TemplateDeadline,
+    Ask, Beyond, CreateBounds, Creating, Me, NewBudget, NewContract, NewDeadline, NewTask, Operation, OwnerExecutor,
+    ProposeAction, Recipient, Refusal, Specification, TaskContractDocument, Template, TemplateBudget, TemplateDeadline,
     TemplateExecutor, Text,
 };
 use skein_lib::{List, Wall};
@@ -68,10 +68,10 @@ fn creating(me: &Me, project: u32) -> Result<&Creating, NotOffered> {
     }
     Err(NotOffered::Project)
 }
-pub fn chat(me: &Me, project: u32, words: Text, now: Wall) -> Result<Ask, NotOffered> {
+pub fn chat(me: &Me, project: u32, words: Text) -> Result<Ask, NotOffered> {
     let creating = creating(me, project)?;
     let template = template(me, project, CHAT).ok_or(NotOffered::Template)?;
-    let task = fill(template, creating, words, None, now)?;
+    let task = fill(template, creating, words, None)?;
     Ok(Ask::Create { project, tasks: single(task) })
 }
 pub fn close_chat(me: &Me, project: u32, chat: u64, delegates: &[Delegate], reason: Text) -> Result<Ask, NotOffered> {
@@ -98,7 +98,7 @@ pub fn close_chat(me: &Me, project: u32, chat: u64, delegates: &[Delegate], reas
     Ok(Ask::Compound { project, operations })
 }
 #[must_use]
-pub fn set_goal(me: &Me, project: u32, draft: GoalDraft, reason: Text, now: Wall) -> Judged {
+pub fn set_goal(me: &Me, project: u32, draft: GoalDraft, reason: Text) -> Judged {
     let creating = match creating(me, project) {
         Ok(value) => value,
         Err(why) => return Judged::NotOffered(why),
@@ -106,7 +106,7 @@ pub fn set_goal(me: &Me, project: u32, draft: GoalDraft, reason: Text, now: Wall
     let Some(template) = template(me, project, GOAL) else {
         return Judged::NotOffered(NotOffered::Template);
     };
-    let task = match fill(template, creating, draft.words.clone(), Some(&draft), now) {
+    let task = match fill(template, creating, draft.words.clone(), Some(&draft)) {
         Ok(value) => value,
         Err(why) => return Judged::NotOffered(why),
     };
@@ -117,7 +117,7 @@ pub fn set_goal(me: &Me, project: u32, draft: GoalDraft, reason: Text, now: Wall
         deadline: task.authority.deadline,
         priority: task.tracked,
     };
-    match fall(creating, &filled) {
+    match fall(creating, &filled, task.deadline) {
         Fall::Within => Judged::Create(Ask::Create { project, tasks: single(task) }),
         Fall::Proposable(to) => Judged::Propose {
             ask: Ask::Propose { project, action: ProposeAction::Batch { tasks: single(task) }, reason },
@@ -137,7 +137,6 @@ fn fill(
     creating: &Creating,
     words: Text,
     draft: Option<&GoalDraft>,
-    now: Wall,
 ) -> Result<NewTask, NotOffered> {
     let executor = match template.executor {
         TemplateExecutor::Charter(charter) => {
@@ -183,13 +182,22 @@ fn fill(
             NewBudget::Named
         }
     };
-    authority.deadline = match template.deadline {
-        TemplateDeadline::None => None,
-        TemplateDeadline::Span(span) => Some(Wall::from_nanos(now.as_nanos().saturating_add(span.as_nanos()))),
-        TemplateDeadline::Given => draft.ok_or(NotOffered::Template)?.deadline,
+    let deadline = match template.deadline {
+        TemplateDeadline::None => {
+            authority.deadline = None;
+            NewDeadline::Named
+        }
+        TemplateDeadline::Span(span) => {
+            authority.deadline = None;
+            NewDeadline::Span(span)
+        }
+        TemplateDeadline::Given => {
+            authority.deadline = draft.ok_or(NotOffered::Template)?.deadline;
+            NewDeadline::Named
+        }
     };
     Ok(NewTask {
-        deadline: jig_client_domain::contract::NewDeadline::Named,
+        deadline,
         executor,
         spec: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
         contract,
@@ -204,15 +212,15 @@ fn fill(
     })
 }
 #[must_use]
-pub fn fall(creating: &Creating, draft: &GoalDraft) -> Fall {
+pub fn fall(creating: &Creating, draft: &GoalDraft, deadline: NewDeadline) -> Fall {
     let within = &creating.within;
     if !listed(within, &draft.executor) {
         return Fall::NotOffered(NotOffered::Executor);
     }
-    if draft.budget > within.maximum_budget || !no_later(draft.deadline, within.maximum_deadline) {
+    if draft.budget > within.maximum_budget || !within_deadline(deadline, draft.deadline, within.maximum_deadline) {
         return Fall::NotOffered(NotOffered::Ceiling);
     }
-    if draft.budget <= within.budget && no_later(draft.deadline, within.latest) {
+    if draft.budget <= within.budget && within_deadline(deadline, draft.deadline, within.latest) {
         return Fall::Within;
     }
     match &creating.beyond {
@@ -240,11 +248,14 @@ fn listed(within: &CreateBounds, executor: &OwnerExecutor) -> bool {
     }
     false
 }
-const fn no_later(deadline: Option<Wall>, bound: Option<Wall>) -> bool {
-    match (deadline, bound) {
-        (_, None) => true,
-        (None, Some(_)) => false,
-        (Some(at), Some(latest)) => at.as_nanos() <= latest.as_nanos(),
+const fn within_deadline(selection: NewDeadline, deadline: Option<Wall>, bound: Option<Wall>) -> bool {
+    match selection {
+        NewDeadline::Span(_) => true,
+        NewDeadline::Named => match (deadline, bound) {
+            (_, None) => true,
+            (None, Some(_)) => false,
+            (Some(at), Some(latest)) => at.as_nanos() <= latest.as_nanos(),
+        },
     }
 }
 

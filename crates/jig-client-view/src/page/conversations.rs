@@ -62,7 +62,7 @@ pub fn start(
     }
     let words = field.text.clone();
     let Some(me) = domain.frame(lent).document else { return };
-    let ask = match jig_client::shapes::chat(me, project, words.clone(), domain.borrow(lent).wall()) {
+    let ask = match jig_client::shapes::chat(me, project, words.clone()) {
         Ok(ask) => Box::new(ask),
         Err(_) => {
             domain.chats.refusal = Some(Refusal::NotOffered);

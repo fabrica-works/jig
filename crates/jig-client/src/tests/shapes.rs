@@ -5,8 +5,6 @@ const CHAT_TASK: u64 = 41;
 const CANCELLED: u64 = 43;
 const MOVED: u64 = 47;
 const DEADLINE: Wall = Wall::from_nanos(100);
-const NOW: Wall = Wall::from_nanos(10);
-const SPAN_DEADLINE: Wall = Wall::from_nanos(5_000_000_010);
 fn words() -> Text {
     Text::new(b"Hello".as_slice().into(), 32).unwrap()
 }
@@ -22,7 +20,7 @@ fn draft() -> GoalDraft {
 #[test]
 fn chat_fills_the_chat_template_into_one_as_allowed_task() {
     let me = me();
-    let Ask::Create { project, tasks } = chat(&me, PROJECT, words(), NOW).unwrap() else { panic!("create") };
+    let Ask::Create { project, tasks } = chat(&me, PROJECT, words()).unwrap() else { panic!("create") };
     assert_eq!(project, PROJECT);
     assert_eq!(tasks.len(), 1);
     let task = tasks.get(0).unwrap();
@@ -67,19 +65,22 @@ fn fall_puts_a_draft_without_a_deadline_beyond_a_bound_that_has_one() {
     creating.within.latest = Some(DEADLINE);
     let mut draft = draft();
     draft.budget = 10;
-    assert_eq!(fall(&creating, &draft), Fall::Proposable(Recipient::Role { project: PROJECT, role: OWNER_ROLE }));
+    assert_eq!(
+        fall(&creating, &draft, NewDeadline::Named),
+        Fall::Proposable(Recipient::Role { project: PROJECT, role: OWNER_ROLE })
+    );
     creating.within.maximum_deadline = Some(DEADLINE);
-    assert_eq!(fall(&creating, &draft), Fall::NotOffered(NotOffered::Ceiling));
+    assert_eq!(fall(&creating, &draft, NewDeadline::Named), Fall::NotOffered(NotOffered::Ceiling));
 }
 #[test]
 fn fall_gives_not_offered_for_an_executor_the_bounds_do_not_list() {
     let mut draft = draft();
     draft.executor = OwnerExecutor::Agent { charter: 2 };
-    assert_eq!(fall(&creating(), &draft), Fall::NotOffered(NotOffered::Executor));
+    assert_eq!(fall(&creating(), &draft, NewDeadline::Named), Fall::NotOffered(NotOffered::Executor));
 }
 #[test]
 fn set_goal_proposes_to_the_holder_the_bounds_name() {
-    let Judged::Propose { ask, to } = set_goal(&me(), PROJECT, draft(), words(), NOW) else { panic!("proposed") };
+    let Judged::Propose { ask, to } = set_goal(&me(), PROJECT, draft(), words()) else { panic!("proposed") };
     assert_eq!(to, Recipient::Role { project: PROJECT, role: OWNER_ROLE });
     let Ask::Propose { project, action: ProposeAction::Batch { tasks }, reason } = ask else { panic!("batch") };
     assert_eq!((project, reason), (PROJECT, words()));
@@ -87,49 +88,127 @@ fn set_goal_proposes_to_the_holder_the_bounds_name() {
     assert_eq!(tasks.get(0).unwrap().tracked, Some(7));
     assert_eq!(tasks.get(0).unwrap().authority.spend, 150);
 }
-#[derive(Clone, Copy, Debug)]
-enum Unfillable {
-    Approval,
-    CutVerdict,
-    ZeroDepth,
-    Executor,
-    Budget,
-    Deadline,
-}
-const UNFILLABLE: [Unfillable; 6] = [
-    Unfillable::Approval,
-    Unfillable::CutVerdict,
-    Unfillable::ZeroDepth,
-    Unfillable::Executor,
-    Unfillable::Budget,
-    Unfillable::Deadline,
-];
 #[test]
 fn a_template_shapes_cannot_fill_is_not_offered() {
-    for case in UNFILLABLE {
+    let base = me().projects.get(0).unwrap().templates.get(0).unwrap().clone();
+    let cases = [
+        ("approval", Template { contract: facts_task().result_contract, ..base.clone() }),
+        (
+            "cut verdict",
+            Template {
+                contract: TaskContractDocument::Verdict { choices: List::with_capacity(0), cut: true },
+                ..base.clone()
+            },
+        ),
+        ("zero depth", Template { shallower: 0, ..base.clone() }),
+        ("executor", Template { executor: TemplateExecutor::Chosen, ..base.clone() }),
+        ("budget", Template { budget: TemplateBudget::Given, ..base.clone() }),
+        ("deadline", Template { deadline: TemplateDeadline::Given, ..base }),
+    ];
+    for (name, template) in cases {
         let mut me = me();
-        let template = me.projects.get_mut(0).unwrap().templates.get_mut(0).unwrap();
-        match case {
-            Unfillable::Approval => template.contract = facts_task().result_contract,
-            Unfillable::CutVerdict => {
-                template.contract = TaskContractDocument::Verdict { choices: List::with_capacity(0), cut: true }
-            }
-            Unfillable::ZeroDepth => template.shallower = 0,
-            Unfillable::Executor => template.executor = TemplateExecutor::Chosen,
-            Unfillable::Budget => template.budget = TemplateBudget::Given,
-            Unfillable::Deadline => template.deadline = TemplateDeadline::Given,
-        }
-        assert_eq!(chat(&me, PROJECT, words(), NOW), Err(NotOffered::Template), "{case:?}");
+        *shape_project(&mut me).templates.get_mut(0).unwrap() = template;
+        assert_eq!(chat(&me, PROJECT, words()), Err(NotOffered::Template), "{name}");
     }
 }
 #[test]
-fn a_template_span_and_narrowing_fill_the_task() {
+fn a_template_span_is_kept_in_the_ask() {
     let mut me = me();
-    let template = me.projects.get_mut(0).unwrap().templates.get_mut(0).unwrap();
-    template.shallower = 3;
-    template.deadline = TemplateDeadline::Span(SHAPE_GRACE);
-    let Ask::Create { tasks, .. } = chat(&me, PROJECT, words(), NOW).unwrap() else { panic!("create") };
-    let task = tasks.get(0).unwrap();
-    assert_eq!(task.authority.delegation.depth, 2);
-    assert_eq!(task.authority.deadline, Some(SPAN_DEADLINE));
+    shape_project(&mut me).templates.get_mut(0).unwrap().deadline = TemplateDeadline::Span(SHAPE_GRACE);
+    let task = shape_task(chat(&me, PROJECT, words()).unwrap());
+    assert_eq!(task.deadline, NewDeadline::Span(SHAPE_GRACE));
+    assert_eq!(task.authority.deadline, None);
+}
+#[test]
+fn a_template_narrows_the_task_delegation() {
+    let mut me = me();
+    shape_project(&mut me).templates.get_mut(0).unwrap().shallower = SHAPE_NARROWING;
+    let task = shape_task(chat(&me, PROJECT, words()).unwrap());
+    assert_eq!(task.authority.delegation.depth, SHAPE_DEPTH - (SHAPE_NARROWING - 1));
+}
+#[test]
+fn the_same_inputs_and_me_make_the_same_ask() {
+    let mut me = me();
+    shape_project(&mut me).templates.get_mut(0).unwrap().deadline = TemplateDeadline::Span(SHAPE_GRACE);
+    assert_eq!(chat(&me, PROJECT, words()), chat(&me, PROJECT, words()));
+}
+#[test]
+fn a_given_deadline_remains_a_wall() {
+    let mut me = me();
+    shape_project(&mut me).templates.get_mut(1).unwrap().deadline = TemplateDeadline::Given;
+    let mut draft = draft();
+    draft.budget = 10;
+    draft.deadline = Some(DEADLINE);
+    let Judged::Create(ask) = set_goal(&me, PROJECT, draft, words()) else { panic!("created") };
+    let task = shape_task(ask);
+    assert_eq!(task.deadline, NewDeadline::Named);
+    assert_eq!(task.authority.deadline, Some(DEADLINE));
+}
+#[test]
+fn a_goal_span_is_within_both_finite_deadline_bounds() {
+    let me = span_goal_me();
+    let mut draft = draft();
+    draft.budget = 10;
+    let Judged::Create(ask) = set_goal(&me, PROJECT, draft, words()) else { panic!("created") };
+    let task = shape_task(ask);
+    assert_eq!(task.deadline, NewDeadline::Span(SHAPE_GRACE));
+    assert_eq!(task.authority.deadline, None);
+}
+#[test]
+fn a_goal_span_keeps_the_other_creating_judgments() {
+    let base = span_goal_me();
+    let project = base.projects.get(0).unwrap();
+    let creating = project.creating.as_ref().unwrap();
+    let mut refused = creating.clone();
+    refused.beyond = Beyond::Refused(Refusal::NotOffered);
+    let mut cut = creating.clone();
+    cut.within.authority.cut = true;
+    let cases = [
+        ("at budget", 100, 1, Some(creating.clone()), project.templates.clone(), Fall::Within),
+        (
+            "over budget",
+            101,
+            1,
+            Some(creating.clone()),
+            project.templates.clone(),
+            Fall::Proposable(Recipient::Role { project: PROJECT, role: OWNER_ROLE }),
+        ),
+        (
+            "at ceiling",
+            500,
+            1,
+            Some(creating.clone()),
+            project.templates.clone(),
+            Fall::Proposable(Recipient::Role { project: PROJECT, role: OWNER_ROLE }),
+        ),
+        (
+            "over ceiling",
+            501,
+            1,
+            Some(creating.clone()),
+            project.templates.clone(),
+            Fall::NotOffered(NotOffered::Ceiling),
+        ),
+        ("executor", 10, 2, Some(creating.clone()), project.templates.clone(), Fall::NotOffered(NotOffered::Executor)),
+        ("refused", 101, 1, Some(refused), project.templates.clone(), Fall::Refused(Refusal::NotOffered)),
+        ("cut authority", 10, 1, Some(cut), project.templates.clone(), Fall::NotOffered(NotOffered::Creating)),
+        ("no creating", 10, 1, None, project.templates.clone(), Fall::NotOffered(NotOffered::Creating)),
+        ("no template", 10, 1, Some(creating.clone()), List::with_capacity(0), Fall::NotOffered(NotOffered::Template)),
+    ];
+    for (name, budget, charter, creating, templates, expected) in cases {
+        let mut me = base.clone();
+        let project = shape_project(&mut me);
+        project.creating = creating;
+        project.templates = templates;
+        let mut draft = draft();
+        draft.budget = budget;
+        draft.executor = OwnerExecutor::Agent { charter };
+        let judgment = match set_goal(&me, PROJECT, draft, words()) {
+            Judged::Create(_) => Fall::Within,
+            Judged::Propose { to, .. } => Fall::Proposable(to),
+            Judged::Refused(why) => Fall::Refused(why),
+            Judged::NotOffered(why) => Fall::NotOffered(why),
+        };
+        assert_eq!(judgment, expected, "{name}");
+    }
 }

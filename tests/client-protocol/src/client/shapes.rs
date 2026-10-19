@@ -6,6 +6,21 @@ const ME: Handle = Handle { asker: Asker::JIG, number: 20 };
 const DELEGATE: Handle = Handle { asker: Asker::JIG, number: 24 };
 const READY: Duration = Duration::from_secs(1);
 impl Story {
+    /// The existing owner policy with a finite first deadline and an unbounded ceiling.
+    #[must_use]
+    pub fn live_span_goal(seed: u64, first: Wall) -> Self {
+        use jig_domain_authority as a;
+        let mut config = jig_core_world::world::config(seed);
+        let mut policy = config.core.authority.policy(1).expect("project policy").clone();
+        policy.roles[0].authority.budget.deadline = Some(first);
+        let mut out = skein_lib::Queue::with_capacity(a::POLICY_MAX_OUT);
+        a::step(&mut config.core.authority, a::Event::Policy { project: 1, policy }, &mut out);
+        assert_eq!(out.pop(), Some(a::PolicyFact::Changed { project: 1 }));
+        let mut story = Self::configured(seed, &fixtures::owner_limits(), config);
+        story.sign_in();
+        assert!(story.run_until(|s| s.client.link().state == client::Link::Live, READY));
+        story
+    }
     pub fn shapes_me(&mut self) -> c::Me {
         self.watch(ME, Watchable::Jig(c::Subject::Me));
         assert!(self.run_until(|s| s.me().is_some(), READY));
@@ -28,7 +43,7 @@ impl Story {
     pub fn shapes_chat(&mut self, key: client::Key) -> u64 {
         let me = self.shapes_me();
         let words = c::Text::new(b"Hello".as_slice().into(), 32).expect("bounded words");
-        let ask = client::shapes::chat(&me, 1, words, self.wall()).expect("chat offered");
+        let ask = client::shapes::chat(&me, 1, words).expect("chat offered");
         self.send(key, client::Ask::Jig(Box::new(ask)));
         assert!(self.run_until(|s| !s.answered(key).is_empty(), READY));
         let answers = self.answered(key);

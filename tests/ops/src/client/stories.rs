@@ -382,7 +382,7 @@ pub fn environment_world(seed: u64) -> ClientWorld {
     p.action =
         ProposalAction::Effect { part: Part::Effect { connector: number(Connector::Infrastructure), proposal: p.key } };
     chat.proposals = list([p.key]);
-    let ask = jig_client::shapes::chat(&truth.frames[&7], 1, text(b"staging for one week"), Wall::EPOCH)
+    let ask = jig_client::shapes::chat(&truth.frames[&7], 1, text(b"staging for one week"))
         .expect("fixture offers the chat template");
     let mut accepted = p.clone();
     accepted.ending =

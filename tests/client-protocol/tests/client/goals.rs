@@ -38,7 +38,6 @@ fn goal(world: &mut bytes::Story, client: jig_client_world::ClientId, words: &[u
             priority: Some(priority),
         },
         jig_client_world::stories::text(b""),
-        fixtures::wall(world.now()),
     );
     let shapes::Judged::Create(ask) = judged else { panic!("goal offered: {judged:?}") };
     world.event(

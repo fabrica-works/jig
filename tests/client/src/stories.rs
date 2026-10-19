@@ -256,7 +256,7 @@ pub fn chat_world(seed: u64) -> World<Test, Scripted> {
         .engine
         .script(jig_client_scripted_engine::Rule {
             party: Some(7),
-            ask: jig_client::shapes::chat(&frame(7), 1, text(b"Hello"), Wall::EPOCH).expect("chat recipe"),
+            ask: jig_client::shapes::chat(&frame(7), 1, text(b"Hello")).expect("chat recipe"),
             answer: Answer::Done(Outcome::Made { what: Made::Tasks { tasks: list([9]) } }),
             changes: vec![
                 jig_client_scripted_engine::Change::Source(jig_client_scripted_engine::Source {

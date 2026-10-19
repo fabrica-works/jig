@@ -422,11 +422,15 @@ pub const MEMBER_ROLE: u32 = 2;
 pub const RETRY_NOTICE: contract::RetryNotice =
     contract::RetryNotice::OwnerFailed { class: contract::HoldFailure::Lost, count: 2, allowance: 3 };
 
+/// Five seconds distinguishes a duration from the fixture wall in nanoseconds.
 pub const SHAPE_GRACE: Duration = Duration::from_secs(5);
+/// Four levels allow a three-level narrowing to retain two delegate levels.
+pub const SHAPE_DEPTH: u32 = 4;
+pub const SHAPE_NARROWING: u32 = 3;
 pub fn creating() -> contract::Creating {
     let mut authority = facts_task().authority;
     authority.cut = false;
-    authority.authority.delegation.depth = 4;
+    authority.authority.delegation.depth = SHAPE_DEPTH;
     let mut charters = List::with_capacity(1);
     charters.push(1).unwrap();
     contract::Creating {
@@ -442,4 +446,25 @@ pub fn creating() -> contract::Creating {
         },
         beyond: contract::Beyond::Proposed { to: contract::Recipient::Role { project: PROJECT, role: OWNER_ROLE } },
     }
+}
+
+/// The first membership owns both offered shape templates.
+pub fn shape_project(me: &mut contract::Me) -> &mut contract::MeProject {
+    me.projects.get_mut(0).unwrap()
+}
+/// Read a shaped single-task create without repeating its destructuring.
+pub fn shape_task(ask: contract::Ask) -> contract::NewTask {
+    let contract::Ask::Create { tasks, .. } = ask else { panic!("create") };
+    assert_eq!(tasks.len(), 1);
+    tasks.get(0).unwrap().clone()
+}
+/// A span goal fits the ordinary budget; its wall bounds are deliberately finite.
+pub fn span_goal_me() -> contract::Me {
+    let mut me = me();
+    let project = shape_project(&mut me);
+    project.templates.get_mut(1).unwrap().deadline = contract::TemplateDeadline::Span(SHAPE_GRACE);
+    let within = &mut project.creating.as_mut().unwrap().within;
+    within.latest = Some(Wall::from_nanos(100));
+    within.maximum_deadline = Some(Wall::from_nanos(100));
+    me
 }
