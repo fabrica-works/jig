@@ -193,6 +193,7 @@ fn batch() -> List<ProposedTask> {
         }
         tasks
             .push(ProposedTask {
+                deadline: NewDeadline::Named,
                 number: n,
                 spec: a.spec,
                 executor: OwnerExecutor::Person(PersonAddress::Party(u64::MAX)),

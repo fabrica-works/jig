@@ -6,6 +6,7 @@ pub(crate) fn limits() -> Limits {
 }
 fn raw_goal() -> tasks::New {
     tasks::New {
+        deadline: jig_domain_tasks::Deadline::Named,
         label: 0,
         flags: jig_domain_tasks::Flags::PLAIN,
         number: u64::MAX,

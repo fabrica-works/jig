@@ -125,6 +125,7 @@ fn authority() -> Authority {
 }
 fn batch_task(number: u64, spec: SpecificationDocument, executor: OwnerExecutor, budget: u64) -> ProposedTask {
     ProposedTask {
+        deadline: jig_client_domain::contract::NewDeadline::Named,
         number,
         spec,
         executor,

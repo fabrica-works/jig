@@ -40,6 +40,7 @@ pub fn forgettable_conversation() -> people::Ask {
 #[must_use]
 pub fn conversation_member(forgettable: bool) -> people::Member {
     people::Member {
+        deadline: jig_domain_people::Deadline::Named,
         executor: people::TaskExecutor::Agent { charter: 1 },
         words: b"make an effect".as_slice().into(),
         parameters: Box::new([]),

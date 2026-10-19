@@ -16,6 +16,7 @@ pub fn create_ask() -> c::Ask {
 }
 pub fn new_task(executor: c::OwnerExecutor, contract: c::NewContract) -> c::NewTask {
     c::NewTask {
+        deadline: jig_client_domain::contract::NewDeadline::Named,
         executor,
         spec: c::Specification {
             words: store_text(),
@@ -39,4 +40,12 @@ pub fn new_task(executor: c::OwnerExecutor, contract: c::NewContract) -> c::NewT
         label: 14,
         flags: c::TaskFlags { conversation: false, listed: true, retention: c::Retention::ForgottenOnceRead },
     }
+}
+
+// A finite wall distinct from the fixture's other clocks.
+pub const DEADLINE: skein_lib::Wall = skein_lib::Wall::from_nanos(101);
+pub fn task_with_deadline(wall: Option<skein_lib::Wall>) -> c::NewTask {
+    let mut task = new_task(c::OwnerExecutor::Agent { charter: CHARTER }, c::NewContract::Report { words: 17 });
+    task.authority.deadline = wall;
+    task
 }

@@ -434,6 +434,7 @@ pub struct ProposedTask {
     pub executor: super::OwnerExecutor,
     pub contract: super::TaskContractDocument,
     pub authority: super::OwnerAuthorityDocument,
+    pub deadline: super::NewDeadline,
     pub budget: u64,
     pub funder: super::Funder,
     pub dependencies: List<u64>,

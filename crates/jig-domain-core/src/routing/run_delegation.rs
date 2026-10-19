@@ -113,6 +113,7 @@ pub(super) fn delegate_validated(
         };
         created
             .push(tasks::New {
+                deadline: jig_domain_tasks::Deadline::Named,
                 label: member.label,
                 flags: member.flags,
                 number,
@@ -302,6 +303,7 @@ pub(super) fn propose_batch(
         let number = *numbers.get(u32::try_from(index).expect("batch index")).expect("one ID per member");
         created
             .push(tasks::New {
+                deadline: jig_domain_tasks::Deadline::Named,
                 label: member.label,
                 flags: member.flags,
                 number,
@@ -473,6 +475,7 @@ pub(super) fn procedure_step(
                 };
                 created
                     .push(tasks::New {
+                        deadline: jig_domain_tasks::Deadline::Named,
                         label: member.label,
                         flags: member.flags,
                         number,
@@ -624,6 +627,7 @@ pub(super) fn start_recurring(
         reply_to: to,
         creator: tasks::Party::Deployment { project },
         batch: Box::new([tasks::New {
+            deadline: jig_domain_tasks::Deadline::Named,
             label: 0,
             flags: jig_domain_tasks::Flags::PLAIN,
             number,

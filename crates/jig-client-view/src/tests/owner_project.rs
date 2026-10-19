@@ -92,6 +92,7 @@ fn chip(number: u64) -> Chip {
 }
 fn template(number: u64) -> ProposedTask {
     ProposedTask {
+        deadline: NewDeadline::Named,
         number,
         spec: SpecificationDocument {
             specification: DocumentSpecification {

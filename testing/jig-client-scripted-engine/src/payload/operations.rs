@@ -46,6 +46,7 @@ impl Payload for jig_client_domain::contract::NewTask {
             contract,
             authority,
             budget: _,
+            deadline: _,
             wake: _,
             dependencies,
             named,

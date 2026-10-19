@@ -74,6 +74,7 @@ pub fn authority() -> Authority {
 #[must_use]
 pub fn task(number: u64, dependencies: &[u64]) -> New {
     New {
+        deadline: jig_domain_tasks::Deadline::Named,
         label: 0,
         flags: jig_domain_tasks::Flags::PLAIN,
         number,

@@ -33,6 +33,7 @@ pub struct Member {
     pub contract: Contract,
     pub authority: Authority,
     pub budget: Budget,
+    pub deadline: Deadline,
     pub wake: WakePolicy,
     pub dependencies: Box<[Dependency]>,
     pub named: Box<[Grant]>,
@@ -59,6 +60,11 @@ pub enum Contract {
 pub enum Budget {
     Named,
     AsAllowed { cap: Option<u64> },
+}
+/// The request deadline retained until the task-making decision.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Deadline {
+    Named,
 }
 /// A dependency within the batch or the party's reach.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

@@ -584,6 +584,7 @@ impl Payload for ProposalAction {
     }
 }
 fields!(ProposedTask {
+    deadline,
     number,
     spec,
     executor,
@@ -598,6 +599,7 @@ fields!(ProposedTask {
     cut
 });
 plain!(
+    jig_client_domain::contract::NewDeadline,
     jig_client_domain::contract::OwnerExecutor,
     jig_client_domain::contract::PersonAddress,
     jig_client_domain::contract::Funder,

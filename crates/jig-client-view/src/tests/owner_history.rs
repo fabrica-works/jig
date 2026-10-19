@@ -110,6 +110,7 @@ pub(super) fn task() -> ProposedTask {
     let mut resources = List::with_capacity(3);
     resources.push(part()).unwrap();
     ProposedTask {
+        deadline: NewDeadline::Named,
         number: u64::MAX,
         spec: source.spec,
         executor: OwnerExecutor::Procedure { connector: u16::MAX, code: u32::MAX },

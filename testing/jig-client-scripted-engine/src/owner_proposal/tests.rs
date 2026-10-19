@@ -218,6 +218,7 @@ fn owner_proposal_full_batch_members_price_every_nested_spec_contract_authority_
         }
         tasks
             .push(ProposedTask {
+                deadline: jig_client_domain::contract::NewDeadline::Named,
                 number,
                 spec: s.spec,
                 executor: OwnerExecutor::Person(PersonAddress::Party(u64::MAX)),

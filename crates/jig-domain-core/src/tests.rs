@@ -367,6 +367,7 @@ pub(crate) fn make_task(core: &mut Core, limits: &Limits, number: u64) {
     let mut given = core.creating_authority(1, 1, people::Role::Owner, u32::MAX);
     given.budget.spend = 100;
     let row = tasks::New {
+        deadline: jig_domain_tasks::Deadline::Named,
         label: 0,
         flags: tasks::Flags { conversation: true, ..tasks::Flags::PLAIN },
         number,
@@ -572,6 +573,7 @@ fn new_row(core: &Core, number: u64, funder: tasks::Funder, tracked: Option<u32>
     };
     authority.budget.spend = budget;
     tasks::New {
+        deadline: jig_domain_tasks::Deadline::Named,
         label: 0,
         flags: jig_domain_tasks::Flags::PLAIN,
         number,

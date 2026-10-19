@@ -81,6 +81,7 @@ fn authority() -> Authority {
 #[must_use]
 pub(super) fn task(number: u64, dependencies: &[u64]) -> New {
     New {
+        deadline: crate::Deadline::Named,
         label: 0,
         flags: crate::Flags::PLAIN,
         number,

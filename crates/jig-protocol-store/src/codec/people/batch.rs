@@ -24,6 +24,9 @@ pub(super) fn encode(batch: &[domain::Member], limits: &wire::Limits) -> Result<
                         shared_sum(limits),
                         limits.member_inputs,
                     )?,
+                    deadline: match member.deadline {
+                        domain::Deadline::Named => wire::Deadline::Named,
+                    },
                     budget: match member.budget {
                         domain::Budget::Named => wire::Budget::Named,
                         domain::Budget::AsAllowed { cap } => wire::Budget::AsAllowed(wire::BudgetAsAllowed::new(
@@ -70,6 +73,7 @@ pub(super) fn decode(batch: List<wire::Member>, limits: &wire::Limits) -> Result
             contract,
             authority,
             budget,
+            deadline,
             inputs,
             named,
             wake,
@@ -81,6 +85,9 @@ pub(super) fn decode(batch: List<wire::Member>, limits: &wire::Limits) -> Result
         let wire::FlagsParts { conversation, listed, retention } = flags.into_parts();
         members
             .push(domain::Member {
+                deadline: match deadline {
+                    wire::Deadline::Named => domain::Deadline::Named,
+                },
                 executor: parts::decode_executor(executor),
                 words,
                 parameters: decode_spec_parameters(parameters, limits, shared_sum(limits))?,

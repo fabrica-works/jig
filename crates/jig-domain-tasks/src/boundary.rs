@@ -796,6 +796,12 @@ pub struct Kind {
     pub hold: HoldKind,
 }
 
+/// The proposal deadline retained until the task-making decision.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Deadline {
+    Named,
+}
+
 /// Root-authorized member of an atomic creation batch; tasks preflights the whole graph, payloads,
 /// capacity and finite reservations before mutation. (domain/tasks.md, sections 3–4).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -816,6 +822,8 @@ pub struct New {
     pub contract: Contract,
     /// Complete root-approved authority carrier; tasks checks bounded shape, not policy inclusion.
     pub authority: Authority,
+    /// Deadline selection retained in pending proposals.
+    pub deadline: Deadline,
     /// Fresh allotment: budget equals authority spend, with all spend/reservation counters zero.
     pub numbers: Numbers,
     /// Finite source; task sources must be live ancestors of the task creator and external

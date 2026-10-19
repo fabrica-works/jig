@@ -321,6 +321,7 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
                 reason: stories::text(b""),
                 action: jig_client_domain::contract::ProposeAction::Batch {
                     tasks: jig_client_world::test::list([jig_client_domain::contract::NewTask {
+                        deadline: jig_client_domain::contract::NewDeadline::Named,
                         executor: jig_client_domain::contract::OwnerExecutor::Procedure { connector: 2, code: 7 },
                         spec: jig_client_domain::contract::Specification {
                             words: stories::text(b"Resolve incident"),

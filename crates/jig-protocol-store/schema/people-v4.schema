@@ -99,7 +99,8 @@ record ContractChange { connector: u16 kind: u16 words: u32 }
 enum Contract { report: ContractReport, verdict: ContractVerdict, change: ContractChange }
 enum Retention { kept, forgotten_once_read }
 record Flags { conversation: bool listed: bool retention: Retention }
-record Member { executor: TaskExecutor words: bytes 8192 parameters: bytes 65536 inputs: bytes 65536 contract: Contract authority: Authority budget: Budget wake: WakePolicy dependencies: bytes 65536 named: bytes 65536 tracked: option u32 label: u32 flags: Flags }
+enum Deadline { named }
+record Member { deadline: Deadline executor: TaskExecutor words: bytes 8192 parameters: bytes 65536 inputs: bytes 65536 contract: Contract authority: Authority budget: Budget wake: WakePolicy dependencies: bytes 65536 named: bytes 65536 tracked: option u32 label: u32 flags: Flags }
 record OperationCancel { task: u64 reason: bytes 8192 grace: option u64 }
 record OperationMove { task: u64 reason: bytes 8192 }
 record OperationAmend { task: u64 revision: u64 amendment: Amendment release: option u64 }

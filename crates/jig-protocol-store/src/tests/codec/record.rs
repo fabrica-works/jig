@@ -378,3 +378,22 @@ fn task_records_read_back_as_written() {
         ("a_result_word_uses_the_larger_shared_word_bound", a_result_word_uses_the_larger_shared_word_bound),
     ]);
 }
+
+#[test]
+fn a_saved_named_deadline_keeps_its_optional_wall_in_both_batch_asks() {
+    use jig_domain_people as people;
+    for wall in [None, Some(fixtures::DEADLINE)] {
+        let mut member = fixtures::people_member();
+        member.authority.deadline = wall;
+        for ask in [
+            people::Ask::Create { project: 1, batch: Box::new([member.clone()]) },
+            people::Ask::Propose {
+                project: 1,
+                action: people::Action::Batch(Box::new([member])),
+                reason: Box::from(b"please".as_slice()),
+            },
+        ] {
+            super::ask_round_trip(ask);
+        }
+    }
+}

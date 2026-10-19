@@ -259,6 +259,7 @@ pub(crate) fn chat_request(project: u32, words: Text) -> jig_client::contract::A
     let mut tasks = skein_lib::List::with_capacity(1);
     tasks
         .push(NewTask {
+            deadline: NewDeadline::Named,
             executor: OwnerExecutor::Agent { charter: 1 },
             spec: Specification {
                 words,
@@ -286,6 +287,7 @@ pub(crate) fn goal_request(form: crate::page::project::goals::GoalForm, words: T
     let mut tasks = skein_lib::List::with_capacity(1);
     tasks
         .push(NewTask {
+            deadline: NewDeadline::Named,
             executor: form.executor,
             spec: Specification {
                 words,

@@ -48,3 +48,25 @@ fn a_new_task_keeps_each_contract_and_executor_through_the_store() {
         assert_eq!(translate::store::restore_ask(wire, &limits), Ok(ask), "{name}");
     }
 }
+
+#[test]
+fn a_named_deadline_keeps_its_optional_wall_through_create_propose_and_restore() {
+    let limits = fixtures::limits();
+    for (name, wall) in [("none", None), ("finite", Some(fixtures::DEADLINE))] {
+        let task = fixtures::task_with_deadline(wall);
+        for (operation, ask) in [
+            ("create", c::Ask::Create { project: fixtures::PROJECT, tasks: fixtures::list([task.clone()]) }),
+            (
+                "propose",
+                c::Ask::Propose {
+                    project: fixtures::PROJECT,
+                    action: c::ProposeAction::Batch { tasks: fixtures::list([task]) },
+                    reason: fixtures::store_text(),
+                },
+            ),
+        ] {
+            let wire = translate::asks::ask(&ask, &limits.wire).unwrap();
+            assert_eq!(translate::store::restore_ask(wire, &limits), Ok(ask), "{name}: {operation}");
+        }
+    }
+}

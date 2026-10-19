@@ -189,6 +189,7 @@ fn fill(
         TemplateDeadline::Given => draft.ok_or(NotOffered::Template)?.deadline,
     };
     Ok(NewTask {
+        deadline: jig_client_domain::contract::NewDeadline::Named,
         executor,
         spec: Specification { words, parameters: List::with_capacity(0), inputs: List::with_capacity(0) },
         contract,

@@ -196,6 +196,7 @@ pub fn creation_spec() -> jig_domain_tasks::Spec {
 pub fn task_creation(number: u64) -> jig_domain_tasks::New {
     use jig_domain_tasks::{Executor, Funder, Holding, New, Numbers};
     New {
+        deadline: jig_domain_tasks::Deadline::Named,
         label: 7,
         flags: jig_domain_tasks::Flags::PLAIN,
         number,
@@ -449,6 +450,7 @@ pub fn people_amendment() -> people::Amendment {
 
 pub fn people_member() -> people::Member {
     people::Member {
+        deadline: jig_domain_people::Deadline::Named,
         executor: people::TaskExecutor::Agent { charter: 3 },
         words: b"a task".as_slice().into(),
         parameters: Box::new([]),
@@ -739,3 +741,6 @@ fn people_compounds() -> [people::Ask; 3] {
         ]),
     ]
 }
+
+// A finite wall distinct from the row timestamps.
+pub const DEADLINE: skein_lib::Wall = skein_lib::Wall::from_nanos(101);

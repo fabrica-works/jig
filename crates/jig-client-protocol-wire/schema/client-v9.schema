@@ -302,7 +302,8 @@ record BudgetAsAllowed { cap: option u64 }
 enum NewBudget { named, as_allowed: BudgetAsAllowed }
 enum Retention { kept, forgotten_once_read }
 record TaskFlags { conversation: bool listed: bool retention: Retention }
-record NewTask { executor: OwnerExecutor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget wake: option OwnerWakePolicy dependencies: list 32 TaskRef named: bytes 16777216 tracked: option u32 label: u32 flags: TaskFlags }
+enum NewDeadline { named }
+record NewTask { deadline: NewDeadline executor: OwnerExecutor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget wake: option OwnerWakePolicy dependencies: list 32 TaskRef named: bytes 16777216 tracked: option u32 label: u32 flags: TaskFlags }
 record Create { project: u32 tasks: bytes 1048576 }
 record ProposeBatch { tasks: bytes 1048576 }
 record ProposeAmendment { task: u64 revision: Revision change: Amendment }
@@ -530,7 +531,7 @@ record ParameterDocumentResource { name: u32 connector: u16 resource: u64 }
 enum ParameterDocument { number: ParameterDocumentNumber, bytes: ParameterDocumentBytes, resource: ParameterDocumentResource }
 record DocumentSpecification { words: DocumentText parameters: list 32 ParameterDocument inputs: list 32 u64 }
 record SpecificationDocument { specification: DocumentSpecification cut: bool }
-record ProposedTask { number: u64 spec: SpecificationDocument executor: OwnerExecutor contract: TaskContractDocument authority: OwnerAuthorityDocument budget: u64 funder: Funder dependencies: list 32 u64 resources: bytes 16777216 wake: OwnerWakePolicy priority: option u32 cut: bool }
+record ProposedTask { deadline: NewDeadline number: u64 spec: SpecificationDocument executor: OwnerExecutor contract: TaskContractDocument authority: OwnerAuthorityDocument budget: u64 funder: Funder dependencies: list 32 u64 resources: bytes 16777216 wake: OwnerWakePolicy priority: option u32 cut: bool }
 record OwnerRetainedAmendment { addressed: option AddressChange instructions: option DocumentText release: option u64 spec: option SpecificationDocument authority: option OwnerAuthorityDocument wake: option OwnerWakePolicy dependencies: option list 32 u64 reason: DocumentText cut: bool }
 record OwnerRetainedActionBatch { value: bytes 16777216 }
 record OwnerRetainedActionEffect { part: OwnerPart authority: OwnerAuthorityDocument attempt: u64 completion: u32 position: u32 purpose: u64 }

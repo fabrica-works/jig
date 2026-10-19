@@ -231,6 +231,9 @@ fn member(value: w::NewTask, limits: &w::Limits) -> Result<p::Member, Untranslat
     }
     let flags = v.flags.into_parts();
     Ok(p::Member {
+        deadline: match v.deadline {
+            w::NewDeadline::Named => p::Deadline::Named,
+        },
         executor: match v.executor {
             w::OwnerExecutor::Agent(v) => p::TaskExecutor::Agent { charter: v.charter() },
             w::OwnerExecutor::Procedure(v) => p::TaskExecutor::Procedure { connector: v.connector(), code: v.code() },

@@ -15,8 +15,15 @@ pub fn create_ask() -> (w::Ask, p::Ask) {
     };
     let mut tasks = List::with_capacity(2);
     let mut batch = List::with_capacity(2);
-    for role in [false, true] {
-        let (task, member) = member(role, authority.clone(), expected_role.authority.clone());
+    for (role, deadline) in [(false, None), (true, Some(DEADLINE))] {
+        let mut wire = authority.clone().into_parts();
+        wire.deadline = None;
+        if let Some(wall) = deadline {
+            wire.deadline = Some(wall.as_nanos());
+        }
+        let mut expected = expected_role.authority.clone();
+        expected.deadline = deadline;
+        let (task, member) = member(role, w::OwnerAuthority::new(&super::wire(), wire).unwrap(), expected);
         tasks.push(task).unwrap();
         batch.push(member).unwrap();
     }
@@ -74,6 +81,7 @@ fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (
     let task = w::NewTask::new(
         &l,
         w::NewTaskParts {
+            deadline: w::NewDeadline::Named,
             executor,
             spec,
             contract: w::NewContract::Verdict(
@@ -100,6 +108,7 @@ fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (
 }
 fn expected_member(role: bool, expected: p::Authority) -> p::Member {
     p::Member {
+        deadline: jig_domain_people::Deadline::Named,
         executor: if role {
             p::TaskExecutor::Person(p::PersonAddress::Role(ROLE))
         } else {
@@ -214,3 +223,6 @@ pub fn created_outcome() -> w::Outcome {
         .unwrap(),
     )
 }
+
+// A finite wall distinct from policy fixture timestamps.
+const DEADLINE: Wall = Wall::from_nanos(101);

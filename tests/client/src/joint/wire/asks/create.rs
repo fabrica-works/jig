@@ -19,6 +19,9 @@ fn member(v: &c::NewTask) -> p::Member {
         parameters: spec.parameters,
         inputs: spec.inputs,
         authority: authority(&v.authority),
+        deadline: match v.deadline {
+            c::NewDeadline::Named => p::Deadline::Named,
+        },
         budget: match v.budget {
             c::NewBudget::Named => p::Budget::Named,
             c::NewBudget::AsAllowed { cap } => p::Budget::AsAllowed { cap },

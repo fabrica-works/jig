@@ -339,3 +339,16 @@ fn tracking_amendments_read_back() {
         assert_eq!(proposals::read_amendment(encoded, &tasks_limits()), Ok(source), "{tracked:?}");
     }
 }
+
+#[test]
+fn a_named_deadline_keeps_its_optional_wall_in_a_pending_batch() {
+    for (name, wall) in [("none", None), ("finite", Some(fixtures::DEADLINE))] {
+        let mut proposal = fixtures::task_person_proposal();
+        let jig_domain_tasks::PersonAction::Batch(batch) = &mut proposal.action else { panic!("batch fixture") };
+        for member in batch {
+            member.authority.budget.deadline = wall;
+        }
+        let row = jig_domain_tasks::Stored::PersonProposal(Box::new(proposal));
+        assert_eq!(saved_tasks(&row), Ok(row), "{name}");
+    }
+}

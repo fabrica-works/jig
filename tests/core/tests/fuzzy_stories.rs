@@ -133,6 +133,7 @@ fn random_period_budgets_reset_before_a_standing_template_creates_its_next_batch
                     key: 1,
                     overlap: tasks::RecurringOverlap::Skip,
                     batch: Box::new([tasks::New {
+                        deadline: jig_domain_tasks::Deadline::Named,
                         label: 0,
                         flags: jig_domain_tasks::Flags::PLAIN,
                         number: 1,

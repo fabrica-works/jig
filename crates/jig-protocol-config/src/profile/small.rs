@@ -318,7 +318,7 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 // 19.s3: application key2078/value4304, one orphan erase, 256 MiB map.
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
-    value: 1_303_199,
+    value: 1_303_207,
     ops: 36_998,
     commit: 345_687_306,
     queued: 3,
@@ -326,8 +326,8 @@ pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     budget: 268_435_456,
     segment: 691_374_612,
     snapshot_after: 345_687_306,
-    chunk: 1_305_298,
-    page: skein_kv::Page { rows: 2, bytes: 1_305_278 },
+    chunk: 1_305_306,
+    page: skein_kv::Page { rows: 2, bytes: 1_305_286 },
     deadline: Duration::from_secs(30),
 };
 pub(super) const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {

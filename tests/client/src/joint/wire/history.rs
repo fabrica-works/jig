@@ -11,6 +11,9 @@ use jig_domain_tasks as tasks;
 /// Refuses any complete nested text/list allocation above receiving bounds.
 pub fn proposed(value: &documents::ProposedTask, limits: &Limits) -> Result<client::ProposedTask, owner::Invalid> {
     Ok(client::ProposedTask {
+        deadline: match value.deadline {
+            tasks::Deadline::Named => client::NewDeadline::Named,
+        },
         number: value.number,
         spec: owner::specification(&value.spec, limits)?,
         executor: owner::executor(value.executor),
@@ -281,6 +284,7 @@ pub(super) mod tests {
     fn retained_batches_keep_allocated_nested_capacity_exact_executor_funding_and_independent_loss() {
         let state = owner::tests::amendment_source();
         let proposed = documents::ProposedTask {
+            deadline: jig_domain_tasks::Deadline::Named,
             number: u64::MAX,
             executor: tasks::Executor::Person(tasks::PersonAddress::Role(u32::MAX)),
             spec: state.spec.clone(),

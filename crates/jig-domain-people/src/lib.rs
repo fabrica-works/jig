@@ -62,7 +62,7 @@ pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor, Template
 mod amendment;
 mod batch;
 pub use batch::{
-    Action, Budget, Contract, Dependency, FieldRule, Flags, Given, Member, Retention, TaskExecutor, Verdict,
+    Action, Budget, Contract, Deadline, Dependency, FieldRule, Flags, Given, Member, Retention, TaskExecutor, Verdict,
     member_bytes,
 };
 mod boundary;

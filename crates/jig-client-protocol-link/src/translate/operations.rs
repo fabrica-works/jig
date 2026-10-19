@@ -221,6 +221,9 @@ fn new_task(v: &c::NewTask, limits: &w::Limits) -> Result<w::NewTask, w::Problem
             spec: asks::wire_specification(&v.spec, limits)?,
             contract: new_contract(&v.contract, limits)?,
             authority: asks::wire_owner_authority(&v.authority, limits)?,
+            deadline: match v.deadline {
+                c::NewDeadline::Named => w::NewDeadline::Named,
+            },
             budget: match v.budget {
                 c::NewBudget::Named => w::NewBudget::Named,
                 c::NewBudget::AsAllowed { cap } => {
@@ -320,6 +323,9 @@ fn restore_task(v: &w::NewTask, limits: &crate::Limits) -> Result<c::NewTask, w:
         }
     };
     Ok(c::NewTask {
+        deadline: match v.deadline() {
+            w::NewDeadline::Named => c::NewDeadline::Named,
+        },
         executor: super::facts::owner_executor(v.executor(), limits),
         spec: super::pages::specification_fields(v.spec(), limits)?,
         contract,

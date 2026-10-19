@@ -5,6 +5,7 @@ use skein_lib::Wall;
 
 fn template(number: u64, words: &[u8]) -> ProposedTask {
     ProposedTask {
+        deadline: jig_client_domain::contract::NewDeadline::Named,
         number,
         spec: specification(text(words)),
         executor: OwnerExecutor::Agent { charter: 1 },

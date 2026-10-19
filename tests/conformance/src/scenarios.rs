@@ -462,6 +462,7 @@ impl Continuation {
                             key: 1,
                             overlap: tasks::RecurringOverlap::Skip,
                             batch: Box::new([tasks::New {
+                                deadline: jig_domain_tasks::Deadline::Named,
                                 label: 0,
                                 flags: jig_domain_tasks::Flags::PLAIN,
                                 number: 1,

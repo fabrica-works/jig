@@ -183,6 +183,9 @@ fn new_task(
     let given = crate::resolved_delegate_authority(&given, &named(member, env)?, number, core.authority.limits())
         .ok_or(people::Refusal::Limit { which: people::LimitKind::Authority })?;
     Ok(tasks::New {
+        deadline: match member.deadline {
+            people::Deadline::Named => tasks::Deadline::Named,
+        },
         number,
         project: *project,
         executor,

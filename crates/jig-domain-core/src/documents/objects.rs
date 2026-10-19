@@ -23,6 +23,7 @@ pub struct SpecLine {
 /// One future batch member; dependencies retain allocated or local batch numbers.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ProposedTask {
+    pub deadline: tasks::Deadline,
     pub number: u64,
     pub executor: tasks::Executor,
     pub spec: SpecLine,
@@ -290,6 +291,7 @@ pub(super) fn proposed(limits: &Limits, value: &tasks::New) -> Result<ProposedTa
             .expect("bounded holdings");
     }
     Ok(ProposedTask {
+        deadline: value.deadline,
         number: value.number,
         executor: value.executor,
         spec: spec(limits, &value.spec),

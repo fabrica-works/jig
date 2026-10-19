@@ -41,6 +41,11 @@ pub enum NewBudget {
     Named,
     AsAllowed { cap: Option<u64> },
 }
+/// The request deadline retained until admission or acceptance.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NewDeadline {
+    Named,
+}
 /// A task's retention after it ends.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Retention {
@@ -62,6 +67,7 @@ pub struct NewTask {
     pub contract: NewContract,
     pub authority: super::OwnerAuthority,
     pub budget: NewBudget,
+    pub deadline: NewDeadline,
     pub wake: Option<super::OwnerWakePolicy>,
     pub dependencies: skein_lib::List<TaskRef>,
     pub named: skein_lib::List<super::OwnerGrant>,

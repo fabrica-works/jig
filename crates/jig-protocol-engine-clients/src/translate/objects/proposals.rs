@@ -68,6 +68,9 @@ pub fn proposed(value: &d::ProposedTask, limits: &w::Limits) -> Result<w::Propos
     w::ProposedTask::new(
         limits,
         w::ProposedTaskParts {
+            deadline: match value.deadline {
+                jig_domain_tasks::Deadline::Named => w::NewDeadline::Named,
+            },
             number: value.number,
             spec: owner::specification(&value.spec, limits)?,
             executor: owner::executor(value.executor, limits)?,

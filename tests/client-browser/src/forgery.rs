@@ -12,6 +12,7 @@ const REQUEST_KEY: [u8; 16] = [0x46; 16];
 
 fn task() -> c::NewTask {
     c::NewTask {
+        deadline: jig_client_domain::contract::NewDeadline::Named,
         executor: c::OwnerExecutor::Person(c::PersonAddress::Role(PERSON_ROLE)),
         spec: c::Specification {
             words: c::Text::new(b"Forged".as_slice().into(), SPEC_WORDS).expect("bounded specification"),

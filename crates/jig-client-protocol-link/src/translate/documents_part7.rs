@@ -278,6 +278,9 @@ pub(crate) fn proposed_task_fields(value: &w::ProposedTask, limits: &Limits) -> 
         None => None,
     };
     Ok(c::ProposedTask {
+        deadline: match value.deadline() {
+            w::NewDeadline::Named => c::NewDeadline::Named,
+        },
         number: value.number(),
         spec: specification_document_fields(value.spec(), limits)?,
         executor: crate::translate::facts::owner_executor(value.executor(), limits),

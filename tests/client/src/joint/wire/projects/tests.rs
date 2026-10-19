@@ -112,6 +112,7 @@ fn recurring_source(overlap: tasks::RecurringOverlap) -> documents::Recurring {
     let mut batch = List::with_capacity(7);
     batch
         .push(documents::ProposedTask {
+            deadline: jig_domain_tasks::Deadline::Named,
             number: u64::MAX,
             executor: tasks::Executor::Person(tasks::PersonAddress::Role(u32::MAX)),
             spec: state.spec,

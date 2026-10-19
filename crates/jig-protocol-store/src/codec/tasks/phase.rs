@@ -505,6 +505,7 @@ fn member(source: &domain::New, limits: &wire::Limits) -> Result<wire::Member, w
         spec,
         contract,
         authority,
+        deadline,
         numbers: allotment,
         funder,
         dependencies,
@@ -531,6 +532,9 @@ fn member(source: &domain::New, limits: &wire::Limits) -> Result<wire::Member, w
             spec: value::spec(spec, limits)?,
             contract: value::contract(contract, limits)?,
             authority: value::authority(authority, limits)?,
+            deadline: match deadline {
+                domain::Deadline::Named => wire::Deadline::Named,
+            },
             numbers: numbers(allotment, limits)?,
             funder: value::funder(*funder, limits)?,
             dependencies: references(dependencies, limits.member_dependencies, wire::Path::MemberDependencies, limits)?,
@@ -550,6 +554,7 @@ fn read_member(source: wire::Member, limits: &wire::Limits) -> Result<domain::Ne
         spec,
         contract,
         authority,
+        deadline,
         numbers,
         funder,
         dependencies,
@@ -562,6 +567,9 @@ fn read_member(source: wire::Member, limits: &wire::Limits) -> Result<domain::Ne
         resources.push(read_holding(resource, limits)?).expect("same number of holdings");
     }
     Ok(domain::New {
+        deadline: match deadline {
+            wire::Deadline::Named => domain::Deadline::Named,
+        },
         label,
         flags: read_flags(flags),
         number,

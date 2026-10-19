@@ -199,6 +199,7 @@ fn plan_folds(words: &Words) {
 }
 pub(super) fn recurring_task(number: u64, words: &[u8]) -> ProposedTask {
     ProposedTask {
+        deadline: NewDeadline::Named,
         number,
         spec: SpecificationDocument::complete(Specification {
             words: text(words),
