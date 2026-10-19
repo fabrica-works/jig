@@ -671,15 +671,19 @@ served is held, kept and unsent, for its owner's version (client.md,
   parameters, refused with a spec's other faults wherever the tasks
   child admits a spec, a batch's, an amendment's or a proposal's,
   whoever made it: a party, an agent's tool, a procedure's step, a
-  recurring task (`../../domain/tasks.md`, sections 3 and 4); an
-  identity's login and name, refused where they are minted; a run's
-  output; an application's words through its own documents. A value
-  that is not text, such as a commit's id, is a task's parameter only as
-  text its application spells, such as its hexadecimal digits. A text
-  cut to its bound is cut at a character's boundary, never inside a
-  character, and says it was cut. So every text a document carries is
-  UTF-8, as the wire's text fields check (`../../protocol/client.md`,
-  section 3), and the engine never makes a document its wire refuses.
+  recurring task (`../../domain/tasks.md`, sections 3 and 4); a task's
+  result's texts, such as its words or a failure's reason, refused as a
+  result its contract does not admit wherever the tasks child admits a
+  result: a run's end, a procedure's step, a restore
+  (`../../domain/tasks.md`, section 3); an identity's login and name,
+  refused where they are minted; a run's output; an application's words
+  through its own documents. A value that is not text, such as a
+  commit's id, is a task's parameter or a result's words only as text
+  its application spells, such as its hexadecimal digits. A text cut to
+  its bound is cut at a character's boundary, never inside a character,
+  and says it was cut. So every text a document carries is UTF-8, as the
+  wire's text fields check (`../../protocol/client.md`, section 3), and
+  the engine never makes a document its wire refuses.
 
 ### 5.4 A decision's effect
 
