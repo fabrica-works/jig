@@ -15,6 +15,7 @@ jig-client-shell-native = { path = "../../crates/jig-client-shell-native" }
 jig-protocol-engine-clients.workspace = true
 jig-protocol-engine-clients-http.workspace = true
 skein-io.workspace = true
+skein-http.workspace = true
 jig-client.workspace = true
 jig-ops-client-protocol-wire.workspace = true
 jig-client-domain.workspace = true

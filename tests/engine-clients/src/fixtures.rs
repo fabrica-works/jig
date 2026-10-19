@@ -153,11 +153,15 @@ pub fn address() -> skein_io::Addr {
     skein_io::Addr::Ip("127.0.0.1:8080".parse().expect("loopback"))
 }
 #[must_use]
-pub fn server() -> jig_test_service::server::Server {
+pub fn server_limits() -> jig_test_service::server::Limits {
     let mut limits = jig_test_service::limits::profile_limits(jig_protocol_config::Profile::Small).server;
     limits.connections = 8;
     limits.http = server_http();
-    jig_test_service::server::Server::new(address(), &limits)
+    limits
+}
+#[must_use]
+pub fn server() -> jig_test_service::server::Server {
+    jig_test_service::server::Server::new(address(), &server_limits())
 }
 
 #[must_use]

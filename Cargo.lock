@@ -1047,6 +1047,7 @@ dependencies = [
  "jig-test-system",
  "sha2",
  "skein-fake-person",
+ "skein-http",
  "skein-io",
  "skein-json",
  "skein-lib",

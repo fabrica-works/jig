@@ -361,3 +361,26 @@ fn an_empty_response_finishes_its_http_reply() {
     }
     assert_eq!(finishes, FINISHES);
 }
+
+#[test]
+fn room_is_released_only_after_a_calls_end_is_handled() {
+    let mut mount = fixtures::mount();
+    let capacity = fixtures::env().limits.calls;
+    let mut out = Queue::with_capacity(capacity);
+    for number in 0..capacity {
+        fixtures::call_named(
+            &mut mount,
+            &mut out,
+            Token::new(u64::from(number)),
+            Method::Post,
+            b"/jig/v1/read",
+            &[],
+            b"",
+        );
+        fixtures::component(&mut out);
+    }
+    mount.down(&fixtures::env(), Event::Http { call: Token::new(0), event: http::Event::Closed }, &mut out);
+    assert_eq!(mount.room(), 0);
+    fixtures::pump(&mut mount, &mut out);
+    assert_eq!(mount.room(), 1);
+}

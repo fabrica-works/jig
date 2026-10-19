@@ -187,11 +187,15 @@ pub fn printed(secret: &skein_lib::Secret) -> Box<[u8]> {
 }
 
 #[must_use]
-pub fn server() -> jig_test_service::server::Server {
+pub fn server_limits() -> jig_test_service::server::Limits {
     let mut limits = jig_test_service::limits::profile_limits(jig_protocol_config::Profile::Small).server;
     limits.connections = 16;
     limits.http = server_http();
-    jig_test_service::server::Server::new(address(), &limits)
+    limits
+}
+#[must_use]
+pub fn server() -> jig_test_service::server::Server {
+    jig_test_service::server::Server::new(address(), &server_limits())
 }
 
 #[must_use]

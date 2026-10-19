@@ -19,10 +19,11 @@ pub(super) struct Clients {
     component: Option<kit::Component>,
     settings: Option<kit::Settings>,
     pub(super) server: crate::server::Server,
-    mount: http::Mount,
+    pub(super) mount: http::Mount,
+    pub(super) refused: Map<Token, ()>,
     mount_env: Env<http::Limits>,
     mount_out: Queue<http::Request>,
-    server_out: Queue<crate::server::Routed>,
+    pub(super) server_out: Queue<crate::server::Routed>,
     component_closed: bool,
     secret: Option<skein_lib::Secret>,
     pub(super) env: Env<kit::Limits>,
@@ -137,6 +138,7 @@ impl Clients {
         let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: config.limits.clients };
         let out = Queue::with_capacity(room);
         Ok(Self {
+            refused: Map::with_capacity(transport.connections),
             component: None,
             settings: Some(settings),
             server: crate::server::Server::new(listener, transport),
@@ -245,7 +247,7 @@ impl Clients {
         self.pending = true;
         true
     }
-    fn server_requests(&mut self) {
+    pub(super) fn server_requests(&mut self) {
         for _ in 0..self.server_out.len() {
             if self.io.room() == 0 || self.out.room() < kit::MAX_OUT_DOWN {
                 break;
@@ -253,10 +255,41 @@ impl Clients {
             match self.server_out.pop().expect("server requests") {
                 crate::server::Routed::Io(request) => self.io.push(tag(request)),
                 crate::server::Routed::Call { call, head } => {
-                    self.mount.down(&self.mount_env, http::Event::Call { call, head }, &mut self.mount_out);
+                    if self.mount.room() > 0 {
+                        self.mount.down(&self.mount_env, http::Event::Call { call, head }, &mut self.mount_out);
+                    } else {
+                        self.refused.insert(call, ()).expect("bounded refused server calls");
+                        self.server.answer(call, skein_http::server::Request::Discard, &mut self.server_out);
+                        self.server.answer(
+                            call,
+                            skein_http::server::Request::Respond(skein_http::server::Response {
+                                status: 503,
+                                headers: Box::new([]),
+                                body: skein_http::server::Body::None,
+                                close: true,
+                            }),
+                            &mut self.server_out,
+                        );
+                    }
                 }
                 crate::server::Routed::Http { call, event } => {
-                    self.mount.down(&self.mount_env, http::Event::Http { call, event }, &mut self.mount_out);
+                    if self.refused.get(&call).is_some() {
+                        match event {
+                            skein_http::server::Event::Done(_)
+                            | skein_http::server::Event::Failed(_)
+                            | skein_http::server::Event::Closed => {
+                                self.refused.remove(&call);
+                                self.server.done(call, &mut self.server_out);
+                            }
+                            skein_http::server::Event::Call(_)
+                            | skein_http::server::Event::Ended
+                            | skein_http::server::Event::Body(_)
+                            | skein_http::server::Event::Reply(_)
+                            | skein_http::server::Event::Refused(_) => {}
+                        }
+                    } else {
+                        self.mount.down(&self.mount_env, http::Event::Http { call, event }, &mut self.mount_out);
+                    }
                 }
             }
         }
@@ -394,6 +427,8 @@ pub(super) fn worst_case(
 ) -> Option<u64> {
     kit::worst_case(limits)?
         .checked_add(http::worst_case(mapping)?)?
+        .checked_add(Map::<Token, ()>::worst_case(transport.connections)?)?
+        .checked_add(u64::try_from(size_of::<Map<Token, ()>>()).ok()?)?
         // This mount owns one bound listener's textual address.
         .checked_add(List::<Box<[u8]>>::worst_case(1)?.checked_add(u64::from(HOST_BYTES))?)?
         .checked_add(Queue::<http::Request>::worst_case(room)?)?

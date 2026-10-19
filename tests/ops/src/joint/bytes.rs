@@ -140,6 +140,7 @@ pub(super) struct Bytes {
     server: jig_test_service::server::Server,
     server_out: Queue<jig_test_service::server::Routed>,
     mount: http::Mount,
+    refused: skein_lib::Map<Token, ()>,
     mount_out: Queue<http::Request>,
     env: Env<clients::Limits>,
     out: Queue<clients::Request>,
@@ -185,6 +186,7 @@ impl Bytes {
             server: fixtures::server(),
             server_out: Queue::with_capacity(512),
             mount: fixtures::mount(),
+            refused: skein_lib::Map::with_capacity(fixtures::server_limits().connections),
             mount_out: Queue::with_capacity(512),
             env,
             out,
@@ -345,19 +347,7 @@ impl Bytes {
             active |= self.server.advance(&mut self.server_out);
             while let Some(routed) = self.server_out.pop() {
                 active = true;
-                match routed {
-                    jig_test_service::server::Routed::Io(request) => {
-                        if let Some(event) = self.net.io(request) {
-                            self.server.up(event, &mut self.server_out);
-                        }
-                    }
-                    jig_test_service::server::Routed::Call { call, head } => {
-                        self.mount_event(http::Event::Call { call, head });
-                    }
-                    jig_test_service::server::Routed::Http { call, event } => {
-                        self.mount_event(http::Event::Http { call, event });
-                    }
-                }
+                self.routed(routed);
             }
             self.component.fire(&self.env, &mut self.out);
             while self.component.up(&self.env, &mut self.out) {
@@ -422,6 +412,52 @@ impl Bytes {
             }
         }
         panic!("Ops byte transport did not quiesce");
+    }
+    fn routed(&mut self, routed: jig_test_service::server::Routed) {
+        match routed {
+            jig_test_service::server::Routed::Io(request) => {
+                if let Some(event) = self.net.io(request) {
+                    self.server.up(event, &mut self.server_out);
+                }
+            }
+            jig_test_service::server::Routed::Call { call, head } => {
+                if self.mount.room() > 0 {
+                    self.mount_event(http::Event::Call { call, head });
+                } else {
+                    self.refused.insert(call, ()).expect("bounded refused server calls");
+                    self.server.answer(call, skein_http::server::Request::Discard, &mut self.server_out);
+                    self.server.answer(
+                        call,
+                        skein_http::server::Request::Respond(skein_http::server::Response {
+                            status: 503,
+                            headers: Box::new([]),
+                            body: skein_http::server::Body::None,
+                            close: true,
+                        }),
+                        &mut self.server_out,
+                    );
+                }
+            }
+            jig_test_service::server::Routed::Http { call, event } => {
+                if self.refused.get(&call).is_some() {
+                    match event {
+                        skein_http::server::Event::Done(_)
+                        | skein_http::server::Event::Failed(_)
+                        | skein_http::server::Event::Closed => {
+                            self.refused.remove(&call);
+                            self.server.done(call, &mut self.server_out);
+                        }
+                        skein_http::server::Event::Call(_)
+                        | skein_http::server::Event::Ended
+                        | skein_http::server::Event::Body(_)
+                        | skein_http::server::Event::Reply(_)
+                        | skein_http::server::Event::Refused(_) => {}
+                    }
+                } else {
+                    self.mount_event(http::Event::Http { call, event });
+                }
+            }
+        }
     }
     fn crashed(&mut self, joint: &mut Joint) -> bool {
         let crashes = joint.engine.outcome().crashes.len();

@@ -3,6 +3,7 @@ use skein_lib::{
     List, Queue, Token,
     stream::{Down, Up},
 };
+pub const SETTLE_STEPS: u32 = 128;
 pub const SOCKET: Token = Token::new(100);
 pub const OWNER: Token = Token::new(1);
 pub const LISTENER: Token = Token::new(99);
@@ -40,7 +41,7 @@ pub fn calls(out: &mut Queue<Routed>) -> Box<[(Box<[u8]>, skein_http::Method)]> 
     calls.into_boxed()
 }
 pub fn server_drain(server: &mut Server, out: &mut Queue<Routed>) {
-    for _ in 0_u32..128 {
+    for _ in 0_u32..SETTLE_STEPS {
         if !server.advance(out) {
             return;
         }
@@ -67,7 +68,7 @@ pub fn server_response(server: &mut Server, out: &mut Queue<Routed>, call: Token
         Request::Respond(Response { status: 200, headers: Box::new([]), body: Body::None, close: false }),
         out,
     );
-    for _ in 0_u32..128 {
+    for _ in 0_u32..SETTLE_STEPS {
         server.advance(out);
         if let Some(routed) = out.pop() {
             match routed {
@@ -89,4 +90,93 @@ pub fn server_bytes(server: &mut Server, out: &mut Queue<Routed>, request: &[u8]
         server.up(bytes(OWNER, line), out);
         server_drain(server, out);
     }
+}
+
+pub const MOUNT_REQUEST: &[u8] = b"POST /jig/v1/read HTTP/1.1\r\nHost: 127.0.0.1:7100\r\nContent-Type: application/octet-stream\r\nContent-Length: 0\r\n\r\n";
+/// A real accepted connection and parsed head, leaving the routed call for its application.
+pub fn retained_call(server: &mut Server, out: &mut Queue<Routed>, socket: Token) -> (Token, Token) {
+    server.up(accepted(socket), out);
+    server_drain(server, out);
+    let mut owner = None;
+    for routed in &*out {
+        match routed {
+            Routed::Io(skein_io::Request::Bind { socket: found, owner: bound }) if *found == socket => {
+                owner = Some(*bound);
+                break;
+            }
+            Routed::Io(_) | Routed::Call { .. } | Routed::Http { .. } => {}
+        }
+    }
+    let owner = owner.expect("accepted socket binding");
+    let (read, room) = retained_demand(out, socket);
+    assert_eq!(read, skein_lib::stream::Read::Nothing);
+    assert_eq!(room, crate::limits::profile_limits(jig_protocol_config::Profile::Small).server.http.response);
+    server.up(skein_io::Event::Stream { owner, up: Up::Room }, out);
+    server_drain(server, out);
+    for line in MOUNT_REQUEST.split_inclusive(|byte| *byte == b'\n') {
+        let (read, room) = retained_demand(out, socket);
+        assert_eq!(room, 0);
+        match read {
+            skein_lib::stream::Read::Scan { .. } => {}
+            skein_lib::stream::Read::Nothing
+            | skein_lib::stream::Read::Fill(_)
+            | skein_lib::stream::Read::Line { .. }
+            | skein_lib::stream::Read::Arrived { .. } => panic!("head line demand"),
+        }
+        server.up(bytes(owner, line), out);
+        server_drain(server, out);
+    }
+    let mut call = None;
+    for routed in &*out {
+        match routed {
+            Routed::Call { call: found, .. } => {
+                call = Some(*found);
+                break;
+            }
+            Routed::Io(_) | Routed::Http { .. } => {}
+        }
+    }
+    let call = call.expect("parsed request head");
+    (owner, call)
+}
+
+pub fn peer_owner(peers: &List<(Token, Token, Token)>, socket: Token) -> Token {
+    for (found, owner, _) in peers {
+        if *found == socket {
+            return *owner;
+        }
+    }
+    unreachable!("fixture peer exists")
+}
+
+/// Consume each demand before answering it, preserving the application's routed events.
+fn retained_demand(out: &mut Queue<Routed>, socket: Token) -> (skein_lib::stream::Read, u32) {
+    for _ in 0..out.len() {
+        let routed = out.pop().expect("queued fixture output");
+        match routed {
+            Routed::Io(skein_io::Request::Stream { stream, down: Down::Demand { read, room } }) if stream == socket => {
+                return (read, room);
+            }
+            Routed::Io(_) | Routed::Call { .. } | Routed::Http { .. } => out.push(routed),
+        }
+    }
+    panic!("fixture answers an emitted demand")
+}
+
+/// The clients child and listener, with the existing client fixture's 512 request slots.
+pub fn retained_clients() -> crate::clients::Clients {
+    const CLIENT_REQUESTS: u32 = 512;
+    let (config, _) = crate::startup::fixture_connectors(&super::engine_document());
+    let limits = crate::limits::profile_limits(jig_protocol_config::Profile::Small);
+    let mut clients = crate::clients::Clients::new(
+        &config,
+        skein_io::Addr::Ip(core::net::SocketAddr::new(core::net::IpAddr::from([127, 0, 0, 1]), 7100)),
+        &super::seeds(),
+        CLIENT_REQUESTS,
+        &limits.server,
+    )
+    .expect("clients fixture");
+    clients.start(skein_lib::Time::ZERO, skein_lib::Wall::EPOCH).expect("clients start");
+    assert!(clients.up(listening()));
+    clients
 }

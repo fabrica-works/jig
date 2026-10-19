@@ -49,6 +49,11 @@ impl Mount {
     pub fn new(settings: Settings, limits: &Limits) -> Self {
         Self { settings, hosts: List::with_capacity(0), calls: Map::with_capacity(limits.calls) }
     }
+    /// Calls the application may hand over, including no call whose end is still queued.
+    #[must_use]
+    pub fn room(&self) -> u32 {
+        self.calls.capacity().checked_sub(self.calls.len()).expect("bounded mounted calls")
+    }
     pub fn down(&mut self, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
         match event {
             Event::Listening { hosts } => self.hosts = hosts,
