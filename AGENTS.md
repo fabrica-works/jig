@@ -4,8 +4,7 @@
   `scripts/check.sh`, and pushes (`docs/development/workflow.md`, section
   1). Do not run the gate yourself before `land`. A change to Markdown
   files only lands with `land --docs`. Run what compiles and the tests of
-  the crates you touch through `heavy` (skein's development.md, section
-  8.3).
+  the crates you touch through `heavy`.
 - The default test suite (unit tests and the worlds' focused tests under
   `tests/`) takes at most 15 seconds; the fuzzy suite (the worlds'
   `tests/fuzzy_*.rs`, randomized tests) at most 1 minute. Keep new tests
@@ -14,8 +13,9 @@
   application. Read [README.md](README.md), then
   [docs/design/README.md](docs/design/README.md).
 - **jig follows skein's foundation documents:** `programming-model.md`,
-  `testing-strategy.md` and `notes.md`. Read them before writing code.
-  Citations use those file names and their sections.
+  `testing-strategy.md` and `notes.md`. Read them before writing code:
+  the first two are rules, and a departure needs its reason, stated in
+  the design or the commit. Citations use those file names and their sections.
 - **jig's design is `docs/design/`.** Inside jig, a bare file name names
   one of its documents (`README.md`, 6.2). skein's design documents are
   named with skein's name (skein's `lib.md`). Code cites a section at
