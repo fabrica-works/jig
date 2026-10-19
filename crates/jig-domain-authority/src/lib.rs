@@ -68,4 +68,6 @@ pub use order::{
     Implication, Implies, at_most, grant_at_most, grant_covers, pattern_at_most, pattern_covers, resolve_task_grants,
 };
 pub use rules::{Guard, Judge, Policy, ProposalKind, Proposals, RequestKind, Requests, Requirement, Role, Rules};
-pub use value::{Authority, Budget, Delegation, Executor, Grant, Last, Name, Pattern, ResourceScope, Scopes, Tools};
+pub use value::{
+    Authority, Budget, Delegation, Executor, Grant, Last, Name, Pattern, ResourceScope, Scopes, Tools, deadline_after,
+};

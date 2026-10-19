@@ -32,7 +32,8 @@ fn live_task_tree_and_named_chips_keep_the_executors_actual_owner_identity() {
     let (core, limits) = make_tree();
     let mut names = List::with_capacity(limits.documents.chips);
     names.push(2).expect("one named chip");
-    let Document::Chips(chips) = make(&core, &limits, 1, &Subject::Chips { tasks: names }, &window()).expect("chips")
+    let Document::Chips(chips) =
+        make(&core, &limits, 1, &Subject::Chips { tasks: names }, &window(), Wall::EPOCH).expect("chips")
     else {
         panic!("named chips")
     };
@@ -40,12 +41,16 @@ fn live_task_tree_and_named_chips_keep_the_executors_actual_owner_identity() {
     let chip = chips.get(0).expect("named chip");
     assert_eq!(chip.details.executor, tasks::Executor::Agent { charter: 1 });
     assert_eq!(chip.details.project, 1);
-    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window()).expect("task") else {
+    let Document::Task(task) =
+        make(&core, &limits, 1, &Subject::Task { task: 2 }, &window(), Wall::EPOCH).expect("task")
+    else {
         panic!("task document")
     };
     assert_eq!(task.chip.details.executor, row.executor);
     assert_eq!(task.chip.details.project, task.project);
-    let Document::Tree(tree) = make(&core, &limits, 1, &Subject::Tree { task: 1 }, &window()).expect("tree") else {
+    let Document::Tree(tree) =
+        make(&core, &limits, 1, &Subject::Tree { task: 1 }, &window(), Wall::EPOCH).expect("tree")
+    else {
         panic!("tree document")
     };
     assert_eq!(tree.root.details.executor, core.tasks.task(1).expect("root owner").executor);

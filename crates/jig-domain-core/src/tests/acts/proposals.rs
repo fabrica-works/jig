@@ -51,9 +51,9 @@ fn procedure_fixture() -> (Core, Limits, connector::EffectDescription) {
         step: 1,
         purpose: 19,
     };
-    drop(core.proposal_admit_action(1, &action).expect("the policy ceiling admits this proposal"));
+    drop(core.proposal_admit_action(1, &action, Wall::EPOCH).expect("the policy ceiling admits this proposal"));
     assert_eq!(
-        core.proposal_holder(&limits, 1, &action, None),
+        core.proposal_holder(&limits, 1, &action, None, Wall::EPOCH),
         Some(tasks::ProposalHolder::Policy { project: 1, kind: tasks::ProposalKind::Effect })
     );
     (core, limits, description)

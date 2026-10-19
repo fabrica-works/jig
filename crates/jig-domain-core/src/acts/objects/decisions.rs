@@ -12,6 +12,7 @@ pub(crate) fn proposal(
     act: Act,
     proposer: documents::Proposer,
     number: u64,
+    decision: skein_lib::Wall,
 ) -> Result<(), people::Refusal> {
     match proposer {
         documents::Proposer::Party(person) => {
@@ -48,6 +49,7 @@ pub(crate) fn proposal(
                         party,
                         role.expect("standing found role"),
                         limits.tasks.tree_tasks,
+                        decision,
                     )?;
                     Ok(())
                 }
@@ -98,7 +100,7 @@ pub(crate) fn proposal(
             match act {
                 Act::Accept => {
                     let action = core
-                        .proposal_action_for_check(&row.action)
+                        .proposal_action_for_check(&row.action, decision)
                         .ok_or(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape })?;
                     core.proposal_person_admit(
                         party,

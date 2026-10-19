@@ -233,6 +233,7 @@ fn member(value: w::NewTask, limits: &w::Limits) -> Result<p::Member, Untranslat
     Ok(p::Member {
         deadline: match v.deadline {
             w::NewDeadline::Named => p::Deadline::Named,
+            w::NewDeadline::Span(value) => p::Deadline::Span(value.value()),
         },
         executor: match v.executor {
             w::OwnerExecutor::Agent(v) => p::TaskExecutor::Agent { charter: v.charter() },

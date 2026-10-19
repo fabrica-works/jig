@@ -382,9 +382,14 @@ fn task_records_read_back_as_written() {
 #[test]
 fn a_saved_named_deadline_keeps_its_optional_wall_in_both_batch_asks() {
     use jig_domain_people as people;
-    for wall in [None, Some(fixtures::DEADLINE)] {
+    for (selector, wall) in [
+        (jig_domain_people::Deadline::Named, None),
+        (jig_domain_people::Deadline::Named, Some(fixtures::DEADLINE)),
+        (jig_domain_people::Deadline::Span(Duration::from_secs(5)), Some(fixtures::DEADLINE)),
+    ] {
         let mut member = fixtures::people_member();
         member.authority.deadline = wall;
+        member.deadline = selector;
         for ask in [
             people::Ask::Create { project: 1, batch: Box::new([member.clone()]) },
             people::Ask::Propose {

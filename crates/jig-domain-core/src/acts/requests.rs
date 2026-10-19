@@ -14,6 +14,7 @@ pub(crate) fn request(
     project: u32,
     role: Option<people::Role>,
     ask: &people::Ask,
+    decision: skein_lib::Wall,
 ) -> Result<(), people::Refusal> {
     let (act, subject) = match ask {
         people::Ask::Application { .. } | people::Ask::Compound { .. } | people::Ask::Withdraw { .. } => return Ok(()),
@@ -148,7 +149,7 @@ pub(crate) fn request(
         | documents::Subject::Project { .. }
         | documents::Subject::Note { .. } => {}
     }
-    match admit(core, limits, person, act, &subject) {
+    match admit(core, limits, person, act, &subject, decision) {
         Admission::Allowed | Admission::Proposed { .. } | Admission::Bounded { .. } => Ok(()),
         // The child emits the same refusal with its exact observed delegate
         // identities. Preserve that capacity observation at its owner.

@@ -54,19 +54,20 @@ fn a_named_deadline_keeps_its_optional_wall_through_create_propose_and_restore()
     let limits = fixtures::limits();
     for (name, wall) in [("none", None), ("finite", Some(fixtures::DEADLINE))] {
         let task = fixtures::task_with_deadline(wall);
-        for (operation, ask) in [
-            ("create", c::Ask::Create { project: fixtures::PROJECT, tasks: fixtures::list([task.clone()]) }),
-            (
-                "propose",
-                c::Ask::Propose {
-                    project: fixtures::PROJECT,
-                    action: c::ProposeAction::Batch { tasks: fixtures::list([task]) },
-                    reason: fixtures::store_text(),
-                },
-            ),
-        ] {
+        for (operation, ask) in fixtures::deadline_asks(task) {
             let wire = translate::asks::ask(&ask, &limits.wire).unwrap();
             assert_eq!(translate::store::restore_ask(wire, &limits), Ok(ask), "{name}: {operation}");
         }
+    }
+}
+
+#[test]
+fn a_span_keeps_its_duration_through_create_propose_and_restore() {
+    let limits = fixtures::limits();
+    let mut task = fixtures::task_with_deadline(Some(fixtures::DEADLINE));
+    task.deadline = c::NewDeadline::Span(skein_lib::Duration::from_secs(5));
+    for (operation, ask) in fixtures::deadline_asks(task) {
+        let wire = translate::asks::ask(&ask, &limits.wire).unwrap();
+        assert_eq!(translate::store::restore_ask(wire, &limits), Ok(ask), "{operation}");
     }
 }

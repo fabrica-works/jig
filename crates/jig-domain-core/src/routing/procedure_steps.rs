@@ -191,10 +191,10 @@ fn proposals(
         {
             return Err(problem(task, tasks::Refusal::AuthorityShape));
         }
-        if let Err(why) = core.proposal_admit_action(context.project, action) {
+        if let Err(why) = core.proposal_admit_action(context.project, action, env.wall) {
             return Err(problem(task, why));
         }
-        let Some(holder) = core.proposal_holder(&env.limits, task, action, None) else {
+        let Some(holder) = core.proposal_holder(&env.limits, task, action, None, env.wall) else {
             return Err(problem(task, tasks::Refusal::Reference));
         };
         if !crate::acts::bounds::proposal_has_recipient(core, holder) {

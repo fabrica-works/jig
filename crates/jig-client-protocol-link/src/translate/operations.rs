@@ -223,6 +223,9 @@ fn new_task(v: &c::NewTask, limits: &w::Limits) -> Result<w::NewTask, w::Problem
             authority: asks::wire_owner_authority(&v.authority, limits)?,
             deadline: match v.deadline {
                 c::NewDeadline::Named => w::NewDeadline::Named,
+                c::NewDeadline::Span(value) => {
+                    w::NewDeadline::Span(w::DeadlineSpan::new(limits, w::DeadlineSpanParts { value })?)
+                }
             },
             budget: match v.budget {
                 c::NewBudget::Named => w::NewBudget::Named,
@@ -325,6 +328,7 @@ fn restore_task(v: &w::NewTask, limits: &crate::Limits) -> Result<c::NewTask, w:
     Ok(c::NewTask {
         deadline: match v.deadline() {
             w::NewDeadline::Named => c::NewDeadline::Named,
+            w::NewDeadline::Span(value) => c::NewDeadline::Span(value.value()),
         },
         executor: super::facts::owner_executor(v.executor(), limits),
         spec: super::pages::specification_fields(v.spec(), limits)?,

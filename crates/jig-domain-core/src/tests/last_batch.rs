@@ -48,7 +48,8 @@ fn project_reads_the_whole_last_created_batch_after_ending_and_refuses_a_partial
         assert!(core.tasks.task(child).is_none());
     }
     assert!(core.tasks.task(100).unwrap().delegates.is_empty());
-    let Document::Project(project) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap()
+    let Document::Project(project) =
+        make(&core, &limits, 1, &Subject::Project { project: 1 }, &window(), Wall::EPOCH).unwrap()
     else {
         panic!("project")
     };
@@ -57,5 +58,8 @@ fn project_reads_the_whole_last_created_batch_after_ending_and_refuses_a_partial
     assert_eq!(line.last_batch.get(0), Some(&101));
     assert_eq!(line.last_batch.get(1), Some(&102));
     limits.documents.lines = 1;
-    assert_eq!(make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()), Err(Missing::TooLarge));
+    assert_eq!(
+        make(&core, &limits, 1, &Subject::Project { project: 1 }, &window(), Wall::EPOCH),
+        Err(Missing::TooLarge)
+    );
 }

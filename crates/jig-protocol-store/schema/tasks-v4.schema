@@ -82,7 +82,8 @@ record WakePolicy { words: WakeRule notices: WakeRule news: WakeRule results: Re
 enum RecurringOverlap { skip, wait }
 enum Retention { kept, forgotten_once_read }
 record Flags { conversation: bool listed: bool retention: Retention }
-enum Deadline { named }
+record DeadlineSpan { value: duration }
+enum Deadline { named, span: DeadlineSpan }
 record Member { deadline: Deadline
     label: u32 flags: Flags
     number: u64 project: u32 executor: Executor spec: Spec contract: Contract

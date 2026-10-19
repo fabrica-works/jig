@@ -13,6 +13,7 @@ pub fn proposed(value: &documents::ProposedTask, limits: &Limits) -> Result<clie
     Ok(client::ProposedTask {
         deadline: match value.deadline {
             tasks::Deadline::Named => client::NewDeadline::Named,
+            tasks::Deadline::Span(span) => client::NewDeadline::Span(span),
         },
         number: value.number,
         spec: owner::specification(&value.spec, limits)?,

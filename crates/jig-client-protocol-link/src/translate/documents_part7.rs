@@ -280,6 +280,7 @@ pub(crate) fn proposed_task_fields(value: &w::ProposedTask, limits: &Limits) -> 
     Ok(c::ProposedTask {
         deadline: match value.deadline() {
             w::NewDeadline::Named => c::NewDeadline::Named,
+            w::NewDeadline::Span(value) => c::NewDeadline::Span(value.value()),
         },
         number: value.number(),
         spec: specification_document_fields(value.spec(), limits)?,

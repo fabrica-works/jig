@@ -342,13 +342,21 @@ fn tracking_amendments_read_back() {
 
 #[test]
 fn a_named_deadline_keeps_its_optional_wall_in_a_pending_batch() {
-    for (name, wall) in [("none", None), ("finite", Some(fixtures::DEADLINE))] {
+    for (name, selector, wall) in [
+        ("none", jig_domain_tasks::Deadline::Named, None),
+        ("finite", jig_domain_tasks::Deadline::Named, Some(fixtures::DEADLINE)),
+        ("span", jig_domain_tasks::Deadline::Span(skein_lib::Duration::from_secs(5)), Some(fixtures::DEADLINE)),
+    ] {
         let mut proposal = fixtures::task_person_proposal();
         let jig_domain_tasks::PersonAction::Batch(batch) = &mut proposal.action else { panic!("batch fixture") };
         for member in batch {
             member.authority.budget.deadline = wall;
+            member.deadline = selector;
         }
-        let row = jig_domain_tasks::Stored::PersonProposal(Box::new(proposal));
-        assert_eq!(saved_tasks(&row), Ok(row), "{name}");
+        let row = jig_domain_tasks::Stored::PersonProposal(Box::new(proposal.clone()));
+        assert_eq!(saved_tasks(&row), Ok(row), "{name}: pending");
+        proposal.state = jig_domain_tasks::PersonProposalState::Accepted { by: jig_domain_tasks::Party::Person(2) };
+        let row = jig_domain_tasks::Stored::DecidedProposal(Box::new(proposal));
+        assert_eq!(saved_tasks(&row), Ok(row), "{name}: decided");
     }
 }

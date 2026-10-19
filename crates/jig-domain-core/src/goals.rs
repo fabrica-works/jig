@@ -45,7 +45,7 @@ impl Core {
         let period = tasks::Funder::Period { project, period: self.period(project) };
         let open_period = if self.tasks.funding(period).is_none() {
             Some(tasks::Event::OpenPeriod {
-                reply_to: ReplyTo::new(Token::new(0)),
+                reply_to: ReplyTo::new(Token::new(u64::MAX)),
                 project,
                 period: self.period(project),
                 budget: self.period_budget(project),
@@ -56,7 +56,7 @@ impl Core {
         let (pool, _) = self.person_pool(project, person);
         let carve_pool = if self.tasks.funding(pool).is_none() {
             Some(tasks::Event::CarvePool {
-                reply_to: ReplyTo::new(Token::new(0)),
+                reply_to: ReplyTo::new(Token::new(u64::MAX)),
                 project,
                 person,
                 period: self.period(project),
@@ -100,6 +100,7 @@ impl Core {
         person: u64,
         role: people::Role,
         tasks_left: u32,
+        decision: skein_lib::Wall,
     ) -> Result<tasks::Funder, people::Refusal> {
         let (source, numbers) = self.person_pool(project, person);
         let action = match &proposal.action {
@@ -112,7 +113,11 @@ impl Core {
                             executor: self
                                 .delegation_executor(project, member.executor)
                                 .ok_or(people::Refusal::Unknown)?,
-                            authority: translate::authority_value(&member.authority),
+                            authority: crate::routing::deadlines::authority(
+                                &member.authority,
+                                member.deadline,
+                                decision,
+                            ),
                             symbolic: Box::new([]),
                         })
                         .expect("bounded party batch");

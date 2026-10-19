@@ -49,10 +49,17 @@ fn receiving(value: Admission, limits: &DocumentLimits) -> Result<Admission, Mis
         }
     })
 }
-fn list(core: &Core, limits: &Limits, party: u64, subject: &Subject, kinds: &[Act]) -> Result<List<Offered>, Missing> {
+fn list(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    subject: &Subject,
+    kinds: &[Act],
+    decision: skein_lib::Wall,
+) -> Result<List<Offered>, Missing> {
     let mut result = List::with_capacity(u32::try_from(kinds.len()).expect("closed act list"));
     for act in kinds {
-        let value = acts::admit(core, limits, party, *act, subject);
+        let value = acts::admit(core, limits, party, *act, subject, decision);
         let admission = receiving(value, &limits.documents)?;
         result
             .push(Offered { effect: effect(core, limits, *act, subject), act: *act, admission })
@@ -69,6 +76,7 @@ pub(super) fn task(
     limits: &Limits,
     party: u64,
     row: &tasks::TaskRecord,
+    decision: skein_lib::Wall,
 ) -> Result<List<Offered>, Missing> {
     let mut kinds = List::with_capacity(9);
     let mutable = match row.phase {
@@ -107,10 +115,16 @@ pub(super) fn task(
         }
         tasks::Phase::Ended(_) => {}
     }
-    list(core, limits, party, &Subject::Task { task: row.number }, kinds.as_slice())
+    list(core, limits, party, &Subject::Task { task: row.number }, kinds.as_slice(), decision)
 }
 
-pub(super) fn subject(core: &Core, limits: &Limits, party: u64, subject: &Subject) -> Result<List<Offered>, Missing> {
+pub(super) fn subject(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    subject: &Subject,
+    decision: skein_lib::Wall,
+) -> Result<List<Offered>, Missing> {
     match subject {
         Subject::Project { .. } => list(
             core,
@@ -118,6 +132,7 @@ pub(super) fn subject(core: &Core, limits: &Limits, party: u64, subject: &Subjec
             party,
             subject,
             &[Act::Adopt, Act::Reorder, Act::ChangePolicy, Act::SetRoles, Act::MakeService, Act::SetPool],
+            decision,
         ),
         Subject::Proposal { proposer, .. } => {
             let kinds = if *proposer == super::Proposer::Party(party) {
@@ -125,7 +140,7 @@ pub(super) fn subject(core: &Core, limits: &Limits, party: u64, subject: &Subjec
             } else {
                 &[Act::Accept, Act::Reject, Act::PassUp][..]
             };
-            list(core, limits, party, subject, kinds)
+            list(core, limits, party, subject, kinds, decision)
         }
         Subject::Escalation { task } => {
             let row = core.tasks.task(*task).ok_or(Missing::Unknown)?;
@@ -139,10 +154,10 @@ pub(super) fn subject(core: &Core, limits: &Limits, party: u64, subject: &Subjec
                 | tasks::Phase::Held { was: tasks::Was::Waiting | tasks::Was::Active(_), .. }
                 | tasks::Phase::Ended(_) => &[Act::Release, Act::LeaveHeld, Act::PassUp, Act::Amend, Act::Cancel][..],
             };
-            list(core, limits, party, subject, kinds)
+            list(core, limits, party, subject, kinds, decision)
         }
-        Subject::Question { .. } => list(core, limits, party, subject, &[Act::Answer]),
-        Subject::Result { .. } => list(core, limits, party, &Subject::Inbox { party }, &[Act::Seen]),
+        Subject::Question { .. } => list(core, limits, party, subject, &[Act::Answer], decision),
+        Subject::Result { .. } => list(core, limits, party, &Subject::Inbox { party }, &[Act::Seen], decision),
         Subject::Frame { .. }
         | Subject::Task { .. }
         | Subject::Tree { .. }
@@ -162,6 +177,7 @@ pub(super) fn person(
     limits: &Limits,
     party: u64,
     row: &tasks::TaskRecord,
+    decision: skein_lib::Wall,
 ) -> Result<List<Offered>, Missing> {
     match row.phase {
         tasks::Phase::Active(tasks::Active::Due | tasks::Active::Idle) => {
@@ -171,7 +187,7 @@ pub(super) fn person(
                 | tasks::Executor::Agent { .. }
                 | tasks::Executor::Procedure { .. } => &[Act::Answer][..],
             };
-            list(core, limits, party, &Subject::PersonTask { task: row.number }, kinds)
+            list(core, limits, party, &Subject::PersonTask { task: row.number }, kinds, decision)
         }
         tasks::Phase::Waiting
         | tasks::Phase::Active(

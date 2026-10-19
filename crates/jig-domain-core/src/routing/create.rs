@@ -76,9 +76,11 @@ pub(super) fn checked(
         delegates
             .push(authority::Delegate {
                 executor,
-                authority: crate::translate::authority_value(
+                authority: super::deadlines::authority(
                     &crate::amendments::granted(member.authority.clone(), &env.limits.tasks)
                         .expect("member authority checked"),
+                    new.deadline,
+                    env.wall,
                 ),
                 symbolic: crate::symbolic_grants(&named(member, env)?, core.authority.limits().grants)
                     .ok_or(people::Refusal::Limit { which: people::LimitKind::Authority })?,
@@ -124,6 +126,10 @@ pub(super) fn checked(
             });
         }
     }
+    let mut members = members.into_boxed();
+    if !proposing {
+        super::deadlines::resolve(&mut members, env.wall);
+    }
     for _ in &members {
         crate::fresh(&mut core.counters, crate::Family::Task)
             .ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;
@@ -132,7 +138,7 @@ pub(super) fn checked(
     if let Some((at, amount)) = allowed {
         given = Some(people::Given { task: first.checked_add(u64::from(at)).expect("admitted task number"), amount });
     }
-    Ok((members.into_boxed(), given))
+    Ok((members, given))
 }
 fn new_task(
     core: &Core,
@@ -185,6 +191,7 @@ fn new_task(
     Ok(tasks::New {
         deadline: match member.deadline {
             people::Deadline::Named => tasks::Deadline::Named,
+            people::Deadline::Span(span) => tasks::Deadline::Span(span),
         },
         number,
         project: *project,

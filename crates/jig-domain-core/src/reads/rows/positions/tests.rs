@@ -77,7 +77,14 @@ fn an_inbox_page_that_skipped_rows_goes_on_from_the_last_examined() {
     let scope = Scope::Inbox { group: Group::Results, filter: Filter { project: None, goal: None } };
     let row = result_row(core.tasks.task(1).unwrap());
     let next = update_position(10, 98);
-    let answer = super::super::from_store(&core, &limits, &range(scope.clone()), Box::new([row]), Some(next.clone()));
+    let answer = super::super::from_store(
+        &core,
+        &limits,
+        &range(scope.clone()),
+        Box::new([row]),
+        Some(next.clone()),
+        Wall::EPOCH,
+    );
     let Answer::Page(page) = answer else { panic!("indexed cursor accepted") };
     assert_eq!(page.rows.len(), 1);
     assert_eq!(page.next, Some(Cursor::Store { scope, after: Some(next) }));
@@ -88,7 +95,8 @@ fn a_page_that_returned_none_within_its_bound_is_cut_not_ended() {
     let (core, limits) = fixture();
     let scope = Scope::Inbox { group: Group::Results, filter: Filter { project: None, goal: None } };
     let next = update_position(10, 98);
-    let answer = super::super::from_store(&core, &limits, &range(scope.clone()), Box::new([]), Some(next.clone()));
+    let answer =
+        super::super::from_store(&core, &limits, &range(scope.clone()), Box::new([]), Some(next.clone()), Wall::EPOCH);
     let Answer::Page(page) = answer else { panic!("empty filtered page is retained") };
     assert!(page.rows.is_empty());
     assert_eq!(page.next, Some(Cursor::Store { scope, after: Some(next) }));
@@ -100,7 +108,7 @@ fn a_subtree_history_page_moves_from_one_task_to_the_next() {
     let scope = Scope::History { task: 1, subtree: true };
     let rows = subtree_rows(core.tasks.task(1).unwrap());
     let next = reads::row_key(rows.last().unwrap()).unwrap();
-    let answer = super::super::from_store(&core, &limits, &range(scope.clone()), rows, Some(next.clone()));
+    let answer = super::super::from_store(&core, &limits, &range(scope.clone()), rows, Some(next.clone()), Wall::EPOCH);
     let Answer::Page(page) = answer else { panic!("task-by-task history accepted") };
     assert_eq!(page.rows.len(), 2);
     assert_eq!(page.next, Some(Cursor::Store { scope, after: Some(next) }));
@@ -119,7 +127,7 @@ fn subtree_history_does_not_return_to_a_task_already_examined() {
     let mut extra = subtree_rows(owner).into_iter();
     repeated.push(extra.next().unwrap()).unwrap();
     assert_eq!(
-        super::super::from_store(&core, &limits, &range(scope), repeated.into_boxed(), None),
+        super::super::from_store(&core, &limits, &range(scope), repeated.into_boxed(), None, Wall::EPOCH),
         Answer::None(Why::Unknown)
     );
 }

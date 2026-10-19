@@ -534,6 +534,9 @@ fn member(source: &domain::New, limits: &wire::Limits) -> Result<wire::Member, w
             authority: value::authority(authority, limits)?,
             deadline: match deadline {
                 domain::Deadline::Named => wire::Deadline::Named,
+                domain::Deadline::Span(value) => {
+                    wire::Deadline::Span(wire::DeadlineSpan::new(limits, wire::DeadlineSpanParts { value: *value })?)
+                }
             },
             numbers: numbers(allotment, limits)?,
             funder: value::funder(*funder, limits)?,
@@ -569,6 +572,7 @@ fn read_member(source: wire::Member, limits: &wire::Limits) -> Result<domain::Ne
     Ok(domain::New {
         deadline: match deadline {
             wire::Deadline::Named => domain::Deadline::Named,
+            wire::Deadline::Span(value) => domain::Deadline::Span(value.value()),
         },
         label,
         flags: read_flags(flags),

@@ -3,7 +3,7 @@ use super::*;
 
 #[expect(clippy::wildcard_enum_match_arm, reason = "ordinary proof helper receives a Project document")]
 fn project(core: &Core, limits: &Limits) -> Box<Project> {
-    match make(core, limits, 1, &Subject::Project { project: 1 }, &window()).expect("project document") {
+    match make(core, limits, 1, &Subject::Project { project: 1 }, &window(), Wall::EPOCH).expect("project document") {
         Document::Project(value) => value,
         _ => panic!("project document"),
     }

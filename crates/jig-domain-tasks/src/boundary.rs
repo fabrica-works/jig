@@ -800,6 +800,7 @@ pub struct Kind {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Deadline {
     Named,
+    Span(Duration),
 }
 
 /// Root-authorized member of an atomic creation batch; tasks preflights the whole graph, payloads,

@@ -10,7 +10,7 @@ fn task_specification_keeps_source_inputs_and_separate_page_loss() {
     let mut row = core.tasks.task(2).unwrap().clone();
     row.spec.inputs = Box::new([1, u64::MAX]);
     row.dependencies = Box::new([91, 92, 93]);
-    let task = task_from_row(&core, &limits, 1, &row).unwrap();
+    let task = task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
     assert!(task.cut, "the dependency list omits its third row");
     assert!(!task.spec.cut, "the entire specification still fits");
     assert_eq!(task.spec.words, task.words);
@@ -35,7 +35,7 @@ fn task_specification_marks_parameter_and_input_list_loss_independently() {
         tasks::Parameter::Number { name: 9, value: 10 },
         tasks::Parameter::Number { name: 11, value: 12 },
     ]);
-    let task = task_from_row(&core, &limits, 1, &row).unwrap();
+    let task = task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
     assert!(task.spec.cut, "only parameters exceed the spec list bound");
     assert_eq!(task.spec.parameters.len(), 2);
     assert_eq!(task.spec.parameters.get(0), Some(&Parameter::Number { name: 7, value: 8 }));
@@ -45,7 +45,7 @@ fn task_specification_marks_parameter_and_input_list_loss_independently() {
 
     row.spec.parameters = Box::new([]);
     row.spec.inputs = Box::new([u64::MAX, 1, 3]);
-    let task = task_from_row(&core, &limits, 1, &row).unwrap();
+    let task = task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
     assert!(task.spec.cut, "only inputs exceed the spec list bound");
     assert!(task.spec.parameters.is_empty());
     assert_eq!(task.spec.inputs.len(), 2);
@@ -66,7 +66,7 @@ fn task_specification_preserves_parameter_identity_and_local_text_loss() {
         tasks::Parameter::Number { name: 2, value: u64::MAX },
         tasks::Parameter::Resource { name: 3, connector: u16::MAX, resource: u64::MAX },
     ]);
-    let task = task_from_row(&core, &limits, 1, &row).unwrap();
+    let task = task_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
     assert!(!task.spec.cut, "text loss does not omit specification list rows");
     assert!(!task.cut, "text loss is local to each text");
     assert_eq!(task.spec.words, Text { bytes: Box::from(&b"abc"[..]), cut: true });

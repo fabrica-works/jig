@@ -316,3 +316,18 @@ fn normal_phrasebooks_require_and_render_exact_owner_words_in_the_selected_langu
     assert!(!contains(&tree, b"Agent charter"));
     assert!(!contains(&tree, b"Tool bits: "));
 }
+
+#[test]
+fn a_proposed_span_is_distinct_from_no_deadline() {
+    let words = words();
+    for (selector, expected) in
+        [(NewDeadline::Named, false), (NewDeadline::Span(skein_lib::Duration::from_secs(120)), true)]
+    {
+        let mut task = super::work_pages::recurring_task(1, b"work");
+        task.deadline = selector;
+        let mut b = builder();
+        proposed_task::authority(&mut b, &task, words, CLIENT.text, CLIENT.rows);
+        let tree = finish(b);
+        assert_eq!(contains(&tree, b"Deadline after acceptance (minutes): 2"), expected, "{selector:?}");
+    }
+}

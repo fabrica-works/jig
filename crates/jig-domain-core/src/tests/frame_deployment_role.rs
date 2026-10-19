@@ -38,7 +38,7 @@ fn source(deployment_role: Option<people::Role>) -> (Core, Limits) {
 
 #[expect(clippy::wildcard_enum_match_arm, reason = "ordinary proof helper receives a Frame document")]
 fn frame(core: &Core, limits: &Limits) -> Frame {
-    match make(core, limits, 1, &Subject::Frame { party: 1 }, &window()).expect("frame document") {
+    match make(core, limits, 1, &Subject::Frame { party: 1 }, &window(), Wall::EPOCH).expect("frame document") {
         Document::Frame(value) => value,
         _ => panic!("frame document"),
     }
@@ -72,7 +72,7 @@ fn frame_deployment_role_preserves_every_builtin_and_admitted_policy_and_full_wi
             held += List::<Template>::worst_case(project.templates.capacity()).unwrap();
         }
         assert!(document_with_context_worst_case(&limits).unwrap() >= held);
-        let Ok(Document::Deployment(_)) = make(&core, &limits, 1, &Subject::Deployment, &window()) else {
+        let Ok(Document::Deployment(_)) = make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH) else {
             panic!("deployment document admitted");
         };
     }
@@ -92,14 +92,18 @@ fn frame_deployment_role_is_independent_of_clipped_project_rows_and_never_inferr
             Some(role) => {
                 assert_eq!(value.projects.get(0).unwrap().project, 0);
                 assert_eq!(value.projects.get(0).unwrap().role, role);
-                let Ok(Document::Deployment(_)) = make(&core, &limits, 1, &Subject::Deployment, &window()) else {
+                let Ok(Document::Deployment(_)) = make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH)
+                else {
                     panic!("clipped deployment document admitted");
                 };
             }
             None => {
                 assert_eq!(value.projects.get(0).unwrap().project, 1);
                 assert_eq!(value.projects.get(0).unwrap().role, people::Role::Policy { role: 4 });
-                assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window()), Err(Missing::NotAllowed));
+                assert_eq!(
+                    make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH),
+                    Err(Missing::NotAllowed)
+                );
             }
         }
     }
@@ -145,7 +149,7 @@ fn frame_deployment_role_changes_only_when_its_own_retained_membership_changes()
     };
     assert_eq!(out.pop(), None);
     assert_eq!(frame(&core, &limits).deployment_role, None);
-    assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window()), Err(Missing::NotAllowed));
+    assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
 }
 
 #[test]
@@ -168,5 +172,5 @@ fn frame_deployment_role_does_not_invent_a_reserved_policy_number_refused_by_its
     assert_eq!(out.pop(), None);
     assert_eq!(core.people.role(1, 0), None);
     assert_eq!(frame(&core, &limits).deployment_role, None);
-    assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window()), Err(Missing::NotAllowed));
+    assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
 }

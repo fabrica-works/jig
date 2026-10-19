@@ -618,14 +618,20 @@ fn proposal(row: &tasks::TaskRecord) -> Option<ProposalRef> {
     }
 }
 
-pub(super) fn task(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<Task, Missing> {
+pub(super) fn task(core: &Core, limits: &Limits, party: u64, number: u64, decision: Wall) -> Result<Task, Missing> {
     let row = super::small::visible(core, party, number)?;
-    task_from_row(core, limits, party, row)
+    task_from_row(core, limits, party, row, decision)
 }
 
 /// Construct a visible task from its retained owner row, without restoring it.
 #[expect(clippy::too_many_lines, reason = "the task page gathers one bounded overview without changing child state")]
-pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::TaskRecord) -> Result<Task, Missing> {
+pub fn task_from_row(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    row: &tasks::TaskRecord,
+    decision: Wall,
+) -> Result<Task, Missing> {
     if core.people.role(party, row.project).is_none() {
         return Err(Missing::NotAllowed);
     }
@@ -728,7 +734,7 @@ pub fn task_from_row(core: &Core, limits: &Limits, party: u64, row: &tasks::Task
         tasks::Phase::Ended(value) => Some(ending(limits, value)?),
         tasks::Phase::Waiting | tasks::Phase::Active(_) => None,
     };
-    let acts = super::offers::task(core, limits, party, row)?;
+    let acts = super::offers::task(core, limits, party, row, decision)?;
     let authority = authority(limits, &row.authority)?;
     Ok(Task {
         waits_on: core.waits_on(limits, row.number),

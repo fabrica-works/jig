@@ -154,3 +154,24 @@ pub fn contract_nodes(limits: &Limits) -> Option<u32> {
     let verdict = limits.rows.checked_mul(2)?.checked_add(1)?.checked_mul(limits.rows)?.checked_add(2)?;
     Some(approval.max(verdict).max(1))
 }
+
+/// A pending span supersedes the optional authority wall in the retained facts.
+pub fn authority(
+    b: &mut Builder,
+    task: &jig_client::contract::ProposedTask,
+    words: &Words,
+    text_limit: u32,
+    rows: u32,
+) {
+    match task.deadline {
+        jig_client::contract::NewDeadline::Named => {
+            crate::owner_authority::document_words(b, &task.authority, words, text_limit, rows);
+        }
+        jig_client::contract::NewDeadline::Span(span) => {
+            let mut given = task.authority.clone();
+            given.authority.deadline = None;
+            crate::owner_authority::document_words(b, &given, words, text_limit, rows);
+            text(b, words, ProposedPhrase::DeadlineSpan, &[Hole::Span(span)]);
+        }
+    }
+}

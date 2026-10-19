@@ -123,6 +123,12 @@ impl Story {
     pub fn task_budget(&self, task: u64) -> Option<u64> {
         self.task_record(task).map(|v| v.numbers.budget)
     }
+    /// Deadline actually stored by the real task child.
+    #[must_use]
+    pub fn task_deadline(&self, task: u64) -> Option<skein_lib::Wall> {
+        self.task_record(task)?.authority.budget.deadline
+    }
+
     #[must_use]
     pub fn worker_budget(&self, task: u64) -> Option<u64> {
         self.engine

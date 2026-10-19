@@ -65,6 +65,7 @@ pub enum Budget {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Deadline {
     Named,
+    Span(skein_lib::Duration),
 }
 /// A dependency within the batch or the party's reach.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

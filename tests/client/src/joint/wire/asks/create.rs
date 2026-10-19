@@ -21,6 +21,7 @@ fn member(v: &c::NewTask) -> p::Member {
         authority: authority(&v.authority),
         deadline: match v.deadline {
             c::NewDeadline::Named => p::Deadline::Named,
+            c::NewDeadline::Span(value) => p::Deadline::Span(value),
         },
         budget: match v.budget {
             c::NewBudget::Named => p::Budget::Named,

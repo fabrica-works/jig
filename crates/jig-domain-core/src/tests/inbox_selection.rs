@@ -74,7 +74,7 @@ fn waiting(core: &mut Core, limits: &Limits, task: u64, kinds: &[people::EntryKi
 
 fn inbox(core: &Core, limits: &Limits, rows: u32) -> Inbox {
     let Document::Inbox(value) =
-        make(core, limits, 1, &Subject::Inbox { party: 1 }, &Window { rows, after: None }).unwrap()
+        make(core, limits, 1, &Subject::Inbox { party: 1 }, &Window { rows, after: None }, Wall::EPOCH).unwrap()
     else {
         panic!("whole inbox document")
     };
@@ -388,7 +388,7 @@ fn whole_inbox_context_distinguishes_unsupplied_from_empty_and_refuses_depth_ove
     assert_eq!(inbox_selection_worst_case(16, limits.tasks.depth), None);
     assert_eq!(document_with_context_worst_case(&limits), None);
     assert_eq!(
-        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 16, after: None }),
+        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 16, after: None }, Wall::EPOCH),
         Err(Missing::TooLarge)
     );
 }

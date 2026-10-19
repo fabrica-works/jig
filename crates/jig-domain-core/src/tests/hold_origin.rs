@@ -56,7 +56,8 @@ fn drift_task_document_keeps_the_hold_account_separate_from_the_whole_resource_o
     let tasks::Phase::Held { why, source: Some(origin), .. } = &row.phase else { panic!("held drift") };
     assert_eq!(*why, tasks::Hold::Drift);
     assert_eq!(**origin, tasks::HoldSource::Resource(resource.clone()));
-    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window()).unwrap() else {
+    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("held task document")
     };
     let hold = task.hold.unwrap();
@@ -69,7 +70,7 @@ fn drift_task_document_keeps_the_hold_account_separate_from_the_whole_resource_o
     assert_eq!(hold.reason, tasks::Hold::Drift);
     assert_eq!(hold.revision, row.revisions.hold);
     let Document::Escalation(escalation) =
-        make(&core, &limits, 1, &Subject::Escalation { task: 2 }, &window()).unwrap()
+        make(&core, &limits, 1, &Subject::Escalation { task: 2 }, &window(), Wall::EPOCH).unwrap()
     else {
         panic!("escalation")
     };
@@ -93,7 +94,8 @@ fn failed_effect_task_document_names_the_held_task_account_and_preserves_the_act
     let tasks::Phase::Held { why, source: Some(origin), .. } = &row.phase else { panic!("held failed effect") };
     assert_eq!(*why, tasks::Hold::EffectFailed);
     assert_eq!(**origin, tasks::HoldSource::Effect { connector: 2, entry: 8 });
-    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window()).unwrap() else {
+    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("held task document")
     };
     let hold = task.hold.unwrap();
@@ -102,7 +104,7 @@ fn failed_effect_task_document_names_the_held_task_account_and_preserves_the_act
     assert_eq!(hold.reason, tasks::Hold::EffectFailed);
     assert_eq!(hold.revision, row.revisions.hold);
     let Document::Escalation(escalation) =
-        make(&core, &limits, 1, &Subject::Escalation { task: 2 }, &window()).unwrap()
+        make(&core, &limits, 1, &Subject::Escalation { task: 2 }, &window(), Wall::EPOCH).unwrap()
     else {
         panic!("escalation")
     };

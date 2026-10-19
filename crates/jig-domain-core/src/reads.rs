@@ -459,7 +459,7 @@ pub(crate) fn loaded(core: &mut Core, env: &Env<Limits>, load: Token, result: Lo
             }
             Loaded::Busy => Answer::None(Why::Busy),
             Loaded::Gone => Answer::None(Why::Gone),
-            Loaded::Page { rows, next } => rows::from_store(core, &env.limits, &pending.range, rows, next),
+            Loaded::Page { rows, next } => rows::from_store(core, &env.limits, &pending.range, rows, next, env.wall),
         }
     };
     let answer = match (core.reads.get_mut(name).expect("live read").tasks.take(), answer) {

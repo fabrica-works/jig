@@ -178,7 +178,8 @@ fn activity_orders_claim_turns_person_words_and_a_delegate_result_with_their_arc
         _ => false,
     }));
     assert!(core.tasks.task(1).unwrap().inbox.iter().all(|word| word.number != 1));
-    let Document::Task(document) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap() else {
+    let Document::Task(document) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!()
     };
     assert_eq!(document.activity, first + 6);

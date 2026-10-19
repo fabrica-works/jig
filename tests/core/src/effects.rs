@@ -127,6 +127,11 @@ impl World {
         if self.supplied_wall.is_some() {
             assert!(now.as_nanos() >= self.wall, "elapsed time is monotonic");
         }
+        if self.env().wall != wall
+            && let Some(offers) = &mut self.offers
+        {
+            offers.clock_changed();
+        }
         self.wall = now.as_nanos();
         self.supplied_wall = Some(wall);
     }

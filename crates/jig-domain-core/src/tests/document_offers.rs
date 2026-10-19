@@ -24,7 +24,8 @@ fn document_offers_fit_the_object_and_preserve_actor_specific_refusals() {
     core.authority = authority::Domain::new(core.authority.rules().clone(), limits.authority).unwrap();
     let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
-    let Document::Task(value) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window()).unwrap() else {
+    let Document::Task(value) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("task")
     };
     assert_eq!(find(&value.acts, Act::Message), Some(&Admission::Allowed));
@@ -41,14 +42,17 @@ fn document_offers_fit_the_object_and_preserve_actor_specific_refusals() {
         },
         &mut out,
     );
-    let Document::Task(value) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window()).unwrap() else {
+    let Document::Task(value) = make(&core, &limits, 1, &Subject::Task { task: 2 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("task")
     };
     assert_eq!(
         find(&value.acts, Act::Message),
         Some(&Admission::Refused(people::Refusal::Role { held: Some(people::Role::Observer) }))
     );
-    let Document::Project(value) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap() else {
+    let Document::Project(value) =
+        make(&core, &limits, 1, &Subject::Project { project: 1 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("project")
     };
     assert_eq!(value.acts.len(), 6);
@@ -70,7 +74,7 @@ fn complete_policy_recipients_refuse_a_shortened_receiving_form() {
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }));
     limits.documents.lines = 1;
-    assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 2 }, &window()), Err(Missing::TooLarge));
+    assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 2 }, &window(), Wall::EPOCH), Err(Missing::TooLarge));
     let request = people::Ask::Amend {
         project: 1,
         task: 2,
@@ -78,7 +82,7 @@ fn complete_policy_recipients_refuse_a_shortened_receiving_form() {
         amendment: fixtures::person_unchanged(b""),
         release: None,
     };
-    assert_eq!(crate::acts::request(&core, &limits, 1, 1, Some(people::Role::Owner), &request), Ok(()));
+    assert_eq!(crate::acts::request(&core, &limits, 1, 1, Some(people::Role::Owner), &request, Wall::EPOCH), Ok(()));
 }
 
 #[test]
@@ -107,7 +111,8 @@ fn cancellation_during_closing_and_release_of_a_held_closing_task_keep_the_owner
         send_task(&mut core, &limits, tasks::Event::Restore { record: tasks::Stored::Live(Box::new(row)) });
     }
     send_task(&mut core, &limits, tasks::Event::Restored);
-    let Document::Task(value) = make(&core, &limits, 1, &Subject::Task { task: 3 }, &window()).unwrap() else {
+    let Document::Task(value) = make(&core, &limits, 1, &Subject::Task { task: 3 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("closing task")
     };
     assert_eq!(find(&value.acts, Act::Cancel), Some(&Admission::Allowed));
@@ -119,7 +124,8 @@ fn cancellation_during_closing_and_release_of_a_held_closing_task_keep_the_owner
             1,
             1,
             Some(people::Role::Owner),
-            &people::Ask::Cancel { project: 1, task: 3, reason: b"cancel closing".as_slice().into(), grace: None }
+            &people::Ask::Cancel { project: 1, task: 3, reason: b"cancel closing".as_slice().into(), grace: None },
+            Wall::EPOCH
         ),
         Ok(())
     );
@@ -139,7 +145,8 @@ fn cancellation_during_closing_and_release_of_a_held_closing_task_keep_the_owner
         panic!("cancelled by owner");
     }
     send_task(&mut core, &limits, tasks::Event::Hold { task: 3, why: tasks::Hold::StoppedBy { party: 1 } });
-    let Document::Task(value) = make(&core, &limits, 1, &Subject::Task { task: 3 }, &window()).unwrap() else {
+    let Document::Task(value) = make(&core, &limits, 1, &Subject::Task { task: 3 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("held closing task")
     };
     assert_eq!(find(&value.acts, Act::Release), Some(&Admission::Allowed));
@@ -156,7 +163,8 @@ fn cancellation_during_closing_and_release_of_a_held_closing_task_keep_the_owner
                 task: 3,
                 revision: core.tasks.task(3).unwrap().revisions.hold,
                 again: None
-            }
+            },
+            Wall::EPOCH
         ),
         Ok(())
     );
@@ -217,7 +225,7 @@ fn full_grants() -> (Core, Limits, tasks::TaskRecord) {
 #[test]
 fn a_task_and_its_amend_offer_hold_the_roles_grants_whole() {
     let (core, limits, row) = full_grants();
-    let value = task_from_row(&core, &limits, PERSON, &row).unwrap();
+    let value = task_from_row(&core, &limits, PERSON, &row, Wall::EPOCH).unwrap();
     let Some(Admission::Bounded { within: crate::acts::Bounds::Amend { authority, grants, .. }, .. }) =
         find(&value.acts, Act::Amend)
     else {

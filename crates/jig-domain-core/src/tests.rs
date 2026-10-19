@@ -408,7 +408,8 @@ fn window() -> Window {
 #[test]
 fn documents_frame_carries_roles_retention_and_configured_charters() {
     let (core, limits) = core();
-    let Document::Frame(frame) = make(&core, &limits, 1, &Subject::Frame { party: 1 }, &window()).unwrap() else {
+    let Document::Frame(frame) = make(&core, &limits, 1, &Subject::Frame { party: 1 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!()
     };
     assert_eq!(frame.party, 1);
@@ -442,7 +443,7 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
     let mut upgraded = limits;
     upgraded.documents.versions = Versions { minimum: u32::MAX, maximum: u32::MAX };
     assert_eq!(
-        make(&core, &upgraded, 1, &Subject::Frame { party: 1 }, &window()).unwrap(),
+        make(&core, &upgraded, 1, &Subject::Frame { party: 1 }, &window(), Wall::EPOCH).unwrap(),
         Document::Frame(frame),
         "protocol served versions never change the business Frame"
     );
@@ -455,7 +456,8 @@ fn documents_chip_cuts_the_title_and_keeps_its_phase_facts() {
     limits.documents.text_bytes = 6;
     let mut tasks = List::with_capacity(1);
     tasks.push(1).unwrap();
-    let Document::Chips(chips) = make(&core, &limits, 1, &Subject::Chips { tasks }, &window()).unwrap() else {
+    let Document::Chips(chips) = make(&core, &limits, 1, &Subject::Chips { tasks }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!()
     };
     let chip = &chips.as_slice()[0];
@@ -477,8 +479,8 @@ fn documents_refuse_a_party_without_a_project_role() {
     );
     let mut tasks = List::with_capacity(1);
     tasks.push(1).unwrap();
-    assert_eq!(make(&core, &limits, 1, &Subject::Chips { tasks }, &window()), Err(Missing::NotAllowed));
-    assert_eq!(make(&core, &limits, 1, &Subject::Frame { party: 2 }, &window()), Err(Missing::NotAllowed));
+    assert_eq!(make(&core, &limits, 1, &Subject::Chips { tasks }, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
+    assert_eq!(make(&core, &limits, 1, &Subject::Frame { party: 2 }, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
 }
 
 #[test]
@@ -502,12 +504,12 @@ fn documents_run_has_only_the_live_proofs_committed_progress() {
         )
         .unwrap();
     assert_eq!(
-        make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()),
+        make(&core, &limits, 1, &Subject::Run { task: 1 }, &window(), Wall::EPOCH),
         Ok(Document::Run(Run { task: 1, attempt: Some(7), committed_turn: 3, writing: None, call: None }))
     );
     core.proofs.remove(&1);
     assert_eq!(
-        make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()),
+        make(&core, &limits, 1, &Subject::Run { task: 1 }, &window(), Wall::EPOCH),
         Ok(Document::Run(Run { task: 1, attempt: None, committed_turn: 0, writing: None, call: None }))
     );
 }
@@ -516,7 +518,7 @@ fn documents_run_has_only_the_live_proofs_committed_progress() {
 fn documents_reject_oversized_whole_requests_and_invalid_bounds() {
     let (core, mut limits) = core();
     let empty = Subject::Chips { tasks: List::with_capacity(0) };
-    assert_eq!(make(&core, &limits, 1, &empty, &Window { rows: 33, after: None }), Err(Missing::TooLarge));
+    assert_eq!(make(&core, &limits, 1, &empty, &Window { rows: 33, after: None }, Wall::EPOCH), Err(Missing::TooLarge));
     assert!(document_worst_case(&limits.documents).is_some());
     limits.documents.lines = 0;
     assert_eq!(document_worst_case(&limits.documents), None);
@@ -660,7 +662,8 @@ fn amendment_acceptance_reserves_its_terminal_proposal_revision() {
 #[test]
 fn documents_tree_folds_every_unshown_phase_and_keeps_held_counts() {
     let (core, limits) = make_tree();
-    let Document::Tree(tree) = make(&core, &limits, 1, &Subject::Tree { task: 1 }, &window()).unwrap() else {
+    let Document::Tree(tree) = make(&core, &limits, 1, &Subject::Tree { task: 1 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!()
     };
     assert_eq!(tree.rows.len(), 1);
@@ -671,7 +674,8 @@ fn documents_tree_folds_every_unshown_phase_and_keeps_held_counts() {
     assert_eq!(tree.folded.get(0).unwrap().phases.starting, 1);
     assert_eq!(tree.next, Some(Cursor::Number { number: 2 }));
     let Document::Tree(next) =
-        make(&core, &limits, 1, &Subject::Tree { task: 1 }, &Window { rows: 2, after: tree.next }).unwrap()
+        make(&core, &limits, 1, &Subject::Tree { task: 1 }, &Window { rows: 2, after: tree.next }, Wall::EPOCH)
+            .unwrap()
     else {
         panic!()
     };
@@ -684,7 +688,8 @@ fn documents_tree_folds_every_unshown_phase_and_keeps_held_counts() {
 #[test]
 fn documents_task_carries_overview_lineage_and_the_hold_reason() {
     let (core, limits) = make_tree();
-    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 3 }, &window()).unwrap() else {
+    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 3 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!()
     };
     assert_eq!(task.words.bytes.as_ref(), b"Work\nDetailed instructions");
@@ -720,9 +725,10 @@ fn documents_part_keys_are_preserved_or_refused_whole() {
         },
     );
     limits.documents.text_bytes = 3;
-    assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()), Err(Missing::TooLarge));
+    assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH), Err(Missing::TooLarge));
     limits.documents.text_bytes = 5;
-    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap() else {
+    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!()
     };
     assert_eq!(task.authority.grants.get(0).unwrap().segments.get(0).unwrap().as_ref(), b"whole");
@@ -752,7 +758,9 @@ fn documents_proposal_tracks_the_current_holder_and_funding_after_a_pass() {
         },
     );
     let target = Subject::Proposal { proposer: Proposer::Task(2), number: 10 };
-    let Document::Proposal(proposal) = make(&core, &limits, 1, &target, &window()).unwrap() else { panic!() };
+    let Document::Proposal(proposal) = make(&core, &limits, 1, &target, &window(), Wall::EPOCH).unwrap() else {
+        panic!()
+    };
     assert_eq!(proposal.reason.bytes.as_ref(), b"More room");
     assert_eq!(proposal.waiting.holder, tasks::ProposalHolder::Task(1));
     assert_eq!(proposal.funding.get(0).unwrap().source, tasks::Funder::Task(1));
@@ -774,14 +782,16 @@ fn documents_proposal_tracks_the_current_holder_and_funding_after_a_pass() {
             decision: tasks::ProposalDecision::Pass { holder: tasks::ProposalHolder::Person(1) },
         },
     );
-    let Document::Proposal(proposal) = make(&core, &limits, 1, &target, &window()).unwrap() else { panic!() };
+    let Document::Proposal(proposal) = make(&core, &limits, 1, &target, &window(), Wall::EPOCH).unwrap() else {
+        panic!()
+    };
     assert_eq!(proposal.waiting.holder, tasks::ProposalHolder::Person(1));
     send_task(
         &mut core,
         &limits,
         tasks::Event::WithdrawProposal { reply_to: ReplyTo::new(Token::new(52)), proposer: 2, proposal: 10 },
     );
-    assert_eq!(make(&core, &limits, 1, &target, &window()), Err(Missing::Ended));
+    assert_eq!(make(&core, &limits, 1, &target, &window(), Wall::EPOCH), Err(Missing::Ended));
 }
 
 #[test]
@@ -845,7 +855,8 @@ fn person_address_proposals_keep_the_named_revision_and_actual_beforefacts() {
         },
     );
     let Document::Proposal(doc) =
-        make(&core, &limits, 1, &Subject::Proposal { proposer: Proposer::Task(1), number: 20 }, &window()).unwrap()
+        make(&core, &limits, 1, &Subject::Proposal { proposer: Proposer::Task(1), number: 20 }, &window(), Wall::EPOCH)
+            .unwrap()
     else {
         panic!("proposal")
     };
@@ -879,7 +890,8 @@ fn person_address_proposals_keep_the_named_revision_and_actual_beforefacts() {
     assert_eq!(current.revisions.person, 1);
     assert_eq!(tasks::address_admit(current, &edit.addressed), Err(tasks::Refusal::PersonRevision { revision: 1 }));
     let Document::Proposal(doc) =
-        make(&core, &limits, 1, &Subject::Proposal { proposer: Proposer::Task(1), number: 20 }, &window()).unwrap()
+        make(&core, &limits, 1, &Subject::Proposal { proposer: Proposer::Task(1), number: 20 }, &window(), Wall::EPOCH)
+            .unwrap()
     else {
         panic!("pending proposal")
     };
@@ -944,7 +956,8 @@ fn documents_proposal_actions_keep_effect_parts_and_amendment_before_and_after()
             },
         );
         let Document::Proposal(proposal) =
-            make(&core, &limits, 1, &Subject::Proposal { proposer: Proposer::Task(2), number }, &window()).unwrap()
+            make(&core, &limits, 1, &Subject::Proposal { proposer: Proposer::Task(2), number }, &window(), Wall::EPOCH)
+                .unwrap()
         else {
             panic!()
         };
@@ -1014,7 +1027,8 @@ fn documents_every_escalation_reason_keeps_the_task_story_and_independent_revisi
     for reason in reasons {
         let (mut core, limits) = make_tree();
         send_task(&mut core, &limits, tasks::Event::Hold { task: 2, why: reason });
-        let Document::Escalation(value) = make(&core, &limits, 1, &Subject::Escalation { task: 2 }, &window()).unwrap()
+        let Document::Escalation(value) =
+            make(&core, &limits, 1, &Subject::Escalation { task: 2 }, &window(), Wall::EPOCH).unwrap()
         else {
             panic!()
         };
@@ -1049,11 +1063,13 @@ fn documents_question_words_are_whole_or_refused_and_answered_questions_end() {
         },
     );
     let target = Subject::Question { task: 1, message: 60 };
-    let Document::Question(question) = make(&core, &limits, 1, &target, &window()).unwrap() else { panic!() };
+    let Document::Question(question) = make(&core, &limits, 1, &target, &window(), Wall::EPOCH).unwrap() else {
+        panic!()
+    };
     assert_eq!(question.words.as_ref(), b"Whole question?");
     assert_eq!(question.at, Wall::from_nanos(9));
     limits.documents.text_bytes = 5;
-    assert_eq!(make(&core, &limits, 1, &target, &window()), Err(Missing::TooLarge));
+    assert_eq!(make(&core, &limits, 1, &target, &window(), Wall::EPOCH), Err(Missing::TooLarge));
     limits.documents.text_bytes = 256;
     send_task(
         &mut core,
@@ -1073,7 +1089,7 @@ fn documents_question_words_are_whole_or_refused_and_answered_questions_end() {
             },
         },
     );
-    assert_eq!(make(&core, &limits, 1, &target, &window()), Err(Missing::Ended));
+    assert_eq!(make(&core, &limits, 1, &target, &window(), Wall::EPOCH), Err(Missing::Ended));
 }
 
 #[test]
@@ -1098,7 +1114,8 @@ fn documents_person_task_has_the_current_revision_holder_and_answer_form() {
         &limits,
         tasks::Event::TakePerson { reply_to: ReplyTo::new(Token::new(71)), task: 5, person: 1 },
     );
-    let Document::PersonTask(task) = make(&core, &limits, 1, &Subject::PersonTask { task: 5 }, &window()).unwrap()
+    let Document::PersonTask(task) =
+        make(&core, &limits, 1, &Subject::PersonTask { task: 5 }, &window(), Wall::EPOCH).unwrap()
     else {
         panic!()
     };
@@ -1125,7 +1142,7 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
         at: Wall::from_nanos(19),
     });
     row.ended_at = Some(Wall::from_nanos(19));
-    let result = result_from_row(&core, &limits, 1, &row).unwrap();
+    let result = result_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
     assert!(result.followups.as_ref().unwrap().is_empty());
     assert_eq!(result.at, Some(Wall::from_nanos(19)));
     assert_eq!(result.task.phase, PhaseLine::Ended);
@@ -1152,7 +1169,7 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
         }),
     ] {
         row.phase = tasks::Phase::Ended(ending);
-        let result = result_from_row(&core, &limits, 1, &row).unwrap();
+        let result = result_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
         match result.ending {
             Ending::Done(ResultValue::Verdict { code, .. }) => assert_eq!(code, 3),
             Ending::Done(ResultValue::Change { part, .. }) => assert_eq!(part.key, PartKey::Number(4)),
@@ -1168,7 +1185,7 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
     }));
     row.delegates = Box::new([1]);
     row.result_followups = Box::new([3, 99]);
-    let result = result_from_row(&core, &limits, 1, &row).unwrap();
+    let result = result_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
     let TaskLink::Live(delegate) = result.delegates.get(0).unwrap() else { panic!() };
     assert_eq!(delegate.number, 1);
     let followups = result.followups.unwrap();
@@ -1183,7 +1200,7 @@ fn documents_retained_results_and_ended_delegates_preserve_cancellation_facts() 
     }
     let mut limited = limits;
     limited.documents.lines = 1;
-    let result = result_from_row(&core, &limited, 1, &row).unwrap();
+    let result = result_from_row(&core, &limited, 1, &row, Wall::EPOCH).unwrap();
     assert!(result.cut);
     assert_eq!(result.followups.unwrap().len(), 1);
 }
@@ -1211,7 +1228,7 @@ fn documents_notes_carry_the_child_revision_and_cut_display_text_only() {
     assert!(note.description.cut);
     assert!(note.body.cut);
     assert_eq!(note.changed, Some(entry.changed));
-    assert_eq!(make(&core, &limits, 1, &Subject::Note { note: 8 }, &window()), Err(Missing::Ended));
+    assert_eq!(make(&core, &limits, 1, &Subject::Note { note: 8 }, &window(), Wall::EPOCH), Err(Missing::Ended));
 }
 
 #[test]
@@ -1327,7 +1344,8 @@ fn documents_project_exposes_two_roles_members_pool_and_resource_parts() {
             connector::ResourceRole::Owned,
         )
         .unwrap();
-    let Document::Project(project) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap()
+    let Document::Project(project) =
+        make(&core, &limits, 1, &Subject::Project { project: 1 }, &window(), Wall::EPOCH).unwrap()
     else {
         panic!()
     };
@@ -1483,7 +1501,7 @@ fn documents_inbox_keeps_two_projects_groups_order_and_exact_cursor() {
         &mut out,
     );
     let Document::Inbox(first) =
-        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: None }).unwrap()
+        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: None }, Wall::EPOCH).unwrap()
     else {
         panic!()
     };
@@ -1493,14 +1511,15 @@ fn documents_inbox_keeps_two_projects_groups_order_and_exact_cursor() {
     assert_eq!(first.needs.get(0).unwrap().project, Some(2));
     assert_eq!(first.needs.get(1).unwrap().object, InboxObject::Question { message: 8 });
     let Document::Inbox(next) =
-        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: first.next }).unwrap()
+        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: first.next }, Wall::EPOCH)
+            .unwrap()
     else {
         panic!()
     };
     assert_eq!(next.needs.get(0).unwrap().object, InboxObject::Question { message: 9 });
     assert_eq!(next.updates.get(0).unwrap().object, InboxObject::Reply { message: 7 });
     assert_eq!(next.next, None);
-    assert_eq!(make(&core, &limits, 1, &Subject::Inbox { party: 2 }, &window()), Err(Missing::NotAllowed));
+    assert_eq!(make(&core, &limits, 1, &Subject::Inbox { party: 2 }, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
 }
 #[test]
 fn documents_cached_inbox_results_preserve_positions_project_and_time() {
@@ -1516,7 +1535,7 @@ fn documents_cached_inbox_results_preserve_positions_project_and_time() {
         people::ResultRef { task: 99, project: 1, at: Wall::from_nanos(31), position: 31, forgettable: None },
     );
     let Document::Inbox(inbox) =
-        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: None }).unwrap()
+        make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &Window { rows: 2, after: None }, Wall::EPOCH).unwrap()
     else {
         panic!()
     };
@@ -1531,7 +1550,7 @@ fn documents_cached_inbox_results_preserve_positions_project_and_time() {
 fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_clock() {
     let (mut core, mut limits) = make_tree();
     limits.people.projects = 2;
-    assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window()), Err(Missing::NotAllowed));
+    assert_eq!(make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
     restore_document_party(&mut core, &limits, &[0]);
     let env = Env { now: Time::from_nanos(100), wall: Wall::from_nanos(1000), limits: limits.fleet };
     let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
@@ -1606,7 +1625,9 @@ fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_cloc
     assert_eq!(channel, Some(10));
     assert_eq!(until, Some(Wall::from_nanos(1000 + limits.fleet.grace.as_nanos())));
     assert_eq!(remaining, Some(limits.fleet.grace));
-    let Document::Deployment(without_clock) = make(&core, &limits, 1, &Subject::Deployment, &window()).unwrap() else {
+    let Document::Deployment(without_clock) =
+        make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!()
     };
     assert_eq!(
@@ -1751,7 +1772,7 @@ fn watch_subjects() -> [(&'static str, Watched, Subject); 8] {
 fn an_unkeyed_watch_on_each_subject_makes_its_first_document_as_a_held_output() {
     for (label, subject, named) in watch_subjects() {
         let (mut core, limits) = watch_core();
-        let expected = make(&core, &limits, 1, &named, &window()).unwrap();
+        let expected = make(&core, &limits, 1, &named, &window(), Wall::EPOCH).unwrap();
         let out = watch_outputs(
             &mut core,
             &limits,
@@ -1919,7 +1940,7 @@ fn one_task_change_marks_trees_queries_and_named_chips_once() {
         assert!(watchers.insert(*watcher).unwrap());
         let binding = core.view_subjects.get(watcher).unwrap();
         let subject = &core.view_names.get(binding.subject).unwrap().subject;
-        assert_eq!(document.as_ref(), &make(&core, &limits, 1, subject, &window()).unwrap());
+        assert_eq!(document.as_ref(), &make(&core, &limits, 1, subject, &window(), Wall::EPOCH).unwrap());
     }
     assert_eq!(finish_watch_outputs(&mut core, &limits).len(), 1);
 }
@@ -1950,7 +1971,10 @@ fn ten_changed_decisions_coalesce_behind_one_inflight_delivery() {
     assert_eq!(out.len(), 2);
     let Request::Held(held) = &out[0] else { panic!("coalesced held delivery") };
     let Held::Delivery { document, .. } = held.as_ref() else { panic!("typed current document") };
-    assert_eq!(document.as_ref(), &make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &window()).unwrap());
+    assert_eq!(
+        document.as_ref(),
+        &make(&core, &limits, 1, &Subject::Inbox { party: 1 }, &window(), Wall::EPOCH).unwrap()
+    );
     assert_eq!(watch_outputs(&mut core, &limits, Event::Delivered { watcher }).len(), 1);
 }
 
@@ -2106,7 +2130,7 @@ fn two_watchers_of_one_run_advance_independent_turn_offsets() {
     assert_stream(&third[0], 30, turn, 6, 9, b"ghi", false);
     let slow = watch_outputs(&mut core, &limits, Event::StreamDelivered { watcher: Token::new(31) });
     assert_stream(&slow[0], 31, turn, 3, 9, b"defghi", false);
-    let Document::Run(run) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()).unwrap() else {
+    let Document::Run(run) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window(), Wall::EPOCH).unwrap() else {
         panic!("run document")
     };
     let writing = run.writing.unwrap();
@@ -2122,7 +2146,7 @@ fn turn_three_writing_follows_committed_turn_two_and_fences_old_attempts() {
     assert_eq!(run_text_outputs(&mut core, &limits, 7, 2, 0, b"committed").len(), 1);
     let out = run_text_outputs(&mut core, &limits, 7, 3, 0, b"third");
     assert_stream(&out[0], 30, views::TurnName { attempt: 7, turn: 3, retry: 0 }, 0, 5, b"third", false);
-    let Document::Run(run) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()).unwrap() else {
+    let Document::Run(run) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window(), Wall::EPOCH).unwrap() else {
         panic!("current supplied run document")
     };
     let writing = run.writing.unwrap();
@@ -2132,7 +2156,7 @@ fn turn_three_writing_follows_committed_turn_two_and_fences_old_attempts() {
     );
     core.proofs.get_mut(&1).unwrap().turn = Some(TurnProof { turn: 3, cumulative: 0, read: None });
     finish_watch_outputs(&mut core, &limits);
-    let Document::Run(run) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()).unwrap() else {
+    let Document::Run(run) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window(), Wall::EPOCH).unwrap() else {
         panic!("run document")
     };
     assert!(run.writing.is_none());
@@ -2677,7 +2701,8 @@ fn deployment_capacity_carries_keyed_refusal_identity_time_and_bounded_omissions
         while out.pop().is_some() {}
         core.people.reclaim();
     }
-    let Document::Deployment(document) = make(&core, &limits, 1, &Subject::Deployment, &window()).unwrap() else {
+    let Document::Deployment(document) = make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!()
     };
     assert!(document.cut);
@@ -2771,9 +2796,9 @@ fn a_person_result_document_uses_the_durable_answer_instead_of_the_cleared_claim
         tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Report { words: b"chosen".as_slice().into() }));
     row.taken_by = None;
     row.person_answer = Some(tasks::PersonAnswer { by: 1, at: Wall::from_nanos(9) });
-    assert_eq!(result_from_row(&core, &limits, 1, &row).expect("role answer").chosen_by, Some(1));
+    assert_eq!(result_from_row(&core, &limits, 1, &row, Wall::EPOCH).expect("role answer").chosen_by, Some(1));
     row.executor = tasks::Executor::Person(tasks::PersonAddress::Person(1));
-    assert_eq!(result_from_row(&core, &limits, 1, &row).expect("direct answer").chosen_by, Some(1));
+    assert_eq!(result_from_row(&core, &limits, 1, &row, Wall::EPOCH).expect("direct answer").chosen_by, Some(1));
     row.person_answer = None;
     row.phase = tasks::Phase::Ended(tasks::Ending::Cancelled {
         by: tasks::Party::Person(1),
@@ -2781,7 +2806,7 @@ fn a_person_result_document_uses_the_durable_answer_instead_of_the_cleared_claim
         reason: Box::new([]),
         result: None,
     });
-    assert_eq!(result_from_row(&core, &limits, 1, &row).expect("cancelled").chosen_by, None);
+    assert_eq!(result_from_row(&core, &limits, 1, &row, Wall::EPOCH).expect("cancelled").chosen_by, None);
 }
 
 #[test]
@@ -2803,7 +2828,8 @@ fn deployment_capacity_carries_direct_batch_refusals_and_task_history_cut() {
             }),
         );
     }
-    let Document::Deployment(document) = make(&core, &limits, 1, &Subject::Deployment, &window()).unwrap() else {
+    let Document::Deployment(document) = make(&core, &limits, 1, &Subject::Deployment, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("deployment")
     };
     assert!(document.cut);
@@ -2851,24 +2877,24 @@ fn approval_documents_keep_opaque_state_whole_and_refuse_a_smaller_bound() {
         },
     );
     let subject = Subject::PersonTask { task: 5 };
-    let Document::PersonTask(task) = make(&core, &limits, 1, &subject, &window()).unwrap() else {
+    let Document::PersonTask(task) = make(&core, &limits, 1, &subject, &window(), Wall::EPOCH).unwrap() else {
         panic!("person approval");
     };
     assert_eq!(task.contract, ContractLine::Approval { state: Box::from(&b"opaque\x00\xff"[..]), part });
     let mut smaller = limits;
     smaller.documents.text_bytes = 3;
-    assert_eq!(make(&core, &smaller, 1, &subject, &window()), Err(Missing::TooLarge));
+    assert_eq!(make(&core, &smaller, 1, &subject, &window(), Wall::EPOCH), Err(Missing::TooLarge));
     let mut row = core.tasks.task(5).unwrap().clone();
     row.phase = tasks::Phase::Ended(tasks::Ending::Done(tasks::TaskResult::Approved {
         state: Box::from(&b"opaque\x00\xff"[..]),
         words: None,
     }));
-    let result = result_from_row(&core, &limits, 1, &row).unwrap();
+    let result = result_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap();
     assert_eq!(
         result.ending,
         Ending::Done(ResultValue::Approved { state: Box::from(&b"opaque\x00\xff"[..]), words: None })
     );
-    assert_eq!(result_from_row(&core, &smaller, 1, &row), Err(Missing::TooLarge));
+    assert_eq!(result_from_row(&core, &smaller, 1, &row, Wall::EPOCH), Err(Missing::TooLarge));
 }
 
 mod chip_executor;
@@ -2891,7 +2917,8 @@ fn verdict_documents_preserve_machine_field_rules_and_values_whole() {
             batch: Box::new([row]),
         },
     );
-    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 5 }, &window()).unwrap() else {
+    let Document::Task(task) = make(&core, &limits, 1, &Subject::Task { task: 5 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("task document");
     };
     let ContractLine::Verdict { choices, cut } = task.contract else {
@@ -2908,13 +2935,13 @@ fn verdict_documents_preserve_machine_field_rules_and_values_whole() {
         fields: fields.clone(),
     }));
     assert_eq!(
-        result_from_row(&core, &limits, 1, &row).unwrap().ending,
+        result_from_row(&core, &limits, 1, &row, Wall::EPOCH).unwrap().ending,
         Ending::Done(ResultValue::Verdict { code: 2, fields, words: Text { bytes: Box::new([]), cut: false } })
     );
     let mut smaller = limits;
     smaller.documents.text_bytes = 3;
-    assert_eq!(make(&core, &smaller, 1, &Subject::Task { task: 5 }, &window()), Err(Missing::TooLarge));
-    assert_eq!(result_from_row(&core, &smaller, 1, &row), Err(Missing::TooLarge));
+    assert_eq!(make(&core, &smaller, 1, &Subject::Task { task: 5 }, &window(), Wall::EPOCH), Err(Missing::TooLarge));
+    assert_eq!(result_from_row(&core, &smaller, 1, &row, Wall::EPOCH), Err(Missing::TooLarge));
 }
 
 mod engine_timers;

@@ -348,6 +348,7 @@ pub(super) fn from_store(
     range: &Range,
     raw: Box<[Row]>,
     next: Option<Position>,
+    wall: skein_lib::Wall,
 ) -> Answer {
     if raw.len() > usize::try_from(range.rows).expect("row bound fits") {
         return Answer::None(Why::Busy);
@@ -425,7 +426,7 @@ pub(super) fn from_store(
                 Err(Missing::TooLarge) => return Answer::None(Why::Busy),
             }
         } else {
-            match object(core, limits, range, row) {
+            match object(core, limits, range, row, wall) {
                 Ok(Some(answer)) => return answer,
                 Ok(None) | Err(Missing::Unknown | Missing::NotAllowed | Missing::Ended) => {}
                 Err(Missing::TooLarge) => return Answer::None(Why::Busy),
@@ -465,7 +466,13 @@ fn result_actor(row: &tasks::TaskRecord) -> Option<tasks::Party> {
 
 #[expect(clippy::manual_map, reason = "the strict subset uses exhaustive matches rather than closures")]
 #[expect(clippy::too_many_lines, reason = "exhaustive read construction keeps each owner conversion visible")]
-fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Option<Answer>, Missing> {
+fn object(
+    core: &Core,
+    limits: &Limits,
+    range: &Range,
+    row: Row,
+    wall: skein_lib::Wall,
+) -> Result<Option<Answer>, Missing> {
     match &range.scope {
         Scope::Task { task } | Scope::PersonTask { task } | Scope::Result { task } => {
             let Some(owner) = row_owner(&row) else {
@@ -479,7 +486,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 limits,
                 range.party,
                 &row,
-                documents::result_from_row(core, limits, range.party, owner)?,
+                documents::result_from_row(core, limits, range.party, owner, wall)?,
             )?;
             let answer = match range.scope {
                 Scope::Task { .. } => historical(
@@ -489,7 +496,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                             limits,
                             range.party,
                             &row,
-                            documents::task_from_row(core, limits, range.party, owner)?,
+                            documents::task_from_row(core, limits, range.party, owner, wall)?,
                         )?),
                         result: Box::new(result),
                     },
@@ -503,7 +510,8 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                             limits,
                             range.party,
                             &row,
-                            documents::person_from_row(core, limits, range.party, owner)?,
+                            documents::person_from_row(core, limits, range.party, owner, wall)?,
+                            wall,
                         )?),
                         result: Box::new(result),
                     },
@@ -621,7 +629,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
             };
             Ok(Some(historical(
                 Past::Escalation {
-                    task: Box::new(documents::task_from_row(core, limits, range.party, owner)?),
+                    task: Box::new(documents::task_from_row(core, limits, range.party, owner, wall)?),
                     decision: decision.clone(),
                     hold,
                 },
@@ -686,7 +694,7 @@ fn object(core: &Core, limits: &Limits, range: &Range, row: Row) -> Result<Optio
                 None => None,
             };
             let ending = if ended(owner) {
-                Some(Box::new(documents::result_from_row(core, limits, range.party, owner)?))
+                Some(Box::new(documents::result_from_row(core, limits, range.party, owner, wall)?))
             } else {
                 None
             };
@@ -1621,6 +1629,7 @@ fn hydrate_person(
     party: u64,
     row: &Row,
     mut person: documents::PersonTask,
+    wall: skein_lib::Wall,
 ) -> Result<documents::PersonTask, Missing> {
     for index in 0..person.results.len() {
         let shown = person.results.get_mut(index).expect("bounded shown results");
@@ -1631,7 +1640,7 @@ fn hydrate_person(
         if let Some(owner) = linked_row(row, number)
             && ended(owner)
         {
-            shown.result = Some(documents::result_from_row(core, limits, party, owner)?);
+            shown.result = Some(documents::result_from_row(core, limits, party, owner, wall)?);
             shown.task = documents::TaskLink::Retained {
                 chip: documents::chip_from_row_with_core(core, limits, owner)?,
                 at: owner.ended_at,

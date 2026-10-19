@@ -62,7 +62,8 @@ fn a_tree_with_no_tracked_task_serves_no_goal() {
 fn the_task_document_names_the_nearest_tracked_goal() {
     let (core, limits) = nested();
     for number in [CHILD, GRANDCHILD] {
-        let Document::Task(task) = make(&core, &limits, REQUESTER, &Subject::Task { task: number }, &window()).unwrap()
+        let Document::Task(task) =
+            make(&core, &limits, REQUESTER, &Subject::Task { task: number }, &window(), Wall::EPOCH).unwrap()
         else {
             panic!("task document");
         };

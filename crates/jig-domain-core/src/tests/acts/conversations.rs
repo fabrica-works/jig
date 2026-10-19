@@ -43,7 +43,7 @@ fn marking_a_conversation_seen_is_admitted() {
     let (mut core, limits) = conversation();
     let subject = Subject::Task { task: CONVERSATION };
     let seen = people::Seen::Conversation { task: CONVERSATION, through: 0 };
-    assert_eq!(offers::admit(&core, &limits, PARTY, Act::Seen, &subject), Admission::Allowed);
+    assert_eq!(offers::admit(&core, &limits, PARTY, Act::Seen, &subject, Wall::EPOCH), Admission::Allowed);
     assert_eq!(ask_now(&mut core, &limits, MARK, people::Ask::MarkSeen { seen }), people::Outcome::MarkedSeen { seen });
 }
 
@@ -51,7 +51,7 @@ fn marking_a_conversation_seen_is_admitted() {
 fn an_uncertain_conversation_keeps_its_amendment_offer_bounded() {
     let (core, limits) = uncertain_conversation();
     let subject = Subject::Task { task: CONVERSATION };
-    let Admission::Bounded { .. } = offers::admit(&core, &limits, PARTY, Act::Amend, &subject) else {
+    let Admission::Bounded { .. } = offers::admit(&core, &limits, PARTY, Act::Amend, &subject, Wall::EPOCH) else {
         panic!("amend and release remains bounded with an explicit uncertainty choice")
     };
 }
@@ -92,7 +92,7 @@ fn leaving_a_conversations_escalation_held_is_admitted() {
     let (mut core, limits) = routed_conversation();
     let subject = Subject::Escalation { task: CONVERSATION };
     let revision = core.tasks.escalation(CONVERSATION).unwrap().escalation.revision();
-    assert_eq!(offers::admit(&core, &limits, PARTY, Act::LeaveHeld, &subject), Admission::Allowed);
+    assert_eq!(offers::admit(&core, &limits, PARTY, Act::LeaveHeld, &subject, Wall::EPOCH), Admission::Allowed);
     assert_eq!(
         leave_held(&mut core, &limits),
         people::Outcome::EscalationDecided {
@@ -118,7 +118,7 @@ fn an_unknown_party_has_no_leave_held_offer() {
 fn cancelling_a_live_conversation_is_admitted() {
     let (core, limits) = conversation();
     let subject = Subject::Task { task: CONVERSATION };
-    assert_eq!(offers::admit(&core, &limits, PARTY, Act::Cancel, &subject), Admission::Allowed);
+    assert_eq!(offers::admit(&core, &limits, PARTY, Act::Cancel, &subject, Wall::EPOCH), Admission::Allowed);
 }
 
 #[test]
@@ -127,7 +127,7 @@ fn cancelling_a_conversation_left_held_is_admitted() {
     let _outcome = leave_held(&mut core, &limits);
     core.reclaim();
     let subject = Subject::Task { task: CONVERSATION };
-    assert_eq!(offers::admit(&core, &limits, PARTY, Act::Cancel, &subject), Admission::Allowed);
+    assert_eq!(offers::admit(&core, &limits, PARTY, Act::Cancel, &subject, Wall::EPOCH), Admission::Allowed);
     assert_eq!(
         ask_now(
             &mut core,

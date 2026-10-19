@@ -332,7 +332,7 @@ pub(super) fn roles_route(
         return;
     }
     work.push(Event::Tasks(tasks::Event::RecheckEscalations { reply_to: ReplyTo::new(request), project }));
-    let mut reroutes = core.proposal_recheck_project(&env.limits, project);
+    let mut reroutes = core.proposal_recheck_project(&env.limits, project, env.wall);
     for _ in 0..reroutes.len() {
         work.push(Event::Tasks(reroutes.pop().expect("bounded proposal recheck")));
     }
@@ -427,7 +427,7 @@ pub(super) fn change_policy_request(
         Ok(snapshot) => {
             core.touch_project_parties(project);
             out.push(Request::Write(Write::Save(Record::People(people::Stored::Policy { project, value: snapshot }))));
-            let mut reroutes = core.proposal_recheck_project(&env.limits, project);
+            let mut reroutes = core.proposal_recheck_project(&env.limits, project, env.wall);
             for _ in 0..reroutes.len() {
                 work.push(Event::Tasks(reroutes.pop().expect("policy holder recheck")));
             }

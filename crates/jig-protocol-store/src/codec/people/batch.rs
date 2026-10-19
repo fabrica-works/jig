@@ -26,6 +26,9 @@ pub(super) fn encode(batch: &[domain::Member], limits: &wire::Limits) -> Result<
                     )?,
                     deadline: match member.deadline {
                         domain::Deadline::Named => wire::Deadline::Named,
+                        domain::Deadline::Span(value) => {
+                            wire::Deadline::Span(wire::DeadlineSpan::new(limits, wire::DeadlineSpanParts { value })?)
+                        }
                     },
                     budget: match member.budget {
                         domain::Budget::Named => wire::Budget::Named,
@@ -87,6 +90,7 @@ pub(super) fn decode(batch: List<wire::Member>, limits: &wire::Limits) -> Result
             .push(domain::Member {
                 deadline: match deadline {
                     wire::Deadline::Named => domain::Deadline::Named,
+                    wire::Deadline::Span(value) => domain::Deadline::Span(value.value()),
                 },
                 executor: parts::decode_executor(executor),
                 words,

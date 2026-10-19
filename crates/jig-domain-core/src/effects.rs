@@ -1195,14 +1195,14 @@ pub(crate) fn procedure_propose(
         step,
         purpose: description.purpose,
     };
-    if core.proposal_admit_action(context.project, &action).is_err()
+    if core.proposal_admit_action(context.project, &action, env.wall).is_err()
         || core.procedure_proposals.len() >= env.limits.tasks.tasks
     {
         drop_effect(out, connector, owner, authority::Answer::Refuse);
         procedure_wait(core, work, task, step);
         return;
     }
-    let Some(holder) = core.proposal_holder(&env.limits, task, &action, None) else {
+    let Some(holder) = core.proposal_holder(&env.limits, task, &action, None, env.wall) else {
         drop_effect(out, connector, owner, authority::Answer::Refuse);
         procedure_wait(core, work, task, step);
         return;

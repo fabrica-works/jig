@@ -75,9 +75,14 @@ pub(super) fn named_proposal_accept(
         return Requests::Out(out);
     }
     let result_followups = core.tasks.result_proposal(proposal.proposer, proposal.number);
-    if let Err(why) =
-        core.proposal_accept_allowed(&env.limits, proposal.proposer, key.task, proposal.project, &proposal.action)
-    {
+    if let Err(why) = core.proposal_accept_allowed(
+        &env.limits,
+        proposal.proposer,
+        key.task,
+        proposal.project,
+        &proposal.action,
+        env.wall,
+    ) {
         return proposal_refused(core, to, key, why);
     }
     match proposal.action {
@@ -111,6 +116,7 @@ pub(super) fn named_proposal_accept(
             unreachable!("effect accepted through its connector")
         }
         tasks::ProposalAction::Batch(mut batch) => {
+            super::deadlines::resolve(&mut batch, env.wall);
             let creator =
                 if proposal.as_holder { tasks::Party::Task(key.task) } else { tasks::Party::Task(proposal.proposer) };
             for member in &mut batch {
@@ -221,7 +227,8 @@ pub(super) fn named_proposal_decide(
         ProposalChoice::Accept => return named_proposal_accept(core, env, work, to, key, pending),
         ProposalChoice::Reject { reason } => tasks::ProposalDecision::Reject { reason },
         ProposalChoice::Pass => {
-            let Some(holder) = core.proposal_holder(&env.limits, proposer, &pending.action, Some(current)) else {
+            let Some(holder) = core.proposal_holder(&env.limits, proposer, &pending.action, Some(current), env.wall)
+            else {
                 return proposal_refused(core, to, key, tasks::Refusal::Reference);
             };
             tasks::ProposalDecision::Pass { holder }
@@ -279,10 +286,10 @@ pub(crate) fn named_propose(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
-    if let Err(why) = core.proposal_admit_action(context.project, &action) {
+    if let Err(why) = core.proposal_admit_action(context.project, &action, env.wall) {
         return proposal_refused(core, to, key, why);
     }
-    let Some(holder) = core.proposal_holder(&env.limits, key.task, &action, None) else {
+    let Some(holder) = core.proposal_holder(&env.limits, key.task, &action, None, env.wall) else {
         return proposal_refused(core, to, key, tasks::Refusal::Reference);
     };
     if !crate::acts::bounds::proposal_has_recipient(core, holder) {

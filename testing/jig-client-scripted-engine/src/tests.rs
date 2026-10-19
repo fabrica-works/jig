@@ -2255,3 +2255,29 @@ use compound::releasing;
 
 mod fixtures;
 mod propose;
+
+#[test]
+fn span_acceptance_uses_the_supplied_decision_wall() {
+    for (seconds, expected) in [
+        (15, Answer::Done(Outcome::Changed)),
+        (
+            16,
+            Answer::Refused {
+                refusal: Refusal::Authority {
+                    lacking: Lacking::Deadline {
+                        asked: Some(Wall::from_nanos(21_000_000_000)),
+                        latest: Some(Wall::from_nanos(20_000_000_000)),
+                    },
+                    proposable: Some(false),
+                },
+                at: None,
+            },
+        ),
+    ] {
+        let (setup, ask) = fixtures::span_proposal();
+        let mut engine = Engine::new(setup, 1).expect("span fixture");
+        send(&mut engine, seconds * 1_000_000_000, 11, 1, 1, ask);
+        let answers = engine.poll(at(seconds * 1_000_000_000 + 10_000_000));
+        assert_eq!(final_answer(&answers[0]), &expected, "{seconds}");
+    }
+}

@@ -295,7 +295,8 @@ fn committed_main_text_keeps_its_independent_call_on_reopen_and_end_releases_it(
         Some(TerminalRecord { task: 1, attempt: 7, cumulative: 0, end: tasks::End::Parked });
     watch_outputs(&mut core, &limits, Event::Tasks(tasks::Event::Hold { task: 1, why: tasks::Hold::Budget }));
     finish_watch_outputs(&mut core, &limits);
-    let Document::Run(ended) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window()).unwrap() else {
+    let Document::Run(ended) = make(&core, &limits, 1, &Subject::Run { task: 1 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("ended run document")
     };
     assert_eq!(ended.attempt, None);

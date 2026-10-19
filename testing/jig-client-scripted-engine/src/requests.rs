@@ -312,7 +312,7 @@ impl<A: crate::Application> Engine<A> {
             Admission::Bounded { .. } => match ask {
                 Ask::Create { tasks, .. }
                 | Ask::Propose { action: jig_client_domain::contract::ProposeAction::Batch { tasks }, .. } => {
-                    Self::batch_admission(offer, tasks)
+                    Self::batch_admission(offer, tasks, wall)
                 }
                 Ask::Amend { task, change, .. }
                 | Ask::Propose {
@@ -346,6 +346,11 @@ impl<A: crate::Application> Engine<A> {
             },
             Admission::Allowed | Admission::Proposed { .. } | Admission::Refused(_) => offer.clone(),
         });
+        let prediction = if prediction == Some(Admission::Allowed) {
+            self.accepting_admission(party, ask, wall).or(prediction)
+        } else {
+            prediction
+        };
         let admission = prediction.as_ref();
         if let Some(Admission::Refused(refusal)) = admission {
             return Ok((Answer::Refused { refusal: refusal.clone(), at: None }, Vec::new()));

@@ -342,6 +342,7 @@ fn records_7(bytes: &[u8]) {
     check!(NewContract, bytes);
     check!(NewBudget, bytes);
     check!(NewDeadline, bytes);
+    check!(DeadlineSpan, bytes);
     check!(TaskFlags, bytes);
     check!(Retention, bytes);
     check!(CreatedGiven, bytes);

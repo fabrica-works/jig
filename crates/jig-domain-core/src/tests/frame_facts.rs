@@ -6,7 +6,9 @@ const CREATING_CHARTER: u32 = 1;
 const CREATING_PROCEDURE: u32 = 1;
 
 fn frame(core: &Core, limits: &Limits) -> Frame {
-    let Document::Frame(value) = make(core, limits, 1, &Subject::Frame { party: 1 }, &window()).expect("frame") else {
+    let Document::Frame(value) =
+        make(core, limits, 1, &Subject::Frame { party: 1 }, &window(), Wall::EPOCH).expect("frame")
+    else {
         panic!("frame document")
     };
     value

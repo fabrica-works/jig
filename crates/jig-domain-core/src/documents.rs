@@ -313,7 +313,14 @@ pub enum Document {
 }
 
 /// Make the current visible document without changing state or emitting effects.
-pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window: &Window) -> Result<Document, Missing> {
+pub fn make(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    subject: &Subject,
+    window: &Window,
+    decision: Wall,
+) -> Result<Document, Missing> {
     if document_worst_case(&limits.documents).is_none() || window.rows > limits.documents.rows {
         return Err(Missing::TooLarge);
     }
@@ -342,7 +349,7 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
             Ok(Document::Run(run))
         }
         Subject::Task { task } => {
-            let task = task_tree::task(core, limits, party, *task)?;
+            let task = task_tree::task(core, limits, party, *task, decision)?;
             Ok(Document::Task(Box::new(task)))
         }
         Subject::Tree { task } => {
@@ -358,18 +365,22 @@ pub fn make(core: &Core, limits: &Limits, party: u64, subject: &Subject, window:
         }
         Subject::Deployment => Ok(Document::Deployment(Box::new(deployment::deployment(core, limits, party, None)?))),
         Subject::Proposal { proposer, number } => {
-            Ok(Document::Proposal(Box::new(objects::proposal(core, limits, party, *proposer, *number)?)))
+            Ok(Document::Proposal(Box::new(objects::proposal(core, limits, party, *proposer, *number, decision)?)))
         }
-        Subject::Escalation { task } => Ok(Document::Escalation(objects::escalation(core, limits, party, *task)?)),
+        Subject::Escalation { task } => {
+            Ok(Document::Escalation(objects::escalation(core, limits, party, *task, decision)?))
+        }
         Subject::Question { task, message } => {
-            Ok(Document::Question(objects::question(core, limits, party, *task, *message)?))
+            Ok(Document::Question(objects::question(core, limits, party, *task, *message, decision)?))
         }
         Subject::PersonTask { task } => {
-            Ok(Document::PersonTask(Box::new(objects::person(core, limits, party, *task)?)))
+            Ok(Document::PersonTask(Box::new(objects::person(core, limits, party, *task, decision)?)))
         }
-        Subject::Result { task } => Ok(Document::Result(Box::new(objects::result(core, limits, party, *task)?))),
+        Subject::Result { task } => {
+            Ok(Document::Result(Box::new(objects::result(core, limits, party, *task, decision)?)))
+        }
         Subject::Project { project } => {
-            Ok(Document::Project(Box::new(project_note::project(core, limits, party, *project)?)))
+            Ok(Document::Project(Box::new(project_note::project(core, limits, party, *project, decision)?)))
         }
         Subject::Note { .. } => Err(Missing::Ended),
     }

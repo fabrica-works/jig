@@ -45,6 +45,7 @@ pub enum NewBudget {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NewDeadline {
     Named,
+    Span(Duration),
 }
 /// A task's retention after it ends.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

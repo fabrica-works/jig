@@ -495,3 +495,19 @@ fn reordered_duplicate_values_are_equivalent_but_grant_unions_do_not_cover() {
         "even a complete byte partition is not the one containing grant the order requires"
     );
 }
+
+#[test]
+fn zero_span_is_the_decision_wall() {
+    let decision = Wall::from_nanos(71);
+    assert_eq!(crate::deadline_after(decision, skein_lib::Duration::from_nanos(0)), decision);
+}
+#[test]
+fn span_addition_saturates_at_the_last_wall() {
+    for (decision, span, expected) in [(u64::MAX - 5, 5, u64::MAX), (u64::MAX - 5, 6, u64::MAX)] {
+        assert_eq!(
+            crate::deadline_after(Wall::from_nanos(decision), skein_lib::Duration::from_nanos(span)),
+            Wall::from_nanos(expected),
+            "{decision} + {span}"
+        );
+    }
+}

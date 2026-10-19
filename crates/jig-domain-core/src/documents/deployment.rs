@@ -466,7 +466,7 @@ pub fn make_with_clock(
         | super::Subject::Result { .. }
         | super::Subject::Project { .. }
         | super::Subject::Note { .. }
-        | super::Subject::Application { .. } => super::make(core, limits, party, subject, window),
+        | super::Subject::Application { .. } => super::make(core, limits, party, subject, window, clock.wall),
     }
 }
 pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {

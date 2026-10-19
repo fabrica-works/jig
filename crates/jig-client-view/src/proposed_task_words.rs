@@ -1,5 +1,5 @@
 //! Checked words for exact batch member facts (client/domain/view.md, 7).
-//! IDs 5000–5024 are reserved for this closed vocabulary.
+//! IDs 5000–5025 are reserved for this closed vocabulary.
 use crate::Owner;
 use alloc::boxed::Box;
 use skein_lib::{List, bytes::copy_of};
@@ -9,6 +9,7 @@ use skein_ui::phrases::{
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProposedPhrase {
+    DeadlineSpan,
     ExecutorCharter,
     ExecutorProcedure,
     ExecutorParty,
@@ -31,7 +32,8 @@ pub enum ProposedPhrase {
     PartOutbox,
     PartHold,
 }
-pub const ALL: [ProposedPhrase; 21] = [
+pub const ALL: [ProposedPhrase; 22] = [
+    ProposedPhrase::DeadlineSpan,
     ProposedPhrase::ExecutorCharter,
     ProposedPhrase::ExecutorProcedure,
     ProposedPhrase::ExecutorParty,
@@ -58,6 +60,7 @@ impl ProposedPhrase {
     #[must_use]
     pub const fn id(self) -> PhraseId {
         let number = match self {
+            Self::DeadlineSpan => 5025,
             Self::ExecutorCharter => 5000,
             Self::ExecutorProcedure => 5001,
             Self::ExecutorParty => 5002,
@@ -85,7 +88,8 @@ impl ProposedPhrase {
     #[must_use]
     pub fn shape(self) -> PhraseShape {
         let count = match self {
-            Self::ExecutorCharter
+            Self::DeadlineSpan
+            | Self::ExecutorCharter
             | Self::ExecutorParty
             | Self::ExecutorRole
             | Self::ContractReport
@@ -108,7 +112,12 @@ impl ProposedPhrase {
         };
         let mut holes = List::with_capacity(count);
         for _ in 0..count {
-            holes.push(HoleShape { kind: HoleKind::Number, bytes: 0 }).expect("typed holes fit");
+            holes
+                .push(HoleShape {
+                    kind: if self == Self::DeadlineSpan { HoleKind::Span } else { HoleKind::Number },
+                    bytes: 0,
+                })
+                .expect("typed holes fit");
         }
         PhraseShape { id: self.id(), holes: holes.into_boxed(), plural: None }
     }
@@ -126,6 +135,10 @@ pub fn language() -> Language {
     let mut rows = List::with_capacity(u32::try_from(ALL.len()).expect("phrase count fits"));
     for phrase in ALL {
         let segments: Box<[Segment]> = match phrase {
+            ProposedPhrase::DeadlineSpan => Box::new([
+                Segment::Text(copy_of(b"Deadline after acceptance (minutes): ")),
+                Segment::Hole { index: 0, kind: HoleKind::Span },
+            ]),
             ProposedPhrase::ExecutorCharter => Box::new([
                 Segment::Text(copy_of(b"Agent charter ")),
                 Segment::Hole { index: 0, kind: HoleKind::Number },

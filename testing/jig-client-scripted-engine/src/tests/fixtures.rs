@@ -97,3 +97,44 @@ pub(super) fn creating(frame: &mut Me) {
         beyond: Beyond::Proposed { to: Recipient::Party(2) },
     });
 }
+
+pub(super) fn span_proposal() -> (Script, Ask) {
+    let mut setup = script();
+    let mut value = proposal();
+    let member = new_task(text(b"span work"));
+    let task = ProposedTask {
+        number: 9,
+        spec: SpecificationDocument::complete(member.spec),
+        executor: member.executor,
+        contract: TaskContractDocument::Report { words: 128 },
+        authority: OwnerAuthorityDocument { authority: member.authority, cut: false },
+        deadline: NewDeadline::Span(Duration::from_secs(5)),
+        budget: 20,
+        funder: Funder::Pool { project: 1, person: 1, period: 1 },
+        dependencies: List::with_capacity(0),
+        resources: List::with_capacity(0),
+        wake: OwnerWakePolicy {
+            words: WakeRule::Immediate,
+            notices: WakeRule::Never,
+            news: WakeRule::Never,
+            results: ResultsWake::Each,
+            questions: false,
+            answers: false,
+            timers: false,
+        },
+        priority: None,
+        cut: false,
+    };
+    value.action = ProposalAction::Batch { tasks: list(vec![task]), own: false };
+    let ask = Ask::Decide { project: 1, on: DecideOn::Proposal { proposal: value.key, decision: Decision::Accepted } };
+    setup.truth.objects.insert(ObjectKey::Proposal(value.key), ReadValue::Proposal(Box::new(value)));
+    setup.truth.frames.get_mut(&1).unwrap().projects.get_mut(0).unwrap().creating.as_mut().unwrap().within.latest =
+        Some(Wall::from_nanos(20_000_000_000));
+    setup.rules.push(Rule {
+        party: Some(1),
+        ask: ask.clone(),
+        answer: Answer::Done(Outcome::Changed),
+        changes: vec![],
+    });
+    (setup, ask)
+}

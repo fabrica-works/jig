@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use jig_domain_authority as authority;
 use jig_domain_people as people;
 use jig_domain_tasks as tasks;
-use skein_lib::{List, Queue};
+use skein_lib::{List, Queue, Wall};
 
 use crate::{Core, Limits, ProposalDecisionRecord, translate};
 
@@ -21,7 +21,7 @@ fn kind(action: &tasks::ProposalAction) -> (tasks::ProposalKind, authority::Prop
     }
 }
 
-fn action_for_check(core: &Core, action: &tasks::ProposalAction) -> Option<authority::Action> {
+fn action_for_check(core: &Core, action: &tasks::ProposalAction, decision: Wall) -> Option<authority::Action> {
     match action {
         tasks::ProposalAction::Batch(batch) => {
             let mut members = List::with_capacity(u32::try_from(batch.len()).expect("bounded proposed batch"));
@@ -34,7 +34,7 @@ fn action_for_check(core: &Core, action: &tasks::ProposalAction) -> Option<autho
                 members
                     .push(authority::Delegate {
                         executor,
-                        authority: translate::authority_value(&member.authority),
+                        authority: crate::routing::deadlines::authority(&member.authority, member.deadline, decision),
                         symbolic: Box::new([]),
                     })
                     .expect("bounded proposed batch");
@@ -127,10 +127,10 @@ fn holder(
     proposer: u64,
     action: &tasks::ProposalAction,
     after: Option<tasks::ProposalHolder>,
+    decision: Wall,
 ) -> Option<tasks::ProposalHolder> {
     let context = core.tasks.delegation(proposer)?;
-    let checked = action_for_check(core, action)?;
-    let needed = authority::needs(&checked)?;
+    let needed = core.proposal_admit_action(context.project, action, decision).ok()?;
     let (kind, policy_kind) = kind(action);
     let mut next = context.requester;
     let mut distance = 1_u32;
@@ -201,8 +201,9 @@ impl Core {
         &self,
         project: u32,
         action: &tasks::ProposalAction,
+        decision: Wall,
     ) -> Result<authority::Authority, tasks::Refusal> {
-        let Some(checked) = action_for_check(self, action) else { return Err(tasks::Refusal::Executor) };
+        let Some(checked) = action_for_check(self, action, decision) else { return Err(tasks::Refusal::Executor) };
         let Some(needed) = authority::needs(&checked) else { return Err(tasks::Refusal::AuthorityShape) };
         let Some(policy) = self.authority.policy(project) else { return Err(tasks::Refusal::Project) };
         let implies = &self.authority.rules().implies;
@@ -222,15 +223,17 @@ impl Core {
         holder: u64,
         project: u32,
         action: &tasks::ProposalAction,
+        decision: Wall,
     ) -> Result<(), tasks::Refusal> {
-        let Some(checked) = action_for_check(self, action) else { return Err(tasks::Refusal::Executor) };
+        let Some(checked) = action_for_check(self, action, decision) else { return Err(tasks::Refusal::Executor) };
         let Some(needed) = authority::needs(&checked) else { return Err(tasks::Refusal::AuthorityShape) };
+        self.proposal_admit_action(project, action, decision)?;
         let Some(depth) = distance(self, limits, proposer, holder) else { return Err(tasks::Refusal::Reference) };
         if covers_task(self, limits, &needed, holder, depth, project) { Ok(()) } else { Err(tasks::Refusal::Funding) }
     }
     /// Revisit each pending holder after a project policy or role change.
     #[must_use]
-    pub fn proposal_recheck_project(&self, limits: &Limits, project: u32) -> Queue<tasks::Event> {
+    pub fn proposal_recheck_project(&self, limits: &Limits, project: u32, decision: Wall) -> Queue<tasks::Event> {
         let mut out = Queue::with_capacity(limits.tasks.tasks);
         for view in self.tasks.view_tasks() {
             if view.project != project {
@@ -244,7 +247,9 @@ impl Core {
                 | tasks::ProposalState::Rejected { .. }
                 | tasks::ProposalState::Withdrawn => continue,
             };
-            let Some(next) = self.proposal_holder(limits, view.number, &proposal.action, None) else { continue };
+            let Some(next) = self.proposal_holder(limits, view.number, &proposal.action, None, decision) else {
+                continue;
+            };
             if current != next {
                 out.push(tasks::Event::StalledProposal {
                     proposer: view.number,
@@ -274,8 +279,12 @@ impl Core {
 
     /// Translate a proposal action for authority admission.
     #[must_use]
-    pub fn proposal_action_for_check(&self, action: &tasks::ProposalAction) -> Option<authority::Action> {
-        action_for_check(self, action)
+    pub fn proposal_action_for_check(
+        &self,
+        action: &tasks::ProposalAction,
+        decision: Wall,
+    ) -> Option<authority::Action> {
+        action_for_check(self, action, decision)
     }
 
     /// Whether one ancestor can decide this proposal.
@@ -318,13 +327,14 @@ impl Core {
         proposer: u64,
         action: &tasks::ProposalAction,
         after: Option<tasks::ProposalHolder>,
+        decision: Wall,
     ) -> Option<tasks::ProposalHolder> {
-        holder(self, limits, proposer, action, after)
+        holder(self, limits, proposer, action, after, decision)
     }
 }
 
 /// Extract one immutable person-facing final decision from the child's durable row.
-pub(crate) fn decision_record(row: &tasks::Stored, at: skein_lib::Wall) -> Option<ProposalDecisionRecord> {
+pub(crate) fn decision_record(row: &tasks::Stored, at: Wall) -> Option<ProposalDecisionRecord> {
     match row {
         tasks::Stored::PersonProposal(row) | tasks::Stored::DecidedProposal(row) => {
             let (by, choice) = match &row.state {

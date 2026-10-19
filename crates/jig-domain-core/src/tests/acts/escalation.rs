@@ -33,7 +33,7 @@ fn a_rejected_escalation_still_held_offers_not_waiting() {
     };
     for act in [Act::Release, Act::LeaveHeld, Act::PassUp] {
         assert_eq!(
-            offers::admit(&core, &limits, 1, act, &Subject::Escalation { task: 1 }),
+            offers::admit(&core, &limits, 1, act, &Subject::Escalation { task: 1 }, Wall::EPOCH),
             Admission::Refused(people::Refusal::NotWaiting)
         );
     }

@@ -1,7 +1,11 @@
 const OWNER_ROLE: u32 = 0;
 use jig_core_world::{
     effects::World,
-    fixtures::{ask_as, inbox_objects as inbox, live_row, people_member, proposal_object, refusal},
+    fixtures::{
+        ask_as,
+        deadlines::{decide, propose},
+        inbox_objects as inbox, live_row, people_member, proposal_object, refusal,
+    },
     stories::offers::{no_holder_fixture, world_with},
 };
 use jig_domain_people as people;
@@ -411,32 +415,6 @@ fn a_partys_batch_no_role_may_accept_says_nobody() {
 
 fn owner(world: &mut World) -> u64 {
     jig_core_world::fixtures::second_party(world, b"second-party", people::Role::Owner)
-}
-fn propose(world: &mut World, sign_in: u64, key: u8, batch: Box<[people::Member]>) -> u64 {
-    ask_as(
-        world,
-        sign_in,
-        key,
-        people::Ask::Propose {
-            project: PROJECT,
-            action: people::Action::Batch(batch),
-            reason: b"please fund this batch".as_slice().into(),
-        },
-    );
-    let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: OWNER_ROLE })) =
-        world.people_answers.last()
-    else {
-        panic!("batch proposed: {:?}", world.people_answers.last())
-    };
-    *proposal
-}
-fn decide(world: &mut World, sign_in: u64, key: u8, proposal: u64, decision: people::ProposalDecision) {
-    ask_as(
-        world,
-        sign_in,
-        key,
-        people::Ask::DecideProposal { project: PROJECT, proposer: people::Proposer::Party(PARTY), proposal, decision },
-    );
 }
 fn withdraw(world: &mut World, sign_in: u64, proposal: u64) {
     ask_as(world, sign_in, WITHDRAW_REQUEST, people::Ask::Withdraw { project: PROJECT, proposal });

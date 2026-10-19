@@ -73,14 +73,15 @@ fn amendment_offers_keep_every_configured_pair_in_order_with_duplicates_and_full
     ]);
     let (core, limits) = configured(pairs.clone(), 4);
     let Admission::Bounded { within: Bounds::Amend { implications, .. }, .. } =
-        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 })
+        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 }, Wall::EPOCH)
     else {
         panic!("whole bounded amendment")
     };
     assert_eq!(implications.as_slice(), pairs.as_ref());
     assert_eq!(implications.capacity(), 4);
     assert_eq!(core.authority.rules().implies.entries(), pairs.as_ref());
-    let Document::Task(document) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap() else {
+    let Document::Task(document) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("task document")
     };
     let mut received_offer = None;
@@ -116,14 +117,14 @@ fn budget_only_amendments_preserve_narrower_implied_grants_and_follow_direct_har
         })
     );
     let Admission::Bounded { beyond: Beyond::Proposed { to }, .. } =
-        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 })
+        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 }, Wall::EPOCH)
     else {
         panic!("proposal facts")
     };
     assert_eq!(to, policy_holder(&[0]));
     policy(&mut core, false, 1000);
     let Admission::Bounded { beyond: Beyond::Refused(why), .. } =
-        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 })
+        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 }, Wall::EPOCH)
     else {
         panic!("recipient absence")
     };
@@ -151,13 +152,13 @@ fn budget_only_amendments_preserve_narrower_implied_grants_and_follow_direct_har
 fn an_amendment_relation_at_its_receiving_boundary_fits_and_one_under_refuses_the_whole_document() {
     let pairs = Box::new([pair(1, 2, 1), pair(2, 2, 1), pair(u16::MAX, 2, 1), pair(1, 2, 1)]);
     let (core, mut limits) = configured(pairs, 4);
-    make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap();
+    make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH).unwrap();
     limits.documents.implications = 3;
     assert_eq!(
-        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 }),
+        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 }, Wall::EPOCH),
         Admission::Refused(people::Refusal::Limit { which: people::LimitKind::Authority })
     );
-    make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap();
+    make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH).unwrap();
 }
 
 #[test]
@@ -165,7 +166,7 @@ fn an_empty_amendment_relation_is_not_expanded_into_equality_rows() {
     let (mut core, limits) = core();
     make_task(&mut core, &limits, 1);
     let Admission::Bounded { within: Bounds::Amend { implications, .. }, .. } =
-        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 })
+        offers::admit(&core, &limits, 1, Act::Amend, &Subject::Task { task: 1 }, Wall::EPOCH)
     else {
         panic!("identity-only relation")
     };

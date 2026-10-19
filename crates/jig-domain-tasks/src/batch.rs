@@ -164,12 +164,16 @@ fn matches_result_action(parent: &crate::TaskRecord, number: u64, batch: &[New])
         return false;
     }
     for (old, new) in proposed.iter().zip(batch) {
+        let mut authority = old.authority.clone();
+        if let crate::Deadline::Span(_) = old.deadline {
+            authority.budget.deadline = new.authority.budget.deadline;
+        }
         if old.number != new.number
             || old.project != new.project
             || old.executor != new.executor
             || old.spec != new.spec
             || old.contract != new.contract
-            || old.authority != new.authority
+            || authority != new.authority
             || old.numbers != new.numbers
             || old.dependencies != new.dependencies
             || old.holdings != new.holdings
@@ -203,6 +207,7 @@ fn check_members(
     parent: Option<&crate::TaskRecord>,
 ) -> Result<(), Problem> {
     for (at, new) in batch.iter().enumerate() {
+        assert!(new.deadline == crate::Deadline::Named, "root resolves every made deadline");
         let number = Some(new.number);
         if domain.names.contains_key(&new.number) {
             return Err(problem(number, Refusal::Duplicate));

@@ -37,6 +37,10 @@ impl Referee {
         self.people.insert(sign_in, person);
         self.made = made;
     }
+    /// A changed decision wall makes previously delivered span offers stale.
+    pub fn clock_changed(&mut self) {
+        self.documents.clear();
+    }
     pub fn committed(&mut self, made: u64) {
         self.made = made;
     }

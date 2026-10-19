@@ -302,7 +302,8 @@ record BudgetAsAllowed { cap: option u64 }
 enum NewBudget { named, as_allowed: BudgetAsAllowed }
 enum Retention { kept, forgotten_once_read }
 record TaskFlags { conversation: bool listed: bool retention: Retention }
-enum NewDeadline { named }
+record DeadlineSpan { value: duration }
+enum NewDeadline { named, span: DeadlineSpan }
 record NewTask { deadline: NewDeadline executor: OwnerExecutor spec: Specification contract: NewContract authority: OwnerAuthority budget: NewBudget wake: option OwnerWakePolicy dependencies: list 32 TaskRef named: bytes 16777216 tracked: option u32 label: u32 flags: TaskFlags }
 record Create { project: u32 tasks: bytes 1048576 }
 record ProposeBatch { tasks: bytes 1048576 }

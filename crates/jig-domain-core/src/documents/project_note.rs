@@ -302,7 +302,13 @@ pub(super) fn ledger(value: &tasks::FundingRecord) -> Ledger {
     clippy::too_many_lines,
     reason = "one project document gathers child-owned bounded policy, role and spending facts"
 )]
-pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> Result<Project, Missing> {
+pub(super) fn project(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    number: u32,
+    decision: Wall,
+) -> Result<Project, Missing> {
     if core.people.role(party, number).is_none() {
         return Err(Missing::NotAllowed);
     }
@@ -464,7 +470,7 @@ pub(super) fn project(core: &Core, limits: &Limits, party: u64, number: u32) -> 
             .expect("bounded spending rows");
     }
     Ok(Project {
-        acts: super::offers::subject(core, limits, party, &super::Subject::Project { project: number })?,
+        acts: super::offers::subject(core, limits, party, &super::Subject::Project { project: number }, decision)?,
         number,
         resources,
         policy: policy(

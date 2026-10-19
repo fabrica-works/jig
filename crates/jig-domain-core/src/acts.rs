@@ -155,8 +155,15 @@ pub struct Offered {
 
 /// Judge an act using the same current facts as its authenticated request.
 #[must_use]
-pub fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: &documents::Subject) -> Admission {
-    objects::admit(core, limits, party, act, object)
+pub fn admit(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    act: Act,
+    object: &documents::Subject,
+    decision: Wall,
+) -> Admission {
+    objects::admit(core, limits, party, act, object, decision)
 }
 
 fn allowed(value: Result<(), people::Refusal>) -> Admission {

@@ -44,7 +44,7 @@ fn source(connectors: &[u16], lines: u32) -> (Core, Limits) {
 
 #[expect(clippy::wildcard_enum_match_arm, reason = "ordinary proof helper receives a Deployment document")]
 fn deployment(core: &Core, limits: &Limits) -> Deployment {
-    match make(core, limits, 1, &Subject::Deployment, &window()).unwrap() {
+    match make(core, limits, 1, &Subject::Deployment, &window(), Wall::EPOCH).unwrap() {
         Document::Deployment(value) => *value,
         _ => panic!("deployment document"),
     }
@@ -88,8 +88,8 @@ fn deployment_connector_references_keep_full_width_identifiers_and_configured_or
     assert!(core.people.identity(2).is_some());
     assert_eq!(core.people.role(2, 0), None);
     assert_eq!(core.people.identity(3), None);
-    assert_eq!(make(&core, &limits, 2, &Subject::Deployment, &window()), Err(Missing::NotAllowed));
-    assert_eq!(make(&core, &limits, 3, &Subject::Deployment, &window()), Err(Missing::Unknown));
+    assert_eq!(make(&core, &limits, 2, &Subject::Deployment, &window(), Wall::EPOCH), Err(Missing::NotAllowed));
+    assert_eq!(make(&core, &limits, 3, &Subject::Deployment, &window(), Wall::EPOCH), Err(Missing::Unknown));
 }
 
 #[test]

@@ -2,7 +2,13 @@
 
 use alloc::boxed::Box;
 
-use skein_lib::Wall;
+use skein_lib::{Duration, Wall};
+
+/// Resolve a request span at this decision (domain/authority.md, section 7).
+#[must_use]
+pub fn deadline_after(decision: Wall, span: Duration) -> Wall {
+    Wall::from_nanos(decision.as_nanos().saturating_add(span.as_nanos()))
+}
 
 /// What a task may do. Each collection is bounded before the root admits it.
 /// Root-supplied permission value, ordered componentwise; checked inputs must fit the configured

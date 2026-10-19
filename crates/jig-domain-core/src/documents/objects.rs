@@ -461,6 +461,7 @@ pub(super) fn proposal(
     party: u64,
     proposer: Proposer,
     number: u64,
+    decision: Wall,
 ) -> Result<Proposal, Missing> {
     let (project, reason, mut made, as_holder, waiting) = match proposer {
         Proposer::Task(task) => {
@@ -547,7 +548,7 @@ pub(super) fn proposal(
         }
     }
     Ok(Proposal {
-        acts: super::offers::subject(core, limits, party, &super::Subject::Proposal { proposer, number })?,
+        acts: super::offers::subject(core, limits, party, &super::Subject::Proposal { proposer, number }, decision)?,
         proposer,
         number,
         project,
@@ -558,13 +559,19 @@ pub(super) fn proposal(
         funding: offers,
     })
 }
-pub(super) fn escalation(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<Escalation, Missing> {
-    let task = super::task_tree::task(core, limits, party, number)?;
+pub(super) fn escalation(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    number: u64,
+    decision: Wall,
+) -> Result<Escalation, Missing> {
+    let task = super::task_tree::task(core, limits, party, number, decision)?;
     if task.hold.is_none() {
         return Err(Missing::Ended);
     }
     Ok(Escalation {
-        acts: super::offers::subject(core, limits, party, &super::Subject::Escalation { task: number })?,
+        acts: super::offers::subject(core, limits, party, &super::Subject::Escalation { task: number }, decision)?,
         task: Box::new(task),
     })
 }
@@ -574,6 +581,7 @@ pub(super) fn question(
     party: u64,
     number: u64,
     message: u64,
+    decision: Wall,
 ) -> Result<Question, Missing> {
     let row = super::small::visible(core, party, number)?;
     for word in &row.inbox {
@@ -609,6 +617,7 @@ pub(super) fn question(
                         limits,
                         party,
                         &super::Subject::Question { task: number, message },
+                        decision,
                     )?,
                     task: super::small::chip(core, limits, party, number)?,
                     message,
@@ -633,9 +642,15 @@ pub(super) fn question(
     }
     Err(Missing::Ended)
 }
-pub(super) fn person(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<PersonTask, Missing> {
+pub(super) fn person(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    number: u64,
+    decision: Wall,
+) -> Result<PersonTask, Missing> {
     let row = super::small::visible(core, party, number)?;
-    person_from_row(core, limits, party, row)
+    person_from_row(core, limits, party, row, decision)
 }
 
 /// Construct a person form from its retained task row.
@@ -644,6 +659,7 @@ pub fn person_from_row(
     limits: &Limits,
     party: u64,
     row: &tasks::TaskRecord,
+    decision: Wall,
 ) -> Result<PersonTask, Missing> {
     if core.people.role(party, row.project).is_none() {
         return Err(Missing::NotAllowed);
@@ -658,7 +674,7 @@ pub fn person_from_row(
             .push(ShownResult {
                 task: super::task_tree::link(core, limits, party, *task)?,
                 result: match core.tasks.task(*task) {
-                    Some(row) => match result_from_row(core, limits, party, row) {
+                    Some(row) => match result_from_row(core, limits, party, row, decision) {
                         Ok(result) => Some(result),
                         Err(Missing::Ended | Missing::Unknown) => None,
                         Err(Missing::NotAllowed) => return Err(Missing::NotAllowed),
@@ -670,7 +686,7 @@ pub fn person_from_row(
             .expect("bounded dependency results");
     }
     Ok(PersonTask {
-        acts: super::offers::person(core, limits, party, row)?,
+        acts: super::offers::person(core, limits, party, row, decision)?,
         task: super::small::chip_with_core(core, limits, row)?,
         revision: row.revisions.person,
         requester: row.requester,
@@ -700,6 +716,7 @@ pub fn result_from_row(
     limits: &Limits,
     party: u64,
     row: &tasks::TaskRecord,
+    decision: Wall,
 ) -> Result<ResultDoc, Missing> {
     if core.people.role(party, row.project).is_none() {
         return Err(Missing::NotAllowed);
@@ -722,7 +739,7 @@ pub fn result_from_row(
         followups.push(super::task_tree::link(core, limits, party, *task)?).expect("bounded followups");
     }
     Ok(ResultDoc {
-        acts: super::offers::subject(core, limits, party, &super::Subject::Result { task: row.number })?,
+        acts: super::offers::subject(core, limits, party, &super::Subject::Result { task: row.number }, decision)?,
         task: super::small::chip_with_core(core, limits, row)?,
         contract: super::task_tree::contract(limits, &row.contract)?,
         ending: super::task_tree::ending(limits, value)?,
@@ -745,9 +762,15 @@ pub fn result_from_row(
         cut: row.delegates.len() > bound(limits) || row.result_followups.len() > bound(limits),
     })
 }
-pub(super) fn result(core: &Core, limits: &Limits, party: u64, number: u64) -> Result<ResultDoc, Missing> {
+pub(super) fn result(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    number: u64,
+    decision: Wall,
+) -> Result<ResultDoc, Missing> {
     match core.tasks.task(number) {
-        Some(row) => result_from_row(core, limits, party, row),
+        Some(row) => result_from_row(core, limits, party, row, decision),
         None => {
             if core.tasks.stub(number).is_some() {
                 Err(Missing::Ended)

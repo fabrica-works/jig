@@ -24,7 +24,8 @@ fn recurring_lines_join_the_supplied_period_and_its_durable_opening_fact() {
             batch: Box::new([recurring]),
         },
     );
-    let Document::Project(project) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap()
+    let Document::Project(project) =
+        make(&core, &limits, 1, &Subject::Project { project: 1 }, &window(), Wall::EPOCH).unwrap()
     else {
         panic!("project")
     };
@@ -50,7 +51,8 @@ fn recurring_lines_join_the_supplied_period_and_its_durable_opening_fact() {
         }
     }
     assert!(saved);
-    let Document::Project(project) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap()
+    let Document::Project(project) =
+        make(&core, &limits, 1, &Subject::Project { project: 1 }, &window(), Wall::EPOCH).unwrap()
     else {
         panic!("project")
     };
@@ -81,7 +83,8 @@ fn recurring_lines_join_the_supplied_period_and_its_durable_opening_fact() {
         }
     }
     core.tasks = restored;
-    let Document::Project(project) = make(&core, &limits, 1, &Subject::Project { project: 1 }, &window()).unwrap()
+    let Document::Project(project) =
+        make(&core, &limits, 1, &Subject::Project { project: 1 }, &window(), Wall::EPOCH).unwrap()
     else {
         panic!("project")
     };

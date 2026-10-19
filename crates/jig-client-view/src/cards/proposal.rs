@@ -95,7 +95,7 @@ pub(crate) fn proposed_task(
     crate::specification::document(b, &task.spec, words);
     crate::proposed_task::executor(b, task.executor, words);
     crate::proposed_task::contract(b, &task.contract, words, bindings);
-    crate::owner_authority::document_words(b, &task.authority, words, text_limit, rows);
+    crate::proposed_task::authority(b, task, words, text_limit, rows);
     words.text(b, JigPhrase::Budget, &[Hole::Amount(task.budget)]);
     crate::proposed_task::funder(b, task.funder, words);
     crate::owner_wake::policy(b, &task.wake, words.book(), words.language());

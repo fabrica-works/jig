@@ -328,7 +328,8 @@ pub(super) fn tag_tasks(
                 if current != holder {
                     continue;
                 }
-                let Some(next) = core.proposal_holder(&env.limits, proposer, &row.action, Some(holder)) else {
+                let Some(next) = core.proposal_holder(&env.limits, proposer, &row.action, Some(holder), env.wall)
+                else {
                     continue;
                 };
                 let revision = core.tasks.task(proposer).expect("pending proposer remains live").revision;
@@ -347,7 +348,7 @@ pub(super) fn tag_tasks(
             tasks::Request::ProposalRerouteNeeded { proposer, proposal } => {
                 let Some(row) = core.tasks.proposal(proposer, proposal) else { continue };
                 let tasks::ProposalState::Pending { holder: current, .. } = row.state else { continue };
-                let Some(next) = core.proposal_holder(&env.limits, proposer, &row.action, None) else {
+                let Some(next) = core.proposal_holder(&env.limits, proposer, &row.action, None, env.wall) else {
                     continue;
                 };
                 if current == next {

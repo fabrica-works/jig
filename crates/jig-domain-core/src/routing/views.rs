@@ -293,7 +293,7 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
         | Subject::PersonTask { .. }
         | Subject::Result { .. }
         | Subject::Project { .. }
-        | Subject::Note { .. } => match documents::make(core, &env.limits, party, subject, window) {
+        | Subject::Note { .. } => match documents::make(core, &env.limits, party, subject, window, env.wall) {
             Ok(_) => None,
             Err(Missing::NotAllowed) => Some(WatchRefusal::NotAllowed),
             Err(Missing::Unknown | Missing::Ended) => Some(WatchRefusal::Unknown),

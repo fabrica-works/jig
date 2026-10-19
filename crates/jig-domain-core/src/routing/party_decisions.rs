@@ -40,6 +40,7 @@ pub(super) fn goal_decide(
         proposal_act(&choice),
         crate::documents::Proposer::Party(proposer),
         number,
+        env.wall,
     ) {
         pool_refused(work, request, why);
         return;
@@ -59,9 +60,7 @@ pub(super) fn goal_decide(
             }
             let event = match proposal.action {
                 tasks::PersonAction::Batch(mut batch) => {
-                    for member in &mut batch {
-                        member.funder = source;
-                    }
+                    super::deadlines::fund(&mut batch, source, env.wall);
                     tasks::Event::Make {
                         reply_to: ReplyTo::new(request),
                         creator: tasks::Party::Person(proposer),
@@ -154,6 +153,7 @@ pub(super) fn person_proposal_decide(
         proposal_act(&choice),
         crate::documents::Proposer::Task(proposer),
         number,
+        env.wall,
     ) {
         pool_refused(work, request, why);
         return;
@@ -166,7 +166,7 @@ pub(super) fn person_proposal_decide(
     };
     let next = match choice {
         people::ProposalDecision::Accept => {
-            person_proposal_accept(core, work, request, person, proposal);
+            person_proposal_accept(core, work, request, person, proposal, env.wall);
             return;
         }
         people::ProposalDecision::Reject { reason } => tasks::ProposalDecision::Reject { reason },
@@ -216,6 +216,7 @@ pub(super) fn person_proposal_accept(
     request: Token,
     person: u64,
     proposal: tasks::Proposal,
+    decision: skein_lib::Wall,
 ) {
     if super::proposal_revisions::person(core, work, request, person, &proposal) {
         return;
@@ -261,6 +262,7 @@ pub(super) fn person_proposal_accept(
             unreachable!("effect accepted through its connector")
         }
         tasks::ProposalAction::Batch(mut batch) => {
+            super::deadlines::resolve(&mut batch, decision);
             let held = match core.people.role(person, proposal.project) {
                 Some(role) => core.authority.escalations_held(proposal.project, role.number()),
                 None => false,

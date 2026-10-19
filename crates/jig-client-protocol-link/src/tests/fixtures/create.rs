@@ -49,3 +49,17 @@ pub fn task_with_deadline(wall: Option<skein_lib::Wall>) -> c::NewTask {
     task.authority.deadline = wall;
     task
 }
+
+pub fn deadline_asks(task: c::NewTask) -> [(&'static str, c::Ask); 2] {
+    [
+        ("create", c::Ask::Create { project: PROJECT, tasks: list([task.clone()]) }),
+        (
+            "propose",
+            c::Ask::Propose {
+                project: PROJECT,
+                action: c::ProposeAction::Batch { tasks: list([task]) },
+                reason: store_text(),
+            },
+        ),
+    ]
+}

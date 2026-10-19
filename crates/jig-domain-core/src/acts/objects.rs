@@ -9,7 +9,14 @@ mod task;
 pub(crate) use decisions::{escalation, proposal};
 pub(crate) use task::{person, question, write, write_in};
 
-pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: &documents::Subject) -> Admission {
+pub(super) fn admit(
+    core: &Core,
+    limits: &Limits,
+    party: u64,
+    act: Act,
+    object: &documents::Subject,
+    decision: skein_lib::Wall,
+) -> Admission {
     match object {
         documents::Subject::Task { task: number } => task::admit(core, limits, party, act, *number),
         documents::Subject::PersonTask { task: number } => allowed(person(core, party, act, *number, None)),
@@ -41,7 +48,7 @@ pub(super) fn admit(core: &Core, limits: &Limits, party: u64, act: Act, object: 
             | Act::SetPool => allowed(escalation(core, limits, party, act, *task)),
         },
         documents::Subject::Proposal { proposer, number } => {
-            allowed(proposal(core, limits, party, act, *proposer, *number))
+            allowed(proposal(core, limits, party, act, *proposer, *number, decision))
         }
         documents::Subject::Project { project } => project_admission(core, limits, party, act, *project),
         documents::Subject::Result { task } => {

@@ -9,7 +9,7 @@ const PROPOSAL: u64 = 10;
 const PROPOSE: u64 = 103;
 
 fn task_offer(core: &Core, limits: &Limits, task: u64, act: Act) -> crate::acts::Offered {
-    let Document::Task(value) = make(core, limits, 1, &Subject::Task { task }, &window()).unwrap() else {
+    let Document::Task(value) = make(core, limits, 1, &Subject::Task { task }, &window(), Wall::EPOCH).unwrap() else {
         panic!("task document")
     };
     offered(&value.acts, act).clone()
@@ -69,10 +69,12 @@ fn a_party_s_own_proposal_offers_withdraw_to_its_proposer_alone() {
         },
     );
     let subject = Subject::Proposal { proposer: Proposer::Party(1), number: PROPOSAL };
-    let Document::Proposal(own) = make(&core, &limits, 1, &subject, &window()).unwrap() else { panic!("proposal") };
+    let Document::Proposal(own) = make(&core, &limits, 1, &subject, &window(), Wall::EPOCH).unwrap() else {
+        panic!("proposal")
+    };
     assert_eq!(offered(&own.acts, Act::Withdraw).admission, Admission::Allowed);
     assert_eq!(
-        offers::admit(&core, &limits, 2, Act::Withdraw, &subject),
+        offers::admit(&core, &limits, 2, Act::Withdraw, &subject, Wall::EPOCH),
         Admission::Refused(people::Refusal::NotOffered)
     );
 }

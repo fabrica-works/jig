@@ -47,7 +47,8 @@ fn live_delegate_documents_keep_every_identity_and_the_owner_takeover_reservatio
     assert_eq!(row.numbers.spent, 2);
     assert_eq!(row.numbers.reserved, 7);
     assert_eq!(core.tasks.takeover_budget(2), Some(8));
-    let Document::Task(doc) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap() else {
+    let Document::Task(doc) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("task")
     };
     assert_eq!(doc.delegates.len(), 3);
@@ -56,7 +57,7 @@ fn live_delegate_documents_keep_every_identity_and_the_owner_takeover_reservatio
     assert_eq!(doc.delegates.get(2).unwrap().chip.number, 4);
     assert_eq!(doc.delegates.get(0).unwrap().takeover_budget, 8);
     limits.documents.lines = 2;
-    assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()), Err(Missing::TooLarge));
+    assert_eq!(make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH), Err(Missing::TooLarge));
     limits.documents.lines = 8;
     send_task(
         &mut core,
@@ -78,7 +79,8 @@ fn live_delegate_documents_keep_every_identity_and_the_owner_takeover_reservatio
         core.tasks.funding(tasks::Funder::Pool { project: 1, person: 1, period: 1 }).unwrap().numbers.reserved,
         8
     );
-    let Document::Task(doc) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window()).unwrap() else {
+    let Document::Task(doc) = make(&core, &limits, 1, &Subject::Task { task: 1 }, &window(), Wall::EPOCH).unwrap()
+    else {
         panic!("task")
     };
     assert_eq!(doc.delegates.len(), 2);
