@@ -65,7 +65,11 @@ pub(crate) fn provider() -> skein_fake_peers::llm::Peer {
     script.result = br#"{"form":"report","text":"World answer","fields":{}}"#.as_slice().into();
     smith_agent_process_world::fake::configured(
         Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: channel::provider_turns(&script) }]),
-        skein_llm::Credential { access_token: channel::TOKEN.into(), account_id: b"acc".as_slice().into() },
+        skein_llm::Credential {
+            value: channel::TOKEN.into(),
+            account_id: b"acc".as_slice().into(),
+            scheme: skein_llm::Scheme::Bearer,
+        },
         skein_lib::Duration::ZERO,
     )
 }

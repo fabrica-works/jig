@@ -167,6 +167,7 @@ impl Accounts {
                             client_secret: secret,
                             pkce_for_confidential: false,
                             metadata_claim: None,
+                            terms: None,
                         },
                         endpoint,
                         keeper: driver::Keeper::Private {

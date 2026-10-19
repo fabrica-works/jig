@@ -69,7 +69,7 @@ fn a_turn_is_encoded_against_the_worker_s_endpoints() {
         .push(smith_protocol_channel::Endpoint {
             name: b"different".as_slice().into(),
             number: 1,
-            dialect: 0,
+            dialect: 1,
             account: 1,
         })
         .expect("endpoint");
@@ -103,10 +103,9 @@ fn a_grant_s_value_reaches_smith_s_host_half_in_its_envelope() {
         let grant = start.grants().get(0).expect(label);
         assert_eq!(grant.account(), 1, "{label}");
         assert_eq!(grant.generation(), 1, "{label}");
-        let bytes = grant.value().credential();
-        assert_eq!(&bytes[..2], &u16::try_from(id.len()).expect(label).to_be_bytes(), "{label}");
-        assert_eq!(&bytes[2..2 + id.len()], id, "{label}");
-        assert_eq!(&bytes[2 + id.len()..], token, "{label}");
+        let smith_channel::GrantValue::Withdrawn(value) = grant.value() else { panic!("{label}: withdrawn grant") };
+        assert_eq!(value.id(), id, "{label}");
+        assert_eq!(value.bearer(), &skein_lib::Secret::new(token.into()), "{label}");
     }
 }
 #[test]
@@ -300,12 +299,15 @@ fn the_engine_s_listener_opens_before_its_workers_start() {
 fn a_worker_refuses_limits_that_cannot_carry_its_account_envelope() {
     let large =
         fixtures::with(fixtures::WORKER_DOCUMENT, b"\"hub.turns\":1", b"\"hub.turns\":1,\"accounts.token\":8192");
-    for (label, document, bytes) in [
-        ("token leaves no id room", large.as_ref(), 8192_u32),
-        ("caller credential too small", fixtures::WORKER_DOCUMENT, 8191_u32),
+    let id = jig_protocol_worker_wire::CEILINGS.grant_account_id;
+    let bearer = smith_channel::CEILINGS.withdrawn_value_bearer;
+    for (label, document, id, bearer) in [
+        ("caller bearer too small", large.as_ref(), id, bearer - 1),
+        ("caller account id too small", fixtures::WORKER_DOCUMENT, id - 1, bearer),
     ] {
         let mut agent = fixtures::agent();
-        agent.limits.bodies.grant_value_credential = bytes;
+        agent.limits.bodies.withdrawn_value_id = id;
+        agent.limits.bodies.withdrawn_value_bearer = bearer;
         let found = crate::startup(
             document,
             &fixtures::worker_files(),

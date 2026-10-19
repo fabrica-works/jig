@@ -384,11 +384,20 @@ fn up(domain: &mut Domain, env: &Env<Limits>, request: smith::parent::Request, o
         smith::parent::Request::LongDone { client } => {
             hub(domain, env, host::Event::Activity { owner: client, activity: host::Activity::LongDone });
         }
-        smith::parent::Request::Rejected { client, account, generation } => {
+        smith::parent::Request::Unauthorized { client, account, generation } => {
             hub(domain, env, host::Event::Rejected { owner: client, account, generation });
         }
-        smith::parent::Request::Exhausted { client, account, retry_after } => {
-            hub(domain, env, host::Event::Exhausted { owner: client, account, retry_after });
+        smith::parent::Request::Refused { .. } => {}
+        smith::parent::Request::Limited { client, account, reset } => {
+            hub(
+                domain,
+                env,
+                host::Event::Exhausted {
+                    owner: client,
+                    account,
+                    retry_after: reset.unwrap_or(skein_lib::Duration::ZERO),
+                },
+            );
         }
         smith::parent::Request::Faulted { client, fault } => {
             if let Some(hosting) = domain.hub.hosting(client)

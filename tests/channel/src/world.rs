@@ -560,8 +560,9 @@ fn launch(
                 smith_agent_process_world::fake::configured(
                     scripts,
                     skein_llm::Credential {
-                        access_token: fixtures::TOKEN.into(),
+                        value: fixtures::TOKEN.into(),
                         account_id: b"acc".as_slice().into(),
+                        scheme: skein_llm::Scheme::Bearer,
                     },
                     script.latency,
                 )

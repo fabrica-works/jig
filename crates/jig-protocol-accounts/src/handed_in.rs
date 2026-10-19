@@ -23,6 +23,11 @@ pub fn hand_in(
         refresh_token: None,
         metadata: account_id,
         expires_at: lapses,
+        issued_client_id: None,
+        granted_scopes: None,
+        subject: None,
+        id_token: None,
+        earliest_refresh_at: None,
     };
     match oauth::encode_record(&record, limits) {
         Ok(encoded) => drop(encoded),

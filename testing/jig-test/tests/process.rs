@@ -13,7 +13,11 @@ fn a_killed_jig_test_restarts_and_the_work_is_found() {
             cue: Box::default(),
             turns: jig_channel_world::fixtures::provider_turns(&script),
         }]),
-        skein_llm::Credential { access_token: b"token".as_slice().into(), account_id: b"acc".as_slice().into() },
+        skein_llm::Credential {
+            value: b"token".as_slice().into(),
+            account_id: b"acc".as_slice().into(),
+            scheme: skein_llm::Scheme::Bearer,
+        },
         skein_lib::Duration::ZERO,
         skein_fake_peers::Transport::Tls,
     );

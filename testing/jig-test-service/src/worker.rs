@@ -8,7 +8,7 @@ use jig_protocol_worker_link as link;
 use jig_test_worker as root;
 use skein_channel::{Lower, LowerEvent};
 use skein_io::{self as io, kernel::Fd};
-use skein_lib::{Env, List, Map, Queue, Time, Token, Wall, Writer, stream};
+use skein_lib::{Env, List, Map, Queue, Time, Token, Wall, stream};
 use smith_host_domain as smith;
 use smith_host_protocol as host;
 
@@ -68,14 +68,9 @@ impl Worker {
         if secret.len() > usize::try_from(config.limits.link.secret).expect("secret bound") {
             return Err(problem(index, b"secret", What::Bound));
         }
-        let credential = config
-            .limits
-            .token
-            .checked_add(jig_protocol_worker_wire::CEILINGS.grant_account_id)
-            .ok_or(problem(index, b"limits", What::Bound))?
-            .checked_add(2)
-            .ok_or(problem(index, b"limits", What::Bound))?;
-        if credential > agent.limits.bodies.grant_value_credential {
+        if config.limits.token > agent.limits.bodies.withdrawn_value_bearer
+            || jig_protocol_worker_wire::CEILINGS.grant_account_id > agent.limits.bodies.withdrawn_value_id
+        {
             return Err(problem(index, b"limits", What::Bound));
         }
         let mut limits = config.limits.hub;
@@ -607,13 +602,12 @@ fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Option<host::Va
     let value = account(table, grant, now)?;
     Some(host::Values { paths: Box::default(), credentials: Box::new([value]) })
 }
-fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<Box<[u8]>> {
+fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
     let value = table.value(grant.account, grant.generation, now)?;
-    let mut writer = Writer::new(2_usize.checked_add(value.account_id.len())?.checked_add(value.token.len())?);
-    writer.put(&u16::try_from(value.account_id.len()).ok()?.to_be_bytes()).ok()?;
-    writer.put(value.account_id.expose()).ok()?;
-    writer.put(value.token.expose()).ok()?;
-    Some(writer.finish())
+    Some(smith_protocol_channel::GrantValue::Withdrawn {
+        account_id: value.account_id.expose().into(),
+        bearer: value.token.expose().into(),
+    })
 }
 fn start_values(table: &Table, grants: &[smith::Grant], now: Time) -> Option<host::Values> {
     let mut values = List::with_capacity(u32::try_from(grants.len()).ok()?);

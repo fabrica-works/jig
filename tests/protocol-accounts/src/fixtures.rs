@@ -35,6 +35,10 @@ pub fn limits() -> accounts::Limits {
                 client_bytes: 64,
                 detail_bytes: 64,
                 record_bytes: 1024,
+                issued_client_bytes: 0,
+                granted_bytes: 64,
+                subject_bytes: 0,
+                id_token_bytes: 256,
                 depth: 8,
                 tokens: 64,
             },
@@ -44,6 +48,9 @@ pub fn limits() -> accounts::Limits {
             code_bytes: 64,
             url_bytes: 1024,
             request_bytes: 1024,
+            parameter_bytes: 0,
+            resource_bytes: 0,
+            nonce_bytes: 0,
             sign_in_time: Duration::from_secs(120),
             request_time: Duration::from_secs(10),
             backoff_base: Duration::from_secs(1),
@@ -92,6 +99,7 @@ pub fn registration() -> oauth::Registration {
         client_secret: None,
         pkce_for_confidential: false,
         metadata_claim: None,
+        terms: None,
     }
 }
 #[must_use]
@@ -103,6 +111,11 @@ pub fn kept() -> oauth::SavedToken {
         refresh_token: Some(bytes::copy_of(b"seed")),
         metadata: None,
         expires_at: Wall::from_nanos(Duration::from_secs(300).as_nanos()),
+        issued_client_id: None,
+        granted_scopes: None,
+        subject: None,
+        id_token: None,
+        earliest_refresh_at: None,
     }
 }
 #[must_use]
@@ -113,6 +126,9 @@ pub fn rotate() -> fake::Plan {
             access_token: bytes::copy_of(TOKEN_SECOND),
             refresh_token: Some(bytes::copy_of(b"next")),
             expires_in: 300,
+            scope: None,
+            id_token: None,
+            earliest_refresh_at: None,
         }),
         delay: Duration::from_millis(5),
         retry_after: Duration::ZERO,

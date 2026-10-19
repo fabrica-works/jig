@@ -409,7 +409,11 @@ pub(crate) fn window_provider(scripts: Box<[skein_fake_llm_domain::api::Script]>
             path: skein_llm_world::call(1).endpoint.target,
             headers: Box::default(),
         },
-        skein_llm::Credential { access_token: fixtures::TOKEN.into(), account_id: b"acc".as_slice().into() },
+        skein_llm::Credential {
+            value: fixtures::TOKEN.into(),
+            account_id: b"acc".as_slice().into(),
+            scheme: skein_llm::Scheme::Bearer,
+        },
         protocol,
         skein_fake_llm_domain::Domain::try_scripted(&config, 12, scripts).expect("window provider script"),
         config,

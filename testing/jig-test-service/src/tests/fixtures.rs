@@ -11,7 +11,7 @@ const ENGINE: &[u8] = br#"{
 "endpoints": [{
 "name": "fake",
 "number": 1,
-"dialect": 0,
+"dialect": 1,
 "account": 1,
 "provider": "fake-provider",
 "address": {"socket": "127.0.0.1:7101"},
@@ -419,14 +419,14 @@ pub fn assignment(config: &jig_protocol_config::Engine) -> jig_test_domain::Assi
 pub fn endpoints() -> smith_protocol_channel::Endpoints {
     let mut entries = List::with_capacity(1);
     entries
-        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 1, dialect: 0, account: 1 })
+        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 1, dialect: 1, account: 1 })
         .expect("endpoint");
     smith_protocol_channel::Endpoints::new(entries)
 }
 pub fn call(input: &[u8]) -> jig_domain_fleet::Call {
-    let name = smith_channel::v3::CallName::new(
-        &smith_channel::v3::CEILINGS,
-        smith_channel::v3::CallNameParts { activation: 3, completion: 7, position: 2 },
+    let name = smith_channel::v4::CallName::new(
+        &smith_channel::v4::CEILINGS,
+        smith_channel::v4::CallNameParts { activation: 3, completion: 7, position: 2 },
     )
     .expect("call name");
     let mut writer = Writer::new(usize::try_from(name.measure()).expect("call name length"));
@@ -553,7 +553,7 @@ pub fn worker_service() -> Service {
 }
 pub fn worker_assignment() -> jig_domain_host::LinkDown {
     let names =
-        [jig_protocol_charter::EndpointName { number: 1, name: b"fake".as_slice().into(), account: 1, dialect: 0 }];
+        [jig_protocol_charter::EndpointName { number: 1, name: b"fake".as_slice().into(), account: 1, dialect: 1 }];
     let mut assignment =
         crate::tools::charter(assignment(&config()), &names, &seeds().deployment).expect("charter assignment");
     assignment.assignment.identity = [3; 16];
@@ -574,7 +574,7 @@ pub fn concrete_turn() -> smith_host_domain::Turn {
         effort: None,
         version: record::VERSION,
         endpoint: llm::Endpoint(1),
-        dialect: 0,
+        dialect: 1,
         sequence: 1,
         kind: record::Kind::First { affinity: llm::Affinity { key: [3; 16], thread: 1 } },
         usage: llm::Usage {

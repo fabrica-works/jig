@@ -42,7 +42,7 @@ const ENGINE: &[u8] = br#"{
 "endpoints": [{
 "name": "fake",
 "number": 1,
-"dialect": 0,
+"dialect": 1,
 "account": 1,
 "provider": "fake-provider",
 "address": {"socket": "127.0.0.1:7101"},
@@ -154,7 +154,7 @@ pub fn seeds() -> Seeds {
 pub(crate) fn endpoints() -> smith_protocol_channel::Endpoints {
     let mut entries = List::with_capacity(1);
     entries
-        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 0, dialect: 0, account: 1 })
+        .push(smith_protocol_channel::Endpoint { name: b"fake".as_slice().into(), number: 0, dialect: 1, account: 1 })
         .expect("one endpoint");
     smith_protocol_channel::Endpoints::new(entries)
 }

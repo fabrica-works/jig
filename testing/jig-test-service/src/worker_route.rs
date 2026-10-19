@@ -229,8 +229,9 @@ pub(super) fn process(event: smith_host_protocol::ProcessEvent) -> Option<jig_te
             | OpenEvent::LongDone
             | OpenEvent::Turn { .. }
             | OpenEvent::Fact { .. }
-            | OpenEvent::Rejected { .. }
-            | OpenEvent::Exhausted { .. }
+            | OpenEvent::Unauthorized { .. }
+            | OpenEvent::Limited { .. }
+            | OpenEvent::Refused { .. }
             | OpenEvent::Call { .. }
             | OpenEvent::Withdraw { .. }) => smith::process::Event::Received { owner: agent, message: channel(event)? },
         },
@@ -255,8 +256,9 @@ fn channel(event: smith_host_protocol::OpenEvent) -> Option<smith::Up> {
         OpenEvent::LongDone => smith::Up::LongDone,
         OpenEvent::Turn { turn } => smith::Up::Turn { turn },
         OpenEvent::Fact { body } => smith::Up::Fact { body },
-        OpenEvent::Rejected { account, generation } => smith::Up::Rejected { account, generation },
-        OpenEvent::Exhausted { account, retry_after } => smith::Up::Exhausted { account, retry_after },
+        OpenEvent::Unauthorized { account, generation } => smith::Up::Unauthorized { account, generation },
+        OpenEvent::Limited { account, reset } => smith::Up::Limited { account, reset },
+        OpenEvent::Refused { account, code, reason } => smith::Up::Refused { account, code, reason },
         OpenEvent::Call { call, name, deadline, ask } => smith::Up::Call { call, name, deadline, ask },
         OpenEvent::Withdraw { call } => smith::Up::Withdraw { call },
         OpenEvent::Opened { .. }
