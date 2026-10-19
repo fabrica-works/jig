@@ -19,7 +19,8 @@ pub(crate) fn of(crates: &[CrateManifest], project: &str, allowed: &[&str]) -> V
         .iter()
         .filter_map(|item| {
             let name = item.name.as_deref()?;
-            (item.dependencies.iter().any(|dependency| seed(dependency)) || shaped(name, project)).then_some(name)
+            (item.dependencies.iter().any(|dependency| seed(dependency, project)) || shaped(name, project))
+                .then_some(name)
         })
         .collect();
     loop {
@@ -45,21 +46,25 @@ pub(crate) fn of(crates: &[CrateManifest], project: &str, allowed: &[&str]) -> V
         side.extend(more);
     }
     side.into_iter()
-        .filter(|name| !(allowed.contains(name) || name.split('-').next() == Some(project) && under_client(name)))
+        .filter(|name| !(allowed.contains(name) || under_client(name, project)))
         .map(str::to_owned)
         .collect()
 }
 
-fn under_client(name: &str) -> bool {
-    let mut parts = name.split('-');
-    let _ = parts.next();
+fn under_client(name: &str, project: &str) -> bool {
+    let Some(tail) = name.strip_prefix(project).and_then(|tail| tail.strip_prefix('-')) else {
+        return false;
+    };
+    let mut parts = tail.split('-');
     let Some(kind) = parts.next() else { return false };
     kind == "client" || (!KINDS.contains(&kind) && parts.next() == Some("client"))
 }
 
-fn seed(dependency: &str) -> bool {
+// Only this project and the client kit give client names their UI meaning.
+fn seed(dependency: &str, project: &str) -> bool {
     UI_KIT.contains(&dependency)
-        || (under_client(dependency) && !SHARED.iter().any(|suffix| dependency.ends_with(suffix)))
+        || ((under_client(dependency, project) || under_client(dependency, "jig"))
+            && !SHARED.iter().any(|suffix| dependency.ends_with(suffix)))
 }
 
 fn shaped(name: &str, project: &str) -> bool {
