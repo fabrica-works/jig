@@ -4,13 +4,15 @@ use crate::{
     domain::{down, tell},
 };
 use skein_lib::{
-    Env, List, Queue, RequestAnswered, RequestEnvelope, RequestKey, RequestOut, RequestProgress, RequestRecord, Token,
+    Env, List, Queue, RequestAdmission, RequestAnswered, RequestEnvelope, RequestKey, RequestOut, RequestProgress,
+    RequestRecord, RequestRefused, Token,
 };
 #[derive(Debug)]
 pub(crate) struct PendingRequest {
     request: Ask,
     pending: Pending,
     attempt: Option<Token>,
+    admission: RequestAdmission,
 }
 impl Domain {
     #[must_use]
@@ -54,12 +56,13 @@ impl Domain {
         let pending = pending(party, &request);
         let held = Held { key, request: request.clone() };
         match self.table.ask(key, party, size, held) {
-            Ok(_) => {
+            Ok(admission) => {
                 self.requests
-                    .insert(key, PendingRequest { request, pending, attempt: None })
+                    .insert(key, PendingRequest { request, pending, attempt: None, admission })
                     .expect("table admitted request");
             }
-            Err(_) => tell(out, Told::Answered { key, outcome: Outcome::Limit }),
+            Err(RequestRefused::Full(_)) => tell(out, Told::Answered { key, outcome: Outcome::Limit }),
+            Err(RequestRefused::Held(_)) => unreachable!("a drawn key is never held"),
         }
     }
     /// Restores decoded records from the small store (client/domain/client.md, 11).
@@ -73,16 +76,18 @@ impl Domain {
                 Ask::Family { record, .. } => !self.declared(record),
                 Ask::Jig(_) => false,
             };
-            if invalid
-                || self.requests.contains_key(&key)
-                || self.table.restore(key, declared(&env.limits, &request), record).is_err()
-            {
-                dropped = dropped.checked_add(1).expect("restored list bounded");
+            let admission = if invalid || self.requests.contains_key(&key) {
+                None
             } else {
+                self.table.restore(key, declared(&env.limits, &request), record).ok()
+            };
+            if let Some(admission) = admission {
                 self.requests
-                    .insert(key, PendingRequest { request: request.clone(), pending, attempt: None })
+                    .insert(key, PendingRequest { request: request.clone(), pending, attempt: None, admission })
                     .expect("table admitted record");
                 tell(out, Told::Kept { key, request });
+            } else {
+                dropped = dropped.checked_add(1).expect("restored list bounded");
             }
         }
         if dropped != 0 {
@@ -91,7 +96,13 @@ impl Domain {
     }
     /// Retires a request whose last small-store write failed, in any table state.
     pub(crate) fn not_kept(&mut self, key: RequestKey, out: &mut Queue<Request>) {
-        if let Some(owner) = self.table.not_kept(key) {
+        let Some(owner) = self.table.owner(key) else {
+            return;
+        };
+        let Some(held) = self.requests.get(&owner) else {
+            return;
+        };
+        if let Some(owner) = self.table.not_kept(key, held.admission.number) {
             self.requests.remove(&owner);
             tell(out, Told::Answered { key: owner, outcome: Outcome::NotKept });
         }

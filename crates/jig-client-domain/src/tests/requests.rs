@@ -103,6 +103,21 @@ fn a_kept_record_past_the_table_s_room_is_dropped_and_told() {
     assert_eq!(c.domain.pending(OTHER_KEY), None);
 }
 #[test]
+fn a_kept_record_whose_engine_key_is_held_is_dropped_and_told() {
+    // Two records share one engine key; only the first can be restored.
+    const RECORDS: u32 = 2;
+    let mut kept = List::with_capacity(RECORDS);
+    kept.push(record(KEY, ENGINE_KEY, PARTY)).unwrap();
+    kept.push(record(OTHER_KEY, ENGINE_KEY, PARTY)).unwrap();
+    let mut c = Client::new(fixtures::limits());
+    c.step(Event::Start { kept });
+    assert_eq!(
+        c.told().as_ref(),
+        &[Told::Kept { key: KEY, request: stop() }, Told::Dropped { count: 1 }, Told::Pending { key: KEY }]
+    );
+    assert_eq!(c.domain.pending(OTHER_KEY), None);
+}
+#[test]
 fn a_retrying_request_says_why_once_per_answer() {
     const ROWS: [(RequestEnvelope, Retry); 4] = [
         (RequestEnvelope::Again, Retry::Busy),
