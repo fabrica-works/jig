@@ -1,6 +1,6 @@
 # The client and the engine
 
-Provisional, 2026-10-09, revised 2026-10-18. jig's API: what crosses
+Provisional, 2026-10-09, revised 2026-10-19. jig's API: what crosses
 between a party's client and the engine, at the level of the two
 domains. It says who the party is; the plumbing operations a party asks,
 alone or several in one compound request, each keyed and answered once
@@ -138,7 +138,8 @@ Section 9 lists what the engine's domain owes the client, and where
   request sent again within the retention gets it again. `me` says how
   long the retention is, so a client never sends a request again past
   it (client.md, section 6). Busy and not ready are never kept: the
-  client sends the request again, under its key.
+  client sends the request again, under its key, but a request carrying
+  a value (below).
 - **One key, one ask:** a key sent again with a different ask is refused
   as a conflict.
 - **A name** is a key the application gives in place of one the client
@@ -154,6 +155,14 @@ Section 9 lists what the engine's domain owes the client, and where
   at once, and nothing is kept or sent (client.md, section 6).
 - **A compound request is one keyed request** (3.4): one key, one ask,
   one answer.
+- **A request carrying a value,** an LLM account's key added or replaced
+  (3.2), is never kept by the client (client.md, section 6): it carries
+  a name, goes once, and its caller asks again under that name. The
+  engine keeps the value in its secrets' store before the domain sees
+  the request, so the request, its answer and every document name it
+  only by the request that carried it (`../../protocol/client.md`,
+  section 5). Its name is its caller's, never made from the value, so
+  that a name carries no secret. It is never in a compound request.
 
 ### 3.2 jig's requests
 
@@ -167,11 +176,11 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 
 | Operation | Names | Becomes |
 |---|---|---|
-| `Create` | a project; a batch: for each task its executor (an agent's charter, a procedure and its parameters, a person, or a role, which is the project's: roles are per project, `../../domain/people.md`, section 1), spec, result contract (a report, a change or a verdict: an approval is a procedure's, `../../domain/people.md`, section 8), authority, whose spend and deadline are the task's budget and deadline (`../../domain/authority.md`, section 3), that budget as named there or `AsAllowed`, that deadline a wall or a span (below), wake policy, or none for its executor's default (`../../domain/tasks.md`, 8.3), as an agent's delegate may leave it, dependencies and inputs, the grants named after it (`../../domain/authority.md`, section 4), tracked and priority, label and flags; and the dependencies among its tasks. The other resources a task will write are those its connectors name from its executor and spec (`../../domain/tasks.md`, section 4) | the batch checked whole and made at once (`../../domain/tasks.md`, section 4), its tasks numbered consecutively in the batch's order, the first and the last answered, and the `AsAllowed` task, if any, with what it was given |
+| `Create` | a project; a batch: for each task its executor (an agent's charter, a procedure and its parameters, a person, or a role, which is the project's: roles are per project, `../../domain/people.md`, section 1), spec, result contract (a report, a change or a verdict: an approval is a procedure's, `../../domain/people.md`, section 8), authority, whose spend and deadline are the task's budget and deadline (`../../domain/authority.md`, section 3), that budget as named there or `AsAllowed`, that deadline a wall or a span (below), wake policy, or none for its executor's default (`../../domain/tasks.md`, 8.3), as an agent's delegate may leave it, dependencies and inputs, the grants named after it (`../../domain/authority.md`, section 4), tracked and priority, label and flags, and its LLM choice (its main model with its effort, the models its run's sub-agents may use with theirs, and an account, any of them left out for its charter's default: `../../domain/tasks.md`, section 3); and the dependencies among its tasks. The other resources a task will write are those its connectors name from its executor and spec (`../../domain/tasks.md`, section 4) | the batch checked whole and made at once (`../../domain/tasks.md`, section 4), its tasks numbered consecutively in the batch's order, the first and the last answered, and the `AsAllowed` task, if any, with what it was given |
 | `Propose` | a project; the action: a batch, or an amendment (a widening of a task's authority among them); a party makes no effect (`../../domain/people.md`, 5.1); a reason | a proposal to whoever may accept it, its number answered (3.5) |
 | `Withdraw` | the party's own pending proposal | withdrawn |
 | `Message` | a task; the words | words in its inbox, their message number answered |
-| `Amend` | a task; its spec's revision, or a person task's for its address; the change: spec and parameters, instructions, authority, wake policy, dependencies removed, a person task's address, tracked and priority; a reason | amended. A change of priority alone names no revision: the first commit decides |
+| `Amend` | a task; its spec's revision, or a person task's for its address; the change: spec and parameters, instructions, authority, wake policy, dependencies removed, a person task's address, tracked and priority, its LLM choice, which its next run takes; a reason | amended. A change of priority alone names no revision: the first commit decides |
 | `Cancel` | a task; a reason; a grace, or none | it and its tree closing; with a grace, the task first hears that it is asked to finish, as it hears an amendment, and is cancelled when the grace ends unless it ended first |
 | `Release` | a held task; its hold's revision; for an uncertain effect that cannot be recovered, whether to make it again | its hold lifted, judged afresh |
 | `Stop` | a task | its run cancelled, the task held for the party |
@@ -182,6 +191,7 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
 | `Seen` | how far the party has read: their results, or one conversation's turns | their read position over that moved (`../../domain/people.md`, section 6) |
 | the project's own | notes, by the revision recalled; the policy, its templates' overrides among them (3.6); roles; a party's pool; services, a service's credential answered once; as `../../domain/people.md`, 5.1 and 5.2 | the note or the project changed |
 | adopting a resource | the application's own request (3.3), its form the application's; the engine's root makes the people request on the party's behalf | the project changed |
+| the party's LLM accounts | as `../../domain/accounts.md`, section 5 has them: signing in with an LLM provider; signing a source out; adding or replacing a key, carrying its value (3.1), of at most the bytes `me` states (5.1), and removing one; declaring a program's login under a name; checking a program source's login; an account's place among the holder's and its sources' order; its uses; resuming a limited source; removing an account, which signs each of its sources out and erases its keys. The party's own accounts, or, for an owner, the deployment's | an account made, renewed or changed. A sign-in is answered done with the address to open in a browser on the engine's machine, and ends on the `accounts` watch (7.1), made, renewed or refused; a sign-out's answer says whether the provider confirmed revocation, and names each host that did not sign a program's login out; a program's login declared is answered with the source's name, by which the application's own command signs the program in on each host |
 
 - **A task's fields cross as data** (`../../domain/tasks.md`,
   section 3): *tracked* and *priority*, which the engine acts on; a
@@ -389,7 +399,13 @@ Every request has one answer, of one of these kinds:
     have no holder (3.2);
   - *limit:* which one (the project's live tasks, its goals, the
     operations per request, a grace past its bound, the inbox full, the
-    words too long);
+    words too long, a key past the bytes `me` states (5.1), the LLM
+    accounts' bounds: accounts in the deployment, accounts per holder,
+    sources per account, sign-ins at once, program sources per worker);
+  - *provider's rule:* an LLM provider's terms forbid it, naming the
+    rule (a plan's uses naming another person, or a project with
+    another party; another account for a task its account limits:
+    `../../domain/accounts.md`, sections 4.2 and 4.3);
   - *moved:* the object's revision now, and what changed;
   - *ended:* the object has ended, and how;
   - *unknown:* nothing by that name the party may see;
@@ -433,13 +449,20 @@ served is held, kept and unsent, for its owner's version (client.md,
     a limit; their read position over results; each project's merged
     templates (3.6); what they may create in each project, as the bounds
     a draft is compared with (5.3); their role in the deployment, if
-    any; and the retention of the engine's answers (3.1). It carries no
-    version: the stream's hello does (section 8);
+    any; the models they may choose in each project, as the brief's
+    catalogue gives them (`../../domain/engine.md`, section 9): each
+    with its LLM provider, window and output, the efforts it takes, its
+    prices and its description, so that a task's LLM choice (3.2) is
+    drafted from it; the most bytes a key may have, which bounds a
+    request carrying one (3.1); and the retention of the engine's
+    answers (3.1). It carries no version: the stream's hello does
+    (section 8);
   - *a task:* its header, overview, budget and authority; its fields
     (3.2): tracked and priority, label, flags, last activity, and what
-    it waits on; its hold and its escalation if held; the proposals
-    waiting in its subtree; how far its activity has committed; and the
-    acts the party may make on it, with what each would do (5.3, 5.4);
+    it waits on; its LLM choice, and the account its runs take; its hold
+    and its escalation if held; the proposals waiting in its subtree; how
+    far its activity has committed; and the acts the party may make on
+    it, with what each would do (5.3, 5.4);
   - *a task line:* one record for every list of tasks (6.1): the task's
     chip; its project and its requester; tracked and priority, label
     and flags; when it last changed, its last activity, and when it
@@ -475,7 +498,27 @@ served is held, kept and unsent, for its owner's version (client.md,
     begins, where the period's source said so; otherwise at the next
     period, with the current period and when it began
     (`../../domain/authority.md`, section 7);
-  - *the deployment:* hosts, accounts, capacity.
+  - *the deployment:* hosts, each with its program sources' logins;
+    the deployment's LLM accounts, as the party's own are (below), with
+    the runs using each and the tasks waiting on each; capacity;
+  - *the party's accounts:* the party's own LLM accounts, each with its
+    LLM provider, display name and holder; its sources in order, each
+    with its state: usable; limited, until when where the provider said;
+    refused, and why; needs sign-in, and for a program on which hosts;
+    misconfigured; unloaded, where and why; a program source's state on
+    each host; and its uses. With them, the facts the providers' terms
+    ask an application to show: whether each is a plan, its LLM
+    provider's name and manage-usage address, and a plan's first use;
+    the party's sign-ins under way, and how the last ended: made,
+    renewed, or refused for a subject another holder holds; the checks
+    they asked of a program's login that a host has yet to answer, with
+    those hosts; and two facts a client waits on: *usable*, that an
+    account which serves the party's work (their own, those whose uses
+    name them, and the deployment's: `../../domain/accounts.md`, 4.3)
+    has a source usable on a host, and *settled*, that no sign-in or
+    check the party asked is in progress
+    (`../../domain/accounts.md`, sections 3 and 5). It holds no value,
+    and the words and screens are the application's.
 - **What a task waits on** is the engine's to compute, since only it
   holds the tree and the inbox together: a party (who), for a question,
   a proposal or a person task in its tree; its delegates; news; or
@@ -770,6 +813,7 @@ party reads is therefore never lost by a crash.
 | `tasks{query}` | the live task lines a query selects (6.1), in its order, within the watch's window, saying whether there are more | a party with a role in the project it names; a query naming no project, only the party, for tasks whose requester they are |
 | `run{n}` | a task's live run: its attempt, its provisional text and current call (7.3) | a party who may see the task |
 | `deployment` | hosts, accounts, capacity | a party with a deployment role |
+| `accounts` | the party's accounts (5.1): their own LLM accounts, their sources and states, their sign-ins and checks under way, and whether an account serving their work is *usable* and everything they asked is *settled* | the party, always |
 | an application's subject, naming its owner, its scope and its window | the application's document | a party the scope admits (7.5); what of it they may see, as its owner, the application's connector, says |
 
 The objects a client shows apart from these (a proposal, an escalation,
@@ -825,7 +869,10 @@ does not change, so it is read once (section 6).
   after it, so a task that leaves a query's set changes it too; a
   party's entries, role or pool touched mark their inbox and their `me`;
   a project's policy changed marks the `me` of every party with a role
-  in it. Matching a task against the open queries is bounded by the
+  in it; an account's source, state, order or uses touched, a program's
+  login reported on a host, or a sign-in or a check begun or ended,
+  marks the `accounts` of the parties it concerns and the
+  `deployment`'s. Matching a task against the open queries is bounded by the
   watches the engine allows, each a fixed set of keys. A connector marks
   its own subjects, through the root, as its state changes.
 
@@ -994,6 +1041,20 @@ What `../../domain/` owes this contract, each designed where named:
     read's answer is.
 17. **A watch is not a keyed request** (3.2; `../../domain/people.md`,
     5.1).
+18. **The party's LLM accounts** (3.2, 5.1): the accounts' requests
+    admitted from parties, a sign-in answered with its address and
+    ended on the `accounts` watch, a key named by the request that
+    carried it, the accounts' bounds and the providers' rules refused
+    with their facts, and each account's sources, states, uses and the
+    terms' facts in the party's accounts and the deployment's documents,
+    with the *usable* and *settled* facts of the first, marked as 7.2
+    says (`../../domain/accounts.md`, sections 3 to 5;
+    `../../domain/people.md`, 5.1).
+19. **A task's LLM choice** (3.2): given at `Create`, changed by
+    `Amend` for the next run, its charter's default where it gives
+    none, within the authority's models; the models a party may choose
+    in `me` (`../../domain/tasks.md`, sections 3, 4 and 7;
+    `../../domain/authority.md`, section 3).
 
 ## 10. Below the domain
 
@@ -1018,6 +1079,10 @@ designs (`../../protocol/client.md`):
   it against its digest and hands the domain the sign-in's number.
   Signing in is jig's built-ins and `Mint`, the application's server's
   word (section 2; `../../protocol/client.md`, section 8).
+- **A value is taken out below the domain:** a key a request carries is
+  kept in the secrets' store by the clients' component before the
+  domain sees the request, which names it by the request alone
+  (`../../protocol/client.md`, section 5).
 - **`jig-client-protocol-wire`** encodes jig's messages and documents
   for both ends, from one schema, with their versions; each
   application's own wire crate does the same for its own.

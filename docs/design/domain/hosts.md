@@ -9,7 +9,8 @@ workspaces, and how a run's charter, tools, contract, messages and
 delivery become smith's. The agent is smith, whose design is its own
 (smith's `docs/design/`, cited by path: smith's `domain/run.md`, smith's
 `protocol/channel.md`). The core's side of runs is engine.md, sections 7
-and 8. What is still open is listed in section 12.
+and 8, and the LLM accounts that pay for them are accounts.md's. What is
+still open is listed in section 12.
 
 ## 1. In one page
 
@@ -79,14 +80,21 @@ Between the core's fleet and a host, whatever its shape:
   - an **assignment:** the run and its attempt; the workspace's items and
     its workstream key; the charter; when it resumes, the transcript's
     current window and the calls committed since its last turn (6.4);
-    the start's messages (section 9); the run's identity; credential
-    grants (engine.md, 7.1); and the **ask** for live content: one
-    boolean per kind, `text`, `reasoning` and `input`, which the core sets
-    for a run whose task is a conversation (engine.md, 7.1) and the hub
-    passes into smith's start (6.2, 6.5);
+    the start's messages (section 9); the run's identity; its grants:
+    for each LLM account its check chose, its source's credential or a
+    program source's name, and the application's credentials its
+    workspace needs (engine.md, 7.1); and the **ask** for live content:
+    one boolean per kind, `text`, `reasoning` and `input`, which the core
+    sets for a run whose task is a conversation (engine.md, 7.1) and the
+    hub passes into smith's start (6.2, 6.5);
   - **messages** for the run, named, in order (tasks.md, 8.2);
   - **answers** to the run's relayed calls;
-  - **grants** refreshed while the run lives;
+  - **grants** renewed while the run lives: each new generation of a
+    credential it holds;
+  - to a worker, the **program sources** it may be given, by name, after
+    its hello and as one is added or removed; a holder's **check** of a
+    program source's login; and a **sign-out** of one, which the worker
+    runs (accounts.md, 3.4 and section 5);
   - **acknowledgements** of turns and of the answer, once committed;
   - at most one **cancel.**
 - **Up, from the host:**
@@ -95,10 +103,12 @@ Between the core's fleet and a host, whatever its shape:
     those whose turns or answers wait for acknowledgement; and its
     agent's bounds, by which the fleet admits it (engine.md, section 8):
     the limits a run's start must meet (smith's `protocol/limits.md`):
-    each model's window and output; the most turns, spend, time and
-    waiting a run may have; its checks' timeout; the largest message a run takes, and
-    how many its inbox holds; and how many turns it keeps
-    unacknowledged;
+    the models it declares, each with its window and output, among which
+    a run's models must be; the most turns, spend, time and waiting a run
+    may have; its checks' timeout; the largest message a run takes, and
+    how many its inbox holds; and how many turns it keeps unacknowledged.
+    A worker's program logins are not in its hello: they follow it, as
+    `logins` (below);
   - **turns,** numbered within their attempt, each with its spend, the
     last message it read, whether it opens a window, and the messages
     refused since the run's previous turn, each by name with smith's
@@ -113,8 +123,16 @@ Between the core's fleet and a host, whatever its shape:
     message it read (the unread fence, section 9), the messages refused
     since its last turn, what it left on resources (the application's
     part), and how its save went;
-  - **notices,** relayed from the run's agent: a grant its provider
-    rejected, an account exhausted until a time;
+  - **notices,** relayed from the run's agent: a source *limited*, until
+    a time where its LLM provider gave one, or *refused*, and a
+    generation *unauthorized* (accounts.md, 3.5; smith's
+    `protocol/channel.md`, section 4);
+  - **logins,** from a worker, after its hello: the state of each
+    program source's login on it, as the check of the sources the engine
+    sent answered (the fleet places no run on the worker until the
+    first), then each one whose check answers otherwise than before, and
+    a sign-out's outcome (accounts.md, 3.4; `../protocol/channel.md`,
+    4.3);
   - **refusals:** busy, a duplicate among them (6.1), or invalid.
 - **Fenced.** Every message names the run's task and attempt; the core
   drops what a stale attempt sends, and a host drops an attempt the core
@@ -143,7 +161,10 @@ agents on workers   the hub and agent processes            workspaces, commands,
    need many machines. Each run is its own agent process, so stopping a
    run ends its process tree. A worker's root may compose
    `smith-inline-agent` instead, for one person's machine: its runs are
-   then in the worker's process, with no containment (5.2).
+   then in the worker's process, with no containment (5.2). Only an
+   agent process runs a program backend, such as Claude Code on a
+   person's plan, so a program's source pays only for runs on workers
+   (5.1).
 
 A charter says which kinds of host may run it, and the fleet places by it
 (engine.md, section 8). `ops` is the second shape; an application whose
@@ -216,7 +237,9 @@ its root chooses otherwise:
 
 - **one process per run,** its process tree the run's containment
   boundary, its environment free of credentials, which come as grants on
-  its channel;
+  its channel. A program backend is the agent's child, inside that tree,
+  started with its source's configuration directory and no credential
+  variable (smith's `protocol/programs.md`, sections 2 and 4.2);
 - **one channel** over the process's pipes, whose rules smith's host
   domain enforces, its host half in the worker's protocol layer
   (section 10);
@@ -227,8 +250,19 @@ its root chooses otherwise:
 - **cancel, then kill:** a cancel down the channel first; past the host
   domain's grace, the tree terminated; past its `kill_after`, killed.
   Only an exited process and an empty tree say the agent is gone;
-- **LLM completions** are the agent process's own io, with the grants it
-  is given.
+- **LLM completions** are the agent process's own io, with the
+  credentials it is granted, or the program's, for a grant that names a
+  program source (smith's `protocol/programs.md`, section 3);
+- **the programs directory** is the worker's, private to its user, with
+  one configuration directory per program source, named by the source,
+  holding the program's own login and never a value of jig's
+  (accounts.md, 3.4). The worker's host half checks each login, at the
+  engine's asking or its own interval, runs a sign-out, and reports each
+  answer (section 2). A run's process tree, and a program's own tools,
+  run as the worker's user and can read every login there, so until a
+  run's tree is contained from the programs directory a worker that
+  keeps a person's logins takes only runs that person's accounts pay
+  for (engine.md, section 8; accounts.md, 3.4).
 
 ### 5.2 `smith-inline-agent`
 
@@ -259,7 +293,11 @@ with no workspace, and a worker's by its root's choice:
   its own deadlines and those of the requests it hands up; a bound on
   wall time stays;
 - **bounded:** each run's worst case is smith's, and the inline agent's
-  is its slots' sum, part of the root's.
+  is its slots' sum, part of the root's;
+- **no program backend:** it has no child of its own, so it runs the
+  direct backend only, and the fleet gives it no grant naming a program
+  source (engine.md, section 8; smith's `protocol/programs.md`,
+  section 2).
 
 What it gives up is said in smith's `domain/host.md`, 9.3: no process as
 the run's containment boundary. That is why the engine runs no commands
@@ -406,7 +444,9 @@ Typed, so the engine can act on them without reading prose:
   workstream holds its workspace), or permanent until something changes
   on a system, naming the resource the workspace says;
 - **the run failed,** as it reports it (smith's `domain/run.md`,
-  section 10), or because an LLM account it needs is exhausted;
+  section 10), or because the source of an LLM account it needs turned
+  limited, refused or in need of a sign-in, naming the account, which
+  is no failure of its task's (tasks.md, 5.5; accounts.md, 3.5);
 - **the agent failed:** it could not be started, it exited or was dropped
   without answering, it broke the channel's rules, or the watchdog or its
   bound on wall time stopped it;
@@ -634,8 +674,8 @@ host tools' calls (6.8).
 
   | jig's family | In smith |
   |---|---|
-  | inspecting, modifying, the shell | smith's inspect, modify and shell, when the run has a workspace |
-  | sub-agents | smith's sub-agents |
+  | inspecting, modifying, the shell | smith's inspect, modify and shell, when the run has a workspace; on a program backend, the program's built-in tools of these families, each call asked of smith's policy through the program's permission prompt (smith's `protocol/programs.md`, 5.3 and 5.4) |
+  | sub-agents | smith's sub-agents, on the direct backend; none on a program backend (smith's `protocol/programs.md`, section 2) |
   | the engine's tools (engine.md, 7.3) | host tools, each declared with its schema, its description and whether it writes |
   | each connector's reads, and the effects and topics it offers to agents | host tools, declared by the application; its effects through the engine's `effect`, its topics through `subscribe` |
   | waiting, by its wake policy | smith's `wait` |
@@ -685,12 +725,15 @@ host tools' calls (6.8).
 - **Budget, models, waiting:** the run's budget, its turns, spend and
   time, its spend reserved from its task at its claim, in the
   deployment's unit, and its reserve of turns and time for finishing
-  (smith's `domain/run.md`, 9.1); its models, the main session's and
-  those its sub-agents may use, each on an endpoint named as the agent's
+  (smith's `domain/run.md`, 9.1); its models, from its task's LLM choice
+  (tasks.md, section 3), the main session's and those its sub-agents may
+  use, each with its effort, on an endpoint named as the agent's
   configuration names it, with its window, its output and its prices
-  (engine.md, 7.1); the LLM endpoints the accounts give, their
-  credentials as grants; the charter's waiting time, and whether a run
-  resumes its transcript or starts fresh.
+  (engine.md, 7.1); for each model's LLM provider, the account its check
+  chose, whose grant says the source, and so the backend, since an
+  endpoint names no account (accounts.md, 3.4; smith's
+  `protocol/programs.md`, section 3); the charter's waiting time, and
+  whether a run resumes its transcript or starts fresh.
 - **What jig asks of smith's budget** (smith's `domain/run.md`, 9 and
   9.1): before each completion, its sub-agents' included, smith reserves
   that completion's most (its input at the highest input rate, its
@@ -699,12 +742,20 @@ host tools' calls (6.8).
   budget is spent, the run winds down on its reserve and finishes; a
   completion that does not fit what is left at all ends the run for its
   budget. All of it is inside the run, with no call to its host, so a
-  run never spends past its budget (authority.md, section 7).
+  run never spends past its budget (authority.md, section 7). On a
+  program backend, which makes its own completions, smith cannot reserve
+  one first: the program may pass the ordinary part by one completion of
+  its main model, which the reserve takes, and the run stops at its next
+  turn (smith's `protocol/programs.md`, 5.7 and section 7). Such a run's
+  reserve holds one more of those completions (authority.md, section 7),
+  so it never spends past its budget either.
 - **The core places no run smith would refuse.** A task whose budget
   cannot hold its run's reserve and one of its main model's most costly
-  completions is held for its budget (authority.md, 7 and 8.3), and the
-  fleet admits no host whose agent cannot run the engine's charters
-  (engine.md, section 8). A start smith refuses all the same fails its
+  completions, and on a program backend one more again, is held for its
+  budget (authority.md, 7 and 8.3); the fleet admits no host whose agent
+  cannot run the engine's charters, and places a run only on a host that
+  declares its models and where its sources are usable (engine.md,
+  section 8). A start smith refuses all the same fails its
   attempt as invalid, naming why (6.3).
 
 ## 9. Messages and delivery
@@ -816,6 +867,9 @@ host tools' calls (6.8).
 - **Workspaces in the engine.** Whether a deployment may give in-engine
   runs a workspace, for one person's machine, knowing it has no
   containment; the mechanism would allow it.
+- **Containing a run from the programs directory,** so that a worker
+  keeping several people's program logins may take each one's runs:
+  accounts.md, section 7.
 - **Agents other than smith:** the contract of section 2 is jig's; an
   agent that spoke it through a capability of its own could run beside
   smith. Not wanted yet.

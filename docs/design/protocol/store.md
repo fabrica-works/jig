@@ -1,6 +1,6 @@
 # The store
 
-Provisional, 2026-10-12, revised 2026-10-18. What lies beneath the
+Provisional, 2026-10-12, revised 2026-10-19. What lies beneath the
 engine's store vocabulary: skein's key-value store, embedded in the
 engine's process, holds every record jig's core and the application
 keep, transcripts are files beside it, and secrets are in a second
@@ -51,7 +51,9 @@ section 16.
   task's current window starts, so a resumed run reads only its window
   (section 8).
 - **Secrets in a second store,** in a directory only the engine's user
-  may read, written by components alone (section 9).
+  may read, written by components alone: minted credentials' digests,
+  and LLM accounts' records and keys, each kept before it is used
+  (section 9).
 - **Growth is bounded by retention and fill:** the domain forgets an
   ended task once read, or shrinks it past a horizon on its timers, by
   the task's retention class, and refuses new work above a high-water
@@ -110,7 +112,7 @@ the application's part with the application's codecs.
 | **read** a party's read: its scope, position, direction, rows and bytes (`../domain/engine.md`, 5.3) | the page, each row with its joins, and its cursor; or busy, or gone |
 | **get** a record by key: jig's or the application's | the record, or none |
 | **transcript**: a task's current window, from the turn the core names as its start; a turn by its task, attempt and number; a page of a task's turns from either end | the turns, with their fields and bytes, and a cursor; or unread |
-| **secrets**: keep, erase, get, by owner and number (section 9) | kept, erased, the value or none |
+| **secrets**: keep, erase, get, by owner and number, or a key by the request that carried it (section 9) | kept, erased, the value or none |
 
 - **Turns are records of the core's** (`../domain/engine.md`, 5.4): the
   core saves each accepted turn, keyed by its task, attempt and number,
@@ -196,14 +198,18 @@ child puts live first.
 | tasks | ended tasks, past periods, decided proposals, history, milestones, activity | task, then a position or revision; funder, period; proposal | on demand |
 | people | parties, sign-ins (no secret), roles, projects' policies (their overrides of templates among them), read positions over results and over live conversations, answered keys within the retention | as the people child keys them; a live conversation's position by party, then task | at start |
 | people | ended conversations' read positions (7.4) | task, then party | at start, by the census, every row (7.2); otherwise on demand |
+| accounts | LLM accounts: each one's holder, LLM provider, subject and display name, its sources in their holder's order (each with its kind, its name for a program's, and its state, but not per host) and its uses; the installation's identifier, drawn at the first start (`configuration.md`, section 8) | account; account, source; none: one row | at start |
 | notes | entries, and an index line per entry per scope | name; scope, name | when a scope is in use; entries on demand |
 | tasks | the results' index, the inbox's census's (7.2): a row per result of a task a party requested, at its position among that party's results, past the tasks child's live families | party, position | at start, by the census, past each party's read position over results |
 | tasks, people | indexes for parties' reads (7.4): each party's inbox by time; ended tasks by requester party and by project; ended delegates; a subtree's delegates | the index's own, newest first where it reads so: an ended index's by party or project, then label, ended at reversed and task | on demand |
 
 Children that keep nothing durable (the views, the fleet, authority,
-briefs, accounts) have no family. What a run reports as it goes (its
-text, its activity) is not stored: each committed turn holds what the
-run said and did.
+briefs) have no family. What a run reports as it goes (its text, its
+activity) is not stored: each committed turn holds what the run said
+and did. Nor is a program's login on a host, which its host reports
+(`llm.md`, 5.5), or a sign-in under way, which a restart ends
+(`../domain/accounts.md`, section 5). An account's values are in the
+secrets' store (section 9).
 
 ## 5. Records
 
@@ -608,11 +614,17 @@ Removing a missing file is not a failure.
     link's sign-in, a service's, or an identity the application's server
     verified (`client.md`, section 8);
   - services' credentials' digests, by the service's number;
+  - each signed-in source's record, by the source's number: its tokens,
+    the client id the provider issued, the scopes granted and the ID
+    token, as skein's accounts driver hands it to keep (skein's
+    `oauth.md`, 6.4; `llm.md`, 5.1);
+  - each key, under the party and the key of the request that carried
+    it (`client.md`, section 5), which the key's source names;
   - an application's own records, under its tag: its connectors'
     credentials, which it decodes itself.
 
-  An LLM account's record is not here: skein's accounts driver keeps it
-  in its private files (`llm.md`, section 5).
+  A program source's login is not here: it is the program's own, on
+  each host (`llm.md`, 5.5).
 - **Written by components alone,** through the protocol layer's routing.
   The domain names a secret by number, never holds one, and never sees
   the secrets' store's commits, which have numbers of their own.
@@ -622,15 +634,31 @@ Removing a missing file is not a failure.
   signed in or to the application's server that asked it to mint
   (`README.md`, section 8). A crash between leaves a sign-in no client
   holds a credential for, which expires with its time.
+- **A record kept before lent.** skein's driver takes this store as its
+  keeper (skein's `oauth.md`, 6.4): each new record goes out as a keep,
+  which the routing writes here under its source's number, stating the
+  digest of the record it replaces, and answers `kept` once it is
+  durable; the driver lends the record's token only then. A crash
+  between leaves at worst a record its driver never lent, which the
+  next start lends from.
+- **A key kept before the core sees it.** The clients' component takes
+  a key out of the request carrying it as it decodes it, and keeps it
+  here before the core gets the request, which names it by its party
+  and key (`client.md`, section 5). A request the core refuses, or a
+  key sent again under a key already answered, leaves a key no source
+  names, which the component erases.
 - **A presented credential names its sign-in:** a credential is the
   sign-in's number and its random bytes, opaque to the transport that
   carries it. The component gets the digest by number, and the clients'
   component compares in constant time.
 - **Erased** when the core says a sign-in ended (signed out or revoked)
-  or expired, or a service was removed. A crash between that commit and
-  the erase leaves a digest nobody names, which the restart sweeps:
-  once people's families are restored, the component erases each of
-  jig's digests whose sign-in or service it did not hand up.
+  or expired, or a service was removed; and when the accounts child
+  says a source was signed out or removed, a key replaced, or a record
+  revoked. A crash between that commit and the erase leaves a value
+  nobody names, which the restart sweeps: once people's and the
+  accounts' families are restored, the component erases each of jig's
+  digests whose sign-in or service, and each record or key whose
+  source, it did not hand up.
 - **A failure stops the engine,** as the store's does (section 6): what a
   failed commit of the secrets' store was keeping is never handed out.
 - **Read at start,** whole: small, with its own limits and worst case.
@@ -651,7 +679,9 @@ Removing a missing file is not a failure.
    script asks for one step at a time, and the store serves each step's
    ranges (7.2).
 4. **Secrets are served** to the protocol layer's other components once
-   the secrets' store is open.
+   the secrets' store is open: each signed-in source's record to make
+   skein's driver with, and each key to the accounts' table, before the
+   root's restart begins (`llm.md`, 5.1).
 
 ## 11. Growth
 
@@ -794,9 +824,16 @@ section 2).
      people child's family, loaded at start; moved, by the decision that
      ends its task, to the family of ended read positions, read on
      demand; erased with the task (7.4, 11.1).
+  9. **the accounts' family:** each account with its holder, LLM
+     provider, subject, display name, sources, order and uses, and the
+     installation's identifier, restored at start; a source's record or
+     key named by its number or its request, and erased when the source
+     goes (4.4, section 9; `../domain/accounts.md`).
 - **skein owes:** io's `OpenWrite` and `Cut` (skein's `io.md`, section
   5), for 8.2 and 8.4. skein-kv serves as it is: its in-memory
-  mode, its key writer, its fill.
+  mode, its key writer, its fill. Its accounts driver takes the owner's
+  store as keeper, made with the records it holds (skein's `oauth.md`,
+  6.4).
 - **The application owes:** its keys' encoders, its records' codecs, its
   store version, its live intervals, and its indexes, by the rules of
   section 12.

@@ -116,10 +116,37 @@ it is live:
 - **Its references:** tasks it may message beyond its requester and its
   delegates (8.5).
 - **Its executor** (2) and, for an agent, its **charter**: the role's
-  instructions, the models, the tools, the outcome it must produce, its
+  instructions, the models it allows, in order, each with an effort, or
+  every configured one, the tools, the outcome it must produce, its
   default wake policy and waiting time, whether a run resumes its
   transcript or starts fresh, and which hosts may run it (engine.md,
   7.1).
+- **Its LLM choice,** for an agent task, what its runs' LLMs are:
+  - *main:* a configured model, and an effort among those the model
+    declares (`../protocol/configuration.md`, section 3); its runs use
+    it, and their check holds its most costly completion (authority.md,
+    8.3);
+  - *sub-agents:* the models its runs' sub-agents may use, each with an
+    effort, among which smith chooses within a run (smith's
+    `domain/run.md`, 5.3);
+  - *account:* optionally, one LLM account its creator wants in
+    particular, within the account's uses (accounts.md, 4.3).
+
+  Its creator gives it, or a template does
+  (`../protocol/configuration.md`, 3.1), each model within the task's
+  authority (authority.md, section 3). A task given none takes its
+  charter's default as its batch is checked: the first of the charter's
+  models, in its order, whose LLM provider has an account usable now and
+  serving its payer, with its charter's effort, or the charter's first
+  when none has; its run then waits for an account (accounts.md, 4.3).
+  The task keeps the choice it was given, and only an amendment changes
+  it (section 7).
+- **Its account:** the LLM account its runs use for its main model's LLM
+  provider, chosen at its first run's check and kept from run to run,
+  so that a conversation stays on one account's cache and replay, until
+  a change of its payer or of that LLM provider chooses again
+  (accounts.md, 4.3). The accounts its sub-agents use are each run's,
+  recorded in its claim (engine.md, 7.1, step 3).
 - **Its authority** (authority.md, section 3), and the numbers kept
   against it: spent by itself, spent by the ended tasks it funded,
   reserved for the live tasks it funds, and who funded its own budget.
@@ -195,9 +222,10 @@ dependencies among them.
   whoever creates it: its executor, spec, result contract, authority,
   budget, deadline, wake policy, dependencies and inputs, the resources
   it will write, whether it is tracked and its priority, its label and
-  its flags (section 3). Both pass the same checks; only the source of
-  the creator's authority differs: a task's authority and what it has
-  left, or a party's role and pool (authority.md, 8.1 and 8.4).
+  its flags, and an agent task's LLM choice (section 3). Both pass the
+  same checks; only the source of the creator's authority differs: a
+  task's authority and what it has left, or a party's role and pool
+  (authority.md, 8.1 and 8.4).
 - **A party's root has someone to escalate to.** Every task a party
   requests is the root of a tree, whose escalations wait for that party
   or past them (section 9). A party becomes a root's requester only
@@ -226,7 +254,9 @@ dependencies among them.
   - every task well formed: a known executor kind, a charter or
     procedure the deployment has, a result contract its executor can
     produce, its spec within its limits, its words and text parameters
-    UTF-8 (section 3), the conversation flag on an agent's task only;
+    UTF-8 (section 3), the conversation flag on an agent's task only,
+    and an LLM choice on an agent's task only, its models configured
+    and its efforts among those its models declare;
   - at most one task giving `AsAllowed`;
   - no cycle;
   - within the limits: live tasks in the deployment, tasks in the tree,
@@ -234,7 +264,9 @@ dependencies among them.
     (section 11);
   - within authority: each task's authority fits what the creator has
     left, its budgets carved from what it has left (authority.md, 8.1),
-    or, for a party, fits their role and their pool (authority.md, 8.4).
+    or, for a party, fits their role and their pool (authority.md, 8.4);
+    its LLM choice names models its authority allows, and an account
+    only one whose uses serve its payer (authority.md, 8.1).
 
   A batch that fails a check other than authority is refused, saying
   which task and why, and nothing of it is made. One that fails only on
@@ -362,8 +394,11 @@ which may amend, cancel or re-address it.
   - *invalid:* a result that broke its contract.
 
   A refusal before anything ran (a host busy, a writer slot taken) is no
-  failure: the task claims again after a pause. Every attempt, a failed
-  one included, takes a new attempt number.
+  failure: the task claims again after a pause. Nor is a run ended
+  because its LLM account's source turned limited, refused or in need of
+  a sign-in: its task waits for its account, saying why (accounts.md,
+  3.5 and 4.3). Every attempt, a failed one included, takes a new
+  attempt number.
 - **Past its tries, a task is held.** So it is when its executor stalls
   past its bound, a dependency fails or is cancelled, drift breaks a
   resource it relies on (connectors.md, section 11), an effect it asked
@@ -371,8 +406,9 @@ which may amend, cancel or re-address it.
   connectors.md, 4.2), an effect it asked for is uncertain and of a kind
   that cannot be recovered (connectors.md, 4.3), its budget or its
   deadline runs out (authority.md, section 7; for an agent task, too
-  little left for its next run's reserve and one completion more, with
-  nothing to free more), a party stops it, it waits for a hold past its
+  little left for its next run's reserve and one completion more of its
+  main model, and on a program backend one more again, with nothing to
+  free more), a party stops it, it waits for a hold past its
   bound (6.2), its pool lost its allocation (6.6), or its procedure says
   it needs a decision. A hold keeps whatever the task had: its result
   while closing, its inbox, its attempt number.
@@ -519,8 +555,20 @@ tasks holding it: a quota cut, a machine gone.
   person task's address, to another party or role, naming the person
   task's revision as an amendment names the spec's, a party who took it
   holding it no more; whether it is tracked, within goals per project
-  (section 11), and its priority. An amendment is refused once a task is
-  closing. Its label and its flags are never amended (section 3).
+  (section 11), and its priority; an agent task's LLM choice, within the
+  amender's authority as a batch's is (section 4). An amendment is
+  refused once a task is closing. Its label and its flags are never
+  amended (section 3).
+- **A new LLM choice is for the next run.** A run in flight keeps its
+  own models and account; the next run's check uses the new choice and
+  chooses its account again when its main model's LLM provider changed
+  (accounts.md, 4.3). A conversation that moves to another LLM provider
+  or another account is carried over, its text, calls and results kept
+  and the provider's opaque replay dropped (smith's
+  `protocol/transcript.md`, section 4). An amendment naming another
+  account of an LLM provider whose account the task keeps is refused
+  while that account is limited (accounts.md, 4.3; providers.md, 2.5 and
+  3.4).
 - **Tracking and untracking.** A task an amendment tracks is a goal from
   that commit, with all a goal has (core.md, 6.2). One it untracks is no
   goal from that commit: the core ends its goals' topics, and its
@@ -577,12 +625,14 @@ tasks holding it: a quota cut, a machine gone.
   reason, since that cancel is what ends it. If its grace ends no sooner,
   nothing of the task changes.
 - **Moving a task.** A party may make themselves the requester of a live
-  task they may amend, so that it outlives the task that asked for it, as
-  a goal outlives the chat it came from. Its reservation moves to their
-  funding (authority.md, section 7); the task that asked for it keeps a
-  reference to it, and does not wait for it as for a delegate. It
-  becomes the root of a tree of the party's, so a move needs their
-  escalations to have a holder, as their batch does (section 4).
+  task they may amend, so that it outlives the task that asked for it,
+  as a goal outlives the chat it came from. Its reservation moves to
+  their funding (authority.md, section 7), and its next run keeps its
+  LLM account only if the account serves them (accounts.md, 4.3); the
+  task that asked for it keeps a reference to it, and does not wait for
+  it as for a delegate. It becomes the root of a tree of the party's, so
+  a move needs their escalations to have a holder, as their batch does
+  (section 4).
 - **Several operations, one decision.** A party's compound request
   (people.md, 5.1) cancels, moves, amends, releases, messages and stops
   in one decision, all or none: so a conversation is closed in one

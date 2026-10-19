@@ -1,6 +1,6 @@
 # Authority
 
-Provisional, 2026-10-07, revised 2026-10-18. What a task may do, and how
+Provisional, 2026-10-07, revised 2026-10-19. What a task may do, and how
 the core holds it there: authority as a value, its order and how
 delegation narrows it, where it comes from, budgets and what is spent,
 the checks every action passes, what a proposal needs and what accepting
@@ -11,8 +11,9 @@ is still open is listed in section 12.
 
 ## 1. In one page
 
-- **Authority is a value with an order.** It names tools, effects and
-  reads on resources, what may be delegated and what may be spent. One
+- **Authority is a value with an order.** It names tools, the models
+  its runs may use, effects and reads on resources, what may be
+  delegated and what may be spent. One
   authority is at most another when every part of it is: a preorder,
   decidable from the two values alone. Whether a delegate's authority
   **fits** under its creator's is that order, checked against what the
@@ -29,10 +30,11 @@ is still open is listed in section 12.
   completions as runs price them, and effects as their connectors price
   them.
 - **Recorded spend never exceeds a budget.** A run reserves each
-  completion's maximum before making it, and a priced effect is charged
-  its maximum when decided. The only spend beyond a budget is what a
-  worker spent on turns it lost before they were committed, which is
-  bounded (section 7).
+  completion's maximum before making it, or, on a program backend, where
+  it cannot, holds one more turn in its reserve; a priced effect is
+  charged its maximum when decided. The only spend beyond a budget is
+  what a worker spent on turns it lost before they were committed, which
+  is bounded (section 7).
 - **Every action is checked** before it commits: a batch, an effect, a
   read, a tool call, a run starting, a party's request, an amendment, a
   note. A check answers allow, wait, propose, or refuse.
@@ -86,6 +88,7 @@ Its questions, each a pure function of what the core gathers:
 ```
 Authority
   tools       the tool families an agent's run may call
+  models      the configured models its runs may use, and so their LLM providers
   grants      effects and reads, each a connector's kind on a pattern of resources
   delegation  executor kinds and charters it may delegate to; how many tasks; how deep
   budget      what it may spend, in the deployment's unit; by when
@@ -98,7 +101,14 @@ Authority
   (engine.md, 7.3), in families of their own: delegate; message, with
   `introduce`; amend and cancel, with `release`; decide, with
   `withdraw`; propose; subscribe, with `unsubscribe`; effect; note;
-  recall. A procedure has no tools; its authority's tools are empty.
+  recall. A procedure has no tools; its authority's tools are empty. On
+  a program backend, the program's own tools are these families too,
+  each call asked of smith's policy before it runs (8.5).
+- **Models:** the configured models a task's LLM choice may name, for
+  its main model and its sub-agents' (tasks.md, section 3), and so the
+  LLM providers whose accounts may pay for its runs (accounts.md, 4.3);
+  every configured model, unless the deployment's rules, the project's
+  policy or a role names fewer (section 6). A procedure's are empty.
 - **Grants:** each is a connector, a kind of effect or read that
   connector defines, and a pattern of resource names (section 4):
   "restart the services under `staging`", "create environments in the
@@ -142,7 +152,8 @@ Authority
 ## 5. Order and fitting
 
 - **The order.** Authority A is at most B when:
-  - A's tools, kinds of delegate and note scopes are subsets of B's;
+  - A's tools, models, kinds of delegate and note scopes are subsets of
+    B's;
   - every grant of A is covered by one of B's: the same connector, a kind
     at most B's, a pattern at most B's;
   - A's tasks, depth and spend are at most B's, and A's deadline no later
@@ -159,10 +170,10 @@ Authority
   checked, never applied silently: a batch asking for more than fits is
   refused, naming what it lacked, and may be proposed (section 9); it is
   never trimmed to fit.
-- **What is consumed and what is not.** Tools, grants, kinds, depth,
-  deadlines and scopes are shared: a delegate given a grant does not take
-  it from its creator. Spend and tasks are consumed: what a delegate is
-  given is reserved from its creator (section 7).
+- **What is consumed and what is not.** Tools, models, grants, kinds,
+  depth, deadlines and scopes are shared: a delegate given a grant does
+  not take it from its creator. Spend and tasks are consumed: what a
+  delegate is given is reserved from its creator (section 7).
 
 ## 6. Where it comes from
 
@@ -175,8 +186,9 @@ deployment's rules       the most any project may have; requirements on effects
 ```
 
 - **The deployment's rules** are configuration: the connectors and the
-  kinds of effect any project may be granted, the deployment's spend per
-  period, the charters and procedures it has, the limits, and the
+  kinds of effect any project may be granted, the models any project may
+  use, the deployment's spend per period, the charters and procedures it
+  has, the limits, and the
   requirements every project's effects meet. A rule may forbid what no
   project may grant at all.
 - **A project's policy** is in the store, changed by the parties whose
@@ -184,7 +196,7 @@ deployment's rules       the most any project may have; requirements on effects
   - its ceiling: the authority no task in the project exceeds, which
     follows from its resources' roles (owned, fork, context) and from
     what the application was given on each at adoption (connectors.md,
-    section 12);
+    section 12), and names the models its tasks may use;
   - its spend per period, from which every root task's budget is carved;
   - its roles: for each, the authority a party in it has, the spend a
     party in it may allot per period, and the kinds of proposal it may
@@ -212,11 +224,11 @@ deployment's rules       the most any project may have; requirements on effects
   that pool, which is itself carved from the project's spend for the
   period.
 - **Permissions stay primitive.** A role says which executors and
-  charters a party in it may create with (its delegation's kinds), how
-  deep and how much (its depth and spend), and which kinds of proposal it
-  decides; never which template. A task filled in from a template is
-  checked as any batch is (8.1), so a template grants nothing a party
-  could not create by hand.
+  charters a party in it may create with (its delegation's kinds), which
+  models its tasks may use, how deep and how much (its depth and spend),
+  and which kinds of proposal it decides; never which template. A task
+  filled in from a template is checked as any batch is (8.1), so a
+  template grants nothing a party could not create by hand.
 - **The deployment** is the requester of what configuration or a
   connector starts on a project's behalf (a recurring task, a standing
   watch), with the authority the project's policy gives such tasks,
@@ -317,7 +329,8 @@ deployment's rules       the most any project may have; requirements on effects
   to it. So a task has one funder, and a widening is never split between
   two.
 - **No overrun is recorded.** Every charge is reserved before it is
-  made (below), so what is recorded against a task never passes its
+  made, or, for a program backend's completions, held in its run's
+  reserve (below), so what is recorded against a task never passes its
   budget. A task left with too little for its next run or effect waits,
   or is held for its budget (tasks.md, 5.5).
 - **Periods.** A project's spend and a party's allotment are per period.
@@ -338,8 +351,9 @@ deployment's rules       the most any project may have; requirements on effects
   keep their reservations in the period that funded them, and return to
   it.
 - **What is spent:**
-  - *LLM completions,* priced as they are spent. A charter carries its
-    models' prices, in the deployment's unit: input, cached input, cache
+  - *LLM completions,* priced as they are spent, on either backend. A
+    run's assignment carries its models' prices (engine.md, 7.1), from
+    configuration, in the deployment's unit: input, cached input, cache
     writes when priced apart (at the input's rate otherwise), and
     output. A run prices each completion it makes, its sub-agents'
     included, and reports what it spent with each turn it commits
@@ -359,15 +373,23 @@ deployment's rules       the most any project may have; requirements on effects
   (smith's `domain/run.md`, 9 and 9.1; hosts.md, section 8): it reserves
   each completion's maximum cost before making it, winds down on its
   reserve when the rest is spent, and ends for its budget a completion
-  that does not fit what is left at all. So a run never spends past its
-  budget, and stops a little early rather than late.
+  that does not fit what is left at all. On a program backend, which
+  makes its own completions so that the agent cannot reserve one before
+  it is made (smith's `protocol/programs.md`, section 7), the program
+  may take one turn past where the run should wind down, at most one
+  completion of its main model, and that turn is spent within the one
+  more its reserve holds (below). So a run never spends past its budget
+  on either backend, and stops a little early rather than late.
 - **A run's spend holds its reserve and one completion more.** The
   reserve's spend is its turns, each at the main model's most costly
   completion: a window of input at its highest input rate, plus its
   output at the output rate. The core places a run only if its spend
-  holds the reserve's and one more such completion, so the agent never
-  refuses it for its budget; a task whose budget left cannot fund that
-  waits, or is held for its budget (8.3).
+  holds the reserve's and one more such completion, and on a program
+  backend one more again, for the turn the program may take past the
+  wind-down, so the agent never refuses it for its budget; a task whose
+  budget left cannot fund that waits, or is held for its budget (8.3).
+  The source its check chose says which backend the run has
+  (accounts.md, 3.4).
 - **Spend lost with a worker.** A turn's spend is recorded when the turn
   commits. A worker that dies loses the turns it had not had
   acknowledged, and what they spent was spent but never recorded; the
@@ -398,11 +420,15 @@ A check answers the strictest of what it found.
 
 Before a batch commits (tasks.md, section 4): each task's authority fits
 under its creator (section 5), the creator's delegation allows each
-task's executor kind and charter, and the batch's tasks, depth, budgets
-and deadlines are within what its creator has left. Beyond any of these,
-the answer is propose; beyond the project's ceiling, refuse. Allowed, the
-answer gives the creator's numbers after the reservations, and what the
-budget given `AsAllowed`, if any, resolved to (section 7).
+task's executor kind and charter, each agent task's LLM choice names
+models its own authority allows and efforts its models declare
+(tasks.md, section 3), and the batch's tasks, depth, budgets and
+deadlines are within what its creator has left. Beyond any of these, the
+answer is propose; beyond the project's ceiling, refuse. An account a
+task's LLM choice names that does not serve its payer is refused, naming
+the LLM provider's rule where it is a plan's (accounts.md, 4.2).
+Allowed, the answer gives the creator's numbers after the reservations,
+and what the budget given `AsAllowed`, if any, resolved to (section 7).
 
 - **One check for every creator.** An agent's `delegate`, a procedure's
   step, a party's `Create` and an accepted proposal's batch reach this
@@ -445,27 +471,30 @@ Every check is against effective authority (section 6).
 Before a run is claimed and again as it starts: its deadline is not
 past; the run's spend, what its task has left capped per run by the
 deployment, is above the deployment's minimum for a run and holds its
-reserve and one more of its main model's most costly completions
-(section 7); the accounts its charter's models use, and the
-application's credentials its workspace needs, are usable (engine.md,
-section 12); a host the charter allows has room (engine.md,
-section 8); and every resource its workspace writes, saved state
+reserve and one more of its main model's most costly completions, and
+on a program backend one more again (section 7); the accounts its check
+chooses each have a source usable on a host with room (accounts.md,
+4.3), and the application's credentials its workspace needs are usable
+(engine.md, 12.1); a host the charter allows has room, declares its
+task's models, and may take its payer's runs (engine.md, section 8);
+and every resource its workspace writes, saved state
 included, is covered by a grant of the task and held by the task or by
 the task above it that holds it (tasks.md, section 6). A run that fails
 this check is not started: its task waits for its budget (held, if
 nothing will free one), its account or credential, its host, or its
 writer slot.
 
-Allowed, the answer is the run's budget: the turns, time and reserve
-its charter gives, and that spend, so the core places no run the agent
-would refuse for its budget. Each charter's turns and time above its
-reserve's are configuration's to check (`../protocol/configuration.md`,
-section 6); the agent's own limits are the fleet's, at each host's hello:
-the charter's models, their windows and outputs, the most turns, spend,
-time and waiting a run may have, and the reserve's time against the
-checks' timeout (engine.md, section 8). A start the agent refuses all
-the same fails its attempt as an assignment its host found invalid,
-naming why (tasks.md, 5.5).
+Allowed, the answer is the run's budget: the turns, time and reserve its
+charter gives, and that spend, so the core places no run the agent would
+refuse for its budget; and the accounts and sources chosen, which the
+claim's commit records (engine.md, 7.1). Each charter's turns and time
+above its reserve's are configuration's to check
+(`../protocol/configuration.md`, section 6); the agent's own limits are
+the fleet's, at each host's hello: the models it declares, their windows
+and outputs, the most turns, spend, time and waiting a run may have, and
+the reserve's time against the checks' timeout (engine.md, section 8). A
+start the agent refuses all the same fails its attempt as an assignment
+its host found invalid, naming why (tasks.md, 5.5).
 
 ### 8.4 Parties' requests
 
@@ -488,6 +517,12 @@ pool has left.
   refused, whatever authority it fits.
 - **A compound request** is checked as people.md, 5.1 says: each
   operation as it would be alone, in order.
+- **Account requests** (accounts.md, section 5) are checked against the
+  account's holder, not a role: a person's own accounts by that person,
+  the deployment's by its first owners (accounts.md, 3.2). A plan's
+  account's uses naming another person, or a project with another party,
+  are refused, naming the LLM provider's rule (accounts.md, 4.2). They
+  give no authority and spend nothing.
 
 ### 8.5 Tool calls and reads
 
@@ -498,6 +533,17 @@ among the task's tools, and a read grant covering the resources the
 connector says the topic concerns (connectors.md, 5.3; hosts.md,
 section 8). A message to a task needs a reference to it (tasks.md, 8.5);
 a note needs its scope.
+
+On a program backend, each built-in tool the run is granted has an ask
+rule in the run's settings, so each call of the program's own tools
+reaches smith's policy through the program's permission prompt before
+it runs. The prompt's tool answers *allow*, with the call's input
+unchanged, or *deny*, with a message, and the agent never changes a
+call's input: smith decides the call as it decides one of its own
+tools, within the run's tool families, and the host sees the call that
+runs (smith's `protocol/programs.md`, sections 5.3 and 5.4; hosts.md,
+section 8). So no call runs unseen by its host, and every call's
+effects and reads pass these checks on either backend.
 
 ## 9. Proposals
 

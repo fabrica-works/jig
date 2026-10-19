@@ -7,9 +7,9 @@ reaches the store before anything leaves the engine, how it restarts,
 how it runs agents, and the capabilities it keeps (the fleet, briefs,
 notes, views, accounts). The model is core.md; tasks are tasks.md,
 authority authority.md, connectors connectors.md, parties people.md,
-hosts hosts.md; what the application's root does with all of it is
-root.md. The mechanics are those of skein's `programming-model.md`. What
-is still open is listed in section 16.
+hosts hosts.md, LLM accounts accounts.md; what the application's root
+does with all of it is root.md. The mechanics are those of skein's
+`programming-model.md`. What is still open is listed in section 16.
 
 ## 1. In one page
 
@@ -85,7 +85,7 @@ jig-domain-core             the core: routing among its children, runs, calls, t
 ├── jig-domain-authority    authority's order and checks; the rules and the projects' policies
 ├── jig-domain-people       parties: identities, sign-ins, roles, requests, inboxes
 ├── jig-domain-fleet        hosts: slots, placement, attempts, relaying
-├── jig-domain-accounts     LLM accounts and an application's credentials: usable, granted
+├── jig-domain-accounts     LLM accounts and an application's credentials: sources, states, uses, granted
 ├── jig-domain-brief        a run's brief, from typed sections and connectors' sized ones, within a budget
 ├── jig-domain-notes        notes: scopes, entries, indexes
 └── jig-domain-views        parties' watches, level-triggered
@@ -101,9 +101,9 @@ translates between them with small total functions.
 - **`authority` is policy:** decisions over data, keeping only the rules
   and policies in force.
 - **The others are capabilities,** each knowing its own concern: the
-  fleet the hosts, people the parties, accounts the credentials runs are
-  lent, the brief a run's context, notes what agents learn, views who
-  watches.
+  fleet the hosts, people the parties, accounts the LLM accounts that pay
+  for runs and the credentials runs are lent, the brief a run's context,
+  notes what agents learn, views who watches.
 - **The core keeps little of its own:**
   - the deployment's numbers: the next task number and every other number
     the core gives, committed as they are used;
@@ -128,15 +128,19 @@ translates between them with small total functions.
   section 4), and feeds back what the core asked to resume after one;
 - **from hosts:** a host's hello with its slots, what it hosts and its
   agent's bounds; turns, with the messages a run refused, calls, answers
-  and facts of runs; notices relayed from a run's agent, a grant its
-  provider rejected or an account exhausted until a time (section 12); a
-  host lost or back;
+  and facts of runs; notices relayed from a run's agent, a source
+  limited (until a time, where its LLM provider gives one) or refused, or
+  a generation unauthorized (accounts.md, 3.5); each program source's
+  login on a worker, which follows its hello and which its half checks
+  (section 8); a host lost or back;
 - **from parties:** sign-ins and their ends, a credential to mint for an
   identity the application's server verified (people.md, section 3);
   keyed requests, each one operation or a compound request of several
   (people.md, 5.1); reads, and watches opened and closed (section 11);
-- **from accounts' protocol:** a generation granted, a failure, the
-  component closed;
+- **from accounts' protocol:** a generation granted, a failure, a
+  sign-in's address for the client that asked and its subject once
+  signed in, a revocation's outcome, the component closed
+  (accounts.md, 3.5 and section 5);
 - **from the application,** through its root: each generation of an
   application's credential granted (12.1); a project's period begun,
   saying when the next begins if its source knows. The core keeps no
@@ -319,7 +323,8 @@ answers to a run's reads.
 | projects: resources and roles, homes, policy, parties' roles | people | at start |
 | parties: identities, sign-ins | people | those with a live sign-in or a role, at start; others as they sign in |
 | parties' requests' keys, with their answers, for a retention | people | at start, those within it |
-| tasks: every field of tasks.md, section 3 (its label, flags and last activity among them), holds and their queues, writer slots, the last turn committed for a live attempt | tasks | live ones at start; ended ones on demand |
+| tasks: every field of tasks.md, section 3 (its label, flags, last activity, LLM choice and kept account among them), holds and their queues, writer slots, the last turn committed for a live attempt | tasks | live ones at start; ended ones on demand |
+| LLM accounts: each account's holder, LLM provider, subject and display name, uses, and its sources in their order, each with its kind, a program's name, its state and a limit's reset; never a program's login on a host, which hosts report (accounts.md, 3.1 and 3.5) | accounts | at start |
 | the indexes of ended tasks: by requester, every ended task a party requested; by project, the ended tasks flagged listed; each saved in the decision that ends its task (11.2; `../protocol/store.md`, 7.4) | tasks | on demand |
 | parties' read positions over conversations: a live one's; an ended one's, moved by the decision that ends the task and erased with it (11.4) | people | live ones at start; ended ones on demand |
 | calls committed since each live task's last turn, by attempt and name, with the core's part of their answers | the core | with their task |
@@ -330,7 +335,7 @@ answers to a run's reads.
 | proposals: pending, and decided ones' outcome | tasks | pending ones at start |
 | transcripts: turns, with their spend and whether each opens a window | the core | to resume, from the current window's start; on demand |
 | notes | notes | indexes per scope in use; entries on demand |
-| secrets: minted credentials' digests, by their sign-in's number, and services' credentials' digests (`../protocol/store.md`, section 9); LLM accounts' records are kept apart, by skein's accounts driver | the protocol layer, never the domain, which names them by account and generation, or by a sign-in's or a service's number | at start, by the protocol layer |
+| secrets: minted credentials' digests, by their sign-in's number, and services' credentials' digests; LLM accounts' records and keys, by their account and source, each kept before it is lent (`../protocol/store.md`, section 9; `../protocol/llm.md`, sections 5 and 6) | the protocol layer, never the domain, which names them by account, source and generation, or by a sign-in's or a service's number | at start, by the protocol layer |
 
 Each connector keeps its own records beside these (connectors.md,
 section 2): its outbox, procedures' states and parameters, what it made
@@ -462,7 +467,10 @@ then starts from the store as section 6 says.
 When an agent task is due (tasks.md, 5.2), the core:
 
 1. **Checks** that the run may start, and with what budget
-   (authority.md, 8.3).
+   (authority.md, 8.3), and chooses the accounts that pay for it: one
+   for its main model's LLM provider, kept by its task, and one for each
+   other LLM provider its sub-agents' models use, each with its first
+   source usable on a host with room (accounts.md, 4.3).
 2. **Prepares it,** the task preparing over as many steps as it takes:
    gathers its brief (section 9), for why it runs: its first activation,
    or what woke it; has each connector that owns a resource the task
@@ -473,17 +481,19 @@ When an agent task is due (tasks.md, 5.2), the core:
    committed after its task's last committed turn: a resumed run as a
    note after the transcript, a fresh one as a section of its brief.
 3. **Commits the claim:** the task claimed, with its new attempt number,
-   the host kind it is placed on, the writer slots of the holds its
-   workspace writes (tasks.md, 6.3), and the messages its start carries
-   (tasks.md, 8.2).
+   the host kind it is placed on, the accounts and sources its check
+   chose, the task's kept account among them (accounts.md, 4.3), the
+   writer slots of the holds its workspace writes (tasks.md, 6.3), and
+   the messages its start carries (tasks.md, 8.2).
 4. **Places it** through the fleet, once the claim is durable, on a host
-   its charter allows, with an assignment the root puts together
+   its charter allows, where its sources are usable and the host rule
+   allows it (section 8), with an assignment the root puts together
    (root.md, section 7):
    - its run and attempt, the core's names for them, and its
      conversation's first attempt, from which the engine's protocol layer
-     derives the run's identity, for the provider's prompt cache, the same
-     for every attempt of a conversation and never shared by two
-     (`../protocol/channel.md`, section 7). No domain holds it;
+     derives the run's identity, for the LLM provider's prompt cache,
+     the same for every attempt of a conversation and never shared by
+     two (`../protocol/channel.md`, section 7). No domain holds it;
    - its workspace: the connectors' items, and a workstream key, the
      number of the task that holds the resources written, so that the
      runs of one piece of work find their workspace cached;
@@ -499,17 +509,21 @@ When an agent task is due (tasks.md, 5.2), the core:
      contract asks for; its budget for the run: turns, spend and time,
      with a reserve of turns and time for finishing, its spend reserved
      from what its task has left in the claim's commit (authority.md,
-     section 7); and its models, the main session's and those its
-     sub-agents may use, each with its window (the input tokens a
-     conversation's window may hold), its output (the most output tokens
-     a completion may have) and its prices (authority.md, section 7).
+     section 7); and its models, from its task's LLM choice (tasks.md,
+     section 3): the main model with its effort, and those its
+     sub-agents may use, each with its effort, its window (the input
+     tokens a conversation's window may hold), its output (the most
+     output tokens a completion may have) and its prices (authority.md,
+     section 7).
      The engine's protocol layer translates it into smith's (hosts.md,
      section 8);
    - its transcript's current window, when it resumes, and the calls
      committed since its last turn;
-   - its credential grants (section 12): those its models' accounts
-     need, one account per charter, which its models' endpoints share;
-     and the application's credentials its connectors named (12.1).
+   - its credential grants: for each account its check chose, its
+     source's (accounts.md, 3.4), a value's current generation with how
+     it is sent, or a program source's name, which has its agent run the
+     program backend (smith's `protocol/programs.md`, section 3); and
+     the application's credentials its connectors named (12.1).
      Each names whose table the protocol layer fills its value from.
 
 ### 7.2 Transcripts
@@ -587,7 +601,7 @@ answered after the commit:
 
 | Tool | What it does | Answers |
 |---|---|---|
-| `delegate` | makes a batch of tasks as its delegates, each with what a party's `Create` names, its label and flags among them (tasks.md, section 4) | their numbers and their specs' revisions, and what a budget given `AsAllowed` was given; refused, and why; beyond authority, naming what it lacked and whether a proposal could be accepted |
+| `delegate` | makes a batch of tasks as its delegates, each with what a party's `Create` names, its label, flags and LLM choice among them (tasks.md, section 4) | their numbers and their specs' revisions, and what a budget given `AsAllowed` was given; refused, and why; beyond authority, naming what it lacked and whether a proposal could be accepted |
 | `message` | words, a question or an answer to a task it references | sent; no reference; the inbox full; too large for a run to read |
 | `amend`, `release` | a task below it: an amendment naming its spec's revision as the run last read it, but for a change of priority alone; a release naming its hold's, and, for an effect held uncertain, whether to make it again (tasks.md, 5.5 and section 7) | done, with the task's spec revision after the commit, the one its next amendment names (a release moves none); refused, and why; moved, with what it is now |
 | `cancel` | a task below it and its tree, with a reason, and a grace if the run gives one, within the tasks child's bound: the task is asked to finish first (tasks.md, section 7) | done; refused, and why |
@@ -691,8 +705,26 @@ The fleet child domain knows the hosts and the runs they host:
   (hosts.md, section 6), its agent `smith-inline-agent` with no
   workspace, present from construction. A charter says which kinds may
   run it. A run goes to a host with a free slot of a kind its charter
-  allows, preferring a worker that holds its workstream. A refusal as
-  busy is no failure.
+  allows, that declares its models, where its sources are usable and
+  that the host rule allows (below), preferring a worker that holds its
+  workstream. A refusal as busy is no failure.
+- **Models at the hello, program logins after it.** A host's hello
+  states the models its agent declares (hosts.md, section 2). A worker's
+  logins follow its hello: the engine sends it, by name, every program
+  source it may be given, and places no run on it until the first
+  `logins` that answers them (`../protocol/channel.md`, 4.3). Its host's
+  half checks each login when told of a new source, on its holder's
+  check (accounts.md, section 5) and at a configured interval
+  (`../protocol/configuration.md`, section 4), and reports what changed.
+  A run is placed only on a host that declares its task's models and,
+  for a program source, where that source's login is usable
+  (accounts.md, 3.4). The engine's own slots never take a program
+  source: `smith-inline-agent` has no program backend.
+- **The host rule:** a host that keeps a person's program logins takes
+  only runs that person's accounts pay for, until a run's process tree is
+  contained from them (accounts.md, 3.4; hosts.md, 5.1). One person's
+  deployment is unaffected. The deployment's document names each host
+  the rule keeps a run from, and why.
 - **Attempts are fenced.** Everything a host sends is dropped unless its
   attempt is its task's live one, but a cancelled attempt's answer. No
   attempt of a task is placed while the fleet knows a host may still run
@@ -717,8 +749,9 @@ The fleet child domain knows the hosts and the runs they host:
 - **A host's agent must run the engine's charters.** The fleet refuses
   a hello, as not admitted and naming why, whose agent's bounds
   (hosts.md, section 2) do not hold every run the engine may place there:
-  a model a charter it may run names missing, or held with a smaller
-  window or output than the charter's; turns, spend, time or waiting per
+  a model it declares held with a smaller window or output than the
+  configuration's for it, never a model it does not declare, which only
+  narrows what is placed there (above); turns, spend, time or waiting per
   run smaller than the deployment's most for a run, or a charter's; a checks' timeout longer
   than the reserve's time of a charter that allows a change; a largest
   message smaller than the deployment's message bound (tasks.md, 8.2), or
@@ -727,9 +760,9 @@ The fleet child domain knows the hosts and the runs they host:
   placed where smith would refuse its start, and no run refuses a
   message as too large or its start's messages as full.
 - **Grants follow their attempts:** each new generation of an LLM
-  account or an application's credential goes to every live attempt
-  that holds one (section 12), and each attempt the fleet keeps at a
-  worker's hello, or adopts, is sent its current grants, so no run
+  account's source or an application's credential goes to every live
+  attempt that holds one (section 12), and each attempt the fleet keeps
+  at a worker's hello, or adopts, is sent its current grants, so no run
   outlives its token for want of a resend. A grant never overtakes its
   attempt's assignment (5.2), so a generation renewed while the
   assignment waits for its commit reaches the attempt after it.
@@ -772,7 +805,15 @@ Its sections come from two places:
   attempts and why they failed; the calls its task committed since its
   last turn, when it does not resume; the proposals and escalations
   waiting for its decision; the index of its notes; a transcript's tail,
-  when it does not resume.
+  when it does not resume; and, for a run whose tools hold `delegate`,
+  the catalogue: each model its authority allows (authority.md, section
+  3), with its LLM provider, its window and output, its efforts, its
+  prices, and what it is good at, a description its configuration gives
+  (`../protocol/configuration.md`, section 3), and whether an account
+  that serves the run's payer is usable now, limited and until when, or
+  needs sign-in (accounts.md, 3.5), so that a planning agent gives each
+  task it delegates the LLM choice its work needs, by capability and
+  cost (tasks.md, section 4).
 - **Its connectors',** which it plans by kind, priority and budget but
   never holds (core.md, section 5): for each resource the task names, and
   for each dependency or input whose result is a connector's, the
@@ -828,7 +869,7 @@ computes for them is said below (11.1 to 11.5).
   `me`, the signed-in party's own document (11.1); a task; a task's
   tree; chips, a bounded set of tasks; the party's inbox, across
   projects; a task query's live lines (11.2); a task's live run; the
-  deployment; and an application's own subjects, through the root to the
+  party's LLM accounts (accounts.md, section 5); the deployment; and an application's own subjects, through the root to the
   connector that owns them. The other objects a client shows (a
   proposal, an escalation, a question, a person task, a result, a task's
   activity, a task query's ended part, a project, a note) are read, and
@@ -870,6 +911,10 @@ computes for them is said below (11.1 to 11.5).
   - *a party touched,* their entries, a turn of a conversation they
     requested, their read positions, their roles or pools, or a policy's
     templates in a project of theirs: their `me` and their inbox.
+  - *an LLM account touched,* its source, state, order or uses, a
+    program's login reported on a host, or a sign-in or a check begun or
+    ended: the `accounts` of the parties it concerns, and the
+    deployment's (accounts.md, section 5).
 
   A connector marks its own subjects (connectors.md, 5.5).
 - **Durable before shown:** a delivery waits for the last commit made
@@ -1048,56 +1093,28 @@ section 3):
 ## 12. Accounts
 
 The accounts child domain keeps the deployment's LLM accounts, and an
-application's credentials beside them (12.1): which are usable, and
-which runs hold which generation of each. The protocol layer's accounts'
-component signs LLM accounts in, refreshes them, keeps their records
-before lending, and holds their values (`../protocol/llm.md`,
-section 5). The domain names an account by its number and a token's
-generation, with how long it is valid, and never sees a value or a
+application's credentials beside them (12.1). accounts.md says what its
+LLM accounts are: their holders, sources and uses (its section 3), each
+source's state and how the child keeps it, from the restart's first step
+to the close (3.5), and the accounts chosen with a run's check (4.3). The
+protocol layer's accounts' component signs signed-in sources in,
+refreshes them, keeps their records and keys before lending, and holds
+their values (`../protocol/llm.md`, section 5). The domain names a
+source by its account and its place, and a credential by its source and
+a generation, with how long it is valid, and never sees a value or a
 record.
-
-- **Every configured account is wanted,** from the restart's first step
-  (section 6) to the close, so the component refreshes each before its
-  token expires, and answers each new generation, granted.
-- **Usable** while the child holds a granted generation still valid and
-  the account is not spent. A run whose account is unusable is not
-  started.
-- **Every live attempt hears each new generation** of its account, on
-  whatever host, the engine's own included; and the fleet sends each
-  attempt it keeps its current grant when its worker says hello, and
-  when it adopts the attempt (section 8).
-- **Rejected:** a run's provider refused a generation. The child passes
-  it to the component, which refreshes once; a second rejection of the
-  same generation fails.
-- **Exhausted:** a run's provider says the account is spent until a time.
-  The child marks it spent until then, and asks nothing of the component.
-- **Failed,** in one of five classes:
-  - **later,** with how long: the child asks again after it, while the
-    account is still wanted;
-  - **sign in again:** its grant was revoked, or it has no record. The
-    account is unusable, the deployment's document says a person must
-    sign it in, and the child asks again at its retry interval, which
-    finds a record a new sign-in put in place;
-  - **misconfigured:** the provider rejected the deployment's client. The
-    account is unusable until a restart with its configuration fixed,
-    and the document says so;
-  - **unloaded:** its record could not be read. The account is unusable,
-    the document says where and why, and the child asks again at its
-    retry interval;
-  - **cancelled,** at the close.
-- **Close** releases every account, and ends once the component has
-  closed.
 
 ### 12.1 An application's credentials
 
 A connector's workspace may need credentials of the application's own: a
 token to read from a system and write to it. The accounts child keeps
-them beside LLM accounts, and lends them the same way:
+them beside LLM accounts, and lends them as it lends a source's value
+(accounts.md, 3.5):
 
 - **Named, never seen:** each by the application's number for it and a
   generation, with how long it is valid. Their values are the
-  application's protocol layer's, in a table of its own, from a source
-  of its own: a file, or an exchange it refreshes.
+  application's protocol layer's, in a table of its own, read from a
+  file or from an exchange it refreshes.
 - **Granted through the root:** the application's root tells the child
   each generation granted, as the accounts' component does for an
   account (4.1). One is usable while a granted generation is still
@@ -1107,9 +1124,9 @@ them beside LLM accounts, and lends them the same way:
   carries them as grants, each naming the application's table (7.1;
   `../protocol/channel.md`, section 8); and they follow their attempts
   as an account's do (section 8).
-- **Rejected and exhausted are LLM accounts' only.** A system that
-  refuses a credential is the workspace's failure (hosts.md, 6.3), and
-  its source's to refresh.
+- **Unauthorized, limited and refused are LLM accounts' only.** A
+  system that refuses a credential is the workspace's failure (hosts.md,
+  6.3), and the application's to refresh where it keeps it.
 
 ## 13. Limits and working sets
 
@@ -1128,7 +1145,8 @@ worst case (programming-model.md, 6.3):
 - the calls committed since each live task's last turn, and the funders'
   numbers;
 - hosts, their runs, and the calls and messages relayed;
-- LLM accounts, and an application's credentials;
+- LLM accounts, with their sources and uses, within the accounts'
+  bounds (accounts.md, 3.6), and an application's credentials;
 - decisions in progress and their hand-offs; loads in flight and their
   rows;
 - briefs gathering, with the sizes of the connectors' sections, and the
@@ -1177,13 +1195,18 @@ protocol layer, which composes jig's pieces with its own:
   asks the component to mint a credential for the identity it verified
   (people.md, sections 3 and 10; `../client/domain/contract.md`,
   sections 2 and 10).
-- **Accounts:** sign-in, refresh, records kept and tokens lent, by
-  skein's OAuth accounts driver (`../protocol/llm.md`, section 5); an
-  application's credentials by its own protocol layer, each generation
-  granted told to the core through the root (12.1).
+- **Accounts:** sign-in, refresh, revocation, records and keys kept in
+  the secrets' store before they are lent, and tokens lent, by skein's
+  OAuth accounts driver (`../protocol/llm.md`, sections 5 and 6;
+  `../protocol/store.md`, section 9); a value a party's request carries
+  taken out and kept before the request reaches the core (accounts.md,
+  section 5); an application's credentials by its own protocol layer,
+  each generation granted told to the core through the root (12.1).
 - **Configuration:** the deployment's rules, connectors and their
-  systems' addresses and credentials, LLM endpoints, accounts, and models
-  with their windows, outputs and prices, workers' secrets, the engine's
+  systems' addresses and credentials, LLM providers with their
+  endpoints, sources and terms' facts, and models with their windows,
+  outputs, efforts, prices and descriptions, but no account (accounts.md,
+  3.1), workers' secrets, the engine's
   own slots, the charters the deployment offers with their runs' budgets
   and reserves, the application's templates, which the core only serves
   (11.1), procedures' settings, limits. Projects and their policies are
@@ -1269,4 +1292,10 @@ section 5).
   come and go (11.2 and 11.3).
 - **Scaling out:** one engine per deployment until it binds; the store
   being the engine's alone is what would change first.
-- **Accounts per run:** whether a run's models may use several accounts.
+- **Models an LLM provider lists** for an account (providers.md, 2.4),
+  in the catalogue beside configuration's (section 9). Default:
+  configuration's only, since a run's budget needs each model's window,
+  output and prices, which a provider's list does not give.
+- **What a model is good at:** a description in configuration, or
+  structured capabilities a planning agent could filter on. Default: a
+  description (section 9).

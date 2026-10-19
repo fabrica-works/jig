@@ -67,8 +67,9 @@ is still open is listed in section 15.
   not served answered so, typed, naming the owner and the ranges, in an
   envelope every version reads (section 9).
 - **The small store is the client's records,** the request table's and
-  its own, per owner, versioned, each request's stored before it leaves.
-  The application keeps its own (section 10).
+  its own, per owner, versioned, each request's stored before it leaves,
+  but for a request carrying a value, which is sent once and never
+  stored (section 5). The application keeps its own (section 10).
 - **Shells are the application's.** jig ships a native shell,
   `jig-client-shell-native`, and its browser parts,
   `jig-client-shell-web` (section 12).
@@ -348,25 +349,29 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   with another request apart (`../client/domain/contract.md`, 3.3). The
   record is canonical (skein's `codec.md`, section 1), so the same
   request always has the same digest.
-- **The answer** is one record, of one of the contract's kinds
-  (`../client/domain/contract.md`, section 4): done, with its outcome;
-  refused, with its facts; busy; not ready; signed out; version not
-  served. The engine's protocol layer makes it from whichever of the
-  core's outputs answers the request: a party's reply, an application's
-  outcome its connector kept, or a refusal before any child changed; a
-  version not served, before the record is read.
-- **The client's envelope:** done and refused are *final*, with the record
-  decoded into its owner's vocabulary: jig's by
-  `jig-client-protocol-wire`, an application's by its own wire; busy and
-  not ready are *again*; signed out, or a credential the engine does not
-  know, is *signed out*; an exchange that failed, timed out or ended
-  without a whole answer is *lost*. A final answer that does not decode
-  is *lost* too, and reported in the request's progress, retrying
-  because its answer did not decode (`../client/domain/client.md`,
-  section 6): the engine has it, and sending the request again under
-  its key fetches it again. A version not served is
-  neither final nor sent again: the request is held, kept and unsent, for
-  its owner's version (section 9).
+- **A request carrying a value,** an LLM account's key added or
+  replaced (`../client/domain/contract.md`, 3.2), is sent once and never
+  kept: the client never stores it in the small store, and never sends
+  it again by itself (`../client/domain/client.md`, section 6). Its key
+  is its caller's name, never made from the value
+  (`../client/domain/contract.md`, 3.1).
+  - *The engine's side* takes the value out of the record as it decodes
+    it, keeps it in the secrets' store before the core sees the request
+    (`store.md`, section 9), and hands the core the request with the
+    value named by its party and key, and the digest of the record's
+    bytes as they came, as for an application's request, so that a key
+    sent again with another value is told apart. The digest is the only
+    trace of the bytes the core keeps, and no value can be read from it.
+  - *The client's side* sends it once: an answer of busy or not ready, a
+    link down, or a party signed out or not yet confirmed ends it as
+    *unsent*, the engine having made nothing; an exchange that ends with
+    no whole answer ends it as *lost*, the engine possibly having made
+    it. Nothing is sent again by the client. Its caller asks again under
+    the same key, with the value; the engine answers a key it has
+    answered with its first answer, and erases unused a value kept for
+    it again.
+  - *No value is in a record kept:* not in the small store, the core's
+    commits, an answer, a log or a progress report.
 
 ## 6. Reads
 
@@ -601,7 +606,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   for it, its owner and version, and when it was first sent; and the
   name of the client's stream (section 4), under a key of its own, which
   no request's key can be (a request's is 16 bytes); nothing else of the
-  client's, and never a credential or an answer. Each is encoded with
+  client's, and never a credential, an answer or a request carrying a
+  value (section 5). Each is encoded with
   jig's wire, with its store version.
 - **The stream's name** is saved at each hello, in a write of its own,
   and replaces the last; nothing waits for it, and a write of it not
@@ -618,7 +624,9 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   record is stored: the client sends it only once its `Save` is answered
   `Stored`. `NotStored` (a quota full, a disk failing) is each request
   whose record that write was the last to carry not sent, parked or not,
-  answered *not kept* (`../client/domain/client.md`, section 11).
+  answered *not kept* (`../client/domain/client.md`, section 11). A
+  request carrying a value is never stored, and leaves at once, once
+  (section 5).
 - **Read at start,** the records the application's shell loaded handed
   to `jig-client` as it starts, each request's to the request table, and
   the stream's name to the link (section 4); one of a
@@ -721,8 +729,11 @@ section 2).
   each with its own name, a stream sent gone by the client that followed
   it, signed out, records that do not decode, a version not served, a
   `Mint` answered and refused, the printed link spent and drawn again, a
-  service signing in. Its referee: one reply per exchange; one streamed
-  message in flight per stream; no credential reaches a domain.
+  service signing in, a key added, sent again under its key with the
+  same value and with another. Its referee: one reply per exchange; one
+  streamed message in flight per stream; no credential reaches a
+  domain; no key is in the small store, a committed request or an
+  answer.
 - **The default mapping's ends,** each against a scripted peer of bytes:
   every route, the stream's events cut at random, the credential as a
   cookie and as a bearer, the printed link's route, and the example
@@ -782,7 +793,9 @@ section 2).
   credential held, or carried by the transport (section 8); reads and
   watches answered signed out, a reopened run's watch taken from its
   turn's beginning, and a run's document with no text and no call, for
-  a run whose host gives neither (`../client/domain/contract.md`, 7.3).
+  a run whose host gives neither (`../client/domain/contract.md`, 7.3);
+  a request carrying a value, sent once, never stored, its value taken
+  out and kept before the core sees it (section 5).
 - **The application owes:** its transport, or jig's default mapping; its
   sign-in flows, with `Mint` sent from its server alone (section 8); the
   printed link's URL, printed from the secret the component gives; its

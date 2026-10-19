@@ -1,6 +1,6 @@
 # Pages
 
-Provisional, 2026-10-09, revised 2026-10-18. The reference UI's pages:
+Provisional, 2026-10-09, revised 2026-10-19. The reference UI's pages:
 jig's optional pages, in `jig-client-view`, for `ops` and jig's test
 application: how they are organised, what a party finds where, and what
 they do there. They are built on the public client alone (`jig-client`
@@ -438,8 +438,15 @@ For a party with a role on the deployment:
 - **Hosts:** the engine's own slots and each worker: connected or lost,
   and how long its grace still holds; slots used and free; the runs it
   hosts, as chips; a worker refused at its hello, and why.
-- **LLM accounts:** each usable or not, and why; the runs using it; the
-  tasks waiting for it.
+- **LLM accounts:** each with its LLM provider, display name and
+  holder; its sources in order, each with its state and why: limited,
+  and until when where the provider said; refused; needs sign-in, and
+  for a program on which hosts; misconfigured; unloaded; a program
+  source's login on each host; its uses; the runs using it and the tasks
+  waiting for it (contract.md, 5.1). It shows no value. The facts the
+  providers' terms ask for (a plan, the provider's name, where to
+  manage its usage) are in the document; their words are the
+  application's (`../../domain/accounts.md`, section 5).
 - **Connectors:** each as a part: its outbox, effects waiting and those
   uncertain, its request budget, what its system last said.
 - **Capacity:** live tasks against their limits, for the deployment and
@@ -536,6 +543,11 @@ inbox, withdrawn, with R's result saying why.
 - **Naming a chat:** a chat is named by its first words; whether its
   person names it, or the chat proposes a name.
 - **A board across projects,** for a party with several.
+- **A person's own LLM accounts:** the `accounts` watch (contract.md,
+  7.1) gives every party theirs, with their sign-ins under way; which
+  page of the reference UI shows them, and its place in view.md's
+  places, is not settled. Until it is, an application shows them on its
+  own page.
 
 ## 12. Parts, sections and arrangements
 

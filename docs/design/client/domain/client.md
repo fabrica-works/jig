@@ -300,8 +300,9 @@ handles, as every presentation does (sections 7 and 8).
     already answers a repeated name with its first answer.
 - **Through skein-lib's request table** (skein's `lib.md`, section 12),
   which the client holds. It is the client's only way out for a keyed
-  request, as the journal is the engine's root's (`../../README.md`,
-  6.2). It:
+  request that is kept, as the journal is the engine's root's
+  (`../../README.md`, 6.2); a request carrying a value (below) is the
+  one request that does not go through it. It:
   - *keeps it before sending it:* the request's record leaves in a
     `Save`, and its first `Exchange` only once the transport says
     `Stored` (section 11);
@@ -317,6 +318,22 @@ handles, as every presentation does (sections 7 and 8).
   - *is bounded:* requests held, and their bytes, a family's included. A
     `Send` past them is answered at once, refused by the client's limit,
     and never queued.
+- **A request carrying a value,** an LLM account's key added or
+  replaced (contract.md, 3.2), is sent once and never kept, so that no
+  value is ever in the small store (`../../protocol/client.md`, section
+  5):
+  - *beside the table:* it carries a name, the engine key its caller
+    gives and never makes from the value (contract.md, 3.1), and goes
+    as one exchange: never in a `Save`, never parked, never sent again
+    by the client;
+  - *its one answer* is the engine's, done or refused; or the client's
+    own *unsent*, when the engine answered busy or not ready, the link
+    is down, or the party is signed out or not yet confirmed: the
+    engine did not make it; or the client's own *lost*, when the
+    exchange ended with no whole answer: the engine may have made it;
+  - *its caller asks again* under the same name, with the value; within
+    its retention the engine answers a name it has answered with its
+    first answer (contract.md, 3.1).
 - **Progress, for showing.** `Pending { key }` says the request's
   progress changed: in flight, retrying, parked (offline, signed out, or
   another party's), or held for its owner's version (8.2). Retrying
@@ -344,6 +361,9 @@ handles, as every presentation does (sections 7 and 8).
   - *held,* the client's own: the name the `Send` carries is held by
     another request. It is answered at once, and nothing of it is kept
     or sent (above).
+  - *unsent* and *lost,* the client's own, for a request carrying a
+    value only: the engine did not make it, or may have; its caller asks
+    again under its name (above).
 
   Done and refused come only once the engine's commit is durable
   (`../../domain/core.md`, section 11), so the client never says done
@@ -651,11 +671,12 @@ for any presentation of a chat or of any agent task's activity.
 ## 11. The small store
 
 - **What the client keeps across its own restart:** the requests not yet
-  answered, as the request table's records, each with the key the engine
-  knows it by, its party, the application's key, the request (jig's
-  record, or a family's bytes under its owner's number and version), and
-  the wall time of its first sending; and the name of its stream, which
-  the client that follows sends gone before it opens its own
+  answered, but a request carrying a value (section 6), as the request
+  table's records, each with the key the engine knows it by, its party,
+  the application's key, the request (jig's record, or a family's bytes
+  under its owner's number and version), and the wall time of its first
+  sending; and the name of its stream, which the client that follows
+  sends gone before it opens its own
   (`../../protocol/client.md`, sections 4 and 10). Nothing else of the
   client's: everything shown is read again. A presentation's own records
   (the reference UI's drafts and its place) are the application's, which
@@ -672,7 +693,9 @@ for any presentation of a chat or of any agent task's activity.
   whole in each write, so a request whose record a later write carries
   again is decided by that later write, and one whose record the write
   did not carry is sent once its own write is stored. So a restart never
-  loses a request the engine may have made.
+  loses a request the engine may have made. A request carrying a value
+  is the one never kept: it is sent once, and its caller asks again
+  (section 6).
 - **Restored at `Start { kept }`,** before any other event: each
   request's record admitted to the table under its key, parked until
   the link is live, its party confirmed and the retention known; and

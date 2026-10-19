@@ -35,6 +35,12 @@ mechanics are those of skein's `programming-model.md`.
    their agents run, smith's payloads it carries, workspaces, and what
    the core takes from smith.
 9. **testing.md:** the worlds, the conformance world and its referee.
+10. **accounts.md:** LLM accounts: each application its own client,
+    accounts and their holders, sources and states, whose work an
+    account pays for, which account a run gets, what people do with
+    their accounts, and moving one.
+11. **providers.md:** the LLM providers' terms, OpenAI's and
+    Anthropic's, as accounts.md and smith's programs apply them.
 
 `../examples.md` is the example application, `ops`, which each document
 uses for its examples.
@@ -49,7 +55,7 @@ an application's engine
 │   ├── jig-domain-authority    policy (authority.md)
 │   ├── jig-domain-people       parties (people.md)
 │   ├── jig-domain-fleet        hosts, placement, attempts
-│   ├── jig-domain-accounts     LLM accounts
+│   ├── jig-domain-accounts     LLM accounts and an application's credentials (accounts.md)
 │   ├── jig-domain-brief        briefs
 │   ├── jig-domain-notes        notes
 │   └── jig-domain-views        parties' watches
@@ -137,7 +143,7 @@ system.
 | subscription, topic | a task's standing interest; a connector's subject |
 | reference | a task another may message |
 | party | a person or a service that takes part (people.md) |
-| provider | one of the application's ways of signing in, numbered in its configuration; an identity is a provider and a subject (people.md, section 3) |
+| identity provider (provider) | one of the application's ways of signing in, numbered in its configuration; an identity is an identity provider and a subject (people.md, section 3). Not an LLM provider |
 | credential, sign-in | what jig mints for an identity, verifies, expires and revokes; the signed-in session it names, numbered by the core (people.md, section 3) |
 | the printed link, the application's sign-in, `Mint` | jig's one-time secret on loopback; any other way of signing in, on the application's own routes; its server's word that it verified an identity, on which jig mints (people.md, section 3) |
 | operation | one of jig's primitives as a request: `Create`, `Propose`, `Withdraw`, `Message`, `Amend`, `Cancel`, `Release`, `Stop`, `Move`, `Decide`, `Answer`, `Take`, `HandBack`, `Seen`, and the project's own (people.md, 5.1) |
@@ -149,7 +155,7 @@ system.
 | a party's role | what a party may do in a project: owner, maintainer, member, observer, or the policy's own |
 | a resource's role | owned, fork, or context, in a project |
 | authority | what a task may do (authority.md, section 3) |
-| grant | an effect or a read of a connector's kind on a pattern of resources |
+| grant (authority's) | an effect or a read of a connector's kind on a pattern of resources |
 | fit | whether a delegate's authority goes under its creator's, given what it has left |
 | funder | who a task's budget was reserved from: a task, a party's pool, a project's period |
 | price | what a priced effect costs at most, in the deployment's unit |
@@ -181,6 +187,18 @@ system.
 | test connector | jig's connector for its own worlds |
 | smith | the agent, and the kit it is built with, in its own repository |
 | session | an agent's conversation with an LLM: smith's |
+| LLM provider | OpenAI, Anthropic, a local model's server: an entry of configuration, with its endpoints, models and the sources it offers, numbered apart from identity providers (accounts.md, 3.1; providers.md) |
+| LLM account, holder | what pays for runs' LLMs: a holder, an LLM provider, the provider's subject where a sign-in gives one, its sources in order and its uses; the person, or the deployment, it belongs to (accounts.md, section 3) |
+| plan, a plan's account | a subscription a person pays for, such as ChatGPT's or Claude's; an account with one among its sources, which pays for its holder's work only (accounts.md, 3.2 and 4.2) |
+| source | how a run may use an account: signed in (`sign_in`), with the application's own registration; a key (`key`); a program's own login on a host (`program`); none (`none`), for a local model (accounts.md, 3.4) |
+| record | a signed-in source's OAuth record: its tokens, the issued client id, the granted scopes, the subject (accounts.md, 3.4) |
+| subject (an LLM account's) | the LLM provider's validated identifier of the account a sign-in is to, an ID token's `sub`; told apart from the subject of an identity (people.md, section 3), and it opens no session (accounts.md, 3.1) |
+| usable, limited, refused, needs sign-in, misconfigured, unloaded | a source's states, kept by the accounts child (accounts.md, 3.5) |
+| uses, payer | whose work an account pays for; the party or project at the end of a run's chain of funders (accounts.md, section 4) |
+| LLM choice | a task's main model and effort, its sub-agents' models and efforts, and optionally its account (tasks.md, section 3) |
+| grant (a run's) | what a host lends a run: a credential, a bearer or a key, by generation; or a program source's name (accounts.md, 3.4; engine.md, 7.1) |
+| program, program backend | an LLM program, Claude Code (`claude_code`) first, that smith's agent runs as its child in place of its own loop, the direct backend (smith's `protocol/programs.md`; hosts.md, 5.1) |
+| configuration directory, programs directory | where a program source's login lives on a worker, one per source, named by it; their parent, the worker's (accounts.md, 3.4; hosts.md, 5.1) |
 
 ## 5. Decisions this design takes
 
@@ -204,8 +222,8 @@ where each is answered:
   verifies, expires and revokes credentials; the printed link and
   services' credentials are its own ways of signing in, and any other is
   the application's, on its own routes, ending in a `Mint` on its
-  server's word; the core knows an identity as a provider and a subject,
-  and jig adds no acting for (people.md, section 3).
+  server's word; the core knows an identity as an identity provider and
+  a subject, and jig adds no acting for (people.md, section 3).
 - **Hosting runs inside the engine:** the same hub as on a worker, a
   child of the application's root, whose slots the fleet places on like
   a worker's, with `smith-inline-agent` as its agent, with no workspace
@@ -232,10 +250,12 @@ where each is answered:
 - **A hard ceiling on recorded spend:** a run reserves each completion's
   most before making it and winds down on its reserve when the rest is
   spent, as smith's budget does (smith's `domain/run.md`, 9 and 9.1), and
-  the core places no run smith would refuse for its budget; a priced
-  effect is charged its maximum; only turns lost with a worker escape
-  it, within a stated bound (authority.md, section 7; hosts.md,
-  section 8).
+  the core places no run smith would refuse for its budget; on a program
+  backend, which makes its own completions, the run's reserve holds one
+  more of its main model's most costly completions, which the one
+  completion it may pass takes; a priced effect is charged its maximum;
+  only turns lost with a worker escape it, within a stated bound
+  (authority.md, section 7; hosts.md, section 8).
 - **Standing work renews by period:** a standing task's allotment of
   tasks and spend is carved again each period (authority.md, section 7).
 - **Periods are the application's to say:** the engine keeps no
@@ -276,9 +296,9 @@ where each is answered:
   the fleet admits no host whose agent takes less, so no run refuses one
   for its size (hosts.md, 6.4 and sections 2 and 9; tasks.md, 8.2 and
   8.3).
-- **An application's credentials are lent as accounts are:** named by
-  number and generation, their values its protocol layer's, named by the
-  connectors for a run's workspace and granted with the assignment
+- **An application's credentials are lent as LLM accounts' are:** named
+  by number and generation, their values its protocol layer's, named by
+  the connectors for a run's workspace and granted with the assignment
   (engine.md, 12.1; connectors.md, section 10).
 - **A run's text at the assignment's ask:** activity from every host
   carries no content; a run's text comes from any host whose assignment
@@ -361,6 +381,23 @@ where each is answered:
   durably (connectors.md, 6.3).
 - **A task's activity kept** in commit order, the words parties wrote
   among it (engine.md, 7.2).
+- **LLM accounts are runtime state, never configuration:** each
+  application is its own client, with its own registration, records and
+  refreshes; an account is a holder's, a person's or the deployment's,
+  with its sources in the holder's order and its uses; a plan pays for
+  its holder's work only; configuration names LLM providers and their
+  models, never an account (accounts.md, sections 2 to 4; providers.md).
+- **A task chooses its models, its run's check its account:** a task's
+  LLM choice, within its authority, or its charter's default; the
+  account taken with the run's check and kept by the task, a limited one
+  waited for, never left for another of its holder's (tasks.md, section
+  3; accounts.md, 4.3).
+- **A program as the agent's backend:** Claude Code runs as the agent's
+  child on a worker, signed in by its holder in a configuration
+  directory of the worker's, its tools' calls asked of smith's policy;
+  a worker that keeps a person's program logins takes only runs that
+  person's accounts pay for, until a run's tree is contained from them
+  (accounts.md, 3.4; hosts.md, 5.1; smith's `protocol/programs.md`).
 
 ## 6. What is open
 
@@ -370,4 +407,7 @@ Each document lists its own; the ones that reach across:
 - generating a root's boilerplate rather than copying it (root.md);
 - fairness for runs on the engine's loop (hosts.md);
 - how fresh a verdict's facts must be (connectors.md);
-- how many commits the focused suite crashes at (testing.md).
+- how many commits the focused suite crashes at (testing.md);
+- replay across accounts of one LLM provider, a sign-in's redirect
+  relayed by a client, and program logins on a worker once runs are
+  contained from them (accounts.md).

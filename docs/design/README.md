@@ -1,6 +1,6 @@
 # jig's design
 
-Provisional, 2026-10-06, revised 2026-10-18. What jig is, how an
+Provisional, 2026-10-06, revised 2026-10-19. What jig is, how an
 application is built around it, and what keeps the application's wiring
 from breaking what jig promises. This document comes first. The documents
 it lists in section 12 go deeper into each part. The mechanics are those
@@ -183,7 +183,8 @@ application root    routing between its children, translation; its store, channe
   - agents' hosts: the workers' channel, the engine's side, or the host
     inside the engine (section 9);
   - people's requests, and the replies to them;
-  - LLM accounts: wanted, granted, failed;
+  - LLM accounts: signed in and out, keys added and removed, wanted,
+    granted, failed, and the limited, refused and unauthorized notices;
   - the connectors' vocabulary (section 7).
 - **Connectors are numbered.** The core knows from its configuration that
   connector `k` exists and that its resources are paths under its
@@ -195,8 +196,9 @@ application root    routing between its children, translation; its store, channe
   - **authority**: policy as data, checks and budgets;
   - **people**: identities, sign-ins, roles, requests, inboxes;
   - **fleet**: agents' hosts, slots, placement, attempts;
-  - **accounts**: the LLM accounts and the application's credentials
-    runs are lent;
+  - **accounts**: the LLM accounts, each a holder's with one LLM
+    provider, with their sources, states and uses, and the application's
+    credentials runs are lent (`domain/accounts.md`);
   - **brief**: a run's context, in typed sections within a byte budget;
   - **notes**: what agents learn, in scopes;
   - **views**: parties' watches, each delivered its subject's current
@@ -411,8 +413,8 @@ and the conformance world crashes the application at every commit.
   - their encoding, ordered as the keys are and versioned;
   - transcripts as files, one per task;
   - the secret records: minted credentials' and services' credentials'
-    digests (`protocol/store.md`, section 9); LLM accounts' records are
-    skein's accounts driver's own files.
+    digests, and LLM accounts' records and keys (`protocol/store.md`,
+    section 9). A program's login is the program's own, on its host.
 - **The application's part:**
   - its connectors' records: outboxes, procedures' states, what was made
     by key, and each connector's own state;
@@ -703,9 +705,11 @@ application as its first user.
 ## 12. Documents
 
 - **`domain/`:** jig's domain layer: the model, tasks, authority,
-  connectors, the core, the application's root, parties, hosts, and
-  testing. Its `README.md` gives the reading order and the names, and
-  the decisions it took on what this document left open.
+  connectors, the core, the application's root, parties, hosts, LLM
+  accounts (`accounts.md`) and the LLM providers' terms they keep
+  (`providers.md`), and testing. Its `README.md` gives the reading order
+  and the names, and the decisions it took on what this document left
+  open.
 - **`client/domain/`:** jig's client: `jig-client`, what it holds and
   its surface; the API between a client and the engine: plumbing
   operations, subjects and reads, documents and their revisions,

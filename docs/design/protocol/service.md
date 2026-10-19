@@ -1,6 +1,6 @@
 # The engine's and the worker's services
 
-Provisional, 2026-10-10, revised 2026-10-18. What an application writes
+Provisional, 2026-10-10, revised 2026-10-19. What an application writes
 around its roots to make running processes: the protocol layer that
 composes jig's components with its own, `iterate`, which carries every
 event between io, the components and the root, and `main`, which reads
@@ -59,7 +59,7 @@ listed in section 9.
 └── the protocol layer
     ├── jig-protocol-store            commits, loads, transcripts, secrets (store.md)
     ├── jig-protocol-engine-workers   workers, if any (channel.md)
-    ├── jig-protocol-accounts         LLM accounts, if it runs agents (llm.md)
+    ├── jig-protocol-accounts         LLM accounts' sign-ins, records and table of values, if it runs agents (llm.md)
     │   └── skein-oauth-accounts
     ├── smith-protocol-llm            smith-inline-agent's completions, for the engine's own slots (shape 2) (llm.md)
     │   └── skein-llm-connection
@@ -85,8 +85,11 @@ listed in section 9.
   component; a party's answer, a read's answer or a watch's delivery to
   the clients' component; a completion `smith-inline-agent` asks for, or
   its cancel, to smith's LLM component, with its slot's result contract
-  (`llm.md`, section 3); an account wanted or released to the accounts';
-  an outbox entry to make, to its connector's protocol.
+  (`llm.md`, section 3); a source signed in or out, wanted or released,
+  a key added or removed, a sign-in cancelled, to the accounts'
+  (`llm.md`, 5.2); a program source's set, check or sign-out to the
+  channel's (`channel.md`, 5.2); an outbox entry to make, to its
+  connector's protocol.
 - **Calls decoded, answers rendered, in the routing:** a host tool's call
   the core hands out is decoded, and an answer rendered, by functions the
   routing calls, `jig-protocol-tools`' for the core's tools and the
@@ -102,7 +105,12 @@ listed in section 9.
 - **Routing between components:** secrets' values go from the accounts'
   table, and from the application's table of its credentials, to the
   components that fill them in (`llm.md`, section 6; `channel.md`,
-  section 8), never through the root.
+  section 8), never through the root. A record skein's driver asks to
+  keep goes to the secrets' store, and `kept` back once it is durable; a
+  key a request carried goes from the clients' component to the secrets'
+  store before the request goes to the root, and from the secrets' store
+  to the accounts' table once the accounts child names it a source's
+  (`store.md`, section 9; `client.md`, section 5).
 - **The clients' traffic, through the application's server.** The
   server is the application's: skein's HTTP server over the clients'
   listener, or any other, and its routes. It answers its pages, its
@@ -146,9 +154,11 @@ listed in section 9.
    records that disagree with its own header, a recovery that fails) ends
    the start.
 3. **The components made,** with their limits and their parts of the
-   configuration; skein's accounts driver loads each account's private
-   file (`llm.md`, 5.4), and the application's credentials' sources are
-   read or started.
+   configuration; skein's accounts driver is made with each signed-in
+   source's record from the secrets' store, the accounts' table is
+   filled with each key there (`llm.md`, 5.1 and 5.3; `store.md`,
+   section 10), and the application's credentials' sources are read or
+   started.
 4. **The listeners opened:** the workers', the clients' (the
    application's server's), and each connector's own for its webhooks.
    Workers may dial in and say hello during the restart, which needs
@@ -165,7 +175,7 @@ listed in section 9.
 5. **The root's restart:** `iterate` gives the root its start, and the
    core's script asks for one step at a time; the protocol layer does the
    store's and the connectors' parts of each step as the root asks; the
-   core wants every configured account from its first step
+   core wants every signed-in source from its first step
    (`../domain/root.md`, section 8; `../domain/engine.md`, section 12).
 6. **Decisions open** once the core says so; from then on the root takes
    every event.
@@ -246,18 +256,29 @@ down:  released and door outputs → components → io submissions
   spawns the agent program its configuration names (`configuration.md`,
   section 4), with an environment holding no credential, in a process
   group of its own (skein's `io.md`, section 6), and gives smith's host
-  half its pipes (smith's `protocol/hosts.md`, section 3). The program
-  may be the application's own binary run as its `agent` command,
-  smith's agent shell (`smith-agent-shell`).
+  half its pipes (smith's `protocol/hosts.md`, section 3). A run on a
+  program source names its configuration directory under the programs
+  directory (`configuration.md`, section 4), where the program keeps
+  its own login; that login is on the host, beyond the environment, and
+  is why a host keeping a person's logins takes only runs that person's
+  accounts pay for, until a run's process tree is contained from them
+  (`llm.md`, 5.5). The program may be the application's own binary run
+  as its `agent` command, smith's agent shell (`smith-agent-shell`).
 - **smith's payloads, decoded and encoded in the routing,** as in the
   engine (section 2), the charter against the endpoints of the worker's
   agent configuration (`configuration.md`, section 4), and smith's facts
   decoded into jig's activity (`channel.md`, 6.1 and 6.4).
 - **Credentials:** `jig-protocol-worker-link` takes grants' values out
   into the worker's tables, and the protocol layer hands LLM accounts'
-  values to smith's host half, which fills them into each agent's start
-  and grants (`channel.md`, section 8; smith's `protocol/hosts.md`,
-  section 2); an application's credentials go to its workspace's io.
+  values, each with its scheme, or a program source's name, to smith's
+  host half, which fills them into each agent's start and grants
+  (`channel.md`, section 8; smith's `protocol/hosts.md`, section 2); an
+  application's credentials go to its workspace's io.
+- **Program logins:** for the program sources the engine names, the
+  worker's protocol layer has smith's host half check each login, runs
+  each sign-out in the source's environment, and reports both over the
+  link (`channel.md`, 5.1 and 5.2; smith's `protocol/hosts.md`, section
+  2; smith's `protocol/programs.md`, section 4).
 - **Or agents in the worker's process,** as the worker's root's choice,
   for one person's machine: a root that composes `smith-inline-agent`
   has smith's LLM and machine components in its protocol layer instead
@@ -355,9 +376,11 @@ section 2).
   restarted, and the work found where it was; it checks integration, as
   skein's real-loop tests do. `ops`'s binary proves its own shape the
   same way.
-- **The live layer:** `jig-test` with a real LLM account handed in
-  (`llm.md`, 5.4), a native client signing in by the printed link, and a
-  request answered by a real model, within a bound on calls.
+- **The live layer:** `jig-test` with a real LLM account, a key added
+  by a request, a sign-in made as the test starts, or a program's login
+  on its test worker's host (`llm.md`, 5.4 and 5.5), a native client
+  signing in by the printed link, and a request answered by a real
+  model, within a bound on calls. No record is read from a file.
 - **The browser tier:** `jig-test` serving jig's test application's
   bundle and the mapping at `/jig`, and Chromium, children of the
   harness's loop, a person in a page, and jig's attack stories against

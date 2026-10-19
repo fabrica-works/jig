@@ -67,7 +67,7 @@ section 4. What is still open is listed in section 14.
   other components rely only on the boundary section 9 states.
 - **Secrets never reach a domain.** A domain names a secret by number and
   generation; components hold values in tables and in the store's
-  secrets' records, skein's accounts driver in its private files, and
+  secrets' records, LLM accounts' records and keys among them, and
   they are filled in where they leave (section 8).
 - **Configuration is read once, before the loop,** strict, composed per
   child as the root is (`configuration.md`).
@@ -83,8 +83,9 @@ section 4. What is still open is listed in section 14.
 3. **channel.md:** jig's channel between the engine and its workers, and
    where host tools' calls are decoded.
 4. **llm.md:** LLM calls in a host's own process, for
-   `smith-inline-agent`'s runs, and LLM accounts on skein's accounts
-   driver: the translation, the table of access tokens, credential grants.
+   `smith-inline-agent`'s runs, and LLM accounts: skein's accounts
+   driver for sign-ins, keys from requests, program sources on their
+   hosts, the translation, the table of values, and grants.
 5. **configuration.md:** what an engine and a worker are told at start.
 6. **client.md:** the client's protocol: jig's messages and their wire,
    the clients' component and its messages toward the application's
@@ -114,9 +115,9 @@ section 4. What is still open is listed in section 14.
 | worker's link | a worker's one channel with its engine, dialled and redialled (`channel.md`); the hub's link to the core, over a channel |
 | worker's credential | what a worker's opening carries: its name, its secret, the application's payload version (`channel.md`, 4.1) |
 | payload version | the number an application gives jig's components for its own encodings carried inside jig's records |
-| credential grant | an LLM account's credential, or an application's, named by account (or the application's number for it) and generation, with how long it is valid; its value is beside it (section 8). Not the authority's grant (`../domain/README.md`, section 4) |
-| table | a component's holding of secrets' values, by account and generation; jig's accounts' table, or the application's of its credentials |
-| secrets' records | what the store keeps of secrets that change while the engine runs: minted credentials' and services' digests, and an application's own |
+| credential grant | an LLM account's grant, or an application's credential, named by account and source (or the application's number for it) and generation, with how long it is valid; its value is beside it (section 8). An LLM account's is a credential with its scheme, `bearer` or `key`, or a program source's name, which carries no value (`llm.md`, section 6). Not the authority's grant (`../domain/README.md`, section 4) |
+| table | a component's holding of secrets' values, by account, source and generation; jig's accounts' table, or the application's of its credentials |
+| secrets' records | what the store keeps of secrets that change while the engine runs: minted credentials' and services' digests, LLM accounts' records and keys, and an application's own |
 | jig's messages | what a client and the clients' component exchange, whatever carries them: a keyed request, a read, opening and closing a watch, signing in and out, and the stream's events; each names its owner and its version (`client.md`, 4.1) |
 | the clients' component | `jig-protocol-engine-clients`, the engine's side of jig's messages: it takes them with an opaque credential from the application's transport, and a `Mint` from its server; it mints, verifies, expires and revokes credentials; it knows no HTTP (`client.md`, 4.2) |
 | the transport | the application's carrier of jig's messages between `jig-client` and the clients' component: HTTP, a local socket, or an in-process channel |
@@ -177,7 +178,7 @@ An application that mixes the last two has both.
 | `jig-protocol-worker-link` | component | worker | the link: dialling, liveness, the grace's clock, relays across channels, translation to and from the hub's vocabulary, smith's payloads carried as bytes (`channel.md`) |
 | `jig-protocol-charter` | translation | engine | the core's charter put into smith's, as smith's bytes, and a run's result read back (`../domain/hosts.md`, section 8) |
 | `jig-protocol-tools` | translation | engine | the core's host tools: their schemas and descriptions, their calls decoded into the core's typed requests, their answers rendered as text (`channel.md`, 6.3) |
-| `jig-protocol-accounts` | translation, table | engine | the accounts child's vocabulary to skein's accounts driver's and back, and the access tokens lent (`llm.md`, section 5) |
+| `jig-protocol-accounts` | translation, table | engine | the accounts child's vocabulary to skein's accounts driver's and back, and the values lent, tokens and keys with their scheme (`llm.md`, section 5) |
 | `jig-protocol-config` | parsing | engine, worker | jig's part of a configuration, parsed and checked (`configuration.md`) |
 | `jig-protocol-store` | component, codecs | engine | jig's records and the application's on skein-kv, transcripts' files, the secrets' store (`store.md`) |
 | `jig-client-protocol-wire` | codecs | engine, client | jig's wire records, both ends, from schemas: jig's messages, their operations and compound requests, subjects and reads, documents, the stream's events, the small store's records (`client.md`, section 3) |
@@ -239,9 +240,9 @@ processes (smith's `protocol/hosts.md`, sections 2 and 3).
 | its templates: its own shapes of work, and jig's chat and goal kept, changed or dropped | the engine's configuration | its own data (`configuration.md`, 3.1) |
 
 It writes no codec of jig's records, none of the channel's rules, none of
-the core's tools' decoding, no OAuth exchange of an LLM account, no agent,
-none of `smith-inline-agent`'s runs' LLM calls, and no credential's
-keeping: jig mints, verifies, expires and revokes them.
+the core's tools' decoding, no OAuth exchange or key's keeping of an LLM
+account, no agent, none of `smith-inline-agent`'s runs' LLM calls, and
+no credential's keeping: jig mints, verifies, expires and revokes them.
 
 ## 7. Versions
 
@@ -283,7 +284,9 @@ keeping: jig mints, verifies, expires and revokes them.
 
 | Secret | Held by | Kept | Reaches |
 |---|---|---|---|
-| an LLM account's record: its generation, its access token and expiry, its refresh token | skein's accounts driver; the access tokens lent, `jig-protocol-accounts`' table | the driver's private files, one per account, before the access token is lent (`llm.md`, section 5) | the refresh token, nobody; the access token, `smith-inline-agent`'s runs in the engine through smith's LLM component, and workers through credential grants, then their agent processes through smith's host half, or smith's LLM component on a worker that composes `smith-inline-agent` (`llm.md`, section 6) |
+| an LLM account's signed-in source's record: its tokens and their expiry, the client id its provider issued, the scopes granted, the ID token | skein's accounts driver; the access tokens lent, `jig-protocol-accounts`' table | the store's secrets' records, by the source's number, before the access token is lent (`llm.md`, section 5; `store.md`, section 9) | the refresh token, its provider alone; the access token, with its scheme, `smith-inline-agent`'s runs in the engine through smith's LLM component, and workers through credential grants, then their agent processes through smith's host half, or smith's LLM component on a worker that composes `smith-inline-agent` (`llm.md`, section 6) |
+| an LLM account's key | `jig-protocol-accounts`' table | the store's secrets' records, under the request that carried it, before the core sees the request; that request is never kept by the client (`client.md`, section 5) | as an access token, with its scheme |
+| a program source's login | the program, in its configuration directory on each host; never jig | the host's, never the engine's (`llm.md`, 5.5) | the program alone; a grant carries the source's name |
 | a worker's secret | the worker; its digest on the engine | configuration's files | the opening of the worker's link, over TLS, loopback, or an in-process address (`channel.md`, 4.1) |
 | a credential, a sign-in's | `jig-client`, where its transport needs it in hand (a bearer); or a browser, as a cookie the application's server sets and the client never sees; its digest on the engine | the store's secrets' records | the application's server once, in `Minted`, where it asked for it; then each of the party's messages, verified by the clients' component (`../domain/people.md`, section 3) |
 | a service's credential | the service; its digest on the engine | the store's secrets' records | its sign-in only, which answers a sign-in's credential |
@@ -298,8 +301,10 @@ keeping: jig mints, verifies, expires and revokes them.
   domain state, fact, record of the main store or log holds a value.
   Values move between components through the protocol layer's routing,
   never through a root.
-- **Kept before used.** An account's record is durable before the access
-  token it bought is lent, by skein's driver. A sign-in is committed
+- **Kept before used.** An account's record is durable in the secrets'
+  records before the access token it bought is lent, by skein's driver
+  and its owner's-store keeper; a key is durable there before the core
+  sees the request that carried it. A sign-in is committed
   first, which gives it its number; its credential's digest is then
   kept under that number; and only then is the credential answered, to
   the client that signed in or to the application's server that asked
@@ -366,7 +371,8 @@ Each is generic, and says nothing about jig.
 - **A cryptographic generator:** skein-lib's `CryptoRng`, keyed by the
   seed the shell draws at start (skein's `lib.md`, section 8; skein's
   `shell.md`, section 5), for minted credentials, the printed link's
-  secret, services' credentials, and the accounts driver's states.
+  secret, services' credentials, the accounts driver's states and
+  verifiers, and the installation's identifier (`store.md`, 4.4).
 - **The loop's host:** skein's `Host` and `drive`, with
   `next_policy_deadline` (skein's `shell.md`, section 12; `service.md`,
   section 4).
@@ -410,6 +416,12 @@ Each is generic, and says nothing about jig.
     jig's tier calls beside its own (skein's `ui-web.md`, 14.2;
     `../client/domain/testing.md`, section 3; `browser.md`, section
     15).
+- **LLM accounts' mechanism:** the accounts driver, with sources added
+  and removed while it runs, sign-out with revocation, the client id a
+  registration is issued kept with its record, signed in with the
+  subject and scopes granted, and records kept through its owner's
+  store (skein's `oauth.md`, 6.2 to 6.4); a credential with its scheme,
+  and the failures' classes (skein's `llm.md`, sections 2 and 2.5).
 - **What it has, as it is:** the framed channel, codecs and their
   generator, the JSON reader and writer, the key-value store, the LLM
   client and connection component and their fake peer, OAuth's client and
@@ -441,6 +453,13 @@ Each is generic, and says nothing about jig.
   `jig-client` decodes turns with it below its surface, through
   `jig-protocol-transcript`, whose build for that target jig's gate
   checks (`../client/domain/client.md`, section 10).
+- **LLM accounts' grants:** a grant carrying a credential with its
+  scheme, or a program source's name; the limited, refused and
+  unauthorized notices; the program backend, which runs Claude Code
+  with its own login and its built-in tools asking smith's policy; and
+  the host half's sources, login checks and sign-outs (smith's
+  `protocol/channel.md`, section 6; `protocol/hosts.md`, section 2;
+  `protocol/programs.md`, sections 3 to 5).
 - **Not asked: a completion's result contract.** A protocol layer that
   runs `smith-inline-agent` keeps each slot's beside smith's LLM
   component, as smith's own local host does (`llm.md`, section 3).
@@ -467,9 +486,9 @@ Each is generic, and says nothing about jig.
 What the protocol layer relies on from jig's domain is designed there:
 
 - **the engine stopping:** `../domain/engine.md`, 6.1;
-- **credential grants pushed and resent, and accounts on skein's
-  driver:** `../domain/engine.md`, sections 8 and 12; `llm.md`, section
-  5;
+- **credential grants pushed and resent, and LLM accounts:**
+  `../domain/engine.md`, sections 8 and 12; `../domain/accounts.md`;
+  `llm.md`, section 5;
 - **the hub's link vocabulary, whole, and smith's payloads and facts by
   hand-out:** `../domain/hosts.md`, 6.1 and 6.8;
 - **what smith gives** (section 11): windows, and resuming from the
@@ -544,10 +563,12 @@ What the store asks of the domain is `store.md`, section 15.
 - **A reference binary,** `jig-test`, which an application copies for
   its `main`, and the binary jig's end-to-end and live tests run
   (`service.md`, sections 7 and 8).
-- **Accounts on skein's accounts driver:** sign-in, refresh, records kept
-  in private files before lending, tokens lent by generation, all
-  skein's; the accounts child keeps only which accounts are usable and
-  who holds which generation (`llm.md`, section 5).
+- **LLM accounts on skein's accounts driver and the secrets' store:**
+  sign-in, refresh, sign-out and tokens lent by generation are skein's;
+  records and keys are kept in the store's secrets' records before
+  lent; program logins stay the program's, on each host; the accounts
+  child keeps which sources are usable and who holds which generation
+  (`llm.md`, section 5).
 - **What is generic leaves jig,** within reason: a mechanism that is not
   about jig's vocabularies goes to skein, or to smith when it is about
   agents, generalised, before jig uses it: joined sockets (section 10),
@@ -608,7 +629,10 @@ What the store asks of the domain is `store.md`, section 15.
   secret, keeping nothing between runs that the engine does not hand them
   again. Every credential a run needs, an LLM account's or an
   application's for its workspace's systems, is the engine's, granted
-  with the assignment (`channel.md`, section 8).
+  with the assignment (`channel.md`, section 8), but a program's login,
+  which is the program's own on its host, and is why a host keeping a
+  person's logins takes only runs that person's accounts pay for, until
+  a run's process tree is contained from them (`llm.md`, 5.5).
 - **No upgrade in place, and no rolling upgrades** (section 7).
 - **One process** (section 4): the workers joined to the engine by
   in-process addresses, their agents child processes, a browser on
@@ -616,7 +640,8 @@ What the store asks of the domain is `store.md`, section 15.
 
 ## 14. Open questions
 
-- **Signing an LLM account in through a client** (`llm.md`, section 10).
+- **A sign-in's redirect relayed by a client,** for a browser on
+  another machine than the engine's (`llm.md`, section 10).
 - **Upgrades:** in place, across a store's format: records translated
   between versions, and rolling upgrades of the engine and its workers
   (section 7).

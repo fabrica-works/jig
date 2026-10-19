@@ -1,6 +1,6 @@
 # Parties
 
-Provisional, 2026-10-07, revised 2026-10-18. How people, and the
+Provisional, 2026-10-07, revised 2026-10-19. How people, and the
 services that act like them, take part: who they are and the credentials
 they sign in with, what their role in a project lets them do, the
 operations they ask of the engine and what waits for them, the
@@ -8,7 +8,8 @@ conversations they hold with agents, the tasks they carry out
 themselves, and how they hear of what waits. Parties are requesters and
 executors, as tasks are (core.md, section 9); this document is that
 party in depth. The client they use is jig's, `jig-client`, which an
-application holds under its own presentation (`../client/domain/`). What
+application holds under its own presentation (`../client/domain/`). The
+LLM accounts a person holds, which pay for runs, are accounts.md's. What
 is still open is listed in section 12.
 
 ## 1. In one page
@@ -71,13 +72,20 @@ inbox are the views child's (engine.md, section 11).
 
 ## 3. Parties and identity
 
-- **An identity is a provider and a subject.** A provider is one of the
-  application's ways of signing in, numbered in its configuration
-  (`../protocol/configuration.md`, section 3): an OAuth server, a
-  company's directory, a chat platform's identity, or the deployment
-  itself, for services' credentials. The subject is the provider's
-  stable id for the party; a login and a name come with it, for display
-  only.
+- **An identity is an identity provider and a subject.** An identity
+  provider, a *provider* in this document and in the configuration's
+  `providers`, is one of the application's ways of signing in, numbered
+  in its configuration (`../protocol/configuration.md`, section 3): an
+  OAuth server, a company's directory, a chat platform's identity, or
+  the deployment itself, for services' credentials. The subject is the
+  provider's stable id for the party; a login and a name come with it,
+  for display only.
+- **An LLM provider is no identity provider.** OpenAI, Anthropic or a
+  local model's server is configured and numbered apart
+  (`../protocol/configuration.md`, section 3), and signs nobody in to
+  jig. An LLM account's subject is the LLM provider's for the account,
+  never a party's identity: signing an LLM account in changes no one's
+  identity, and one person may hold several (accounts.md, 3.1 and 3.3).
 - **jig owns credentials.** It mints a credential for an identity,
   verifies each one presented to its party's sign-in, expires it after a
   configured time, and revokes it when its party signs out, or when an
@@ -109,9 +117,11 @@ inbox are the views child's (engine.md, section 11).
   (`../protocol/configuration.md`, section 3; `../protocol/client.md`,
   section 8).
 - **The domain sees an authenticated identity,** and the kind of party it
-  is, never how it was verified. jig is given no provider's token: what
-  the application's sign-in received is the application's, and jig acts
-  on no system as a party (section 12).
+  is, never how it was verified. jig is given no identity provider's
+  token: what the application's sign-in received is the application's,
+  and jig acts on no system as a party (section 12). An LLM provider's
+  record is an LLM account's, kept by the protocol layer and lent only to
+  pay for runs (accounts.md, 3.4; `../protocol/store.md`, section 9).
 - **No acting for.** A credential is one party's own. A bot relaying a
   person's decision holds that person's credential, obtained through the
   application's sign-in, and the decision is the person's request,
@@ -133,7 +143,8 @@ inbox are the views child's (engine.md, section 11).
     party is kept, as every party is, for the history that names it.
 - **The first owners** of a deployment are named in its configuration;
   everyone else gets a role from a project's owner, or by adoption's seed
-  (section 4).
+  (section 4). The first owners decide the deployment's LLM accounts
+  (accounts.md, 3.2).
 
 ## 4. Roles
 
@@ -201,6 +212,7 @@ The operations as the client sends them are
 | adopt a resource, as a home or not; change the policy, roles or services | owner | the project changed (5.2) |
 | edit or delete a note | the note's scope within their role | the note revised (engine.md, section 10) |
 | set a party's pool | owner | the pool opened or resized in the current period, what was spent and reserved kept |
+| an account request: sign in, sign out, add, replace or remove a key, declare or check a program's login, order, uses, resume, remove an account | the account's holder, not a role: a person for their own, a first owner for the deployment's (authority.md, 8.4) | accounts.md, section 5: the account's sources, states and uses changed; a value never committed |
 
 - **Words are never cut.** A party's words, in a `Message` or answering
   a question, are within the people child's bound, which is at most what
@@ -252,7 +264,8 @@ The operations as the client sends them are
   Their other operations reach what the table says.
 - **What only parties do,** by design: carry out person tasks (`Take`,
   `HandBack`, and `Answer` with a result), stop runs, move tasks to
-  themselves, mark what they have seen, and run the project (5.2).
+  themselves, mark what they have seen, run the project (5.2), and act
+  on the LLM accounts they hold (accounts.md, section 5).
   Procedures decide nothing (tasks.md, section 9).
 - **A decision names what it saw.** A release, an amendment, a decision
   about an escalation and a person task's answer carry the revision the

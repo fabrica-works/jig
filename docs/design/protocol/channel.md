@@ -54,10 +54,16 @@ What is still open is listed in section 14.
   versions, liveness, and, on the worker's side, the link's dialling,
   redialling and its grace's clock.
 - **Credentials travel beside the domains.** The domains name a credential
-  grant by its number (an LLM account's, or one of the application's
-  credentials') and a generation. Each side's component fills its value
-  in as it encodes and takes it out as it decodes, from tables of the
-  protocol layer (section 8).
+  grant by its number (an LLM account's source, or one of the
+  application's credentials') and a generation. An LLM account's value
+  is a credential with its scheme, `bearer` or `key`, or a program
+  source's name, which carries no secret. Each side's component fills
+  its value in as it encodes and takes it out as it decodes, from tables
+  of the protocol layer (section 8).
+- **A program's login stays on its worker.** The engine tells each
+  worker its program sources by name; the worker reports each one's
+  login there, and signs one out when asked (5.1, 5.2). The login never
+  crosses (`llm.md`, 5.5).
 - **Bounded, never queued past its cap.** Each side's output cap is sized
   from the domains' limits, so the domains never send what the channel
   must refuse; facts go only while room remains; a link whose peer stops
@@ -185,10 +191,18 @@ worker, `Accept` or `Refuse` from the engine, then each side's `Terms`.
   announced. Nothing but the hello is taken before it.
 - **The fleet may refuse the hello:** no room for another host; a stop
   bound not strictly shorter than the engine's grace; or an agent whose
-  bounds cannot run the engine's charters (`../domain/engine.md`,
-  section 8). The engine's side then refuses the channel with *not
-  admitted*, the fleet's reason as its text, and the worker redials after
-  its backoff, as for any refusal.
+  bounds cannot run the engine's charters, a model it declares among
+  them held with a smaller window or output than configuration's
+  (`../domain/engine.md`, section 8). A model it does not declare is no
+  reason: runs that need it are not placed there. The engine's side
+  then refuses the channel with *not admitted*, the fleet's reason as
+  its text, and the worker redials after its backoff, as for any
+  refusal.
+- **Logins follow the hello** (5.1 and 5.2): the engine sends a worker
+  `sources` after its hello, and places no run on it until the first
+  `logins` that answers them, so that a host keeping a person's logins
+  is known before it is given another's run (`../domain/accounts.md`,
+  3.4; `../domain/engine.md`, section 8).
 - **Deadlines:** the opening within the handshake's deadline from the
   connection being made; the hello within the hello's deadline from
   `Accept`. Each is the component's, from its limits.
@@ -208,8 +222,11 @@ answer, and a **notice** is not answered.
 | call | task, attempt; the run's name for the call, as bytes (section 7); the host tool's name; whether it writes; its input; the time left on its deadline | call |
 | answer | task, attempt; the turns it took; what it spent; the last message it read, by name, if any: the unread fence; the messages refused since the run's last turn, each by name with smith's reason, as a turn carries them; how it ended: refused (busy, or invalid and what), ended with its result, smith's bytes (6.1), parked, or failed with its typed failure and bounded detail; what it left on resources and what it saved, each the application's bytes (6.2) | answer to an assignment, kept by the hub until acknowledged; a refusal, kept by nothing (below) |
 | fact | task, attempt; activity: the run's phase, a long operation begun (checks, an LLM completion or a command, with its span) or ended, or a count from smith's channel facts (its kind, its time, its count), all jig's typed activity, never smith's bytes; or a piece of live content: its turn, retry, kind (`text`, `reasoning` or `input`) and offset, and its bytes, when the assignment asked; or, from a host that gives it, a tool begun with its call's name, its tool and its input (6.4) | notice, best effort |
-| rejected | task, attempt; an LLM account, generation | notice |
-| exhausted | task, attempt; an LLM account; how long until it may be used again | notice |
+| limited | task, attempt; an LLM account and its source; how long until it may be used again, only where its provider said | notice |
+| refused | task, attempt; an LLM account and its source; its provider's code and reason, as text within the detail's bound | notice |
+| unauthorized | task, attempt; an LLM account and its source; the generation its provider refused, or whose program login was lost | notice |
+| logins | for each program source the engine named (5.2), its name and its login's state on this host: usable, not signed in, signed in otherwise and how, or failed, with bounded detail (smith's `protocol/hosts.md`, section 2) | notice: once checked after each `sources`, then on each change |
+| signed out | a program source's name; whether the program's sign-out ran, or failed, with bounded detail | answer to a sign out |
 
 - **A refused start is not kept.** An answer that refuses its start
   (busy, a duplicate among them, or invalid, at the entrance or as a
@@ -227,19 +244,28 @@ answer, and a **notice** is not answered.
   answer carries those the hub kept since the run's previous turn, at
   most as many as the run's inbox takes, and carries them again after a
   hello.
+- **The accounts' notices are relayed as the run's agent sends them**
+  (smith's `protocol/channel.md`, section 4): limited, refused and
+  unauthorized, each naming the account and source by the grant's
+  number. They are LLM accounts' only (section 8), and the core decides
+  what each changes (`../domain/accounts.md`, 3.5). Unsupported is the
+  run's failure, never a notice.
 
 ### 5.2 Down, engine to worker
 
 | Record | Fields | Shape |
 |---|---|---|
-| assignment | task, attempt; the run's identity, 16 bytes (section 7); the workstream key and the workspace's items, the application's bytes; whether to save unfinished work; the ask for live content, a boolean for each kind (`../domain/hosts.md`, section 2); the charter, smith's bytes; the transcript, when the run resumes: its current window's turns, smith's bytes, from the last that opens a window (6.1); the calls committed since its last turn, each with its name, its tool and its answer; the start's messages: those waiting in the task's inbox, oldest first, as many as the run's inbox takes, each with its name, its sender's label and its words, the rest relayed as message records as the run reads (`../domain/tasks.md`, 8.2); its credential grants, each naming whose table its value comes from, with their values (section 8) | call |
+| assignment | task, attempt; the run's identity, 16 bytes (section 7); the workstream key and the workspace's items, the application's bytes; whether to save unfinished work; the ask for live content, a boolean for each kind (`../domain/hosts.md`, section 2); the charter, smith's bytes; the transcript, when the run resumes: its current window's turns, smith's bytes, from the last that opens a window (6.1); the calls committed since its last turn, each with its name, its tool and its answer; the start's messages: those waiting in the task's inbox, oldest first, as many as the run's inbox takes, each with its name, its sender's label and its words, the rest relayed as message records as the run reads (`../domain/tasks.md`, 8.2); its credential grants, each naming whose table its value comes from, with their values: a credential with its scheme, or a program source's name (section 8) | call |
 | message | task, attempt; the message's name; its sender's label; its words | notice |
 | relayed | task, attempt; the call's name; the engine's answer: its text for the LLM and whether it is an error, or busy, to ask again after a backoff | answer to a call |
 | turn kept | task, attempt; the turn's number | notice |
 | turn busy | task, attempt; the turn's number: send it again after a backoff | notice |
 | acknowledge | task, attempt: the answer is durable, or not wanted | notice |
 | cancel | task, attempt | notice, at most one per attempt |
-| grant | task, attempt; whose table its value comes from, jig's accounts' or the application's; its number there, generation, how long it is valid; its value (section 8) | notice |
+| grant | task, attempt; whose table its value comes from, jig's accounts' or the application's; its number there, generation, how long it is valid, if it lapses; its value: a credential with its scheme, a program source's name, or the application's secret (section 8) | notice |
+| sources | the program sources this worker may be given, each by its name, the whole list: a source not in it is none of the worker's | notice, after each hello and on each change |
+| check | a program source's name: check its login now, at its holder's asking | notice; `logins` follows |
+| sign out | a program source's name: run the program's own sign-out in the source's configuration directory (smith's `protocol/hosts.md`, section 2) | call, answered by `signed out` |
 
 - **The fleet's refusals travel as the records above:** a turn answered
   busy, a relayed call answered busy or as an error, and an answer
@@ -270,9 +296,11 @@ answer, and a **notice** is not answered.
   acknowledgements in the order of the commits they follow.
 - **After a redial, everything kept goes again,** in order, after the
   hello: the hub's unacknowledged turns and answers, with the refusals
-  they carry, and its relays still waiting; the engine's current
-  credential grants for every attempt it keeps (section 13 says what the
-  fleet owes for them). The domains drop what they have seen
+  they carry, and its relays still waiting; the engine's program
+  sources, whole, and its current credential grants for every attempt it
+  keeps (section 13 says what the fleet owes for them). A sign out lost
+  with its channel is not sent again: its answer names the host as not
+  signed out. The domains drop what they have seen
   (`../domain/engine.md`, section 8; `../domain/hosts.md`, 6.6).
 
 ## 6. Bytes of other owners
@@ -367,6 +395,26 @@ holds, and neither of its components reads them.
   is an error, rendered in the engine's protocol layer, by the same crates,
   from the core's part and the connector's (`../domain/root.md`,
   section 7).
+- **Claude Code's built-in tools run on the worker,** as smith's own
+  workspace tools do, and never cross this channel as calls. On a
+  program source, the run's agent starts Claude Code with an ask rule
+  for each built-in tool of the families the charter grants,
+  `--setting-sources user` with the source's configuration directory,
+  and the agent's own MCP server as its permission prompt tool. So every
+  built-in call asks and reaches smith's policy before it runs. The
+  prompt tool answers allow, with the call's input unchanged, or deny,
+  with a message, within the run's families, as a call of smith's own
+  tools is allowed or denied; the agent never changes a call's input, so
+  the host sees the call that runs, in the run's turns and activity, as
+  it sees a direct backend's (smith's `protocol/programs.md`, 5.3 and
+  5.4; `../domain/authority.md`, 8.5). What stays outside the agent's
+  reach, the host's managed settings among it, is smith's
+  `protocol/programs.md`, section 7's.
+- **Host tools on a program source** are offered to the program by the
+  agent's own MCP server, under the names the charter declares, and the
+  agent relays each call to the host. Such a call crosses as this
+  section says, the same record whichever backend the run has, and its
+  answer goes back the same way.
 
 ### 6.4 Facts, and a run's text
 
@@ -449,9 +497,9 @@ holds, and neither of its components reads them.
 ## 8. Credential grants
 
 - **The domains name a credential grant** by its number (an LLM
-  account's, or the application's for one of its credentials) and a
-  generation, with how long it is valid, and never hold its value
-  (`../domain/engine.md`, section 12).
+  account's source, or the application's for one of its credentials)
+  and a generation, with how long it is valid where it lapses, and never
+  hold its value (`../domain/engine.md`, section 12).
 - **Tables of the protocol layer hold the values:** jig's accounts'
   table, LLM accounts' (`llm.md`, 5.3), and the application's own table,
   its credentials' (below). `jig-protocol-engine-workers` fills a grant's
@@ -459,19 +507,24 @@ holds, and neither of its components reads them.
   the table the grant names, through its protocol layer. A grant whose
   generation the table no longer holds is left out as it is encoded: a
   newer one follows it.
-- **A value crosses in its parts:** an LLM account's as its access token
-  and its account's id, empty where its provider names none, both
-  secret (`llm.md`, 5.3); an application's credential as one secret. The
-  worker's protocol layer puts a value in the form its agent capability
-  takes as it hands it over, never the engine (`llm.md`, 5.3).
+- **A value crosses as one of:** a credential, its scheme, `bearer` or
+  `key`, and its bytes, secret, with no account's id (`llm.md`, 5.3);
+  a program source's name, which is no secret and names the source's
+  configuration directory under the worker's programs directory
+  (`llm.md`, 5.5; `configuration.md`, section 4); or an application's
+  credential, one secret. The worker's protocol layer puts a value in
+  the form its agent capability takes as it hands it over, never the
+  engine (`llm.md`, 5.3): for smith's host half, the grant's value of
+  smith's `protocol/channel.md`, section 6.
 - **The worker's side takes the values out** as it decodes, into the
   worker's table of the same owner, by number, at most the two newest
   generations of each, and the hub hears the names. The worker's
   protocol layer hands LLM accounts' values to smith's host half, which
-  fills them into its agent's start and grants (smith's
-  `protocol/hosts.md`, section 2), or to smith's LLM component on a
-  worker that composes `smith-inline-agent` (`llm.md`, section 6). No
-  root sees a value.
+  fills them into its agent's start and grants, a credential with its
+  scheme or a program source's name (smith's `protocol/hosts.md`,
+  section 2), or to smith's LLM component on a worker that composes
+  `smith-inline-agent`, which takes no program source (`llm.md`,
+  section 6). No root sees a value.
 - **Validity crosses as a duration,** the time left on the writer's
   clock, which the reader turns into a deadline on its own.
 - **An application's credentials** for a workspace's systems (a token
@@ -481,13 +534,18 @@ holds, and neither of its components reads them.
   application's protocol layer's, in its table on the engine, from a
   source of its own, and are taken out on the worker into its table
   there, for its workspace. A grant names whose table its value comes
-  from: jig's accounts' or the application's. Rejected and exhausted are
-  LLM accounts' only. A worker's configuration holds no credential but
-  its own secret.
+  from: jig's accounts' or the application's. The notices limited,
+  refused and unauthorized are LLM accounts' only
+  (`../domain/engine.md`, section 12). A worker's configuration holds no
+  credential but its own secret; a program's login is the program's own,
+  in its configuration directory, which the worker never reads
+  (`llm.md`, 5.5).
 - **Grants cross only over TLS, in plaintext over loopback, or in one
   process,** as the worker's secret does (section 1).
 - **An entry goes** when its token has expired on the holder's clock, or a
-  newer generation pushes it out. Nothing tells a table to forget.
+  newer generation pushes it out; a key's or a program source's, which
+  do not lapse, also when no attempt the worker hosts holds a grant of
+  it. Nothing else tells a table to forget.
 
 ## 9. Liveness and flow control
 
@@ -505,11 +563,13 @@ holds, and neither of its components reads them.
     may hold, an answer for each call a run may have in flight, a kept or
     busy notice for each turn it may have unacknowledged, an
     acknowledgement of its answer, a cancel, and a grant for each LLM
-    account and each of the application's credentials;
+    account's source and each of the application's credentials; and a
+    sources notice, and a check and a sign out per program source;
   - worker to engine: a hello at its largest; for each slot, the turns
     and the answer it may keep, each with the most refusals it may carry,
-    and its calls in flight; a rejected and an exhausted notice per LLM
-    account; and a reserve for facts.
+    and its calls in flight; a limited, a refused and an unauthorized
+    notice per LLM account's source a run may hold; a logins notice, and
+    a signed out per program source; and a reserve for facts.
 - **Facts take only the reserve.** The worker's side sends a fact only
   while the queue leaves the rest of the cap free; a long operation's
   beginning and end are facts too.
@@ -597,9 +657,12 @@ and resends what it must after the next hello.
   grant; the application's largest items, left work, saved work and
   evidence, which the application's limits give; slots, calls per run,
   turns kept per run, the messages a run's inbox takes (a start's, and a
-  record's refusals), the models a hello may declare, LLM accounts and
-  the application's credentials. The crate turns them into each kind's
-  largest body and each side's output cap. It depends on no domain.
+  record's refusals), the models a hello may declare, LLM accounts'
+  sources, the program sources a worker may be given (which bound
+  `sources` and `logins`) and the application's credentials, from the
+  accounts' bounds (`configuration.md`, section 6). The crate turns
+  them into each kind's largest body and each side's output cap. It
+  depends on no domain.
 - **The component's own limits:** the chunk read at once, the name's and
   the secret's bytes, the handshake's, hello's, ping's, silence's and
   stall's deadlines, the backoff's first span and ceiling, the span that
@@ -610,8 +673,10 @@ and resends what it must after the next hello.
   engine's is that times the fleet's workers and the connections opening,
   and the worker's one channel and its relay table. The hand-out's
   decoding and encoding are the routing's, within smith's codecs' worst
-  cases. The credential tables are sized from the configured LLM
-  accounts and the application's credentials.
+  cases. The credential tables are sized from the accounts' bounds
+  (accounts in the deployment, sources per account) and the
+  application's credentials; a worker's program sources, from program
+  sources per worker.
 
 ## 12. Testing
 
@@ -628,7 +693,9 @@ suite.
   scripted vocabulary and a scripted peer of skein's channel, with every
   refusal of the opening, a worker replaced, a hello not admitted,
   silence, stall, the hello late, grants filled and dropped, of both
-  owners, relays across channels, and the grace passing and not. smith's
+  owners and of each kind of value (a bearer, a key, a program source's
+  name), sources, checks, logins and sign-outs, relays across channels,
+  and the grace passing and not. smith's
   payloads are opaque bytes there, as they are to the components.
 - **The channel's protocol world,** `tests/channel`: the engine's side
   with the core under jig's test root, and the worker's side with the hub
@@ -655,7 +722,16 @@ suite.
   - an assignment whose charter or transcript does not decode;
   - smith's facts reaching the views as activity, and a conversation's
     text reaching them from agent processes, by turn, retry and offset,
-    only when its assignment asked.
+    only when its assignment asked;
+  - a run on a program source, its agent process running smith's fake
+    `claude` (smith's `protocol/programs.md`, section 8) with the
+    source's configuration directory: the login reported usable, not
+    signed in, then signed in again after a check; a usage limit
+    relayed as limited, with its reset and without; a login lost
+    mid-run relayed as unauthorized; and the source signed out, one
+    worker lost before it answers;
+  - runs on a bearer and on a key, a key replaced mid-run, and each
+    notice reaching the core once per run that sent it.
 
   Its referee is the hub's and the fleet's: every turn, and every answer
   of a run the host started, reaches the engine once and is acknowledged
@@ -663,8 +739,12 @@ suite.
   acknowledged, and the start ends once, refused or lost (5.1;
   `../domain/engine.md`, section 8); every relayed call is answered
   once, every message sent ends once (read, refused or unread), no
-  attempt is placed while a worker may still run the last, and no
-  credential grant's value appears in any domain's state.
+  attempt is placed while a worker may still run the last, no run on a
+  program source is placed on a host whose login was not last reported
+  usable, no run is placed on a worker before its first `logins` after
+  its hello, no run is placed on a host that keeps a person's logins
+  unless that person's accounts pay for it, and no credential grant's
+  value appears in any domain's state.
 - **The application's worlds** keep running its hosts without bytes
   (`../domain/testing.md`), on the domain's vocabulary.
 - **Fuzzing,** in the fuzzy suite: each record's decoder and the
@@ -676,7 +756,13 @@ suite.
   sections 8 and 12): the fleet sends each attempt it keeps its current
   credential grants, LLM accounts' and the application's credentials',
   when its worker says hello, or when it adopts the attempt, and the core
-  pushes a new generation to every live attempt that holds one. The stop
+  pushes a new generation to every live attempt that holds one; and it
+  sends each worker its program sources after its hello and on each
+  change, places a run on a program source only where its login was
+  reported usable, and places on a host that keeps a person's logins only
+  runs that person's accounts pay for, until a run's process tree is
+  contained from them (`../domain/engine.md`, section 8;
+  `../domain/accounts.md`, 3.4). The stop
   bound's meaning is `../domain/hosts.md`, 6.6's, which counts it from
   the engine's view of the link, as 10.1 does, and the fleet checks it
   at the hello (4.3; `../domain/engine.md`, section 8).
@@ -685,13 +771,20 @@ suite.
   assignment's current window, start's messages and conversation's
   first attempt; the turns' windows, the refusals with turns and
   answers, and the unread fence; activity typed; smith's payloads as the
-  hand-out's bytes.
+  hand-out's bytes; and the accounts' notices, the sources, checks,
+  logins and sign-outs in the hub's link vocabulary.
 - **What smith gives** (`README.md`, section 11): smith's codecs, which
   the hand-out calls, to decode a charter and a transcript against an
   agent configuration's endpoints, and a channel fact, and to encode a
   turn, a call's name and a result; its host domain's long operations
   and facts; and `smith-inline-agent`'s drained content and facts
-  (smith's `domain/host.md`, 9.1). No crate of this channel's links
+  (smith's `domain/host.md`, 9.1); a grant's value as a credential with
+  its scheme or a program source's name, the notices limited, refused
+  and unauthorized (smith's `protocol/channel.md`, sections 4 and 6);
+  and its host half's check of a program source's login and the
+  program's own sign-out in the source's configuration directory
+  (smith's `protocol/hosts.md`, section 2; the check's answers are smith's
+  `protocol/programs.md`, section 3). No crate of this channel's links
   smith.
 - **What jig asks of smith** (`README.md`, section 11): the ask in its
   start, and a run's live content on its channel, at the ask, best

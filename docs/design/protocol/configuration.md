@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-10, revised 2026-10-18. What an engine and a worker
+Provisional, 2026-10-10, revised 2026-10-19. What an engine and a worker
 are told when they start, as far as jig defines its shape: the parts of
 `../domain/engine.md`, section 14 that are jig's, the templates an
 application defines its shapes of work with, how an application's
@@ -34,10 +34,11 @@ when configuration is read. What is still open is listed in section 9.
   `io.md`, 5.3): owned by the process's user and readable by nobody else,
   or the start is refused.
 - **What lives in the store is not configuration.** Projects, their
-  policies and roles, parties and their pools are the store's, changed by
-  parties' requests. Configuration seeds projects, their policies and
-  their parties' roles on a deployment's first start only; resources and
-  homes come by adoption after it (section 3).
+  policies and roles, parties and their pools, and LLM accounts with
+  their keys and records are the store's, changed by parties' requests.
+  Configuration seeds projects, their policies and their parties' roles
+  on a deployment's first start only; resources and homes come by
+  adoption after it (section 3).
 - **Templates are data the engine serves and never expands.** The
   application's shapes of work (jig's chat and goal among them) are
   numbered templates in jig's part; a project's policy may override some
@@ -80,10 +81,10 @@ the application's main (its shell)
 | providers | the numbers and kinds that identities name (`../domain/people.md`, section 3), and nothing else: jig runs no provider's exchange. Of kind *link*, the printed link's; of kind *deployment*, exactly one, the deployment's own, for services' credentials; of kind *application*, each of the application's ways of signing in, whose identities its server verifies on its own routes and asks the clients' component to mint a credential for (`client.md`, section 8). The settings and secrets of the application's sign-in are its own members | the people child; `jig-protocol-engine-clients`, which mints a printed link's credential for the first owner it names, a service's under the deployment's provider, and a `Mint`'s only for an identity whose provider is of kind application |
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6) | authority |
 | projects | each project seeded on a first start: its number; its policy, with its spend per period, its roles (each one's authority, the spend a party in it may allot per period, the kinds of proposal it decides; `../domain/authority.md`, section 6) and its overrides of templates' defaults (3.1); its parties' roles. Its resources and homes come by adoption (below) | the core, on a first start |
-| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8); one account, which its models' endpoints share (`../domain/engine.md`, 7.1) | the core; `jig-protocol-charter` |
+| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8). Its models are those it allows, in order, or every configured one; a task that names none takes the first whose LLM provider has a usable account serving its payer (`../domain/tasks.md`, section 3). It names no account: the core chooses one with each run's check (`../domain/accounts.md`, 4.3) | the core; `jig-protocol-charter` |
 | templates | each template the application defines, numbered and never renumbered, with its defaults; jig's chat and goal among them unless the application drops them (3.1) | the core, only to serve each project's merged templates in `me` (`../client/domain/contract.md`, 5.1); the client, which fills them in |
 | hosts | the engine's own slots, if it runs agents in the engine (shape 2), and their `smith-inline-agent`'s limits; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers`; `smith-inline-agent`, through the application's startup |
-| llm | endpoints, each with the models it serves; each model's window, output and the rest of what smith's agent configuration declares of it (smith's `protocol/agent.md`, section 4), and its prices: input, cached input, output, and cache writes when priced apart; accounts, each signed in, with its registration and its token endpoint, or handed in, with the private file of its access token (`llm.md`, 5.4), and the private directory of their records (`llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
+| llm | the LLM providers (`../domain/providers.md`), each numbered, with its name for showing; its endpoints, each with the models it serves; each model's window, output, the efforts it takes and the rest of what smith's agent configuration declares of it (smith's `protocol/agent.md`, section 4), its prices (input, cached input, output, and cache writes when priced apart) and its description, what it is good at, for the brief's catalogue (`../domain/engine.md`, section 9); the sources it offers: a sign-in, with its public registration (its entry client id, its name hint, its authorization, token, revocation and published keys' addresses with their transport, its issuer, its scopes and those that must be granted, its resource, its redirect's path, and its port where fixed, an ephemeral loopback port for each sign-in otherwise), a key, a program, named `claude_code` where the program is Claude Code (smith's `protocol/programs.md`, section 3), or none; a sign-in waits for its redirect within the profile's sign-in deadline, as a limit of the driver (section 6; skein's `oauth.md`, section 3); and the facts its terms ask an application to show: whether a signed-in source is a plan, and its manage-usage address (`../domain/providers.md`, 2.6). No account, key or record: accounts are made at runtime and kept in the store (`../domain/accounts.md`, 3.1; `llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
 | clients | the heartbeat of the clients' streams (`client.md`, section 4); whether the clients' component gives a printed link's one-time secret at start, whose URL the application's startup prints (`client.md`, section 8), only where its clients reach it on loopback, which that startup checks against its own listener (`service.md`, section 3). The listener, its certificate and key, and what serves a browser are the application's service's own members (`service.md`, section 7) | `jig-protocol-engine-clients` |
 | connectors | the application's connectors' numbers, as the core knows them (`../domain/core.md`, 3.5); none takes the number the core keeps for its own procedures (below) | the core |
 | limits | a profile, and any limit overridden by name (section 6) | every child and component of jig's |
@@ -163,7 +164,11 @@ the application's main (its shell)
   - the flags: *conversation*, *listed*, and the retention class,
     *kept* or *forgotten once read* (`../domain/tasks.md`, section 3);
   - the label: an opaque 32-bit number, which jig gives no meaning;
-  - the grace its helper cancels with, or none.
+  - the grace its helper cancels with, or none;
+  - the LLM choice: none, for the charter's default; or a main model
+    with its effort, and the models its run's sub-agents may use, each
+    with an effort (`../domain/tasks.md`, section 3). It names no
+    account.
 
   It names no wake policy, parameters, inputs, dependencies or
   resources: a task filled from it wakes and parks as its executor's
@@ -191,6 +196,7 @@ the application's main (its shell)
 | retention | kept | kept |
 | label | 1 | 2 |
 | grace | a span, which the helper closing a chat cancels with | none |
+| LLM choice | none: the charter's default | none: the charter's default |
 
 - **A project's policy may override,** per template number, the
   executor, the budget and its cap, the deadline and the default
@@ -230,9 +236,10 @@ the application's main (its shell)
   documents' bound on a text; each charter a template's executor names
   configured; each contract within the tasks child's bounds; each grace
   within the tasks child's limit on a grace's span
-  (`../domain/tasks.md`, section 11); each seeded policy's overrides
-  naming configured templates, each at most once, and no more of them
-  than the limit on templates.
+  (`../domain/tasks.md`, section 11); each model an LLM choice names
+  configured, and each effort one its model takes; each seeded policy's
+  overrides naming configured templates, each at most once, and no more
+  of them than the limit on templates.
 
 ## 4. jig's part for a worker
 
@@ -243,12 +250,15 @@ the application's main (its shell)
 | slots | how many runs it hosts at once |
 | graces | the grace after losing the engine, the stop graces of an agent's tree, a delivery's deadline, a save's: with the link's ping interval and silence deadline, what its stop bound is made of (`channel.md`, 10.1; `../domain/hosts.md`, 6.6) |
 | agent | the agent program, which the worker's protocol layer spawns for each run, and which may be the application's own binary run as its `agent` command, smith's agent shell (`service.md`, section 6); and its configuration, smith's agent configuration (smith's `protocol/agent.md`, section 4), which declares the models the engine's charters name, with their window and output, and the endpoints they run on, by the same names as the engine's (`llm.md`, section 4). The worker's routing decodes charters against its endpoints, and its hello states its agent's bounds from it (`channel.md`, 4.3). A worker that composes `smith-inline-agent` gives it the same configuration, and runs no agent program |
+| programs | the programs directory, private to the worker's user, under which each program source's configuration directory is named by the source's name (`../domain/accounts.md`, 3.4; `llm.md`, 5.5); and the interval at which the worker has smith's host half check their logins, since when to ask is the host's (smith's `protocol/programs.md`, section 3) |
 | limits | a profile, and overrides |
 
 The worker's workspace's configuration is the application's. Workers are
 alike: every worker's configuration is the same but for its name and
 secret, and every credential its runs need comes with their assignments
-(`channel.md`, section 8).
+(`channel.md`, section 8). A program's login is not configuration: its
+holder signs it in on each host, in the programs directory, and the
+host's half reports it (`llm.md`, 5.5).
 
 ## 5. Periods
 
@@ -284,9 +294,22 @@ secret, and every credential its runs need comes with their assignments
   follow from the same limits (`channel.md`, section 11). A profile whose
   sum does not fit refuses the start, saying by how much.
 - **Charters' budgets:** each charter's turns and time are above its
-  reserve's, and its default budget holds its reserve and one of its main
-  model's most costly completions (`../domain/authority.md`, section 7),
-  or the engine's start is refused, naming the charter.
+  reserve's, and its default budget holds its reserve and one of its
+  default model's most costly completions (`../domain/authority.md`,
+  section 7), or the engine's start is refused, naming the charter. A
+  task's chosen model is checked with its run's check
+  (`../domain/authority.md`, 8.3).
+- **LLM accounts' bounds:** accounts in the deployment, accounts per
+  holder, sources per account, sign-ins at once, program sources per
+  worker, and a credential's bytes, which bound a key (skein's
+  `llm.md`, 2.6). Within them the accounts' table, skein's driver, the
+  hub's grants, a worker's `sources` and `logins` and the secrets'
+  store are sized; a request that would pass one is refused, naming it
+  (`../domain/accounts.md`, 3.6). A sign-in waits for its redirect only
+  within the sign-in deadline, a limit of the driver's (skein's
+  `oauth.md`, section 3).
+- **A model's description** is within its own bound on bytes, or the
+  start is refused, naming the model.
 - **Operations per request,** the people child's limit on a compound
   request (`../domain/people.md`, 5.1), is at least the larger of
   *delegates per task* plus one and *goals per project*, both the tasks
@@ -314,9 +337,7 @@ secret, and every credential its runs need comes with their assignments
 | Secret | Kind | Configured as |
 |---|---|---|
 | a worker's secret | shared between the engine and that worker | on the worker, a file holding it; on the engine, a file holding its digest, per worker |
-| an LLM account's record | its tokens, as skein's accounts driver keeps them | a private file per account, written by a sign-in, loaded by the driver (`llm.md`, 5.4) |
-| a handed-in LLM account's access token | an access token and when it lapses | a private file, filled by another program's login, read at start (`llm.md`, 5.4) |
-| an LLM account's client secret, if its provider has one | a confidential client's | a file |
+| an LLM account's record or key | a signed-in source's record (its tokens, the client id the provider issued, the scopes granted, the ID token), or a key | never configured: kept in the secrets' store, from a sign-in or from a request carrying it (`store.md`, section 9; `llm.md`, 5.4). A registration is public, with no client secret; a confidential one is refused |
 | the workers' listener's TLS key | a private key | a file beside its certificate |
 | the clients' listener's TLS key; the secrets of the application's sign-in (an OAuth client's) | the application's server's | its own members' files; jig's part names none (`service.md`, section 7; `client.md`, section 8) |
 | a connector's credentials | the application's | the application's files, or its own secrets' records |
@@ -329,21 +350,27 @@ secret, and every credential its runs need comes with their assignments
 - **Held by the protocol layer,** never the domain: the domains name
   secrets by number (`../domain/engine.md`, section 12).
 - **What changes while the engine runs** is kept by its owner, never
-  written back to configuration: a rotated refresh token in the account's
-  private file, by skein's driver; a minted credential's digest in the
-  store's secrets' records (`store.md`, section 9).
+  written back to configuration: a rotated refresh token in the
+  secrets' store, as skein's driver asks it kept (`llm.md`, 5.1); a
+  minted credential's digest in the store's secrets' records
+  (`store.md`, section 9).
 
 ## 8. First start, and every start
 
 - **A deployment's first start** is the first with an empty store: the
-  shell draws the deployment's id, and the core seeds owners and projects
-  from configuration into its first commit (`../domain/engine.md`, 5.4
-  and section 14).
+  shell draws the deployment's id and the installation's identifier, a
+  `urn:uuid:…` sent to LLM providers as `ext_agent_host_id`
+  (`store.md`, 4.4), and the core seeds owners and projects from
+  configuration into its first commit (`../domain/engine.md`, 5.4 and
+  section 14).
 - **Every later start** reads the deployment from the store. The
   configuration's projects are ignored; its rules, charters, templates,
-  limits, hosts, endpoints and accounts apply as configured, and a
-  narrowing reaches every later decision, as a policy's does
-  (`../domain/authority.md`, section 6).
+  limits, hosts and LLM providers apply as configured, and a narrowing
+  reaches every later decision, as a policy's does
+  (`../domain/authority.md`, section 6). LLM accounts are the store's,
+  made at runtime; an LLM provider whose source is *none*, configured
+  for the first time, gets the deployment's account at that start
+  (`../domain/accounts.md`, 3.1).
 - **What the store holds and the configuration does not name** (a charter
   removed, a connector gone) is the domain's to judge at restart, as it
   judges a live set past limits lowered since (`../domain/engine.md`,
@@ -355,15 +382,13 @@ secret, and every credential its runs need comes with their assignments
 - **Reloading without a restart:** a deployment's rules, charters and
   limits changed while it runs, which the domain would hear as an event,
   as a policy change is, in place of a restart.
-- **Removed parts at restart:** whether a charter or a connector that
-  live work names may be removed, and what becomes of that work: a
-  refused start, saying which, or the work's runs failing as not
-  offered.
+- **Removed parts at restart:** whether a charter, a connector or an
+  LLM provider that live work or accounts name may be removed, and what
+  becomes of that work: a refused start, saying which, or the work's
+  runs failing as not offered.
 - **Profiles' numbers,** from the first deployments' measurements.
 - **A configuration's format version,** once a deployment's configuration
   must survive a release that changes it.
-- **Accounts per run:** whether a run's models may use several
-  accounts is `../domain/engine.md`'s (section 16).
 
 ## 10. Formats an operator writes
 
@@ -378,10 +403,9 @@ secret, and every credential its runs need comes with their assignments
   digits, and nothing else but a final newline.
 - **A secret file** holds the secret's bytes as they are, and nothing
   else but a final newline, which is not part of the secret.
-- **A handed-in account's file** (`llm.md`, 5.4) is one JSON object:
-  `access_token`, a string; `expires_at`, the Unix time in seconds at
-  which it lapses; and `account_id`, a string, where the account's
-  provider names one. Nothing else.
+- **No LLM account's value is in a file** the configuration names: a
+  key comes in a request carrying it (`client.md`, section 5), and a
+  record from a sign-in (`llm.md`, 5.4).
 - **A template,** in the `templates` member (3.1), is one JSON object
   whose members are all required, `null` where it has none: `number`;
   `name`; `executor`, `{"charter": n}` or `"chosen"`; `contract`,
@@ -391,25 +415,28 @@ secret, and every credential its runs need comes with their assignments
   it may propose, and each field it requires, with its value's most
   bytes: `../domain/tasks.md`, section 3) or `{"change": {"connector":
   c, "kind": k, "words": n}}`, a connector's result (an approval names
-  a state its procedure gives, so no template makes one); `shallower`, the levels of
-  delegation its authority is below the creator's role; `budget`,
+  a state its procedure gives, so no template makes one); `shallower`,
+  the levels of delegation its authority is below the creator's role; `budget`,
   `{"amount": n}`, `{"as_allowed": cap}`, the cap a number or `null`, or
   `"given"`; `deadline`, `"none"`, `{"span_ms": n}` or `"given"`;
   `tracked`, `null` or `{"priority": n}`; `conversation` and `listed`,
   booleans; `retention`, `"kept"` or `"forgotten_once_read"`; `label`;
-  and `grace_ms`, or `null`. jig's chat: `{"number": 1, "name": "chat",
+  `grace_ms`, or `null`; and `llm`, `null` for the charter's default, or
+  `{"main": {"model": m, "effort": e}, "sub_agents": [{"model": m,
+  "effort": e}]}`, each `m` a configured model's name and each `e` an
+  effort it takes. jig's chat: `{"number": 1, "name": "chat",
   "executor": {"charter": n}, "contract": {"report": {"words": n}},
   "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none",
   "tracked": null, "conversation": true, "listed": false, "retention":
-  "kept", "label": 1, "grace_ms": n}`; jig's goal: `{"number": 2,
-  "name": "goal", "executor": "chosen", "contract": {"report":
+  "kept", "label": 1, "grace_ms": n, "llm": null}`; jig's goal:
+  `{"number": 2, "name": "goal", "executor": "chosen", "contract": {"report":
   {"words": n}}, "shallower": 1, "budget": "given", "deadline":
   "given", "tracked": {"priority": 1}, "conversation": false, "listed":
-  true, "retention": "kept", "label": 2, "grace_ms": null}`, each `n`
-  the application's (3.1). jig's defaults are written, never implied:
-  the `templates` member holds each template the engine has, jig's
-  among them, and an application drops one of jig's by leaving it out
-  (3.1).
+  true, "retention": "kept", "label": 2, "grace_ms": null, "llm":
+  null}`, each `n` the application's (3.1). jig's defaults are written,
+  never implied: the `templates` member holds each template the engine
+  has, jig's among them, and an application drops one of jig's by
+  leaving it out (3.1).
 - **A policy's override of a template,** in its `templates` list, is one
   JSON object: `template`, its number; and `executor`, `budget`,
   `deadline` and `priority`, each in the template's form (`priority` a
