@@ -588,3 +588,5 @@ fn the_providers_uses_rule_checks_people_and_projects_for_plans_and_llm_keys() {
     }
     assert_eq!(people::USES, accounts::USES);
 }
+
+mod catalogue;

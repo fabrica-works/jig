@@ -27,6 +27,8 @@ mod endings;
 pub use chip_phase::{ChipDetails, ChipObservation, ChipWork};
 mod inbox_deployment;
 pub use inbox_deployment::{Inbox, InboxEntry, InboxObject};
+mod catalogue;
+pub use catalogue::{PayerReadiness, ProviderOffer, Readiness};
 mod accounts;
 pub use accounts::{AccountLine, Accounts, LastEnd, SignInLine, SourceLine};
 pub use jig_domain_accounts::Use;
@@ -273,6 +275,9 @@ pub struct Frame {
     pub results_seen: u64,
     pub retention: Duration,
     pub cut: bool,
+    pub providers: List<ProviderOffer>,
+    pub providers_cut: bool,
+    pub key_bytes: u32,
 }
 
 /// A live attempt's committed progress; provisional writing is supplied by watches.
@@ -426,7 +431,8 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
     let frame = List::<FrameProjectRole>::worst_case(limits.lines)?
         .checked_add(u64::from(limits.lines).checked_mul(creating)?)?
         .checked_add(u64::from(limits.lines).checked_mul(u64::from(limits.text_bytes))?)?
-        .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?;
+        .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?
+        .checked_add(catalogue::offers_worst_case(limits)?)?;
     u64::try_from(size_of::<Document>()).ok()?.checked_add(
         chips
             .max(frame)
@@ -455,6 +461,14 @@ pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?;
     Some(
         deployment::scratch_worst_case(limits)?
+            .max(
+                List::<jig_domain_accounts::Coverage>::worst_case(limits.accounts.accounts)?
+                    .checked_add(List::<jig_domain_accounts::Pending>::worst_case(limits.accounts.sign_ins)?)?
+                    .checked_add(List::<jig_domain_accounts::Fact>::worst_case(limits.accounts.sources)?)?
+                    .checked_add(List::<jig_domain_fleet::HostView>::worst_case(
+                        limits.fleet.workers.checked_add(limits.fleet.history)?.checked_add(1)?,
+                    )?)?,
+            )
             .max(List::<jig_domain_accounts::Pending>::worst_case(limits.accounts.sign_ins)?)
             .max(List::<crate::Template>::worst_case(limits.templates)?)
             .max(task_query::scratch_worst_case(limits)?.checked_add(waits)?),

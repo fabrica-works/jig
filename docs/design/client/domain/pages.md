@@ -453,6 +453,11 @@ For a party with a role on the deployment:
   each project; pending proposals; what was refused for want of room,
   recently.
 
+The existing LLM accounts section also renders the public offers and the
+viewer's provider/payer readiness through reusable fragments. These fragments
+may be composed on an application's own accounts page. No reference route,
+place or navigation is added; unknown and cut facts remain visible.
+
 Lost workers, refused hellos and refusals for want of room are the
 engine's diagnostics, kept in memory within its limits: after the engine
 restarts, they start empty.

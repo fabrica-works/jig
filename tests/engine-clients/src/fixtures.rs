@@ -71,6 +71,9 @@ pub fn me_subject() -> jig_client_protocol_wire::v10::Subject {
 pub fn me_document(needs: u32) -> jig_domain_core::documents::Document {
     use jig_domain_core::documents as d;
     d::Document::Frame(d::Frame {
+        providers: skein_lib::List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
         party: 7,
         kind: jig_domain_people::Kind::Person,
         login: d::Text { bytes: Box::new([]), cut: false },

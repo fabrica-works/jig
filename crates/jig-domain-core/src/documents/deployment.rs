@@ -133,6 +133,11 @@ pub struct Deployment {
     pub connectors: List<u16>,
     pub connectors_cut: bool,
     pub cut: bool,
+    pub providers: List<super::ProviderOffer>,
+    pub providers_cut: bool,
+    pub key_bytes: u32,
+    pub readiness: List<super::PayerReadiness>,
+    pub readiness_cut: bool,
 }
 /// Recent refused hello facts, without protocol rights or advertised workstream payloads.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -440,7 +445,14 @@ pub(super) fn deployment(
     }
     let connectors_cut = core.connectors.len() > line_bound(limits);
     cut |= connectors_cut;
+    let (providers, providers_cut) = super::catalogue::offers(core, &limits.documents)?;
+    let (readiness, readiness_cut) = super::catalogue::rows(core, limits, party)?;
     Ok(Deployment {
+        providers,
+        providers_cut,
+        readiness,
+        readiness_cut,
+        key_bytes: core.settings.key_bytes,
         store: StoreFill { bytes: core.fill, mark: limits.fill_mark },
         hosts,
         attempts,
@@ -538,7 +550,9 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(List::<people::CapacityRefusal>::worst_case(limits.lines)?)?
         .checked_add(List::<tasks::CapacityRefusal>::worst_case(limits.lines)?)?
         .checked_add(List::<u16>::worst_case(limits.lines)?)?
-        .checked_add(u64::try_from(size_of::<Deployment>()).ok()?)
+        .checked_add(u64::try_from(size_of::<Deployment>()).ok()?)?
+        .checked_add(super::catalogue::offers_worst_case(limits)?)?
+        .checked_add(super::catalogue::rows_worst_case(limits)?)
 }
 
 pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {

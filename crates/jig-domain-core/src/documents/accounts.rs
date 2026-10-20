@@ -55,6 +55,8 @@ pub struct Accounts {
     pub usable: bool,
     pub settled: bool,
     pub cut: bool,
+    pub readiness: List<super::PayerReadiness>,
+    pub readiness_cut: bool,
 }
 
 pub(super) fn source_lines(
@@ -150,7 +152,17 @@ pub(super) fn make(
         Some(ended) => Some(LastEnd { source: ended.source, end: ended.end }),
         None => None,
     };
-    Ok(Accounts { accounts, signing, last_end, usable: serves_work(core, party), settled, cut })
+    let (readiness, readiness_cut) = super::catalogue::rows(core, limits, party)?;
+    Ok(Accounts {
+        accounts,
+        signing,
+        last_end,
+        usable: serves_work(core, party),
+        settled,
+        cut,
+        readiness,
+        readiness_cut,
+    })
 }
 
 /// A usable account serves its explicit party payers, or its default holder/deployment uses.
@@ -176,7 +188,8 @@ pub(super) fn worst_case(limits: &DocumentLimits) -> Option<u64> {
         .ok()?
         .checked_add(List::<AccountLine>::worst_case(limits.lines)?)?
         .checked_add(u64::from(limits.lines).checked_mul(account_heap)?)?
-        .checked_add(List::<SignInLine>::worst_case(limits.lines)?)
+        .checked_add(List::<SignInLine>::worst_case(limits.lines)?)?
+        .checked_add(super::catalogue::rows_worst_case(limits)?)
 }
 
 /// Copy an account's explicit uses without changing the default/empty distinction.

@@ -815,6 +815,9 @@ pub(super) mod tests {
                 .expect("the complete supplied fixture is admitted");
         }
         let source = documents::Frame {
+            providers: skein_lib::List::with_capacity(0),
+            providers_cut: false,
+            key_bytes: 256,
             party: u64::MAX,
             kind: jig_domain_people::Kind::Service,
             login: documents::Text { bytes: Box::from(UTF8_TEXTS[1]), cut: true },

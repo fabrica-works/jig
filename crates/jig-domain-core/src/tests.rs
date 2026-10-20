@@ -327,6 +327,7 @@ fn config(seed: u64) -> Config {
             resume_bytes: 256,
 
             tools: ToolFamilies::JIG,
+            key_bytes: 256,
             llm_providers: accounts::Providers {
                 providers: Box::new([accounts::Provider {
                     name: b"Fake".as_slice().into(),

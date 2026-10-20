@@ -69,6 +69,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
             models: Box::new([model()]),
             resume_bytes: 256,
             tools: core::ToolFamilies::JIG,
+            key_bytes: 256,
             llm_providers: jig_domain_accounts::Providers::none(),
             charters: Box::new([core::Charter {
                 number: 1,

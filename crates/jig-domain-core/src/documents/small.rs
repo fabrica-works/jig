@@ -132,7 +132,11 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
     }
     let counts = core.people.counts(&limits.people, party).ok_or(Missing::Unknown)?;
     let updates = if counts.more_unread { Count::AtLeast(counts.unread) } else { Count::Known(counts.unread) };
+    let (providers, providers_cut) = super::catalogue::offers(core, &limits.documents)?;
     Ok(Frame {
+        providers,
+        providers_cut,
+        key_bytes: core.settings.key_bytes,
         party,
         kind: core.people.kind(party).ok_or(Missing::Unknown)?,
         login: text(&identity.login, limits.documents.text_bytes),

@@ -145,6 +145,11 @@ pub fn host_run() -> d::HostRun {
 }
 pub fn deployment_document() -> d::Deployment {
     d::Deployment {
+        providers: List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
         store: d::StoreFill { bytes: 31, mark: 37 },
         hosts: list([d::Host {
             channel: 17,

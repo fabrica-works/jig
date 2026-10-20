@@ -32,6 +32,11 @@ pub(crate) fn source() -> documents::Deployment {
     run.state = fleet::AttemptState::Kept;
     let chip = chips::tests::source_chip();
     documents::Deployment {
+        providers: skein_lib::List::with_capacity(0),
+        providers_cut: false,
+        key_bytes: 256,
+        readiness: skein_lib::List::with_capacity(0),
+        readiness_cut: false,
         store: documents::StoreFill { bytes: u64::MAX, mark: 0 },
         hosts: rows(
             2,
@@ -641,6 +646,9 @@ fn me_deployment_role_is_independent_of_project_rows() {
         (Some(people::Role::Policy { role: u32::MAX }), Some(client::HeldRole::Policy { role: u32::MAX })),
     ] {
         let mut source = documents::Frame {
+            providers: skein_lib::List::with_capacity(0),
+            providers_cut: false,
+            key_bytes: 256,
             party: 17,
             kind: people::Kind::Person,
             login: documents::Text { bytes: Box::new([]), cut: false },

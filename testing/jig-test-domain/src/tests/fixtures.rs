@@ -128,6 +128,7 @@ pub fn domain() -> Domain {
                     }]),
                     resume_bytes: 256,
                     tools: core::ToolFamilies::JIG,
+                    key_bytes: 256,
                     llm_providers: jig_domain_accounts::Providers {
                         providers: Box::new([jig_domain_accounts::Provider {
                             name: b"Fake".as_slice().into(),

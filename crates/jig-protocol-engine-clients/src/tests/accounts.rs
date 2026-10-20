@@ -34,6 +34,8 @@ fn source_lines() -> List<d::SourceLine> {
 #[expect(clippy::manual_map, reason = "optional fixture facts follow the step crate lint configuration")]
 fn document(end: Option<a::End>) -> d::Accounts {
     d::Accounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
         accounts: list([
             d::AccountLine {
                 provider_name: None,

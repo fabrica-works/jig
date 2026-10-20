@@ -101,6 +101,8 @@ fn deployment_watch_keeps_original_subject_and_ack_until_whole_delivery_admissio
 fn accounts_and_deployment_deliveries_require_their_own_subjects() {
     let limits = wire::deployment::tests::limits();
     let accounts = documents::Document::Accounts(Box::new(documents::Accounts {
+        readiness: skein_lib::List::with_capacity(0),
+        readiness_cut: false,
         accounts: skein_lib::List::with_capacity(0),
         signing: skein_lib::List::with_capacity(0),
         last_end: None,

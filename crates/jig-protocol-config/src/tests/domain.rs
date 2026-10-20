@@ -289,6 +289,9 @@ fn memory_below_the_components_sum_is_refused() {
     // prices (4 lines squared + 8 * 4 + 8) task carriers, each gaining the 40-byte wait.
     // Routed/load payloads: (18,538 writes + 4 loads) * (2 members * 8) = 296,672.
     // 3,824 + 44,800 + 296,672 = 345,296; hub unchanged.
+    // JP10c-c: 18_677_344_295 + 20 * 0 document-envelope bytes + 1 * 0 scratch
+    // bytes = 18_677_344_295. Bounded catalogue/readiness heaps remain below the
+    // dominant project document; their selection scratch is below existing scratch.
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_344_295 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
@@ -369,4 +372,18 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+fn the_catalogue_key_bound_follows_the_component() {
+    let mut engine = engine();
+    engine.limits.driver.client.document.token_bytes = 123;
+    let core = crate::core(&engine, [0; 16], 1);
+    assert_eq!(core.settings.key_bytes, engine.limits.driver.client.document.token_bytes);
+}
+#[test]
+fn the_catalogue_key_bound_respects_the_carried_value_limit() {
+    let engine = engine();
+    let core = crate::core(&engine, [0; 16], 1);
+    assert_eq!(core.settings.key_bytes, engine.limits.clients.wire.keyed_value_some);
 }

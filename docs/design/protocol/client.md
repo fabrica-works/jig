@@ -204,6 +204,13 @@ authority forms carry them. Authority documents carry `cut` independently
 from the whole authority payload used for edits (`../client/domain/contract.md`,
 3.2); decoding retains the flag, and `whole()` refuses a cut projection.
 
+Client v10 appends the public provider catalogue and startup key bound to `me`,
+and provider/payer readiness to `accounts`. Deployment includes the same
+catalogue and viewer readiness for the reference fragment. Existing tags stay
+fixed. These are bounded secret-free configuration/derived facts
+(`../client/domain/contract.md`, 5.1 and 7.1); people v5 and accounts v1 do not
+change.
+
 ## 4. The connection
 
 A client keeps one connection to the engine, whatever carries it, of

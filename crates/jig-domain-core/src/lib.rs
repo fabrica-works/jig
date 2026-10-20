@@ -153,6 +153,8 @@ pub struct Settings {
     pub tools: ToolFamilies,
     /// Configured LLM providers, for the accounts child (accounts.md, 3.1).
     pub llm_providers: accounts::Providers,
+    /// Actual client key ceiling, supplied by startup after protocol limits are checked.
+    pub key_bytes: u32,
 }
 
 /// Jig's authority bits for the engine's tool families.

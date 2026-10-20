@@ -278,6 +278,8 @@ fn an_accounts_document_is_watched_but_never_read() {
     use jig_domain_core::{documents as d, reads};
     use skein_lib::List;
     let document = d::Document::Accounts(Box::new(d::Accounts {
+        readiness: List::with_capacity(0),
+        readiness_cut: false,
         accounts: List::with_capacity(0),
         signing: List::with_capacity(0),
         last_end: None,

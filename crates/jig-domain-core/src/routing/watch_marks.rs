@@ -149,6 +149,7 @@ impl Core {
     }
 
     pub(crate) fn touch_project_parties(&mut self, project: u32) {
+        self.touch_accounts(None);
         self.touch_project_objects(project);
         let mut parties = List::with_capacity(self.view_subjects.len());
         for (_, binding) in &self.view_subjects {

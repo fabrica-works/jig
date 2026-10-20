@@ -79,6 +79,13 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
             charters: engine.charters.clone(),
             resume_bytes: limits.resume_bytes,
             tools: domain::ToolFamilies::JIG,
+            key_bytes: engine
+                .limits
+                .driver
+                .client
+                .document
+                .token_bytes
+                .min(engine.limits.clients.wire.keyed_value_some),
             llm_providers: accounts::Providers { providers: llm_providers.into_boxed() },
         },
         projects,

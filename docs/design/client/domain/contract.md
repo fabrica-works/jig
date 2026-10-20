@@ -561,6 +561,29 @@ subject, source, key or digest payloads, and includes the accounts',
 holder's accounts', sources' and sign-ins' room limits under the same
 keyed retention and bounded entrance-history rules as other actions.
 
+The public provider catalogue in `me` carries the configured provider number,
+cut-aware name, sign-in and key offers, whole program names (at most 32 bytes
+each), the no-credential offer, signed-in-plan flag and whole manage-usage
+address. The maximum key bytes is the smaller of startup's accounts token
+limit and the client wire's carried-value limit. Offers describe configuration,
+not a running backend. Provider and program lists use the document line bound;
+each has its own cut flag. Absence from a cut catalogue means nothing.
+
+`accounts` also carries volatile readiness rows keyed by provider and payer:
+the party itself, then every project it may read, including deployment-role
+membership where it is a readable project. Rows expose no serving holder,
+account or source identity. Coverage is the same current people/uses join as
+run selection. A row is usable when a serving source can run on an eligible
+connected host; unavailable when the complete known evidence rules that out;
+unknown when program login evidence is still missing. Slot and budget
+admission, task charter restrictions and account pins remain the concrete run's
+check. Settled is optional: false for this party's pending sign-in at that
+provider, unknown when program checks cannot yet be known, true otherwise.
+The readiness list has its own cut flag; it never makes a negative statement
+about an omitted provider/payer. Decisions use full domain state, independently
+of displayed account/source/host prefixes. The existing aggregate usable and
+settled fields remain available.
+
 ### 5.2 Revisions
 
 - **One for each thing a party decides about,** which moves only when
@@ -860,6 +883,11 @@ a question, a person task, a result, a task's activity, a project, a
 note) are read (section 6), and read again when a watch that names them
 says they moved. A turn is a read and not a subject: a committed turn
 does not change, so it is read once (section 6).
+
+Account source/uses and fleet changes invalidate accounts watches; membership
+changes invalidate them too, including another member joining a sole-holder
+project. The catalogue is immutable startup configuration and arrives on every
+new `me` watch, including after restart.
 
 ### 7.2 Level-triggered
 

@@ -658,6 +658,9 @@ pub(crate) mod tests {
 
     fn frame() -> documents::Frame {
         documents::Frame {
+            providers: skein_lib::List::with_capacity(0),
+            providers_cut: false,
+            key_bytes: 256,
             party: u64::MAX,
             kind: jig_domain_people::Kind::Person,
             login: documents::Text { bytes: Box::from(UTF8_TEXTS[0]), cut: true },

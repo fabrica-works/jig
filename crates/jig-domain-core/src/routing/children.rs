@@ -621,6 +621,7 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::
     if touched {
         core.touch_deployment();
         core.touch_run_waits();
+        core.touch_accounts(None);
     }
     let mut out = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
     fleet::step(&mut core.fleet, &Env { now: env.now, wall: env.wall, limits: env.limits.fleet }, event, &mut out);
