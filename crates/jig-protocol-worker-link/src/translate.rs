@@ -410,38 +410,35 @@ pub(crate) fn down(
     };
     Some(down)
 }
-/// A value's arm names its table: a credential is an account's, a secret
-/// the application's.
+/// A value's arm and scheme name the form in which it is lent.
 fn grant(grant: wire::Grant, now: Time, out: &mut Queue<Request>) -> host::Grant {
     let grant = grant.into_parts();
-    let (table, value) = match grant.value {
+    let (form, value) = match grant.value {
         wire::GrantValue::Credential(value) => {
             let value = value.into_parts();
             let scheme = match value.scheme {
                 wire::Scheme::Bearer => Scheme::Bearer,
                 wire::Scheme::Key => Scheme::Key,
             };
-            (host::GrantTable::Accounts, GrantValue::Credential { scheme, token: value.bytes })
+            (
+                host::Form::Credential(match scheme {
+                    Scheme::Bearer => host::Scheme::Bearer,
+                    Scheme::Key => host::Scheme::Key,
+                }),
+                GrantValue::Credential { scheme, token: value.bytes },
+            )
         }
         wire::GrantValue::Withdrawn(value) => {
             let value = value.into_parts();
-            (host::GrantTable::Accounts, GrantValue::Withdrawn { id: value.id, bearer: value.bearer })
+            (host::Form::Withdrawn, GrantValue::Withdrawn { id: value.id, bearer: value.bearer })
         }
         wire::GrantValue::Application(value) => {
-            (host::GrantTable::Application, GrantValue::Application { secret: value.into_parts().secret })
+            (host::Form::Application, GrantValue::Application { secret: value.into_parts().secret })
         }
     };
     let expires = now.saturating_add(grant.valid);
     out.push(Request::Value { account: grant.number, generation: grant.generation, expires, value });
-    host::Grant {
-        form: match table {
-            host::GrantTable::Accounts => host::Form::Credential(host::Scheme::Bearer),
-            host::GrantTable::Application => host::Form::Application,
-        },
-        account: grant.number,
-        generation: grant.generation,
-        valid: grant.valid,
-    }
+    host::Grant { form, account: grant.number, generation: grant.generation, valid: grant.valid }
 }
 fn transcript(bytes: &[u8]) -> Box<[Box<[u8]>]> {
     let mut reader = Reader::new(bytes);

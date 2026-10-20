@@ -513,27 +513,30 @@ fn transcript(turns: &[Box<[u8]>], bound: u32) -> Option<Box<[u8]>> {
     }
     Some(writer.finish())
 }
-/// A grant's table and its value's arm agree, or the grant is not sent.
+/// A grant's form and its value's arm agree, or the grant is not sent.
 fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v3::Limits) -> Option<wire::Grant> {
-    let value = match (grant.form.table(), value) {
-        (host::GrantTable::Accounts, crate::GrantValue::Credential { scheme, token }) => {
-            let scheme = match scheme {
-                crate::Scheme::Bearer => wire::Scheme::Bearer,
-                crate::Scheme::Key => wire::Scheme::Key,
+    let value = match (grant.form, value) {
+        (host::Form::Credential(form), crate::GrantValue::Credential { scheme, token }) => {
+            if scheme != grant_scheme(form) {
+                return None;
+            }
+            let scheme = match form {
+                host::Scheme::Bearer => wire::Scheme::Bearer,
+                host::Scheme::Key => wire::Scheme::Key,
             };
             wire::GrantValue::Credential(
                 wire::CredentialValue::new(limits, wire::CredentialValueParts { scheme, bytes: token }).ok()?,
             )
         }
-        (host::GrantTable::Accounts, crate::GrantValue::Withdrawn { id, bearer }) => wire::GrantValue::Withdrawn(
+        (host::Form::Withdrawn, crate::GrantValue::Withdrawn { id, bearer }) => wire::GrantValue::Withdrawn(
             wire::WithdrawnValue::new(limits, wire::WithdrawnValueParts { id, bearer }).ok()?,
         ),
-        (host::GrantTable::Application, crate::GrantValue::Application { secret }) => wire::GrantValue::Application(
+        (host::Form::Application, crate::GrantValue::Application { secret }) => wire::GrantValue::Application(
             wire::ApplicationValue::new(limits, wire::ApplicationValueParts { secret }).ok()?,
         ),
-        (host::GrantTable::Accounts, crate::GrantValue::Application { .. })
-        | (host::GrantTable::Application, crate::GrantValue::Credential { .. } | crate::GrantValue::Withdrawn { .. }) =>
-        {
+        (host::Form::Credential(_), crate::GrantValue::Withdrawn { .. } | crate::GrantValue::Application { .. })
+        | (host::Form::Withdrawn, crate::GrantValue::Credential { .. } | crate::GrantValue::Application { .. })
+        | (host::Form::Application, crate::GrantValue::Credential { .. } | crate::GrantValue::Withdrawn { .. }) => {
             return None;
         }
     };
@@ -542,6 +545,12 @@ fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v3:
         wire::GrantParts { number: grant.account, generation: grant.generation, valid: grant.valid, value },
     )
     .ok()
+}
+const fn grant_scheme(scheme: host::Scheme) -> crate::Scheme {
+    match scheme {
+        host::Scheme::Bearer => crate::Scheme::Bearer,
+        host::Scheme::Key => crate::Scheme::Key,
+    }
 }
 fn settled(answer: host::SettledAnswer, limits: &wire::v3::Limits) -> Option<wire::SettledAnswer> {
     match answer {

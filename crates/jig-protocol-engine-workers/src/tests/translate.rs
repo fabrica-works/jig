@@ -281,9 +281,13 @@ fn granted_value(down: Option<translate::Down>) -> jig_protocol_worker_wire::Gra
 }
 #[test]
 fn each_credential_scheme_reaches_the_wire_with_its_token() {
+    use jig_domain_host::{Form, Scheme};
     use jig_protocol_worker_wire as wire;
-    for (scheme, expected) in [(crate::Scheme::Bearer, wire::Scheme::Bearer), (crate::Scheme::Key, wire::Scheme::Key)] {
-        let grant = granted_value(granted(jig_domain_host::Form::Withdrawn, fixtures::credential_value(scheme)));
+    for (form, scheme, expected) in [
+        (Scheme::Bearer, crate::Scheme::Bearer, wire::Scheme::Bearer),
+        (Scheme::Key, crate::Scheme::Key, wire::Scheme::Key),
+    ] {
+        let grant = granted_value(granted(Form::Credential(form), fixtures::credential_value(scheme)));
         let wire::GrantValue::Credential(value) = grant.value() else { panic!("credential value") };
         assert_eq!(value.scheme(), &expected);
         assert_eq!(value.bytes().expose(), fixtures::TOKEN_ONE);
@@ -304,11 +308,26 @@ fn an_application_grant_reaches_the_wire_with_its_secret() {
     assert_eq!(value.secret().expose(), fixtures::TOKEN_TWO);
 }
 #[test]
-fn a_value_unlike_its_grants_table_is_not_sent() {
-    let application = fixtures::values()[1].take().expect("application value");
-    assert!(granted(jig_domain_host::Form::Withdrawn, application).is_none());
-    let credential = fixtures::credential_value(crate::Scheme::Key);
-    assert!(granted(jig_domain_host::Form::Application, credential).is_none());
+fn a_value_unlike_its_grants_form_is_not_sent() {
+    use jig_domain_host::{Form, Scheme};
+    let bearer = Form::Credential(Scheme::Bearer);
+    let key = Form::Credential(Scheme::Key);
+    for (form, value) in [
+        (key, fixtures::credential_value(crate::Scheme::Bearer)),
+        (bearer, fixtures::credential_value(crate::Scheme::Key)),
+        (bearer, fixtures::values()[0].take().expect("withdrawn")),
+        (key, fixtures::values()[0].take().expect("withdrawn")),
+        (Form::Withdrawn, fixtures::credential_value(crate::Scheme::Bearer)),
+        (Form::Withdrawn, fixtures::credential_value(crate::Scheme::Key)),
+        (bearer, fixtures::values()[1].take().expect("application")),
+        (key, fixtures::values()[1].take().expect("application")),
+        (Form::Withdrawn, fixtures::values()[1].take().expect("application")),
+        (Form::Application, fixtures::credential_value(crate::Scheme::Bearer)),
+        (Form::Application, fixtures::credential_value(crate::Scheme::Key)),
+        (Form::Application, fixtures::values()[0].take().expect("withdrawn")),
+    ] {
+        assert!(granted(form, value).is_none(), "value unlike {form:?}");
+    }
 }
 #[test]
 fn a_standalone_grant_without_a_value_is_not_sent() {

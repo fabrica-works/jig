@@ -66,8 +66,18 @@ mod grants {
     #[test]
     fn a_grant_of_each_arm_reaches_the_worker_with_its_value() {
         let (mut world, connection, channel) = joined();
-        send_grant(&mut world, channel, host::Form::Withdrawn, fixtures::credential_value(Scheme::Bearer));
-        send_grant(&mut world, channel, host::Form::Withdrawn, fixtures::credential_value(Scheme::Key));
+        send_grant(
+            &mut world,
+            channel,
+            host::Form::Credential(host::Scheme::Bearer),
+            fixtures::credential_value(Scheme::Bearer),
+        );
+        send_grant(
+            &mut world,
+            channel,
+            host::Form::Credential(host::Scheme::Key),
+            fixtures::credential_value(Scheme::Key),
+        );
         send_grant(&mut world, channel, host::Form::Withdrawn, withdrawn());
         send_grant(&mut world, channel, host::Form::Application, application());
         let grants = received_grants(&world, connection);
@@ -82,6 +92,17 @@ mod grants {
         assert_eq!(credential(grants[1].grant()), (&wire::Scheme::Key, fixtures::TOKEN_ONE));
         assert_eq!(withdrawn_parts(grants[2].grant()), (fixtures::ACCOUNT_ID, fixtures::TOKEN_ONE));
         assert_eq!(application_secret(grants[3].grant()), fixtures::TOKEN_TWO);
+    }
+    #[test]
+    fn a_grant_whose_value_is_unlike_its_form_is_not_sent() {
+        let (mut world, connection, channel) = joined();
+        send_grant(
+            &mut world,
+            channel,
+            host::Form::Credential(host::Scheme::Bearer),
+            fixtures::credential_value(Scheme::Key),
+        );
+        assert!(received_grants(&world, connection).is_empty());
     }
     #[test]
     fn an_assignment_reaches_the_worker_with_its_start_and_identity() {

@@ -228,7 +228,7 @@ fn check_down_records(world: &World, records: &[&host::LinkDown]) {
             run: Token::new(7),
             attempt: Token::new(2),
             grant: host::Grant {
-                form: host::Form::Credential(host::Scheme::Bearer),
+                form: host::Form::Withdrawn,
                 account: 1,
                 generation: 3,
                 valid: Duration::from_secs(60)
