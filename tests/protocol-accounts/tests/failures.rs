@@ -1,7 +1,7 @@
 use jig_domain_accounts as accounts;
 use jig_protocol_accounts_world::{
     fixtures::ACCOUNT_CHAT,
-    owner::Heard,
+    owner::{Heard, Trace},
     world::{self, Story},
 };
 use skein_lib::Duration;
@@ -46,7 +46,7 @@ fn a_rejected_client_fails_as_misconfigured() {
     );
 }
 #[test]
-fn a_damaged_record_file_fails_as_unloaded_naming_the_file() {
+fn a_damaged_stored_record_fails_its_source_as_unloaded() {
     assert_eq!(
         heard(Story::DamagedRecord),
         [Heard::Failed {
@@ -62,5 +62,8 @@ fn a_close_during_an_exchange_drains_it() {
     let owner = world::owner(&outcome);
     assert_eq!(owner.child_heard(), [Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }]);
     assert!(owner.closed());
-    assert!(outcome.machine.writes > 0, "the exchange's refreshed record was kept before Closed");
+    let trace = owner.trace();
+    let kept = trace.iter().position(|entry| *entry == Trace::Kept { account: ACCOUNT_CHAT, generation: 2 });
+    let closed = trace.iter().position(|entry| *entry == Trace::Closed);
+    assert!(kept.is_some() && kept < closed, "the exchange's renewed record was kept before Closed");
 }

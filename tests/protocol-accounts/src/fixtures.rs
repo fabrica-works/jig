@@ -11,9 +11,20 @@ pub const ACCOUNT_CHAT: u32 = 0;
 pub const ROOM: u32 = 64;
 pub const TOKEN_FIRST: &[u8] = b"access-first";
 pub const TOKEN_SECOND: &[u8] = b"access-second";
+/// Every token the issuer gives and the record it starts from: the access
+/// tokens and the refresh tokens.
+pub const VALUES: [&[u8]; 4] = [TOKEN_FIRST, TOKEN_SECOND, b"seed", b"next"];
 pub const AUTHORIZE: &[u8] = b"http://127.0.0.1:31000/authorize";
 pub const TOKEN: &[u8] = b"http://127.0.0.1:31000/token";
 pub const REDIRECT: &[u8] = b"http://localhost:31234/callback";
+/// The store's application bounds: this world keeps no application rows.
+pub const APPLICATION: jig_protocol_store::sizes::Application =
+    jig_protocol_store::sizes::Application { version: 1, key: 16, value: 64 };
+/// The small profile's store: its memory maps grow only as rows arrive.
+#[must_use]
+pub fn store_limits() -> jig_protocol_store::Limits {
+    jig_protocol_config::profile(jig_protocol_config::Profile::Small).store
+}
 #[must_use]
 pub fn limits() -> accounts::Limits {
     accounts::Limits {
@@ -156,6 +167,26 @@ pub fn refuse() -> fake::Plan {
     }
 }
 
+/// The record the store holds when a story starts: the kept record for a
+/// sign-in, bytes that decode as no record when it is damaged, and none
+/// before a handed-in record is first kept.
+#[must_use]
+pub fn held(story: crate::world::Story) -> Option<Box<[u8]>> {
+    use crate::world::Story;
+    match story {
+        Story::DamagedRecord => Some(bytes::copy_of(b"damaged record")),
+        Story::HandedIn { .. } | Story::HandedInRejected => None,
+        Story::Granted
+        | Story::Refreshed
+        | Story::Closed
+        | Story::RateLimitedRefresh
+        | Story::RefusedRefresh
+        | Story::RejectedClient
+        | Story::ClosedExchange => {
+            Some(oauth::encode_record(&kept(), &limits().client.document).expect("kept fixture"))
+        }
+    }
+}
 pub const ACCOUNT_HANDED: u32 = 0;
 #[must_use]
 pub fn handed_lapse(story: crate::world::Story) -> Option<Duration> {

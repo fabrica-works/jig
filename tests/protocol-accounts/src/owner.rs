@@ -1,16 +1,28 @@
-//! One process composing the real child, translation, table and driver.
+//! One process composing the real child, translation, table and driver,
+//! and the secrets' store that keeps the driver's records (llm.md 5 and 8;
+//! store.md 9).
 use crate::fixtures::{self, ACCOUNT_CHAT, ROOM};
 use crate::world::Story;
 use jig_domain_accounts as child;
 use jig_protocol_accounts::{
+    handed_in,
+    records::{self, Records},
     table::{Table, Value},
     translate::{self, Up},
 };
+use jig_protocol_store as store;
 use skein_io::{self as io, kernel};
-use skein_lib::{Env, List, Queue, Secret, Time, Wall};
+use skein_lib::{Env, List, Queue, Secret, Time, Token, Wall, bytes, sha256};
 use skein_oauth_accounts as driver;
-use skein_world::{Host, files};
+use skein_world::Host;
 use std::net::SocketAddr;
+
+/// The store's answers, by what was asked; a replace is answered under its
+/// source's number.
+const OPEN: Token = Token::new(1);
+const LOAD: Token = Token::new(2);
+const GET: Token = Token::new(3);
+const SOURCE: u64 = 1 << 32;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Heard {
@@ -21,8 +33,25 @@ pub enum Heard {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Trace {
     Requested(child::ToComponent),
+    /// The store held this generation of the source's record at start.
+    Loaded {
+        account: u32,
+        generation: u64,
+    },
+    /// The store answered that this generation of the record is durable.
+    Kept {
+        account: u32,
+        generation: u64,
+    },
     Heard(Heard),
     Closed,
+}
+/// A value the table lent a run, by its digest.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Lent {
+    pub account: u32,
+    pub generation: u64,
+    pub digest: [u8; 32],
 }
 pub struct Owner {
     io: io::Io,
@@ -34,9 +63,16 @@ pub struct Owner {
     table: Table,
     events: Queue<io::Event>,
     requests: Queue<io::Request>,
+    /// The owner keeper files nothing; the driver's calls take the queue.
     files: Queue<driver::FileLower>,
-    file_driver: files::Driver,
     above: Queue<driver::Event>,
+    store: store::Store,
+    store_limits: store::Limits,
+    store_above: Queue<store::Event>,
+    below: store::Below,
+    records: Records,
+    lent: Vec<Lent>,
+    last_kept: Option<Secret>,
     completions: Queue<kernel::Complete>,
     submissions: Queue<kernel::Submit>,
     pub(crate) address: Option<SocketAddr>,
@@ -62,7 +98,9 @@ impl std::fmt::Debug for Owner {
     }
 }
 impl Owner {
-    pub(crate) fn new(root: kernel::Fd, story: Story) -> Self {
+    /// The owner over an open memory store holding `held` as its source's
+    /// record, as an earlier run left it.
+    pub(crate) fn new(story: Story, held: Option<&[u8]>) -> Self {
         let limits = fixtures::limits();
         let child_limits = fixtures::child_limits();
         let account = if matches!(story, Story::HandedIn { .. } | Story::HandedInRejected) {
@@ -70,7 +108,8 @@ impl Owner {
         } else {
             ACCOUNT_CHAT
         };
-        Self {
+        let store_limits = fixtures::store_limits();
+        let mut owner = Self {
             io: io::Io::new(&limits.io),
             component: None,
             child: child::Domain::new(&child_limits, Box::new([account])),
@@ -83,7 +122,24 @@ impl Owner {
             above: Queue::with_capacity(ROOM),
             completions: Queue::with_capacity(ROOM),
             submissions: Queue::with_capacity(ROOM),
-            file_driver: files::Driver::new(root, 4, limits.client.document.record_bytes, limits.file_stall, 1234),
+            store: store::Store::over(
+                &store_limits,
+                fixtures::APPLICATION,
+                store::Stores {
+                    store: skein_kv::Store::memory(&store_limits.store),
+                    secrets: skein_kv::Store::memory(&store_limits.secrets),
+                },
+            ),
+            store_limits,
+            store_above: Queue::with_capacity(store::MAX_OUT_DOWN),
+            below: store::Below {
+                store: Queue::with_capacity(skein_kv::MAX_OUT.below),
+                secrets: Queue::with_capacity(skein_kv::MAX_OUT.below),
+                transcripts: Queue::with_capacity(skein_kv::MAX_OUT.below),
+            },
+            records: Records::new(limits.accounts),
+            lent: Vec::with_capacity(8),
+            last_kept: None,
             limits,
             address: None,
             heard: Vec::with_capacity(8),
@@ -97,7 +153,22 @@ impl Owner {
             now: Time::ZERO,
             story,
             account,
+        };
+        // Memory stores open no file: the root is never read.
+        let root = store::Root { token: OPEN, fd: kernel::Fd::new(3) };
+        owner.ask(Time::ZERO, Wall::EPOCH, store::Request::Open { owner: OPEN, root });
+        let opened = owner.store_above.pop();
+        assert!(
+            matches!(opened, Some(store::Event::Opened { owner: OPEN, last: 0 })),
+            "the memory store opens at once"
+        );
+        if let Some(held) = held {
+            let value = Secret::new(bytes::copy_of(held));
+            owner.secrets(Time::ZERO, Wall::EPOCH, source_token(account), replace(account, value, None));
+            let kept = owner.store_above.pop();
+            assert!(matches!(kept, Some(store::Event::Kept { .. })), "the store keeps the record held before the run");
         }
+        owner
     }
     #[must_use]
     pub fn child_heard(&self) -> &[Heard] {
@@ -129,6 +200,16 @@ impl Owner {
     pub(crate) fn reject(&mut self) {
         self.reject_requested = Some(());
     }
+    /// Each value the table lent, in order.
+    #[must_use]
+    pub fn lent(&self) -> &[Lent] {
+        &self.lent
+    }
+    /// The record the store last answered as kept, read back from it.
+    #[must_use]
+    pub fn last_kept(&self) -> Option<&[u8]> {
+        self.last_kept.as_ref().map(Secret::expose)
+    }
     pub(crate) fn unstarted(&self) -> bool {
         self.component.is_none()
     }
@@ -139,11 +220,14 @@ impl Owner {
             self.facts.push(fact);
         }
     }
+    /// The driver starts from the store's records (llm.md 5.1); a handed-in
+    /// record is kept before it is handed in, unless the store holds it.
     fn start(&mut self, env: &Env<driver::Limits>) {
+        let handed = fixtures::handed_lapse(self.story);
         let mut configured = List::with_capacity(1);
         assert!(
             configured
-                .push(if matches!(self.story, Story::HandedIn { .. } | Story::HandedInRejected) {
+                .push(if handed.is_some() {
                     driver::Account::HandedIn
                 } else {
                     driver::Account::SignIn {
@@ -154,35 +238,122 @@ impl Owner {
                             address: self.address.expect("issuer address"),
                             transport: driver::Transport::Plaintext,
                         },
-                        keeper: driver::Keeper::Private {
-                            root: self.file_driver.root(),
-                            directory: skein_lib::bytes::copy_of(b"secret"),
-                            file: skein_lib::bytes::copy_of(b"record"),
-                        },
+                        keeper: driver::Keeper::Owner { kept: None },
                     }
                 })
                 .is_ok()
         );
+        self.load(env, &mut configured);
         let crypto = skein_lib::CryptoRng::new(&skein_world::crypto_seed(17), 0).expect("world crypto seed");
         self.component = Some(driver::Component::new(configured, &self.limits, crypto).expect("configured driver"));
-        if let Some(lapses_in) = fixtures::handed_lapse(self.story) {
-            let request = jig_protocol_accounts::handed_in::hand_in(
+        if let Some(lapses_in) = handed {
+            // A handed-in file states when its token lapses, the same at
+            // every start.
+            let record = handed_in::record(
                 self.account,
-                Secret::new(skein_lib::bytes::copy_of(fixtures::TOKEN_FIRST)),
-                Wall::from_nanos(env.wall.as_nanos().saturating_add(lapses_in.as_nanos())),
+                Secret::new(bytes::copy_of(fixtures::TOKEN_FIRST)),
+                Wall::from_nanos(Wall::EPOCH.as_nanos().saturating_add(lapses_in.as_nanos())),
                 None,
                 &self.limits.client.document,
             )
             .expect("handed-in fixture");
-            self.component.as_mut().expect("started").down(
-                env,
-                request,
-                &mut self.above,
-                &mut self.requests,
-                &mut self.files,
-            );
+            match self.records.hand_in(self.account, record, &self.limits.client.document).expect("handed-in fixture") {
+                records::Next::Driver(request) => self.driver(env, request),
+                records::Next::Store(keep) => self.replace(env, keep),
+            }
         }
         self.child_event(env.now, env.wall, child::Event::Want);
+    }
+    /// Reads the store's records, page by page, into the configured sources.
+    fn load(&mut self, env: &Env<driver::Limits>, configured: &mut List<driver::Account>) {
+        let mut after = None;
+        loop {
+            let load = store::Secrets::Load { owner: store::SecretOwner::Source, after };
+            self.secrets(env.now, env.wall, LOAD, load);
+            let Some(store::Event::SecretsLoaded { owner: LOAD, rows, next }) = self.store_above.pop() else {
+                panic!("a memory store answers a load at once");
+            };
+            for row in rows {
+                let account = u32::try_from(row.number).expect("a source's number");
+                let Some(record) = self.records.load(account, row.value.expose(), &self.limits.client.document) else {
+                    continue;
+                };
+                self.trace.push(Trace::Loaded { account, generation: record.generation });
+                if let Some(driver::Account::SignIn { keeper, .. }) = configured.get_mut(account) {
+                    *keeper = driver::Keeper::Owner { kept: Some(record) };
+                }
+            }
+            match next {
+                Some(next) => after = Some(next),
+                None => return,
+            }
+        }
+    }
+    fn driver(&mut self, env: &Env<driver::Limits>, request: driver::Request) {
+        self.component.as_mut().expect("started").down(
+            env,
+            request,
+            &mut self.above,
+            &mut self.requests,
+            &mut self.files,
+        );
+    }
+    fn ask(&mut self, now: Time, wall: Wall, request: store::Request) {
+        let env = Env { now, wall, limits: self.store_limits };
+        store::down(&mut self.store, &env, request, &mut self.store_above, &mut self.below);
+        assert!(
+            self.below.store.is_empty() && self.below.secrets.is_empty() && self.below.transcripts.is_empty(),
+            "a memory store files nothing"
+        );
+    }
+    fn secrets(&mut self, now: Time, wall: Wall, owner: Token, request: store::Secrets) {
+        self.ask(now, wall, store::Request::Secrets { owner, request });
+    }
+    /// Asks the store to keep a record in place of the one it holds, and
+    /// passes its answer on.
+    fn replace(&mut self, env: &Env<driver::Limits>, keep: records::Keep) {
+        let records::Keep { account, value, replaces } = keep;
+        self.secrets(env.now, env.wall, source_token(account), replace(account, value, replaces));
+        self.answers(env);
+    }
+    /// The store's answers to replaces (store.md 9): the driver hears `Kept`,
+    /// or a handed-in record is handed in, only once the record is durable.
+    fn answers(&mut self, env: &Env<driver::Limits>) {
+        while let Some(event) = self.store_above.pop() {
+            let request = match event {
+                store::Event::Kept { owner } => {
+                    let account = source(owner);
+                    let Some(request) = self.records.kept(account) else { continue };
+                    self.trace.push(Trace::Kept { account, generation: generation(&request) });
+                    let get = store::Secrets::Get { owner: store::SecretOwner::Source, number: u64::from(account) };
+                    self.secrets(env.now, env.wall, GET, get);
+                    let Some(store::Event::Secret { owner: GET, value: Some(value) }) = self.store_above.pop() else {
+                        panic!("a kept record reads back");
+                    };
+                    self.last_kept = Some(value);
+                    request
+                }
+                store::Event::Stale { owner } => {
+                    let Some(request) = self.records.stale(source(owner)) else { continue };
+                    request
+                }
+                store::Event::Opened { .. }
+                | store::Event::OpenRefused { .. }
+                | store::Event::Committed { .. }
+                | store::Event::Failed { .. }
+                | store::Event::Restored { .. }
+                | store::Event::Loaded { .. }
+                | store::Event::Read { .. }
+                | store::Event::Got { .. }
+                | store::Event::Turns { .. }
+                | store::Event::Unread { .. }
+                | store::Event::Erased { .. }
+                | store::Event::Secret { .. }
+                | store::Event::SecretsLoaded { .. }
+                | store::Event::Corrupt { .. } => unreachable!("a replace is answered kept or stale"),
+            };
+            self.driver(env, request);
+        }
     }
     fn child_requests(&mut self, env: &Env<driver::Limits>) {
         while let Some(request) = self.child_out.pop() {
@@ -201,15 +372,15 @@ impl Owner {
                 child::Request::Closed => {
                     self.closed = true;
                     self.trace.push(Trace::Closed);
-                    self.file_driver.close_root(env.now);
                 }
             }
         }
     }
     fn observe(&mut self, env: &Env<driver::Limits>) {
         while let Some(event) = self.above.pop() {
-            let event = match translate::up(event, env.now) {
+            let event = match self.records.up(event, env.now) {
                 Up::Granted { event, account, generation, value, expires } => {
+                    self.lent.push(Lent { account, generation, digest: sha256::digest(value.expose()) });
                     self.table
                         .granted(
                             account,
@@ -221,7 +392,13 @@ impl Owner {
                     event
                 }
                 Up::Child(event) => event,
-                Up::Keep { account: _, record: _ } => unreachable!("the private keeper keeps its own records"),
+                Up::Keep { account, record } => {
+                    match self.records.keep(account, record.0, &self.limits.client.document) {
+                        records::Next::Driver(request) => self.driver(env, request),
+                        records::Next::Store(keep) => self.replace(env, keep),
+                    }
+                    continue;
+                }
             };
             let heard = match event {
                 child::FromComponent::Granted { account, generation, valid: _ } => {
@@ -238,29 +415,24 @@ impl Owner {
             self.child_event(env.now, env.wall, child::Event::Component(event));
         }
     }
-    fn private_io(&mut self, env: &Env<driver::Limits>) {
-        while let Some(lower) = self.files.pop() {
-            match lower {
-                driver::FileLower::Request { request, deadline } => self.file_driver.request(request, deadline),
-                driver::FileLower::Remove { .. } => unreachable!("the owner never signs out or removes an account"),
-                driver::FileLower::Cancel { owner } => self.file_driver.cancel(owner),
-            }
-        }
-        self.file_driver.progress(env.now);
-        while let Some(event) = self.file_driver.take_event() {
-            if event.owner() != skein_lib::Token::new(u64::MAX) {
-                self.component.as_mut().expect("file event after start").filed(
-                    env,
-                    event,
-                    &mut self.above,
-                    &mut self.requests,
-                    &mut self.files,
-                );
-            }
-        }
-        while let Some(submit) = self.file_driver.take_submit() {
-            self.submissions.push(submit);
-        }
+}
+fn source_token(account: u32) -> Token {
+    Token::new(SOURCE | u64::from(account))
+}
+fn source(owner: Token) -> u32 {
+    u32::try_from(owner.raw() - SOURCE).expect("a source's number")
+}
+fn replace(account: u32, value: Secret, replaces: Option<[u8; 32]>) -> store::Secrets {
+    store::Secrets::Replace { owner: store::SecretOwner::Source, number: u64::from(account), value, replaces }
+}
+/// The generation the store's answer makes durable.
+fn generation(request: &driver::Request) -> u64 {
+    if let driver::Request::Kept { generation, .. } = request {
+        *generation
+    } else if let driver::Request::HandIn { record, .. } = request {
+        record.generation
+    } else {
+        unreachable!("the store answers a candidate or a handed-in record")
     }
 }
 impl Host for Owner {
@@ -282,7 +454,6 @@ impl Host for Owner {
             self.child_event(now, wall, child::Event::Unauthorized { account: self.account, generation: 1 });
         }
         self.child_requests(&env);
-        self.private_io(&env);
         for _ in 0..ROOM {
             if !self.io.is_ready() || self.events.room() < 3 || self.submissions.room() < 2 {
                 break;
@@ -290,11 +461,7 @@ impl Host for Owner {
             io::resume(&mut self.io, &io_env, &mut self.events, &mut self.submissions);
         }
         while let Some(complete) = self.completions.pop() {
-            if files::Driver::owns(complete.op) {
-                self.file_driver.up(complete);
-            } else {
-                io::up(&mut self.io, &io_env, complete, &mut self.events, &mut self.submissions);
-            }
+            io::up(&mut self.io, &io_env, complete, &mut self.events, &mut self.submissions);
         }
         for _ in 0..ROOM {
             if !self.io.is_due(now) || self.events.room() < 3 || self.submissions.room() < 2 {
@@ -328,7 +495,7 @@ impl Host for Owner {
             let Some(request) = self.requests.pop() else { break };
             io::down(&mut self.io, &io_env, request, &mut self.submissions);
         }
-        self.private_io(&env);
+        assert!(self.files.is_empty(), "the owner keeper files nothing");
         self.io.reclaim();
         self.component.as_mut().expect("started").reclaim();
     }
@@ -339,9 +506,7 @@ impl Host for Owner {
         &mut self.submissions
     }
     fn work_pending(&self, now: Time) -> bool {
-        self.file_driver.has_work()
-            || !self.files.is_empty()
-            || self.io.is_ready()
+        self.io.is_ready()
             || !self.events.is_empty()
             || !self.requests.is_empty()
             || !self.above.is_empty()
@@ -355,10 +520,7 @@ impl Host for Owner {
             })
     }
     fn next_deadline(&self) -> Option<Time> {
-        [self.io.next_deadline(), self.file_driver.next_deadline(), self.next_policy_deadline()]
-            .into_iter()
-            .flatten()
-            .min()
+        [self.io.next_deadline(), self.next_policy_deadline()].into_iter().flatten().min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
         [
@@ -373,7 +535,8 @@ impl Host for Owner {
     fn is_empty(&self) -> bool {
         self.closed
             && self.io.is_empty()
-            && self.file_driver.is_empty()
+            && !self.records.keeping()
+            && self.store_above.is_empty()
             && self.events.is_empty()
             && self.requests.is_empty()
             && self.files.is_empty()
@@ -385,13 +548,16 @@ impl Host for Owner {
     fn worst_case(&self) -> u64 {
         driver::worst_case(&self.limits).expect("driver bound")
             + io::worst_case(&self.limits.io).expect("io bound")
-            + self.file_driver.worst_case(4)
+            + store::worst_case(&self.store_limits).expect("store bound")
+            + Queue::<store::Event>::worst_case(store::MAX_OUT_DOWN).expect("store answers bound")
+            + 3 * Queue::<skein_io::file::Request>::worst_case(skein_kv::MAX_OUT.below).expect("store files bound")
+            + records::worst_case(self.limits.accounts, &self.limits.client.document).expect("records bound")
             + child::worst_case(&self.child_limits).expect("child bound")
             + jig_protocol_accounts::table::worst_case(self.limits.accounts, self.limits.client.document.token_bytes)
                 .expect("table bound")
             + 512_000
     }
     fn operations(&self) -> u32 {
-        io::operations(&self.limits.io).expect("io operation bound") + 4
+        io::operations(&self.limits.io).expect("io operation bound")
     }
 }

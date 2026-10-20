@@ -1,9 +1,10 @@
 use jig_domain_accounts as accounts;
 use jig_protocol_accounts_world::{
-    fixtures::ACCOUNT_CHAT,
+    fixtures::{self, ACCOUNT_CHAT, TOKEN_SECOND},
     owner::{Heard, Trace},
     world::{self, Story},
 };
+use skein_oauth as oauth;
 #[global_allocator]
 static HEAP: skein_heap::Counting = skein_heap::Counting;
 
@@ -27,7 +28,14 @@ fn a_rejected_generation_is_refreshed_and_the_newer_one_lent() {
         ]
     );
     assert_eq!(owner.table_value(ACCOUNT_CHAT, 2), Some(b"access-second".as_slice()));
-    assert!(outcome.machine.writes > 0, "the refreshed record was kept");
+    let trace = owner.trace();
+    let kept = trace.iter().position(|entry| *entry == Trace::Kept { account: ACCOUNT_CHAT, generation: 2 });
+    let granted =
+        trace.iter().position(|entry| *entry == Trace::Heard(Heard::Granted { account: ACCOUNT_CHAT, generation: 2 }));
+    assert!(kept.is_some() && kept < granted, "the renewed record was kept before its token was lent");
+    let stored = owner.last_kept().expect("the store holds the renewed record");
+    let record = oauth::decode_record(stored, &fixtures::limits().client.document).expect("the stored record reads");
+    assert_eq!((record.generation, &*record.access_token), (2, TOKEN_SECOND));
 }
 #[test]
 fn a_close_releases_and_ends_with_closed() {

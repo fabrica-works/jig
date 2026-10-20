@@ -1,7 +1,10 @@
-//! Outside grant and settlement checks shared by the stories.
+//! Outside grant and settlement checks shared by the stories, with
+//! llm.md 8's referees for the driver and the secrets' store: no token
+//! reaches a run before its record is kept; a name never means two values;
+//! no value is in anything the owner keeps outside the secrets' store.
 use crate::{
     fixtures,
-    owner::{Heard, Trace},
+    owner::{Heard, Owner, Trace},
     world::{Process, Story},
 };
 use skein_lib::{Duration, Time};
@@ -62,6 +65,8 @@ impl Referee<Process> for Judge {
                 Process::Issuer(_) => None,
             })
             .expect("owner");
+        kept_before_lent(owner);
+        one_value_per_name(owner);
         for heard in owner.child_heard() {
             if let Heard::Granted { account, generation } = heard
                 && !matches!(owner.child_heard().last(), Some(Heard::Failed { .. }))
@@ -84,6 +89,7 @@ impl Referee<Process> for Judge {
             }
             let expected = fixtures::expected(self.story);
             assert_eq!(owner.child_heard(), expected);
+            no_value_outside_the_store(owner);
         }
         self.wake = ((owner.unstarted()
             && processes.iter().any(|process| matches!(process, Process::Issuer(peer) if peer.address().is_some())))
@@ -103,5 +109,40 @@ impl Referee<Process> for Judge {
     }
     fn passed(&self) -> bool {
         self.passed.is_some()
+    }
+}
+/// Each granted generation's record was read from the store at start, or
+/// the store answered that it is durable, before the grant was heard.
+fn kept_before_lent(owner: &Owner) {
+    let trace = owner.trace();
+    for (index, entry) in trace.iter().enumerate() {
+        if let Trace::Heard(Heard::Granted { account, generation }) = entry {
+            let kept = trace[..index].iter().any(|before| {
+                matches!(before, Trace::Loaded { account: a, generation: g } | Trace::Kept { account: a, generation: g }
+                    if a == account && g == generation)
+            });
+            assert!(kept, "no token reaches a run before its record is kept: {account} generation {generation}");
+        }
+    }
+}
+/// A source's generation names one value.
+fn one_value_per_name(owner: &Owner) {
+    let lent = owner.lent();
+    for (index, first) in lent.iter().enumerate() {
+        for second in &lent[index + 1..] {
+            if (first.account, first.generation) == (second.account, second.generation) {
+                assert_eq!(first.digest, second.digest, "a name never means two values");
+            }
+        }
+    }
+}
+/// What the owner holds outside the store, its trace and the child's facts,
+/// names no token; the driver files nothing (the owner's `iterate` checks).
+fn no_value_outside_the_store(owner: &Owner) {
+    let facts = format!("{:?}", owner.facts());
+    let trace = format!("{:?}", owner.trace());
+    for value in fixtures::VALUES {
+        let value = std::str::from_utf8(value).expect("fixture values are text");
+        assert!(!facts.contains(value) && !trace.contains(value), "no value outside the secrets' store");
     }
 }

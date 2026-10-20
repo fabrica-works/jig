@@ -1,11 +1,10 @@
-//! The simulated io world and its private filesystem.
+//! The simulated io world; the owner's records live in its secrets' store.
 use crate::{fixtures, owner::Owner, referee::Judge};
-use skein_fake_machine::{self as disk, How, Item};
 use skein_fake_oauth as fake;
 use skein_fake_peers::{Transport, oauth as peer};
 use skein_io::kernel;
 use skein_lib::{Queue, Time, Wall, bytes};
-use skein_world::{Host, Machine, Memory, Outcome, World};
+use skein_world::{Host, Memory, Outcome, World};
 use std::net::Ipv4Addr;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -68,29 +67,6 @@ impl Host for Process {
         self.host().operations()
     }
 }
-pub struct Files {
-    disk: disk::Machine,
-    pub writes: usize,
-}
-impl Files {
-    fn new(story: Story) -> (Self, skein_sim::Handle) {
-        let encoded =
-            skein_oauth::encode_record(&fixtures::kept(), &fixtures::limits().client.document).expect("kept fixture");
-        let encoded = if story == Story::DamagedRecord { bytes::copy_of(b"damaged record") } else { encoded };
-        let mut disk = disk::Machine::for_user(1234);
-        let root =
-            disk.lay(&[Item::directory(b"secret").mode(0o700), Item::file(b"secret/record", &encoded).mode(0o600)]);
-        let startup = disk.open(root, b".", How::Directory).expect("startup root");
-        disk.close(root);
-        (Self { disk, writes: 0 }, skein_sim::Handle::new(startup.raw()))
-    }
-}
-impl Machine for Files {
-    fn step(&mut self, call: skein_sim::Call, answers: &mut Queue<skein_sim::Answer>) {
-        self.writes += usize::from(matches!(call.ask, skein_sim::Ask::Write { .. }));
-        disk::step(&mut self.disk, call, answers);
-    }
-}
 fn issuer(story: Story) -> Process {
     let profile = fixtures::limits();
     let mut peer = peer::Peer::new(
@@ -138,20 +114,24 @@ fn issuer(story: Story) -> Process {
     }
     Process::Issuer(Box::new(peer))
 }
+/// A story from the record its store holds at the start.
 #[must_use]
-pub fn run(seed: u64, story: Story) -> Outcome<Process, Files> {
-    let (files, root) = Files::new(story);
+pub fn run(seed: u64, story: Story) -> Outcome<Process> {
+    run_from(seed, story, fixtures::held(story).as_deref())
+}
+/// A story from `held`, the record an earlier run left in the store: a
+/// start after a restart.
+#[must_use]
+pub fn run_from(seed: u64, story: Story, held: Option<&[u8]>) -> Outcome<Process> {
     let mut config = skein_sim::Config::calm();
     config.wall = Wall::EPOCH;
-    let mut world = World::new(seed, config, Judge::new(story), Memory::Checked).with_machine(files);
+    let mut world = World::new(seed, config, Judge::new(story), Memory::Checked);
     world.spawn(|| issuer(story));
-    world.spawn_root(root, |fd| Process::Owner(Box::new(Owner::new(fd, story))));
-    let outcome = world.run();
-    assert_eq!(outcome.machine.disk.open_handles(), 0, "startup root and private keeper settle");
-    outcome
+    world.spawn(|| Process::Owner(Box::new(Owner::new(story, held))));
+    world.run()
 }
 #[must_use]
-pub fn owner(outcome: &Outcome<Process, Files>) -> &Owner {
+pub fn owner(outcome: &Outcome<Process>) -> &Owner {
     outcome
         .procs
         .iter()
