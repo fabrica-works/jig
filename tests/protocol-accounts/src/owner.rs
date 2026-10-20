@@ -520,7 +520,10 @@ impl Owner {
                 }
                 child::Request::Signing(signing) => {
                     match signing {
-                        child::Signing::Restore { .. } | child::Signing::Restored => continue,
+                        child::Signing::Keep { .. }
+                        | child::Signing::Forget { .. }
+                        | child::Signing::Restore { .. }
+                        | child::Signing::Restored => continue,
                         child::Signing::SignIn { .. }
                         | child::Signing::SignOut { .. }
                         | child::Signing::Replaced { .. } => {}
@@ -643,7 +646,7 @@ impl Owner {
                 }
                 child::FromComponent::Expiring { account, generation } => Some(Heard::Expiring { account, generation }),
                 child::FromComponent::Failed { account, failure } => Some(Heard::Failed { account, failure }),
-                child::FromComponent::Closed => None,
+                child::FromComponent::KeepFailed { .. } | child::FromComponent::Closed => None,
             };
             if let Some(heard) = heard {
                 self.heard.push(heard);

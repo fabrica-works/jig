@@ -294,6 +294,7 @@ impl Core {
 }
 
 fn route_room_checked(limits: &Limits) -> Option<u32> {
+    accounts::worst_case(&limits.accounts)?;
     let tasks = tasks::max_out(&limits.tasks).checked_mul(16)?;
     let people = people::max_out(&limits.people).checked_mul(8)?;
     let fleet = fleet::max_out(&limits.fleet).checked_mul(8)?;

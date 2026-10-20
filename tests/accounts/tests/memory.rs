@@ -50,7 +50,7 @@ fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
         meter.start();
         let record = Stored::Account {
             place: 0,
-            uses: None,
+            uses: Some((0..jig_domain_accounts::USES).map(|n| jig_domain_accounts::Use::Party(u64::from(n))).collect()),
             number: number(account, None),
             provider: 1,
             holder: Holder::Party(u64::from(account)),
@@ -196,5 +196,81 @@ impl Run {
     fn sign_out(&mut self, domain: &mut Domain, account: u32, source: u32) {
         let event = Event::SignOut { request: self.token(), holder: Holder::Party(u64::from(account)), source };
         assert_eq!(self.step(domain, event, "sign out"), Some(Signing::SignOut { source }));
+    }
+}
+
+#[test]
+fn pending_llm_key_keeps_and_account_removals_stay_within_the_worst_case() {
+    use jig_domain_accounts::{Change, USES, Use};
+    let providers = providers(vec![provider(1, true, true)]);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS };
+    let bound = worst_case(&LIMITS).expect("world limits");
+    let mut run = Run { meter: Meter::new(), env, bound, out: Queue::with_capacity(max_out(&LIMITS)), request: 0 };
+    let mut domain = Domain::new(&LIMITS, providers, Box::new([]));
+    for number in 0..LIMITS.accounts {
+        let account = jig_accounts_world::account(number * 2, 1, Holder::Party(u64::from(number)), b"subject");
+        // Each subscription has its own subject.
+        let Stored::Account { number: account, provider, holder, place, mut subject, display, .. } = account else {
+            unreachable!()
+        };
+        subject[0] = u8::try_from(number).expect("tiny number");
+        run.step(
+            &mut domain,
+            Event::Restore {
+                record: Stored::Account {
+                    number: account,
+                    provider,
+                    holder,
+                    place,
+                    subject,
+                    display,
+                    uses: Some((0..USES).map(|n| Use::Party(u64::from(n))).collect()),
+                },
+            },
+            "uses restored",
+        );
+        run.step(
+            &mut domain,
+            Event::Restore { record: jig_accounts_world::source(account, account + 1, 0, Kind::SignIn) },
+            "source restored",
+        );
+    }
+    run.step(&mut domain, Event::Want, "restored");
+    let change = Change::AddKey { provider: 1, join: Some(0), carried: 1 << 63 };
+    assert!(matches!(
+        run.step(
+            &mut domain,
+            Event::Change { request: Token::new(50), holder: Holder::Party(0), change },
+            "LLM key being kept"
+        ),
+        Some(Signing::Keep { .. })
+    ));
+    for number in 1..LIMITS.accounts {
+        run.step(
+            &mut domain,
+            Event::Change {
+                request: Token::new(u64::from(number)),
+                holder: Holder::Party(u64::from(number)),
+                change: Change::Remove { account: number * 2 },
+            },
+            "account awaiting sign-out",
+        );
+    }
+    let pending = domain.next_number() - 1;
+    run.step(
+        &mut domain,
+        Event::Component(FromComponent::KeepFailed {
+            account: pending,
+            why: jig_domain_accounts::KeyFailure::NotStored,
+        }),
+        "LLM key keep failed",
+    );
+    run.step(
+        &mut domain,
+        Event::Change { request: Token::new(0), holder: Holder::Party(0), change: Change::Remove { account: 0 } },
+        "all removals pending",
+    );
+    for number in 0..LIMITS.accounts {
+        run.step(&mut domain, Event::SignedOut { source: number * 2 + 1, confirmed: true }, "removal confirmed");
     }
 }

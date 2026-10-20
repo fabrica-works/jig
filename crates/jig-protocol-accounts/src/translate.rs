@@ -204,7 +204,10 @@ pub enum Down {
 #[must_use]
 pub fn down_signing(signing: accounts::Signing) -> Down {
     match signing {
-        accounts::Signing::Restore { .. } | accounts::Signing::Restored => {
+        accounts::Signing::Keep { .. }
+        | accounts::Signing::Forget { .. }
+        | accounts::Signing::Restore { .. }
+        | accounts::Signing::Restored => {
             unreachable!("the host holds the LLM-key and restart paths until their component is wired")
         }
         accounts::Signing::SignIn { source, provider } => Down::SignIn { source, provider },

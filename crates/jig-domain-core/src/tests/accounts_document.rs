@@ -170,7 +170,7 @@ fn a_partys_accounts_document_lists_its_own_accounts_with_their_sources_in_order
             provider: Some(PROVIDER),
             display: Text { bytes: b"Name".as_slice().into(), cut: false },
             holder: accounts::Holder::Party(ALICE),
-            sources: list([line(2, FIRST_SOURCE, accounts::Kind::SignIn), line(7, LAST_SOURCE, accounts::Kind::Key)]),
+            sources: list([line(0, FIRST_SOURCE, accounts::Kind::SignIn), line(1, LAST_SOURCE, accounts::Kind::Key)]),
             cut: false,
         }]
     );

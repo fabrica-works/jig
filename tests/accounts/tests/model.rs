@@ -50,7 +50,12 @@ fn configured_accounts_are_the_deployments_with_one_signed_in_source() {
     assert_eq!(world.domain.next_number(), 9);
     assert_eq!(
         world.step(Event::Want),
-        vec![save(Stored::Next { number: 9 }), want(7), want(8)],
+        vec![
+            save(Stored::Next { number: 9 }),
+            Request::Signing(jig_domain_accounts::Signing::Restored),
+            want(7),
+            want(8)
+        ],
         "the counter is kept past the configured numbers, so that none is given again once dropped"
     );
 }
@@ -80,7 +85,14 @@ fn the_none_account_is_made_at_the_first_start_alone() {
     let mut world = fresh();
     assert_eq!(world.domain.accounts(), 0);
     let made = vec![account(0, 3, Holder::Deployment, b""), source(0, 1, 0, Kind::None), Stored::Next { number: 2 }];
-    assert_eq!(world.step(Event::Want), made.iter().cloned().map(save).collect::<Vec<_>>());
+    assert_eq!(
+        world.step(Event::Want),
+        made.iter()
+            .cloned()
+            .map(save)
+            .chain([Request::Signing(jig_domain_accounts::Signing::Restored)])
+            .collect::<Vec<_>>()
+    );
     assert_eq!(world.domain.accounts(), 1);
     let none = world.domain.account(0).expect("made at the start");
     assert_eq!((none.holder(), none.provider()), (Holder::Deployment, Some(3)));
@@ -90,7 +102,11 @@ fn the_none_account_is_made_at_the_first_start_alone() {
     assert_eq!(world.domain.grant(0, world.now), None, "a none source holds nothing to grant");
     let mut again = fresh();
     again.restore(made);
-    assert_eq!(again.step(Event::Want), vec![], "nothing made, nothing saved");
+    assert_eq!(
+        again.step(Event::Want),
+        vec![Request::Signing(jig_domain_accounts::Signing::Restored)],
+        "nothing made, nothing saved"
+    );
     assert_eq!((again.domain.accounts(), again.domain.next_number()), (1, 2));
 }
 
@@ -144,7 +160,7 @@ fn a_sources_state_is_its_own() {
     world.restore(vec![account(1, 1, Holder::Deployment, b"team"), source(1, 2, 0, Kind::SignIn)]);
     world.restore(vec![source(1, 3, 1, Kind::Key)]);
     let wants = world.step(Event::Want).into_iter().filter(|request| matches!(request, Request::Component(_)));
-    assert_eq!(wants.collect::<Vec<_>>(), vec![want(2)], "the component serves signed-in sources alone");
+    assert_eq!(wants.collect::<Vec<_>>(), vec![want(2), want(3)], "the component serves signed-in and LLM-key sources");
     world.step(granted(2));
     world.facts();
     world.step(Event::Limited { account: 3, reset: None });
@@ -266,7 +282,13 @@ fn each_record_restores_to_the_same_model() {
     assert_eq!(
         wanted[..3],
         [
-            save(account(23, 3, Holder::Deployment, b"")),
+            save({
+                let mut row = account(23, 3, Holder::Deployment, b"");
+                if let Stored::Account { place, .. } = &mut row {
+                    *place = 1;
+                }
+                row
+            }),
             save(source(23, 24, 0, Kind::None)),
             save(Stored::Next { number: 25 })
         ]
@@ -289,7 +311,18 @@ fn each_record_restores_to_the_same_model() {
     );
     let mut again = start(&store);
     assert_eq!(again.domain.unrestored(), 0);
-    assert_eq!(again.step(Event::Want), vec![want(7), want(21)], "a restart makes nothing and saves nothing");
+    assert_eq!(
+        again.step(Event::Want),
+        vec![
+            Request::Signing(jig_domain_accounts::Signing::Restore { source: 21, provider: 1, kind: Kind::SignIn }),
+            Request::Signing(jig_domain_accounts::Signing::Restore { source: 22, provider: 1, kind: Kind::Key }),
+            Request::Signing(jig_domain_accounts::Signing::Restored),
+            want(7),
+            want(21),
+            want(22)
+        ],
+        "a restart makes nothing and saves nothing"
+    );
     assert_eq!(again.domain.next_number(), world.domain.next_number());
     assert_eq!(again.domain.source_views().as_slice(), world.domain.source_views().as_slice());
     assert_eq!(again.domain.source(21).expect("kept").state, State::Limited { until: reset });

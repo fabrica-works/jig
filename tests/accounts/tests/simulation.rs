@@ -50,6 +50,7 @@ fn every_configured_account_is_wanted_at_the_start() {
         world.step(Event::Want),
         vec![
             Request::Save { record: Stored::Next { number: 9 } },
+            Request::Signing(jig_domain_accounts::Signing::Restored),
             want(),
             Request::Component(ToComponent::Want { account: 8 })
         ],
@@ -174,7 +175,17 @@ fn a_limit_without_a_reset_holds_until_resumed() {
     assert_eq!(world.step(Event::Limited { account: ANALYST, reset: Some(at(10)) }), vec![], "a hold unchanged");
     assert_eq!(world.fire_at(10), vec![]);
     assert!(!world.domain.usable(ANALYST));
-    assert_eq!(world.step(Event::Resume { account: ANALYST }), vec![kept(None)]);
+    assert_eq!(
+        world.step(Event::Change {
+            request: skein_lib::Token::new(0),
+            holder: jig_domain_accounts::Holder::Deployment,
+            change: jig_domain_accounts::Change::Resume { source: ANALYST }
+        }),
+        vec![
+            kept(None),
+            Request::Answer { request: skein_lib::Token::new(0), answer: jig_domain_accounts::Answer::Done }
+        ]
+    );
     assert!(world.domain.usable(ANALYST));
     assert_eq!(world.views()[0].state, State::Granted);
 }
@@ -190,7 +201,17 @@ fn a_refused_account_holds_and_asks_nothing() {
     assert_eq!(world.views()[0].state, State::Refused);
     assert!(world.views()[0].attention);
     assert!(!world.domain.usable(ANALYST));
-    assert_eq!(world.step(Event::Resume { account: ANALYST }), vec![]);
+    assert_eq!(
+        world.step(Event::Change {
+            request: skein_lib::Token::new(0),
+            holder: jig_domain_accounts::Holder::Deployment,
+            change: jig_domain_accounts::Change::Resume { source: ANALYST }
+        }),
+        vec![Request::Answer {
+            request: skein_lib::Token::new(0),
+            answer: jig_domain_accounts::Answer::Refused { refusal: jig_domain_accounts::Refusal::NotLimited }
+        }]
+    );
     assert_eq!(world.fire_at(1000), vec![]);
     assert_eq!(world.views()[0].state, State::Refused);
 }

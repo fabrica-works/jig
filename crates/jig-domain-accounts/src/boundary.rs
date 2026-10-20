@@ -1,4 +1,4 @@
-use crate::{Holder, Key, Kind, Refusal, Stored};
+use crate::{Holder, Key, Kind, Refusal, Stored, Use};
 use alloc::boxed::Box;
 use skein_lib::{Duration, Time, Token};
 
@@ -92,8 +92,10 @@ pub enum Event {
         account: u32,
         turned: Turned,
     },
-    Resume {
-        account: u32,
+    Change {
+        request: Token,
+        holder: Holder,
+        change: Change,
     },
     Credential {
         number: u32,
@@ -142,6 +144,7 @@ pub enum Turned {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum FromComponent {
+    KeepFailed { account: u32, why: KeyFailure },
     Granted { account: u32, generation: u64, valid: Duration, form: Form },
     Expiring { account: u32, generation: u64 },
     Failed { account: u32, failure: Failure },
@@ -193,6 +196,14 @@ pub enum ToComponent {
 /// 5.2), each naming a source by the number the child gives it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Signing {
+    Keep {
+        source: u32,
+        carried: u64,
+        replaces: bool,
+    },
+    Forget {
+        source: u32,
+    },
     Restore {
         source: u32,
         provider: u32,
@@ -220,6 +231,13 @@ pub enum Signing {
 /// The child's answer to a party's sign-in or sign-out.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    KeyKept {
+        source: u32,
+    },
+    Done,
+    Removed {
+        confirmed: bool,
+    },
     /// The sign-in started under this source's number; its end is a fact (`Ended`).
     Started {
         source: u32,
@@ -329,6 +347,24 @@ pub struct Fact {
     pub expiring: bool,
     pub spent_until: Option<Time>,
     pub attention: bool,
+}
+
+/// A holder's account change; an LLM key is named only by its carried number.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum Change {
+    AddKey { provider: u32, join: Option<u32>, carried: u64 },
+    ReplaceKey { source: u32, carried: u64 },
+    RemoveKey { source: u32 },
+    Resume { source: u32 },
+    Remove { account: u32 },
+    MoveAccount { account: u32, place: u32 },
+    MoveSource { account: u32, source: u32, place: u32 },
+    SetUses { account: u32, uses: Option<Box<[Use]>> },
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum KeyFailure {
+    TooLong,
+    NotStored,
 }
 
 #[cfg(test)]

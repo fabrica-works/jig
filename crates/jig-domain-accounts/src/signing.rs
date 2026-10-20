@@ -95,7 +95,7 @@ fn startable(domain: &Domain, limits: &Limits, provider: u32) -> Result<(), Refu
         Some(offered) if offered.offers.sign_in => {}
         Some(_) | None => return Err(Refusal::Provider { provider }),
     }
-    room_for_sign_in(limits, domain.signing.len())?;
+    room_for_sign_in(limits, domain.signing.len().saturating_add(domain.keeping.len()))?;
     if domain.numbers_left() < 1 {
         return Err(Refusal::Numbers);
     }
@@ -250,7 +250,9 @@ fn join(
     }
     let hold = entry.hold;
     assert!(domain.sources.insert(source, entry) == Ok(None), "a new number, within the sources' bound");
-    let places = &mut domain.accounts.get_mut(&account).expect("a joined account is kept").sources;
+    let account_entry = domain.accounts.get_mut(&account).expect("a joined account is kept");
+    account_entry.plan = true;
+    let places = &mut account_entry.sources;
     assert!(places.insert(place, source).is_ok(), "a place checked within the sources' bound");
     out.push(Request::Save { record: stored(domain, env, source) });
     out.push(Request::Component(ToComponent::Want { account: source }));
@@ -259,7 +261,14 @@ fn join(
 
 /// A signed-in source of the holder's is removed, and its account with its last source; the
 /// component revokes its record, and the party is answered when it says so.
-pub(crate) fn sign_out(domain: &mut Domain, request: Token, holder: Holder, source: u32, out: &mut Queue<Request>) {
+pub(crate) fn sign_out(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    request: Token,
+    holder: Holder,
+    source: u32,
+    out: &mut Queue<Request>,
+) {
     let account = match removable(domain, holder, source) {
         Ok(account) => account,
         Err(refusal) => {
@@ -267,33 +276,18 @@ pub(crate) fn sign_out(domain: &mut Domain, request: Token, holder: Holder, sour
             return;
         }
     };
-    drop(domain.sources.remove(&source).expect("checked above"));
-    domain.alarms.cancel(source);
-    let entry = domain.accounts.get_mut(&account).expect("checked above");
-    let mut at = None;
-    for (place, number) in &entry.sources {
-        if *number == source {
-            at = Some(*place);
-        }
-    }
-    entry.sources.remove(&at.expect("a source has its place")).expect("its place is kept");
-    out.push(Request::Erase { key: Key::Source { account, number: source } });
-    if entry.sources.is_empty() {
-        drop(domain.accounts.remove(&account).expect("checked above"));
-        out.push(Request::Erase { key: Key::Account { number: account } });
-    }
-    assert!(domain.signing_out.insert(source, request) == Ok(None), "room checked");
+    crate::changes::detach(domain, env, account, source, out);
+    assert!(domain.signing_out.insert(source, crate::changes::Leaving::Source(request)) == Ok(None), "room checked");
     out.push(Request::Signing(Signing::SignOut { source }));
 }
 fn removable(domain: &Domain, holder: Holder, source: u32) -> Result<u32, Refusal> {
-    if !domain.wanted() {
-        return Err(Refusal::Closing);
+    let account = crate::changes::source(domain, holder, source)?;
+    for (_, keeping) in &domain.keeping {
+        if keeping.join == Some(account) {
+            return Err(Refusal::Limit { bound: Bound::SignIns });
+        }
     }
-    let Some(entry) = domain.sources.get(&source) else { return Err(Refusal::Unknown) };
-    let account = domain.accounts.get(&entry.account).expect("a source's account is kept");
-    if account.holder != holder {
-        return Err(Refusal::Unknown);
-    }
+    let entry = domain.sources.get(&source).expect("checked source");
     if entry.kind != Kind::SignIn {
         return Err(Refusal::Kind { kind: entry.kind });
     }
@@ -305,7 +299,12 @@ fn removable(domain: &Domain, holder: Holder, source: u32) -> Result<u32, Refusa
 
 /// The component revoked and forgot a source's record: a party's sign-out is answered.
 pub(crate) fn signed_out(domain: &mut Domain, source: u32, confirmed: bool, out: &mut Queue<Request>) {
-    if let Some(request) = domain.signing_out.remove(&source) {
-        out.push(Request::Answer { request, answer: Answer::SignedOut { confirmed } });
+    if let Some(leaving) = domain.signing_out.remove(&source) {
+        match leaving {
+            crate::changes::Leaving::Source(request) => {
+                out.push(Request::Answer { request, answer: Answer::SignedOut { confirmed } })
+            }
+            crate::changes::Leaving::Account(account) => crate::changes::signed_out(domain, account, confirmed, out),
+        }
     }
 }

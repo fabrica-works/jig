@@ -15,13 +15,25 @@ pub enum SignIn {
 /// Why a sign-in or a new source is refused, naming what refuses it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    Configured,
+    NotLimited,
+    Uses,
+    NotKept {
+        why: crate::KeyFailure,
+    },
     /// A bound of the deployment's (accounts.md, 3.6) would be passed.
-    Limit { bound: Bound },
+    Limit {
+        bound: Bound,
+    },
     /// Another holder holds this provider's account of the subject: the provider's rule that a
     /// subscription serves one person.
-    Held { provider: u32 },
+    Held {
+        provider: u32,
+    },
     /// No configured provider of this number offers this source.
-    Provider { provider: u32 },
+    Provider {
+        provider: u32,
+    },
     /// A subject empty, or longer than `SUBJECT`.
     Subject,
     /// No account or source of this number, or none of the holder's.
@@ -29,7 +41,9 @@ pub enum Refusal {
     /// The counter has no numbers left for it.
     Numbers,
     /// A source of a kind this request does not serve: a sign-out serves a signed-in source.
-    Kind { kind: Kind },
+    Kind {
+        kind: Kind,
+    },
     /// The child takes no request before its start, nor once closing.
     Closing,
     /// The account sign-in ended before its visit.
@@ -84,7 +98,17 @@ impl Domain {
     ///
     /// The deployment's accounts, the holder's, or the counter's numbers.
     pub fn room_for_account(&self, limits: &Limits, holder: Holder) -> Result<(), Refusal> {
-        if self.accounts.len() >= limits.accounts.min(self.accounts.capacity()) {
+        let mut making: u32 = 0;
+        let mut holders: u32 = 0;
+        for (_, keeping) in &self.keeping {
+            if keeping.join.is_none() {
+                making = making.saturating_add(1);
+                if keeping.holder == holder {
+                    holders = holders.saturating_add(1);
+                }
+            }
+        }
+        if self.accounts.len().saturating_add(making) >= limits.accounts.min(self.accounts.capacity()) {
             return Err(Refusal::Limit { bound: Bound::Accounts });
         }
         let mut held: u32 = 0;
@@ -93,11 +117,24 @@ impl Domain {
                 held = held.saturating_add(1);
             }
         }
-        if held >= limits.holder_accounts {
+        if held.saturating_add(holders) >= limits.holder_accounts {
             return Err(Refusal::Limit { bound: Bound::HolderAccounts });
         }
-        if self.numbers_left() < 2 {
+        self.room_for_live_source()?;
+        if self.numbers_left() < making.saturating_add(2) {
             return Err(Refusal::Numbers);
+        }
+        Ok(())
+    }
+    fn room_for_live_source(&self) -> Result<(), Refusal> {
+        let mut keeping: u32 = 0;
+        for (_, entry) in &self.keeping {
+            if !entry.replacing {
+                keeping = keeping.saturating_add(1);
+            }
+        }
+        if self.sources.len().saturating_add(keeping) >= self.sources.capacity() {
+            return Err(Refusal::Limit { bound: Bound::Sources });
         }
         Ok(())
     }
@@ -108,10 +145,21 @@ impl Domain {
     /// No such account, its sources' bound, or the counter's numbers.
     pub fn room_for_source(&self, limits: &Limits, account: u32) -> Result<(), Refusal> {
         let Some(entry) = self.accounts.get(&account) else { return Err(Refusal::Unknown) };
-        if entry.sources.len() >= limits.sources.min(entry.sources.capacity()) {
+        let mut joining: u32 = 0;
+        let mut making: u32 = 0;
+        for (_, keeping) in &self.keeping {
+            if !keeping.replacing && keeping.join == Some(account) {
+                joining = joining.saturating_add(1);
+            }
+            if keeping.join.is_none() {
+                making = making.saturating_add(1);
+            }
+        }
+        if entry.sources.len().saturating_add(joining) >= limits.sources.min(entry.sources.capacity()) {
             return Err(Refusal::Limit { bound: Bound::Sources });
         }
-        if self.numbers_left() < 1 {
+        self.room_for_live_source()?;
+        if self.numbers_left() <= making {
             return Err(Refusal::Numbers);
         }
         Ok(())

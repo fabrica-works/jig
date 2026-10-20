@@ -103,7 +103,15 @@ fn a_sign_in_to_a_new_subject_makes_an_account_that_restores() {
     assert_eq!(world.domain.source(0).expect("its source").state, State::Asking);
     let mut again = fresh();
     again.restore(store.into_values().collect());
-    assert_eq!(again.step(Event::Want), vec![want(0)], "its records restore it, and the component is asked for it");
+    assert_eq!(
+        again.step(Event::Want),
+        vec![
+            Request::Signing(Signing::Restore { source: 0, provider: 1, kind: Kind::SignIn }),
+            Request::Signing(Signing::Restored),
+            want(0)
+        ],
+        "its records restore it, and the component is asked for it"
+    );
     assert_eq!((again.domain.account(1).expect("restored").display(), places(&again, 1)), (&b"Al"[..], vec![(0, 0)]));
     world.step(sign_in(2, BOB, 2));
     let long = vec![b'd'; usize::try_from(DISPLAY).expect("small") + 1];
@@ -128,6 +136,7 @@ fn a_sign_in_to_a_held_subject_renews_its_account() {
         world.step(signed_in(12, b"alice", b"other", false)),
         vec![
             Request::Erase { key: Key::Source { account: 5, number: 6 } },
+            save(source(5, 7, 0, Kind::Key)),
             Request::Signing(Signing::Replaced { source: 6, by: 12 }),
             save(source(5, 12, 0, Kind::SignIn)),
             want(12),
@@ -223,10 +232,11 @@ fn a_sign_out_removes_the_source_and_answers_once_revoked() {
         world.step(sign_out(2, ALICE, 6)),
         vec![
             Request::Erase { key: Key::Source { account: 5, number: 6 } },
+            save(source(5, 7, 0, Kind::Key)),
             Request::Signing(Signing::SignOut { source: 6 })
         ]
     );
-    assert_eq!((places(&world, 5), world.domain.source(6)), (vec![(1, 7)], None));
+    assert_eq!((places(&world, 5), world.domain.source(6)), (vec![(0, 7)], None));
     assert_eq!(
         world.step(Event::SignedOut { source: 6, confirmed: false }),
         vec![answer(2, Answer::SignedOut { confirmed: false })],

@@ -429,7 +429,7 @@ fn account_party(core: &Core, event: &accounts::Event) -> Option<u64> {
             }
             None
         }
-        accounts::Event::SignOut { holder, .. } => match holder {
+        accounts::Event::SignOut { holder, .. } | accounts::Event::Change { holder, .. } => match holder {
             accounts::Holder::Party(party) => Some(*party),
             accounts::Holder::Deployment => None,
         },
@@ -440,7 +440,6 @@ fn account_party(core: &Core, event: &accounts::Event) -> Option<u64> {
         | accounts::Event::Limited { .. }
         | accounts::Event::Refused { .. }
         | accounts::Event::RunFailed { .. }
-        | accounts::Event::Resume { .. }
         | accounts::Event::Credential { .. }
         | accounts::Event::Visited { .. }
         | accounts::Event::SignedOut { .. }

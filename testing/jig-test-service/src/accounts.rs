@@ -358,7 +358,10 @@ impl Accounts {
             domain::Request::Component(request) => self.down(translate::down(request)),
             domain::Request::Signing(signing) => {
                 match signing {
-                    domain::Signing::Restore { .. } | domain::Signing::Restored => return,
+                    domain::Signing::Keep { .. }
+                    | domain::Signing::Forget { .. }
+                    | domain::Signing::Restore { .. }
+                    | domain::Signing::Restored => return,
                     domain::Signing::SignIn { .. }
                     | domain::Signing::SignOut { .. }
                     | domain::Signing::Replaced { .. } => {}
@@ -496,7 +499,8 @@ impl Accounts {
                     let granted_form = self.granted(account, generation, value, expires, values);
                     match &mut event {
                         domain::FromComponent::Granted { form, .. } => *form = granted_form,
-                        domain::FromComponent::Expiring { .. }
+                        domain::FromComponent::KeepFailed { .. }
+                        | domain::FromComponent::Expiring { .. }
                         | domain::FromComponent::Failed { .. }
                         | domain::FromComponent::Closed => unreachable!("a lent value accompanies its grant"),
                     }
@@ -551,7 +555,8 @@ impl Accounts {
             match &event {
                 domain::FromComponent::Granted { .. }
                 | domain::FromComponent::Expiring { .. }
-                | domain::FromComponent::Failed { .. } => {}
+                | domain::FromComponent::Failed { .. }
+                | domain::FromComponent::KeepFailed { .. } => {}
                 domain::FromComponent::Closed => self.closed = true,
             }
             events.push(root::Event::Core(core::Event::Account(domain::Event::Component(event))));

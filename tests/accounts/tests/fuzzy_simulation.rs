@@ -57,7 +57,11 @@ fn run(seed: u64) -> Vec<Request> {
             trace.extend(world.step(Event::Limited { account: ANALYST, reset }));
         }
         if rng.chance(20) {
-            trace.extend(world.step(Event::Resume { account: ANALYST }));
+            trace.extend(world.step(Event::Change {
+                request: skein_lib::Token::new(0),
+                holder: jig_domain_accounts::Holder::Deployment,
+                change: jig_domain_accounts::Change::Resume { source: ANALYST },
+            }));
         }
         let due = world.fire_at(seconds);
         respond(&mut world, &mut rng, due, &mut trace);
@@ -76,5 +80,118 @@ fn run(seed: u64) -> Vec<Request> {
 fn seeded_account_timers_and_faults_replay() {
     for seed in 0..64 {
         assert_eq!(run(seed), run(seed), "seed {seed}");
+    }
+}
+
+/// Every holder change, interleaved with component answers and source holds.
+fn changes(seed: u64) -> Vec<Request> {
+    use jig_accounts_world::{provider, providers};
+    use jig_domain_accounts::{Answer, Change, Holder, Signing, Stored, Use};
+    use skein_lib::Token;
+    let mut world = World::with(providers(vec![provider(1, true, true)]), &[]);
+    world.step(Event::Want);
+    let mut rng = Rng::new(seed);
+    let mut trace = Vec::new();
+    for request in 0..160_u64 {
+        let views = world.views();
+        let chosen = views.get(
+            usize::try_from(rng.below(u64::try_from(views.len().max(1)).expect("tiny views"))).expect("tiny index"),
+        );
+        let account = chosen.map_or(u32::MAX, |view| view.account);
+        let source = chosen.map_or(u32::MAX, |view| view.source);
+        let change = match rng.below(8) {
+            0 => Change::AddKey {
+                provider: 1,
+                join: if rng.chance(40) { Some(account) } else { None },
+                carried: 1 << 63,
+            },
+            1 => Change::ReplaceKey { source, carried: 1 << 63 },
+            2 => Change::RemoveKey { source },
+            3 => Change::Resume { source },
+            4 => Change::Remove { account },
+            5 => Change::MoveAccount { account, place: u32::try_from(rng.below(4)).expect("tiny place") },
+            6 => Change::MoveSource { account, source, place: u32::try_from(rng.below(4)).expect("tiny place") },
+            _ => Change::SetUses { account, uses: if rng.chance(50) { Some(Box::new([Use::Party(7)])) } else { None } },
+        };
+        let outputs = world.step(Event::Change { request: Token::new(request), holder: Holder::Party(7), change });
+        let mut pending = std::collections::VecDeque::from(outputs);
+        while let Some(output) = pending.pop_front() {
+            let event = match output {
+                Request::Signing(Signing::Keep { source, .. }) => {
+                    if rng.chance(25) {
+                        Some(Event::Component(FromComponent::KeepFailed {
+                            account: source,
+                            why: jig_domain_accounts::KeyFailure::NotStored,
+                        }))
+                    } else {
+                        let generation = world.domain.source(source).and_then(|s| s.generation).unwrap_or(0) + 1;
+                        Some(Event::Component(FromComponent::Granted {
+                            form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Key),
+                            account: source,
+                            generation,
+                            valid: Duration::from_secs(100),
+                        }))
+                    }
+                }
+                Request::Signing(Signing::SignOut { source }) => {
+                    Some(Event::SignedOut { source, confirmed: rng.chance(70) })
+                }
+                Request::Signing(
+                    Signing::SignIn { .. }
+                    | Signing::Replaced { .. }
+                    | Signing::Forget { .. }
+                    | Signing::Restore { .. }
+                    | Signing::Restored,
+                )
+                | Request::Component(_)
+                | Request::Granted { .. }
+                | Request::Save { .. }
+                | Request::Erase { .. }
+                | Request::Closed => None,
+                Request::Answer { ref answer, .. } => {
+                    assert!(!matches!(answer, Answer::Started { .. }));
+                    None
+                }
+            };
+            trace.push(output);
+            if let Some(event) = event {
+                pending.extend(world.step(event));
+            }
+        }
+        if source != u32::MAX && rng.chance(20) {
+            trace.extend(world.step(Event::Limited { account: source, reset: None }));
+        }
+        let views = world.views();
+        let mut places = Vec::new();
+        for view in &views {
+            let account = world.domain.account(view.account).expect("account view");
+            places.push(account.place());
+            assert_eq!(
+                account.sources().iter().map(|(p, _)| *p).collect::<Vec<_>>(),
+                (0..account.sources().len()).collect::<Vec<_>>()
+            );
+            if let Some(uses) = account.uses() {
+                assert!(uses.len() <= 16);
+            }
+        }
+        places.sort_unstable();
+        assert_eq!(places, (0..world.domain.accounts()).collect::<Vec<_>>());
+        assert!(world.domain.accounts() <= jig_accounts_world::LIMITS.accounts);
+        // Counter records carry only numbers; LLM-key values never enter the trace.
+        for output in &trace {
+            if let Request::Save { record: Stored::Next { number } } = output {
+                assert!(*number <= world.domain.next_number());
+            }
+        }
+    }
+    trace.extend(world.step(Event::Close));
+    trace.extend(world.step(Event::Component(FromComponent::Closed)));
+    assert_eq!(world.domain.accounts(), 0);
+    trace
+}
+#[test]
+fn seeded_account_changes_replay() {
+    for seed in 0..64 {
+        assert_eq!(changes(seed), changes(seed), "seed {seed}");
     }
 }

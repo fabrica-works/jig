@@ -67,7 +67,11 @@ impl World {
                 }
             }
             accounts::Signing::SignOut { source } => accounts::Event::SignedOut { source, confirmed: true },
-            accounts::Signing::Replaced { .. } | accounts::Signing::Restore { .. } | accounts::Signing::Restored => {
+            accounts::Signing::Keep { .. }
+            | accounts::Signing::Forget { .. }
+            | accounts::Signing::Replaced { .. }
+            | accounts::Signing::Restore { .. }
+            | accounts::Signing::Restored => {
                 return;
             }
         };

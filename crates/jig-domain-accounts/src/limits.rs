@@ -1,4 +1,4 @@
-use skein_lib::{Deadlines, Duration, List, Map, Queue, Token};
+use skein_lib::{Deadlines, Duration, List, Map, Queue};
 
 use crate::domain::{Account, Granted, Source};
 use crate::signing::UnderWay;
@@ -64,6 +64,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<u32, UnderWay>::worst_case(limits.sign_ins)?)?
         // Each account sign-in can emit one answer owning its bounded visit address.
         .checked_add(u64::from(limits.sign_ins).checked_mul(u64::from(crate::ADDRESS))?)?
-        .checked_add(Map::<u32, Token>::worst_case(sources)?)?
+        .checked_add(Map::<u32, crate::changes::Leaving>::worst_case(sources)?)?
+        .checked_add(Map::<u32, crate::keys::Keeping>::worst_case(limits.sign_ins)?)?
+        .checked_add(Map::<u32, crate::changes::Removing>::worst_case(limits.accounts)?)?
         .checked_add(Queue::<Ended>::worst_case(limits.facts)?)
 }

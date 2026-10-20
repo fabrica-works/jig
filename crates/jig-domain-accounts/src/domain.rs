@@ -4,7 +4,7 @@ use crate::{
     Providers, Request, Signing, State, Stored, ToComponent, Turned, Use,
 };
 use alloc::boxed::Box;
-use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time, Token, Wall};
+use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time, Wall};
 
 /// Room for restart normalization, source names and wants, account removal, and close.
 #[must_use]
@@ -157,7 +157,9 @@ pub struct Domain {
     pub(crate) signing: Map<u32, UnderWay>,
     /// Sign-outs the component has not answered, by source; a source signed out holds its room
     /// at the component until then, so they are within the sources' bound.
-    pub(crate) signing_out: Map<u32, Token>,
+    pub(crate) signing_out: Map<u32, crate::changes::Leaving>,
+    pub(crate) keeping: Map<u32, crate::keys::Keeping>,
+    pub(crate) removing: Map<u32, crate::changes::Removing>,
     facts: Queue<Fact>,
     ended: Queue<Ended>,
     lost: u64,
@@ -183,6 +185,8 @@ impl Domain {
             alarms: Deadlines::with_capacity(sources),
             signing: Map::with_capacity(limits.sign_ins),
             signing_out: Map::with_capacity(sources),
+            keeping: Map::with_capacity(limits.sign_ins),
+            removing: Map::with_capacity(limits.accounts),
             facts: Queue::with_capacity(limits.facts),
             ended: Queue::with_capacity(limits.facts),
             lost: 0,
@@ -517,15 +521,13 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 Turned::Refused => refused(domain, env, account, out),
             }
         }
-        Event::Resume { account } => {
-            if domain.phase == Phase::Wanted {
-                resume(domain, env, account, out);
-            }
-        }
+        Event::Change { request, holder, change } => crate::changes::change(domain, env, request, holder, change, out),
         Event::SignIn { request, holder, by, provider } => {
             crate::signing::sign_in(domain, env, request, holder, by, provider, out);
         }
-        Event::SignOut { request, holder, source } => crate::signing::sign_out(domain, request, holder, source, out),
+        Event::SignOut { request, holder, source } => {
+            crate::signing::sign_out(domain, env, request, holder, source, out)
+        }
         Event::Visited { source, address } => {
             if domain.phase == Phase::Wanted {
                 crate::signing::visited(domain, source, address, out);
@@ -692,24 +694,24 @@ fn refused(domain: &mut Domain, env: &Env<Limits>, source: u32, out: &mut Queue<
     entry.hold_attention = true;
     changed(domain, env, source, before, out);
 }
-fn resume(domain: &mut Domain, env: &Env<Limits>, source: u32, out: &mut Queue<Request>) {
-    let Some(entry) = domain.sources.get_mut(&source) else { return };
-    let before = entry.hold;
-    match entry.hold {
-        Some(Hold::Limited { .. }) => {
-            entry.hold = None;
-            entry.hold_attention = false;
-        }
-        Some(Hold::Refused) | None => return,
-    }
-    changed(domain, env, source, before, out);
-}
 fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     match domain.phase {
         Phase::Closing | Phase::Closed => return,
         Phase::New | Phase::Wanted => domain.phase = Phase::Closing,
     }
     crate::signing::close(domain, out);
+    crate::keys::close(domain, out);
+    for (_, leaving) in &domain.signing_out {
+        match leaving {
+            crate::changes::Leaving::Source(request) => crate::changes::refuse(*request, crate::Refusal::Closing, out),
+            crate::changes::Leaving::Account(_) => {}
+        }
+    }
+    for (_, removing) in &domain.removing {
+        crate::changes::refuse(removing.request, crate::Refusal::Closing, out);
+    }
+    domain.signing_out = Map::with_capacity(domain.signing_out.capacity());
+    domain.removing = Map::with_capacity(domain.removing.capacity());
     domain.credentials = Map::with_capacity(env.limits.credentials);
     domain.credential_alarms = Deadlines::with_capacity(env.limits.credentials);
     let mut numbers = List::with_capacity(domain.sources.capacity());
@@ -725,7 +727,7 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         entry.unauthorized = None;
         entry.expiring = false;
         entry.hold_attention = false;
-        if entry.kind == Kind::SignIn {
+        if entry.kind == Kind::SignIn || entry.kind == Kind::Key {
             out.push(Request::Component(ToComponent::Release { account: *number }));
         }
     }
@@ -737,23 +739,34 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 }
 /// The component serves signed-in sources; it names each by its number.
 fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: &mut Queue<Request>) {
+    let kept = match event {
+        FromComponent::Granted { account, form, .. } => {
+            match form {
+                Form::Application => return,
+                Form::Credential(_) | Form::Withdrawn => {}
+            }
+            crate::keys::granted(domain, env, account, out)
+        }
+        FromComponent::KeepFailed { account, why } => {
+            crate::keys::failed(domain, account, why, out);
+            return;
+        }
+        FromComponent::Expiring { .. } | FromComponent::Failed { .. } | FromComponent::Closed => None,
+    };
     let source = match event {
         FromComponent::Granted { account, .. }
         | FromComponent::Expiring { account, .. }
         | FromComponent::Failed { account, .. } => account,
-        FromComponent::Closed => return,
+        FromComponent::KeepFailed { .. } | FromComponent::Closed => return,
     };
     let Some(entry) = domain.sources.get_mut(&source) else { return };
-    if entry.kind != Kind::SignIn {
+    if entry.kind != Kind::SignIn && entry.kind != Kind::Key {
         return;
     }
     let before = entry.hold;
     match event {
         FromComponent::Granted { account: _, generation, valid, form } => {
-            match form {
-                Form::Application => return,
-                Form::Credential(_) | Form::Withdrawn => {}
-            }
+            let valid = if entry.kind == Kind::Key { crate::KEY_VALID } else { valid };
             entry.grant = Some(Granted { generation, expires: env.now.saturating_add(valid), form });
             entry.state = State::Granted;
             entry.retry = None;
@@ -762,6 +775,9 @@ fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: 
             out.push(Request::Granted { grant: Grant { form, account: source, generation, valid } });
         }
         FromComponent::Expiring { account: _, generation } => {
+            if entry.kind == Kind::Key {
+                return;
+            }
             if match entry.grant {
                 Some(grant) => grant.generation != generation,
                 None => true,
@@ -771,9 +787,12 @@ fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: 
             entry.expiring = true;
         }
         FromComponent::Failed { account: _, failure } => failed(entry, env, failure),
-        FromComponent::Closed => return,
+        FromComponent::KeepFailed { .. } | FromComponent::Closed => return,
     }
     changed(domain, env, source, before, out);
+    if let Some(request) = kept {
+        out.push(Request::Answer { request, answer: crate::Answer::KeyKept { source } });
+    }
 }
 fn failed(entry: &mut Source, env: &Env<Limits>, failure: Failure) {
     entry.retry = None;
