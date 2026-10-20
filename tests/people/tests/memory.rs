@@ -329,3 +329,43 @@ fn retained_account_sign_in_answers_hold_their_longest_addresses_within_the_wors
         .is_none()
     );
 }
+
+#[test]
+fn retained_program_outcomes_fit_the_people_bound() {
+    let mut test = Measured::new(LIMITS);
+    test.event(Event::Restored);
+    let reply_to = test.to();
+    test.event(Event::SignedIn {
+        reply_to,
+        person: 1,
+        sign_in: 1,
+        identity: Identity {
+            key: IdentityKey { provider: 0, subject: Box::new([1]) },
+            login: Box::new([]),
+            name: Box::new([]),
+        },
+        kind: jig_domain_people::Kind::Person,
+    });
+    for key in 0..u8::try_from(LIMITS.requests).expect("small retained-answer count") {
+        let reply_to = test.to();
+        let request = test
+            .event(Event::Ask {
+                models: Box::new([]),
+                reply_to,
+                sign_in: 1,
+                key: [key; 16],
+                ask: Ask::AccountSignOut { holder: jig_domain_people::AccountHolder::Own, source: 0 },
+            })
+            .expect("holder sign-out admitted");
+        let rows = (0..LIMITS.program_hosts)
+            .map(|host| jig_domain_people::AccountHostFailure {
+                name: format!("{host:032}").into_bytes().into_boxed_slice(),
+                why: jig_domain_people::AccountHostWhy::Lost,
+            })
+            .collect();
+        test.event(Event::Decided {
+            request,
+            outcome: Outcome::AccountSignedOut { confirmed: false, failed_hosts: rows },
+        });
+    }
+}

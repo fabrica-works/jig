@@ -39,13 +39,33 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
             limits,
             wire::OutcomeAccountKeyKeptParts { source: *source },
         )?),
+        domain::Outcome::AccountProgramDeclared { source, name } => {
+            wire::Outcome::AccountProgramDeclared(wire::OutcomeAccountProgramDeclared::new(
+                limits,
+                wire::OutcomeAccountProgramDeclaredParts { source: *source, name: name.clone() },
+            )?)
+        }
         domain::Outcome::AccountChanged => wire::Outcome::AccountChanged,
-        domain::Outcome::AccountRemoved { confirmed } => wire::Outcome::AccountRemoved(
-            wire::OutcomeAccountRemoved::new(limits, wire::OutcomeAccountRemovedParts { confirmed: *confirmed })?,
-        ),
+        domain::Outcome::AccountRemoved { confirmed, failed_hosts } => {
+            wire::Outcome::AccountRemoved(wire::OutcomeAccountRemoved::new(
+                limits,
+                wire::OutcomeAccountRemovedParts {
+                    confirmed: *confirmed,
+                    failed_hosts: super::account_hosts::encode(failed_hosts, limits)?,
+                },
+            )?)
+        }
         domain::Outcome::SignedOut => wire::Outcome::SignedOut,
         domain::Outcome::AccountSignInStarted { source, address } => account_sign_in_started(*source, address, limits)?,
-        domain::Outcome::AccountSignedOut { confirmed } => account_signed_out(*confirmed, limits)?,
+        domain::Outcome::AccountSignedOut { confirmed, failed_hosts } => {
+            wire::Outcome::AccountSignedOut(wire::OutcomeAccountSignedOut::new(
+                limits,
+                wire::OutcomeAccountSignedOutParts {
+                    confirmed: *confirmed,
+                    failed_hosts: super::account_hosts::encode(failed_hosts, limits)?,
+                },
+            )?)
+        }
         domain::Outcome::NoteEdited { name } => wire::Outcome::NoteEdited(wire::OutcomeNoteEdited::new(
             limits,
             wire::OutcomeNoteEditedParts { name: *name },
@@ -119,10 +139,7 @@ fn account_sign_in_started(source: u32, address: &[u8], limits: &wire::Limits) -
     let parts = wire::OutcomeAccountSignInStartedParts { source, address: skein_lib::bytes::copy_of(address) };
     Ok(wire::Outcome::AccountSignInStarted(wire::OutcomeAccountSignInStarted::new(limits, parts)?))
 }
-fn account_signed_out(confirmed: bool, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
-    let parts = wire::OutcomeAccountSignedOutParts { confirmed };
-    Ok(wire::Outcome::AccountSignedOut(wire::OutcomeAccountSignedOut::new(limits, parts)?))
-}
+
 #[expect(clippy::too_many_lines, reason = "one exhaustive permanent outcome translation table")]
 pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
     match value {
@@ -145,18 +162,24 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
             domain::Outcome::Again(decode_again(value))
         }
         wire::Outcome::AccountKeyKept(value) => domain::Outcome::AccountKeyKept { source: value.into_parts().source },
+        wire::Outcome::AccountProgramDeclared(value) => domain::Outcome::AccountProgramDeclared {
+            source: value.source(),
+            name: skein_lib::bytes::copy_of(value.name()),
+        },
         wire::Outcome::AccountChanged => domain::Outcome::AccountChanged,
-        wire::Outcome::AccountRemoved(value) => {
-            domain::Outcome::AccountRemoved { confirmed: value.into_parts().confirmed }
-        }
+        wire::Outcome::AccountRemoved(value) => domain::Outcome::AccountRemoved {
+            confirmed: value.confirmed(),
+            failed_hosts: super::account_hosts::decode(value.failed_hosts()),
+        },
         wire::Outcome::SignedOut => domain::Outcome::SignedOut,
         wire::Outcome::AccountSignInStarted(value) => {
             let wire::OutcomeAccountSignInStartedParts { source, address } = value.into_parts();
             domain::Outcome::AccountSignInStarted { source, address }
         }
-        wire::Outcome::AccountSignedOut(value) => {
-            domain::Outcome::AccountSignedOut { confirmed: value.into_parts().confirmed }
-        }
+        wire::Outcome::AccountSignedOut(value) => domain::Outcome::AccountSignedOut {
+            confirmed: value.confirmed(),
+            failed_hosts: super::account_hosts::decode(value.failed_hosts()),
+        },
         wire::Outcome::NoteEdited(value) => {
             let wire::OutcomeNoteEditedParts { name } = value.into_parts();
             domain::Outcome::NoteEdited { name }

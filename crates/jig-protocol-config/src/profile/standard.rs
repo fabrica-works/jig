@@ -52,6 +52,7 @@ pub(super) const TASKS: tasks::Limits = tasks::Limits {
     ..small::TASKS
 };
 pub(super) const PEOPLE: people::Limits = people::Limits {
+    program_hosts: 65,
     operations: 16,
     batch: 4,
     people: 16,

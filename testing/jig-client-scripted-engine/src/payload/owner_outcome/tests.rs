@@ -34,8 +34,8 @@ fn maximum_outcomes() -> [OwnerOutcome; 24] {
         OwnerOutcome::RolesSet { project: u32::MAX },
         OwnerOutcome::PolicyChanged { project: u32::MAX },
         OwnerOutcome::PoolSet { project: u32::MAX, person: u64::MAX },
-        OwnerOutcome::AccountSignedOut { confirmed: false },
-        OwnerOutcome::AccountSignedOut { confirmed: true },
+        OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts: Box::new([]) },
+        OwnerOutcome::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) },
         OwnerOutcome::EscalationDecided {
             task: u64::MAX,
             revision: Revision { value: u64::MAX },

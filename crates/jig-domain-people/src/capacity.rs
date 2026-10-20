@@ -156,6 +156,7 @@ pub(crate) fn permanent(outcome: &Outcome) -> Option<CapacityCause> {
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountProgramDeclared { .. }
         | Outcome::AccountKeyKept { .. }
         | Outcome::AccountChanged
         | Outcome::AccountRemoved { .. }

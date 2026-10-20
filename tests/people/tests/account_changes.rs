@@ -40,8 +40,13 @@ fn an_account_change_is_admitted_for_its_holder_with_no_role() {
     for (at, value) in changes.into_iter().enumerate() {
         let expected = match value {
             AccountChange::AddKey { .. } | AccountChange::ReplaceKey { .. } => Outcome::AccountKeyKept { source: 1 },
-            AccountChange::Remove { .. } => Outcome::AccountRemoved { confirmed: true },
-            AccountChange::RemoveKey { .. }
+            AccountChange::DeclareProgram { ref name, .. } => {
+                Outcome::AccountProgramDeclared { source: 1, name: name.clone() }
+            }
+
+            AccountChange::Remove { .. } => Outcome::AccountRemoved { confirmed: true, failed_hosts: Box::new([]) },
+            AccountChange::CheckProgram { .. }
+            | AccountChange::RemoveKey { .. }
             | AccountChange::Resume { .. }
             | AccountChange::MoveAccount { .. }
             | AccountChange::MoveSource { .. }
@@ -126,5 +131,29 @@ fn account_uses_are_bounded_before_admission() {
     );
     world.commit_all();
     assert_eq!(world.reply(call), Some(Reply::Refused(Refusal::Limit { which: jig_domain_people::LimitKind::Words })));
+    world.assert_settled();
+}
+
+#[test]
+fn another_program_name_under_a_retained_key_conflicts() {
+    let mut world = owners();
+    let declare = |name: &[u8]| {
+        change(AccountHolder::Own, AccountChange::DeclareProgram { provider: 3, join: None, name: name.into() })
+    };
+    world.request(11, [31; 16], declare(b"first"));
+    world.commit_all();
+    let routes = world.stats().routes;
+    let conflict = world.request(11, [31; 16], declare(b"second"));
+    world.commit_all();
+    assert_eq!(world.reply(conflict), Some(Reply::Refused(Refusal::KeyConflict)));
+    assert_eq!(world.stats().routes, routes);
+    world.assert_settled();
+}
+#[test]
+fn a_program_check_is_admitted_as_an_account_change() {
+    let mut world = owners();
+    let call = world.request(11, [32; 16], change(AccountHolder::Own, AccountChange::CheckProgram { source: 1 }));
+    world.commit_all();
+    assert_eq!(world.reply(call), Some(Reply::Outcome(Outcome::AccountChanged)));
     world.assert_settled();
 }

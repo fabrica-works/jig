@@ -516,7 +516,7 @@ pub(super) fn tag_account(
             accounts::Request::Erase { key } => out.push(Request::Write(Write::Erase(Key::Accounts(key)))),
             // People keeps the answer under the party's key, and replies once it is durable.
             accounts::Request::Answer { request, answer } => {
-                let outcome = super::account_requests::outcome(answer);
+                let outcome = super::account_requests::outcome(core, answer);
                 work.push(Event::People(people::Event::Decided { request, outcome }));
             }
         }

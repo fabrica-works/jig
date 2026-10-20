@@ -37,7 +37,7 @@ pub fn reply(
         people::Reply::Refused(why) => {
             Reply::Final(client::Answer::Refused { refusal: refusal(why, models, limits)?, at: None })
         }
-        people::Reply::Outcome(value) => match outcomes::outcome(&value) {
+        people::Reply::Outcome(value) => match outcomes::outcome(&value, limits)? {
             outcomes::Outcome::Owner(value) => Reply::Final(client::Answer::Done(client::Outcome::Owner(value))),
             outcomes::Outcome::Applied { connector, token } => Reply::Applied { connector, token },
             outcomes::Outcome::Again(why) => Reply::Again(why),

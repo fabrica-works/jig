@@ -46,8 +46,8 @@ pub(crate) fn owner_escalation_choice(value: &w::OwnerEscalationChoice, _limits:
 }
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields")]
-pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::OwnerOutcome {
-    match value {
+pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> Result<c::OwnerOutcome, w::Problem> {
+    Ok(match value {
         w::OwnerOutcome::Created(row) => c::OwnerOutcome::Created {
             first: row.first(),
             last: row.last(),
@@ -91,9 +91,21 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::Owne
             c::OwnerOutcome::AccountSignInStarted { source: row.source(), address: bytes::copy_of(row.address()) }
         }
         w::OwnerOutcome::AccountKeyKept(row) => c::OwnerOutcome::AccountKeyKept { source: row.source() },
+        w::OwnerOutcome::AccountProgramDeclared(row) => {
+            if !c::valid_program_name(row.name()) {
+                return Err(super::piece_problem(skein_codec::Reason::Malformed));
+            }
+            c::OwnerOutcome::AccountProgramDeclared { source: row.source(), name: bytes::copy_of(row.name()) }
+        }
         w::OwnerOutcome::AccountChanged => c::OwnerOutcome::AccountChanged,
-        w::OwnerOutcome::AccountRemoved(row) => c::OwnerOutcome::AccountRemoved { confirmed: row.confirmed() },
-        w::OwnerOutcome::AccountSignedOut(row) => c::OwnerOutcome::AccountSignedOut { confirmed: row.confirmed() },
+        w::OwnerOutcome::AccountRemoved(row) => c::OwnerOutcome::AccountRemoved {
+            confirmed: row.confirmed(),
+            failed_hosts: super::account_hosts::decode(row.failed_hosts(), row.confirmed(), limits)?,
+        },
+        w::OwnerOutcome::AccountSignedOut(row) => c::OwnerOutcome::AccountSignedOut {
+            confirmed: row.confirmed(),
+            failed_hosts: super::account_hosts::decode(row.failed_hosts(), row.confirmed(), limits)?,
+        },
         w::OwnerOutcome::PoolSet(row) => c::OwnerOutcome::PoolSet { project: row.project(), person: row.person() },
         w::OwnerOutcome::EscalationDecided(row) => c::OwnerOutcome::EscalationDecided {
             task: row.task(),
@@ -102,7 +114,7 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::Owne
             at: Wall::from_nanos(row.at()),
             choice: owner_escalation_choice(row.choice(), limits),
         },
-    }
+    })
 }
 
 pub(crate) fn owner_pattern_end(value: &w::OwnerPatternEnd, _limits: &Limits) -> c::OwnerPatternEnd {
@@ -204,7 +216,7 @@ pub(crate) fn party(value: &w::Party, limits: &Limits) -> Result<c::Party, w::Pr
 
 pub(crate) fn outcome(value: &w::Outcome, limits: &Limits) -> Result<c::Outcome, w::Problem> {
     Ok(match value {
-        w::Outcome::Owner(row) => c::Outcome::Owner(owner_outcome(row.value(), limits)),
+        w::Outcome::Owner(row) => c::Outcome::Owner(owner_outcome(row.value(), limits)?),
         w::Outcome::Made(row) => c::Outcome::Made { what: made(row.what(), limits) },
         w::Outcome::Proposed(row) => c::Outcome::Proposed { proposal: proposal_key(row.proposal(), limits) },
         w::Outcome::Decided(row) => c::Outcome::Decided {

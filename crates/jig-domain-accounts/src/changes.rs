@@ -49,6 +49,27 @@ pub(crate) fn change(
         return;
     }
     let result = match change {
+        Change::DeclareProgram { provider, join, name } => {
+            if !crate::records::program_name(&name) {
+                refuse(request, Refusal::Uses, out);
+                return;
+            }
+            let kept_name = name.clone();
+            match crate::programs::declare(domain, env, holder, provider, join, name, out) {
+                Ok(source) => {
+                    out.push(Request::Answer { request, answer: Answer::ProgramDeclared { source, name: kept_name } });
+                }
+                Err(crate::programs::DeclarationRefusal::Account(refusal)) => refuse(request, refusal, out),
+                Err(crate::programs::DeclarationRefusal::Name | crate::programs::DeclarationRefusal::Issued) => {
+                    refuse(request, Refusal::Uses, out);
+                }
+                Err(crate::programs::DeclarationRefusal::Names) => {
+                    refuse(request, Refusal::Limit { bound: Bound::Sources }, out);
+                }
+            }
+            return;
+        }
+        Change::CheckProgram { source } => crate::programs::check(domain, holder, source, out),
         Change::AddKey { provider, join, carried } => {
             crate::keys::add(domain, env, request, holder, provider, join, carried, out);
             return;

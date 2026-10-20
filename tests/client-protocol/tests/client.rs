@@ -10,6 +10,8 @@ mod llm;
 mod named;
 #[path = "client/named_accounts.rs"]
 mod named_accounts;
+#[path = "client/programs.rs"]
+mod programs;
 #[path = "client/words.rs"]
 mod words;
 use jig_client::{

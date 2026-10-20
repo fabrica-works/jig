@@ -20,6 +20,8 @@ fn trail(limits: &Limits) -> Option<u32> {
     // Introduction, actor, time, reason and a whole lacking-authority explanation.
     limits.rows.checked_mul(limits.segments.checked_add(9)?)
 }
+// Refusals follow the row envelope. The larger committed program answers are
+// counted per card frame and notice, independently of the offered controls.
 fn outcome(limits: &Limits) -> Option<u32> {
     // A moved hold includes its complete bounded attempt failures or exact
     // connector part identity; endings retain only supplied actor/decision facts.
@@ -45,7 +47,7 @@ fn frame_of_card(limits: &Limits) -> Option<u32> {
     chip_nodes(limits)?
         .checked_mul(limits.rows)?
         .checked_add(markdown(limits)?.checked_add(6)?)?
-        .checked_add(outcome(limits)?.checked_mul(2)?)?
+        .checked_add(outcome(limits)?.max(crate::owner_outcome::MAX_NODES).checked_mul(2)?)?
         .checked_add(offered_nodes(limits)?)?
         .checked_add(13)
 }
@@ -249,7 +251,7 @@ pub fn confirmation_nodes(limits: &Limits) -> Option<u32> {
 /// Full visible notices and the oldest notice's dismissal control.
 #[must_use]
 pub fn notices_nodes(limits: &Limits) -> Option<u32> {
-    outcome(limits)?.checked_add(4)?.checked_mul(limits.notices)?.checked_add(3)
+    outcome(limits)?.max(crate::owner_outcome::MAX_NODES).checked_add(4)?.checked_mul(limits.notices)?.checked_add(3)
 }
 
 mod pages;

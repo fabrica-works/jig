@@ -221,6 +221,8 @@ pub enum Answer {
 /// Holder changes to LLM accounts (domain/accounts.md, section 5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AccountChange {
+    DeclareProgram { provider: u32, join: Option<u32>, name: Box<[u8]> },
+    CheckProgram { source: u32 },
     AddKey { provider: u32, join: Option<u32>, digest: [u8; 32] },
     ReplaceKey { source: u32, digest: [u8; 32] },
     RemoveKey { source: u32 },

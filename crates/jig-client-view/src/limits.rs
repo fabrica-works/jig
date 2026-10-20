@@ -45,12 +45,22 @@ fn with_phrase_bytes(
     slot_depth: u32,
 ) -> Option<Limits> {
     let mut limits = envelope(client, phrase, arrangement, application_nodes, slot_nodes, slot_depth)?;
-    // Only the deployment's account links carry the whole public addresses;
-    // other nodes retain the existing display/phrase envelope.
+    // Whole manage addresses and configured names have independent byte bounds.
+    // Names cover deployment hosts, two committed answer positions per retained
+    // object, goal-row answers, and each visible notice, up to 128 hosts apiece.
     limits.text_bytes = limits
         .nodes
         .checked_mul(node_text(client.text, phrase)?)?
-        .checked_add(client.rows.checked_mul(2)?.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?;
+        .checked_add(client.rows.checked_mul(2)?.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?
+        .checked_add(client.rows.checked_mul(jig_client::contract::PROGRAM_HOST_NAME)?)?
+        .checked_add(
+            client
+                .notices
+                .checked_add(client.objects.checked_mul(2)?)?
+                .checked_add(client.rows)?
+                .checked_mul(128)?
+                .checked_mul(jig_client::contract::PROGRAM_HOST_NAME)?,
+        )?;
     limits.patches = limits.nodes.checked_mul(5)?;
     Some(limits)
 }
@@ -76,11 +86,12 @@ pub fn envelope(
         .checked_add(3)?;
     // A field carries a saying as its name and the full domain value.
     // Markdown links may carry both label and external target.
-    // Public manage addresses stay whole even with a smaller display-text bound.
+    // Public manage addresses and configured host names stay whole below the display-text bound.
     // skein-ui shares this bound with every text node's run capacity, so this
     // still over-reserves runs when the external-target floor dominates.
-    let text_per_node =
-        node_text(client.text, phrase)?.max(jig_client::contract::ACCOUNT_MANAGE_USAGE.checked_add(phrase)?);
+    let text_per_node = node_text(client.text, phrase)?
+        .max(jig_client::contract::ACCOUNT_MANAGE_USAGE.checked_add(phrase)?)
+        .max(jig_client::contract::PROGRAM_HOST_NAME);
     Some(Limits {
         nodes,
         // Page, card/input result, verdict proposal, and its deepest

@@ -176,7 +176,7 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
         domain::Outcome::NoteEdited { name: 2 },
         domain::Outcome::ServiceMade { person: 2 },
         domain::Outcome::AccountSignInStarted { source: 2, address: b"https://issuer.test/visit".as_slice().into() },
-        domain::Outcome::AccountSignedOut { confirmed: true },
+        domain::Outcome::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) },
         domain::Outcome::Adopted { project: 2 },
         domain::Outcome::Proposed { proposal: 2, to: 0 },
         domain::Outcome::Withdrawn { proposal: 2 },

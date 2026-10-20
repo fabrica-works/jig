@@ -1142,13 +1142,33 @@ fn facts_beyond_the_room_are_dropped_and_counted() {
 }
 
 #[test]
-fn the_worst_case_is_bounded_or_refused() {
+fn a_representable_fleet_bound_is_accepted() {
     assert!(worst_case(&LIMITS).is_some());
+}
+#[test]
+fn an_overflowing_fleet_bound_is_refused() {
     let huge = Limits { workers: u32::MAX, slots: u32::MAX, ..LIMITS };
     assert_eq!(worst_case(&huge), None);
-    assert_eq!(max_out(&LIMITS), 13);
-    assert_eq!(max_out(&Limits { slots: 1, ..LIMITS }), 13);
-    assert_eq!(max_out(&Limits { slots: 8, ..LIMITS }), 33);
+}
+#[test]
+fn a_configured_worker_fan_out_sets_the_output_floor() {
+    for slots in [1, 2, 8] {
+        assert_eq!(max_out(&Limits { slots, ..LIMITS }), 65);
+    }
+}
+#[test]
+fn a_slot_burst_sets_the_output_floor() {
+    for (slots, expected) in [(1, 13), (8, 33)] {
+        assert_eq!(max_out(&Limits { configured_workers: 0, slots, ..LIMITS }), expected);
+    }
+}
+#[test]
+fn an_overflowing_configured_worker_count_is_refused() {
+    assert_eq!(worst_case(&Limits { configured_workers: u32::MAX, ..LIMITS }), None);
+}
+#[test]
+fn an_overflowing_program_source_count_is_refused() {
+    assert_eq!(worst_case(&Limits { program_sources: u32::MAX, ..LIMITS }), None);
 }
 
 fn turns() -> Harness {

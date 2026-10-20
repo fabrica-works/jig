@@ -7,6 +7,15 @@ pub(super) fn encode(
     limits: &wire::Limits,
 ) -> Result<wire::AccountChange, wire::Problem> {
     Ok(match value {
+        domain::AccountChange::DeclareProgram { provider, join, name } => {
+            wire::AccountChange::DeclareProgram(wire::AccountChangeDeclareProgram::new(
+                limits,
+                wire::AccountChangeDeclareProgramParts { provider: *provider, join: *join, name: name.clone() },
+            )?)
+        }
+        domain::AccountChange::CheckProgram { source } => wire::AccountChange::CheckProgram(
+            wire::AccountChangeCheckProgram::new(limits, wire::AccountChangeCheckProgramParts { source: *source })?,
+        ),
         domain::AccountChange::AddKey { provider, join, digest } => {
             wire::AccountChange::AddKey(wire::AccountChangeAddKey::new(
                 limits,
@@ -52,6 +61,17 @@ pub(super) fn encode(
 }
 pub(super) fn decode(value: wire::AccountChange) -> Result<domain::AccountChange, wire::Problem> {
     Ok(match value {
+        wire::AccountChange::DeclareProgram(value) => {
+            let value = value.into_parts();
+            if !domain::program_name(&value.name) {
+                return Err(wire::Problem {
+                    path: wire::Path::AccountChangeDeclareProgramName,
+                    reason: skein_codec::Reason::Malformed,
+                });
+            }
+            domain::AccountChange::DeclareProgram { provider: value.provider, join: value.join, name: value.name }
+        }
+        wire::AccountChange::CheckProgram(value) => domain::AccountChange::CheckProgram { source: value.source() },
         wire::AccountChange::AddKey(value) => {
             let value = value.into_parts();
             domain::AccountChange::AddKey {

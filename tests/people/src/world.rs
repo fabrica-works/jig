@@ -30,6 +30,8 @@ pub const LIMITS: Limits = Limits {
     requests: 32,
     pending: 8,
     waiters: 3,
+    program_hosts: 65,
+    program_host_name_bytes: 32,
     identity_bytes: 32,
     words: 64,
     amendment_bytes: 512,
@@ -673,8 +675,15 @@ impl World {
                                     people::AccountChange::AddKey { .. } | people::AccountChange::ReplaceKey { .. } => {
                                         Outcome::AccountKeyKept { source: 1 }
                                     }
-                                    people::AccountChange::Remove { .. } => Outcome::AccountRemoved { confirmed: true },
-                                    people::AccountChange::RemoveKey { .. }
+                                    people::AccountChange::DeclareProgram { name, .. } => {
+                                        Outcome::AccountProgramDeclared { source: 1, name: name.clone() }
+                                    }
+
+                                    people::AccountChange::Remove { .. } => {
+                                        Outcome::AccountRemoved { confirmed: true, failed_hosts: Box::new([]) }
+                                    }
+                                    people::AccountChange::CheckProgram { .. }
+                                    | people::AccountChange::RemoveKey { .. }
                                     | people::AccountChange::Resume { .. }
                                     | people::AccountChange::MoveAccount { .. }
                                     | people::AccountChange::MoveSource { .. }
@@ -691,7 +700,13 @@ impl World {
                                 people::step(
                                     &mut self.domain,
                                     &self.env,
-                                    Event::Decided { request, outcome: Outcome::AccountSignedOut { confirmed: true } },
+                                    Event::Decided {
+                                        request,
+                                        outcome: Outcome::AccountSignedOut {
+                                            confirmed: true,
+                                            failed_hosts: Box::new([]),
+                                        },
+                                    },
                                     &mut self.out,
                                 );
                             }

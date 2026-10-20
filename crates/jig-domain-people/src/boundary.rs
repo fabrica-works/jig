@@ -379,51 +379,108 @@ pub enum EscalationChoice {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
     /// All operations were made; their issued messages start here, or at zero for none.
-    Compound { project: u32, operations: u32, first_message: u64 },
+    Compound {
+        project: u32,
+        operations: u32,
+        first_message: u64,
+    },
     /// No operation was made; the first failure has this zero-based place.
-    CompoundRefused { at: u32, why: Refusal },
+    CompoundRefused {
+        at: u32,
+        why: Refusal,
+    },
     /// The batch was made in order.
-    Created { first: u64, last: u64, given: Option<crate::Given> },
+    Created {
+        first: u64,
+        last: u64,
+        given: Option<crate::Given>,
+    },
     /// The named read position was accepted; it never moves backwards.
-    MarkedSeen { seen: Seen },
+    MarkedSeen {
+        seen: Seen,
+    },
     /// Connector-owned durable outcome named by token; the root asks its owner for the value.
-    Applied { connector: u16, token: Token },
+    Applied {
+        connector: u16,
+        token: Token,
+    },
     /// Unsaved retry answer; the request may be sent again.
     Again(crate::Again),
     /// Unsaved expired-sign-in answer.
     SignedOut,
     /// A note correction or deletion was committed with its keyed answer.
-    NoteEdited { name: u64 },
+    NoteEdited {
+        name: u64,
+    },
     /// A service party and its project role were committed together.
-    ServiceMade { person: u64 },
+    ServiceMade {
+        person: u64,
+    },
     /// Resource adoption and its connector-known party seed committed together.
-    Adopted { project: u32 },
+    Adopted {
+        project: u32,
+    },
     /// An explicit proposal awaits the named policy role.
-    Proposed { proposal: u64, to: u32 },
+    Proposed {
+        proposal: u64,
+        to: u32,
+    },
     /// This party withdrew its pending proposal.
-    Withdrawn { proposal: u64 },
+    Withdrawn {
+        proposal: u64,
+    },
     /// A person stopped one live task for a later release or decision.
-    Stopped { task: u64 },
+    Stopped {
+        task: u64,
+    },
     /// A person cancelled one task and its descendants.
-    Cancelled { task: u64 },
+    Cancelled {
+        task: u64,
+    },
     /// A person released a held task.
-    Released { task: u64 },
+    Released {
+        task: u64,
+    },
     /// One role-addressed task was durably claimed.
-    PersonTaken { task: u64 },
+    PersonTaken {
+        task: u64,
+    },
     /// The claimant durably returned the task to its role.
-    PersonHandedBack { task: u64 },
+    PersonHandedBack {
+        task: u64,
+    },
     /// An addressed person's result was durably admitted.
-    PersonAnswered { task: u64 },
+    PersonAnswered {
+        task: u64,
+    },
     /// The task now belongs to the requesting person, with its remaining funding transferred.
-    Moved { task: u64 },
+    Moved {
+        task: u64,
+    },
     /// Keyed answer to one current or historical proposal decision.
-    ProposalDecided { proposer: Proposer, proposal: u64, by: u64, at: Wall, choice: ProposalChoice },
+    ProposalDecided {
+        proposer: Proposer,
+        proposal: u64,
+        by: u64,
+        at: Wall,
+        choice: ProposalChoice,
+    },
     /// Words were durably admitted under the root-issued message number.
-    Said { task: u64, message: u64 },
+    Said {
+        task: u64,
+        message: u64,
+    },
     /// A named question was answered with a durable message.
-    QuestionAnswered { task: u64, question: u64, message: u64 },
+    QuestionAnswered {
+        task: u64,
+        question: u64,
+        message: u64,
+    },
     /// The named task accepted this person's amendment.
-    Amended { task: u64, released: bool },
+    Amended {
+        task: u64,
+        released: bool,
+    },
     /// Root accepted one roster and all affected `Waiting` recipients atomically; saved keyed
     /// replay does not apply the roster again.
     RolesSet {
@@ -431,9 +488,14 @@ pub enum Outcome {
         project: u32,
     },
     /// The full committed policy now applies to later checks; existing grants remain.
-    PolicyChanged { project: u32 },
+    PolicyChanged {
+        project: u32,
+    },
     /// One person's finite pool was opened or resized in its original period.
-    PoolSet { project: u32, person: u64 },
+    PoolSet {
+        project: u32,
+        person: u64,
+    },
     /// Root's committed current or historical decision for one task revision; first commit decides
     /// a race.
     EscalationDecided {
@@ -446,15 +508,30 @@ pub enum Outcome {
         choice: EscalationChoice,
     },
     /// An account's sign-in is under way for this source; its end is the accounts child's fact.
-    AccountSignInStarted { source: u32, address: Box<[u8]> },
+    AccountSignInStarted {
+        source: u32,
+        address: Box<[u8]>,
+    },
     /// The source was signed out, and whether its provider confirmed the revocation.
-    AccountSignedOut { confirmed: bool },
+    AccountSignedOut {
+        confirmed: bool,
+        failed_hosts: Box<[AccountHostFailure]>,
+    },
     /// The LLM key was kept at this source.
-    AccountKeyKept { source: u32 },
+    AccountKeyKept {
+        source: u32,
+    },
     /// The holder's account change finished.
+    AccountProgramDeclared {
+        source: u32,
+        name: Box<[u8]>,
+    },
     AccountChanged,
     /// Every signed-in source answered its sign-out.
-    AccountRemoved { confirmed: bool },
+    AccountRemoved {
+        confirmed: bool,
+        failed_hosts: Box<[AccountHostFailure]>,
+    },
     /// Final refusal, retained under the request key.
     Refused(/** Final refusal facts, retained under the request key. */ Refusal),
 }
@@ -796,6 +873,8 @@ pub enum Use {
 /// Holder changes to LLM accounts (domain/accounts.md, section 5).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum AccountChange {
+    DeclareProgram { provider: u32, join: Option<u32>, name: Box<[u8]> },
+    CheckProgram { source: u32 },
     AddKey { provider: u32, join: Option<u32>, digest: [u8; 32] },
     ReplaceKey { source: u32, digest: [u8; 32] },
     RemoveKey { source: u32 },
@@ -804,4 +883,17 @@ pub enum AccountChange {
     MoveAccount { account: u32, place: u32 },
     MoveSource { account: u32, source: u32, place: u32 },
     SetUses { account: u32, uses: Option<Box<[Use]>> },
+}
+
+/// A configured worker that did not confirm the original operation.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AccountHostFailure {
+    pub name: Box<[u8]>,
+    pub why: AccountHostWhy,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AccountHostWhy {
+    NotInContact,
+    Lost,
+    Failed,
 }

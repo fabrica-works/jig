@@ -46,3 +46,21 @@ pub fn replace_key(key: Key, name: RequestKey, holder: AccountHolder, source: u3
         value,
     }
 }
+
+/// Declare a host-local program login under its portable directory name.
+#[must_use]
+pub fn declare_program(
+    key: Key,
+    request: RequestKey,
+    holder: AccountHolder,
+    provider: u32,
+    join: Option<u32>,
+    name: Box<[u8]>,
+) -> Event {
+    account_change(key, request, holder, AccountChange::DeclareProgram { provider, join, name })
+}
+/// Ask each host to refresh a declared program's inventory.
+#[must_use]
+pub fn check_program(key: Key, request: RequestKey, holder: AccountHolder, source: u32) -> Event {
+    account_change(key, request, holder, AccountChange::CheckProgram { source })
+}

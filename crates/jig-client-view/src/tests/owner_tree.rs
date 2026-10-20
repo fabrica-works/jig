@@ -381,7 +381,8 @@ fn deciding_tree_page(domain: &Fixture) -> Tree {
     let w = words();
     let mut cap = crate::limits::of_words(&CLIENT, w).unwrap();
     cap.nodes = cap.nodes.max(4096);
-    cap.text_bytes = cap.nodes.checked_mul(cap.text_per_node).unwrap();
+    // This fragment needs the minimum scratch; whole-page text is priced by of_words.
+    cap.text_bytes = cap.text_bytes.max(4096_u32.checked_mul(cap.text_per_node).unwrap());
     let mut b = Builder::new(&cap);
     let mut bindings = JigBindings::new(cap.bindings, CLIENT.text);
     b.open(Role::Page);

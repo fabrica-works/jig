@@ -69,16 +69,22 @@ fn the_account_outcomes_are_read() {
             .unwrap(),
         );
         assert_eq!(
-            translate::answers::owner_outcome(&wire, &limits),
+            translate::answers::owner_outcome(&wire, &limits).unwrap(),
             c::OwnerOutcome::AccountSignInStarted { source: u32::MAX, address }
         );
     }
     for confirmed in [false, true] {
         let wire = w::OwnerOutcome::AccountSignedOut(
-            w::OwnerOutcomeAccountSignedOut::new(&limits.wire, w::OwnerOutcomeAccountSignedOutParts { confirmed })
-                .unwrap(),
+            w::OwnerOutcomeAccountSignedOut::new(
+                &limits.wire,
+                w::OwnerOutcomeAccountSignedOutParts { confirmed, failed_hosts: skein_lib::List::with_capacity(0) },
+            )
+            .unwrap(),
         );
-        assert_eq!(translate::answers::owner_outcome(&wire, &limits), c::OwnerOutcome::AccountSignedOut { confirmed });
+        assert_eq!(
+            translate::answers::owner_outcome(&wire, &limits).unwrap(),
+            c::OwnerOutcome::AccountSignedOut { confirmed, failed_hosts: Box::new([]) }
+        );
     }
 }
 #[test]
@@ -133,14 +139,59 @@ fn the_key_outcomes_and_provider_refusal_are_read() {
             w::OwnerOutcome::AccountRemoved(
                 w::OwnerOutcomeAccountRemoved::new(
                     &limits.wire,
-                    w::OwnerOutcomeAccountRemovedParts { confirmed: true },
+                    w::OwnerOutcomeAccountRemovedParts {
+                        confirmed: true,
+                        failed_hosts: skein_lib::List::with_capacity(0),
+                    },
                 )
                 .unwrap(),
             ),
-            c::OwnerOutcome::AccountRemoved { confirmed: true },
+            c::OwnerOutcome::AccountRemoved { confirmed: true, failed_hosts: Box::new([]) },
         ),
     ] {
-        assert_eq!(translate::answers::owner_outcome(&wire, &limits), client);
+        assert_eq!(translate::answers::owner_outcome(&wire, &limits).unwrap(), client);
     }
     assert_eq!(translate::answers::refusal(&w::Refusal::Provider, &limits), Ok(c::Refusal::Provider));
+}
+
+#[test]
+fn a_declared_program_name_is_validated_on_receipt() {
+    let limits = fixtures::limits();
+    let wire = w::OwnerOutcome::AccountProgramDeclared(
+        w::OwnerOutcomeAccountProgramDeclared::new(
+            &limits.wire,
+            w::OwnerOutcomeAccountProgramDeclaredParts { source: 0, name: b"../escape".as_slice().into() },
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        translate::answers::owner_outcome(&wire, &limits).err(),
+        Some(w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Malformed })
+    );
+}
+#[test]
+fn program_host_results_share_the_native_answer_budget() {
+    let mut limits = fixtures::limits();
+    limits.client.document_bytes = 1;
+    let mut failed_hosts = skein_lib::List::with_capacity(1);
+    failed_hosts
+        .push(
+            w::AccountHostFailure::new(
+                &limits.wire,
+                w::AccountHostFailureParts { name: b"worker".as_slice().into(), why: w::AccountHostWhy::Lost },
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let wire = w::OwnerOutcome::AccountSignedOut(
+        w::OwnerOutcomeAccountSignedOut::new(
+            &limits.wire,
+            w::OwnerOutcomeAccountSignedOutParts { confirmed: false, failed_hosts },
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        translate::answers::owner_outcome(&wire, &limits).err(),
+        Some(w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Bound })
+    );
 }

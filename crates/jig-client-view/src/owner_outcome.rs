@@ -12,6 +12,9 @@ use jig_client::contract::{
 };
 use skein_lib::Wall;
 
+// Region + named status + title + confirmation, then a reason and whole name per host.
+pub(crate) const MAX_NODES: u32 = 4 + 128 * 2;
+
 /// A finite fragment envelope reusable by an owner's enclosing view.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OutcomeFragment {
@@ -21,14 +24,20 @@ pub struct OutcomeFragment {
     pub depth: u32,
 }
 /// Maximum fragment over all committed kinds and every loaded language.
-/// One region, one named status with its text, and at most five fact rows.
+/// One region, one named status, and up to 128 configured hosts with whole names.
 #[must_use]
 pub fn required(words: &Words) -> Option<OutcomeFragment> {
     let mut capacity = 0_u32;
     for phrase in owner_outcome_words::ALL {
         capacity = capacity.max(owner_outcome_words::capacity(words, phrase));
     }
-    Some(OutcomeFragment { nodes: 8, text_bytes: capacity.checked_mul(7)?, text_per_node: capacity, depth: 3 })
+    let per_node = capacity.max(4096);
+    Some(OutcomeFragment {
+        nodes: MAX_NODES,
+        text_bytes: per_node.checked_mul(MAX_NODES)?,
+        text_per_node: per_node,
+        depth: 3,
+    })
 }
 fn header(value: &OwnerOutcome) -> P {
     match value {
@@ -53,6 +62,7 @@ fn header(value: &OwnerOutcome) -> P {
         OwnerOutcome::Withdrawn { .. } => P::Withdrawn,
         OwnerOutcome::RolesSet { .. } => P::RolesSet,
         OwnerOutcome::PolicyChanged { .. } => P::PolicyChanged,
+        OwnerOutcome::AccountProgramDeclared { .. } => P::AccountProgramDeclared,
         OwnerOutcome::AccountKeyKept { .. } => P::AccountKeyKept,
         OwnerOutcome::AccountChanged => P::AccountChanged,
         OwnerOutcome::AccountRemoved { .. } => P::AccountRemoved,
@@ -119,9 +129,25 @@ fn details(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
     match value {
         OwnerOutcome::AccountKeyKept { .. }
         | OwnerOutcome::AccountChanged
-        | OwnerOutcome::AccountRemoved { .. }
-        | OwnerOutcome::AccountSignInStarted { .. }
-        | OwnerOutcome::AccountSignedOut { .. } => {}
+        | OwnerOutcome::AccountSignInStarted { .. } => {}
+        OwnerOutcome::AccountProgramDeclared { source, name } => {
+            number(b, words, P::SourceNumber, u64::from(*source));
+            b.text(Run::Plain, name);
+        }
+        OwnerOutcome::AccountRemoved { confirmed, failed_hosts }
+        | OwnerOutcome::AccountSignedOut { confirmed, failed_hosts } => {
+            let status = if *confirmed { P::SignOutConfirmed } else { P::SignOutUnconfirmed };
+            text(b, words, status, &[]);
+            for host in &**failed_hosts {
+                let why = match host.why {
+                    jig_client::contract::AccountHostWhy::NotInContact => P::HostNotInContact,
+                    jig_client::contract::AccountHostWhy::Lost => P::HostLost,
+                    jig_client::contract::AccountHostWhy::Failed => P::HostFailed,
+                };
+                text(b, words, why, &[]);
+                b.text(Run::Plain, &host.name);
+            }
+        }
         OwnerOutcome::Created { first, last, given } => created(b, *first, *last, *given, words),
         OwnerOutcome::MarkedSeen { seen: position } => seen(b, position, words),
         OwnerOutcome::NoteEdited { name } => number(b, words, P::Note, *name),

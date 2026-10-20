@@ -305,3 +305,59 @@ fn removing_a_program_account_retains_cleanup_evidence() {
     assert!(world.domain.account(0).is_none());
     assert!(requests.iter().any(|request| matches!(request, Request::Programs { names } if names[0].cleanup)));
 }
+
+#[test]
+fn a_change_answers_a_program_declaration() {
+    let mut world = fresh();
+    let request = skein_lib::Token::new(41);
+    let rows = world.step(Event::Change {
+        request,
+        holder: HOLDER,
+        change: jig_domain_accounts::Change::DeclareProgram {
+            provider: PROVIDER,
+            join: None,
+            name: b"personal".as_slice().into(),
+        },
+    });
+    assert_eq!(
+        rows.last(),
+        Some(&Request::Answer {
+            request,
+            answer: jig_domain_accounts::Answer::ProgramDeclared { source: 1, name: b"personal".as_slice().into() }
+        })
+    );
+}
+#[test]
+fn a_foreign_check_emits_no_host_command() {
+    let mut world = fresh();
+    let (source, _) = declare(&mut world, HOLDER, PROVIDER, None, b"personal");
+    let source = source.expect("declared source");
+    let request = skein_lib::Token::new(42);
+    assert_eq!(
+        world.step(Event::Change {
+            request,
+            holder: OTHER,
+            change: jig_domain_accounts::Change::CheckProgram { source }
+        }),
+        vec![Request::Answer { request, answer: jig_domain_accounts::Answer::Refused { refusal: Refusal::Unknown } }]
+    );
+}
+#[test]
+fn a_holder_check_is_answered_after_dispatch() {
+    let mut world = fresh();
+    let (source, _) = declare(&mut world, HOLDER, PROVIDER, None, b"personal");
+    let source = source.expect("declared source");
+    let request = skein_lib::Token::new(43);
+    let rows = world.step(Event::Change {
+        request,
+        holder: HOLDER,
+        change: jig_domain_accounts::Change::CheckProgram { source },
+    });
+    assert_eq!(
+        rows[rows.len() - 2..],
+        [
+            Request::CheckProgram { name: b"personal".as_slice().into() },
+            Request::Answer { request, answer: jig_domain_accounts::Answer::Done }
+        ]
+    );
+}

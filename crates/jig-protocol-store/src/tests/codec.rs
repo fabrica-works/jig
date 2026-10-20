@@ -919,8 +919,8 @@ fn every_account_change_and_answer_round_trips() {
             for outcome in [
                 Outcome::AccountKeyKept { source: 1 },
                 Outcome::AccountChanged,
-                Outcome::AccountRemoved { confirmed: true },
-                Outcome::AccountRemoved { confirmed: false },
+                Outcome::AccountRemoved { confirmed: true, failed_hosts: Box::new([]) },
+                Outcome::AccountRemoved { confirmed: false, failed_hosts: Box::new([]) },
             ] {
                 people_round_trip(Stored::Answer {
                     models: Box::new([]),
@@ -1241,4 +1241,43 @@ fn account_refusals_keep_their_reasons_in_the_store() {
         problem.why = t::Refusal::Account { account: 42, why };
         core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::DelegationRefused(problem)));
     }
+}
+
+#[test]
+fn a_program_declaration_retains_its_public_name() {
+    use jig_domain_people::{AccountChange, AccountHolder, Ask, Outcome, RequestKey, Stored};
+    let ask = Ask::AccountChange {
+        holder: AccountHolder::Own,
+        change: AccountChange::DeclareProgram { provider: 3, join: Some(2), name: b"personal".as_slice().into() },
+    };
+    people_round_trip(Stored::Answer {
+        models: Box::new([]),
+        key: RequestKey { person: 1, key: [7; 16] },
+        ask: Box::new(ask),
+        outcome: Outcome::AccountProgramDeclared { source: 0, name: b"personal".as_slice().into() },
+        at: skein_lib::Wall::EPOCH,
+    });
+}
+#[test]
+fn program_sign_out_answers_retain_host_failures() {
+    use jig_domain_people::{AccountHolder, AccountHostFailure, AccountHostWhy, Ask, Outcome, RequestKey, Stored};
+    for why in [AccountHostWhy::NotInContact, AccountHostWhy::Lost, AccountHostWhy::Failed] {
+        people_round_trip(Stored::Answer {
+            models: Box::new([]),
+            key: RequestKey { person: 1, key: [7; 16] },
+            ask: Box::new(Ask::AccountSignOut { holder: AccountHolder::Own, source: 0 }),
+            outcome: Outcome::AccountSignedOut {
+                confirmed: false,
+                failed_hosts: Box::new([AccountHostFailure { name: b"configured-worker".as_slice().into(), why }]),
+            },
+            at: skein_lib::Wall::EPOCH,
+        });
+    }
+}
+#[test]
+fn program_checks_retain_the_source_number() {
+    ask_round_trip(jig_domain_people::Ask::AccountChange {
+        holder: jig_domain_people::AccountHolder::Own,
+        change: jig_domain_people::AccountChange::CheckProgram { source: 0 },
+    });
 }

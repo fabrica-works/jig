@@ -268,6 +268,7 @@ fn number(value: &OwnerOutcome, task: u64, place: u32) -> Option<u64> {
         | OwnerOutcome::Withdrawn { .. }
         | OwnerOutcome::RolesSet { .. }
         | OwnerOutcome::PolicyChanged { .. }
+        | OwnerOutcome::AccountProgramDeclared { .. }
         | OwnerOutcome::AccountKeyKept { .. }
         | OwnerOutcome::AccountChanged
         | OwnerOutcome::AccountRemoved { .. }

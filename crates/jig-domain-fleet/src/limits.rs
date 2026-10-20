@@ -78,6 +78,9 @@ pub(crate) fn tracked(limits: &Limits) -> Option<u32> {
 /// rest is its sender's to count.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    // Each fan-out includes its terminal or target-list message.
+    limits.configured_workers.checked_add(1)?;
+    limits.program_sources.checked_add(1)?;
     if limits.worker_name_bytes > crate::WORKER_NAME {
         return None;
     }

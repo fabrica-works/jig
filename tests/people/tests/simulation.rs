@@ -152,7 +152,10 @@ fn an_account_request_is_admitted_only_from_its_holder() {
     }));
     assert_eq!(world.reply(own), started, "a person's own");
     assert_eq!(world.reply(deployment), started, "a first owner's for the deployment");
-    assert_eq!(world.reply(sign_out), Some(Reply::Outcome(Outcome::AccountSignedOut { confirmed: true })));
+    assert_eq!(
+        world.reply(sign_out),
+        Some(Reply::Outcome(Outcome::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) }))
+    );
     assert_eq!(world.stats().routes, routes + 3);
     let refused = Some(Reply::Outcome(Outcome::Refused(Refusal::Role { held: None })));
     let other = world.request(11, [5; 16], sign_in(AccountHolder::Deployment));

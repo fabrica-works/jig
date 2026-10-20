@@ -64,14 +64,12 @@ pub(super) fn fits(rows: &List<OwnerProgramLogin>, limits: &Limits) -> Option<()
         return None;
     }
     for row in rows {
-        if !jig_client::contract::valid_program_name(&row.name) || row.name.len() > usize::try_from(limits.text).ok()? {
+        if !jig_client::contract::valid_program_name(&row.name) {
             return None;
         }
         match &row.state {
             Some(OwnerProgramState::SignedInOtherwise { method }) => {
-                if !jig_client::contract::valid_program_method(method)
-                    || method.len() > usize::try_from(limits.text).ok()?
-                {
+                if !jig_client::contract::valid_program_method(method) {
                     return None;
                 }
             }

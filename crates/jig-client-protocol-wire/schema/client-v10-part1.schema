@@ -45,6 +45,8 @@ record OwnerAccountUseProject { project: u32 }
 enum OwnerAccountUse { party: OwnerAccountUseParty, project: OwnerAccountUseProject }
 record PayerReadiness { provider: u32 payer: OwnerAccountUse readiness: Readiness settled: option bool }
 # Account changes share the account documents' payer type and ACCOUNT_USES bound.
+record AccountChangeDeclareProgram { provider: u32 join: option u32 name: bytes 32 }
+record AccountChangeCheckProgram { source: u32 }
 record AccountChangeAddKey { provider: u32 join: option u32 digest: fixed 32 }
 record AccountChangeReplaceKey { source: u32 digest: fixed 32 }
 record AccountChangeRemoveKey { source: u32 }
@@ -53,7 +55,7 @@ record AccountChangeRemove { account: u32 }
 record AccountChangeMoveAccount { account: u32 place: u32 }
 record AccountChangeMoveSource { account: u32 source: u32 place: u32 }
 record AccountChangeSetUses { account: u32 uses: option list 16 OwnerAccountUse }
-enum AccountChange { add_key: AccountChangeAddKey, replace_key: AccountChangeReplaceKey, remove_key: AccountChangeRemoveKey, resume: AccountChangeResume, remove: AccountChangeRemove, move_account: AccountChangeMoveAccount, move_source: AccountChangeMoveSource, set_uses: AccountChangeSetUses }
+enum AccountChange { add_key: AccountChangeAddKey, replace_key: AccountChangeReplaceKey, remove_key: AccountChangeRemoveKey, resume: AccountChangeResume, remove: AccountChangeRemove, move_account: AccountChangeMoveAccount, move_source: AccountChangeMoveSource, set_uses: AccountChangeSetUses, declare_program: AccountChangeDeclareProgram, check_program: AccountChangeCheckProgram }
 record AskAccountChange { holder: AccountHolder change: AccountChange }
 enum Ask { message: Message, answer: Answer, take: Take, hand_back: HandBack, decide: Decide, release: Release, amend: boxed Amend, stop: Stop, cancel: Cancel, move_task: Move, seen: Seen, edit_note: EditNote, delete_note: DeleteNote, change_policy: ChangePolicy, set_roles: SetRoles, make_service: MakeService, set_pool: SetPool, compound: Compound, create: Create, propose: Propose, withdraw: Withdraw, sign_in: AskSignIn, sign_out: AskSignOut, account_change: AskAccountChange }
 record OwnerAccountHolderParty { party: u64 }

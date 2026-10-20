@@ -67,7 +67,9 @@ pub(super) fn admitted(
             }
             accounts::Change::ReplaceKey { source, carried }
         }
-        other @ (people::AccountChange::RemoveKey { .. }
+        other @ (people::AccountChange::DeclareProgram { .. }
+        | people::AccountChange::CheckProgram { .. }
+        | people::AccountChange::RemoveKey { .. }
         | people::AccountChange::Resume { .. }
         | people::AccountChange::Remove { .. }
         | people::AccountChange::MoveAccount { .. }

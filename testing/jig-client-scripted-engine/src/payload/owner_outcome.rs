@@ -23,12 +23,31 @@ impl Payload for OwnerEscalationChoice {
 impl Payload for OwnerOutcome {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Created { .. }
-            | Self::Compound { .. }
-            | Self::AccountKeyKept { .. }
-            | Self::AccountChanged
-            | Self::AccountRemoved { .. }
-            | Self::AccountSignedOut { .. } => Some(0),
+            Self::Created { .. } | Self::Compound { .. } | Self::AccountKeyKept { .. } | Self::AccountChanged => {
+                Some(0)
+            }
+            Self::AccountProgramDeclared { name, .. } => {
+                if !jig_client_domain::contract::valid_program_name(name) {
+                    return None;
+                }
+                u64::try_from(name.len()).ok()
+            }
+            Self::AccountRemoved { confirmed, failed_hosts } | Self::AccountSignedOut { confirmed, failed_hosts } => {
+                if failed_hosts.len() > 128 || *confirmed && !failed_hosts.is_empty() {
+                    return None;
+                }
+                let mut bytes = u64::try_from(
+                    failed_hosts.len().checked_mul(size_of::<jig_client_domain::contract::AccountHostFailure>())?,
+                )
+                .ok()?;
+                for host in &**failed_hosts {
+                    if host.name.len() > 4096 {
+                        return None;
+                    }
+                    bytes = bytes.checked_add(u64::try_from(host.name.len()).ok()?)?;
+                }
+                Some(bytes)
+            }
             Self::AccountSignInStarted { address, .. } => {
                 if address.len() > 2048 {
                     return None;

@@ -987,6 +987,7 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
         | people::Outcome::PoolSet { .. }
         | people::Outcome::EscalationDecided { .. }
         | people::Outcome::AccountSignInStarted { .. }
+        | people::Outcome::AccountProgramDeclared { .. }
         | people::Outcome::AccountKeyKept { .. }
         | people::Outcome::AccountChanged
         | people::Outcome::AccountRemoved { .. }

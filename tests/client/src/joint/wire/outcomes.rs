@@ -1,8 +1,10 @@
 //! Closed owner facts and separate transport dispositions (contract.md, 4).
 //! Uses the actual whole owner carrier; successful owner translation is kept separate from transport-only dispositions.
+use super::owner;
+use jig_client::DomainLimits as Limits;
 use jig_client_domain::contract as client;
 use jig_domain_people as people;
-use skein_lib::Token;
+use skein_lib::{List, Token};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
@@ -14,8 +16,9 @@ pub enum Outcome {
     CompoundRefused { at: u32, why: people::Refusal },
 }
 
-#[must_use]
-pub fn outcome(value: &people::Outcome) -> Outcome {
+/// # Errors
+/// Refuses malformed program outcomes or host answers above the link's receiving bounds.
+pub fn outcome(value: &people::Outcome, limits: &Limits) -> Result<Outcome, owner::Invalid> {
     let owner = match value {
         people::Outcome::NoteEdited { name } => client::OwnerOutcome::NoteEdited { name: *name },
         people::Outcome::ServiceMade { person } => client::OwnerOutcome::ServiceMade { person: *person },
@@ -23,7 +26,7 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::Compound { project, operations, first_message } => {
             client::OwnerOutcome::Compound { project: *project, operations: *operations, first_message: *first_message }
         }
-        people::Outcome::CompoundRefused { at, why } => return Outcome::CompoundRefused { at: *at, why: *why },
+        people::Outcome::CompoundRefused { at, why } => return Ok(Outcome::CompoundRefused { at: *at, why: *why }),
         people::Outcome::Proposed { proposal, .. } => client::OwnerOutcome::Proposed { proposal: *proposal },
         people::Outcome::Withdrawn { proposal } => client::OwnerOutcome::Withdrawn { proposal: *proposal },
         people::Outcome::Created { first, last, given } => client::OwnerOutcome::Created {
@@ -91,28 +94,76 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
             }
         }
         people::Outcome::Applied { connector, token } => {
-            return Outcome::Applied { connector: *connector, token: *token };
+            return Ok(Outcome::Applied { connector: *connector, token: *token });
         }
-        people::Outcome::Again(why) => return Outcome::Again(*why),
-        people::Outcome::SignedOut => return Outcome::SignedOut,
-        people::Outcome::Refused(why) => return Outcome::Refused(*why),
+        people::Outcome::Again(why) => return Ok(Outcome::Again(*why)),
+        people::Outcome::SignedOut => return Ok(Outcome::SignedOut),
+        people::Outcome::Refused(why) => return Ok(Outcome::Refused(*why)),
         people::Outcome::AccountSignInStarted { source, address } => {
             client::OwnerOutcome::AccountSignInStarted { source: *source, address: address.clone() }
         }
-        people::Outcome::AccountSignedOut { confirmed } => {
-            client::OwnerOutcome::AccountSignedOut { confirmed: *confirmed }
-        }
+        people::Outcome::AccountSignedOut { confirmed, failed_hosts } => client::OwnerOutcome::AccountSignedOut {
+            confirmed: *confirmed,
+            failed_hosts: hosts(failed_hosts, *confirmed, limits)?,
+        },
         people::Outcome::AccountKeyKept { source } => client::OwnerOutcome::AccountKeyKept { source: *source },
+        people::Outcome::AccountProgramDeclared { source, name } => {
+            client::OwnerOutcome::AccountProgramDeclared { source: *source, name: super::programs::program_name(name)? }
+        }
         people::Outcome::AccountChanged => client::OwnerOutcome::AccountChanged,
-        people::Outcome::AccountRemoved { confirmed } => client::OwnerOutcome::AccountRemoved { confirmed: *confirmed },
+        people::Outcome::AccountRemoved { confirmed, failed_hosts } => client::OwnerOutcome::AccountRemoved {
+            confirmed: *confirmed,
+            failed_hosts: hosts(failed_hosts, *confirmed, limits)?,
+        },
     };
-    Outcome::Owner(owner)
+    Ok(Outcome::Owner(owner))
+}
+
+fn hosts(
+    rows: &[people::AccountHostFailure],
+    confirmed: bool,
+    limits: &Limits,
+) -> Result<Box<[client::AccountHostFailure]>, owner::Invalid> {
+    if confirmed && !rows.is_empty() {
+        return Err(owner::Invalid::Program);
+    }
+    let count = u32::try_from(rows.len()).map_err(|_| owner::Invalid::TooLarge)?;
+    if count > 128 {
+        return Err(owner::Invalid::TooLarge);
+    }
+    let mut bytes = List::<client::AccountHostFailure>::worst_case(count).ok_or(owner::Invalid::TooLarge)?;
+    for row in rows {
+        bytes = bytes
+            .checked_add(u64::try_from(row.name.len()).map_err(|_| owner::Invalid::TooLarge)?)
+            .ok_or(owner::Invalid::TooLarge)?;
+    }
+    if bytes > limits.document_bytes.checked_mul(2).ok_or(owner::Invalid::TooLarge)? {
+        return Err(owner::Invalid::TooLarge);
+    }
+    let mut result = List::with_capacity(count);
+    for row in rows {
+        result
+            .push(client::AccountHostFailure {
+                name: super::programs::configured_name(&row.name)?,
+                why: match row.why {
+                    people::AccountHostWhy::NotInContact => client::AccountHostWhy::NotInContact,
+                    people::AccountHostWhy::Lost => client::AccountHostWhy::Lost,
+                    people::AccountHostWhy::Failed => client::AccountHostWhy::Failed,
+                },
+            })
+            .map_err(|_| owner::Invalid::TooLarge)?;
+    }
+    Ok(result.into_boxed())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use skein_lib::Wall;
+    fn outcome(value: &people::Outcome) -> Outcome {
+        super::outcome(value, &crate::test::limits().client.domain).expect("representable fixture")
+    }
+
     const FIRST_CREATED: u64 = 17;
     const LAST_CREATED: u64 = 19;
     const GIVEN_AMOUNT: u64 = 23;
@@ -233,5 +284,58 @@ mod tests {
             outcome(&people::Outcome::Refused(people::Refusal::Role { held: None })),
             Outcome::Refused(people::Refusal::Role { held: None })
         );
+    }
+}
+
+#[cfg(test)]
+mod programs {
+    use super::*;
+    fn limits() -> Limits {
+        crate::test::limits().client.domain
+    }
+    fn failed() -> people::Outcome {
+        people::Outcome::AccountSignedOut {
+            confirmed: false,
+            failed_hosts: Box::new([people::AccountHostFailure {
+                name: b"configured-worker".as_slice().into(),
+                why: people::AccountHostWhy::Lost,
+            }]),
+        }
+    }
+    #[test]
+    fn malformed_declaration_names_are_refused() {
+        assert_eq!(
+            outcome(
+                &people::Outcome::AccountProgramDeclared { source: 1, name: b"bad name".as_slice().into() },
+                &limits()
+            ),
+            Err(owner::Invalid::Program)
+        );
+    }
+    #[test]
+    fn confirmed_answers_refuse_host_failures() {
+        let people::Outcome::AccountSignedOut { failed_hosts, .. } = failed() else { panic!("sign-out fixture") };
+        assert_eq!(
+            outcome(&people::Outcome::AccountSignedOut { confirmed: true, failed_hosts }, &limits()),
+            Err(owner::Invalid::Program)
+        );
+    }
+    #[test]
+    fn host_answers_hold_at_the_native_budget() {
+        let bytes = List::<client::AccountHostFailure>::worst_case(1).expect("host list") + 17;
+        let limits = Limits { document_bytes: bytes.div_ceil(2), ..limits() };
+        assert!(outcome(&failed(), &limits).is_ok());
+        assert_eq!(
+            outcome(&failed(), &Limits { document_bytes: limits.document_bytes - 1, ..limits }),
+            Err(owner::Invalid::TooLarge)
+        );
+    }
+    #[test]
+    fn host_answers_keep_whole_configured_names() {
+        let value = outcome(&failed(), &Limits { text: 1, ..limits() }).expect("independent name bound");
+        let Outcome::Owner(client::OwnerOutcome::AccountSignedOut { failed_hosts, .. }) = value else {
+            panic!("host answer")
+        };
+        assert_eq!(failed_hosts[0].name.as_ref(), b"configured-worker");
     }
 }

@@ -349,10 +349,13 @@ record OwnerOutcomeCompound { project: u32 operations: u32 first_message: u64 }
 record CreatedGiven { task: u64 amount: u64 }
 record OwnerOutcomeCreated { first: u64 last: u64 given: option CreatedGiven }
 record OwnerOutcomeAccountSignInStarted { source: u32 address: bytes 2048 }
-record OwnerOutcomeAccountSignedOut { confirmed: bool }
+enum AccountHostWhy { not_in_contact, lost, failed }
+record AccountHostFailure { name: bytes 4096 why: AccountHostWhy }
+record OwnerOutcomeAccountProgramDeclared { source: u32 name: bytes 32 }
+record OwnerOutcomeAccountSignedOut { confirmed: bool failed_hosts: list 128 AccountHostFailure }
 record OwnerOutcomeAccountKeyKept { source: u32 }
-record OwnerOutcomeAccountRemoved { confirmed: bool }
-enum OwnerOutcome { marked_seen: OwnerOutcomeMarkedSeen, note_edited: OwnerOutcomeNoteEdited, service_made: OwnerOutcomeServiceMade, adopted: OwnerOutcomeAdopted, stopped: OwnerOutcomeStopped, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, person_taken: OwnerOutcomePersonTaken, person_handed_back: OwnerOutcomePersonHandedBack, person_answered: OwnerOutcomePersonAnswered, moved: OwnerOutcomeMoved, proposal_decided: OwnerOutcomeProposalDecided, said: OwnerOutcomeSaid, question_answered: OwnerOutcomeQuestionAnswered, amended: OwnerOutcomeAmended, proposed: OwnerOutcomeProposed, withdrawn: OwnerOutcomeWithdrawn, roles_set: OwnerOutcomeRolesSet, policy_changed: OwnerOutcomePolicyChanged, pool_set: OwnerOutcomePoolSet, escalation_decided: OwnerOutcomeEscalationDecided, compound: OwnerOutcomeCompound, created: OwnerOutcomeCreated, account_sign_in_started: OwnerOutcomeAccountSignInStarted, account_signed_out: OwnerOutcomeAccountSignedOut, account_key_kept: OwnerOutcomeAccountKeyKept, account_changed, account_removed: OwnerOutcomeAccountRemoved }
+record OwnerOutcomeAccountRemoved { confirmed: bool failed_hosts: list 128 AccountHostFailure }
+enum OwnerOutcome { marked_seen: OwnerOutcomeMarkedSeen, note_edited: OwnerOutcomeNoteEdited, service_made: OwnerOutcomeServiceMade, adopted: OwnerOutcomeAdopted, stopped: OwnerOutcomeStopped, cancelled: OwnerOutcomeCancelled, released: OwnerOutcomeReleased, person_taken: OwnerOutcomePersonTaken, person_handed_back: OwnerOutcomePersonHandedBack, person_answered: OwnerOutcomePersonAnswered, moved: OwnerOutcomeMoved, proposal_decided: OwnerOutcomeProposalDecided, said: OwnerOutcomeSaid, question_answered: OwnerOutcomeQuestionAnswered, amended: OwnerOutcomeAmended, proposed: OwnerOutcomeProposed, withdrawn: OwnerOutcomeWithdrawn, roles_set: OwnerOutcomeRolesSet, policy_changed: OwnerOutcomePolicyChanged, pool_set: OwnerOutcomePoolSet, escalation_decided: OwnerOutcomeEscalationDecided, compound: OwnerOutcomeCompound, created: OwnerOutcomeCreated, account_sign_in_started: OwnerOutcomeAccountSignInStarted, account_signed_out: OwnerOutcomeAccountSignedOut, account_key_kept: OwnerOutcomeAccountKeyKept, account_changed, account_removed: OwnerOutcomeAccountRemoved, account_program_declared: OwnerOutcomeAccountProgramDeclared }
 record MadeTasks { tasks: list 32 u64 }
 record MadeService { party: u64 credential: secret 40 }
 record MadePersonResult { task: u64 }

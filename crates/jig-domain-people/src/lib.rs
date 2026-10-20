@@ -92,18 +92,32 @@ pub use amendment::{
     ResourceScope, ResultsWake, Spec, Tracking, WakePolicy, WakeRule, amendment_bytes, authority_bytes,
 };
 pub use boundary::{
-    ADDRESS, AccountChange, AccountHolder, Adoption, Ask, Counts, Entry, EntryKind, EscalationChoice,
-    EscalationDecision, Event, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, Needs, NoteChange, NoteScope,
-    Outcome, PersonResult, ProjectRole, ProposalChoice, ProposalDecision, Proposer, Reply, Request, RequestKey,
-    ResourceName, ResourceRole, Role, Seed, Stored, USES, Use, Whom,
+    ADDRESS, AccountChange, AccountHolder, AccountHostFailure, AccountHostWhy, Adoption, Ask, Counts, Entry, EntryKind,
+    EscalationChoice, EscalationDecision, Event, Holding, Identity, IdentityKey, InitialOwner, Key, Kind, Needs,
+    NoteChange, NoteScope, Outcome, PersonResult, ProjectRole, ProposalChoice, ProposalDecision, Proposer, Reply,
+    Request, RequestKey, ResourceName, ResourceRole, Role, Seed, Stored, USES, Use, Whom,
 };
 pub use capacity::{CapacityAction, CapacityCause, CapacityRefusal};
 pub use decisions::{FailureClass, HoldReason, Moved};
 pub use domain::{Domain, application_part, application_part_done, fire, max_out, step};
 pub use facts::Fact;
-pub use limits::{Limits, worst_case};
+pub use limits::{Limits, outcome_bytes, worst_case};
 pub use policy_value::{
     Guard, Judge, PermissionRole, PolicyChange, PolicyRole, PolicyValue, Requirement, policy_bytes,
     policy_change_bytes, requirements_bytes,
 };
 pub use refusals::{Accepter, Again, Ending, Lack, LimitKind, Malformed, Party, Refusal};
+
+/// The source directory's portable public grammar (accounts.md, 3.4).
+#[must_use]
+pub fn program_name(name: &[u8]) -> bool {
+    if name.is_empty() || name.len() > 32 {
+        return false;
+    }
+    for byte in name {
+        if !byte.is_ascii_lowercase() && !byte.is_ascii_digit() && *byte != b'-' {
+            return false;
+        }
+    }
+    true
+}

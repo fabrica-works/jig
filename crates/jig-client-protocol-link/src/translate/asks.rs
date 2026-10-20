@@ -694,6 +694,19 @@ fn account_holder(value: c::AccountHolder) -> w::AccountHolder {
 
 fn account_change(value: &c::AccountChange, limits: &w::Limits) -> Result<w::AccountChange, w::Problem> {
     Ok(match value {
+        c::AccountChange::DeclareProgram { provider, join, name } => {
+            if !c::valid_program_name(name) {
+                return Err(super::piece_problem(skein_codec::Reason::Malformed));
+            }
+            w::AccountChange::DeclareProgram(w::AccountChangeDeclareProgram::new(
+                limits,
+                w::AccountChangeDeclareProgramParts { provider: *provider, join: *join, name: name.clone() },
+            )?)
+        }
+        c::AccountChange::CheckProgram { source } => w::AccountChange::CheckProgram(w::AccountChangeCheckProgram::new(
+            limits,
+            w::AccountChangeCheckProgramParts { source: *source },
+        )?),
         c::AccountChange::AddKey { provider, join, digest } => w::AccountChange::AddKey(w::AccountChangeAddKey::new(
             limits,
             w::AccountChangeAddKeyParts { provider: *provider, join: *join, digest: *digest },

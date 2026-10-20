@@ -170,7 +170,10 @@ fn a_partys_sign_out_removes_its_source_and_account() {
     let sign_out = people::Ask::AccountSignOut { holder: people::AccountHolder::Own, source };
     assert_eq!(
         ask(&mut world, 41, sign_out),
-        Some(&people::Reply::Outcome(people::Outcome::AccountSignedOut { confirmed: true }))
+        Some(&people::Reply::Outcome(people::Outcome::AccountSignedOut {
+            confirmed: true,
+            failed_hosts: Box::new([])
+        }))
     );
     assert!(world.domain.accounts().source(source).is_none());
     assert!(world.domain.accounts().account(account).is_none());

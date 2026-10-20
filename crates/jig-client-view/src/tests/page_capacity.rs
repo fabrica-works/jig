@@ -787,6 +787,8 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
     // Two catalogue offers (two programs each), two readiness rows and six
     // list/heading/cut nodes add 2 * (2 * 2 + 12) + 2 * 5 + 6 = 48.
     // Program facts add 11 * 2 * 2 + 3 * 2 = 50 nodes at this profile.
+    // Each card frame's two committed outcomes grow by 2 * (260 - 34) = 452.
+    // The page formulas count these frames independently of their offered controls.
     const DEPLOYMENT_NODES: u32 = 2_979;
     assert_eq!(
         [
@@ -800,14 +802,14 @@ fn each_page_bound_keeps_its_value_at_the_client_limits() {
             crate::page_nodes(&CLIENT, 0)
         ],
         [
-            Some(339_259),
-            Some(85_634),
-            Some(1_016_040),
-            Some(1_172_995),
-            Some(509_013),
+            Some(386_267),
+            Some(97_386),
+            Some(1_157_064),
+            Some(1_335_715),
+            Some(579_525),
             Some(DEPLOYMENT_NODES),
             Some(25),
-            Some(1_172_995)
+            Some(1_335_715)
         ]
     );
 }
@@ -825,20 +827,20 @@ fn an_arranged_task_page_counts_the_sum_of_its_sections() {
     let counts = sections.map(|s| crate::task_section_nodes(&CLIENT, s).unwrap());
     assert_eq!(
         (crate::task_header_nodes(&CLIENT).unwrap(), counts),
-        (42_572, [183_691, 1_130_423, 312_714, 13_832, 71, 94])
+        (48_448, [209_003, 1_287_267, 356_106, 15_640, 71, 94])
     );
     let arrangement = crate::page::Arrangement { task: list(sections), project: list([]) };
     assert_eq!(
         crate::arranged_nodes(&CLIENT, 0, &arrangement),
-        Some(42_572 + 183_691 + 1_130_423 + 312_714 + 13_832 + 71 + 94)
+        Some(48_448 + 209_003 + 1_287_267 + 356_106 + 15_640 + 71 + 94)
     );
 }
 #[test]
 fn no_arrangement_keeps_each_page_bound() {
     each_page_bound_keeps_its_value_at_the_client_limits();
     let arrangement = crate::page::Arrangement::none();
-    assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_172_995));
-    assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_173_004));
+    assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_335_715));
+    assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_335_724));
 }
 
 fn most_owed_cards() -> Fixture {

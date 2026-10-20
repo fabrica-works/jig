@@ -132,7 +132,9 @@ fn context_carrier(limits: &Limits) -> Option<u64> {
 #[must_use]
 #[expect(clippy::too_many_lines, reason = "one checked sum names each retained and in-flight owner")]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
-    if limits.accounts.program_hosts < limits.fleet.configured_workers.checked_add(1)?
+    if limits.people.program_hosts < limits.fleet.configured_workers.checked_add(1)?
+        || limits.people.program_host_name_bytes < limits.fleet.worker_name_bytes
+        || limits.accounts.program_hosts < limits.fleet.configured_workers.checked_add(1)?
         || limits.people.operations > limits.tasks.tasks
         || limits.accounts.program_names > limits.fleet.program_sources
         || limits.templates == 0
@@ -422,7 +424,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             limits.accounts.program_names,
             sizeof(size_of::<accounts::Program>())?.checked_add(u64::from(accounts::NAME))?,
         )?);
-    let payload = payload.max(source_payload).max(program_payload);
+    let payload = payload.max(source_payload).max(program_payload).max(people::outcome_bytes(&limits.people)?);
     total = total.checked_add(Queue::<fleet::Request>::worst_case(fleet::max_out(&limits.fleet).checked_mul(4)?)?)?;
     total = total.checked_add(Queue::<Event>::worst_case(route.writes)?)?;
     total = total.checked_add(Queue::<Request>::worst_case(route.writes.checked_add(1)?)?)?;

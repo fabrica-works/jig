@@ -145,9 +145,14 @@ pub enum OwnerOutcome {
     AccountKeyKept {
         source: u32,
     },
+    AccountProgramDeclared {
+        source: u32,
+        name: Box<[u8]>,
+    },
     AccountChanged,
     AccountRemoved {
         confirmed: bool,
+        failed_hosts: Box<[AccountHostFailure]>,
     },
     AccountSignInStarted {
         source: u32,
@@ -156,5 +161,19 @@ pub enum OwnerOutcome {
     /// Whether the issuer confirmed the end of the LLM account sign-in.
     AccountSignedOut {
         confirmed: bool,
+        failed_hosts: Box<[AccountHostFailure]>,
     },
+}
+
+/// A configured worker that did not confirm the original operation.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct AccountHostFailure {
+    pub name: Box<[u8]>,
+    pub why: AccountHostWhy,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AccountHostWhy {
+    NotInContact,
+    Lost,
+    Failed,
 }

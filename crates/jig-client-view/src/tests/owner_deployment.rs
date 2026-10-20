@@ -1107,3 +1107,13 @@ fn deployment_renders_the_program_observation() {
         assert!(contains(&tree, word), "missing {word:?}");
     }
 }
+
+#[test]
+fn configured_names_use_their_own_byte_bound() {
+    let mut value = empty();
+    let mut host = program_host();
+    host.name = Some(vec![b'a'; 4096].into());
+    value.hosts.push(host).unwrap();
+    let limits = crate::Limits { text: 1, ..CLIENT };
+    assert!(view::required(&value, &limits, shared_words()).is_some());
+}

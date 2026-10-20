@@ -22,6 +22,8 @@ const LIMITS: Limits = Limits {
     requests: 4,
     pending: 2,
     waiters: 2,
+    program_hosts: 65,
+    program_host_name_bytes: 32,
     identity_bytes: 16,
     words: 8,
     amendment_bytes: 256,
@@ -1790,5 +1792,55 @@ fn a_restored_kept_llm_key_answer_replays_source_zero() {
     }
     assert!(test.send(Event::Restored).is_empty());
     assert!(test.d.ready());
+    assert_eq!(reply(&test.request(10, 7, ask)), Reply::Outcome(outcome));
+}
+
+#[test]
+fn a_restored_program_declaration_replays_its_name() {
+    let mut test = Test::new(LIMITS);
+    test.member();
+    let ask = Ask::AccountChange {
+        holder: AccountHolder::Own,
+        change: AccountChange::DeclareProgram { provider: 3, join: None, name: b"personal".as_slice().into() },
+    };
+    let request = route(&test.request(10, 7, ask.clone()));
+    let outcome = Outcome::AccountProgramDeclared { source: 0, name: b"personal".as_slice().into() };
+    let rows = test.send(Event::Decided { request, outcome: outcome.clone() });
+    let saved = saved_answer(&rows);
+    test.d = Domain::new(&LIMITS, Box::new([]), 2);
+    for record in [
+        Stored::Person { number: 1, identity: identity(0, 1) },
+        Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()) },
+        saved,
+    ] {
+        assert!(test.send(Event::Restore { record }).is_empty());
+    }
+    assert!(test.send(Event::Restored).is_empty());
+    assert_eq!(reply(&test.request(10, 7, ask)), Reply::Outcome(outcome));
+}
+#[test]
+fn a_restored_program_sign_out_replays_its_original_host_name() {
+    let mut test = Test::new(LIMITS);
+    test.member();
+    let ask = Ask::AccountSignOut { holder: AccountHolder::Own, source: 1 };
+    let request = route(&test.request(10, 7, ask.clone()));
+    let outcome = Outcome::AccountSignedOut {
+        confirmed: false,
+        failed_hosts: Box::new([AccountHostFailure {
+            name: b"old-worker".as_slice().into(),
+            why: AccountHostWhy::Lost,
+        }]),
+    };
+    let rows = test.send(Event::Decided { request, outcome: outcome.clone() });
+    let saved = saved_answer(&rows);
+    test.d = Domain::new(&LIMITS, Box::new([]), 2);
+    for record in [
+        Stored::Person { number: 1, identity: identity(0, 1) },
+        Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()) },
+        saved,
+    ] {
+        assert!(test.send(Event::Restore { record }).is_empty());
+    }
+    assert!(test.send(Event::Restored).is_empty());
     assert_eq!(reply(&test.request(10, 7, ask)), Reply::Outcome(outcome));
 }

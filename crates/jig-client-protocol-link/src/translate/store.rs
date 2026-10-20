@@ -160,7 +160,7 @@ pub(crate) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::P
             role: answers::held_role(value.role(), limits),
         },
         w::Ask::AccountChange(value) => {
-            c::Ask::AccountChange { holder: account_holder(value.holder()), change: account_change(value.change()) }
+            c::Ask::AccountChange { holder: account_holder(value.holder()), change: account_change(value.change())? }
         }
         w::Ask::SignIn(value) => c::Ask::SignIn { holder: account_holder(value.holder()), provider: value.provider() },
         w::Ask::SignOut(value) => c::Ask::SignOut { holder: account_holder(value.holder()), source: value.source() },
@@ -247,8 +247,22 @@ fn account_holder(value: &w::AccountHolder) -> c::AccountHolder {
     }
 }
 
-fn account_change(value: &w::AccountChange) -> c::AccountChange {
-    match value {
+fn account_change(value: &w::AccountChange) -> Result<c::AccountChange, w::Problem> {
+    Ok(match value {
+        w::AccountChange::DeclareProgram(row) => {
+            if !c::valid_program_name(row.name()) {
+                return Err(w::Problem {
+                    path: w::Path::AccountChangeDeclareProgramName,
+                    reason: skein_codec::Reason::Malformed,
+                });
+            }
+            c::AccountChange::DeclareProgram {
+                provider: row.provider(),
+                join: *row.join(),
+                name: bytes::copy_of(row.name()),
+            }
+        }
+        w::AccountChange::CheckProgram(row) => c::AccountChange::CheckProgram { source: row.source() },
         w::AccountChange::AddKey(row) => {
             c::AccountChange::AddKey { provider: row.provider(), join: *row.join(), digest: *row.digest() }
         }
@@ -281,5 +295,5 @@ fn account_change(value: &w::AccountChange) -> c::AccountChange {
                 }
             },
         },
-    }
+    })
 }

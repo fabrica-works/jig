@@ -372,6 +372,10 @@ fn account_holder(value: client::AccountHolder) -> people::AccountHolder {
 
 fn account_change(value: &client::AccountChange) -> people::AccountChange {
     match value {
+        client::AccountChange::DeclareProgram { provider, join, name } => {
+            people::AccountChange::DeclareProgram { provider: *provider, join: *join, name: name.clone() }
+        }
+        client::AccountChange::CheckProgram { source } => people::AccountChange::CheckProgram { source: *source },
         client::AccountChange::AddKey { provider, join, digest } => {
             people::AccountChange::AddKey { provider: *provider, join: *join, digest: *digest }
         }

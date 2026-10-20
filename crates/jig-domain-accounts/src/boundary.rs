@@ -240,6 +240,10 @@ pub enum Signing {
 /// The child's answer to a holder's sign-in, sign-out or account change.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
+    ProgramDeclared {
+        source: u32,
+        name: Box<[u8]>,
+    },
     KeyKept {
         source: u32,
     },
@@ -374,6 +378,8 @@ pub struct Fact {
 /// A holder's account change; an LLM key is named only by its carried number.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Change {
+    DeclareProgram { provider: u32, join: Option<u32>, name: Box<[u8]> },
+    CheckProgram { source: u32 },
     AddKey { provider: u32, join: Option<u32>, carried: u64 },
     ReplaceKey { source: u32, carried: u64 },
     RemoveKey { source: u32 },

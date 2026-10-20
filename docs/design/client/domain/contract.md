@@ -255,6 +255,14 @@ whole document can supply a replacement. Names are copied literally in
 both directions, and current availability is checked after retained-key
 lookup (`../../protocol/store.md`, 5.1).
 
+The program operations use the existing account-change request: declaration
+carries the provider, optional joined account, and portable source name; check
+carries the source number. Declaration returns that number and whole name. Check
+answers when dispatched, while inventory facts arrive on the existing watches.
+Sign-out and account removal retain the configured names of workers that failed,
+were not in contact, or lost contact; replay preserves those original names.
+Neither request carries a secret or digest.
+
 ### 3.3 An application's requests
 
 A request about an application's own object (silence this alert, extend

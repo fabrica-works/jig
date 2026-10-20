@@ -126,10 +126,17 @@ fn an_account_sign_out_is_answered_with_whether_it_was_confirmed() {
     let limits = f::wire();
     for confirmed in [false, true] {
         let expected = w::OwnerOutcome::AccountSignedOut(
-            w::OwnerOutcomeAccountSignedOut::new(&limits, w::OwnerOutcomeAccountSignedOutParts { confirmed }).unwrap(),
+            w::OwnerOutcomeAccountSignedOut::new(
+                &limits,
+                w::OwnerOutcomeAccountSignedOutParts { confirmed, failed_hosts: skein_lib::List::with_capacity(0) },
+            )
+            .unwrap(),
         );
         assert_eq!(
-            f::translated(&p::Reply::Outcome(p::Outcome::AccountSignedOut { confirmed }), &limits),
+            f::translated(
+                &p::Reply::Outcome(p::Outcome::AccountSignedOut { confirmed, failed_hosts: Box::new([]) }),
+                &limits
+            ),
             account_sign_in_done(expected, &limits)
         );
     }

@@ -1,6 +1,7 @@
 //! A party's account request between people and the accounts child (domain/people.md, 5.1;
 //! domain/accounts.md, 3.3 and section 5): people admitted it from its holder, the child decides.
 
+use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
 use jig_domain_people as people;
 
@@ -14,19 +15,28 @@ pub(super) const fn holder(holder: people::AccountHolder, person: u64) -> accoun
 
 /// The child's answer as the party's outcome. A sign-in's subject is checked at its end, a fact,
 /// so the subject's refusals (another holder's, or not well formed) are never an answer here.
-pub(super) fn outcome(answer: accounts::Answer) -> people::Outcome {
+pub(super) fn outcome(core: &crate::Core, answer: accounts::Answer) -> people::Outcome {
     let refusal = match answer {
         accounts::Answer::Started { source, address } => {
             return people::Outcome::AccountSignInStarted { source, address };
         }
-        accounts::Answer::SignedOut { confirmed, failed_hosts: _ } => {
-            return people::Outcome::AccountSignedOut { confirmed };
+        accounts::Answer::ProgramDeclared { source, name } => {
+            return people::Outcome::AccountProgramDeclared { source, name };
+        }
+        accounts::Answer::SignedOut { confirmed, failed_hosts } => {
+            return match hosts(core, failed_hosts) {
+                Ok(failed_hosts) => people::Outcome::AccountSignedOut { confirmed, failed_hosts },
+                Err(refusal) => people::Outcome::Refused(refusal),
+            };
         }
         accounts::Answer::Refused { refusal } => refusal,
         accounts::Answer::KeyKept { source } => return people::Outcome::AccountKeyKept { source },
         accounts::Answer::Done => return people::Outcome::AccountChanged,
-        accounts::Answer::Removed { confirmed, failed_hosts: _ } => {
-            return people::Outcome::AccountRemoved { confirmed };
+        accounts::Answer::Removed { confirmed, failed_hosts } => {
+            return match hosts(core, failed_hosts) {
+                Ok(failed_hosts) => people::Outcome::AccountRemoved { confirmed, failed_hosts },
+                Err(refusal) => people::Outcome::Refused(refusal),
+            };
         }
     };
     let refusal = match refusal {
@@ -46,9 +56,8 @@ pub(super) fn outcome(answer: accounts::Answer) -> people::Outcome {
         accounts::Refusal::NotKept { why: accounts::KeyFailure::TooLong } => {
             people::Refusal::Limit { which: people::LimitKind::Words }
         }
-        accounts::Refusal::Unknown => people::Refusal::Unknown,
-        accounts::Refusal::Held { .. } | accounts::Refusal::Subject => {
-            unreachable!("a subject is refused at its sign-in's end")
+        accounts::Refusal::Unknown | accounts::Refusal::Held { .. } | accounts::Refusal::Subject => {
+            people::Refusal::Unknown
         }
     };
     people::Outcome::Refused(refusal)
@@ -71,6 +80,29 @@ pub(crate) fn change(
     change: people::AccountChange,
 ) -> Result<accounts::Change, people::Refusal> {
     Ok(match change {
+        people::AccountChange::DeclareProgram { provider, join, name } => {
+            if let Some(number) = join {
+                let row = core.accounts.account(number).ok_or(people::Refusal::Unknown)?;
+                if row.holder() != holder || row.provider() != provider {
+                    return Err(people::Refusal::Unknown);
+                }
+                if let Some(uses) = row.uses() {
+                    for use_ in uses {
+                        match use_ {
+                            accounts::Use::Party(person) => payer(core, holder, true, *person)?,
+                            accounts::Use::Project(project) => {
+                                let members = core.people.project_members(*project).ok_or(people::Refusal::Unknown)?;
+                                for member in members {
+                                    payer(core, holder, true, member.person)?;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            accounts::Change::DeclareProgram { provider, join, name }
+        }
+        people::AccountChange::CheckProgram { source } => accounts::Change::CheckProgram { source },
         people::AccountChange::AddKey { .. } | people::AccountChange::ReplaceKey { .. } => {
             return Err(people::Refusal::NotOffered);
         }
@@ -122,6 +154,28 @@ fn payer(core: &crate::Core, holder: accounts::Holder, plan: bool, party: u64) -
     Ok(())
 }
 
+fn hosts(
+    core: &crate::Core,
+    hosts: Box<[accounts::ProgramHost]>,
+) -> Result<Box<[people::AccountHostFailure]>, people::Refusal> {
+    let Ok(count) = u32::try_from(hosts.len()) else {
+        return Err(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
+    };
+    let mut rows = skein_lib::List::with_capacity(count);
+    for host in hosts {
+        let name = core.fleet.worker_name(host.worker).ok_or(people::Refusal::Unknown)?;
+        let why = match host.result {
+            accounts::ProgramResult::NotInContact => people::AccountHostWhy::NotInContact,
+            accounts::ProgramResult::Lost => people::AccountHostWhy::Lost,
+            accounts::ProgramResult::Failed => people::AccountHostWhy::Failed,
+            accounts::ProgramResult::SignedOut => return Err(people::Refusal::Unknown),
+        };
+        if rows.push(people::AccountHostFailure { name: skein_lib::bytes::copy_of(name), why }).is_err() {
+            return Err(people::Refusal::Limit { which: people::LimitKind::Sources });
+        }
+    }
+    Ok(rows.into_boxed())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,10 +187,7 @@ mod tests {
             (accounts::Bound::Sources, people::LimitKind::Sources),
             (accounts::Bound::SignIns, people::LimitKind::SignIns),
         ] {
-            assert_eq!(
-                outcome(accounts::Answer::Refused { refusal: accounts::Refusal::Limit { bound } }),
-                people::Outcome::Refused(people::Refusal::Limit { which })
-            );
+            assert_eq!(limit(bound), which);
         }
     }
 }

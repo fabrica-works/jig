@@ -709,14 +709,17 @@ pub fn limits(l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
     let phrase = words.jig_capacity()?;
     let text = phrase.max(crate::literal_segment::max_bytes(l.text)?).max(64).checked_mul(2)?;
     // skein-ui still shares the external-target bound with text-run capacity.
-    let text_per_node = text.max(jig_client::contract::ACCOUNT_MANAGE_USAGE.checked_add(phrase)?);
+    let text_per_node = text
+        .max(jig_client::contract::ACCOUNT_MANAGE_USAGE.checked_add(phrase)?)
+        .max(jig_client::contract::PROGRAM_HOST_NAME);
     Some(skein_ui::Limits {
         nodes,
         depth: l.rows.checked_add(32)?,
         text_per_node,
         text_bytes: nodes
             .checked_mul(text)?
-            .checked_add(l.rows.checked_mul(2)?.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?,
+            .checked_add(l.rows.checked_mul(2)?.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?
+            .checked_add(l.rows.checked_mul(jig_client::contract::PROGRAM_HOST_NAME)?)?,
         drawing_bytes: 0,
         styles_per_node: 2,
         patches: 0,
@@ -796,7 +799,7 @@ pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<sk
     }
     for host in &value.hosts {
         if let Some(name) = &host.name
-            && name.len() > usize::try_from(l.text).ok()?
+            && crate::literal_segment::display_bytes(name)? > jig_client::contract::PROGRAM_HOST_NAME
         {
             return None;
         }
@@ -837,7 +840,7 @@ pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<sk
         }
         for source in &account.sources {
             if let Some(name) = &source.name
-                && (!jig_client::contract::valid_program_name(name) || name.len() > usize::try_from(l.text).ok()?)
+                && !jig_client::contract::valid_program_name(name)
             {
                 return None;
             }

@@ -105,7 +105,7 @@ fn decode(
             p::Ask::MakeService { project: v.project, name: v.name, role: role(v.role) }
         }
         w::Ask::AccountChange(value) => {
-            p::Ask::AccountChange { holder: account_holder(value.holder()), change: account_change(value.change()) }
+            p::Ask::AccountChange { holder: account_holder(value.holder()), change: account_change(value.change())? }
         }
         w::Ask::SignIn(value) => {
             p::Ask::AccountSignIn { holder: account_holder(value.holder()), provider: value.provider() }
@@ -550,8 +550,19 @@ fn account_holder(value: &w::AccountHolder) -> p::AccountHolder {
     }
 }
 
-fn account_change(value: &w::AccountChange) -> p::AccountChange {
-    match value {
+fn account_change(value: &w::AccountChange) -> Result<p::AccountChange, Untranslatable> {
+    Ok(match value {
+        w::AccountChange::DeclareProgram(row) => {
+            if !p::program_name(row.name()) {
+                return Err(Untranslatable { path: w::Path::AccountChangeDeclareProgramName });
+            }
+            p::AccountChange::DeclareProgram {
+                provider: row.provider(),
+                join: *row.join(),
+                name: skein_lib::bytes::copy_of(row.name()),
+            }
+        }
+        w::AccountChange::CheckProgram(row) => p::AccountChange::CheckProgram { source: row.source() },
         w::AccountChange::AddKey(row) => {
             p::AccountChange::AddKey { provider: row.provider(), join: *row.join(), digest: *row.digest() }
         }
@@ -584,5 +595,5 @@ fn account_change(value: &w::AccountChange) -> p::AccountChange {
                 }
             },
         },
-    }
+    })
 }

@@ -9,7 +9,7 @@ use jig_client::contract::{
 use skein_lib::{Wall, bytes::copy_of};
 
 fn phrase_limits() -> PhraseLimits {
-    PhraseLimits { languages: 2, phrases: 55, holes: 1, segments: 200, text_bytes: 8192, hole_bytes: 0 }
+    PhraseLimits { languages: 2, phrases: 62, holes: 1, segments: 200, text_bytes: 8192, hole_bytes: 0 }
 }
 fn words() -> Words {
     Words::new(Phrasebook::load(phrases::shapes(), Box::new([phrases::english()]), &phrase_limits()).unwrap(), 0, 0)
@@ -194,11 +194,7 @@ fn proposal_decisions_keep_both_makers_and_every_closed_choice_without_explanati
                     wanted,
                 ],
             );
-            assert_eq!(
-                tree.len(),
-                view::required(&words).unwrap().nodes,
-                "the longest outcome attains the finite node bound"
-            );
+            assert_eq!(tree.len(), 8, "all proposal facts remain visible");
         }
     }
 }
@@ -229,7 +225,7 @@ fn escalation_decisions_keep_revision_winner_clock_and_every_closed_choice() {
                 wanted,
             ],
         );
-        assert_eq!(tree.len(), view::required(&words).unwrap().nodes);
+        assert!(tree.len() <= view::required(&words).unwrap().nodes);
     }
 }
 #[test]
@@ -283,7 +279,7 @@ fn selected_outcome_language_is_checked_and_maximum_fragment_fits() {
         choice: OwnerProposalChoice::Rejected,
     };
     let tree = render(&value, &words);
-    assert_eq!(tree.len(), view::required(&words).unwrap().nodes);
+    assert!(tree.len() <= view::required(&words).unwrap().nodes);
     assert!(has(&tree, b"selected committed outcome language: 18446744073709551615"));
     assert!(has(&tree, b"selected committed outcome language: 60000000000"));
     assert!(!has(&tree, b"Rejected"));
@@ -357,7 +353,7 @@ fn normal_words_register_every_outcome_once_and_bound_the_selected_language() {
         choice: OwnerProposalChoice::Rejected,
     };
     let tree = render(&value, &words);
-    assert_eq!(tree.len(), fragment.nodes);
+    assert_eq!(tree.len(), 8);
     assert!(has(&tree, &[b'R'; 2048]));
     assert!(has(&tree, b"Proposing party: 18446744073709551615"));
     assert!(has(&tree, b"Proposal number: 17"));
@@ -403,8 +399,7 @@ fn durable_answer_rendering_keeps_every_owner_fact_within_the_existing_notice_en
         expect_lines(&tree, expected);
         assert!(tree.len() <= required.nodes);
     }
-    // The enclosing notice bound includes at least twelve nodes even with no
-    // incoming rows; the owner fragment needs eight, including its region.
+    // The enclosing notice includes the largest whole per-host outcome.
     let client = crate::Limits { rows: 0, notices: 1, ..super::cards::CLIENT };
     assert!(crate::notices_nodes(&client).unwrap() >= required.nodes + 4);
 }
@@ -437,6 +432,32 @@ fn the_account_sign_in_outcomes_say_their_phrases() {
         &[b"LLM account sign-in started"],
     );
     for confirmed in [false, true] {
-        expect_lines(&render(&OwnerOutcome::AccountSignedOut { confirmed }, &words), &[b"LLM account signed out"]);
+        expect_lines(
+            &render(&OwnerOutcome::AccountSignedOut { confirmed, failed_hosts: Box::new([]) }, &words),
+            if confirmed {
+                &[b"LLM account signed out", b"Sign-out confirmed"]
+            } else {
+                &[b"LLM account signed out", b"Sign-out not confirmed"]
+            },
+        );
     }
+}
+
+#[test]
+fn a_program_outcome_shows_its_declared_name() {
+    let tree =
+        render(&OwnerOutcome::AccountProgramDeclared { source: 0, name: b"personal".as_slice().into() }, &words());
+    assert!(has(&tree, b"personal"));
+}
+#[test]
+fn a_sign_out_outcome_shows_every_whole_host_name() {
+    use jig_client::contract::{AccountHostFailure, AccountHostWhy};
+    let mut rows = skein_lib::List::with_capacity(128);
+    for _ in 0_u32..128 {
+        rows.push(AccountHostFailure { name: Box::from([b'a'; 4096]), why: AccountHostWhy::NotInContact }).unwrap();
+    }
+    let rows = rows.into_boxed();
+    let tree = render(&OwnerOutcome::AccountSignedOut { confirmed: false, failed_hosts: rows }, &words());
+    assert_eq!(tree.len(), view::required(&words()).unwrap().nodes);
+    assert!(has(&tree, &[b'a'; 4096]));
 }

@@ -87,6 +87,8 @@ pub(super) const PEOPLE: people::Limits = people::Limits {
     room_refusals: 8,
     pending: 8,
     waiters: 4,
+    program_hosts: 9,
+    program_host_name_bytes: 32,
     identity_bytes: 1_024,
     words: 2_048,
     amendment_bytes: 8_192,

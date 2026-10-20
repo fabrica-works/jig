@@ -227,7 +227,10 @@ impl Referee<Process> for Judge {
                 {
                     assert_eq!(
                         answer,
-                        c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountSignedOut { confirmed: true }))
+                        c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountSignedOut {
+                            confirmed: true,
+                            failed_hosts: Box::new([])
+                        }))
                     );
                     client(procs).finish_account_sign_in();
                     self.phase = Phase::Closing;

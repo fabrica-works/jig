@@ -114,9 +114,16 @@ pub enum OutcomePhrase {
     AccountKeyKept,
     AccountChanged,
     AccountRemoved,
+    AccountProgramDeclared,
+    SourceNumber,
+    SignOutConfirmed,
+    SignOutUnconfirmed,
+    HostNotInContact,
+    HostLost,
+    HostFailed,
 }
 /// Every outcome phrase in stable owner order.
-pub const ALL: [OutcomePhrase; 55] = [
+pub const ALL: [OutcomePhrase; 62] = [
     OutcomePhrase::Created,
     OutcomePhrase::FirstTask,
     OutcomePhrase::LastTask,
@@ -172,6 +179,13 @@ pub const ALL: [OutcomePhrase; 55] = [
     OutcomePhrase::AccountKeyKept,
     OutcomePhrase::AccountChanged,
     OutcomePhrase::AccountRemoved,
+    OutcomePhrase::AccountProgramDeclared,
+    OutcomePhrase::SourceNumber,
+    OutcomePhrase::SignOutConfirmed,
+    OutcomePhrase::SignOutUnconfirmed,
+    OutcomePhrase::HostNotInContact,
+    OutcomePhrase::HostLost,
+    OutcomePhrase::HostFailed,
 ];
 impl OutcomePhrase {
     /// Stable identity for checked language composition.
@@ -233,12 +247,20 @@ impl OutcomePhrase {
             Self::AccountKeyKept => 6459,
             Self::AccountChanged => 6460,
             Self::AccountRemoved => 6461,
+            Self::AccountProgramDeclared => 6462,
+            Self::SourceNumber => 6463,
+            Self::SignOutConfirmed => 6464,
+            Self::SignOutUnconfirmed => 6465,
+            Self::HostNotInContact => 6466,
+            Self::HostLost => 6467,
+            Self::HostFailed => 6468,
         };
         PhraseId { owner: Owner::Jig.opaque(), number }
     }
     fn hole(self) -> Option<HoleKind> {
         match self {
-            Self::FirstTask
+            Self::SourceNumber
+            | Self::FirstTask
             | Self::LastTask
             | Self::GivenTask
             | Self::GivenAmount
@@ -260,7 +282,13 @@ impl OutcomePhrase {
             | Self::ResultsThrough
             | Self::RepliesThrough => Some(HoleKind::Number),
             Self::At => Some(HoleKind::Wall),
-            Self::Created
+            Self::AccountProgramDeclared
+            | Self::SignOutConfirmed
+            | Self::SignOutUnconfirmed
+            | Self::HostNotInContact
+            | Self::HostLost
+            | Self::HostFailed
+            | Self::Created
             | Self::Compound
             | Self::MarkedSeen
             | Self::NoteEdited
@@ -299,7 +327,7 @@ impl OutcomePhrase {
 /// Phrase contracts independent of the selected language's word order.
 #[must_use]
 pub fn shapes() -> Box<[PhraseShape]> {
-    let mut values = List::with_capacity(55);
+    let mut values = List::with_capacity(62);
     for phrase in ALL {
         let holes: Box<[HoleShape]> = match phrase.hole() {
             Some(kind) => Box::new([HoleShape { kind, bytes: 0 }]),
@@ -312,7 +340,7 @@ pub fn shapes() -> Box<[PhraseShape]> {
 /// Explicit English data for composition, never a rendering fallback.
 #[must_use]
 pub fn english() -> Language {
-    let mut values = List::with_capacity(55);
+    let mut values = List::with_capacity(62);
     for phrase in ALL {
         let text: &[u8] = match phrase {
             OutcomePhrase::Created => b"Tasks created",
@@ -369,6 +397,14 @@ pub fn english() -> Language {
             OutcomePhrase::AccountKeyKept => b"LLM account key kept",
             OutcomePhrase::AccountChanged => b"LLM account changed",
             OutcomePhrase::AccountRemoved => b"LLM account removed",
+            OutcomePhrase::AccountProgramDeclared => b"Program login declared",
+            OutcomePhrase::SourceNumber => b"Login source: ",
+            OutcomePhrase::SignOutConfirmed => b"Sign-out confirmed",
+            OutcomePhrase::SignOutUnconfirmed => b"Sign-out not confirmed",
+            OutcomePhrase::HostNotInContact => b"Not signed out (not in contact):",
+            OutcomePhrase::HostLost => b"Not signed out (lost contact):",
+            OutcomePhrase::HostFailed => b"Not signed out (failed):",
+
             OutcomePhrase::AccountSignedOut => b"LLM account signed out",
         };
         let segments: Box<[Segment]> = match phrase.hole() {

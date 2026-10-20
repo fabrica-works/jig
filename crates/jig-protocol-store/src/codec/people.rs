@@ -29,6 +29,11 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     let people = &domain.people;
     let authority = &domain.authority;
     let mut limits = wire::Limits {
+        account_change_declare_program_name: 32,
+        account_host_failure_name: people.program_host_name_bytes,
+        outcome_account_program_declared_name: 32,
+        outcome_account_signed_out_failed_hosts: people.program_hosts,
+        outcome_account_removed_failed_hosts: people.program_hosts,
         account_change_add_key_digest: 32,
         account_change_replace_key_digest: 32,
         account_change_set_uses_uses_some: domain::USES
@@ -497,3 +502,5 @@ fn derive_amendment(domain: &core::Limits, limits: &mut wire::Limits) -> Option<
         piece_bound(people.amendment_bytes, size_of::<u64>(), wire::Number64::worst_case_bytes(&EMPTY)?, false)?;
     Some(())
 }
+
+mod account_hosts;

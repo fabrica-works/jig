@@ -549,6 +549,7 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountProgramDeclared { .. }
         | Outcome::AccountKeyKept { .. }
         | Outcome::AccountChanged
         | Outcome::AccountRemoved { .. }
@@ -1072,6 +1073,9 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
             Seen::Results { .. } => true,
             Seen::Conversation { task, .. } => *task != 0,
         },
+        Ask::AccountChange { change: crate::AccountChange::DeclareProgram { name, .. }, .. } => {
+            crate::program_name(name)
+        }
         Ask::AccountChange { change: crate::AccountChange::SetUses { uses: Some(uses), .. }, .. } => {
             uses.len() <= usize::try_from(crate::USES).expect("account uses fit usize")
                 && match uses.len().checked_mul(size_of::<crate::Use>()) {
@@ -1257,6 +1261,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         AccountSignIn,
         AccountSignOut,
         AccountKey,
+        AccountProgram,
         AccountChanged,
         AccountRemoved,
     }
@@ -1303,8 +1308,10 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::AccountSignOut { .. } => Expected::AccountSignOut,
         Ask::AccountChange { change, .. } => match change {
             crate::AccountChange::AddKey { .. } | crate::AccountChange::ReplaceKey { .. } => Expected::AccountKey,
+            crate::AccountChange::DeclareProgram { .. } => Expected::AccountProgram,
             crate::AccountChange::Remove { .. } => Expected::AccountRemoved,
-            crate::AccountChange::RemoveKey { .. }
+            crate::AccountChange::CheckProgram { .. }
+            | crate::AccountChange::RemoveKey { .. }
             | crate::AccountChange::Resume { .. }
             | crate::AccountChange::MoveAccount { .. }
             | crate::AccountChange::MoveSource { .. }
@@ -1351,6 +1358,16 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::PoolSet { project, person } => expected == Expected::Pool(project, person),
         Outcome::EscalationDecided { .. } => expected == Expected::Escalation,
         Outcome::AccountSignInStarted { .. } => expected == Expected::AccountSignIn,
+        Outcome::AccountProgramDeclared { source, name } => {
+            if expected != Expected::AccountProgram || source == u32::MAX || !crate::program_name(&name) {
+                return false;
+            }
+            let Ask::AccountChange { change: crate::AccountChange::DeclareProgram { name: asked, .. }, .. } = ask
+            else {
+                return false;
+            };
+            *asked == name
+        }
         Outcome::AccountKeyKept { source } => expected == Expected::AccountKey && source != u32::MAX,
         Outcome::AccountChanged => expected == Expected::AccountChanged,
         Outcome::AccountRemoved { .. } => expected == Expected::AccountRemoved,
@@ -1555,6 +1572,7 @@ pub(super) fn answer_decided(
         | Outcome::EscalationDecided { .. }
         | Outcome::ProposalDecided { .. }
         | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountProgramDeclared { .. }
         | Outcome::AccountKeyKept { .. }
         | Outcome::AccountChanged
         | Outcome::AccountRemoved { .. }
@@ -1605,6 +1623,7 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
         Stored::Answer { key, ask, models, outcome, at } => {
             valid_ask(&env.limits, ask)
                 && crate::valid_model_context(ask, models)
+                && valid_program_outcome(&env.limits, outcome)
                 && valid_answer_shape(ask, outcome.clone())
                 && !domain.answers.contains_key(key)
                 && (answer_expiry(*at, &env.limits) <= env.wall || domain.answers.len() < env.limits.requests)
@@ -1756,6 +1775,7 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::EscalationDecided { .. }
             | Outcome::ProposalDecided { .. }
             | Outcome::AccountSignInStarted { .. }
+            | Outcome::AccountProgramDeclared { .. }
             | Outcome::AccountKeyKept { .. }
             | Outcome::AccountChanged
             | Outcome::AccountRemoved { .. }
@@ -1953,4 +1973,60 @@ pub fn application_part_done(domain: &mut Domain, request: Token) {
     if let Some(flight) = domain.pending.get_mut(Id::from_token(request)) {
         flight.part = None;
     }
+}
+
+fn valid_program_outcome(limits: &Limits, outcome: &Outcome) -> bool {
+    let (confirmed, rows) = match outcome {
+        Outcome::AccountSignedOut { confirmed, failed_hosts } | Outcome::AccountRemoved { confirmed, failed_hosts } => {
+            (*confirmed, failed_hosts)
+        }
+        Outcome::AccountProgramDeclared { name, .. } => return crate::program_name(name),
+        Outcome::Compound { .. }
+        | Outcome::CompoundRefused { .. }
+        | Outcome::MarkedSeen { .. }
+        | Outcome::Applied { .. }
+        | Outcome::NoteEdited { .. }
+        | Outcome::ServiceMade { .. }
+        | Outcome::Adopted { .. }
+        | Outcome::Created { .. }
+        | Outcome::Proposed { .. }
+        | Outcome::Withdrawn { .. }
+        | Outcome::Stopped { .. }
+        | Outcome::Cancelled { .. }
+        | Outcome::Released { .. }
+        | Outcome::PersonTaken { .. }
+        | Outcome::PersonHandedBack { .. }
+        | Outcome::PersonAnswered { .. }
+        | Outcome::Moved { .. }
+        | Outcome::ProposalDecided { .. }
+        | Outcome::Said { .. }
+        | Outcome::QuestionAnswered { .. }
+        | Outcome::Amended { .. }
+        | Outcome::RolesSet { .. }
+        | Outcome::PolicyChanged { .. }
+        | Outcome::PoolSet { .. }
+        | Outcome::EscalationDecided { .. }
+        | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountKeyKept { .. }
+        | Outcome::AccountChanged
+        | Outcome::SignedOut
+        | Outcome::Again(_)
+        | Outcome::Refused(_) => return true,
+    };
+    if rows.len() > usize::try_from(limits.program_hosts).unwrap_or(0) || confirmed && !rows.is_empty() {
+        return false;
+    }
+    for at in 0..rows.len() {
+        let Some(row) = rows.get(at) else { return false };
+        if row.name.len() > usize::try_from(limits.program_host_name_bytes).unwrap_or(0) {
+            return false;
+        }
+        let Some(prefix) = rows.get(..at) else { return false };
+        for earlier in prefix {
+            if earlier.name == row.name {
+                return false;
+            }
+        }
+    }
+    true
 }

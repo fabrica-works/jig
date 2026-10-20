@@ -217,20 +217,35 @@ fn owner(value: &p::Outcome, limits: &w::Limits) -> Result<w::OwnerOutcome, w::P
                 },
             )?)
         }
-        p::Outcome::AccountSignedOut { confirmed } => {
+        p::Outcome::AccountSignedOut { confirmed, failed_hosts } => {
             w::OwnerOutcome::AccountSignedOut(w::OwnerOutcomeAccountSignedOut::new(
                 limits,
-                w::OwnerOutcomeAccountSignedOutParts { confirmed: *confirmed },
+                w::OwnerOutcomeAccountSignedOutParts {
+                    confirmed: *confirmed,
+                    failed_hosts: super::account_hosts::encode(failed_hosts, limits)?,
+                },
             )?)
         }
         p::Outcome::AccountKeyKept { source } => w::OwnerOutcome::AccountKeyKept(w::OwnerOutcomeAccountKeyKept::new(
             limits,
             w::OwnerOutcomeAccountKeyKeptParts { source: *source },
         )?),
+        p::Outcome::AccountProgramDeclared { source, name } => {
+            w::OwnerOutcome::AccountProgramDeclared(w::OwnerOutcomeAccountProgramDeclared::new(
+                limits,
+                w::OwnerOutcomeAccountProgramDeclaredParts { source: *source, name: name.clone() },
+            )?)
+        }
         p::Outcome::AccountChanged => w::OwnerOutcome::AccountChanged,
-        p::Outcome::AccountRemoved { confirmed } => w::OwnerOutcome::AccountRemoved(
-            w::OwnerOutcomeAccountRemoved::new(limits, w::OwnerOutcomeAccountRemovedParts { confirmed: *confirmed })?,
-        ),
+        p::Outcome::AccountRemoved { confirmed, failed_hosts } => {
+            w::OwnerOutcome::AccountRemoved(w::OwnerOutcomeAccountRemoved::new(
+                limits,
+                w::OwnerOutcomeAccountRemovedParts {
+                    confirmed: *confirmed,
+                    failed_hosts: super::account_hosts::encode(failed_hosts, limits)?,
+                },
+            )?)
+        }
         p::Outcome::CompoundRefused { .. }
         | p::Outcome::Applied { .. }
         | p::Outcome::Again(_)

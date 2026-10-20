@@ -97,6 +97,8 @@ pub(super) fn limits() -> Limits {
         requests: 4,
         pending: 2,
         waiters: 2,
+        program_hosts: 65,
+        program_host_name_bytes: 32,
         identity_bytes: 32,
         words: 64,
         amendment_bytes: 512,
@@ -3089,3 +3091,16 @@ mod coverage;
 mod run_choice;
 
 mod account_admission;
+
+#[test]
+fn outcomes_reserve_one_more_than_configured_workers() {
+    let mut limits = limits();
+    limits.people.program_hosts = limits.fleet.configured_workers;
+    assert_eq!(worst_case(&limits), None);
+}
+#[test]
+fn outcome_names_cover_the_configured_name_bound() {
+    let mut limits = limits();
+    limits.people.program_host_name_bytes = limits.fleet.worker_name_bytes - 1;
+    assert_eq!(worst_case(&limits), None);
+}

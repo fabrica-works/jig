@@ -156,6 +156,12 @@ impl Payload for Ask {
             Self::Create { tasks, .. } => tasks.heap(bounds),
             Self::Propose { action, reason, .. } => sum(&[action.heap(bounds), reason.heap(bounds)]),
             Self::AccountChange { change, .. } => match change {
+                jig_client_domain::contract::AccountChange::DeclareProgram { name, .. } => {
+                    if !jig_client_domain::contract::valid_program_name(name) {
+                        return None;
+                    }
+                    u64::try_from(name.len()).ok()
+                }
                 jig_client_domain::contract::AccountChange::SetUses { uses: Some(uses), .. } => {
                     if uses.len()
                         > usize::try_from(jig_client_domain::contract::ACCOUNT_USES).expect("account uses bound fits")
@@ -165,7 +171,8 @@ impl Payload for Ask {
                     u64::try_from(uses.len() * core::mem::size_of::<jig_client_domain::contract::OwnerAccountUse>())
                         .ok()
                 }
-                jig_client_domain::contract::AccountChange::AddKey { .. }
+                jig_client_domain::contract::AccountChange::CheckProgram { .. }
+                | jig_client_domain::contract::AccountChange::AddKey { .. }
                 | jig_client_domain::contract::AccountChange::ReplaceKey { .. }
                 | jig_client_domain::contract::AccountChange::RemoveKey { .. }
                 | jig_client_domain::contract::AccountChange::Resume { .. }

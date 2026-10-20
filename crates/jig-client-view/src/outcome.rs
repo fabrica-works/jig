@@ -39,6 +39,7 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
             | OwnerOutcome::Amended { .. }
             | OwnerOutcome::RolesSet { .. }
             | OwnerOutcome::PolicyChanged { .. }
+            | OwnerOutcome::AccountProgramDeclared { .. }
             | OwnerOutcome::AccountKeyKept { .. }
             | OwnerOutcome::AccountChanged
             | OwnerOutcome::AccountRemoved { .. }

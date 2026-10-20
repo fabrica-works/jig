@@ -280,7 +280,7 @@ fn every_owner_outcome_remains_whole_on_its_original_card_after_duplicate_termin
         O::PolicyChanged { project: 132 },
         O::PoolSet { project: 133, person: 134 },
         O::AccountSignInStarted { source: 135, address: b"http://issuer/visit".as_slice().into() },
-        O::AccountSignedOut { confirmed: true },
+        O::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) },
         O::EscalationDecided {
             task: 135,
             revision: Revision { value: 136 },

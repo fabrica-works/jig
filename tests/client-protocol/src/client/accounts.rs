@@ -138,3 +138,36 @@ impl Story {
         )));
     }
 }
+
+impl Story {
+    /// Public program requests have no secret-bearing component below accounts.
+    #[must_use]
+    pub fn program_sources(seed: u64) -> Self {
+        let mut config = jig_core_world::world::config(seed);
+        config.core.worker_names = Box::new([b"unavailable".as_slice().into()]);
+        config.core.settings.llm_providers = accounts::Providers {
+            providers: Box::new([accounts::Provider {
+                number: 3,
+                name: b"Fake".as_slice().into(),
+                signed_in_plan: false,
+                manage_usage: Some(b"https://usage.example/".as_slice().into()),
+                models: Box::new([]),
+                offers: accounts::Offers {
+                    sign_in: false,
+                    key: false,
+                    programs: Box::new([b"claude_code".as_slice().into()]),
+                },
+            }]),
+        };
+        let mut limits = fixtures::owner_limits();
+        limits.core.people.sign_ins = 3;
+        limits.core.accounts.accounts = 2;
+        limits.core.accounts.holder_accounts = 2;
+        limits.core.people.requests = 8;
+        let mut story =
+            Self::configured_peers(seed, &limits, config, jig_core_world::peers::Peers::new(Vec::new(), Vec::new()));
+        story.sign_in();
+        assert!(story.run_until(|s| s.client.link().state == client::Link::Live, Duration::from_secs(1)));
+        story
+    }
+}

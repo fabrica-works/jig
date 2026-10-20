@@ -11,6 +11,10 @@ use skein_lib::{Deadlines, Duration, Id, List, Map, Queue, Slab, Wall};
 /// outputs; validate via `worst_case` before construction. (domain/people.md, sections 2–5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
+    /// Configured workers plus the engine host in one retained program outcome.
+    pub program_hosts: u32,
+    /// Whole configured worker name bytes in retained operation answers.
+    pub program_host_name_bytes: u32,
     /// Maximum members of one requested or proposed batch.
     pub batch: u32,
     /// Maximum task operations in one keyed compound request.
@@ -72,10 +76,19 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     limits.waiters.checked_add(2)?;
     limits.sign_ins.checked_add(1)?;
     limits.holdings.checked_add(1)?;
-    if limits.waiters == 0 || limits.sign_in_lifetime == Duration::ZERO || limits.request_retention == Duration::ZERO {
+    if limits.program_hosts == 0
+        || limits.program_hosts > 128
+        || limits.program_host_name_bytes == 0
+        || limits.program_host_name_bytes > 4096
+        || limits.waiters == 0
+        || limits.sign_in_lifetime == Duration::ZERO
+        || limits.request_retention == Duration::ZERO
+    {
         return None;
     }
     let ask_bytes = ask_bytes(limits)?;
+    // One local copy validates a restored answer while its retained names remain owned.
+    let host_copy = host_outcome_bytes(limits)?;
     let people = Map::<u64, Identity>::worst_case(limits.people)?
         .checked_add(Map::<IdentityKey, u64>::worst_case(limits.people)?)?
         .checked_add(u64::from(limits.people).checked_mul(u64::from(limits.identity_bytes).checked_mul(2)?)?)?;
@@ -93,6 +106,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<crate::Whom>::worst_case(waiting_recipients)?)?
         .checked_add(List::<crate::Entry>::worst_case(limits.inbox_entries)?)?;
     people
+        .checked_add(host_copy)?
         .checked_add(
             u64::from(limits.amendment_bytes)
                 .checked_add(u64::try_from(size_of::<crate::Amendment>()).ok()?)?
@@ -141,8 +155,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Deadlines::<u64>::worst_case(limits.sign_ins)?)?
         .checked_add(Map::<RequestKey, Answered>::worst_case(limits.requests)?)?
         .checked_add(Deadlines::<RequestKey>::worst_case(limits.requests)?)?
-        // Each retained account sign-in answer may own its longest visit address.
-        .checked_add(u64::from(limits.requests).checked_mul(ask_bytes.checked_add(u64::from(crate::ADDRESS))?)?)?
+        // Each retained answer owns its longest visit address or configured-host failure list.
+        .checked_add(u64::from(limits.requests).checked_mul(ask_bytes.checked_add(outcome_bytes(limits)?)?)?)?
         .checked_add(Slab::<Pending>::worst_case(limits.pending)?)?
         .checked_add(Map::<RequestKey, Id<Pending>>::worst_case(limits.pending)?)?
         .checked_add(u64::from(limits.pending).checked_mul(List::<skein_lib::ReplyTo>::worst_case(limits.waiters)?)?)?
@@ -174,4 +188,17 @@ pub(crate) fn ask_bytes(limits: &Limits) -> Option<u64> {
     .max(u64::from(limits.amendment_bytes))
     .max(u64::from(limits.holdings).checked_mul(u64::try_from(size_of::<Holding>()).ok()?)?)
     .checked_add(crate::model_names_worst_case()?)
+}
+
+/// Retained operation answers own configured names, not observed login inventory.
+#[must_use]
+pub fn outcome_bytes(limits: &Limits) -> Option<u64> {
+    Some(host_outcome_bytes(limits)?.max(u64::from(crate::ADDRESS)).max(32))
+}
+fn host_outcome_bytes(limits: &Limits) -> Option<u64> {
+    u64::from(limits.program_hosts).checked_mul(
+        u64::try_from(size_of::<crate::AccountHostFailure>())
+            .ok()?
+            .checked_add(u64::from(limits.program_host_name_bytes))?,
+    )
 }

@@ -352,6 +352,8 @@ pub const PEOPLE_LIMITS: people::Limits = people::Limits {
     room_refusals: 2,
     pending: 2,
     waiters: 2,
+    program_hosts: 65,
+    program_host_name_bytes: 32,
     identity_bytes: 32,
     words: 32,
     amendment_bytes: 512,

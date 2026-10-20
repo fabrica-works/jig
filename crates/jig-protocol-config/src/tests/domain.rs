@@ -317,8 +317,11 @@ fn memory_below_the_components_sum_is_refused() {
     // max(128, 768, 4600): 10 HostViews * (48 - 40) = 80 of those bytes.
     // Program documents have their own explicit bound but remain below the
     // pre-existing largest document envelope; routed and journal caps are unchanged.
-    // Total y1b delta: 114,476 + 416 = 114,892 over main.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_463_843 });
+    // Public answer validation adds one host-name scratch copy:
+    // (8 configured workers + 1 engine) * (24-byte carrier + 32-byte name) = 504.
+    // Retained answers take max(9 * 56, 2,048 visit bytes), so that term is unchanged.
+    // Total y1b delta: 114,476 + 416 + 504 = 115,396 over main.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_464_347 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

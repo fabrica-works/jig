@@ -119,7 +119,7 @@ fn a_party_s_account_sign_in_is_answered_at_its_visit_and_sign_out_at_its_end() 
     let confirmed = Event::Account(accounts::Event::SignedOut { source, confirmed: true });
     assert_eq!(
         stepped(&mut core, &env, confirmed),
-        (None, Some(people::Outcome::AccountSignedOut { confirmed: true }))
+        (None, Some(people::Outcome::AccountSignedOut { confirmed: true, failed_hosts: Box::new([]) }))
     );
 }
 
@@ -268,6 +268,15 @@ fn program_sign_out_routes_the_offline_member_result() {
             &env,
             ask(77, people::Ask::AccountSignOut { holder: people::AccountHolder::Own, source: 21 })
         ),
-        (None, Some(people::Outcome::AccountSignedOut { confirmed: false }))
+        (
+            None,
+            Some(people::Outcome::AccountSignedOut {
+                confirmed: false,
+                failed_hosts: Box::new([people::AccountHostFailure {
+                    name: b"offline".as_slice().into(),
+                    why: people::AccountHostWhy::NotInContact
+                }])
+            })
+        )
     );
 }

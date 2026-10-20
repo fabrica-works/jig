@@ -68,7 +68,8 @@ fn a_sign_out_is_answered_with_confirmed() {
     assert_eq!(
         answered(&mut story, SECOND),
         vec![Outcome::Answered(Answered::Jig(c::Answer::Done(c::Outcome::Owner(c::OwnerOutcome::AccountSignedOut {
-            confirmed: true
+            confirmed: true,
+            failed_hosts: Box::new([])
         }))))]
     );
 }

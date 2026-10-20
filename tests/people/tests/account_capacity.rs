@@ -165,3 +165,18 @@ fn account_waiter_pressure_names_its_cause() {
     }
     settle(world);
 }
+
+#[test]
+fn program_requests_classify_as_account_changes() {
+    for change in [
+        AccountChange::DeclareProgram { provider: PROVIDER, join: None, name: b"personal".as_slice().into() },
+        AccountChange::CheckProgram { source: SOURCE },
+    ] {
+        let (world, _) = refused(LimitKind::Sources, Ask::AccountChange { holder: AccountHolder::Own, change });
+        assert_eq!(
+            world.capacity_refusals().get(0).expect("one content-free room refusal").action,
+            CapacityAction::AccountChange
+        );
+        world.assert_settled();
+    }
+}

@@ -290,10 +290,18 @@ impl Story {
         Self::configured(seed, limits, jig_core_world::world::config(seed))
     }
     fn configured(seed: u64, limits: &jig_test_domain::Limits, config: jig_test_domain::Config) -> Self {
+        Self::configured_peers(seed, limits, config, fixtures::peers())
+    }
+    fn configured_peers(
+        seed: u64,
+        limits: &jig_test_domain::Limits,
+        config: jig_test_domain::Config,
+        peers: jig_core_world::peers::Peers,
+    ) -> Self {
         let mut story = Self {
             front: Front::new(seed),
             second: None,
-            engine: Engine::configured(seed, limits, config),
+            engine: Engine::with_peers(seed, limits, config, peers),
             net: Net::new(seed),
             now: Time::ZERO,
             seen: Vec::new(),

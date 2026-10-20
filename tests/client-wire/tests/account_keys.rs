@@ -72,8 +72,11 @@ fn all_eight_account_changes_and_their_outcomes_round_trip() {
         ),
         OwnerOutcome::AccountChanged,
         OwnerOutcome::AccountRemoved(
-            OwnerOutcomeAccountRemoved::new(&CEILINGS, OwnerOutcomeAccountRemovedParts { confirmed: true })
-                .expect("bounded account wire fixture"),
+            OwnerOutcomeAccountRemoved::new(
+                &CEILINGS,
+                OwnerOutcomeAccountRemovedParts { confirmed: true, failed_hosts: skein_lib::List::with_capacity(0) },
+            )
+            .expect("bounded account wire fixture"),
         ),
     ] {
         let mut out = Writer::new(usize::try_from(outcome.measure()).expect("measured outcome fits"));

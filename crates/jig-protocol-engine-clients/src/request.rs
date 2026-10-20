@@ -208,7 +208,9 @@ fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
     match change {
         w::AccountChange::AddKey(row) => Some(*row.digest()),
         w::AccountChange::ReplaceKey(row) => Some(*row.digest()),
-        w::AccountChange::RemoveKey(_)
+        w::AccountChange::DeclareProgram(_)
+        | w::AccountChange::CheckProgram(_)
+        | w::AccountChange::RemoveKey(_)
         | w::AccountChange::Resume(_)
         | w::AccountChange::Remove(_)
         | w::AccountChange::MoveAccount(_)
