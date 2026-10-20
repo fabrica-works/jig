@@ -25,7 +25,7 @@ pub(crate) fn rules(
 ) -> Option<authority::Rules> {
     let mut object = check::object(document, at, path, problems)?;
     let at = object.required(document, b"ceiling", path, problems);
-    let ceiling = value(document, at, &path.member(b"ceiling"), limits, Some(configured), problems);
+    let ceiling = value(document, at, &path.member(b"ceiling"), limits, configured, problems);
     let period_spend = check::integer(&mut object, document, b"period_spend", path, problems);
     let minimum_run_spend = check::integer(&mut object, document, b"minimum_run_spend", path, problems);
     let maximum_run_spend = check::integer(&mut object, document, b"maximum_run_spend", path, problems);
@@ -130,10 +130,10 @@ fn policy(
     let escalation = check::optional(&mut object, document, b"escalation_role", path, problems);
     let escalation_role = optional_count(escalation, &path.member(b"escalation_role"), problems);
     let at = object.required(document, b"ceiling", path, problems);
-    let ceiling = value(document, at, &path.member(b"ceiling"), limits, Some(configured), problems);
+    let ceiling = value(document, at, &path.member(b"ceiling"), limits, configured, problems);
     let projections = grants(&mut object, document, b"projections", path, limits, problems);
     let period_spend = check::integer(&mut object, document, b"period_spend", path, problems);
-    let roles = roles(&mut object, document, path, limits, problems);
+    let roles = roles(&mut object, document, path, limits, configured, problems);
     let requirements = requirements(&mut object, document, path, limits, problems);
     object.finish(document, path, problems);
     Some((
@@ -153,6 +153,7 @@ fn roles(
     document: &Document,
     path: &Path,
     limits: &authority::Limits,
+    configured: &[Model],
     problems: &mut Problems,
 ) -> Option<Box<[authority::Role]>> {
     let items = check::list(object, document, b"roles", limits.roles, path, problems)?;
@@ -162,7 +163,7 @@ fn roles(
         let Some(mut object) = check::object(document, *at, &path, problems) else { continue };
         let number = check::count(&mut object, document, b"number", &path, problems);
         let at = object.required(document, b"authority", &path, problems);
-        let authority = value(document, at, &path.member(b"authority"), limits, None, problems);
+        let authority = value(document, at, &path.member(b"authority"), limits, configured, problems);
         let period_spend = check::integer(&mut object, document, b"period_spend", &path, problems);
         let requests = check::short(&mut object, document, b"requests", &path, problems);
         let decides = check::short(&mut object, document, b"decides", &path, problems);
@@ -197,22 +198,18 @@ fn roles(
     }
     Some(roles.into_boxed())
 }
-/// An authority's form. A ceiling, given the configured models, may name fewer of them; a role's
-/// names no models yet, and so narrows none.
+/// An authority's form, a ceiling's or a role's: either may name fewer of the configured models.
 fn value(
     document: &Document,
     at: Option<u32>,
     path: &Path,
     limits: &authority::Limits,
-    configured: Option<&[Model]>,
+    configured: &[Model],
     problems: &mut Problems,
 ) -> Option<authority::Authority> {
     let mut object = check::object(document, at?, path, problems)?;
     let tools = check::integer(&mut object, document, b"tools", path, problems);
-    let models = match configured {
-        Some(configured) => models(&mut object, document, path, configured, problems),
-        None => Some(authority::Models::ALL),
-    };
+    let models = models(&mut object, document, path, configured, problems);
     let grants = grants(&mut object, document, b"grants", path, limits, problems);
     let at = object.required(document, b"delegation", path, problems);
     let delegation = delegation(document, at, &path.member(b"delegation"), limits, problems);
@@ -235,7 +232,7 @@ fn value(
         note_resources: note_resources?,
     })
 }
-/// The configured models a ceiling's `models` names, one bit each in configuration's order;
+/// The configured models an authority's `models` names, one bit each in configuration's order;
 /// absent, every configured model.
 fn models(
     object: &mut read::Object,

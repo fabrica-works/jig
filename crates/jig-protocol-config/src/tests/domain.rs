@@ -191,8 +191,41 @@ fn a_ceiling_naming_a_model_twice_is_refused() {
         What::Unique,
     );
 }
-fn a_roles_models_member_is_refused_as_unknown() {
-    refuses(br#""authority": {"tools": 1023,"#, br#""authority": {"tools": 1023, "models": ["small"],"#, What::Unknown);
+const ROLE: &[u8] = br#""authority": {"tools": 1023,"#;
+const NAMED: &[u8] = br#""authority": {"tools": 1023, "models": "#;
+fn role_models(models: &[u8]) -> Result<crate::Engine, crate::Problems> {
+    let mut writer = skein_lib::Writer::new(NAMED.len().checked_add(models.len()).unwrap().checked_add(1).unwrap());
+    writer.put(NAMED).unwrap();
+    writer.put(models).unwrap();
+    writer.put(b",").unwrap();
+    fixtures::engine(&fixtures::with(fixtures::ENGINE_SMALL, ROLE, &writer.finish()))
+}
+fn role(engine: &crate::Engine) -> jig_domain_authority::Models {
+    engine.projects[0].policy.roles[0].authority.models
+}
+fn role_models_path(index: usize) -> crate::Path {
+    fixtures::path(&[b"projects"])
+        .child(crate::Segment::Index(0))
+        .member(b"policy")
+        .member(b"roles")
+        .child(crate::Segment::Index(0))
+        .member(b"authority")
+        .member(b"models")
+        .child(crate::Segment::Index(u32::try_from(index).unwrap()))
+}
+#[test]
+fn a_roles_models_name_the_configured_models_it_keeps() {
+    assert_eq!(role(&engine()), jig_domain_authority::Models(0b1), "absent names every configured model");
+    assert_eq!(role(&role_models(br#"["small"]"#).unwrap()), jig_domain_authority::Models(0b1));
+    assert_eq!(role(&role_models(b"[]").unwrap()), jig_domain_authority::Models::NONE);
+}
+fn a_role_naming_an_unknown_model_is_refused() {
+    let problems = role_models(br#"["large"]"#).unwrap_err();
+    assert_eq!(problems.problems.get(0), Some(&crate::Problem { path: role_models_path(0), what: What::Refers }));
+}
+fn a_role_naming_a_model_twice_is_refused() {
+    let problems = role_models(br#"["small", "small"]"#).unwrap_err();
+    assert_eq!(problems.problems.get(0), Some(&crate::Problem { path: role_models_path(1), what: What::Unique }));
 }
 #[test]
 fn each_owner_owns_every_seeded_project() {
@@ -296,7 +329,8 @@ fn domain_configuration_problems_name_the_invalid_fields() {
         ),
         ("a_ceiling_naming_an_unknown_model_is_refused", a_ceiling_naming_an_unknown_model_is_refused),
         ("a_ceiling_naming_a_model_twice_is_refused", a_ceiling_naming_a_model_twice_is_refused),
-        ("a_roles_models_member_is_refused_as_unknown", a_roles_models_member_is_refused_as_unknown),
+        ("a_role_naming_an_unknown_model_is_refused", a_role_naming_an_unknown_model_is_refused),
+        ("a_role_naming_a_model_twice_is_refused", a_role_naming_a_model_twice_is_refused),
     ]);
 }
 
