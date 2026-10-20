@@ -414,12 +414,46 @@ pub(super) fn remember_due(core: &mut Core, context: Box<tasks::RunContext>) {
     core.due.push(context);
 }
 
+/// Determine the concerned party before the step removes an ended sign-in.
+fn account_party(core: &Core, event: &accounts::Event) -> Option<u64> {
+    match event {
+        accounts::Event::SignIn { by, .. } => Some(*by),
+        accounts::Event::SignedIn { source, .. } | accounts::Event::SignInFailed { source, .. } => {
+            for pending in &core.accounts.pending() {
+                if pending.source == *source {
+                    return match pending.holder {
+                        accounts::Holder::Party(_) => Some(pending.by),
+                        accounts::Holder::Deployment => None,
+                    };
+                }
+            }
+            None
+        }
+        accounts::Event::SignOut { holder, .. } => match holder {
+            accounts::Holder::Party(party) => Some(*party),
+            accounts::Holder::Deployment => None,
+        },
+        accounts::Event::Restore { .. }
+        | accounts::Event::Want
+        | accounts::Event::Component(_)
+        | accounts::Event::Unauthorized { .. }
+        | accounts::Event::Limited { .. }
+        | accounts::Event::Refused { .. }
+        | accounts::Event::RunFailed { .. }
+        | accounts::Event::Resume { .. }
+        | accounts::Event::Credential { .. }
+        | accounts::Event::SignedOut { .. }
+        | accounts::Event::Close => None,
+    }
+}
+
 pub(super) fn route_account(
     core: &mut Core,
     env: &Env<Limits>,
     work: &mut Queue<Event>,
     event: accounts::Event,
 ) -> Requests {
+    let party = account_party(core, &event);
     let mut out = Queue::with_capacity(accounts::max_out(&env.limits.accounts));
     accounts::step(
         &mut core.accounts,
@@ -428,6 +462,7 @@ pub(super) fn route_account(
         &mut out,
     );
     core.touch_deployment();
+    core.touch_accounts(party);
     tag_account(core, env, work, out)
 }
 

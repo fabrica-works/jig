@@ -104,6 +104,35 @@ impl Core {
         }
     }
 
+    /// An asker's own sign-in, or shared source state that can serve every party.
+    pub(crate) fn touch_accounts(&mut self, party: Option<u64>) {
+        for (_, binding) in &self.view_subjects {
+            let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
+            let touched = match subject {
+                Subject::Accounts { party: owner } => party.is_none() || party == Some(*owner),
+                Subject::Application { .. }
+                | Subject::Frame { .. }
+                | Subject::Task { .. }
+                | Subject::Tree { .. }
+                | Subject::Chips { .. }
+                | Subject::Inbox { .. }
+                | Subject::Query { .. }
+                | Subject::Run { .. }
+                | Subject::Deployment
+                | Subject::Proposal { .. }
+                | Subject::Escalation { .. }
+                | Subject::Question { .. }
+                | Subject::PersonTask { .. }
+                | Subject::Result { .. }
+                | Subject::Project { .. }
+                | Subject::Note { .. } => false,
+            };
+            if touched {
+                let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
+            }
+        }
+    }
+
     pub(crate) fn touch_project_parties(&mut self, project: u32) {
         self.touch_project_objects(project);
         let mut parties = List::with_capacity(self.view_subjects.len());

@@ -426,7 +426,7 @@ pub fn step(core: &mut Core, env: &Env<Limits>, event: Event) -> Requests {
     Requests::Out(out)
 }
 
-/// Want configured accounts once their records have been restored.
+/// Want every configured account once, after the restart has restored the core's own ranges.
 pub fn want_accounts(core: &mut Core, env: &Env<Limits>) -> Requests {
     let mut work = Queue::with_capacity(0);
     let requests = route_account(core, env, &mut work, accounts::Event::Want);
@@ -641,6 +641,7 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
                 &mut out,
             );
             core.touch_deployment();
+            core.touch_accounts(None);
             let mut work = Queue::with_capacity(0);
             let requests = tag_account(core, env, &mut work, out);
             assert!(work.is_empty(), "an account's alarm answers no party");
