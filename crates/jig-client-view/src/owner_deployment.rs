@@ -786,7 +786,7 @@ pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<sk
             return None;
         }
         if let Some(uses) = &account.uses
-            && uses.capacity() > 16
+            && uses.capacity() > jig_client::contract::ACCOUNT_USES
         {
             return None;
         }

@@ -811,7 +811,7 @@ fn deployment_accounts_show_identity_sources_and_payers_in_order() {
         b"Held by party 23",
         b"A plan's account",
         b"Source 11",
-        b"Signed in",
+        b"Sign-in",
         b"Account State Granted",
         b"Usable",
         b"Expiring",

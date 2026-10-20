@@ -1,6 +1,8 @@
 //! Secret-free party account facts (client/domain/contract.md, 5.1; domain/accounts.md, 3–5).
 use super::{DocumentText, OwnerAccountPlace, OwnerAccountState, OwnerAccountUnread};
 use skein_lib::{Duration, List, Wall};
+/// An account's payers at most: `jig_domain_accounts::USES` (domain/accounts.md, 3).
+pub const ACCOUNT_USES: u32 = 16;
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerAccounts {
     pub accounts: List<OwnerAccountLine>,
