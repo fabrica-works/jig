@@ -442,7 +442,12 @@ impl Application for Testing {
                     account,
                 }))) => {
                     vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
-                        accounts::FromComponent::Granted { account, generation: 1, valid: Duration::from_secs(60) },
+                        accounts::FromComponent::Granted {
+                            form: accounts::Form::Credential(accounts::Scheme::Bearer),
+                            account,
+                            generation: 1,
+                            valid: Duration::from_secs(60),
+                        },
                     ))))]
                 }
                 Delivery::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Close))) => {
@@ -612,7 +617,12 @@ impl Application for Testing {
                     next: None,
                 })));
                 events.push(Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
-                    accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+                    accounts::FromComponent::Granted {
+                        form: accounts::Form::Credential(accounts::Scheme::Bearer),
+                        account: 1,
+                        generation: 1,
+                        valid: Duration::from_secs(60),
+                    },
                 )))));
             }
             events.extend(peers.peers.tick(store, Time::from_nanos(clock.now)).into_iter().map(Input::Event));

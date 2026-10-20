@@ -678,7 +678,7 @@ impl World {
     fn receive_grant(&mut self, agent: Token, grant: host::Grant) {
         assert_eq!(agent, AGENT);
         assert!(self.agent_live);
-        assert_eq!(grant.table, host::GrantTable::Accounts);
+        assert_eq!(grant.form, host::Form::Credential(host::Scheme::Key));
         self.received_grant = Some(grant);
     }
 
@@ -687,7 +687,7 @@ impl World {
         assert_eq!(workspace, if self.space_live { Some(SPACE) } else { None });
         assert_eq!(&*charter, b"charter");
         for grant in &grants {
-            assert_eq!(grant.table, host::GrantTable::Accounts);
+            assert_eq!(grant.form, host::Form::Credential(host::Scheme::Key));
         }
         self.owner = Some(owner);
         self.agent_live = true;

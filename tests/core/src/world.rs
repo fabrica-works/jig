@@ -459,7 +459,12 @@ impl World {
         events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Loaded)));
         events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Want)));
         events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
-            accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+            accounts::FromComponent::Granted {
+                form: accounts::Form::Credential(accounts::Scheme::Bearer),
+                account: 1,
+                generation: 1,
+                valid: Duration::from_secs(60),
+            },
         ))));
         events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
             channel: Token::new(7),
@@ -537,7 +542,12 @@ impl World {
                     account,
                 }))) => {
                     self.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
-                        accounts::FromComponent::Granted { account, generation: 1, valid: Duration::from_secs(60) },
+                        accounts::FromComponent::Granted {
+                            form: accounts::Form::Credential(accounts::Scheme::Bearer),
+                            account,
+                            generation: 1,
+                            valid: Duration::from_secs(60),
+                        },
                     ))));
                 }
                 root::Request::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Close))) => {

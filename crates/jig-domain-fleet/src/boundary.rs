@@ -92,10 +92,41 @@ impl Kinds {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Grant {
-    pub table: GrantTable,
+    pub form: Form,
     pub account: u32,
     pub generation: u64,
     pub valid: Duration,
+}
+
+/// The form in which a grant lends its value (protocol/channel.md, section 8).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Form {
+    /// A credential with the scheme its provider takes.
+    Credential(Scheme),
+    /// The live test's id-and-bearer arm (D2/JP13).
+    Withdrawn,
+    /// An application's credential, held in its own table.
+    Application,
+}
+
+/// A credential's scheme (protocol/channel.md, section 8).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Scheme {
+    /// A bearer credential.
+    Bearer,
+    /// A key credential.
+    Key,
+}
+
+impl Form {
+    /// The protocol table that holds this form's value.
+    #[must_use]
+    pub const fn table(self) -> GrantTable {
+        match self {
+            Self::Credential(_) | Self::Withdrawn => GrantTable::Accounts,
+            Self::Application => GrantTable::Application,
+        }
+    }
 }
 
 /// The protocol layer's table that holds a credential (channel.md, section 8).
@@ -631,4 +662,22 @@ pub struct AttemptView {
     pub state: AttemptState,
     pub placement: Placement,
     pub until: Option<skein_lib::Time>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Form, GrantTable, Scheme};
+
+    #[test]
+    fn a_form_names_its_table_and_takes_one_byte() {
+        for (form, table) in [
+            (Form::Credential(Scheme::Bearer), GrantTable::Accounts),
+            (Form::Credential(Scheme::Key), GrantTable::Accounts),
+            (Form::Withdrawn, GrantTable::Accounts),
+            (Form::Application, GrantTable::Application),
+        ] {
+            assert_eq!(form.table(), table);
+        }
+        assert_eq!(size_of::<Form>(), 1);
+    }
 }

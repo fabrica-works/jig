@@ -433,7 +433,15 @@ fn grant(grant: wire::Grant, now: Time, out: &mut Queue<Request>) -> host::Grant
     };
     let expires = now.saturating_add(grant.valid);
     out.push(Request::Value { account: grant.number, generation: grant.generation, expires, value });
-    host::Grant { table, account: grant.number, generation: grant.generation, valid: grant.valid }
+    host::Grant {
+        form: match table {
+            host::GrantTable::Accounts => host::Form::Credential(host::Scheme::Bearer),
+            host::GrantTable::Application => host::Form::Application,
+        },
+        account: grant.number,
+        generation: grant.generation,
+        valid: grant.valid,
+    }
 }
 fn transcript(bytes: &[u8]) -> Box<[Box<[u8]>]> {
     let mut reader = Reader::new(bytes);

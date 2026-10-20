@@ -267,7 +267,7 @@ fn memory_below_the_components_sum_is_refused() {
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
     // Visit addresses plus the asker in 32 retained ends and the 11-entry sign-in map node.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_613_698_195 });
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_613_698_283 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

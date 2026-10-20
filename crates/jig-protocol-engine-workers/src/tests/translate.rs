@@ -265,9 +265,9 @@ fn a_grant_without_a_value_is_left_out() {
     };
     assert_eq!(value.secret().expose(), fixtures::TOKEN_TWO);
 }
-fn granted(table: jig_domain_host::GrantTable, value: crate::GrantValue) -> Option<translate::Down> {
+fn granted(form: jig_domain_host::Form, value: crate::GrantValue) -> Option<translate::Down> {
     translate::down(
-        jig_domain_host::LinkDown::Grant { run: Token::new(7), attempt: Token::new(2), grant: fixtures::grant(table) },
+        jig_domain_host::LinkDown::Grant { run: Token::new(7), attempt: Token::new(2), grant: fixtures::grant(form) },
         &[],
         Box::new([Some(value)]),
         &codec(),
@@ -283,7 +283,7 @@ fn granted_value(down: Option<translate::Down>) -> jig_protocol_worker_wire::Gra
 fn each_credential_scheme_reaches_the_wire_with_its_token() {
     use jig_protocol_worker_wire as wire;
     for (scheme, expected) in [(crate::Scheme::Bearer, wire::Scheme::Bearer), (crate::Scheme::Key, wire::Scheme::Key)] {
-        let grant = granted_value(granted(jig_domain_host::GrantTable::Accounts, fixtures::credential_value(scheme)));
+        let grant = granted_value(granted(jig_domain_host::Form::Withdrawn, fixtures::credential_value(scheme)));
         let wire::GrantValue::Credential(value) = grant.value() else { panic!("credential value") };
         assert_eq!(value.scheme(), &expected);
         assert_eq!(value.bytes().expose(), fixtures::TOKEN_ONE);
@@ -292,23 +292,23 @@ fn each_credential_scheme_reaches_the_wire_with_its_token() {
 #[test]
 fn a_withdrawn_grant_reaches_the_wire_with_its_account_id_apart() {
     let value = fixtures::values()[0].take().expect("withdrawn value");
-    let grant = granted_value(granted(jig_domain_host::GrantTable::Accounts, value));
+    let grant = granted_value(granted(jig_domain_host::Form::Withdrawn, value));
     let jig_protocol_worker_wire::GrantValue::Withdrawn(value) = grant.value() else { panic!("withdrawn value") };
     assert_eq!((value.id().expose(), value.bearer().expose()), (fixtures::ACCOUNT_ID, fixtures::TOKEN_ONE));
 }
 #[test]
 fn an_application_grant_reaches_the_wire_with_its_secret() {
     let value = fixtures::values()[1].take().expect("application value");
-    let grant = granted_value(granted(jig_domain_host::GrantTable::Application, value));
+    let grant = granted_value(granted(jig_domain_host::Form::Application, value));
     let jig_protocol_worker_wire::GrantValue::Application(value) = grant.value() else { panic!("application value") };
     assert_eq!(value.secret().expose(), fixtures::TOKEN_TWO);
 }
 #[test]
 fn a_value_unlike_its_grants_table_is_not_sent() {
     let application = fixtures::values()[1].take().expect("application value");
-    assert!(granted(jig_domain_host::GrantTable::Accounts, application).is_none());
+    assert!(granted(jig_domain_host::Form::Withdrawn, application).is_none());
     let credential = fixtures::credential_value(crate::Scheme::Key);
-    assert!(granted(jig_domain_host::GrantTable::Application, credential).is_none());
+    assert!(granted(jig_domain_host::Form::Application, credential).is_none());
 }
 #[test]
 fn a_standalone_grant_without_a_value_is_not_sent() {
@@ -317,7 +317,7 @@ fn a_standalone_grant_without_a_value_is_not_sent() {
             jig_domain_host::LinkDown::Grant {
                 run: Token::new(7),
                 attempt: Token::new(2),
-                grant: fixtures::grant(jig_domain_host::GrantTable::Accounts),
+                grant: fixtures::grant(jig_domain_host::Form::Withdrawn),
             },
             &[],
             Box::new([None]),

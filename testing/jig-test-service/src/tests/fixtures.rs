@@ -384,7 +384,7 @@ pub fn workers(config: &jig_protocol_config::Engine) -> crate::workers::Workers 
     crate::workers::Workers::new(config, &files(&[]), seeds().deployment, &limits, 64).expect("fixture workers")
 }
 pub fn assignment(config: &jig_protocol_config::Engine) -> jig_test_domain::Assignment {
-    use jig_domain_accounts::{Grant, GrantTable};
+    use jig_domain_accounts::{Form, Grant, Scheme};
     use jig_domain_brief::{Core, GatherPlaced};
     use skein_lib::Duration;
     jig_test_domain::Assignment {
@@ -414,8 +414,8 @@ pub fn assignment(config: &jig_protocol_config::Engine) -> jig_test_domain::Assi
         transcript: Box::default(),
         answered: Box::default(),
         grants: Box::new([
-            Grant { table: GrantTable::Accounts, account: 1, generation: 1, valid: Duration::from_secs(30) },
-            Grant { table: GrantTable::Application, account: 1, generation: 1, valid: Duration::from_secs(30) },
+            Grant { form: Form::Credential(Scheme::Bearer), account: 1, generation: 1, valid: Duration::from_secs(30) },
+            Grant { form: Form::Application, account: 1, generation: 1, valid: Duration::from_secs(30) },
         ]),
     }
 }
@@ -563,7 +563,7 @@ pub fn worker_assignment() -> jig_domain_host::LinkDown {
     assignment.assignment.run = Token::new(7);
     assignment.assignment.attempt = Token::new(3);
     assignment.assignment.grants = Box::new([jig_domain_host::Grant {
-        table: jig_domain_host::GrantTable::Accounts,
+        form: jig_domain_host::Form::Credential(jig_domain_host::Scheme::Bearer),
         account: 1,
         generation: 1,
         valid: skein_lib::Duration::from_secs(30),

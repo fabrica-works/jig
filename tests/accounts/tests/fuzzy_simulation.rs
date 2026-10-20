@@ -1,5 +1,5 @@
 use jig_accounts_world::{ANALYST, World};
-use jig_domain_accounts::{Event, Failure, FromComponent, Place, Request, ToComponent, Unread};
+use jig_domain_accounts::{Event, Failure, Form, FromComponent, Place, Request, Scheme, ToComponent, Unread};
 use skein_lib::{Duration, Rng};
 fn respond(world: &mut World, rng: &mut Rng, requests: Vec<Request>, trace: &mut Vec<Request>) {
     for request in &requests {
@@ -13,7 +13,12 @@ fn respond(world: &mut World, rng: &mut Rng, requests: Vec<Request>, trace: &mut
                     failure: Failure::Unloaded { at: Place::File, why: Unread::Stalled },
                 },
                 4 => FromComponent::Failed { account, failure: Failure::Cancelled },
-                _ => FromComponent::Granted { account, generation: 4, valid: Duration::from_secs(40) },
+                _ => FromComponent::Granted {
+                    form: Form::Credential(Scheme::Bearer),
+                    account,
+                    generation: 4,
+                    valid: Duration::from_secs(40),
+                },
             }),
             Request::Component(ToComponent::Rejected { account, generation }) => {
                 Some(FromComponent::Expiring { account, generation })

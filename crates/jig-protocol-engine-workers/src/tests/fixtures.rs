@@ -296,8 +296,8 @@ pub const TOKEN_ONE: &[u8] = b"TOKEN_ONE";
 pub const TOKEN_TWO: &[u8] = b"TOKEN_TWO";
 pub const ACCOUNT_ID: &[u8] = b"ID_ONE";
 pub const IDENTITY: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-pub fn grant(table: jig_domain_host::GrantTable) -> jig_domain_host::Grant {
-    jig_domain_host::Grant { table, account: 1, generation: 4, valid: Duration::from_secs(30) }
+pub fn grant(form: jig_domain_host::Form) -> jig_domain_host::Grant {
+    jig_domain_host::Grant { form, account: 1, generation: 4, valid: Duration::from_secs(30) }
 }
 pub fn values() -> Box<[Option<crate::GrantValue>]> {
     Box::new([
@@ -328,7 +328,7 @@ pub fn assignment() -> jig_domain_host::Assignment {
             workspace: Some(host::Workspace { workstream: 9, items: Token::new(500) }),
             save: true,
             charter: Box::from(b"charter".as_slice()),
-            grants: Box::new([grant(host::GrantTable::Accounts), grant(host::GrantTable::Application)]),
+            grants: Box::new([grant(host::Form::Withdrawn), grant(host::Form::Application)]),
         },
         turns: Box::new([Box::from([0, 127]), Box::from([255, 1, 2])]),
         answered: Box::new([host::AnsweredCall {

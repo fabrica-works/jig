@@ -1,6 +1,6 @@
 use crate::signing::UnderWay;
 use crate::{
-    Configured, Ended, Event, Fact, Failure, FromComponent, Grant, GrantTable, Held, Holder, Kind, Limits, Pending,
+    Configured, Ended, Event, Fact, Failure, Form, FromComponent, Grant, Held, Holder, Kind, Limits, Pending,
     Providers, Request, State, Stored, ToComponent, Turned,
 };
 use alloc::boxed::Box;
@@ -116,6 +116,7 @@ pub(crate) enum Hold {
 pub(crate) struct Granted {
     generation: u64,
     expires: Time,
+    form: Form,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum Phase {
@@ -306,7 +307,7 @@ impl Domain {
             return None;
         }
         Some(Grant {
-            table: GrantTable::Accounts,
+            form: grant.form,
             account: source,
             generation: grant.generation,
             valid: grant.expires.saturating_since(now),
@@ -330,7 +331,7 @@ impl Domain {
             return None;
         }
         Some(Grant {
-            table: GrantTable::Application,
+            form: grant.form,
             account: number,
             generation: grant.generation,
             valid: grant.expires.saturating_since(now),
@@ -531,11 +532,11 @@ fn credential(
         Phase::New | Phase::Wanted => {}
     }
     let expires = env.now.saturating_add(valid);
-    if domain.credentials.insert(number, Granted { generation, expires }).is_err() {
+    if domain.credentials.insert(number, Granted { generation, expires, form: Form::Application }).is_err() {
         return;
     }
     domain.credential_alarms.arm(number, expires).expect("credential alarm room");
-    out.push(Request::Granted { grant: Grant { table: GrantTable::Application, account: number, generation, valid } });
+    out.push(Request::Granted { grant: Grant { form: Form::Application, account: number, generation, valid } });
 }
 /// The deployment's account of each provider offering no source, made at the first start that
 /// configures it (accounts.md, 3.1), while the accounts' bound and the counter leave room; the
@@ -713,15 +714,17 @@ fn component(domain: &mut Domain, env: &Env<Limits>, event: FromComponent, out: 
     }
     let before = entry.hold;
     match event {
-        FromComponent::Granted { account: _, generation, valid } => {
-            entry.grant = Some(Granted { generation, expires: env.now.saturating_add(valid) });
+        FromComponent::Granted { account: _, generation, valid, form } => {
+            match form {
+                Form::Application => return,
+                Form::Credential(_) | Form::Withdrawn => {}
+            }
+            entry.grant = Some(Granted { generation, expires: env.now.saturating_add(valid), form });
             entry.state = State::Granted;
             entry.retry = None;
             entry.expiring = false;
             entry.backoff = env.limits.backoff_base;
-            out.push(Request::Granted {
-                grant: Grant { table: GrantTable::Accounts, account: source, generation, valid },
-            });
+            out.push(Request::Granted { grant: Grant { form, account: source, generation, valid } });
         }
         FromComponent::Expiring { account: _, generation } => {
             if match entry.grant {

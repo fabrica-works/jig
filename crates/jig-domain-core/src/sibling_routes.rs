@@ -14,10 +14,7 @@ use crate::{CallKey, Core, Family, GoalRoute, Limits, PersonProposalRoute, Route
 
 pub(crate) fn fleet_grant(grant: accounts::Grant) -> fleet::Grant {
     fleet::Grant {
-        table: match grant.table {
-            accounts::GrantTable::Accounts => fleet::GrantTable::Accounts,
-            accounts::GrantTable::Application => fleet::GrantTable::Application,
-        },
+        form: fleet_form(grant.form),
         account: grant.account,
         generation: grant.generation,
         valid: grant.valid,
@@ -483,5 +480,16 @@ impl Core {
                 SentRoute::Person(Box::new(people::Event::Decided { request, outcome }))
             }
         }
+    }
+}
+
+const fn fleet_form(form: accounts::Form) -> fleet::Form {
+    match form {
+        accounts::Form::Credential(scheme) => fleet::Form::Credential(match scheme {
+            accounts::Scheme::Bearer => fleet::Scheme::Bearer,
+            accounts::Scheme::Key => fleet::Scheme::Key,
+        }),
+        accounts::Form::Withdrawn => fleet::Form::Withdrawn,
+        accounts::Form::Application => fleet::Form::Application,
     }
 }

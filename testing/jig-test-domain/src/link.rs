@@ -242,10 +242,7 @@ pub fn down(domain: &mut Domain, delivery: Delivery) -> Delivery {
                 run,
                 attempt,
                 grant: host::Grant {
-                    table: match grant.table {
-                        fleet::GrantTable::Accounts => host::GrantTable::Accounts,
-                        fleet::GrantTable::Application => host::GrantTable::Application,
-                    },
+                    form: host_form(grant.form),
                     account: grant.account,
                     generation: grant.generation,
                     valid: grant.valid,
@@ -469,4 +466,15 @@ pub(super) enum Work {
         read: Option<u64>,
         refused: Box<[u64]>,
     },
+}
+
+const fn host_form(form: fleet::Form) -> host::Form {
+    match form {
+        fleet::Form::Credential(scheme) => host::Form::Credential(match scheme {
+            fleet::Scheme::Bearer => host::Scheme::Bearer,
+            fleet::Scheme::Key => host::Scheme::Key,
+        }),
+        fleet::Form::Withdrawn => host::Form::Withdrawn,
+        fleet::Form::Application => host::Form::Application,
+    }
 }

@@ -50,7 +50,7 @@ pub fn down(request: accounts::ToComponent) -> driver::Request {
 pub fn up(event: driver::Event, now: Time) -> Up {
     match event {
         driver::Event::Granted { account, token, generation, valid } => Up::Granted {
-            event: accounts::FromComponent::Granted { account, generation, valid },
+            event: accounts::FromComponent::Granted { form: form(&table::Scheme::Bearer), account, generation, valid },
             account,
             generation,
             value: table::Value { token: Secret::new(token), scheme: table::Scheme::Bearer },
@@ -159,5 +159,15 @@ fn unread(why: driver::Unloaded) -> accounts::Unread {
         driver::Unloaded::Failed(_) => accounts::Unread::Failed,
         driver::Unloaded::Stalled => accounts::Unread::Stalled,
         driver::Unloaded::TooLarge { size: _ } => accounts::Unread::TooLarge,
+    }
+}
+
+/// The secret-free form announced for the same scheme held in the table.
+#[must_use]
+pub const fn form(scheme: &table::Scheme) -> accounts::Form {
+    match scheme {
+        table::Scheme::Bearer => accounts::Form::Credential(accounts::Scheme::Bearer),
+        table::Scheme::Key => accounts::Form::Credential(accounts::Scheme::Key),
+        table::Scheme::Withdrawn { .. } => accounts::Form::Withdrawn,
     }
 }

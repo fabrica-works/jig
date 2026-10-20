@@ -5,6 +5,37 @@ use skein_lib::{Duration, Time, Token};
 /// Maximum address bytes in an account sign-in answer.
 pub const ADDRESS: u32 = 2_048;
 
+/// The form in which a grant lends its value (protocol/channel.md, section 8).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Form {
+    /// A credential with the scheme its provider takes.
+    Credential(Scheme),
+    /// The live test's id-and-bearer arm (D2/JP13).
+    Withdrawn,
+    /// An application's credential, held in its own table.
+    Application,
+}
+
+/// A credential's scheme (protocol/channel.md, section 8).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Scheme {
+    /// A bearer credential.
+    Bearer,
+    /// A key credential.
+    Key,
+}
+
+impl Form {
+    /// The protocol table that holds this form's value.
+    #[must_use]
+    pub const fn table(self) -> GrantTable {
+        match self {
+            Self::Credential(_) | Self::Withdrawn => GrantTable::Accounts,
+            Self::Application => GrantTable::Application,
+        }
+    }
+}
+
 /// The protocol layer's table that holds a grant (protocol/channel.md, section 8).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum GrantTable {
@@ -16,7 +47,7 @@ pub enum GrantTable {
 /// named by its source's number.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Grant {
-    pub table: GrantTable,
+    pub form: Form,
     pub account: u32,
     pub generation: u64,
     pub valid: Duration,
@@ -111,7 +142,7 @@ pub enum Turned {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum FromComponent {
-    Granted { account: u32, generation: u64, valid: Duration },
+    Granted { account: u32, generation: u64, valid: Duration, form: Form },
     Expiring { account: u32, generation: u64 },
     Failed { account: u32, failure: Failure },
     Closed,
@@ -275,4 +306,22 @@ pub struct Fact {
     pub expiring: bool,
     pub spent_until: Option<Time>,
     pub attention: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Form, GrantTable, Scheme};
+
+    #[test]
+    fn a_form_names_its_table_and_takes_one_byte() {
+        for (form, table) in [
+            (Form::Credential(Scheme::Bearer), GrantTable::Accounts),
+            (Form::Credential(Scheme::Key), GrantTable::Accounts),
+            (Form::Withdrawn, GrantTable::Accounts),
+            (Form::Application, GrantTable::Application),
+        ] {
+            assert_eq!(form.table(), table);
+        }
+        assert_eq!(size_of::<Form>(), 1);
+    }
 }

@@ -2,8 +2,8 @@
 //! child, asked of the component, each change saved or erased in the step that makes it.
 use jig_accounts_world::{World, account, provider, providers, source};
 use jig_domain_accounts::{
-    Answer, Bound, DISPLAY, End, Ended, Event, Failure, FromComponent, Held, Holder, Key, Kind, Refusal, Request,
-    Signing, State, Stored, ToComponent,
+    Answer, Bound, DISPLAY, End, Ended, Event, Failure, Form, FromComponent, Held, Holder, Key, Kind, Refusal, Request,
+    Scheme, Signing, State, Stored, ToComponent,
 };
 use skein_lib::{Duration, Token};
 use std::collections::BTreeMap;
@@ -173,7 +173,12 @@ fn plan_usage_declined_keeps_the_sign_in_and_refuses_the_source() {
     let asked = world.step(signed_in(0, b"alice", b"", true));
     assert_eq!(asked[2..], [save(refused), want(0)]);
     assert_eq!(world.ended(), ended(1, 0, End::Made { account: 1, declined: true }));
-    let granted = FromComponent::Granted { account: 0, generation: 1, valid: Duration::from_secs(100) };
+    let granted = FromComponent::Granted {
+        form: Form::Credential(Scheme::Bearer),
+        account: 0,
+        generation: 1,
+        valid: Duration::from_secs(100),
+    };
     world.step(Event::Component(granted));
     let fact = world.domain.source(0).expect("kept");
     assert_eq!((fact.state, fact.usable, fact.attention), (State::Refused, false, true), "until its holder acts");

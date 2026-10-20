@@ -1,6 +1,6 @@
 use jig_accounts_world::{ANALYST, World};
 use jig_domain_accounts::{
-    Event, Failure, FromComponent, Grant, GrantTable, Held, Kind, Place, Request, State, Stored, ToComponent, Turned,
+    Event, Failure, Form, FromComponent, Grant, Held, Kind, Place, Request, Scheme, State, Stored, ToComponent, Turned,
     Unread,
 };
 use skein_lib::{Duration, Time, Wall};
@@ -8,13 +8,14 @@ fn granted() -> World {
     let mut world = World::wanting(&[ANALYST]);
     assert_eq!(
         world.step(Event::Component(FromComponent::Granted {
+            form: Form::Credential(Scheme::Bearer),
             account: ANALYST,
             generation: 4,
             valid: Duration::from_secs(100)
         })),
         vec![Request::Granted {
             grant: Grant {
-                table: GrantTable::Accounts,
+                form: Form::Credential(Scheme::Bearer),
                 account: ANALYST,
                 generation: 4,
                 valid: Duration::from_secs(100)
@@ -141,6 +142,7 @@ fn an_unauthorized_generation_already_renewed_asks_nothing() {
     let mut world = granted();
     world.step(Event::Unauthorized { account: ANALYST, generation: 4 });
     world.step(Event::Component(FromComponent::Granted {
+        form: Form::Credential(Scheme::Bearer),
         account: ANALYST,
         generation: 5,
         valid: Duration::from_secs(100),
@@ -243,7 +245,45 @@ fn a_credentials_new_generation_is_granted_on() {
     assert_eq!(
         world.step(credential(2)),
         vec![Request::Granted {
-            grant: Grant { table: GrantTable::Application, account: 7, generation: 2, valid: Duration::from_secs(100) }
+            grant: Grant { form: Form::Application, account: 7, generation: 2, valid: Duration::from_secs(100) }
         }]
     );
+}
+
+#[test]
+fn a_sign_in_sources_grant_carries_the_form_its_component_announced() {
+    for form in [Form::Credential(Scheme::Bearer), Form::Credential(Scheme::Key), Form::Withdrawn] {
+        let mut world = World::wanting(&[ANALYST]);
+        for generation in [4, 5] {
+            let grant = Grant { form, account: ANALYST, generation, valid: Duration::from_secs(100) };
+            assert_eq!(
+                world.step(Event::Component(FromComponent::Granted {
+                    account: ANALYST,
+                    generation,
+                    valid: grant.valid,
+                    form,
+                })),
+                vec![Request::Granted { grant }]
+            );
+            assert_eq!(world.domain.grant(ANALYST, world.now), Some(grant));
+        }
+    }
+}
+
+#[test]
+fn a_component_grant_in_the_application_form_is_ignored() {
+    let mut world = World::wanting(&[ANALYST]);
+    assert!(
+        world
+            .step(Event::Component(FromComponent::Granted {
+                account: ANALYST,
+                generation: 4,
+                valid: Duration::from_secs(100),
+                form: Form::Application,
+            }))
+            .is_empty()
+    );
+    assert!(!world.domain.usable(ANALYST));
+    assert_eq!(world.domain.grant(ANALYST, world.now), None);
+    assert_eq!(world.views()[0].state, State::Asking);
 }

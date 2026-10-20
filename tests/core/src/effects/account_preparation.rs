@@ -28,9 +28,15 @@ impl World {
     pub(super) fn account_request(&mut self, request: accounts::ToComponent) {
         let response = match request {
             accounts::ToComponent::Want { account: 1 } if !self.hold_accounts => {
-                Some(accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) })
+                Some(accounts::FromComponent::Granted {
+                    form: accounts::Form::Credential(accounts::Scheme::Bearer),
+                    account: 1,
+                    generation: 1,
+                    valid: Duration::from_secs(60),
+                })
             }
             accounts::ToComponent::Rejected { account, generation } => Some(accounts::FromComponent::Granted {
+                form: accounts::Form::Credential(accounts::Scheme::Bearer),
                 account,
                 generation: generation.checked_add(1).expect("fixture generation has a successor"),
                 valid: Duration::from_secs(60),

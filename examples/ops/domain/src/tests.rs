@@ -335,6 +335,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
         core::Event::Fleet(fleet::Event::Loaded),
         core::Event::Account(accounts::Event::Want),
         core::Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
+            form: accounts::Form::Credential(accounts::Scheme::Bearer),
             account: 1,
             generation: 1,
             valid: Duration::from_secs(60),

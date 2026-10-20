@@ -32,8 +32,9 @@ mod turns;
 pub use activity::{Activity, CountKind, Operation};
 pub use boundary::{
     AgentFailure, Answer, AnsweredCall, Ask, Assignment, Delivery, DeliveryOutcome, Ending, Event, Failure, Finish,
-    FromAgent, Grant, GrantTable, Hosting, Invalid, MessageRefusal, Phase, Preparation, Reason, Refusal, Refused,
-    Reply, Request, RunAssignment, RunFailure, SettledAnswer, Start, StartMessage, ToAgent, Turn, Work, Workspace,
+    Form, FromAgent, Grant, GrantTable, Hosting, Invalid, MessageRefusal, Phase, Preparation, Reason, Refusal, Refused,
+    Reply, Request, RunAssignment, RunFailure, Scheme, SettledAnswer, Start, StartMessage, ToAgent, Turn, Work,
+    Workspace,
 };
 pub use domain::{Domain, max_out, resume, step};
 pub use facts::Fact;

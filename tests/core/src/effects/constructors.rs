@@ -169,6 +169,7 @@ impl World {
         }
         world.events.extend([
             root::Event::Core(core::Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
+                form: accounts::Form::Credential(accounts::Scheme::Bearer),
                 account: 1,
                 generation: 1,
                 valid: Duration::from_secs(60),
@@ -328,7 +329,12 @@ impl World {
         world.events.push_back(root::Event::RestartBegin);
         world.hello_engine();
         world.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
-            accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+            accounts::FromComponent::Granted {
+                form: accounts::Form::Credential(accounts::Scheme::Bearer),
+                account: 1,
+                generation: 1,
+                valid: Duration::from_secs(60),
+            },
         ))));
         world.drain();
         world

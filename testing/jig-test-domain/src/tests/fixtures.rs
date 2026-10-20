@@ -192,7 +192,7 @@ pub fn assignment() -> Assignment {
         transcript: Box::new([b"prior turn".as_slice().into()]),
         answered: Box::new([]),
         grants: Box::new([jig_domain_accounts::Grant {
-            table: jig_domain_accounts::GrantTable::Accounts,
+            form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Bearer),
             account: 1,
             generation: 2,
             valid: Duration::from_secs(30),
@@ -300,7 +300,7 @@ fn held_records() -> [(core::Held, host::LinkDown); 4] {
                 run: RUN,
                 attempt: ATTEMPT,
                 grant: fleet::Grant {
-                    table: fleet::GrantTable::Application,
+                    form: fleet::Form::Application,
                     account: 7,
                     generation: 2,
                     valid: Duration::from_secs(30),
@@ -310,7 +310,7 @@ fn held_records() -> [(core::Held, host::LinkDown); 4] {
                 run: RUN,
                 attempt: ATTEMPT,
                 grant: host::Grant {
-                    table: host::GrantTable::Application,
+                    form: host::Form::Application,
                     account: 7,
                     generation: 2,
                     valid: Duration::from_secs(30),

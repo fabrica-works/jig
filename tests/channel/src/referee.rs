@@ -235,7 +235,12 @@ fn put_key(engine: &mut jig_test_service::Engine, generation: u64, key: &[u8], n
         now.saturating_add(valid),
     );
     engine.parties_in().push(core::Event::Account(jig_domain_accounts::Event::Component(
-        jig_domain_accounts::FromComponent::Granted { account: 1, generation, valid },
+        jig_domain_accounts::FromComponent::Granted {
+            form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Key),
+            account: 1,
+            generation,
+            valid,
+        },
     )));
 }
 

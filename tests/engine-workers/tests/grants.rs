@@ -28,10 +28,10 @@ mod grants {
             world.observed(connection).iter().find(|record| record.kind == 0x0180).expect("assignment crossed");
         wire::Assignment::decode(&codec(), &mut Reader::new(&record.body)).expect("assignment decodes")
     }
-    fn send_grant(world: &mut World, channel: Token, table: host::GrantTable, value: GrantValue) {
+    fn send_grant(world: &mut World, channel: Token, form: host::Form, value: GrantValue) {
         world.down(Event::Down {
             channel,
-            down: LinkDown::Grant { run: Token::new(7), attempt: Token::new(2), grant: fixtures::grant(table) },
+            down: LinkDown::Grant { run: Token::new(7), attempt: Token::new(2), grant: fixtures::grant(form) },
             parts: Box::new([]),
             values: Box::new([Some(value)]),
         });
@@ -66,10 +66,10 @@ mod grants {
     #[test]
     fn a_grant_of_each_arm_reaches_the_worker_with_its_value() {
         let (mut world, connection, channel) = joined();
-        send_grant(&mut world, channel, host::GrantTable::Accounts, fixtures::credential_value(Scheme::Bearer));
-        send_grant(&mut world, channel, host::GrantTable::Accounts, fixtures::credential_value(Scheme::Key));
-        send_grant(&mut world, channel, host::GrantTable::Accounts, withdrawn());
-        send_grant(&mut world, channel, host::GrantTable::Application, application());
+        send_grant(&mut world, channel, host::Form::Withdrawn, fixtures::credential_value(Scheme::Bearer));
+        send_grant(&mut world, channel, host::Form::Withdrawn, fixtures::credential_value(Scheme::Key));
+        send_grant(&mut world, channel, host::Form::Withdrawn, withdrawn());
+        send_grant(&mut world, channel, host::Form::Application, application());
         let grants = received_grants(&world, connection);
         assert_eq!(grants.len(), 4);
         for record in &grants {
@@ -120,7 +120,7 @@ mod grants {
     fn a_down_record_for_a_lost_channel_is_dropped() {
         let (mut world, connection, channel) = joined();
         world.down(Event::Gone { connection });
-        send_grant(&mut world, channel, host::GrantTable::Accounts, withdrawn());
+        send_grant(&mut world, channel, host::Form::Withdrawn, withdrawn());
         assert!(received_grants(&world, connection).is_empty());
         assert_eq!(world.dropped_down(), 1);
     }
@@ -129,7 +129,7 @@ mod grants {
         let mut world = world();
         let connection = world.connect(fixtures::worker(fixtures::WORKER_A, fixtures::SECRET_A, fixtures::PAYLOAD));
         world.run();
-        send_grant(&mut world, Token::new(1), host::GrantTable::Accounts, withdrawn());
+        send_grant(&mut world, Token::new(1), host::Form::Withdrawn, withdrawn());
         assert!(received_grants(&world, connection).is_empty());
         assert_eq!(world.dropped_down(), 1);
     }
@@ -154,7 +154,7 @@ mod grants {
             down: LinkDown::Grant {
                 run: Token::new(7),
                 attempt: Token::new(2),
-                grant: fixtures::grant(host::GrantTable::Accounts),
+                grant: fixtures::grant(host::Form::Withdrawn),
             },
             parts: Box::new([]),
             values: Box::new([None]),

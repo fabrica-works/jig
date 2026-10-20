@@ -515,7 +515,7 @@ fn transcript(turns: &[Box<[u8]>], bound: u32) -> Option<Box<[u8]>> {
 }
 /// A grant's table and its value's arm agree, or the grant is not sent.
 fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v3::Limits) -> Option<wire::Grant> {
-    let value = match (grant.table, value) {
+    let value = match (grant.form.table(), value) {
         (host::GrantTable::Accounts, crate::GrantValue::Credential { scheme, token }) => {
             let scheme = match scheme {
                 crate::Scheme::Bearer => wire::Scheme::Bearer,

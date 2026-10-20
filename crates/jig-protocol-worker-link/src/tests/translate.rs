@@ -40,7 +40,7 @@ fn granted(value: wire::GrantValue) -> (host::Grant, crate::GrantValue) {
 fn a_granted_credential_hands_its_scheme_and_token_out_and_the_hub_hears_the_account() {
     for (scheme, expected) in [(wire::Scheme::Bearer, crate::Scheme::Bearer), (wire::Scheme::Key, crate::Scheme::Key)] {
         let (grant, value) = granted(fixtures::credential_value(scheme));
-        assert_eq!(grant.table, host::GrantTable::Accounts);
+        assert_eq!(grant.form.table(), host::GrantTable::Accounts);
         let crate::GrantValue::Credential { scheme, token } = value else { panic!("credential: {value:?}") };
         assert_eq!((scheme, token.expose()), (expected, fixtures::TOKEN_ONE));
     }
@@ -48,14 +48,14 @@ fn a_granted_credential_hands_its_scheme_and_token_out_and_the_hub_hears_the_acc
 #[test]
 fn a_granted_withdrawn_value_keeps_its_account_id_apart_from_its_bearer() {
     let (grant, value) = granted(fixtures::withdrawn_value());
-    assert_eq!(grant.table, host::GrantTable::Accounts);
+    assert_eq!(grant.form.table(), host::GrantTable::Accounts);
     let crate::GrantValue::Withdrawn { id, bearer } = value else { panic!("withdrawn: {value:?}") };
     assert_eq!((id.expose(), bearer.expose()), (fixtures::ACCOUNT_ONE, fixtures::TOKEN_ONE));
 }
 #[test]
 fn a_granted_application_secret_names_the_application_table() {
     let (grant, value) = granted(fixtures::application_value());
-    assert_eq!(grant.table, host::GrantTable::Application);
+    assert_eq!(grant.form.table(), host::GrantTable::Application);
     let crate::GrantValue::Application { secret } = value else { panic!("application: {value:?}") };
     assert_eq!(secret.expose(), fixtures::TOKEN_ONE);
 }

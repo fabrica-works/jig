@@ -147,7 +147,7 @@ fn assignment(run: u64, limits: &Limits) -> RunAssignment {
         identity: [0; 16],
         grants: (0..limits.accounts)
             .map(|account| Grant {
-                table: jig_domain_host::GrantTable::Accounts,
+                form: jig_domain_host::Form::Credential(jig_domain_host::Scheme::Bearer),
                 account,
                 generation: 7,
                 valid: Duration::from_secs(300),

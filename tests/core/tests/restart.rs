@@ -31,7 +31,12 @@ fn account(world: &mut World) {
 
 fn grant_account(world: &mut World, account: u32, generation: u64) {
     world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Component(
-        jig_domain_accounts::FromComponent::Granted { account, generation, valid: Duration::from_secs(60) },
+        jig_domain_accounts::FromComponent::Granted {
+            form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Bearer),
+            account,
+            generation,
+            valid: Duration::from_secs(60),
+        },
     ))));
 }
 
@@ -613,7 +618,7 @@ fn a_new_generation_reaches_the_live_chat() {
     let mut world = World::new(161, false);
     grant_account(&mut world, 1, 2);
     let grant = received(&world);
-    assert_eq!((grant.table, grant.account, grant.generation), (fleet::GrantTable::Accounts, 1, 2));
+    assert_eq!((grant.form.table(), grant.account, grant.generation), (fleet::GrantTable::Accounts, 1, 2));
 }
 
 #[test]
@@ -624,7 +629,7 @@ fn a_restart_sends_an_adopted_chat_its_current_grant() {
     grant_account(&mut world, 1, 7);
     hello(&mut world, live);
     let grant = received(&world);
-    assert_eq!((grant.table, grant.account, grant.generation), (fleet::GrantTable::Accounts, 1, 7));
+    assert_eq!((grant.form.table(), grant.account, grant.generation), (fleet::GrantTable::Accounts, 1, 7));
     assert!(world.grant_follows_assignment());
 }
 
@@ -640,7 +645,11 @@ fn a_generation_renewed_while_the_assignment_is_held_reaches_the_attempt_after_i
     }
     let mut world = World::configured_unassigned(163, false, config, limits);
     assert!(world.assigned.is_none());
-    world.renew_on_assignment(SECOND_ANALYST, 2);
+    world.renew_on_assignment(
+        SECOND_ANALYST,
+        2,
+        jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Bearer),
+    );
     grant_account(&mut world, SECOND_ANALYST, 1);
     assert_eq!(world.assigned.as_ref().expect("assigned after commit").grants[0].generation, 1);
     let grant = received(&world);

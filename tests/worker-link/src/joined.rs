@@ -417,12 +417,16 @@ pub fn application() -> engine::GrantValue {
 pub fn values() -> Box<[Option<engine::GrantValue>]> {
     Box::new([Some(withdrawn()), Some(application())])
 }
-/// The host table a value belongs to.
+/// The form a value is lent as.
 #[must_use]
-pub fn table(value: &engine::GrantValue) -> host::GrantTable {
+pub fn form(value: &engine::GrantValue) -> host::Form {
     match value {
-        engine::GrantValue::Credential { .. } | engine::GrantValue::Withdrawn { .. } => host::GrantTable::Accounts,
-        engine::GrantValue::Application { .. } => host::GrantTable::Application,
+        engine::GrantValue::Credential { scheme, .. } => host::Form::Credential(match scheme {
+            engine::Scheme::Bearer => host::Scheme::Bearer,
+            engine::Scheme::Key => host::Scheme::Key,
+        }),
+        engine::GrantValue::Withdrawn { .. } => host::Form::Withdrawn,
+        engine::GrantValue::Application { .. } => host::Form::Application,
     }
 }
 /// A value's arm and its bytes, so the engine's value and the layer's

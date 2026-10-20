@@ -9,10 +9,7 @@ pub(super) fn fleet(grants: &[accounts::Grant]) -> Box<[fleet::Grant]> {
     for grant in grants {
         translated
             .push(fleet::Grant {
-                table: match grant.table {
-                    accounts::GrantTable::Accounts => fleet::GrantTable::Accounts,
-                    accounts::GrantTable::Application => fleet::GrantTable::Application,
-                },
+                form: fleet_form(grant.form),
                 account: grant.account,
                 generation: grant.generation,
                 valid: grant.valid,
@@ -20,4 +17,15 @@ pub(super) fn fleet(grants: &[accounts::Grant]) -> Box<[fleet::Grant]> {
             .expect("grant room");
     }
     translated.into_boxed()
+}
+
+const fn fleet_form(form: accounts::Form) -> fleet::Form {
+    match form {
+        accounts::Form::Credential(scheme) => fleet::Form::Credential(match scheme {
+            accounts::Scheme::Bearer => fleet::Scheme::Bearer,
+            accounts::Scheme::Key => fleet::Scheme::Key,
+        }),
+        accounts::Form::Withdrawn => fleet::Form::Withdrawn,
+        accounts::Form::Application => fleet::Form::Application,
+    }
 }

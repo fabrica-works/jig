@@ -517,13 +517,13 @@ fn a_newer_account_grant_reaches_a_started_agent() {
     use jig_host_world::fixtures::ANALYST;
     let mut world = World::new();
     world.assign_granted(Box::new([jig_domain_host::Grant {
-        table: jig_domain_host::GrantTable::Accounts,
+        form: jig_domain_host::Form::Credential(jig_domain_host::Scheme::Key),
         account: ANALYST,
         generation: 1,
         valid: Duration::from_secs(30),
     }]));
     world.grant(jig_domain_host::Grant {
-        table: jig_domain_host::GrantTable::Accounts,
+        form: jig_domain_host::Form::Credential(jig_domain_host::Scheme::Key),
         account: ANALYST,
         generation: 2,
         valid: Duration::from_secs(60),
@@ -531,7 +531,7 @@ fn a_newer_account_grant_reaches_a_started_agent() {
     assert_eq!(
         world.received_grant(),
         Some(jig_domain_host::Grant {
-            table: jig_domain_host::GrantTable::Accounts,
+            form: jig_domain_host::Form::Credential(jig_domain_host::Scheme::Key),
             account: ANALYST,
             generation: 2,
             valid: Duration::from_secs(60),

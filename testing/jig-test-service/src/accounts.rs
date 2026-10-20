@@ -348,7 +348,7 @@ impl Accounts {
             }
             let event = self.above.pop().expect("account events");
             let event = match self.records.up(event, now) {
-                translate::Up::Granted { event, account, generation, value, expires } => {
+                translate::Up::Granted { mut event, account, generation, value, expires } => {
                     // An account with a provider account id is jig's live test's
                     // (D2): its bearer goes out beside the id until JP13.
                     let id = self.ids.get(account).expect("configured account id");
@@ -357,6 +357,9 @@ impl Accounts {
                     } else {
                         table::Value { token: value.token, scheme: table::Scheme::Withdrawn { id: id.clone() } }
                     };
+                    if let domain::FromComponent::Granted { form, .. } = &mut event {
+                        *form = translate::form(&value.scheme);
+                    }
                     values
                         .accounts
                         .granted(account, generation, value, expires)

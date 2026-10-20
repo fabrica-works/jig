@@ -35,7 +35,7 @@ impl Harness {
                 kept: 0,
                 kind: HostKind::Worker,
                 worked: false,
-                holds: Box::new([GrantName { table: grant.table, account: grant.account }]),
+                holds: Box::new([GrantName { table: grant.form.table(), account: grant.account }]),
                 grants: Box::new([grant]),
             })
             .is_empty()
@@ -91,4 +91,13 @@ fn a_lapsed_grant_is_not_sent_at_a_hello() {
     let mut h = placed(ANALYST_FIRST);
     h.at(61);
     assert!(h.hello(C1, 2, &[], &[hosted(R1, A1, Phase::Active)]).is_empty());
+}
+
+#[test]
+fn a_resent_grant_keeps_the_form_of_its_newest_generation() {
+    let mut h = placed(ANALYST_FIRST);
+    h.step(Event::Lost { channel: C1 });
+    let newest = Grant { form: crate::Form::Credential(crate::Scheme::Key), ..ANALYST_SECOND };
+    h.grant(newest);
+    assert_eq!(&*h.hello(C1, 2, &[], &[hosted(R1, A1, Phase::Active)]), &[sent(R1, A1, newest)]);
 }

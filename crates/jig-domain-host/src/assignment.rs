@@ -14,7 +14,7 @@ pub(crate) fn check(assignment: &RunAssignment, limits: &Limits) -> Result<(), I
     }
     for (index, grant) in assignment.grants.iter().enumerate() {
         for other in assignment.grants.iter().skip(index.saturating_add(1)) {
-            if grant.table == other.table && grant.account == other.account {
+            if grant.form.table() == other.form.table() && grant.account == other.account {
                 return Err(Invalid::Grants);
             }
         }

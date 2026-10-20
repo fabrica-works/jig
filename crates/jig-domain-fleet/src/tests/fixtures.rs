@@ -27,7 +27,7 @@ pub fn adopt(run: skein_lib::Token, attempt: skein_lib::Token, kept: u32) -> cra
 }
 
 pub const ANALYST_FIRST: crate::Grant = crate::Grant {
-    table: crate::GrantTable::Accounts,
+    form: crate::Form::Credential(crate::Scheme::Bearer),
     account: 1,
     generation: 1,
     valid: skein_lib::Duration::from_secs(60),

@@ -416,8 +416,8 @@ pub fn joined_limits() -> Limits {
     limits()
 }
 #[must_use]
-pub fn grant(table: host::GrantTable) -> host::Grant {
-    host::Grant { table, account: 1, generation: 3, valid: Duration::from_secs(60) }
+pub fn grant(form: host::Form) -> host::Grant {
+    host::Grant { form, account: 1, generation: 3, valid: Duration::from_secs(60) }
 }
 #[must_use]
 pub fn assignment() -> host::Assignment {
@@ -429,7 +429,7 @@ pub fn assignment() -> host::Assignment {
             workspace: Some(host::Workspace { workstream: 3, items: Token::new(10) }),
             save: true,
             charter: b"charter".as_slice().into(),
-            grants: Box::new([grant(host::GrantTable::Accounts), grant(host::GrantTable::Application)]),
+            grants: Box::new([grant(host::Form::Withdrawn), grant(host::Form::Application)]),
         },
         turns: Box::new([Box::from(b"one!".as_slice()), Box::from(b"two!".as_slice())]),
         answered: Box::new([host::AnsweredCall {

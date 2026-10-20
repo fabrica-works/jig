@@ -507,7 +507,7 @@ impl Owner {
                 }
             };
             let heard = match event {
-                child::FromComponent::Granted { account, generation, valid: _ } => {
+                child::FromComponent::Granted { form: _, account, generation, valid: _ } => {
                     Some(Heard::Granted { account, generation })
                 }
                 child::FromComponent::Expiring { account, generation } => Some(Heard::Expiring { account, generation }),

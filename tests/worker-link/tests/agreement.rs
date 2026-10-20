@@ -1,7 +1,7 @@
 #[path = "../src/joined.rs"]
 pub mod joined;
 mod agreement {
-    use super::joined::{Joined, application, credential, received, sent, table, values, withdrawn};
+    use super::joined::{Joined, application, credential, form, received, sent, values, withdrawn};
     use jig_domain_host as host;
     use jig_protocol_engine_workers as engine;
     use jig_protocol_worker_link::Request;
@@ -127,17 +127,17 @@ mod agreement {
         for sent_value in
             [credential(engine::Scheme::Bearer), credential(engine::Scheme::Key), withdrawn(), application()]
         {
-            let (table, expected) = (table(&sent_value), sent(&sent_value));
+            let (form, expected) = (form(&sent_value), sent(&sent_value));
             let mut world = world();
             world.engine_down(
-                host::LinkDown::Grant { run: RUN_SEVEN, attempt: ATTEMPT_TWO, grant: fixtures::grant(table) },
+                host::LinkDown::Grant { run: RUN_SEVEN, attempt: ATTEMPT_TWO, grant: fixtures::grant(form) },
                 Box::new([]),
                 Box::new([Some(sent_value)]),
             );
             world.run();
             assert_eq!(
                 down(&world).0,
-                &host::LinkDown::Grant { run: RUN_SEVEN, attempt: ATTEMPT_TWO, grant: fixtures::grant(table) }
+                &host::LinkDown::Grant { run: RUN_SEVEN, attempt: ATTEMPT_TWO, grant: fixtures::grant(form) }
             );
             let Request::Value { account, generation, expires, value } = &world.values[0] else { panic!("value") };
             assert_eq!(

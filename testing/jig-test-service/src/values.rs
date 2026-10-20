@@ -29,7 +29,7 @@ impl Values {
     pub fn grants(&self, grants: &[host::Grant], now: Time) -> Box<[Option<GrantValue>]> {
         let mut values = List::with_capacity(u32::try_from(grants.len()).expect("bounded grants"));
         for grant in grants {
-            let value = match grant.table {
+            let value = match grant.form.table() {
                 host::GrantTable::Accounts => account_grant(self.accounts.value(grant.account, grant.generation, now)),
                 host::GrantTable::Application => {
                     application_grant(self.application.get(&(grant.account, grant.generation)))

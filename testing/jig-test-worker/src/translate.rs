@@ -4,7 +4,7 @@ use smith_host_domain as smith;
 
 #[must_use]
 pub const fn grant(value: host::Grant) -> Option<smith::Grant> {
-    match value.table {
+    match value.form.table() {
         host::GrantTable::Accounts => Some(smith::Grant {
             account: value.account,
             generation: value.generation,

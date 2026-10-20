@@ -234,6 +234,7 @@ fn grant(core: &mut Core, env: &Env<Limits>, source: u32) {
         core,
         env,
         Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
+            form: accounts::Form::Credential(accounts::Scheme::Bearer),
             account: source,
             generation: 1,
             valid: Duration::from_secs(60),

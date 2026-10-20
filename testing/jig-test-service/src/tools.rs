@@ -220,10 +220,7 @@ pub(super) fn charter(
     for grant in value.grants {
         grants
             .push(host::Grant {
-                table: match grant.table {
-                    jig_domain_accounts::GrantTable::Accounts => host::GrantTable::Accounts,
-                    jig_domain_accounts::GrantTable::Application => host::GrantTable::Application,
-                },
+                form: host_form(grant.form),
                 account: grant.account,
                 generation: grant.generation,
                 valid: grant.valid,
@@ -380,5 +377,16 @@ fn family(name: &[u8]) -> u64 {
         b"note" => jig.note.0,
         b"recall" => jig.recall.0,
         _ => 0,
+    }
+}
+
+const fn host_form(form: jig_domain_accounts::Form) -> jig_domain_host::Form {
+    match form {
+        jig_domain_accounts::Form::Credential(scheme) => jig_domain_host::Form::Credential(match scheme {
+            jig_domain_accounts::Scheme::Bearer => jig_domain_host::Scheme::Bearer,
+            jig_domain_accounts::Scheme::Key => jig_domain_host::Scheme::Key,
+        }),
+        jig_domain_accounts::Form::Withdrawn => jig_domain_host::Form::Withdrawn,
+        jig_domain_accounts::Form::Application => jig_domain_host::Form::Application,
     }
 }

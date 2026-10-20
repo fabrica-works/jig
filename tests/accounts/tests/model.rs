@@ -2,8 +2,8 @@
 //! kept by the store: each change saved in the step that makes it, and restored at the start.
 use jig_accounts_world::{LIMITS, World, account, provider, providers, source};
 use jig_domain_accounts::{
-    Bound, Configured, Event, FromComponent, Held, Holder, Key, Kind, Refusal, Request, SignIn, State, Stored,
-    ToComponent, room_for_sign_in,
+    Bound, Configured, Event, Form, FromComponent, Held, Holder, Key, Kind, Refusal, Request, Scheme, SignIn, State,
+    Stored, ToComponent, room_for_sign_in,
 };
 use skein_lib::{Duration, Time, Wall};
 use std::collections::BTreeMap;
@@ -18,7 +18,12 @@ fn save(record: Stored) -> Request {
     Request::Save { record }
 }
 fn granted(source: u32) -> Event {
-    Event::Component(FromComponent::Granted { account: source, generation: 1, valid: Duration::from_secs(100) })
+    Event::Component(FromComponent::Granted {
+        form: Form::Credential(Scheme::Bearer),
+        account: source,
+        generation: 1,
+        valid: Duration::from_secs(100),
+    })
 }
 /// Providers 1 and 2 offer a sign-in and a key; 3 offers none of its own: the `none` source.
 fn fresh() -> World {

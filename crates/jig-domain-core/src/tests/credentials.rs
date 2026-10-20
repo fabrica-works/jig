@@ -12,6 +12,7 @@ fn a_run_waits_while_a_credential_it_needs_is_unusable() {
         &mut core.accounts,
         &env,
         accounts::Event::Component(accounts::FromComponent::Granted {
+            form: accounts::Form::Credential(accounts::Scheme::Bearer),
             account: 1,
             generation: 1,
             valid: Duration::from_secs(60),

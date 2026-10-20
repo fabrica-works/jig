@@ -181,7 +181,7 @@ mod down_records {
             down: LinkDown::Grant {
                 run: Token::new(7),
                 attempt: Token::new(2),
-                grant: fixtures::grant(jig_domain_host::GrantTable::Accounts),
+                grant: fixtures::grant(jig_domain_host::Form::Withdrawn),
             },
             parts: Box::new([]),
             values: Box::new([fixtures::values()[0].take()]),

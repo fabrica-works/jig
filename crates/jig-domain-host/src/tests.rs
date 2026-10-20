@@ -418,7 +418,7 @@ mod fixtures {
     const ANALYST: u32 = 3;
     pub fn account_grant(generation: u64) -> crate::Grant {
         crate::Grant {
-            table: crate::GrantTable::Accounts,
+            form: crate::Form::Credential(crate::Scheme::Bearer),
             account: ANALYST,
             generation,
             valid: skein_lib::Duration::from_secs(30),
@@ -426,7 +426,7 @@ mod fixtures {
     }
 
     pub fn application_grant(generation: u64) -> crate::Grant {
-        crate::Grant { table: crate::GrantTable::Application, ..account_grant(generation) }
+        crate::Grant { form: crate::Form::Application, ..account_grant(generation) }
     }
     pub fn assign(assignment: RunAssignment) -> Event {
         Event::Down(LinkDown::Assign {
@@ -474,7 +474,7 @@ fn kept_grants(h: &Harness, owner: Token) -> &[crate::Grant] {
 }
 
 #[test]
-fn a_grant_keeps_its_table_through_the_start() {
+fn a_grant_keeps_its_form_through_the_start() {
     let mut h = Harness::new();
     let (_, start) = assigned_grants(&mut h, Box::new([fixtures::account_grant(1)]));
     assert_eq!(&*start.grants, &[fixtures::account_grant(1)]);
@@ -504,11 +504,9 @@ fn an_accounts_grant_renews_the_agents_grant() {
     let (owner, _) = assigned_grants(&mut h, Box::new([fixtures::account_grant(1), fixtures::application_grant(1)]));
     let agent = Token::new(301);
     h.step(Event::Started { owner, agent });
-    assert_eq!(
-        &*renewal(&mut h, fixtures::account_grant(2)),
-        &[Request::Grant { agent, grant: fixtures::account_grant(2) }]
-    );
-    assert_eq!(kept_grants(&h, owner), &[fixtures::account_grant(2), fixtures::application_grant(1)]);
+    let newest = crate::Grant { form: crate::Form::Credential(crate::Scheme::Key), ..fixtures::account_grant(2) };
+    assert_eq!(&*renewal(&mut h, newest), &[Request::Grant { agent, grant: newest }]);
+    assert_eq!(kept_grants(&h, owner), &[newest, fixtures::application_grant(1)]);
 }
 
 #[test]
@@ -754,4 +752,24 @@ fn a_start_refusal_after_cancel_keeps_the_cancellations_answer() {
             work: Work { left: None, saved: None },
         }
     );
+}
+
+#[test]
+fn two_grants_of_one_account_in_different_forms_are_refused() {
+    let mut h = Harness::new();
+    let mut assignment = assignment(1);
+    assignment.grants = Box::new([
+        fixtures::account_grant(1),
+        crate::Grant { form: crate::Form::Credential(crate::Scheme::Key), ..fixtures::account_grant(1) },
+    ]);
+    let requests = h.step(fixtures::assign(assignment));
+    let [
+        Request::Up(LinkUp::Answer {
+            answer: crate::Answer { ending: crate::Ending::Refused(Refusal::Invalid(Invalid::Grants)), .. },
+            ..
+        }),
+    ] = &*requests
+    else {
+        panic!("expected invalid grants: {requests:?}")
+    };
 }

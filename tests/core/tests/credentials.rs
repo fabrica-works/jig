@@ -64,7 +64,7 @@ fn the_assignment_carries_the_credential_named_by_its_table() {
     let world = delegated(151);
     let assignment = world.assigned.as_ref().expect("the delegate is assigned");
     assert!(assignment.grants.contains(&accounts::Grant {
-        table: accounts::GrantTable::Application,
+        form: accounts::Form::Application,
         account: WORKSPACE_CREDENTIAL,
         generation: 3,
         valid: Duration::from_secs(60),
@@ -80,7 +80,7 @@ fn a_new_credential_generation_reaches_the_live_run() {
         (
             Token::new(task),
             fleet::Grant {
-                table: fleet::GrantTable::Application,
+                form: fleet::Form::Application,
                 account: WORKSPACE_CREDENTIAL,
                 generation: 4,
                 valid: Duration::from_secs(60),
@@ -100,7 +100,7 @@ fn an_adopted_run_is_sent_its_credential_again() {
         (
             Token::new(task),
             fleet::Grant {
-                table: fleet::GrantTable::Application,
+                form: fleet::Form::Application,
                 account: WORKSPACE_CREDENTIAL,
                 generation: 4,
                 valid: Duration::from_secs(60),
@@ -306,4 +306,24 @@ fn the_deployment_watch_shows_the_deployments_accounts_and_not_a_partys_own() {
     take(&mut world, OWN_WATCH);
     ask_as(&mut world, sign_in, 43, people::Ask::AccountSignOut { holder: people::AccountHolder::Own, source });
     assert!(accounts_document(&world, OWN_WATCH).accounts.is_empty());
+}
+
+#[test]
+fn a_sources_form_reaches_the_fleet_as_the_component_named_it() {
+    const SECOND_ANALYST: u32 = 2;
+    let (mut config, limits) = jig_core_world::effects::fixture(166, false);
+    for charter in &mut config.core.settings.charters {
+        charter.policy.model.account = SECOND_ANALYST;
+        for model in &mut charter.policy.alternatives {
+            model.account = SECOND_ANALYST;
+        }
+    }
+    let mut world = World::configured_unassigned(166, false, config, limits);
+    world.announce_grant(SECOND_ANALYST, 1, accounts::Form::Credential(accounts::Scheme::Key));
+    assert_eq!(
+        world.assigned.as_ref().expect("the fleet started the run").grants[0].form,
+        accounts::Form::Credential(accounts::Scheme::Key),
+    );
+    hello(&mut world);
+    assert_eq!(received(&world).1.form, fleet::Form::Credential(fleet::Scheme::Key));
 }

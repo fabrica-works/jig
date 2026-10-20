@@ -16,9 +16,9 @@ impl World {
     }
 
     /// Let the component renew when placement submits its still-held assignment.
-    pub fn renew_on_assignment(&mut self, account: u32, generation: u64) {
+    pub fn renew_on_assignment(&mut self, account: u32, generation: u64, form: accounts::Form) {
         self.renew_on_running =
-            Some(accounts::FromComponent::Granted { account, generation, valid: Duration::from_secs(60) });
+            Some(accounts::FromComponent::Granted { form, account, generation, valid: Duration::from_secs(60) });
         self.store_delay = 5;
     }
 
@@ -41,5 +41,14 @@ impl World {
     pub(super) fn grant_delivered(&mut self, channel: Token, run: Token, attempt: Token, grant: fleet::Grant) {
         self.grant_follows_assignment = self.assignments.contains(&(run.raw(), attempt.raw()));
         self.received_grant = Some((channel, run, attempt, grant));
+    }
+}
+
+impl World {
+    /// Announce the source's form before placement starts its run.
+    pub fn announce_grant(&mut self, account: u32, generation: u64, form: accounts::Form) {
+        self.send(root::Event::Core(core::Event::Account(accounts::Event::Component(
+            accounts::FromComponent::Granted { account, generation, valid: Duration::from_secs(60), form },
+        ))));
     }
 }

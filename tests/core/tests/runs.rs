@@ -547,6 +547,7 @@ fn account_failed(world: &mut World) {
 fn account_granted(world: &mut World) {
     world.send(root::Event::Core(core::Event::Account(jig_domain_accounts::Event::Component(
         jig_domain_accounts::FromComponent::Granted {
+            form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Bearer),
             account: 1,
             generation: 9,
             valid: skein_lib::Duration::from_secs(60),

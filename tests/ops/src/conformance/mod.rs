@@ -584,7 +584,12 @@ impl Application for Ops {
                 account,
             }))) => {
                 vec![Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
-                    accounts::FromComponent::Granted { account, generation: 1, valid: Duration::from_secs(7200) },
+                    accounts::FromComponent::Granted {
+                        form: accounts::Form::Credential(accounts::Scheme::Bearer),
+                        account,
+                        generation: 1,
+                        valid: Duration::from_secs(7200),
+                    },
                 ))))]
             }
             root::Output::Now(core::Now::Account(accounts::Request::Component(accounts::ToComponent::Close))) => {
@@ -696,7 +701,12 @@ impl Application for Ops {
                 })));
             }
             events.push(Input::Event(root::Event::Core(core::Event::Account(accounts::Event::Component(
-                accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(7200) },
+                accounts::FromComponent::Granted {
+                    form: accounts::Form::Credential(accounts::Scheme::Bearer),
+                    account: 1,
+                    generation: 1,
+                    valid: Duration::from_secs(7200),
+                },
             )))));
         }
         if ready && !peers.asked_sign_in {

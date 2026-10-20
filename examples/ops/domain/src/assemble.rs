@@ -109,10 +109,7 @@ pub(crate) fn assignment(
     let mut held = List::with_capacity(u32::try_from(grants.len()).ok()?);
     for grant in grants {
         held.push(host::Grant {
-            table: match grant.table {
-                accounts::GrantTable::Accounts => host::GrantTable::Accounts,
-                accounts::GrantTable::Application => host::GrantTable::Application,
-            },
+            form: accounts_form(grant.form),
             account: grant.account,
             generation: grant.generation,
             valid: grant.valid,
@@ -347,10 +344,7 @@ pub(crate) fn fleet_grants(grants: &[host::Grant]) -> Box<[fleet::Grant]> {
     for grant in grants {
         translated
             .push(fleet::Grant {
-                table: match grant.table {
-                    host::GrantTable::Accounts => fleet::GrantTable::Accounts,
-                    host::GrantTable::Application => fleet::GrantTable::Application,
-                },
+                form: fleet_form(grant.form),
                 account: grant.account,
                 generation: grant.generation,
                 valid: grant.valid,
@@ -362,12 +356,42 @@ pub(crate) fn fleet_grants(grants: &[host::Grant]) -> Box<[fleet::Grant]> {
 
 pub(crate) fn host_grant(grant: fleet::Grant) -> host::Grant {
     host::Grant {
-        table: match grant.table {
-            fleet::GrantTable::Accounts => host::GrantTable::Accounts,
-            fleet::GrantTable::Application => host::GrantTable::Application,
-        },
+        form: host_form(grant.form),
         account: grant.account,
         generation: grant.generation,
         valid: grant.valid,
+    }
+}
+
+const fn accounts_form(form: accounts::Form) -> host::Form {
+    match form {
+        accounts::Form::Credential(scheme) => host::Form::Credential(match scheme {
+            accounts::Scheme::Bearer => host::Scheme::Bearer,
+            accounts::Scheme::Key => host::Scheme::Key,
+        }),
+        accounts::Form::Withdrawn => host::Form::Withdrawn,
+        accounts::Form::Application => host::Form::Application,
+    }
+}
+
+const fn fleet_form(form: host::Form) -> fleet::Form {
+    match form {
+        host::Form::Credential(scheme) => fleet::Form::Credential(match scheme {
+            host::Scheme::Bearer => fleet::Scheme::Bearer,
+            host::Scheme::Key => fleet::Scheme::Key,
+        }),
+        host::Form::Withdrawn => fleet::Form::Withdrawn,
+        host::Form::Application => fleet::Form::Application,
+    }
+}
+
+const fn host_form(form: fleet::Form) -> host::Form {
+    match form {
+        fleet::Form::Credential(scheme) => host::Form::Credential(match scheme {
+            fleet::Scheme::Bearer => host::Scheme::Bearer,
+            fleet::Scheme::Key => host::Scheme::Key,
+        }),
+        fleet::Form::Withdrawn => host::Form::Withdrawn,
+        fleet::Form::Application => host::Form::Application,
     }
 }

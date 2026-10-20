@@ -63,6 +63,7 @@ fn take_due_skips_a_task_whose_charters_account_is_unusable() {
         &mut core.accounts,
         &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.accounts },
         accounts::Event::Component(accounts::FromComponent::Granted {
+            form: accounts::Form::Credential(accounts::Scheme::Bearer),
             account: 2,
             generation: 1,
             valid: Duration::from_secs(60),

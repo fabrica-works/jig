@@ -29,7 +29,7 @@ pub fn hosting_pair(
 
 /// The account granted to the fleet world's scripted attempts.
 pub const ANALYST: jig_domain_fleet::Grant = jig_domain_fleet::Grant {
-    table: jig_domain_fleet::GrantTable::Accounts,
+    form: jig_domain_fleet::Form::Credential(jig_domain_fleet::Scheme::Bearer),
     account: 1,
     generation: 1,
     valid: skein_lib::Duration::from_secs(60),

@@ -3,13 +3,13 @@
 
 use crate::attempt::{Attempt, State, Where};
 use crate::domain::Domain;
-use crate::{Grant, GrantName, Limits, Request};
+use crate::{Form, Grant, GrantName, Limits, Request};
 use skein_lib::{Duration, Env, List, Queue, Time, Token};
 
 #[derive(Debug)]
 pub(crate) struct Kept {
     name: GrantName,
-    current: Option<(u64, Time)>,
+    current: Option<(u64, Time, Form)>,
 }
 
 pub(crate) fn keep(
@@ -33,7 +33,7 @@ fn entries(holds: &[GrantName], grants: &[Grant], now: Time, most: u32) -> List<
         add(&mut kept, *name);
     }
     for grant in grants {
-        let name = GrantName { table: grant.table, account: grant.account };
+        let name = GrantName { table: grant.form.table(), account: grant.account };
         if holds.is_empty() {
             add(&mut kept, name);
         }
@@ -57,12 +57,12 @@ fn add(kept: &mut List<Kept>, name: GrantName) {
 }
 
 fn newer(kept: &mut Kept, grant: Grant, now: Time) -> bool {
-    if let Some((generation, _)) = kept.current
+    if let Some((generation, _, _)) = kept.current
         && grant.generation <= generation
     {
         return false;
     }
-    kept.current = Some((grant.generation, now.saturating_add(grant.valid)));
+    kept.current = Some((grant.generation, now.saturating_add(grant.valid), grant.form));
     true
 }
 
@@ -82,7 +82,7 @@ pub(crate) fn renew(domain: &mut Domain, env: &Env<Limits>, grant: Grant, out: &
         let mut changed = false;
         for index in 0..attempt.grants.len() {
             let kept = attempt.grants.get_mut(index).expect("grant index");
-            if kept.name == (GrantName { table: grant.table, account: grant.account }) {
+            if kept.name == (GrantName { table: grant.form.table(), account: grant.account }) {
                 changed = newer(kept, grant, env.now);
             }
         }
@@ -105,19 +105,14 @@ pub(crate) fn resend(
     let State::Claimed { at: Where::On(channel), .. } = attempt.state else { return };
     let channel = channels.get(channel).expect("a claimed channel is connected").token;
     for kept in &attempt.grants {
-        if let Some((generation, lapses)) = kept.current
+        if let Some((generation, lapses, form)) = kept.current
             && lapses > now
         {
             out.push(Request::Grant {
                 channel,
                 run: attempt.run,
                 attempt: attempt.token,
-                grant: Grant {
-                    table: kept.name.table,
-                    account: kept.name.account,
-                    generation,
-                    valid: lapses.saturating_since(now),
-                },
+                grant: Grant { form, account: kept.name.account, generation, valid: lapses.saturating_since(now) },
             });
         }
     }

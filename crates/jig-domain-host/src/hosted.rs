@@ -426,7 +426,7 @@ fn start_prepared(domain: &mut Domain, owner: Token, workspace: Option<Token>, o
         State::Preparing { charter, held } => {
             let mut grants = List::with_capacity(u32::try_from(entry.grants.len()).expect("validated grants"));
             for grant in &entry.grants {
-                if grant.table == GrantTable::Accounts {
+                if grant.form.table() == GrantTable::Accounts {
                     grants.push(*grant).expect("room for every account grant");
                 }
             }
@@ -509,7 +509,7 @@ pub(crate) fn started(domain: &mut Domain, env: &Env<Limits>, owner: Token, agen
         State::Starting { workspace, mut held } => {
             if entry.refreshed {
                 for grant in &entry.grants {
-                    if grant.table == GrantTable::Accounts {
+                    if grant.form.table() == GrantTable::Accounts {
                         out.push(Request::Grant { agent, grant: *grant });
                     }
                 }
@@ -1216,12 +1216,15 @@ pub(crate) fn grant(domain: &mut Domain, run: Token, attempt: Token, grant: Gran
     let entry = domain.hosted.get_mut(id).expect("a named run is hosted");
     let mut accepted = false;
     for current in &mut entry.grants {
-        if current.table == grant.table && current.account == grant.account && current.generation < grant.generation {
+        if current.form.table() == grant.form.table()
+            && current.account == grant.account
+            && current.generation < grant.generation
+        {
             *current = grant;
             accepted = true;
         }
     }
-    if !accepted || grant.table != GrantTable::Accounts {
+    if !accepted || grant.form.table() != GrantTable::Accounts {
         return;
     }
     entry.refreshed = true;

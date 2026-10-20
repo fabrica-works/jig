@@ -1,7 +1,7 @@
 use jig_accounts_world::{LIMITS, provider, providers};
 use jig_domain_accounts::{
-    ADDRESS, DISPLAY, Domain, Event, Failure, FromComponent, Held, Holder, Kind, Limits, NAME, Request, SUBJECT,
-    Signing, Stored, max_out, step, worst_case,
+    ADDRESS, DISPLAY, Domain, Event, Failure, Form, FromComponent, Held, Holder, Kind, Limits, NAME, Request, SUBJECT,
+    Scheme, Signing, Stored, max_out, step, worst_case,
 };
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};
@@ -24,6 +24,14 @@ fn number(account: u32, place: Option<u32>) -> u32 {
 }
 fn kind(place: u32) -> Kind {
     KINDS[usize::try_from(place).expect("a small place") % KINDS.len()]
+}
+fn granted(source: u32) -> FromComponent {
+    FromComponent::Granted {
+        form: Form::Credential(Scheme::Bearer),
+        account: source,
+        generation: 9,
+        valid: Duration::from_secs(100),
+    }
 }
 /// Every account with its longest names, every source of each, a program's name at its longest,
 /// a limit on each key, a grant for each signed-in source, and every credential. Each record is
@@ -85,7 +93,7 @@ fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
             }
             let source = number(account, Some(place));
             meter.start();
-            let event = FromComponent::Granted { account: source, generation: 9, valid: Duration::from_secs(100) };
+            let event = granted(source);
             step(&mut domain, &env, Event::Component(event), &mut out);
             let measured = meter.end();
             while out.pop().is_some() {}

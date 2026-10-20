@@ -202,6 +202,10 @@ fn a_handed_in_record_is_kept_before_its_value_is_lent() {
     let value = engine.values.accounts.value(1, 1, skein_lib::Time::from_nanos(1)).expect("lent value");
     assert_eq!(value.token.expose(), fixtures::TOKEN);
     assert_eq!(value.scheme, Scheme::Bearer);
+    assert_eq!(
+        engine.domain.accounts().source_grant(1, engine.env.now).expect("announced grant").form,
+        jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Bearer)
+    );
 }
 #[test]
 fn a_handed_in_record_with_an_account_id_is_lent_withdrawn_beside_it() {
@@ -214,6 +218,10 @@ fn a_handed_in_record_with_an_account_id_is_lent_withdrawn_beside_it() {
     let value = engine.values.accounts.value(1, 1, skein_lib::Time::from_nanos(1)).expect("lent value");
     assert_eq!(value.token.expose(), fixtures::TOKEN);
     assert_eq!(value.scheme, Scheme::Withdrawn { id: Secret::new(b"acc".as_slice().into()) });
+    assert_eq!(
+        engine.domain.accounts().source_grant(1, engine.env.now).expect("announced grant").form,
+        jig_domain_accounts::Form::Withdrawn
+    );
 }
 
 #[test]
@@ -300,7 +308,7 @@ fn an_assignment_leaves_with_its_charter_encoded_and_grants_filled() {
 }
 #[test]
 fn each_scheme_reaches_the_engine_s_grant_value() {
-    use jig_domain_host::{Grant, GrantTable};
+    use jig_domain_host::{Form, Grant};
     use skein_lib::{Duration, Time};
     let id = Secret::new(b"acc".as_slice().into());
     for (scheme, expected) in [
@@ -311,7 +319,12 @@ fn each_scheme_reaches_the_engine_s_grant_value() {
         let mut values = fixtures::values();
         let value = Value { token: Secret::new(fixtures::TOKEN.into()), scheme };
         values.accounts.granted(1, 2, value, Time::from_nanos(1)).expect("room");
-        let grant = Grant { table: GrantTable::Accounts, account: 1, generation: 2, valid: Duration::from_secs(1) };
+        let grant = Grant {
+            form: Form::Credential(jig_domain_host::Scheme::Bearer),
+            account: 1,
+            generation: 2,
+            valid: Duration::from_secs(1),
+        };
         let grants = values.grants(&[grant], Time::ZERO);
         let found = match &grants[0] {
             Some(GrantValue::Credential { scheme: engine::Scheme::Bearer, token }) => ("bearer", token, b"".as_slice()),
@@ -324,22 +337,22 @@ fn each_scheme_reaches_the_engine_s_grant_value() {
 }
 #[test]
 fn a_grant_whose_generation_the_table_lacks_is_left_out() {
-    use jig_domain_host::{Grant, GrantTable};
+    use jig_domain_host::{Form, Grant};
     use skein_lib::{Duration, Time};
     let values = fixtures::values();
-    for (table, generation, time) in [
-        (GrantTable::Accounts, 2, Time::ZERO),
-        (GrantTable::Accounts, 1, Time::from_nanos(120_000_000_000)),
-        (GrantTable::Application, 2, Time::ZERO),
+    for (form, generation, time) in [
+        (Form::Credential(jig_domain_host::Scheme::Bearer), 2, Time::ZERO),
+        (Form::Credential(jig_domain_host::Scheme::Bearer), 1, Time::from_nanos(120_000_000_000)),
+        (Form::Application, 2, Time::ZERO),
     ] {
-        let grants = values.grants(&[Grant { table, account: 1, generation, valid: Duration::from_secs(1) }], time);
+        let grants = values.grants(&[Grant { form, account: 1, generation, valid: Duration::from_secs(1) }], time);
         assert_eq!(grants.len(), 1);
         assert!(grants[0].is_none());
     }
 }
 #[test]
 fn application_grants_keep_the_two_newest_generations_per_number() {
-    use jig_domain_host::{Grant, GrantTable};
+    use jig_domain_host::{Form, Grant};
     use skein_lib::{Duration, Secret, Time};
     let mut values = fixtures::values();
     for (number, generation, value) in [
@@ -359,7 +372,7 @@ fn application_grants_keep_the_two_newest_generations_per_number() {
         (2, 1, Some(b"other".as_slice())),
     ] {
         let grants = values.grants(
-            &[Grant { table: GrantTable::Application, account: number, generation, valid: Duration::from_secs(1) }],
+            &[Grant { form: Form::Application, account: number, generation, valid: Duration::from_secs(1) }],
             Time::ZERO,
         );
         match &grants[0] {

@@ -75,7 +75,12 @@ pub fn restart(world: &mut World, seed: u64, engine: bool) {
     world.restart_with(crate::peers::fixture(seed, u32::from(engine)).0);
     // Account usability is an independently refreshed runtime capability.
     world.send(jig_test_domain::Event::Core(jig_domain_core::Event::Account(jig_domain_accounts::Event::Component(
-        jig_domain_accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
+        jig_domain_accounts::FromComponent::Granted {
+            form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Bearer),
+            account: 1,
+            generation: 1,
+            valid: Duration::from_secs(60),
+        },
     ))));
 }
 
