@@ -1,6 +1,6 @@
 # Configuration
 
-Provisional, 2026-10-10, revised 2026-10-19. What an engine and a worker
+Provisional, 2026-10-10, revised 2026-10-20. What an engine and a worker
 are told when they start, as far as jig defines its shape: the parts of
 `../domain/engine.md`, section 14 that are jig's, the templates an
 application defines its shapes of work with, how an application's
@@ -29,6 +29,11 @@ when configuration is read. What is still open is listed in section 9.
   unique, numbers that refer to something configured, limits whose worst
   case fits the process's memory. A configuration that fails it never
   starts the loop.
+- **Paths are typed.** Each path the document names is a configuration
+  path, a data path or a cache path, by its member: relative to the
+  application's directory of that kind, or absolute. The parsers resolve
+  them against the directories their caller gives, touching no disk, or
+  against the working directory where it gives none (section 10).
 - **No secret in the file.** A secret is a file of its own, which the
   configuration names, read at startup as a private file (skein's
   `io.md`, 5.3): owned by the process's user and readable by nobody else,
@@ -62,8 +67,10 @@ the application's main (its shell)
 - **`jig-protocol-config`** is a crate of jig's, step code: functions from
   a parsed JSON value to jig's typed configuration and back to the
   problems it found, each naming its path in the document. It reads no
-  file. It yields jig's own plain values only, and links neither smith nor
-  skein's LLM crates, so an application without agents never links them
+  file: it resolves each path member against the directories its caller
+  gives, by joining their names (section 10). It yields jig's own plain
+  values only, and links neither smith nor skein's LLM crates, so an
+  application without agents never links them
   (`../README.md`, section 9); an application with agents turns the
   endpoints and charters it yields into smith's and skein's types in its
   startup (`llm.md`, section 4).
@@ -76,14 +83,14 @@ the application's main (its shell)
 
 | Member | What it gives | Used by |
 |---|---|---|
-| deployment | the deployment's directory, which holds the store, transcripts and the secrets' store; retention's horizons (`store.md`, 11.1); the seed's source, for tests | the store (`store.md`); the domain's retention; the shell |
+| deployment | the deployment's directory, a data path, which holds the store, transcripts and the secrets' store; retention's horizons (`store.md`, 11.1); the seed's source, for tests | the store (`store.md`); the domain's retention; the shell |
 | owners | the deployment's first owners, each a provider and a subject (`../domain/people.md`, section 3), each an owner of every project seeded with it | the people child, on a first start |
 | providers | the numbers and kinds that identities name (`../domain/people.md`, section 3), and nothing else: jig runs no provider's exchange. Of kind *link*, the printed link's; of kind *deployment*, exactly one, the deployment's own, for services' credentials; of kind *application*, each of the application's ways of signing in, whose identities its server verifies on its own routes and asks the clients' component to mint a credential for (`client.md`, section 8). The settings and secrets of the application's sign-in are its own members | the people child; `jig-protocol-engine-clients`, which mints a printed link's credential for the first owner it names, a service's under the deployment's provider, and a `Mint`'s only for an identity whose provider is of kind application |
 | rules | the deployment's rules: the ceilings every project's policy is under (`../domain/authority.md`, section 6). A ceiling, the rules' or a project policy's, names in `models` the configured models it allows, from the llm member's, or every one without it; a role's authority names its models the same way: they seed the role on a first start, and the store keeps them by name (`store.md`, 5.1) | authority |
 | projects | each project seeded on a first start: its number; its policy, with its spend per period, its roles (each one's authority, the spend a party in it may allot per period, the kinds of proposal it decides; `../domain/authority.md`, section 6) and its overrides of templates' defaults (3.1); its parties' roles. Its resources and homes come by adoption (below) | the core, on a first start |
-| charters | each charter the deployment offers, numbered: its instructions (a file it names), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8). Its models are those it allows, in order, or every configured one; a task that names none takes the first whose LLM provider has a usable account serving its payer (`../domain/tasks.md`, section 3). It names no account: the core chooses one with each run's check (`../domain/accounts.md`, 4.3) | the core; `jig-protocol-charter` |
+| charters | each charter the deployment offers, numbered: its instructions (a file it names, a configuration path), its models, named from the llm member's (its main model, and those its sub-agents may use), its tool families, the hosts that may run it, its waiting time, whether its runs resume, its default budget (turns, spend and time, and a reserve of turns and time), which applies to a task whose batch gives none (`../domain/hosts.md`, section 8). Its models are those it allows, in order, or every configured one; a task that names none takes the first whose LLM provider has a usable account serving its payer (`../domain/tasks.md`, section 3). It names no account: the core chooses one with each run's check (`../domain/accounts.md`, 4.3) | the core; `jig-protocol-charter` |
 | templates | each template the application defines, numbered and never renumbered, with its defaults; jig's chat and goal among them unless the application drops them (3.1) | the core, only to serve each project's merged templates in `me` (`../client/domain/contract.md`, 5.1); the client, which fills them in |
-| hosts | the engine's own slots, if it runs agents in the engine (shape 2), and their `smith-inline-agent`'s limits; the workers' names, each with the file of its secret's digest; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers`; `smith-inline-agent`, through the application's startup |
+| hosts | the engine's own slots, if it runs agents in the engine (shape 2), and their `smith-inline-agent`'s limits; the workers' names, each with the file of its secret's digest, a data path; the workers' listener: its addresses, socket addresses or an in-process name (skein's `io.md`, section 4), and its certificate and key files, data paths, but for an in-process name (`channel.md`, section 10); a listener on an in-process name tells the core its workers are in its process, and that no worker outlives it (`../domain/engine.md`, section 6) | the fleet; `jig-protocol-engine-workers`; `smith-inline-agent`, through the application's startup |
 | llm | the LLM providers (`../domain/providers.md`), each numbered, with its name for showing; its endpoints, each with the models it serves; each model's window, output, the efforts it takes, in order, the first being the one a task given no LLM choice takes (`../domain/tasks.md`, section 3), or none, and the rest of what smith's agent configuration declares of it (smith's `protocol/agent.md`, section 4), its prices (input, cached input, output, and cache writes when priced apart) and its description, what it is good at, for the brief's catalogue (`../domain/engine.md`, section 9); the sources it offers: a sign-in, with its public registration (its entry client id, its name hint, its authorization, token, revocation and published keys' addresses with their transport, its issuer, its scopes and those that must be granted, its resource, its redirect's path, and its port where fixed, an ephemeral loopback port for each sign-in otherwise), a key, a program, named `claude_code` where the program is Claude Code (smith's `protocol/programs.md`, section 3), or none; a sign-in waits for its redirect within the profile's sign-in deadline, as a limit of the driver (section 6; skein's `oauth.md`, section 3); and the facts its terms ask an application to show: whether a signed-in source is a plan, and its manage-usage address (`../domain/providers.md`, 2.6). No account, key or record: accounts are made at runtime and kept in the store (`../domain/accounts.md`, 3.1; `llm.md`, sections 4 and 5) | the core; smith's and skein's components and skein's accounts driver, through the application's startup; `jig-protocol-accounts` |
 | clients | the heartbeat of the clients' streams (`client.md`, section 4); whether the clients' component gives a printed link's one-time secret at start, whose URL the application's startup prints (`client.md`, section 8), only where its clients reach it on loopback, which that startup checks against its own listener (`service.md`, section 3). The listener, its certificate and key, and what serves a browser are the application's service's own members (`service.md`, section 7) | `jig-protocol-engine-clients` |
 | connectors | the application's connectors' numbers, as the core knows them (`../domain/core.md`, 3.5); none takes the number the core keeps for its own procedures (below) | the core |
@@ -247,11 +254,11 @@ the application's main (its shell)
 | Member | What it gives |
 |---|---|
 | engine | the engine's address, and its TLS server name and trusted roots; or plaintext to a loopback address; or an in-process name, in one process (`channel.md`, 10.1; `service.md`, section 10) |
-| name, secret | the worker's name, and the file holding its secret |
+| name, secret | the worker's name, and the file holding its secret, a data path |
 | slots | how many runs it hosts at once |
 | graces | the grace after losing the engine, the stop graces of an agent's tree, a delivery's deadline, a save's: with the link's ping interval and silence deadline, what its stop bound is made of (`channel.md`, 10.1; `../domain/hosts.md`, 6.6) |
-| agent | the agent program, which the worker's protocol layer spawns for each run, and which may be the application's own binary run as its `agent` command, smith's agent shell (`service.md`, section 6); and its configuration, smith's agent configuration (smith's `protocol/agent.md`, section 4), which declares the models the engine's charters name, with their window and output, and the endpoints they run on, by the same names as the engine's (`llm.md`, section 4). The worker's routing decodes charters against its endpoints, and its hello states its agent's bounds from it (`channel.md`, 4.3). A worker that composes `smith-inline-agent` gives it the same configuration, and runs no agent program |
-| programs | the programs directory, private to the worker's user, under which each program source's configuration directory is named by the source's name (`../domain/accounts.md`, 3.4; `llm.md`, 5.5); and the interval at which the worker has smith's host half check their logins, since when to ask is the host's (smith's `protocol/programs.md`, section 3) |
+| agent | the agent program, which the worker's protocol layer spawns for each run, and which may be the application's own binary run as its `agent` command, smith's agent shell (`service.md`, section 6), with its arguments, which the worker passes as written: neither is a path of the document's; and its configuration, a configuration path, smith's agent configuration (smith's `protocol/agent.md`, section 4), which declares the models the engine's charters name, with their window and output, and the endpoints they run on, by the same names as the engine's (`llm.md`, section 4). The worker's routing decodes charters against its endpoints, and its hello states its agent's bounds from it (`channel.md`, 4.3). A worker that composes `smith-inline-agent` gives it the same configuration, and runs no agent program |
+| programs | the programs directory, a data path, private to the worker's user, under which each program source's configuration directory is named by the source's name (`../domain/accounts.md`, 3.4; `llm.md`, 5.5); and the interval at which the worker has smith's host half check their logins, since when to ask is the host's (smith's `protocol/programs.md`, section 3) |
 | limits | a profile, and overrides |
 
 The worker's workspace's configuration is the application's. Workers are
@@ -403,6 +410,32 @@ host's half reports it (`llm.md`, 5.5).
   - `{"in_process": "<name>"}`, an in-process name within skein's bound
     (skein's `io.md`, section 4), in one process only (`service.md`,
     section 10).
+- **A path** is a string of bytes, of one of three kinds, which its
+  member fixes: a *configuration path*, a *data path* or a *cache path*,
+  after the application's three directories (skein's `shell.md`, 6.5).
+  Configuration is what the operator writes and may copy or publish (the
+  document itself, charters' instructions, trusted roots, the agent's
+  configuration); data is what the deployment keeps, secrets among it
+  (the deployment's directory, a worker's secret and the digests of
+  workers' secrets, the workers' listener's certificate and key, the
+  programs directory); cache is what can be fetched again (jig's part
+  names none yet). Every trusted roots' file, the engine's, an LLM
+  endpoint's, a sign-in's and a registration's, is a configuration path.
+  - *An absolute path,* one beginning with `/`, is taken as written.
+  - *A relative path* is joined to its kind's directory when the
+    document is parsed, by joining names, without reading the disk. It
+    is non-empty, and none of its components is `..`, or the start is
+    refused, naming its member.
+  - *The directories* are the caller's: each absolute, given to the
+    parsers with the document by the application's startup, which takes
+    them from its arguments (skein's `shell.md`, 6.5). A caller that
+    gives none, as `jig-test` and tests do, has each relative path
+    resolved against the working directory. Every file the
+    configuration names (`files`, `worker_files`) is reported resolved,
+    so a startup reads each where its row says.
+  - *The agent's program and its arguments* are no kind: the worker
+    spawns them as written (`service.md`, section 6), so a bare program
+    name stays bare.
 - **A digest file** holds one SHA-256 digest as 64 lowercase hexadecimal
   digits, and nothing else but a final newline.
 - **A secret file** holds the secret's bytes as they are, and nothing
