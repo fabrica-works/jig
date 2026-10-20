@@ -109,7 +109,10 @@ fn a_service_result_contains_its_party_and_no_credential() {
 fn an_account_answer_or_bound_is_not_carried_to_a_client_before_jp10() {
     let limits = f::wire();
     let not_carried = w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Tag };
-    for outcome in [p::Outcome::AccountSignInStarted { source: 4 }, p::Outcome::AccountSignedOut { confirmed: true }] {
+    for outcome in [
+        p::Outcome::AccountSignInStarted { source: 4, address: b"https://issuer.test/visit".as_slice().into() },
+        p::Outcome::AccountSignedOut { confirmed: true },
+    ] {
         let answer = crate::translate::answers::answer(&p::Reply::Outcome(outcome), &f::models(), &limits);
         assert_eq!(answer.err().as_ref(), Some(&not_carried));
     }

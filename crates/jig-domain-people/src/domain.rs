@@ -227,7 +227,7 @@ impl Domain {
         let mut ordered = Map::with_capacity(capacity);
         let mut ordinal = 0_u32;
         for (key, answer) in &self.answers {
-            if let Some(cause) = crate::capacity::permanent(answer.outcome)
+            if let Some(cause) = crate::capacity::permanent(&answer.outcome)
                 && let Some(action) = crate::capacity::action(&answer.ask, key.person)
             {
                 let value = crate::CapacityRefusal {
@@ -1369,7 +1369,7 @@ fn admit_ask(
         if answer.ask != ask {
             return refused(to, Refusal::KeyConflict, out);
         }
-        return out.push(Request::Reply { to, reply: Reply::Outcome(answer.outcome) });
+        return out.push(Request::Reply { to, reply: Reply::Outcome(answer.outcome.clone()) });
     }
 
     if let Some(id) = domain.flights.get(&key).copied() {
@@ -1402,7 +1402,7 @@ fn admit_ask(
     let refusal = admission(domain, key.person, project, role, &ask);
     if let Some(refusal) = refusal {
         let outcome = Outcome::Refused(refusal);
-        save_answer(domain, env, key, ask, outcome, out);
+        save_answer(domain, env, key, ask, outcome.clone(), out);
         return out.push(Request::Reply { to, reply: outcome_reply(outcome) });
     }
     if domain.pending.is_full() {
@@ -1446,7 +1446,9 @@ fn save_answer(
     outcome: Outcome,
     out: &mut Queue<Request>,
 ) {
-    out.push(Request::Save { record: Stored::Answer { key, ask: Box::new(ask.clone()), outcome, at: env.wall } });
+    out.push(Request::Save {
+        record: Stored::Answer { key, ask: Box::new(ask.clone()), outcome: outcome.clone(), at: env.wall },
+    });
     let due = deadline(env, answer_expiry(env.wall, &env.limits));
     let saved = domain.answers.insert(key, Answered { ask, outcome, at: env.wall, due });
     assert!(saved.is_ok(), "answer room reserved at request entrance");
@@ -1509,10 +1511,10 @@ pub(super) fn answer_decided(
         | Outcome::ProposalDecided { .. }
         | Outcome::AccountSignInStarted { .. }
         | Outcome::AccountSignedOut { .. }
-        | Outcome::Refused(_) => save_answer(domain, env, key, ask, outcome, out),
+        | Outcome::Refused(_) => save_answer(domain, env, key, ask, outcome.clone(), out),
     }
     for to in replies.into_boxed() {
-        out.push(Request::Reply { to, reply: outcome_reply(outcome) });
+        out.push(Request::Reply { to, reply: outcome_reply(outcome.clone()) });
     }
 }
 
@@ -1554,7 +1556,7 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
         Stored::Policy { .. } | Stored::EndedRead { .. } => false,
         Stored::Answer { key, ask, outcome, at } => {
             valid_ask(&env.limits, ask)
-                && valid_answer_shape(ask, *outcome)
+                && valid_answer_shape(ask, outcome.clone())
                 && !domain.answers.contains_key(key)
                 && (answer_expiry(*at, &env.limits) <= env.wall || domain.answers.len() < env.limits.requests)
         }

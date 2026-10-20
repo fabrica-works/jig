@@ -224,7 +224,7 @@ record OutcomePolicyChanged { project: u32 }
 record OutcomePoolSet { project: u32 person: u64 }
 record OutcomeEscalationDecided { task: u64 revision: u64 by: u64 at: u64 choice: EscalationChoice }
 record OutcomeRefused { value: Refusal }
-record OutcomeAccountSignInStarted { source: u32 }
+record OutcomeAccountSignInStarted { source: u32 address: bytes 2048 }
 record OutcomeAccountSignedOut { confirmed: bool }
 record Given { task: u64 amount: u64 }
 record OutcomeCreated { first: u64 last: u64 given: option Given }

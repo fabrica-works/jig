@@ -121,9 +121,9 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
     }
 }
 
-pub(crate) fn permanent(outcome: Outcome) -> Option<CapacityCause> {
+pub(crate) fn permanent(outcome: &Outcome) -> Option<CapacityCause> {
     match outcome {
-        Outcome::Refused(refusal) | Outcome::CompoundRefused { why: refusal, .. } => room(refusal),
+        Outcome::Refused(refusal) | Outcome::CompoundRefused { why: refusal, .. } => room(*refusal),
         Outcome::Compound { .. }
         | Outcome::Applied { .. }
         | Outcome::Again(_)

@@ -320,7 +320,7 @@ fn a_partys_amendment_proposal_accepted_after_its_spec_moved_is_stale() {
             reason: b"please".as_slice().into(),
         },
     );
-    let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, .. })) = world.people_answers.last().copied()
+    let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, .. })) = world.people_answers.last().cloned()
     else {
         panic!("party proposed: {:?}", world.people_answers.last())
     };

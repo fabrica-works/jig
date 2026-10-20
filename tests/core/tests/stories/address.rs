@@ -25,7 +25,7 @@ fn a_person_task_is_readdressed_after_durability_and_the_previous_taker_cannot_a
         },
     }));
     let second_sign_in = w.sign_in.expect("person signed in");
-    let Some(people::Reply::SignedIn { person: second, .. }) = w.people_answers.last().copied() else {
+    let Some(people::Reply::SignedIn { person: second, .. }) = w.people_answers.last().cloned() else {
         panic!("sign-in")
     };
     w.sign_in = Some(first_sign_in);

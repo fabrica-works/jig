@@ -71,14 +71,21 @@ fn stepped(core: &mut Core, env: &Env<Limits>, event: Event) -> (Option<accounts
 }
 
 #[test]
-fn a_party_s_sign_in_and_sign_out_ask_the_accounts_component() {
+fn a_party_s_account_sign_in_is_answered_at_its_visit_and_sign_out_at_its_end() {
     let (mut core, env) = signing_core();
     let sign_in = people::Ask::AccountSignIn { holder: people::AccountHolder::Own, provider: 3 };
     let (started, answered) = stepped(&mut core, &env, ask(5, sign_in));
     let Some(accounts::Request::Signing(accounts::Signing::SignIn { source, provider: 3 })) = started else {
         panic!("the component starts the provider's sign-in: {started:?}");
     };
-    assert_eq!(answered, Some(people::Outcome::AccountSignInStarted { source }), "the party is answered at its start");
+    assert_eq!(answered, None, "the account sign-in waits for its visit");
+    let address: Box<[u8]> = b"https://issuer.test/visit".as_slice().into();
+    let visited = accounts::Event::Visited { source, address: address.clone() };
+    assert_eq!(
+        stepped(&mut core, &env, Event::Account(visited)),
+        (None, Some(people::Outcome::AccountSignInStarted { source, address })),
+        "the account sign-in is answered at its visit"
+    );
     let signed_in = accounts::Event::SignedIn {
         source,
         subject: Box::from(&b"party"[..]),

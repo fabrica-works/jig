@@ -8,17 +8,19 @@ use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time, Token, Wall};
 
 /// The most one step asks: at the start, an account's want or its `none` account's two saves,
 /// each account's, and the counter's save; at close, a release an account and the close; and
-/// a sign-in's end, at most the four of `SIGNED_IN`.
+/// an account sign-in's end, at most `SIGNED_IN`, including its unanswered request.
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
-    out_bound(limits.accounts).expect("account output bound")
+    out_bound(limits.accounts, limits.sign_ins).expect("account output bound")
 }
 /// A sign-in's end asks the most: the counter's save, the new account's and its source's, and
 /// the source's want; or a renewal's erase, its replacement, its save and its want.
-const SIGNED_IN: u32 = 4;
-pub(crate) const fn out_bound(accounts: u32) -> Option<u32> {
+/// An account sign-in ending before its visit also answers its pending request.
+const SIGNED_IN: u32 = 5;
+pub(crate) const fn out_bound(accounts: u32, sign_ins: u32) -> Option<u32> {
+    let Some(close) = sign_ins.checked_add(1) else { return None };
     match accounts.checked_mul(2) {
-        Some(both) => match both.checked_add(1) {
+        Some(both) => match both.checked_add(close) {
             Some(most) if most < SIGNED_IN => Some(SIGNED_IN),
             Some(most) => Some(most),
             None => None,
@@ -468,6 +470,11 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             crate::signing::sign_in(domain, env, request, holder, provider, out);
         }
         Event::SignOut { request, holder, source } => crate::signing::sign_out(domain, request, holder, source, out),
+        Event::Visited { source, address } => {
+            if domain.phase == Phase::Wanted {
+                crate::signing::visited(domain, source, address, out);
+            }
+        }
         Event::SignedIn { source, subject, display, declined } => {
             if domain.phase == Phase::Wanted {
                 crate::signing::signed_in(domain, env, source, subject, display, declined, out);
@@ -475,7 +482,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         }
         Event::SignInFailed { source, failure } => {
             if domain.phase == Phase::Wanted {
-                crate::signing::failed(domain, source, failure);
+                crate::signing::failed(domain, source, failure, out);
             }
         }
         Event::SignedOut { source, confirmed } => {
@@ -641,6 +648,7 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         Phase::Closing | Phase::Closed => return,
         Phase::New | Phase::Wanted => domain.phase = Phase::Closing,
     }
+    crate::signing::close(domain, out);
     domain.credentials = Map::with_capacity(env.limits.credentials);
     domain.credential_alarms = Deadlines::with_capacity(env.limits.credentials);
     let mut numbers = List::with_capacity(domain.sources.capacity());

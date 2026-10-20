@@ -16,13 +16,17 @@ pub(super) const fn holder(holder: people::AccountHolder, person: u64) -> accoun
 /// so the subject's refusals (another holder's, or not well formed) are never an answer here.
 pub(super) fn outcome(answer: accounts::Answer) -> people::Outcome {
     let refusal = match answer {
-        accounts::Answer::Started { source } => return people::Outcome::AccountSignInStarted { source },
+        accounts::Answer::Started { source, address } => {
+            return people::Outcome::AccountSignInStarted { source, address };
+        }
         accounts::Answer::SignedOut { confirmed } => return people::Outcome::AccountSignedOut { confirmed },
         accounts::Answer::Refused { refusal } => refusal,
     };
     let refusal = match refusal {
-        // Not wanted yet, or closing: the same key may ask again.
-        accounts::Refusal::Closing => return people::Outcome::Again(people::Again::NotReady),
+        // Account sign-in ended before its visit, not wanted yet, or closing: the key may ask again.
+        accounts::Refusal::Closing | accounts::Refusal::NotStarted => {
+            return people::Outcome::Again(people::Again::NotReady);
+        }
         accounts::Refusal::Limit { bound } => people::Refusal::Limit { which: limit(bound) },
         accounts::Refusal::Numbers => people::Refusal::Limit { which: people::LimitKind::Arithmetic },
         // A provider offering no sign-in, or a configured source that no sign-out serves.

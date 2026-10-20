@@ -144,3 +144,25 @@ fn table<const N: usize>(cases: [Case; N]) {
     }
     assert!(passed, "{failures:?}");
 }
+
+#[test]
+fn an_account_sign_in_address_reads_back_at_its_bounds() {
+    for length in [0, 1, domain::ADDRESS] {
+        let address = skein_lib::bytes::zeroed(usize::try_from(length).expect("small bound"));
+        people_round_trip(values::answered(domain::Outcome::AccountSignInStarted { source: 2, address }));
+    }
+}
+
+#[test]
+fn an_account_sign_in_address_over_its_bound_is_an_encode_error() {
+    let address = skein_lib::bytes::zeroed(usize::try_from(domain::ADDRESS).expect("small bound") + 1);
+    let row = values::answered(domain::Outcome::AccountSignInStarted { source: 2, address });
+    let result = crate::codec::people::encode(&row, &super::people_limits(), &fixtures::model_names(&[]));
+    assert_eq!(
+        result,
+        Err(crate::people_v5::Problem {
+            path: crate::people_v5::Path::OutcomeAccountSignInStartedAddress,
+            reason: skein_codec::Reason::Bound,
+        })
+    );
+}

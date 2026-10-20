@@ -23,9 +23,10 @@ pub(crate) struct UnderWay {
     request: Token,
     holder: Holder,
     provider: u32,
+    visited: bool,
 }
 
-/// Started, within the sign-ins' bound, at a provider offering a sign-in; answered at once.
+/// An account sign-in starts within its bound; its visit answers the party.
 pub(crate) fn sign_in(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -40,11 +41,44 @@ pub(crate) fn sign_in(
     }
     let source = domain.take();
     domain.counted(out);
-    let entry = UnderWay { request, holder, provider };
+    let entry = UnderWay { request, holder, provider, visited: false };
     assert!(domain.signing.insert(source, entry) == Ok(None), "a new number, within the sign-ins' bound");
     out.push(Request::Signing(Signing::SignIn { source, provider }));
-    out.push(Request::Answer { request, answer: Answer::Started { source } });
 }
+/// Answer the account sign-in once its component has a listener ready.
+pub(crate) fn visited(domain: &mut Domain, source: u32, address: Box<[u8]>, out: &mut Queue<Request>) {
+    let Some(under_way) = domain.signing.get_mut(&source) else { return };
+    if under_way.visited {
+        return;
+    }
+    assert!(within(&address, crate::ADDRESS), "the component bounds the account sign-in address");
+    under_way.visited = true;
+    out.push(Request::Answer { request: under_way.request, answer: Answer::Started { source, address } });
+}
+
+/// An account sign-in that ended before a visit still owes its party an answer.
+fn not_started(under_way: &UnderWay, out: &mut Queue<Request>) {
+    if !under_way.visited {
+        out.push(Request::Answer {
+            request: under_way.request,
+            answer: Answer::Refused { refusal: Refusal::NotStarted },
+        });
+    }
+}
+
+/// Close answers account sign-ins still waiting for their visit, before forgetting them.
+pub(crate) fn close(domain: &mut Domain, out: &mut Queue<Request>) {
+    for (_, under_way) in &domain.signing {
+        if !under_way.visited {
+            out.push(Request::Answer {
+                request: under_way.request,
+                answer: Answer::Refused { refusal: Refusal::Closing },
+            });
+        }
+    }
+    domain.signing = Map::with_capacity(domain.signing.capacity());
+}
+
 fn startable(domain: &Domain, limits: &Limits, provider: u32) -> Result<(), Refusal> {
     if !domain.wanted() {
         return Err(Refusal::Closing);
@@ -71,6 +105,7 @@ pub(crate) fn signed_in(
     out: &mut Queue<Request>,
 ) {
     let Some(under_way) = domain.signing.remove(&source) else { return };
+    not_started(&under_way, out);
     let decided = match domain.sign_in(&env.limits, under_way.holder, under_way.provider, &subject) {
         Ok(SignIn::New) => Ok(None),
         Ok(SignIn::Renew { account }) => match place(domain, account) {
@@ -97,8 +132,9 @@ pub(crate) fn signed_in(
 }
 
 /// The component's sign-in failed or was cancelled: it ends, with nothing made.
-pub(crate) fn failed(domain: &mut Domain, source: u32, failure: Failure) {
+pub(crate) fn failed(domain: &mut Domain, source: u32, failure: Failure, out: &mut Queue<Request>) {
     let Some(under_way) = domain.signing.remove(&source) else { return };
+    not_started(&under_way, out);
     domain.end(Ended { request: under_way.request, source, end: End::Failed { failure } });
 }
 

@@ -24,7 +24,7 @@ fn an_observers_create_is_refused_by_role() {
     let rows = test.request(SIGN_IN, 1, Ask::Create { project: 1, batch: Box::new([fixtures::member(b"one")]) });
     let request = route(&rows);
     let outcome = Outcome::Refused(Refusal::Role { held: Some(Role::Observer) });
-    assert_eq!(reply(&test.send(Event::Decided { request, outcome })), Reply::Outcome(outcome));
+    assert_eq!(reply(&test.send(Event::Decided { request, outcome: outcome.clone() })), Reply::Outcome(outcome));
 }
 #[test]
 fn an_empty_create_is_refused_as_empty() {

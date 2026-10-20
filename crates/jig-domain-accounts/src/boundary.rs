@@ -2,6 +2,9 @@ use crate::{Holder, Key, Kind, Refusal, Stored};
 use alloc::boxed::Box;
 use skein_lib::{Duration, Time, Token};
 
+/// Maximum address bytes in an account sign-in answer.
+pub const ADDRESS: u32 = 2_048;
+
 /// The protocol layer's table that holds a grant (protocol/channel.md, section 8).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum GrantTable {
@@ -36,20 +39,65 @@ pub struct Grant {
 /// confirmed the revocation (2.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
-    Restore { record: Stored },
+    Restore {
+        record: Stored,
+    },
     Want,
     Component(FromComponent),
-    Unauthorized { account: u32, generation: u64 },
-    Limited { account: u32, reset: Option<Time> },
-    Refused { account: u32, code: Box<[u8]>, reason: Box<[u8]> },
-    RunFailed { account: u32, turned: Turned },
-    Resume { account: u32 },
-    Credential { number: u32, generation: u64, valid: Duration },
-    SignIn { request: Token, holder: Holder, provider: u32 },
-    SignOut { request: Token, holder: Holder, source: u32 },
-    SignedIn { source: u32, subject: Box<[u8]>, display: Box<[u8]>, declined: bool },
-    SignInFailed { source: u32, failure: Failure },
-    SignedOut { source: u32, confirmed: bool },
+    Unauthorized {
+        account: u32,
+        generation: u64,
+    },
+    Limited {
+        account: u32,
+        reset: Option<Time>,
+    },
+    Refused {
+        account: u32,
+        code: Box<[u8]>,
+        reason: Box<[u8]>,
+    },
+    RunFailed {
+        account: u32,
+        turned: Turned,
+    },
+    Resume {
+        account: u32,
+    },
+    Credential {
+        number: u32,
+        generation: u64,
+        valid: Duration,
+    },
+    SignIn {
+        request: Token,
+        holder: Holder,
+        provider: u32,
+    },
+    SignOut {
+        request: Token,
+        holder: Holder,
+        source: u32,
+    },
+    /// The account sign-in listener is ready; address is at most `ADDRESS` bytes.
+    Visited {
+        source: u32,
+        address: Box<[u8]>,
+    },
+    SignedIn {
+        source: u32,
+        subject: Box<[u8]>,
+        display: Box<[u8]>,
+        declined: bool,
+    },
+    SignInFailed {
+        source: u32,
+        failure: Failure,
+    },
+    SignedOut {
+        source: u32,
+        confirmed: bool,
+    },
     Close,
 }
 
@@ -115,11 +163,12 @@ pub enum Signing {
 }
 
 /// The child's answer to a party's sign-in or sign-out.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
     /// The sign-in started under this source's number; its end is a fact (`Ended`).
     Started {
         source: u32,
+        address: Box<[u8]>,
     },
     /// The source is signed out and removed; unconfirmed, its holder disconnects the
     /// application in the provider's settings (providers.md, 2.3).

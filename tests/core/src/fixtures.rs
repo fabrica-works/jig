@@ -345,7 +345,7 @@ pub fn second_party(world: &mut crate::effects::World, subject: &[u8], role: jig
             name: b"Second".as_slice().into(),
         },
     }));
-    let Some(people::Reply::SignedIn { sign_in, person, .. }) = world.people_answers.last().copied() else {
+    let Some(people::Reply::SignedIn { sign_in, person, .. }) = world.people_answers.last().cloned() else {
         panic!("second party signed in")
     };
     holdings.retain(|holding| holding.person != person);

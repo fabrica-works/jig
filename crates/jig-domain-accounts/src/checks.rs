@@ -32,6 +32,8 @@ pub enum Refusal {
     Kind { kind: Kind },
     /// The child takes no request before its start, nor once closing.
     Closing,
+    /// The account sign-in ended before its visit.
+    NotStarted,
 }
 
 /// The bounds of accounts.md, 3.6 that the child keeps.

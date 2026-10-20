@@ -67,7 +67,7 @@ fn signed_in(world: &mut World, token: Token) -> (u64, u64) {
     world.send(sign_in(token));
     let receipts = replies(world);
     assert_eq!(receipts.len(), 1);
-    let (commit, destination, reply) = receipts[0];
+    let (commit, destination, reply) = receipts[0].clone();
     assert_eq!(destination, token);
     assert!(commit > 0 && commit <= world.store.applied);
     let people::Reply::SignedIn { person, sign_in, .. } = reply else { panic!("successful sign-in") };
@@ -243,7 +243,7 @@ fn keyed_client_work_replays_after_explicit_registration_reset_and_cold_restart(
     world.send(chat());
     let duplicate = replies(&mut world);
     assert_eq!(duplicate.len(), 1);
-    assert_eq!((duplicate[0].1, duplicate[0].2), (CLIENT, first[0].2));
+    assert_eq!((duplicate[0].1, &duplicate[0].2), (CLIENT, &first[0].2));
     assert_eq!(world.peers.as_ref().expect("peers").workers[0].seen.len(), 1);
     world.client_peer.as_mut().expect("client peer").clear_replies();
     assert!(!world.client_peer.as_mut().expect("client peer").unregister_reply(CLIENT));
@@ -252,7 +252,7 @@ fn keyed_client_work_replays_after_explicit_registration_reset_and_cold_restart(
     world.send(chat());
     let replay = replies(&mut world);
     assert_eq!(replay.len(), 1);
-    assert_eq!((replay[0].1, replay[0].2), (CLIENT, first[0].2));
+    assert_eq!((replay[0].1, &replay[0].2), (CLIENT, &first[0].2));
     assert!(replay[0].0 <= world.store.applied);
     assert_eq!(
         world

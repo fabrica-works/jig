@@ -28,7 +28,7 @@ pub struct Limits {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.accounts == 0
-        || crate::domain::out_bound(limits.accounts).is_none()
+        || crate::domain::out_bound(limits.accounts, limits.sign_ins).is_none()
         || limits.holder_accounts == 0
         || limits.holder_accounts > limits.accounts
         || limits.sources == 0
@@ -55,6 +55,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Deadlines::<u32>::worst_case(sources)?)?
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)?
         .checked_add(Map::<u32, UnderWay>::worst_case(limits.sign_ins)?)?
+        // Each account sign-in can emit one answer owning its bounded visit address.
+        .checked_add(u64::from(limits.sign_ins).checked_mul(u64::from(crate::ADDRESS))?)?
         .checked_add(Map::<u32, Token>::worst_case(sources)?)?
         .checked_add(Queue::<Ended>::worst_case(limits.facts)?)
 }

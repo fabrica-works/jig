@@ -59,7 +59,7 @@ fn an_outside_allotment_goal_is_shown_as_proposed_before_send_and_named_in_the_a
         .filter_map(|row| match row {
             jig_test_domain::Record::Core(jig_domain_core::Record::People(people::Stored::Answer {
                 outcome, ..
-            })) => Some(*outcome),
+            })) => Some(outcome.clone()),
             jig_test_domain::Record::Core(_) | jig_test_domain::Record::Connector { .. } => None,
         })
         .collect();

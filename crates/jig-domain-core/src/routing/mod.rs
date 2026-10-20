@@ -426,7 +426,7 @@ pub fn step(core: &mut Core, env: &Env<Limits>, event: Event) -> Requests {
     Requests::Out(out)
 }
 
-/// Want every configured account once, at the restart's first step.
+/// Want configured accounts once their records have been restored.
 pub fn want_accounts(core: &mut Core, env: &Env<Limits>) -> Requests {
     let mut work = Queue::with_capacity(0);
     let requests = route_account(core, env, &mut work, accounts::Event::Want);

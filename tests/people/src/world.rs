@@ -232,7 +232,7 @@ impl World {
 
     #[must_use]
     pub fn reply(&self, call: u64) -> Option<Reply> {
-        self.replies.get(&call).copied()
+        self.replies.get(&call).cloned()
     }
 
     /// Present the scripted owner's current hold snapshot.
@@ -623,7 +623,13 @@ impl World {
                                 people::step(
                                     &mut self.domain,
                                     &self.env,
-                                    Event::Decided { request, outcome: Outcome::AccountSignInStarted { source: 1 } },
+                                    Event::Decided {
+                                        request,
+                                        outcome: Outcome::AccountSignInStarted {
+                                            source: 1,
+                                            address: b"https://issuer.test/visit".as_slice().into(),
+                                        },
+                                    },
                                     &mut self.out,
                                 );
                             }

@@ -131,11 +131,12 @@ fn ask(world: &mut World, key: u8, ask: people::Ask) -> Option<&people::Reply> {
 }
 fn signed_in(world: &mut World) -> (u32, u32) {
     let sign_in = people::Ask::AccountSignIn { holder: people::AccountHolder::Own, provider: PROVIDER };
-    let Some(people::Reply::Outcome(people::Outcome::AccountSignInStarted { source })) =
-        ask(world, 40, sign_in).copied()
+    let Some(people::Reply::Outcome(people::Outcome::AccountSignInStarted { source, address })) =
+        ask(world, 40, sign_in).cloned()
     else {
         panic!("the sign-in started: {:?}", world.people_answers.last());
     };
+    assert_eq!(&*address, format!("https://issuer.test/visit/{source}").as_bytes());
     let account = world.domain.accounts().source(source).expect("the signed-in source").account;
     (account, source)
 }

@@ -83,7 +83,7 @@ fn a_procedure_goal_commits_before_delivery_and_replays_its_exact_owner_facts() 
     assert!(world.procedure_inputs.is_empty(), "no procedure receives an uncommitted goal");
     world.release_commits();
     let Some(people::Reply::Outcome(people::Outcome::Created { first: task, .. })) =
-        world.people_answers.last().copied()
+        world.people_answers.last().cloned()
     else {
         panic!("procedure goal: {:?}", world.people_answers)
     };
@@ -131,7 +131,7 @@ fn a_procedure_goal_proposal_restores_and_accepts_the_original_executor() {
     world.hold_procedures = true;
     ask(&mut world, 90, jig_core_world::fixtures::propose_goal(goal(300)));
     let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) =
-        world.people_answers.last().copied()
+        world.people_answers.last().cloned()
     else {
         panic!("procedure proposal: {:?}", world.people_answers)
     };

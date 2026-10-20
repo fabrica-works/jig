@@ -146,7 +146,10 @@ fn an_account_request_is_admitted_only_from_its_holder() {
     let deployment = world.request(10, [3; 16], sign_in(AccountHolder::Deployment));
     let sign_out = world.request(11, [4; 16], Ask::AccountSignOut { holder: AccountHolder::Own, source: 1 });
     world.commit_all();
-    let started = Some(Reply::Outcome(Outcome::AccountSignInStarted { source: 1 }));
+    let started = Some(Reply::Outcome(Outcome::AccountSignInStarted {
+        source: 1,
+        address: b"https://issuer.test/visit".as_slice().into(),
+    }));
     assert_eq!(world.reply(own), started, "a person's own");
     assert_eq!(world.reply(deployment), started, "a first owner's for the deployment");
     assert_eq!(world.reply(sign_out), Some(Reply::Outcome(Outcome::AccountSignedOut { confirmed: true })));
@@ -311,7 +314,7 @@ fn an_answer_to_a_person_task_another_holder_took_is_refused_and_told_who() {
     assert_eq!(world.reply(other), None);
     world.commit_all();
     let taken = Reply::Outcome(Outcome::Refused(Refusal::Taken { by: first }));
-    assert_eq!(world.reply(other), Some(taken));
+    assert_eq!(world.reply(other), Some(taken.clone()));
     world.advance(Duration::from_secs(1));
     let at = skein_lib::Wall::from_nanos(1_000_000_000);
     let winner = world.request(10, [5; 16], answer.clone());

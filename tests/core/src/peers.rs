@@ -231,7 +231,7 @@ impl Peers {
         }
     }
 
-    pub fn reply(&mut self, to: ReplyTo, reply: people::Reply) {
+    pub fn reply(&mut self, to: ReplyTo, reply: &people::Reply) {
         let number = to.into_token().raw();
         if let Some(index) = self.party_flights.remove(&number) {
             let translated = match reply {
@@ -324,14 +324,20 @@ fn task_number(task: parties::Task) -> u64 {
     }
 }
 
-fn party_reply(reply: people::Reply) -> parties::Reply {
+fn party_reply(reply: &people::Reply) -> parties::Reply {
     match reply {
-        people::Reply::SignedIn { person, sign_in, .. } => parties::Reply::SignedIn { person, sign_in },
-        people::Reply::Outcome(people::Outcome::Created { first: task, .. }) => parties::Reply::Started { task },
-        people::Reply::Outcome(people::Outcome::Said { task, message }) => parties::Reply::Said { task, message },
-        people::Reply::Outcome(people::Outcome::Proposed { proposal, .. }) => parties::Reply::Proposed { proposal },
+        people::Reply::SignedIn { person, sign_in, .. } => {
+            parties::Reply::SignedIn { person: *person, sign_in: *sign_in }
+        }
+        people::Reply::Outcome(people::Outcome::Created { first: task, .. }) => parties::Reply::Started { task: *task },
+        people::Reply::Outcome(people::Outcome::Said { task, message }) => {
+            parties::Reply::Said { task: *task, message: *message }
+        }
+        people::Reply::Outcome(people::Outcome::Proposed { proposal, .. }) => {
+            parties::Reply::Proposed { proposal: *proposal }
+        }
         people::Reply::Outcome(people::Outcome::Stopped { task } | people::Outcome::Released { task }) => {
-            parties::Reply::Changed { task }
+            parties::Reply::Changed { task: *task }
         }
         people::Reply::Again(again) | people::Reply::Outcome(people::Outcome::Again(again)) => {
             parties::Reply::Again(match again {
@@ -340,18 +346,18 @@ fn party_reply(reply: people::Reply) -> parties::Reply {
             })
         }
         people::Reply::Refused(why) | people::Reply::Outcome(people::Outcome::Refused(why)) => {
-            parties::Reply::Refused(party_refusal(why))
+            parties::Reply::Refused(party_refusal(*why))
         }
         people::Reply::SignedOut | people::Reply::Outcome(people::Outcome::SignedOut) => parties::Reply::SignedOut,
         people::Reply::Outcome(people::Outcome::ProposalDecided { proposer, proposal, by, at, choice }) => {
             parties::Reply::ProposalDecided {
                 proposer: match proposer {
-                    people::Proposer::Task(number) => parties::Proposer::Task(number),
-                    people::Proposer::Party(number) => parties::Proposer::Party(number),
+                    people::Proposer::Task(number) => parties::Proposer::Task(*number),
+                    people::Proposer::Party(number) => parties::Proposer::Party(*number),
                 },
-                proposal,
-                by,
-                at,
+                proposal: *proposal,
+                by: *by,
+                at: *at,
                 choice: match choice {
                     people::ProposalChoice::Accepted => parties::Choice::Accepted,
                     people::ProposalChoice::Rejected => parties::Choice::Rejected,
@@ -363,10 +369,10 @@ fn party_reply(reply: people::Reply) -> parties::Reply {
         }
         people::Reply::Outcome(people::Outcome::EscalationDecided { task, revision, by, at, choice }) => {
             parties::Reply::EscalationDecided {
-                task,
-                revision,
-                by,
-                at,
+                task: *task,
+                revision: *revision,
+                by: *by,
+                at: *at,
                 choice: match choice {
                     people::EscalationChoice::Released => parties::Choice::Released,
                     people::EscalationChoice::Rejected => parties::Choice::Rejected,

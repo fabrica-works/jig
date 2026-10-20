@@ -68,18 +68,18 @@ fn application_parts_use_party_admission_and_preserve_the_original_key() {
     application_part_done(&mut test.d, request);
     assert!(test.request(10, 1, ask.clone()).is_empty(), "same digest still joins the original flight");
     let outcome = Outcome::Applied { connector: 7, token: Token::new(40) };
-    let completed = test.send(Event::Decided { request, outcome });
-    assert_eq!(reply(&completed), Reply::Outcome(outcome));
+    let completed = test.send(Event::Decided { request, outcome: outcome.clone() });
+    assert_eq!(reply(&completed), Reply::Outcome(outcome.clone()));
     assert_eq!(
         saved_answer(&completed),
         Stored::Answer {
             key: RequestKey { person: 1, key: [1; 16] },
             ask: Box::new(ask.clone()),
-            outcome,
+            outcome: outcome.clone(),
             at: Wall::EPOCH
         }
     );
-    assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
+    assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome.clone()));
 }
 
 #[test]
@@ -313,7 +313,7 @@ impl Test {
 fn reply(rows: &[Request]) -> Reply {
     rows.iter()
         .find_map(|r| match r {
-            Request::Reply { reply, .. } => Some(*reply),
+            Request::Reply { reply, .. } => Some(reply.clone()),
             Request::Save { .. }
             | Request::Erase { .. }
             | Request::Route { .. }
@@ -686,8 +686,8 @@ fn role_success_restores_before_identities_and_replays_after_roster_changes() {
         ]
     );
     let outcome = Outcome::RolesSet { project: 1 };
-    let completed = live.send_bounded(Event::Decided { request, outcome });
-    assert_eq!(reply(completed.as_slice()), Reply::Outcome(outcome));
+    let completed = live.send_bounded(Event::Decided { request, outcome: outcome.clone() });
+    assert_eq!(reply(completed.as_slice()), Reply::Outcome(outcome.clone()));
     let mut cold = Test::new(LIMITS);
     cold.d = Domain::new(&LIMITS, Box::new([]), 2);
     assert!(cold.send_bounded(Event::Restore { record: saved_answer(completed.as_slice()) }).is_empty());
@@ -711,7 +711,7 @@ fn role_success_restores_before_identities_and_replays_after_roster_changes() {
     cold.signin_bounded(3, 30, identity(0, 1));
     let replayed = cold.request_bounded(30, 7, ask.clone());
     assert_eq!(replayed.len(), 1, "replay emits no route or role write");
-    assert_eq!(reply(replayed.as_slice()), Reply::Outcome(outcome));
+    assert_eq!(reply(replayed.as_slice()), Reply::Outcome(outcome.clone()));
     assert_eq!(cold.d.role(1, 1), Some(Role::Observer));
     assert_eq!(cold.d.role(2, 1), None);
     let request = route(cold.request_bounded(30, 8, ask).as_slice());
@@ -1138,8 +1138,8 @@ fn authenticated_escalation_decisions_route_without_membership_and_io_pressure_i
         at: Wall::from_nanos(0),
         choice: EscalationChoice::Passed,
     };
-    test.send(Event::Decided { request, outcome });
-    assert_eq!(reply(&test.request(10, 2, ask)), Reply::Outcome(outcome));
+    test.send(Event::Decided { request, outcome: outcome.clone() });
+    assert_eq!(reply(&test.request(10, 2, ask)), Reply::Outcome(outcome.clone()));
     assert_eq!(
         reply(&test.request(
             10,
@@ -1177,9 +1177,9 @@ fn a_decisions_revision_is_part_of_its_keyed_payload_and_moved_facts_replay() {
         test.member();
         let request = route(&test.request(10, 14, ask.clone()));
         let outcome = Outcome::Refused(Refusal::Moved { now });
-        let outputs = test.send(Event::Decided { request, outcome });
-        assert_eq!(reply(&outputs), Reply::Outcome(outcome));
-        assert_eq!(reply(&test.request(10, 14, ask.clone())), Reply::Outcome(outcome));
+        let outputs = test.send(Event::Decided { request, outcome: outcome.clone() });
+        assert_eq!(reply(&outputs), Reply::Outcome(outcome.clone()));
+        assert_eq!(reply(&test.request(10, 14, ask.clone())), Reply::Outcome(outcome.clone()));
         let changed = match ask {
             Ask::Release { project, task, .. } => Ask::Release { project, task, revision: 2, again: None },
             Ask::AnswerPerson { project, task, result, .. } => Ask::AnswerPerson { project, task, revision: 2, result },
@@ -1226,14 +1226,14 @@ fn every_final_refusal_keeps_its_facts_under_the_key_when_roles_and_time_change(
         test.member();
         let request = route(&test.request(10, 1, ask(1)));
         let outcome = Outcome::Refused(refusal);
-        let decided = test.send(Event::Decided { request, outcome });
-        assert_eq!(reply(&decided), Reply::Outcome(outcome));
+        let decided = test.send(Event::Decided { request, outcome: outcome.clone() });
+        assert_eq!(reply(&decided), Reply::Outcome(outcome.clone()));
         assert!(decided.iter().any(is_answer));
         test.send(Event::Roles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Observer }]) });
         test.env.wall = Wall::from_nanos(20);
         let replay = test.request(10, 1, ask(1));
         assert_eq!(replay.len(), 1);
-        assert_eq!(reply(&replay), Reply::Outcome(outcome));
+        assert_eq!(reply(&replay), Reply::Outcome(outcome.clone()));
     }
 }
 
@@ -1267,7 +1267,7 @@ fn application_keys_join_flights_and_replay_opaque_tokens_across_sign_ins_and_re
     assert_eq!(reply(&test.request(10, 7, application(2))), Reply::Refused(Refusal::KeyConflict));
     assert_eq!(reply(&test.request(10, 7, ask(1))), Reply::Refused(Refusal::KeyConflict));
     let outcome = Outcome::Applied { connector: 2, token: Token::new(42) };
-    let rows = test.send(Event::Decided { request, outcome });
+    let rows = test.send(Event::Decided { request, outcome: outcome.clone() });
     assert_eq!(
         rows.iter()
             .filter(|row| match row {
@@ -1284,9 +1284,9 @@ fn application_keys_join_flights_and_replay_opaque_tokens_across_sign_ins_and_re
         2
     );
     let saved = saved_answer(&rows);
-    assert_eq!(reply(&test.request(11, 7, application(1))), Reply::Outcome(outcome));
+    assert_eq!(reply(&test.request(11, 7, application(1))), Reply::Outcome(outcome.clone()));
     test.send(Event::Roles { project: 1, holdings: Box::new([]) });
-    assert_eq!(reply(&test.request(10, 7, application(1))), Reply::Outcome(outcome));
+    assert_eq!(reply(&test.request(10, 7, application(1))), Reply::Outcome(outcome.clone()));
     let mut d = Domain::new(&LIMITS, Box::new([]), 2);
     for record in [
         Stored::Person { number: 1, identity: identity(0, 1) },
@@ -1299,7 +1299,7 @@ fn application_keys_join_flights_and_replay_opaque_tokens_across_sign_ins_and_re
     }
     test.d = d;
     assert!(test.send(Event::Restored).is_empty());
-    assert_eq!(reply(&test.request(10, 7, application(1))), Reply::Outcome(outcome));
+    assert_eq!(reply(&test.request(10, 7, application(1))), Reply::Outcome(outcome.clone()));
     assert_eq!(reply(&test.request(10, 7, application(2))), Reply::Refused(Refusal::KeyConflict));
 }
 
@@ -1312,7 +1312,7 @@ fn application_admission_shares_capacity_and_retention_and_requires_a_live_sign_
     let request = route(&test.request(10, 1, application(1)));
     assert_eq!(reply(&test.request(10, 2, ask(1))), Reply::Again(Again::Busy));
     let outcome = Outcome::Applied { connector: 2, token: Token::new(42) };
-    test.send(Event::Decided { request, outcome });
+    test.send(Event::Decided { request, outcome: outcome.clone() });
     assert_eq!(reply(&test.request(10, 2, application(1))), Reply::Again(Again::Busy));
     test.env.now = test.env.now.saturating_add(LIMITS.request_retention);
     test.env.wall = Wall::from_nanos(LIMITS.request_retention.as_nanos());
@@ -1359,9 +1359,9 @@ fn a_said_answer_keeps_the_release_fact_and_request_choice() {
     let ask = Ask::Say { project: 1, task: 7, words: Box::new([1]) };
     let request = route(&test.request(10, 1, ask.clone()));
     let outcome = Outcome::Said { task: 7, message: 8 };
-    let out = test.send(Event::Decided { request, outcome });
-    assert_eq!(reply(&out), Reply::Outcome(outcome));
-    assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
+    let out = test.send(Event::Decided { request, outcome: outcome.clone() });
+    assert_eq!(reply(&out), Reply::Outcome(outcome.clone()));
+    assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome.clone()));
 }
 
 #[test]
@@ -1421,9 +1421,9 @@ fn an_amendment_answer_keeps_the_release_fact_and_named_hold_in_its_key() {
     let ask = Ask::Amend { project: 1, task: 7, revision: 1, amendment: change.clone(), release: Some(2) };
     let request = route(&test.request(10, 1, ask.clone()));
     let outcome = Outcome::Amended { task: 7, released: true };
-    let out = test.send(Event::Decided { request, outcome });
-    assert_eq!(reply(&out), Reply::Outcome(outcome));
-    assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
+    let out = test.send(Event::Decided { request, outcome: outcome.clone() });
+    assert_eq!(reply(&out), Reply::Outcome(outcome.clone()));
+    assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome.clone()));
     let changed = Ask::Amend { project: 1, task: 7, revision: 1, amendment: change, release: Some(3) };
     assert_eq!(reply(&test.request(10, 1, changed)), Reply::Refused(Refusal::KeyConflict));
 }
@@ -1456,8 +1456,8 @@ fn capacity_facts_keep_actual_times_replay_and_diagnostics_independent() {
     assert_eq!(test.d.capacity_refusals(), entrance);
     test.env.wall = Wall::from_nanos(9);
     let refusal = Outcome::Refused(Refusal::Limit { which: LimitKind::LiveTasks });
-    let completed = test.send(Event::Decided { request, outcome: refusal });
-    assert_eq!(reply(&completed), Reply::Outcome(refusal));
+    let completed = test.send(Event::Decided { request, outcome: refusal.clone() });
+    assert_eq!(reply(&completed), Reply::Outcome(refusal.clone()));
     let permanent = test.d.capacity_refusals();
     assert_eq!(permanent.len(), 2);
     assert_eq!(permanent.get(0).expect("newest answer").key.key, [1; 16]);
@@ -1493,10 +1493,10 @@ fn zero_room_history_counts_omissions_without_changing_busy_or_key_admission() {
     assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Again(Again::Busy));
     assert_eq!(test.d.capacity_refusals_lost(), 2);
     assert_eq!(worst_case(&Limits { requests: u32::MAX, room_refusals: 1, ..LIMITS }), None);
-    assert_eq!(capacity::permanent(Outcome::Refused(Refusal::Limit { which: LimitKind::Words })), None);
-    assert_eq!(capacity::permanent(Outcome::Refused(Refusal::Role { held: Some(Role::Observer) })), None);
+    assert_eq!(capacity::permanent(&Outcome::Refused(Refusal::Limit { which: LimitKind::Words })), None);
+    assert_eq!(capacity::permanent(&Outcome::Refused(Refusal::Role { held: Some(Role::Observer) })), None);
     assert_eq!(
-        capacity::permanent(Outcome::Again(Again::Busy)),
+        capacity::permanent(&Outcome::Again(Again::Busy)),
         None,
         "routed busy is not assumed to be room pressure"
     );
@@ -1521,7 +1521,7 @@ fn read_position_room_pressure_keeps_scoped_identity_without_a_project() {
             cause: CapacityCause::Pending { limit: 0 },
         }
     );
-    assert_eq!(capacity::permanent(Outcome::MarkedSeen { seen }), None);
+    assert_eq!(capacity::permanent(&Outcome::MarkedSeen { seen }), None);
 }
 
 #[test]
@@ -1582,8 +1582,8 @@ fn a_proposal_makers_kind_is_kept_in_its_key_and_restored_answer() {
             at: Wall::EPOCH,
             choice: ProposalChoice::Accepted,
         };
-        let completed = test.send(Event::Decided { request, outcome });
-        assert_eq!(reply(&completed), Reply::Outcome(outcome));
+        let completed = test.send(Event::Decided { request, outcome: outcome.clone() });
+        assert_eq!(reply(&completed), Reply::Outcome(outcome.clone()));
         let saved = saved_answer(&completed);
         let other = match proposer {
             Proposer::Task(number) => Proposer::Party(number),
@@ -1601,7 +1601,7 @@ fn a_proposal_makers_kind_is_kept_in_its_key_and_restored_answer() {
             assert!(test.send(Event::Restore { record }).is_empty());
         }
         assert!(test.send(Event::Restored).is_empty());
-        assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome));
+        assert_eq!(reply(&test.request(10, 1, ask)), Reply::Outcome(outcome.clone()));
         assert_eq!(reply(&test.request(10, 1, other_ask)), Reply::Refused(Refusal::KeyConflict));
     }
 }
@@ -1616,3 +1616,31 @@ mod compound;
 mod ended;
 
 mod moving_chat;
+
+#[test]
+fn a_stored_account_sign_in_answer_keeps_its_address() {
+    let mut test = Test::new(LIMITS);
+    test.member();
+    let ask = Ask::AccountSignIn { holder: AccountHolder::Own, provider: 3 };
+    let request = route(&test.request(10, 7, ask.clone()));
+    let outcome = Outcome::AccountSignInStarted {
+        source: 8,
+        address: skein_lib::bytes::zeroed(usize::try_from(ADDRESS).expect("small bound")),
+    };
+    let rows = test.send(Event::Decided { request, outcome: outcome.clone() });
+    assert_eq!(reply(&rows), Reply::Outcome(outcome.clone()));
+    assert_eq!(reply(&test.request(10, 7, ask.clone())), Reply::Outcome(outcome.clone()));
+    let saved = saved_answer(&rows);
+    // Restore the account sign-in answer and its authenticated party into a cold domain.
+    test.d = Domain::new(&LIMITS, Box::new([]), 2);
+    for record in [
+        Stored::Person { number: 1, identity: identity(0, 1) },
+        Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()) },
+        saved,
+    ] {
+        assert!(test.send(Event::Restore { record }).is_empty());
+    }
+    assert!(test.send(Event::Restored).is_empty());
+    assert!(test.d.ready());
+    assert_eq!(reply(&test.request(10, 7, ask)), Reply::Outcome(outcome));
+}

@@ -13,7 +13,7 @@ fn a_second_party_proposal_request_reads_the_original_committed_decision_after_r
     );
     ask(&mut world, 80, jig_core_world::fixtures::propose_goal(proposed_goal));
     let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) =
-        world.people_answers.last().copied()
+        world.people_answers.last().cloned()
     else {
         panic!("goal proposal: {:?}", world.people_answers)
     };

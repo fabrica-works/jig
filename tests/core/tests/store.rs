@@ -244,7 +244,7 @@ fn a_historical_escalation_is_read_through_the_store() {
     };
     let revision = row.revisions.hold;
     release_escalation(&mut world, 64, task, revision);
-    let answer = world.people_answers.last().copied();
+    let answer = world.people_answers.last().cloned();
     assert!(matches!(
         answer,
         Some(jig_domain_people::Reply::Outcome(jig_domain_people::Outcome::EscalationDecided { .. }))
@@ -256,7 +256,7 @@ fn a_historical_escalation_is_read_through_the_store() {
         world.trace.iter().any(|line| line.starts_with("output Now(HistoricalEscalation")),
         "historical store lookup"
     );
-    assert_eq!(world.people_answers.last().copied(), answer);
+    assert_eq!(world.people_answers.last().cloned(), answer);
 }
 
 fn release_escalation(world: &mut World, key: u8, task: u64, revision: u64) {

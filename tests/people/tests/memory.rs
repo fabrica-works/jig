@@ -281,3 +281,48 @@ fn full_conversation_positions_and_replies_fit(limits: Limits) {
         restored.event(Event::Forget { task, project: 1, party: None, last_reply: 0 });
     }
 }
+
+#[test]
+fn retained_account_sign_in_answers_hold_their_longest_addresses_within_the_worst_case() {
+    let mut test = Measured::new(LIMITS);
+    test.event(Event::Restored);
+    let reply_to = test.to();
+    test.event(Event::SignedIn {
+        reply_to,
+        person: 1,
+        sign_in: 1,
+        identity: Identity {
+            key: IdentityKey { provider: 0, subject: Box::new([1]) },
+            login: Box::new([]),
+            name: Box::new([]),
+        },
+        kind: jig_domain_people::Kind::Person,
+    });
+    for key in 0..u8::try_from(LIMITS.requests).expect("tiny request bound") {
+        let reply_to = test.to();
+        let request = test
+            .event(Event::Ask {
+                reply_to,
+                sign_in: 1,
+                key: [key; 16],
+                ask: Ask::AccountSignIn { holder: jig_domain_people::AccountHolder::Own, provider: 3 },
+            })
+            .expect("account sign-in admitted");
+        let address =
+            vec![b'a'; usize::try_from(jig_domain_people::ADDRESS).expect("small address bound")].into_boxed_slice();
+        test.event(Event::Decided {
+            request,
+            outcome: Outcome::AccountSignInStarted { source: u32::from(key), address },
+        });
+    }
+    let reply_to = test.to();
+    assert!(
+        test.event(Event::Ask {
+            reply_to,
+            sign_in: 1,
+            key: [0; 16],
+            ask: Ask::AccountSignIn { holder: jig_domain_people::AccountHolder::Own, provider: 3 }
+        })
+        .is_none()
+    );
+}

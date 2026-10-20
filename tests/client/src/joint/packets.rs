@@ -476,7 +476,7 @@ mod tests {
         let to = transport.reply_to(Reply::SignIn { client: ClientId(1) }).into_token();
         let limits = jig_client::DomainLimits { document_bytes: 0, ..crate::test::limits().client.domain };
         let source = people::Reply::Refused(people::Refusal::Limit { which: people::LimitKind::Arithmetic });
-        assert!(matches!(people_reply(&mut transport, to, source, &limits), Err(Invalid::Payload)));
+        assert!(matches!(people_reply(&mut transport, to, source.clone(), &limits), Err(Invalid::Payload)));
         assert!(transport.reply(to).is_some(), "failed whole admission leaves the original exchange intact");
         let Incoming::SignInFailed { failure, .. } =
             people_reply(&mut transport, to, source, &crate::test::limits().client.domain).expect("whole refusal")

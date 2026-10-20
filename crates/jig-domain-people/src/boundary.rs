@@ -7,6 +7,9 @@ use crate::{Refusal, ReplyRef, Seen};
 use alloc::boxed::Box;
 use skein_lib::{Duration, List, ReplyTo, Token, Wall};
 
+/// Maximum address bytes retained in an account sign-in answer.
+pub const ADDRESS: u32 = 2_048;
+
 /// A task-derived recipient, retained only as a bounded inbox reference.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Whom {
@@ -371,7 +374,7 @@ pub enum EscalationChoice {
 
 /// Root's answer for one routed flight; people replies to each bounded waiter and saves
 /// final outcomes with the parent's task decision. (domain/people.md, section 5.1).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Outcome {
     /// All operations were made; their issued messages start here, or at zero for none.
     Compound { project: u32, operations: u32, first_message: u64 },
@@ -441,7 +444,7 @@ pub enum Outcome {
         choice: EscalationChoice,
     },
     /// An account's sign-in is under way for this source; its end is the accounts child's fact.
-    AccountSignInStarted { source: u32 },
+    AccountSignInStarted { source: u32, address: Box<[u8]> },
     /// The source was signed out, and whether its provider confirmed the revocation.
     AccountSignedOut { confirmed: bool },
     /// Final refusal, retained under the request key.
@@ -450,7 +453,7 @@ pub enum Outcome {
 
 /// Child-to-client answer routed by the parent; state-changing answers are withheld externally
 /// until their decision is durable. (domain/people.md, sections 3 and 5.1).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Reply {
     /// Sign-in succeeded or an existing active same-person sign-in was replayed.
     SignedIn {

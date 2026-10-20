@@ -19,7 +19,7 @@ impl World {
         if let Some(peers) = &mut self.peers {
             peers.delivered(&delivery);
             if let root::Delivery::Core(core::Held::PeopleReply { to, reply }) = delivery {
-                peers.reply(to, reply);
+                peers.reply(to, &reply);
                 self.people_answers.push(reply);
                 return;
             }

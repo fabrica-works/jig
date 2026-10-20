@@ -515,7 +515,7 @@ impl Application for Testing {
             }
             root::Delivery::Core(core::Held::PeopleReply { to, reply }) => {
                 peers.answers += 1;
-                peers.peers.reply(to, reply);
+                peers.peers.reply(to, &reply);
                 Vec::new()
             }
             root::Delivery::System { connector: number, call } => {

@@ -69,6 +69,7 @@ pub struct Limits {
     pub stored_roles_holdings: u32,
     pub model_name_name: u32,
     pub stored_policy_models: u32,
+    pub outcome_account_sign_in_started_address: u32,
 }
 
 /// The schema's maximum limits.
@@ -136,6 +137,7 @@ pub const CEILINGS: Limits = Limits {
     stored_roles_holdings: 1_024,
     model_name_name: 4_096,
     stored_policy_models: 64,
+    outcome_account_sign_in_started_address: 2_048,
 };
 
 /// A field or tag that caused a codec problem.
@@ -1337,6 +1339,8 @@ pub enum Path {
     OutcomeRefusedTail,
     /// The `source` field of `OutcomeAccountSignInStarted`.
     OutcomeAccountSignInStartedSource,
+    /// The `address` field of `OutcomeAccountSignInStarted`.
+    OutcomeAccountSignInStartedAddress,
     /// Bytes after `OutcomeAccountSignInStarted`.
     OutcomeAccountSignInStartedTail,
     /// The `confirmed` field of `OutcomeAccountSignedOut`.
@@ -1456,6 +1460,7 @@ fn check_limits_0(limits: &Limits) -> Result<(), Problem> {
     if limits.stored_roles_holdings > CEILINGS.stored_roles_holdings { return Err(Problem { path: Path::StoredRolesHoldings, reason: skein_codec::Reason::Bound }); }
     if limits.model_name_name > CEILINGS.model_name_name { return Err(Problem { path: Path::ModelNameName, reason: skein_codec::Reason::Bound }); }
     if limits.stored_policy_models > CEILINGS.stored_policy_models { return Err(Problem { path: Path::StoredPolicyModels, reason: skein_codec::Reason::Bound }); }
+    if limits.outcome_account_sign_in_started_address > CEILINGS.outcome_account_sign_in_started_address { return Err(Problem { path: Path::OutcomeAccountSignInStartedAddress, reason: skein_codec::Reason::Bound }); }
     Ok(())
 }
 
@@ -9930,19 +9935,23 @@ impl OutcomeRefused {
 pub struct OutcomeAccountSignInStartedParts {
     /// The `source` field.
     pub source: u32,
+    /// The `address` field.
+    pub address: Box<[u8]>,
 }
 
 /// `OutcomeAccountSignInStarted` in this codec family.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OutcomeAccountSignInStarted {
     source: u32,
+    address: Box<[u8]>,
 }
 
 impl OutcomeAccountSignInStarted {
     /// Makes a value within the given limits.
-    pub fn new(_limits: &Limits, parts: OutcomeAccountSignInStartedParts) -> Result<Self, Problem> {
-        let OutcomeAccountSignInStartedParts { source } = parts;
-        let value = Self { source };
+    pub fn new(limits: &Limits, parts: OutcomeAccountSignInStartedParts) -> Result<Self, Problem> {
+        let OutcomeAccountSignInStartedParts { source, address } = parts;
+        let value = Self { source, address };
+        value.check(limits)?;
         Ok(value)
     }
 
@@ -9950,10 +9959,18 @@ impl OutcomeAccountSignInStarted {
     #[must_use]
     pub fn source(&self) -> u32 { self.source }
 
+    /// Reads the `address` field.
+    #[must_use]
+    pub fn address(&self) -> &[u8] { &self.address }
+
     /// Moves the fields out without copying.
     #[must_use]
-    pub fn into_parts(self) -> OutcomeAccountSignInStartedParts { OutcomeAccountSignInStartedParts { source: self.source } }
+    pub fn into_parts(self) -> OutcomeAccountSignInStartedParts { OutcomeAccountSignInStartedParts { source: self.source, address: self.address } }
 
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        if self.address.len() > usize::try_from(limits.outcome_account_sign_in_started_address.min(CEILINGS.outcome_account_sign_in_started_address)).expect("u32 fits usize") { return Err(Problem { path: Path::OutcomeAccountSignInStartedAddress, reason: skein_codec::Reason::Bound }); }
+        Ok(())
+    }
 }
 
 /// Movable fields of `OutcomeAccountSignedOut`.
@@ -10137,10 +10154,18 @@ pub enum Outcome {
 
 impl Outcome {
     /// Checks the payload against the given limits.
-    pub fn new(_limits: &Limits, value: Self) -> Result<Self, Problem> {
+    pub fn new(limits: &Limits, value: Self) -> Result<Self, Problem> {
+        value.check(limits)?;
         Ok(value)
     }
 
+    fn check(&self, limits: &Limits) -> Result<(), Problem> {
+        match self {
+            Self::AccountSignInStarted(record) => OutcomeAccountSignInStarted::check(record, limits),
+            Self::Compound(_) | Self::CompoundRefused(_) | Self::Created(_) | Self::MarkedSeen(_) | Self::Applied(_) | Self::Again(_) | Self::SignedOut | Self::NoteEdited(_) | Self::ServiceMade(_) | Self::Adopted(_) | Self::Proposed(_) | Self::Stopped(_) | Self::Cancelled(_) | Self::Released(_) | Self::PersonTaken(_) | Self::PersonHandedBack(_) | Self::PersonAnswered(_) | Self::Moved(_) | Self::ProposalDecided(_) | Self::Said(_) | Self::QuestionAnswered(_) | Self::Amended(_) | Self::RolesSet(_) | Self::PolicyChanged(_) | Self::PoolSet(_) | Self::EscalationDecided(_) | Self::Refused(_) | Self::Withdrawn(_) | Self::AccountSignedOut(_) => Ok(()),
+        }?;
+        Ok(())
+    }
 }
 
 /// Movable fields of `StoredAnswer`.
@@ -10196,6 +10221,7 @@ impl StoredAnswer {
 
     fn check(&self, limits: &Limits) -> Result<(), Problem> {
         self.ask.check(limits)?;
+        self.outcome.check(limits)?;
         Ok(())
     }
 }
@@ -18868,6 +18894,9 @@ impl OutcomeAccountSignInStarted {
     pub fn measure(&self) -> u32 {
         let mut size = 0_u32;
         size = size.checked_add(4).expect("schema ceilings fit u32");
+        let field_address = &self.address;
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        size = size.checked_add(u32::try_from(field_address.len()).expect("field ceiling fits u32")).expect("schema ceilings fit u32");
         size
     }
 
@@ -18875,6 +18904,9 @@ impl OutcomeAccountSignInStarted {
     pub fn encode(&self, writer: &mut skein_lib::Writer) -> Result<(), skein_lib::Overflow> {
         let field_source = &self.source;
         writer.put(&field_source.to_be_bytes())?;
+        let field_address = &self.address;
+        writer.put(&u32::try_from(field_address.len()).expect("field ceiling fits u32").to_be_bytes())?;
+        writer.put(field_address.as_ref())?;
         Ok(())
     }
 
@@ -18885,9 +18917,10 @@ impl OutcomeAccountSignInStarted {
         Ok(value)
     }
 
-    fn decode_from(_limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
+    fn decode_from(limits: &Limits, reader: &mut skein_lib::Reader<'_>) -> Result<Self, Problem> {
         let decoded_source = reader.u32().ok_or(Problem { path: Path::OutcomeAccountSignInStartedSource, reason: skein_codec::Reason::Short })?;
-        Ok(Self { source: decoded_source })
+        let decoded_address = { let length = match skein_codec::read_len(reader, limits.outcome_account_sign_in_started_address.min(CEILINGS.outcome_account_sign_in_started_address)) { Ok(length) => length, Err(reason) => return Err(Problem { path: Path::OutcomeAccountSignInStartedAddress, reason }), }; Box::from(reader.bytes(length).ok_or(Problem { path: Path::OutcomeAccountSignInStartedAddress, reason: skein_codec::Reason::Short })?) };
+        Ok(Self { source: decoded_source, address: decoded_address })
     }
 }
 
@@ -25708,9 +25741,9 @@ impl OutcomeAccountSignInStarted {
         Self::worst_case_bytes_within(limits)
     }
 
-    pub(crate) fn worst_case_bytes_within(_limits: &Limits) -> Option<u64> {
+    pub(crate) fn worst_case_bytes_within(limits: &Limits) -> Option<u64> {
         let mut size = 0_u64;
-        size = size.checked_add(4_u64)?;
+        size = size.checked_add(4_u64)?.checked_add(4_u64.checked_add(u64::from(limits.outcome_account_sign_in_started_address))?)?;
         size.checked_add(0)
     }
 
@@ -25721,9 +25754,9 @@ impl OutcomeAccountSignInStarted {
         Self::worst_case_heap_within(limits)
     }
 
-    pub(crate) fn worst_case_heap_within(_limits: &Limits) -> Option<u64> {
+    pub(crate) fn worst_case_heap_within(limits: &Limits) -> Option<u64> {
         let mut heap = 0_u64;
-        heap = heap.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?.checked_add(u64::from(limits.outcome_account_sign_in_started_address))?;
         heap.checked_add(0)
     }
 }
@@ -27380,8 +27413,8 @@ mod golden_tests {
         ("record_outcome_escalation_decided_full", || { let value = OutcomeEscalationDecided::new(&CEILINGS, OutcomeEscalationDecidedParts { task: u64::MAX, revision: u64::MAX, by: u64::MAX, at: u64::MAX, choice: EscalationChoice::Released }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutcomeEscalationDecided::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_outcome_refused_smallest", || { let value = OutcomeRefused::new(&CEILINGS, OutcomeRefusedParts { value: Refusal::NotWellFormed(RefusalNotWellFormed::new(&CEILINGS, RefusalNotWellFormedParts { at: 0_u32, why: Malformed::Cycle }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutcomeRefused::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_outcome_refused_full", || { let value = OutcomeRefused::new(&CEILINGS, OutcomeRefusedParts { value: Refusal::NotWellFormed(RefusalNotWellFormed::new(&CEILINGS, RefusalNotWellFormedParts { at: u32::MAX, why: Malformed::Cycle }).expect("golden within ceilings")) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutcomeRefused::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_outcome_account_sign_in_started_smallest", || { let value = OutcomeAccountSignInStarted::new(&CEILINGS, OutcomeAccountSignInStartedParts { source: 0_u32 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutcomeAccountSignInStarted::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_outcome_account_sign_in_started_full", || { let value = OutcomeAccountSignInStarted::new(&CEILINGS, OutcomeAccountSignInStartedParts { source: u32::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutcomeAccountSignInStarted::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_outcome_account_sign_in_started_smallest", || { let value = OutcomeAccountSignInStarted::new(&CEILINGS, OutcomeAccountSignInStartedParts { source: 0_u32, address: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutcomeAccountSignInStarted::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_outcome_account_sign_in_started_full", || { let value = OutcomeAccountSignInStarted::new(&CEILINGS, OutcomeAccountSignInStartedParts { source: u32::MAX, address: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutcomeAccountSignInStarted::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_outcome_account_signed_out_smallest", || { let value = OutcomeAccountSignedOut::new(&CEILINGS, OutcomeAccountSignedOutParts { confirmed: false }).expect("golden within ceilings"); let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutcomeAccountSignedOut::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_outcome_account_signed_out_full", || { let value = OutcomeAccountSignedOut::new(&CEILINGS, OutcomeAccountSignedOutParts { confirmed: true }).expect("golden within ceilings"); let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, OutcomeAccountSignedOut::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_given_smallest", || { let value = Given::new(&CEILINGS, GivenParts { task: 0_u64, amount: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Given::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -27444,8 +27477,8 @@ mod golden_tests {
         ("enum_outcome_refused_full", || { let value = Outcome::Refused(OutcomeRefused::new(&CEILINGS, OutcomeRefusedParts { value: Refusal::NotWellFormed(RefusalNotWellFormed::new(&CEILINGS, RefusalNotWellFormedParts { at: u32::MAX, why: Malformed::Cycle }).expect("golden within ceilings")) }).expect("golden within ceilings")); let bytes: &[u8] = &[26, 0, 255, 255, 255, 255, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Outcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_outcome_withdrawn_smallest", || { let value = Outcome::Withdrawn(OutcomeWithdrawn::new(&CEILINGS, OutcomeWithdrawnParts { proposal: 0_u64 }).expect("golden within ceilings")); let bytes: &[u8] = &[27, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Outcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_outcome_withdrawn_full", || { let value = Outcome::Withdrawn(OutcomeWithdrawn::new(&CEILINGS, OutcomeWithdrawnParts { proposal: u64::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[27, 255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Outcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_outcome_account_sign_in_started_smallest", || { let value = Outcome::AccountSignInStarted(OutcomeAccountSignInStarted::new(&CEILINGS, OutcomeAccountSignInStartedParts { source: 0_u32 }).expect("golden within ceilings")); let bytes: &[u8] = &[28, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Outcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_outcome_account_sign_in_started_full", || { let value = Outcome::AccountSignInStarted(OutcomeAccountSignInStarted::new(&CEILINGS, OutcomeAccountSignInStartedParts { source: u32::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[28, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Outcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_outcome_account_sign_in_started_smallest", || { let value = Outcome::AccountSignInStarted(OutcomeAccountSignInStarted::new(&CEILINGS, OutcomeAccountSignInStartedParts { source: 0_u32, address: Box::from([].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[28, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Outcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_outcome_account_sign_in_started_full", || { let value = Outcome::AccountSignInStarted(OutcomeAccountSignInStarted::new(&CEILINGS, OutcomeAccountSignInStartedParts { source: u32::MAX, address: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings")); let bytes: &[u8] = &[28, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Outcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_outcome_account_signed_out_smallest", || { let value = Outcome::AccountSignedOut(OutcomeAccountSignedOut::new(&CEILINGS, OutcomeAccountSignedOutParts { confirmed: false }).expect("golden within ceilings")); let bytes: &[u8] = &[29, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Outcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_outcome_account_signed_out_full", || { let value = Outcome::AccountSignedOut(OutcomeAccountSignedOut::new(&CEILINGS, OutcomeAccountSignedOutParts { confirmed: true }).expect("golden within ceilings")); let bytes: &[u8] = &[29, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Outcome::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_stored_answer_smallest", || { let value = StoredAnswer::new(&CEILINGS, StoredAnswerParts { key: RequestKey::new(&CEILINGS, RequestKeyParts { person: 0_u64, key: [0_u8; 16] }).expect("golden within ceilings"), ask: Ask::Compound(AskCompound::new(&CEILINGS, AskCompoundParts { project: 0_u32, operations: skein_lib::List::with_capacity(0) }).expect("golden within ceilings")), outcome: Outcome::Compound(OutcomeCompound::new(&CEILINGS, OutcomeCompoundParts { project: 0_u32, operations: 0_u32, first_message: 0_u64 }).expect("golden within ceilings")), at: 0_u64 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, StoredAnswer::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -27475,7 +27508,7 @@ mod golden_tests {
         table(&GOLDEN_0);
     }
 
-    static BOUNDS_0: [Case; 63] = [
+    static BOUNDS_0: [Case; 64] = [
         ("bound_segment_bytes", || bound((Path::SegmentBytes, skein_codec::Reason::Bound), &Limits { segment_bytes: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Segment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_identity_key_subject", || bound((Path::IdentityKeySubject, skein_codec::Reason::Bound), &Limits { identity_key_subject: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match IdentityKey::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_identity_login", || bound((Path::IdentityLogin, skein_codec::Reason::Bound), &Limits { identity_login: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Identity::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
@@ -27539,6 +27572,7 @@ mod golden_tests {
         ("bound_stored_roles_holdings", || bound((Path::StoredRolesHoldings, skein_codec::Reason::Bound), &Limits { stored_roles_holdings: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match StoredRoles::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_model_name_name", || bound((Path::ModelNameName, skein_codec::Reason::Bound), &Limits { model_name_name: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match ModelName::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_stored_policy_models", || bound((Path::StoredPolicyModels, skein_codec::Reason::Bound), &Limits { stored_policy_models: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match StoredPolicy::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_outcome_account_sign_in_started_address", || bound((Path::OutcomeAccountSignInStartedAddress, skein_codec::Reason::Bound), &Limits { outcome_account_sign_in_started_address: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match OutcomeAccountSignInStarted::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
     ];
 
     #[test]

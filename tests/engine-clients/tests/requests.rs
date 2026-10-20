@@ -163,7 +163,10 @@ fn route_real_core(peer: &mut Peer, world: &mut jig_core_world::effects::World) 
             key,
             ask,
         })));
-        peer.answer_request(skein_lib::ReplyTo::new(token), *world.people_answers.last().expect("real core reply"));
+        peer.answer_request(
+            skein_lib::ReplyTo::new(token),
+            world.people_answers.last().expect("real core reply").clone(),
+        );
     }
     keys
 }

@@ -323,7 +323,7 @@ fn an_observers_core_role_refusals_match_their_offers() {
                 match row {
                     Request::Held(held) => {
                         if let Held::PeopleReply { reply, .. } = &**held {
-                            replied |= *reply == people::Reply::Outcome(outcome);
+                            replied |= *reply == people::Reply::Outcome(outcome.clone());
                         }
                     }
                     Request::Write(Write::Save(Record::People(people::Stored::Answer { outcome: value, .. }))) => {
@@ -584,7 +584,7 @@ fn ask_now(core: &mut Core, limits: &Limits, key: u8, ask: people::Ask) -> peopl
         if let Request::Held(held) = row
             && let Held::PeopleReply { reply: people::Reply::Outcome(outcome), .. } = &**held
         {
-            return *outcome;
+            return outcome.clone();
         }
     }
     panic!("one terminal keyed outcome: {out:?}");
@@ -823,7 +823,7 @@ fn proposal_answer(out: &Queue<Request>) -> people::Outcome {
         if let Request::Held(held) = row
             && let Held::PeopleReply { reply: people::Reply::Outcome(outcome), .. } = &**held
         {
-            return *outcome;
+            return outcome.clone();
         }
     }
     panic!("one terminal keyed outcome: {out:?}");

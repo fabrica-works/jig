@@ -1,7 +1,7 @@
 use jig_accounts_world::{LIMITS, provider, providers};
 use jig_domain_accounts::{
-    DISPLAY, Domain, Event, Failure, FromComponent, Held, Holder, Kind, Limits, NAME, Request, SUBJECT, Signing,
-    Stored, max_out, step, worst_case,
+    ADDRESS, DISPLAY, Domain, Event, Failure, FromComponent, Held, Holder, Kind, Limits, NAME, Request, SUBJECT,
+    Signing, Stored, max_out, step, worst_case,
 };
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};
@@ -128,7 +128,8 @@ fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
         run.step(&mut domain, Event::SignInFailed { source, failure: Failure::Cancelled }, "failed");
         ends += 1;
     }
-    run.sign_in(&mut domain, 0);
+    let source = run.sign_in(&mut domain, 0);
+    run.visit(&mut domain, source);
     assert_eq!(domain.facts_lost(), 0, "every end kept");
 }
 
@@ -141,6 +142,15 @@ struct Run {
     request: u64,
 }
 impl Run {
+    /// Keep the account sign-in answer's allocation in the queue for its heap check.
+    fn visit(&mut self, domain: &mut Domain, source: u32) {
+        self.meter.start();
+        let address = longest(ADDRESS, 0);
+        step(domain, &self.env, Event::Visited { source, address }, &mut self.out);
+        let measured = self.meter.end();
+        self.meter.check(measured, self.bound, &"account sign-in address retained");
+    }
+
     /// The step's last ask of the component, its asks dropped before the check, as the core
     /// takes them.
     fn step(&mut self, domain: &mut Domain, event: Event, label: &str) -> Option<Signing> {

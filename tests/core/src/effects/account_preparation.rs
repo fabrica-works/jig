@@ -43,16 +43,23 @@ impl World {
         }
     }
 
-    /// The accounts' component's side of a party's sign-in and sign-out, which JP6 wires: each
+    /// The fake component's account sign-in and sign-out: each
     /// provider's sign-in answers with [`SIGNED_IN`]'s subject, and each revocation is confirmed.
     pub(super) fn account_signing(&mut self, signing: accounts::Signing) {
         let event = match signing {
-            accounts::Signing::SignIn { source, .. } => accounts::Event::SignedIn {
-                source,
-                subject: Box::from(SIGNED_IN),
-                display: Box::from(SIGNED_IN),
-                declined: false,
-            },
+            accounts::Signing::SignIn { source, .. } => {
+                let visit = accounts::Event::Visited {
+                    source,
+                    address: format!("https://issuer.test/visit/{source}").into_bytes().into_boxed_slice(),
+                };
+                self.events.push_back(root::Event::Core(core::Event::Account(visit)));
+                accounts::Event::SignedIn {
+                    source,
+                    subject: Box::from(SIGNED_IN),
+                    display: Box::from(SIGNED_IN),
+                    declined: false,
+                }
+            }
             accounts::Signing::SignOut { source } => accounts::Event::SignedOut { source, confirmed: true },
             accounts::Signing::Replaced { .. } => return,
         };

@@ -922,10 +922,10 @@ fn a_release_naming_an_old_hold_is_refused_as_moved_saying_what_holds_it_now() {
         })))
     );
     assert!(matches!(live_row(&world, task).phase, tasks::Phase::Held { why: tasks::Hold::Budget, .. }));
-    let refusal = world.people_answers.last().copied();
+    let refusal = world.people_answers.last().cloned();
     world.send(root::Event::Core(core::Event::Tasks(tasks::Event::Hold { task, why: tasks::Hold::Deadline })));
     ask(&mut world, 51, people::Ask::Release { project: 1, task, revision, again: None });
-    assert_eq!(world.people_answers.last().copied(), refusal, "replay retains the refused decision's facts");
+    assert_eq!(world.people_answers.last().cloned(), refusal, "replay retains the refused decision's facts");
 }
 
 #[test]
@@ -1117,7 +1117,7 @@ fn a_person_answering_a_person_task_whose_inputs_changed_is_refused_as_moved() {
         },
     }));
     let second_sign_in = world.sign_in.expect("second party signed in");
-    let Some(people::Reply::SignedIn { person: second_person, .. }) = world.people_answers.last().copied() else {
+    let Some(people::Reply::SignedIn { person: second_person, .. }) = world.people_answers.last().cloned() else {
         panic!("second sign-in")
     };
     world.sign_in = Some(first_sign_in);
@@ -1233,7 +1233,7 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
         },
     );
     let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) =
-        world.people_answers.last().copied()
+        world.people_answers.last().cloned()
     else {
         panic!("widening proposed: {:?}", world.people_answers)
     };
@@ -1316,7 +1316,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
     );
     ask(&mut world, 90, jig_core_world::fixtures::propose_goal(proposed_goal));
     let Some(people::Reply::Outcome(people::Outcome::Proposed { proposal, to: 0 })) =
-        world.people_answers.last().copied()
+        world.people_answers.last().cloned()
     else {
         panic!("goal proposed: {:?}", world.people_answers)
     };

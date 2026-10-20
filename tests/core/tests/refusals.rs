@@ -34,7 +34,7 @@ fn second_person(world: &mut World, role: bool) -> u64 {
             name: b"Second".as_slice().into(),
         },
     }));
-    let Some(people::Reply::SignedIn { person, sign_in, .. }) = world.people_answers.last().copied() else {
+    let Some(people::Reply::SignedIn { person, sign_in, .. }) = world.people_answers.last().cloned() else {
         panic!("second person signed in");
     };
     if role {

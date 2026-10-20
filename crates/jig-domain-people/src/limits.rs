@@ -141,7 +141,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Deadlines::<u64>::worst_case(limits.sign_ins)?)?
         .checked_add(Map::<RequestKey, Answered>::worst_case(limits.requests)?)?
         .checked_add(Deadlines::<RequestKey>::worst_case(limits.requests)?)?
-        .checked_add(u64::from(limits.requests).checked_mul(ask_bytes)?)?
+        // Each retained account sign-in answer may own its longest visit address.
+        .checked_add(u64::from(limits.requests).checked_mul(ask_bytes.checked_add(u64::from(crate::ADDRESS))?)?)?
         .checked_add(Slab::<Pending>::worst_case(limits.pending)?)?
         .checked_add(Map::<RequestKey, Id<Pending>>::worst_case(limits.pending)?)?
         .checked_add(u64::from(limits.pending).checked_mul(List::<skein_lib::ReplyTo>::worst_case(limits.waiters)?)?)?

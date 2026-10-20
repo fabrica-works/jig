@@ -35,7 +35,7 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
             wire::OutcomeAgainParts { value: encode_again(*value, limits) },
         )?),
         domain::Outcome::SignedOut => wire::Outcome::SignedOut,
-        domain::Outcome::AccountSignInStarted { source } => account_sign_in_started(*source, limits)?,
+        domain::Outcome::AccountSignInStarted { source, address } => account_sign_in_started(*source, address, limits)?,
         domain::Outcome::AccountSignedOut { confirmed } => account_signed_out(*confirmed, limits)?,
         domain::Outcome::NoteEdited { name } => wire::Outcome::NoteEdited(wire::OutcomeNoteEdited::new(
             limits,
@@ -106,8 +106,8 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
         )?),
     })
 }
-fn account_sign_in_started(source: u32, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
-    let parts = wire::OutcomeAccountSignInStartedParts { source };
+fn account_sign_in_started(source: u32, address: &[u8], limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
+    let parts = wire::OutcomeAccountSignInStartedParts { source, address: skein_lib::bytes::copy_of(address) };
     Ok(wire::Outcome::AccountSignInStarted(wire::OutcomeAccountSignInStarted::new(limits, parts)?))
 }
 fn account_signed_out(confirmed: bool, limits: &wire::Limits) -> Result<wire::Outcome, wire::Problem> {
@@ -136,7 +136,8 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
         }
         wire::Outcome::SignedOut => domain::Outcome::SignedOut,
         wire::Outcome::AccountSignInStarted(value) => {
-            domain::Outcome::AccountSignInStarted { source: value.into_parts().source }
+            let wire::OutcomeAccountSignInStartedParts { source, address } = value.into_parts();
+            domain::Outcome::AccountSignInStarted { source, address }
         }
         wire::Outcome::AccountSignedOut(value) => {
             domain::Outcome::AccountSignedOut { confirmed: value.into_parts().confirmed }

@@ -29,6 +29,7 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     let people = &domain.people;
     let authority = &domain.authority;
     let mut limits = wire::Limits {
+        outcome_account_sign_in_started_address: domain::ADDRESS,
         ask_compound_operations: people.operations,
         operation_cancel_reason: people.words,
         operation_move_reason: people.words,

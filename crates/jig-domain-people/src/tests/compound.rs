@@ -33,11 +33,11 @@ fn a_compound_sent_twice_under_one_key_is_routed_once() {
     let request = route(&test.request(10, 1, compound(2)));
     assert!(test.request(10, 1, compound(2)).is_empty());
     let outcome = Outcome::Compound { project: 1, operations: 2, first_message: 1 };
-    let replies = test.send(Event::Decided { request, outcome });
+    let replies = test.send(Event::Decided { request, outcome: outcome.clone() });
     let mut answers = 0_u32;
     for row in replies {
         if let Request::Reply { reply, .. } = row {
-            assert_eq!(reply, Reply::Outcome(outcome));
+            assert_eq!(reply, Reply::Outcome(outcome.clone()));
             answers += 1;
         }
     }
