@@ -15,7 +15,7 @@ pub enum Invalid {
     NoteRevision,
     NoteProject,
     CompoundProject,
-    /// A choice of models, which the joint world configures none of.
+    /// A model choice or nonempty named selector; the joint transport has no model registry.
     Llm,
 }
 
@@ -134,14 +134,14 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
                 spec: change.spec.as_ref().map(specification),
                 wake: change.wake.map(request_arguments::wake),
                 dependencies: change.dependencies.as_ref().map(|values| values.iter().copied().collect()),
-                authority: change.authority.as_ref().map(authority),
+                authority: change.authority.as_ref().map(authority).transpose()?,
                 llm: None,
                 reason: Box::from(reason.bytes()),
             },
             release: None,
         },
         client::Ask::ChangePolicy { project, edit } => {
-            people::Ask::ChangePolicy { project: *project, change: policy_edit(edit) }
+            people::Ask::ChangePolicy { project: *project, change: policy_edit(edit)? }
         }
         client::Ask::SetRoles { project, holdings } => people::Ask::SetRoles {
             project: *project,
@@ -200,10 +200,20 @@ fn grant(value: &client::OwnerGrant) -> people::Grant {
     people::Grant { connector: value.connector, kind: value.kind, pattern: pattern(&value.pattern) }
 }
 
-fn authority(value: &client::OwnerAuthority) -> people::Authority {
-    people::Authority {
+fn authority(value: &client::OwnerAuthority) -> Result<people::Authority, Invalid> {
+    let models = match &value.models {
+        None => None,
+        Some(client::AuthorityModels::All) => Some(people::Models::ALL),
+        Some(client::AuthorityModels::Named(names)) => {
+            if !names.is_empty() {
+                return Err(Invalid::Llm);
+            }
+            Some(people::Models::NONE)
+        }
+    };
+    Ok(people::Authority {
         tools: value.tools,
-        models: None,
+        models,
         grants: value.grants.iter().map(grant).collect(),
         delegation: people::Delegation {
             kinds: value
@@ -227,7 +237,7 @@ fn authority(value: &client::OwnerAuthority) -> people::Authority {
             .iter()
             .map(|scope| people::ResourceScope { connector: scope.connector, pattern: pattern(&scope.pattern) })
             .collect(),
-    }
+    })
 }
 
 fn note_scope(value: &client::NoteScope, project: u32) -> Result<people::NoteScope, Invalid> {
@@ -445,7 +455,7 @@ mod tests {
             ]
         );
         assert_eq!(amendment.dependencies.as_deref(), Some([u64::MAX, 0].as_slice()));
-        assert_eq!(amendment.authority, Some(super::authority(&authority)));
+        assert_eq!(amendment.authority, Some(super::authority(&authority).expect("supported authority")));
         assert_eq!(
             amendment.wake,
             Some(people::WakePolicy {

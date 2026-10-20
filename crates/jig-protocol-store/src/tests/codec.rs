@@ -1031,10 +1031,14 @@ fn a_named_full_mask_drops_removed_models_without_becoming_all() {
     let limits = people_limits();
     let mut value = fixtures::people_policy();
     value.roles[0].authority.models = Some(jig_domain_people::Models::Named(u64::MAX));
-    let names: Vec<Box<[u8]>> = (0..64).map(|at| format!("model-{at:02}").into_bytes().into_boxed_slice()).collect();
+    let mut names = skein_lib::List::with_capacity(64);
+    for at in 0_u8..64 {
+        names.push(Box::<[u8]>::from([b'0'.checked_add(at).expect("ASCII name")])).expect("64 names");
+    }
+    let names = names.into_boxed();
     let row = jig_domain_people::Stored::Policy { project: 3, value: value.clone() };
     let bytes = crate::codec::people::encode(&row, &limits, &names).unwrap();
-    let now = fixtures::model_names(&[b"new", b"model-63", b"model-00"]);
+    let now = fixtures::model_names(&[b"new", b"o", b"0"]);
     value.roles[0].authority.models = Some(jig_domain_people::Models::Named(0b110));
     assert_eq!(
         crate::codec::people::decode(&bytes, &limits, &now),

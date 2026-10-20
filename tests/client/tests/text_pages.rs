@@ -10,7 +10,14 @@ fn print(w: &PageWorld, c: ClientId, label: &str, golden: &[u8]) {
     let (_, view) = jig_client_world::test::new(&jig_client_world::test::limits(), 0);
     let mut print = skein_ui_text::Print::new(&view.limits().tree).expect("print fits");
     skein_ui_text::render(w.tree(c), b"jig", Some(jig_client_view::regions::JigRegion::Link.region()), &mut print);
-    assert_eq!(print.text.as_slice(), golden, "{label}");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden").join(format!("{label}.txt"));
+    if std::env::var_os("SKEIN_CODEGEN_WRITE").is_some_and(|value| value == "1") {
+        std::fs::write(&path, print.text.as_slice()).expect("refresh printed page golden");
+    }
+    assert_eq!(print.text.as_slice(), std::fs::read(path).expect("printed page golden"), "{label}");
+    if std::env::var_os("SKEIN_CODEGEN_WRITE").is_none() {
+        assert_eq!(print.text.as_slice(), golden, "{label}");
+    }
 }
 fn settle(w: &mut PageWorld, c: ClientId) {
     w.person(c, vec![Step::Pause { span: Duration::from_millis(100) }]);

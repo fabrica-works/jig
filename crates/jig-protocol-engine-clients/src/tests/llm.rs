@@ -204,6 +204,6 @@ fn original_selector_names_are_canonical_and_unknowns_reach_retained_key_lookup(
     let unknown = translate::asks::named(selector_ask(&[b"removed"]), &models, &w::CEILINGS).unwrap();
     assert_eq!(unknown.models.as_ref(), &[Box::<[u8]>::from(b"removed".as_slice())]);
     for names in [&[b"quick".as_slice(), b"quick".as_slice()][..], &[b"".as_slice()][..]] {
-        assert!(translate::asks::named(selector_ask(names), &models, &w::CEILINGS).is_err());
+        translate::asks::named(selector_ask(names), &models, &w::CEILINGS).expect_err("invalid selector");
     }
 }

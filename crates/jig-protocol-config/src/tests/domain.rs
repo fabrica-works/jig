@@ -263,6 +263,11 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
     );
 }
 #[test]
+#[expect(
+    clippy::disallowed_macros,
+    clippy::disallowed_methods,
+    reason = "this ordinary drift test refreshes its committed memory sum only under SKEIN_CODEGEN_WRITE"
+)]
 fn memory_below_the_components_sum_is_refused() {
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();

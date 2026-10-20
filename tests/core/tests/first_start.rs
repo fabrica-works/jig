@@ -183,7 +183,7 @@ fn named_edit(world: &mut World, sign_in: u64, key: u8, name: &[u8]) -> people::
         models: Box::new([name.into()]),
     })));
     let (_, root::Delivery::Core(core::Held::PeopleReply { reply, .. })) =
-        world.client_peer.as_mut().unwrap().delivered.pop().unwrap()
+        world.client_peer.as_mut().expect("client peer").delivered.pop().expect("keyed reply")
     else {
         panic!("keyed answer")
     };

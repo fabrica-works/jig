@@ -16,8 +16,8 @@ pub fn deadline_after(decision: Wall, span: Duration) -> Wall {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Authority {
     pub tools: Tools,
-    /// The configured models its runs may use, and so their LLM providers. The order
-    /// (`at_most`, `fits`) does not compare them yet.
+    /// The models its runs may use, and so their LLM providers. Permission comparisons
+    /// distinguish literal ALL from a frozen named set, including all 64 configured models.
     pub models: Models,
     /// Resource grants, bounded by `Limits::grants` at admission.
     pub grants: Box<[Grant]>,

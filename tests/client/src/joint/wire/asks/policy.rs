@@ -1,8 +1,8 @@
 //! Whole project-policy request fields on the typed peer.
 use super::{authority, client, grant, pattern, people, request_arguments};
 
-pub(super) fn policy_edit(value: &client::PolicyEdit) -> people::PolicyChange {
-    match value {
+pub(super) fn policy_edit(value: &client::PolicyEdit) -> Result<people::PolicyChange, super::Invalid> {
+    Ok(match value {
         client::PolicyEdit::Templates { overrides } => {
             people::PolicyChange::Templates { overrides: overrides.iter().map(request_arguments::template).collect() }
         }
@@ -11,7 +11,7 @@ pub(super) fn policy_edit(value: &client::PolicyEdit) -> people::PolicyChange {
         }
         client::PolicyEdit::Role(role) => people::PolicyChange::Role(people::PolicyRole {
             number: role.number,
-            authority: authority(&role.authority),
+            authority: authority(&role.authority)?,
             period_spend: role.period_spend,
             requests: role.requests,
             decides: role.decides,
@@ -49,5 +49,5 @@ pub(super) fn policy_edit(value: &client::PolicyEdit) -> people::PolicyChange {
                 })
                 .collect(),
         },
-    }
+    })
 }

@@ -1,6 +1,6 @@
 use jig_client_domain::contract::{
-    OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant, OwnerPattern,
-    OwnerPatternEnd, OwnerResourceScope,
+    AuthorityModels, OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant,
+    OwnerPattern, OwnerPatternEnd, OwnerResourceScope,
 };
 use jig_client_scripted_engine::{Bounds, owner_authority as price};
 use skein_lib::{List, Wall};
@@ -27,7 +27,7 @@ fn pattern(open: bool) -> OwnerPattern {
 }
 fn authority() -> OwnerAuthority {
     OwnerAuthority {
-        models: None,
+        models: Some(AuthorityModels::Named(list((0..64).map(|n| Box::from([b'm', b'o', b'd', n]))))),
         tools: u64::MAX,
         grants: list((0..3).map(|n| OwnerGrant { connector: u16::MAX, kind: n, pattern: pattern(n % 2 == 0) })),
         delegation: OwnerDelegation {
@@ -125,7 +125,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     use skein_ui::phrases::PhraseLimits;
 
     let language_limits =
-        PhraseLimits { languages: 1, phrases: 19, holes: 1, segments: 40, text_bytes: 4096, hole_bytes: 0 };
+        PhraseLimits { languages: 1, phrases: 23, holes: 1, segments: 40, text_bytes: 4096, hole_bytes: 0 };
     let word_meter = Meter::new();
     let words = OwnerAuthorityWords::load(Box::new([words::english()]), &language_limits, 0, 0)
         .expect("closed English authority words");
@@ -133,7 +133,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     let value = OwnerAuthorityDocument { authority: authority(), cut: true };
     let envelope = view::worst_case(3, 3, 4, &words).expect("full view envelope");
     let required = view::document_required(&value, &words, 3).expect("value capacity");
-    assert_eq!(required.nodes, 59, "full three-by-three patterns and executor rows");
+    assert_eq!(required.nodes, 63, "full three-by-three patterns and executor rows");
     assert_eq!(required.nodes, envelope.nodes);
     assert!(required.text_bytes <= envelope.text_bytes);
     let limits = Limits {
@@ -154,7 +154,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     let mut builder = Builder::new(&limits);
     view::document(&mut builder, &value, &words, 4, 3);
     let tree = builder.finish();
-    assert_eq!(tree.len(), 59);
+    assert_eq!(tree.len(), 63);
     assert!(meter.held() <= jig_client_view::limits::jig_worst_case(&limits).expect("tree heap envelope"));
     assert_eq!(
         tree.nodes().iter().flat_map(|n| &n.text).filter(|r| r.text.as_ref() == b"a/b\0").count(),
@@ -174,7 +174,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
         },
         cut: false,
     };
-    assert_eq!(view::document_required(&empty, &words, 3).expect("empty facts").nodes, 9);
+    assert_eq!(view::document_required(&empty, &words, 3).expect("empty facts").nodes, 10);
     assert!(price::document_fits(&empty, &Bounds { rows: 0, authority: 0, text: 0, ..bounds() }));
 }
 

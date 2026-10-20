@@ -101,6 +101,7 @@ Needs you:
           Delegate depth: 1
           Spend ceiling: 1
           Note scope bits: 0
+          Keep default models
           Grants
           Allowed delegation executors
           Note resources

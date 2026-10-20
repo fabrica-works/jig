@@ -79,8 +79,8 @@ fn a_client_role_model_edit_changes_the_models_in_me() {
     let [Readout::Jig(contract::ReadResult::Value(contract::ReadValue::OwnerProject(page)))] = pages.as_slice() else {
         panic!("project page")
     };
-    let role = page.policy.roles.get(0).unwrap();
-    let mut authority = role.authority.whole().unwrap();
+    let role = page.policy.roles.get(0).expect("owner role");
+    let mut authority = role.authority.whole().expect("whole role authority");
     authority.models = Some(contract::AuthorityModels::Named(List::with_capacity(0)));
     let key = Key { asker: Asker::JIG, number: 601 };
     story.send(

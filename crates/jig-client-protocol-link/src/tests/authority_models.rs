@@ -16,10 +16,10 @@ fn selectors_and_cut_authorities_round_trip_without_becoming_replacements() {
         authority.models = models;
         let wire = translate::asks::wire_owner_authority(&authority, &limits.wire).unwrap();
         assert_eq!(translate::documents::owner_authority_fields(&wire, &limits), Ok(authority.clone()));
-        let mut legacy = fixtures::read_wire_authority().into_parts();
-        legacy.models = wire.models().clone();
-        let legacy = w::Authority::new(&limits.wire, legacy).unwrap();
-        assert_eq!(translate::pages::authority_fields(&legacy, &limits).unwrap().models, authority.models);
+        let mut common = fixtures::read_wire_authority().into_parts();
+        common.models = wire.models().clone();
+        let common = w::Authority::new(&limits.wire, common).unwrap();
+        assert_eq!(translate::pages::authority_fields(&common, &limits).unwrap().models, authority.models);
 
         let document =
             w::OwnerAuthorityDocument::new(&limits.wire, w::OwnerAuthorityDocumentParts { authority: wire, cut: true })
@@ -37,16 +37,18 @@ fn malformed_and_one_past_model_sets_are_refused_and_exact_bounds_fit() {
     let mut authority = fixtures::read_value_owner_authority();
     for bad in [names(&[b""]), names(&[b"same", b"same"]), names(&[b"\xff"]), names(&[&[b'x'; 4097]])] {
         authority.models = Some(bad);
-        assert!(translate::asks::wire_owner_authority(&authority, &limits.wire).is_err());
+        translate::asks::wire_owner_authority(&authority, &limits.wire).expect_err("invalid selector");
     }
     for count in [64_u32, 65] {
         let mut values = List::with_capacity(count);
         for at in 0..count {
-            values.push(std::format!("model-{at:02}").into_bytes().into_boxed_slice()).unwrap();
+            values
+                .push(Box::from([b'0'.checked_add(u8::try_from(at).expect("fixture index")).expect("ASCII name")]))
+                .unwrap();
         }
         authority.models = Some(c::AuthorityModels::Named(values));
         assert_eq!(translate::asks::wire_owner_authority(&authority, &limits.wire).is_ok(), count == 64);
     }
     authority.models = Some(names(&[&[b'x'; 4096]]));
-    assert!(translate::asks::wire_owner_authority(&authority, &limits.wire).is_ok());
+    translate::asks::wire_owner_authority(&authority, &limits.wire).expect("exact name bound");
 }

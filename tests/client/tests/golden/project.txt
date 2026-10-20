@@ -132,6 +132,7 @@ Settings:
           Delegate depth: 1
           Spend ceiling: 10
           Note scope bits: 0
+          Keep default models
           Grants
           Allowed delegation executors
           Note resources
@@ -171,6 +172,7 @@ Settings:
           Delegate depth: 1
           Spend ceiling: 10
           Note scope bits: 0
+          Keep default models
           Grants
           Allowed delegation executors
           Note resources

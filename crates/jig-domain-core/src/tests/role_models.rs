@@ -108,7 +108,10 @@ fn an_explicit_role_past_the_ceiling_refuses_the_entire_edit() {
             requests: 0,
             decides: 0,
         });
-        assert!(core.change_policy(&limits(), 1, 1, change).is_err());
+        assert_eq!(
+            core.change_policy(&limits(), 1, 1, change),
+            Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape })
+        );
         assert_eq!(core.authority.policy(1), Some(&policy));
     }
 }

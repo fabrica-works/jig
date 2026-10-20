@@ -22,7 +22,7 @@ fn member(v: &c::NewTask) -> Result<p::Member, super::Invalid> {
         words: spec.words,
         parameters: spec.parameters,
         inputs: spec.inputs,
-        authority: authority(&v.authority),
+        authority: authority(&v.authority)?,
         deadline: match v.deadline {
             c::NewDeadline::Named => p::Deadline::Named,
             c::NewDeadline::Span(value) => p::Deadline::Span(value),
