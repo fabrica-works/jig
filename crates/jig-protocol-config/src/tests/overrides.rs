@@ -226,6 +226,10 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"accounts.retry_ms", 30_000),
     (b"accounts.spent_attention_ms", 300_000),
     (b"accounts.facts", 32),
+    (b"accounts.holder_accounts", 4),
+    (b"accounts.sources", 3),
+    (b"accounts.sign_ins", 2),
+    (b"accounts.sign_in_deadline_ms", 300_000),
     (b"views.runs", 4),
     (b"views.watchers", 4),
     (b"views.watchers_per_party", 4),
@@ -350,6 +354,44 @@ fn override_document_problems_name_the_invalid_fields() {
         ("an_override_named_twice_is_refused_naming_it", an_override_named_twice_is_refused_naming_it),
         ("a_non_integer_override_is_refused_naming_it", a_non_integer_override_is_refused_naming_it),
         ("an_invalid_compound_member_is_refused_naming_it", an_invalid_compound_member_is_refused_naming_it),
+    ]);
+}
+
+#[test]
+fn sign_ins_at_once_and_the_sign_in_deadline_reach_the_driver() {
+    let limits =
+        parse(br#"{"profile":"small","overrides":{"accounts.sign_ins":3,"accounts.sign_in_deadline_ms":120000}}"#)
+            .unwrap();
+    assert_eq!((limits.core.accounts.sign_ins, limits.driver.listeners), (3, 3));
+    assert_eq!(limits.driver.client.sign_in_time, skein_lib::Duration::from_secs(120));
+}
+fn no_sign_ins_at_once_is_refused() {
+    refused(br#"{"profile":"small","overrides":{"accounts.sign_ins":0}}"#, b"accounts.sign_ins");
+}
+fn sign_ins_past_the_drivers_sockets_are_refused() {
+    refused(br#"{"profile":"small","overrides":{"accounts.sign_ins":7}}"#, b"accounts.sign_ins");
+}
+fn a_holders_accounts_past_the_deployments_are_refused() {
+    refused(br#"{"profile":"small","overrides":{"accounts.holder_accounts":5}}"#, b"accounts.holder_accounts");
+}
+fn no_sources_per_account_is_refused() {
+    refused(br#"{"profile":"small","overrides":{"accounts.sources":0}}"#, b"accounts.sources");
+}
+fn a_sign_in_deadline_of_zero_is_refused() {
+    refused(br#"{"profile":"small","overrides":{"accounts.sign_in_deadline_ms":0}}"#, b"accounts.sign_in_deadline_ms");
+}
+/// The small profile's override in `bytes`, of `name`, is refused naming it.
+fn refused(bytes: &[u8], name: &[u8]) {
+    problem(bytes, &[b"limits", b"overrides", name], What::Override);
+}
+#[test]
+fn accounts_bounds_past_their_limits_are_refused_naming_them() {
+    table([
+        ("no_sign_ins_at_once_is_refused", no_sign_ins_at_once_is_refused),
+        ("sign_ins_past_the_drivers_sockets_are_refused", sign_ins_past_the_drivers_sockets_are_refused),
+        ("a_holders_accounts_past_the_deployments_are_refused", a_holders_accounts_past_the_deployments_are_refused),
+        ("no_sources_per_account_is_refused", no_sources_per_account_is_refused),
+        ("a_sign_in_deadline_of_zero_is_refused", a_sign_in_deadline_of_zero_is_refused),
     ]);
 }
 

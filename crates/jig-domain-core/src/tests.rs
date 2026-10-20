@@ -153,6 +153,9 @@ fn limits() -> Limits {
         brief_core_budgets: CoreBriefBudgets { task: 128, dependencies: 128, attempts: 128, plan: 128, notes: 64 },
         accounts: accounts::Limits {
             accounts: 1,
+            holder_accounts: 1,
+            sources: 3,
+            sign_ins: 1,
             credentials: 2,
             backoff_base: Duration::from_secs(2),
             backoff_max: Duration::from_secs(8),

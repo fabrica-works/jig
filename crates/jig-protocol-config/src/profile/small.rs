@@ -5,7 +5,7 @@
 //! **fleet**: `needs_bytes=65536, grants=8, workers=2, engine_slots=0, slots=2, workstreams=8, attempts=8, calls=32, call_name_bytes=64, progress_bytes=1024, turns=32, grace=Duration::from_secs(120), facts=32, history=8`.
 //! **authority**: `projects=2, roles=4, requirements=4, facts=16, grants=4, executors=4, segments=4, segment_bytes=256, implications=8, batch=2, accounts=4, writes=4`.
 //! **brief**: `briefs=4, sections=4, read_bytes=8192, brief_bytes=16384`.
-//! **accounts**: `credentials=3, accounts=4, backoff_base=Duration::from_secs(2), backoff_max=Duration::from_secs(60), retry=Duration::from_secs(30), spent_attention=Duration::from_secs(300), facts=32`.
+//! **accounts**: `credentials=3, accounts=4, holder_accounts=4, sources=3, sign_ins=2, backoff_base=Duration::from_secs(2), backoff_max=Duration::from_secs(60), retry=Duration::from_secs(30), spent_attention=Duration::from_secs(300), facts=32`.
 //! **views**: `runs=4, watchers=4, watchers_per_party=4, subjects_per_change=32, text_bytes=65536, facts=32`.
 //! **notes**: `scopes=8, entries_per_scope=16, pattern_bytes=256, description_bytes=256, body_bytes=4096, references=8, load_rows=4, lines=4, recalled=4`.
 //! **documents**: `segments=4, rows=4, text_bytes=4096, chips=4, lines=4, versions=core::documents::Versions { minimum: 1, maximum: 1 }`.
@@ -13,6 +13,7 @@
 //! **core**: `templates=8, fill_mark=268435456, connectors=2, resume_bytes=65536, run_bytes=16384, policy_bytes=16384, escalation_reason_bytes=512, load_slots=4, load_bytes=65536, call_records=32, call_answer_bytes=32768, tasks=TASKS, authority=AUTHORITY, people=PEOPLE, fleet=FLEET, brief=BRIEF, brief_parts=8, brief_core_budgets=BUDGETS, accounts=ACCOUNTS, notes=NOTES, documents=DOCUMENTS, views=VIEWS`.
 //! **hub**: `slots=2, accounts=8, charter_bytes=65536, transcript_bytes=262144, delivery_evidence_bytes=4096, turn_bytes=65536, outcome_bytes=4096, detail_bytes=4096, held=8, inbox=8, event_bytes=65536, run_calls=8, facts=64, told=64, turns=8, turn_queue_bytes=524288`.
 //! **link**: `chunk=16384, name=32, secret=256, names=8, opening=4, handshake=Duration::from_secs(10), hello=Duration::from_secs(10), ping=Duration::from_secs(5), silence=Duration::from_secs(15), stall=Duration::from_secs(30), backoff=Duration::from_millis(250), ceiling=Duration::from_secs(30), proved=Duration::from_secs(60), busy=Duration::from_secs(2), facts=64`.
+//! **driver**: `listeners=ACCOUNTS.sign_ins`, the sign-in deadline `client.sign_in_time=Duration::from_secs(300)`.
 use super::{Limits, Link};
 use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
@@ -127,6 +128,9 @@ pub(super) const BRIEF: brief::Limits =
     brief::Limits { briefs: 4, sections: 4, read_bytes: 8_192, brief_bytes: 16_384 };
 pub(super) const ACCOUNTS: accounts::Limits = accounts::Limits {
     accounts: 4,
+    holder_accounts: 4,
+    sources: 3,
+    sign_ins: 2,
     credentials: 3,
     backoff_base: Duration::from_secs(2),
     backoff_max: Duration::from_secs(60),
@@ -285,7 +289,7 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
     file_stall: Duration::from_secs(30),
     lock_wait: Duration::from_secs(1),
     exchanges: 4,
-    listeners: 0,
+    listeners: CORE.accounts.sign_ins,
     server: skein_http::server::Limits { head: 4096, headers: 32, body: 1024, read: 1024, response: 4096, send: 1024 },
     refresh_lead: Duration::from_secs(60),
     client: skein_oauth::ClientLimits {

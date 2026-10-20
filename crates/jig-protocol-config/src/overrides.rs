@@ -5,10 +5,14 @@ use skein_lib::{Duration, bytes};
 
 /// Replace one whole scalar limit. The composed reader checks the resulting profile.
 pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), What> {
-    let Limits { core, hub, link, token, .. } = limits;
+    let Limits { core, hub, link, token, driver, .. } = limits;
     if name == b"accounts.token" {
         *token = count(value)?;
-        limits.driver.client.document.token_bytes = *token;
+        driver.client.document.token_bytes = *token;
+        return Ok(());
+    }
+    if name == b"accounts.sign_in_deadline_ms" {
+        driver.client.sign_in_time = millis(value)?;
         return Ok(());
     }
     let dot = bytes::find(name, b".").ok_or(What::Override)?;
@@ -24,7 +28,11 @@ pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), What> {
             Ok(())
         }
         b"brief" => set_brief(&mut core.brief, field, value),
-        b"accounts" => set_accounts(&mut core.accounts, field, value),
+        b"accounts" => {
+            set_accounts(&mut core.accounts, field, value)?;
+            driver.listeners = core.accounts.sign_ins;
+            Ok(())
+        }
         b"views" => set_views(&mut core.views, field, value),
         b"notes" => set_notes(&mut core.notes, field, value),
         b"hub" => set_hub(hub, field, value),
@@ -292,10 +300,23 @@ fn set_brief(limits: &mut jig_domain_brief::Limits, name: &[u8], value: u64) -> 
 }
 
 fn set_accounts(limits: &mut jig_domain_accounts::Limits, name: &[u8], value: u64) -> Result<(), What> {
-    let jig_domain_accounts::Limits { accounts, credentials, backoff_base, backoff_max, retry, spent_attention, facts } =
-        limits;
+    let jig_domain_accounts::Limits {
+        accounts,
+        holder_accounts,
+        sources,
+        sign_ins,
+        credentials,
+        backoff_base,
+        backoff_max,
+        retry,
+        spent_attention,
+        facts,
+    } = limits;
     match name {
         b"accounts" => *accounts = count(value)?,
+        b"holder_accounts" => *holder_accounts = count(value)?,
+        b"sources" => *sources = count(value)?,
+        b"sign_ins" => *sign_ins = count(value)?,
         b"credentials" => *credentials = count(value)?,
         b"backoff_base_ms" => *backoff_base = millis(value)?,
         b"backoff_max_ms" => *backoff_max = millis(value)?,
@@ -597,6 +618,9 @@ struct Fits {
 }
 
 fn valid(limits: &Limits, name: &[u8], fits: &mut Fits) -> bool {
+    if (name == b"accounts.sign_ins" || name == b"accounts.sign_in_deadline_ms") && !driver_fits(&limits.driver) {
+        return false;
+    }
     let Some(dot) = bytes::find(name, b".") else {
         return false;
     };
@@ -619,4 +643,19 @@ fn valid(limits: &Limits, name: &[u8], fits: &mut Fits) -> bool {
         }
         Some(_) | None => false,
     }
+}
+
+/// The accounts' driver listens for each sign-in at once, at least one, on two sockets each beside
+/// its exchanges', and a sign-in waits within a deadline above zero (skein's oauth.md, 6.7).
+fn driver_fits(driver: &skein_oauth_accounts::Limits) -> bool {
+    let Some(listening) = driver.listeners.checked_mul(2) else {
+        return false;
+    };
+    let Some(sockets) = listening.checked_add(driver.exchanges) else {
+        return false;
+    };
+    driver.listeners > 0
+        && sockets <= driver.io.sockets
+        && driver.client.sign_in_time > Duration::ZERO
+        && skein_oauth_accounts::worst_case(driver).is_some()
 }

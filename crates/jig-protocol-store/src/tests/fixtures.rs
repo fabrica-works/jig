@@ -611,6 +611,9 @@ pub const CORE_LIMITS: core::Limits = core::Limits {
     brief_core_budgets: core::CoreBriefBudgets { task: 128, dependencies: 128, attempts: 128, plan: 128, notes: 64 },
     accounts: jig_domain_accounts::Limits {
         accounts: 1,
+        holder_accounts: 1,
+        sources: 3,
+        sign_ins: 1,
         credentials: 2,
         backoff_base: skein_lib::Duration::from_nanos(2_000_000_000),
         backoff_max: skein_lib::Duration::from_nanos(8_000_000_000),

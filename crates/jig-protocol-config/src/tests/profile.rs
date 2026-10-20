@@ -81,6 +81,18 @@ fn profiles_hubs_fit_their_worst_case() {
     ]);
 }
 
+#[test]
+fn profiles_drivers_listen_for_each_sign_in_at_once() {
+    for profile_name in [Profile::Small, Profile::Standard] {
+        let limits = limits(profile_name);
+        assert!(limits.driver.listeners >= 1, "{profile_name:?} listens for a sign-in");
+        assert_eq!(limits.driver.listeners, limits.core.accounts.sign_ins, "{profile_name:?}");
+        let crypto = skein_lib::CryptoRng::new(&skein_lib::Secret::new(Box::new([7; 32])), 1).unwrap();
+        let driver = skein_oauth_accounts::Component::new(skein_lib::List::with_capacity(0), &limits.driver, crypto);
+        assert!(driver.is_ok(), "{profile_name:?} driver is usable");
+    }
+}
+
 type Case = (&'static str, fn());
 
 fn table<const N: usize>(cases: [Case; N]) {

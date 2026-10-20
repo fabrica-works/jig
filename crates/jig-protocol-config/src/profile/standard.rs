@@ -6,13 +6,14 @@
 //! **fleet**: `needs_bytes=262144, grants=32, workers=8, slots=4, workstreams=64, attempts=64, calls=256, turns=128, facts=256, history=64`.
 //! **authority**: `projects=8, accounts=16, roles=8, requirements=8, grants=8, executors=8, batch=4, writes=8`.
 //! **brief**: `briefs=32`.
-//! **accounts**: `credentials=15, accounts=16, facts=128`.
+//! **accounts**: `credentials=15, accounts=16, sign_ins=4, facts=128`.
 //! **views**: `runs=32, watchers=16, facts=256`.
 //! **notes**: `scopes=16, entries_per_scope=64, body_bytes=8192, lines=8, recalled=8`.
 //! **documents**: `rows=8, text_bytes=8192, chips=8, lines=8`.
 //! **core**: `templates=16, fill_mark=1073741824, connectors=4, load_slots=16, call_records=128, tasks=TASKS, authority=AUTHORITY, people=PEOPLE, fleet=FLEET, brief=BRIEF, accounts=ACCOUNTS, notes=NOTES, views=VIEWS, resume_bytes=262144, run_bytes=65536, documents=DOCUMENTS`.
 //! **hub**: `slots=4, accounts=32, facts=256, told=256`.
 //! **link**: `opening=16, facts=256`.
+//! **driver**: `exchanges=8, listeners=ACCOUNTS.sign_ins`.
 use super::small;
 use super::{Limits, Link};
 use jig_domain_accounts as accounts;
@@ -91,7 +92,7 @@ pub(super) const AUTHORITY: authority::Limits = authority::Limits {
 };
 pub(super) const BRIEF: brief::Limits = brief::Limits { briefs: 32, ..small::BRIEF };
 pub(super) const ACCOUNTS: accounts::Limits =
-    accounts::Limits { accounts: 16, credentials: 15, facts: 128, ..small::ACCOUNTS };
+    accounts::Limits { accounts: 16, sign_ins: 4, credentials: 15, facts: 128, ..small::ACCOUNTS };
 pub(super) const VIEWS: views::Limits = views::Limits { runs: 32, watchers: 16, facts: 256, ..small::VIEWS };
 pub(super) const NOTES: notes::Limits =
     notes::Limits { scopes: 16, entries_per_scope: 64, body_bytes: 8_192, lines: 8, recalled: 8, ..small::NOTES };
@@ -137,6 +138,7 @@ pub(super) const LIMITS: Limits = Limits {
     driver: skein_oauth_accounts::Limits {
         accounts: CORE.accounts.accounts.checked_add(1).expect("account zero slot"),
         exchanges: 8,
+        listeners: CORE.accounts.sign_ins,
         io: skein_io::Limits { sockets: 64, names: 64, ..small::IO },
         ..small::DRIVER
     },

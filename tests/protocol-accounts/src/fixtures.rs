@@ -88,6 +88,9 @@ pub fn limits() -> accounts::Limits {
 pub fn child_limits() -> child::Limits {
     child::Limits {
         accounts: 2,
+        holder_accounts: 2,
+        sources: 3,
+        sign_ins: 1,
         credentials: 0,
         backoff_base: Duration::from_secs(2),
         backoff_max: Duration::from_secs(60),

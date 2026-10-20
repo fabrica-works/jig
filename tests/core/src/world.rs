@@ -159,6 +159,9 @@ fn profile() -> root::Limits {
             },
             accounts: accounts::Limits {
                 accounts: 1,
+                holder_accounts: 1,
+                sources: 3,
+                sign_ins: 1,
                 credentials: 2,
                 backoff_base: Duration::from_secs(2),
                 backoff_max: Duration::from_secs(8),
