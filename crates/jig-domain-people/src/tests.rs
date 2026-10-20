@@ -909,6 +909,19 @@ fn initial_owners_bootstrap_all_projects_atomically_and_never_regrant() {
     );
 }
 
+#[test]
+fn first_owners_seed_their_roles_on_the_first_start_only() {
+    let owner = IdentityKey { provider: 0, subject: 1_u64.to_be_bytes().into() };
+    let mut test = Test::new(LIMITS);
+    test.d = Domain::new(&test.env.limits, Box::new([InitialOwner { project: 1, identity: owner }]), 2);
+    test.d.end_seeding();
+    test.send(Event::Roles { project: 1, holdings: Box::new([]) });
+    test.send(Event::Restored);
+    let made = test.signin(1, 10, identity(0, 1));
+    assert_eq!(signed_person(reply(&made)), Some(1));
+    assert!(!made.iter().any(is_roles), "a restart's first sign-in seeds nothing");
+}
+
 fn signed_person(reply: Reply) -> Option<u64> {
     match reply {
         Reply::SignedIn { person, .. } => Some(person),

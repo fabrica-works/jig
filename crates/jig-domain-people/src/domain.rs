@@ -94,7 +94,12 @@ pub struct Domain {
     sign_ins: Map<u64, SignIn>,
     alarms: Deadlines<u64>,
     roles: Map<u32, Box<[Holding]>>,
+    /// The deployment's first owners, who decide its LLM accounts (accounts.md, 3.2) for as long
+    /// as it runs; their first sign-ins seed their roles only while `seeding`.
     owners: Box<[InitialOwner]>,
+    /// The deployment's first start, until the core begins a restore (protocol/configuration.md,
+    /// 3: owners seed the first start only).
+    seeding: bool,
     answers: Map<RequestKey, Answered>,
     answer_alarms: Deadlines<RequestKey>,
     pending: Slab<Pending>,
@@ -159,6 +164,7 @@ impl Domain {
             alarms: Deadlines::with_capacity(limits.sign_ins),
             roles: Map::with_capacity(limits.projects),
             owners,
+            seeding: true,
             answers: Map::with_capacity(limits.requests),
             answer_alarms: Deadlines::with_capacity(limits.requests),
             pending: Slab::with_capacity(limits.pending),
@@ -352,10 +358,10 @@ impl Domain {
         }
     }
 
-    /// Drop the sign-in bootstrap owners when the core begins restore
-    /// (protocol/configuration.md, 3: owners seed the first start only).
-    pub fn forget_initial_owners(&mut self) {
-        self.owners = Box::new([]);
+    /// End the first owners' seeding when the core begins restore (protocol/configuration.md,
+    /// 3: owners seed the first start only); they stay the deployment's first owners.
+    pub fn end_seeding(&mut self) {
+        self.seeding = false;
     }
 
     /// Pure lookup of whether the bounded role table contains `project`, including an empty
@@ -783,6 +789,11 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
     out.push(Request::ServiceMade { request, outcome });
 }
 
+/// The first owners whose first sign-ins seed their roles: none once the first start is over.
+fn seeds(owners: &[InitialOwner], seeding: bool) -> &[InitialOwner] {
+    if seeding { owners } else { &[] }
+}
+
 #[expect(
     clippy::too_many_arguments,
     reason = "the authenticated sign-in has its identity, kind and root-issued numbers"
@@ -836,7 +847,7 @@ fn signin(
         }
         assert!(!domain.people.contains_key(&person), "root gives a fresh candidate person number");
         // Reserve all bootstrap role slots before making either record.
-        for owner in &domain.owners {
+        for owner in seeds(&domain.owners, domain.seeding) {
             if owner.identity == identity.key {
                 let Some(holdings) = domain.roles.get(&owner.project) else {
                     return refused(to, Refusal::Unknown, out);
@@ -857,7 +868,7 @@ fn signin(
         let indexed = domain.identities.insert(identity.key.clone(), person);
         assert!(indexed == Ok(None), "new identity has room");
         // Each project occurs at most once for this identity in configuration.
-        for owner in &domain.owners {
+        for owner in seeds(&domain.owners, domain.seeding) {
             if owner.identity != identity.key {
                 continue;
             }

@@ -109,7 +109,7 @@ impl Core {
     pub fn restart_begin(&mut self) -> RestartRequest {
         match self.restart {
             Restart::Cold => {
-                self.people.forget_initial_owners();
+                self.people.end_seeding();
                 self.counters.begin_restore();
                 self.restart_ask(RestartStep::LoadCore)
             }
