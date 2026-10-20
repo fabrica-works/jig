@@ -5,7 +5,7 @@ use skein_lib::Duration;
 fn worker(bytes: &[u8]) -> Result<crate::Worker, crate::Problems> {
     let limits = crate::DocumentLimits { bytes: 8192, tokens: 128, depth: 8 };
     let document = crate::document(bytes, &limits).expect("worker fixture JSON");
-    crate::worker(&document, 0)
+    crate::worker(&document, 0, &crate::Directories::working())
 }
 fn small() -> crate::Worker {
     worker(fixtures::WORKER_SMALL).unwrap()

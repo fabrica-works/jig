@@ -50,7 +50,7 @@ fn engine() -> jig_protocol_config::Engine {
     let document = jig_protocol_config::document(bytes.as_bytes(), &bounds).expect("fixture document");
     let mut whole = jig_protocol_config::read::Object::new(&document, 0).expect("fixture object");
     let at = whole.member(&document, b"engine").expect("fixture engine member");
-    jig_protocol_config::engine(&document, at).expect("fixture engine")
+    jig_protocol_config::engine(&document, at, &jig_protocol_config::Directories::working()).expect("fixture engine")
 }
 
 pub(crate) fn files() -> jig_test_service::Files {

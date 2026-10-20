@@ -1,5 +1,5 @@
 //! Collected field and reference checks (configuration.md, 1 and 6).
-use crate::{Address, Path, Problems, What, address, read};
+use crate::{Address, Directories, Directory, Path, Problems, What, address, read};
 use alloc::boxed::Box;
 use skein_io::Addr;
 use skein_json::Document;
@@ -22,6 +22,49 @@ pub(crate) fn text(
 ) -> Option<Box<[u8]>> {
     let at = object.required(document, name, path, problems)?;
     match read::text(document, at, 4_096) {
+        Ok(value) => Some(value),
+        Err(what) => {
+            problems.push(path.member(name), what);
+            None
+        }
+    }
+}
+pub(crate) fn path(
+    object: &mut read::Object,
+    document: &Document,
+    name: &[u8],
+    path: &Path,
+    directory: Directory,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Box<[u8]>> {
+    let value = text(object, document, name, path, problems)?;
+    match directories.join(directory, &value) {
+        Ok(value) => Some(value),
+        Err(what) => {
+            problems.push(path.member(name), what);
+            None
+        }
+    }
+}
+pub(crate) fn optional_path(
+    object: &mut read::Object,
+    document: &Document,
+    name: &[u8],
+    path: &Path,
+    directory: Directory,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Box<[u8]>> {
+    let at = object.member(document, name)?;
+    let value = match read::text(document, at, 4_096) {
+        Ok(value) => value,
+        Err(what) => {
+            problems.push(path.member(name), what);
+            return None;
+        }
+    };
+    match directories.join(directory, &value) {
         Ok(value) => Some(value),
         Err(what) => {
             problems.push(path.member(name), what);

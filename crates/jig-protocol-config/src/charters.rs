@@ -1,5 +1,5 @@
 //! Offered run policies and their reserve admission (configuration.md, 3 and 6).
-use crate::{Limits, Llm, Path, Problems, Segment, What, check, read};
+use crate::{Directories, Directory, Limits, Llm, Path, Problems, Segment, What, check, read};
 use alloc::boxed::Box;
 use jig_domain_core::{Charter, Model, RunPolicy};
 use jig_domain_fleet::Kinds;
@@ -11,6 +11,7 @@ pub(crate) fn parse(
     path: &Path,
     llm: &Llm,
     limits: &Limits,
+    directories: &Directories,
     problems: &mut Problems,
 ) -> Option<Box<[Charter]>> {
     let items = match read::list(document, at, limits.core.tasks.charters) {
@@ -23,7 +24,7 @@ pub(crate) fn parse(
     let mut charters = List::<Charter>::with_capacity(limits.core.tasks.charters);
     for (index, at) in items.iter().enumerate() {
         let path = path.child(Segment::Index(u32::try_from(index).expect("bounded charter count")));
-        if let Some(charter) = charter(document, *at, &path, llm, problems) {
+        if let Some(charter) = charter(document, *at, &path, llm, directories, problems) {
             for previous in &charters {
                 if previous.number == charter.number {
                     problems.push(path.member(b"number"), What::Unique);
@@ -56,10 +57,18 @@ pub(crate) fn files(engine: &crate::Engine, files: &mut List<crate::File>) {
     }
 }
 
-fn charter(document: &Document, at: u32, path: &Path, llm: &Llm, problems: &mut Problems) -> Option<Charter> {
+fn charter(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    llm: &Llm,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Charter> {
     let mut object = check::object(document, at, path, problems)?;
     let number = check::count(&mut object, document, b"number", path, problems);
-    let instructions = check::text(&mut object, document, b"instructions", path, problems);
+    let instructions =
+        check::path(&mut object, document, b"instructions", path, Directory::Config, directories, problems);
     let waiting = check::duration(&mut object, document, b"waiting_ms", path, problems);
     let resume = check::boolean(&mut object, document, b"resume", path, problems);
     let turns = check::count(&mut object, document, b"turns", path, problems);

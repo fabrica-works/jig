@@ -95,7 +95,7 @@ pub fn engine(bytes: &[u8]) -> Result<crate::Engine, crate::Problems> {
             return Err(problems);
         }
     };
-    crate::engine(&document, 0)
+    crate::engine(&document, 0, &crate::Directories::working())
 }
 pub fn with(document: &[u8], from: &[u8], to: &[u8]) -> Box<[u8]> {
     let at = skein_lib::bytes::find(document, from).expect("fixture replacement exists");

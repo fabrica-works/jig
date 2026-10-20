@@ -1,6 +1,6 @@
 //! LLM providers: each one's number, its name for showing, the configured models it serves and
 //! the sources it offers (configuration.md, 3 and 7; accounts.md, 3.4). No account, key or record.
-use crate::{Path, Problems, What, check, read};
+use crate::{Directories, Path, Problems, What, check, read};
 use alloc::boxed::Box;
 use jig_domain_core::Model;
 use skein_json::Document;
@@ -58,6 +58,7 @@ pub(super) fn parse(
     document: &Document,
     path: &Path,
     models: &[Model],
+    directories: &Directories,
     problems: &mut Problems,
 ) -> List<Provider> {
     let mut providers = List::<Provider>::with_capacity(document.len());
@@ -77,7 +78,7 @@ pub(super) fn parse(
     }
     for (index, at) in items.iter().enumerate() {
         let path = check::index(&path.member(b"providers"), index);
-        if let Some(value) = provider(document, *at, &path, models, &mut claimed, problems) {
+        if let Some(value) = provider(document, *at, &path, models, &mut claimed, directories, problems) {
             for previous in &providers {
                 if previous.name == value.name {
                     problems.push(path.member(b"name"), What::Unique);
@@ -105,6 +106,7 @@ fn provider(
     path: &Path,
     models: &[Model],
     claimed: &mut List<bool>,
+    directories: &Directories,
     problems: &mut Problems,
 ) -> Option<Provider> {
     let mut object = check::object(document, at, path, problems)?;
@@ -116,7 +118,7 @@ fn provider(
     }
     let mut offered = None;
     if let Some(at) = object.required(document, b"sources", path, problems) {
-        offered = sources(document, at, &path.member(b"sources"), problems);
+        offered = sources(document, at, &path.member(b"sources"), directories, problems);
     }
     object.finish(document, path, problems);
     let offered = offered?;
@@ -181,12 +183,18 @@ fn served_models(
 }
 
 /// The sources offered: `sign_in`, `keys` and `programs`, each optional.
-fn sources(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Sources> {
+fn sources(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Sources> {
     let mut object = check::object(document, at, path, problems)?;
     let mut failed = false;
     let mut sign_in = None;
     if let Some(at) = object.member(document, b"sign_in") {
-        sign_in = registration(document, at, &path.member(b"sign_in"), problems);
+        sign_in = registration(document, at, &path.member(b"sign_in"), directories, problems);
         if sign_in.is_none() {
             failed = true;
         }
@@ -215,7 +223,13 @@ fn sources(document: &Document, at: u32, path: &Path, problems: &mut Problems) -
 
 /// A public registration: a client secret makes it confidential, which is refused
 /// (configuration.md, 7).
-fn registration(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Registration> {
+fn registration(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Registration> {
     let mut object = check::object(document, at, path, problems)?;
     let issuer = present(check::text(&mut object, document, b"issuer", path, problems), b"issuer", path, problems);
     let client = present(check::text(&mut object, document, b"client", path, problems), b"client", path, problems);
@@ -229,7 +243,7 @@ fn registration(document: &Document, at: u32, path: &Path, problems: &mut Proble
     let token = present(check::text(&mut object, document, b"token", path, problems), b"token", path, problems);
     let revocation = super::optional_text(&mut object, document, b"revocation", path, problems);
     let keys = present(check::text(&mut object, document, b"keys", path, problems), b"keys", path, problems);
-    let endpoint_transport = super::transport(&mut object, document, path, b"token", None, problems);
+    let endpoint_transport = super::transport(&mut object, document, path, b"token", None, directories, problems);
     let mut must_grant = None;
     if let Some(items) = check::list(&mut object, document, b"must_grant", document.len(), path, problems) {
         must_grant = scope_tokens(document, &items, &path.member(b"must_grant"), problems);

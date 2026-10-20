@@ -1,5 +1,5 @@
 //! A worker's startup values and its bounded end (configuration.md, 4; channel.md, 10.1).
-use crate::{Address, Limits, Path, Problems, Profile, What, check, overrides, profile, read};
+use crate::{Address, Directories, Directory, Limits, Path, Problems, Profile, What, check, overrides, profile, read};
 use alloc::boxed::Box;
 use skein_json::Document;
 use skein_lib::{Duration, List};
@@ -40,7 +40,7 @@ pub fn stop_bound(graces: &Graces, ping: Duration, silence: Duration) -> Option<
         .checked_add(graces.save)
 }
 /// Parse jig's worker member before startup constructs any component.
-pub fn worker(document: &Document, at: u32) -> Result<Worker, Problems> {
+pub fn worker(document: &Document, at: u32, directories: &Directories) -> Result<Worker, Problems> {
     let path = Path::root();
     let mut problems = Problems::empty();
     let Some(mut object) = check::object(document, at, &path, &mut problems) else {
@@ -68,7 +68,7 @@ pub fn worker(document: &Document, at: u32) -> Result<Worker, Problems> {
     {
         problems.push(path.member(b"name"), What::Bound);
     }
-    let secret = check::text(&mut object, document, b"secret", &path, &mut problems);
+    let secret = check::path(&mut object, document, b"secret", &path, Directory::Data, directories, &mut problems);
     let slots = check::count(&mut object, document, b"slots", &path, &mut problems);
     if let Some(slots) = slots
         && slots > limits.hub.slots
@@ -81,7 +81,7 @@ pub fn worker(document: &Document, at: u32) -> Result<Worker, Problems> {
     }
     let mut agent = None;
     if let Some(at) = object.required(document, b"agent", &path, &mut problems) {
-        agent = parse_agent(document, at, &path.member(b"agent"), &mut problems);
+        agent = parse_agent(document, at, &path.member(b"agent"), directories, &mut problems);
     }
     let memory = check::integer(&mut object, document, b"memory_bytes", &path, &mut problems);
     object.finish(document, &path, &mut problems);
@@ -110,10 +110,17 @@ fn parse_graces(document: &Document, at: u32, path: &Path, problems: &mut Proble
     object.finish(document, path, problems);
     Some(Graces { grace: grace?, agent_stop: agent_stop?, delivery: delivery?, save: save? })
 }
-fn parse_agent(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Agent> {
+fn parse_agent(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Agent> {
     let mut object = check::object(document, at, path, problems)?;
     let program = check::text(&mut object, document, b"program", path, problems);
-    let configuration = check::text(&mut object, document, b"configuration", path, problems);
+    let configuration =
+        check::path(&mut object, document, b"configuration", path, Directory::Config, directories, problems);
     let mut arguments = List::with_capacity(document.len());
     if let Some(items) = check::list(&mut object, document, b"arguments", document.len(), path, problems) {
         for (index, at) in items.iter().enumerate() {

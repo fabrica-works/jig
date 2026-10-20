@@ -1,5 +1,5 @@
 //! Workers and their plaintext listeners (configuration.md, 3).
-use crate::{Address, Limits, Path, Problems, Segment, What, address, check};
+use crate::{Address, Directories, Directory, Limits, Path, Problems, Segment, What, address, check};
 use alloc::boxed::Box;
 use skein_json::Document;
 use skein_lib::List;
@@ -18,6 +18,7 @@ pub(crate) fn parse(
     at: u32,
     path: &Path,
     limits: &Limits,
+    directories: &Directories,
     problems: &mut Problems,
 ) -> Option<Hosts> {
     let mut object = check::object(document, at, path, problems)?;
@@ -26,7 +27,7 @@ pub(crate) fn parse(
         for (index, at) in items.iter().enumerate() {
             let path =
                 path.member(b"workers").child(Segment::Index(u32::try_from(index).expect("list bounded by u32")));
-            if let Some(worker) = worker(document, *at, &path, limits.link.name, problems) {
+            if let Some(worker) = worker(document, *at, &path, limits.link.name, directories, problems) {
                 for previous in &workers {
                     if previous.name == worker.name {
                         problems.push(path.member(b"name"), What::Unique);
@@ -51,7 +52,14 @@ pub(crate) fn parse(
     object.finish(document, path, problems);
     Some(Hosts { workers: workers.into_boxed(), listener: listener.into_boxed() })
 }
-fn worker(document: &Document, at: u32, path: &Path, max_name: u32, problems: &mut Problems) -> Option<WorkerName> {
+fn worker(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    max_name: u32,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<WorkerName> {
     let mut object = check::object(document, at, path, problems)?;
     let name = check::text(&mut object, document, b"name", path, problems);
     if let Some(name) = &name
@@ -59,7 +67,7 @@ fn worker(document: &Document, at: u32, path: &Path, max_name: u32, problems: &m
     {
         problems.push(path.member(b"name"), What::Bound);
     }
-    let digest = check::text(&mut object, document, b"digest", path, problems);
+    let digest = check::path(&mut object, document, b"digest", path, Directory::Data, directories, problems);
     object.finish(document, path, problems);
     Some(WorkerName { name: name?, digest: digest? })
 }

@@ -50,17 +50,33 @@ pub enum What {
     NoProvider,
     Digest,
     HandedIn,
-    Reserve { charter: u32 },
-    Budget { charter: u32 },
-    Accounts { charter: u32 },
-    Grace { template: u32 },
-    Operations { operations: u32, delegates: u32, goals: u32 },
+    Reserve {
+        charter: u32,
+    },
+    Budget {
+        charter: u32,
+    },
+    Accounts {
+        charter: u32,
+    },
+    Grace {
+        template: u32,
+    },
+    Operations {
+        operations: u32,
+        delegates: u32,
+        goals: u32,
+    },
     Message,
     Silence,
     StopBound,
-    Memory { over: u64 },
+    Memory {
+        over: u64,
+    },
     Override,
     Unreadable,
+    /// A relative path that is empty or has a `..` component (configuration.md, 10).
+    Relative,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Problems {

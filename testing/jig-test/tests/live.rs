@@ -40,7 +40,7 @@ fn configuration(directory: &Path, source: &Path) -> codec::Limits {
         .expect("document object")
         .member(&document, b"engine")
         .expect("engine member");
-    let engine = config::engine(&document, at).expect("live engine configuration");
+    let engine = config::engine(&document, at, &config::Directories::working()).expect("live engine configuration");
     let limits = codec::limits(&engine.limits.core).expect("live store codec limits");
     let path = directory.join("agent.json");
     let mut agent: serde_json::Value =

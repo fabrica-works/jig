@@ -1,5 +1,5 @@
 //! Deployment, initial identities and connector numbers (configuration.md, 3).
-use crate::{Path, Problems, What, check, read};
+use crate::{Directories, Directory, Path, Problems, What, check, read};
 use alloc::boxed::Box;
 use jig_domain_people::{IdentityKey, InitialOwner};
 use skein_json::Document;
@@ -22,9 +22,15 @@ pub struct Provider {
     pub kind: ProviderKind,
 }
 
-pub(crate) fn deployment(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Deployment> {
+pub(crate) fn deployment(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Deployment> {
     let mut object = check::object(document, at, path, problems)?;
-    let directory = check::text(&mut object, document, b"directory", path, problems);
+    let directory = check::path(&mut object, document, b"directory", path, Directory::Data, directories, problems);
     let mut seed = None;
     if let Some(at) = object.member(document, b"seed") {
         match read::integer(document, at, u64::MAX) {

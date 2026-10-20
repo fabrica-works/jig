@@ -1,5 +1,5 @@
 //! Engine endpoint, model and account values (llm.md, 4 and 5).
-use crate::{Address, Limits, Path, Problems, Segment, What, check, read};
+use crate::{Address, Directories, Directory, Limits, Path, Problems, Segment, What, check, read};
 use alloc::boxed::Box;
 use jig_domain_core::Model;
 use skein_json::Document;
@@ -66,6 +66,7 @@ pub(crate) fn parse(
     at: u32,
     path: &Path,
     limits: &Limits,
+    directories: &Directories,
     problems: &mut Problems,
 ) -> Option<Llm> {
     let mut object = check::object(document, at, path, problems)?;
@@ -75,7 +76,7 @@ pub(crate) fn parse(
         for (index, at) in items.iter().enumerate() {
             let path =
                 path.member(b"endpoints").child(Segment::Index(u32::try_from(index).expect("list bounded by u32")));
-            if let Some(value) = endpoint(document, *at, &path, problems) {
+            if let Some(value) = endpoint(document, *at, &path, directories, problems) {
                 for previous in &endpoints {
                     if previous.name == value.name {
                         problems.push(path.member(b"name"), What::Unique);
@@ -93,7 +94,7 @@ pub(crate) fn parse(
         for (index, at) in items.iter().enumerate() {
             let path =
                 path.member(b"accounts").child(Segment::Index(u32::try_from(index).expect("list bounded by u32")));
-            if let Some(value) = account(document, *at, &path, problems) {
+            if let Some(value) = account(document, *at, &path, directories, problems) {
                 for previous in &accounts {
                     if previous.number == value.number {
                         problems.push(path.member(b"number"), What::Unique);
@@ -136,7 +137,7 @@ pub(crate) fn parse(
             }
         }
     }
-    let providers = providers::parse(&mut object, document, path, models.as_slice(), problems);
+    let providers = providers::parse(&mut object, document, path, models.as_slice(), directories, problems);
     object.finish(document, path, problems);
     Some(Llm {
         endpoints: endpoints.into_boxed(),
@@ -145,7 +146,13 @@ pub(crate) fn parse(
         accounts: accounts.into_boxed(),
     })
 }
-fn endpoint(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Endpoint> {
+fn endpoint(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Endpoint> {
     let mut object = check::object(document, at, path, problems)?;
     let name = check::text(&mut object, document, b"name", path, problems);
     let number = check::count(&mut object, document, b"number", path, problems);
@@ -156,7 +163,7 @@ fn endpoint(document: &Document, at: u32, path: &Path, problems: &mut Problems) 
     if let Some(address) = &address {
         network_address(address, &path.member(b"address"), problems);
     }
-    let transport = transport(&mut object, document, path, b"address", address.as_ref(), problems);
+    let transport = transport(&mut object, document, path, b"address", address.as_ref(), directories, problems);
     let headers = headers(&mut object, document, path, problems);
     let connect = check::duration(&mut object, document, b"connect_ms", path, problems);
     let handshake = check::duration(&mut object, document, b"handshake_ms", path, problems);
@@ -180,6 +187,7 @@ fn transport(
     path: &Path,
     address_name: &[u8],
     address: Option<&Address>,
+    directories: &Directories,
     problems: &mut Problems,
 ) -> Option<Transport> {
     let kind = check::text(object, document, b"transport", path, problems)?;
@@ -192,7 +200,8 @@ fn transport(
         }
         b"tls" => {
             let server_name = check::text(object, document, b"server_name", path, problems);
-            let trust = optional_text(object, document, b"trust", path, problems);
+            let trust =
+                check::optional_path(object, document, b"trust", path, Directory::Config, directories, problems);
             Some(Transport::Tls { server_name: server_name?, trust })
         }
         _ => {
@@ -236,17 +245,29 @@ fn headers(object: &mut read::Object, document: &Document, path: &Path, problems
     }
     result
 }
-fn account(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Account> {
+fn account(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Account> {
     let mut object = check::object(document, at, path, problems)?;
     let number = check::count(&mut object, document, b"number", path, problems);
     let mut parsed_source = None;
     if let Some(at) = object.required(document, b"source", path, problems) {
-        parsed_source = source(document, at, &path.member(b"source"), problems);
+        parsed_source = source(document, at, &path.member(b"source"), directories, problems);
     }
     object.finish(document, path, problems);
     Some(Account { number: number?, source: parsed_source? })
 }
-fn source(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<Source> {
+fn source(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<Source> {
     let mut object = check::object(document, at, path, problems)?;
     let handed = object.member(document, b"handed_in");
     let signed = object.member(document, b"sign_in");
@@ -256,31 +277,37 @@ fn source(document: &Document, at: u32, path: &Path, problems: &mut Problems) ->
     } else if let Some(at) = handed {
         let path = path.member(b"handed_in");
         if let Some(mut object) = check::object(document, at, &path, problems) {
-            let file = check::text(&mut object, document, b"file", &path, problems);
+            let file = check::path(&mut object, document, b"file", &path, Directory::Data, directories, problems);
             object.finish(document, &path, problems);
             if let Some(file) = file {
                 result = Some(Source::HandedIn { file });
             }
         }
     } else if let Some(at) = signed
-        && let Some(value) = sign_in(document, at, &path.member(b"sign_in"), problems)
+        && let Some(value) = sign_in(document, at, &path.member(b"sign_in"), directories, problems)
     {
         result = Some(Source::SignIn(value));
     }
     object.finish(document, path, problems);
     result
 }
-fn sign_in(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> Option<SignIn> {
+fn sign_in(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    directories: &Directories,
+    problems: &mut Problems,
+) -> Option<SignIn> {
     let mut object = check::object(document, at, path, problems)?;
     let client = check::text(&mut object, document, b"client", path, problems);
-    let secret = optional_text(&mut object, document, b"secret", path, problems);
+    let secret = check::optional_path(&mut object, document, b"secret", path, Directory::Data, directories, problems);
     let authorization = check::text(&mut object, document, b"authorization", path, problems);
     let token = check::text(&mut object, document, b"token", path, problems);
     let endpoint = check::address(&mut object, document, b"endpoint", path, problems);
     if let Some(address) = &endpoint {
         network_address(address, &path.member(b"endpoint"), problems);
     }
-    let transport = transport(&mut object, document, path, b"endpoint", endpoint.as_ref(), problems);
+    let transport = transport(&mut object, document, path, b"endpoint", endpoint.as_ref(), directories, problems);
     let redirect = check::text(&mut object, document, b"redirect", path, problems);
     let scope = check::text(&mut object, document, b"scope", path, problems);
     object.finish(document, path, problems);

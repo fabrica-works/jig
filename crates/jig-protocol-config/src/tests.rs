@@ -1,4 +1,5 @@
 mod charters;
+mod directories;
 mod domain;
 mod fixtures;
 mod forms;

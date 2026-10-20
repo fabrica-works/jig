@@ -357,7 +357,8 @@ pub fn config() -> jig_protocol_config::Engine {
 fn config_document(input: &[u8]) -> jig_protocol_config::Engine {
     let bounds = jig_protocol_config::DocumentLimits { bytes: 8192, tokens: 4096, depth: 32 };
     let document = jig_protocol_config::document(input, &bounds).expect("fixture JSON");
-    let mut config = jig_protocol_config::engine(&document, 0).expect("fixture config");
+    let mut config = jig_protocol_config::engine(&document, 0, &jig_protocol_config::Directories::working())
+        .expect("fixture config");
     for charter in &mut config.charters {
         charter.policy.instructions = b"fixture contents".as_slice().into();
     }

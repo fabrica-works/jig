@@ -7,6 +7,8 @@ mod charters;
 mod core;
 mod templates;
 pub use core::core;
+mod directories;
+pub use directories::{Directories, Directory};
 mod domain;
 mod projects;
 pub use domain::{Deployment, Provider, ProviderKind};
@@ -54,7 +56,7 @@ pub struct Engine {
     pub limits: Limits,
 }
 /// Parse jig's engine member before startup constructs any component.
-pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Problems> {
+pub fn engine(document: &skein_json::Document, at: u32, directories: &Directories) -> Result<Engine, Problems> {
     let path = Path::root();
     let mut problems = Problems::empty();
     let Some(mut object) = check::object(document, at, &path, &mut problems) else {
@@ -74,11 +76,11 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
     }
     let mut llm = None;
     if let Some(at) = object.required(document, b"llm", &path, &mut problems) {
-        llm = llm::parse(document, at, &path.member(b"llm"), &limits, &mut problems);
+        llm = llm::parse(document, at, &path.member(b"llm"), &limits, directories, &mut problems);
     }
     let mut hosts = None;
     if let Some(at) = object.required(document, b"hosts", &path, &mut problems) {
-        hosts = hosts::parse(document, at, &path.member(b"hosts"), &limits, &mut problems);
+        hosts = hosts::parse(document, at, &path.member(b"hosts"), &limits, directories, &mut problems);
     }
     let mut clients = None;
     if let Some(at) = object.required(document, b"clients", &path, &mut problems) {
@@ -88,7 +90,7 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
     if let Some(at) = object.required(document, b"charters", &path, &mut problems)
         && let Some(llm) = &llm
     {
-        charters = charters::parse(document, at, &path.member(b"charters"), llm, &limits, &mut problems);
+        charters = charters::parse(document, at, &path.member(b"charters"), llm, &limits, directories, &mut problems);
     }
     let configured = match &llm {
         Some(llm) => &*llm.models,
@@ -102,7 +104,7 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
     }
     let mut deployment = None;
     if let Some(at) = object.required(document, b"deployment", &path, &mut problems) {
-        deployment = domain::deployment(document, at, &path.member(b"deployment"), &mut problems);
+        deployment = domain::deployment(document, at, &path.member(b"deployment"), directories, &mut problems);
     }
     let mut providers = None;
     if let Some(at) = object.required(document, b"providers", &path, &mut problems) {
