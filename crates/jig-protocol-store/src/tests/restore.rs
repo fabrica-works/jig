@@ -131,6 +131,8 @@ fn accounts_rows() -> [Record; 3] {
     [
         Record::Accounts(Stored::Next { number: 3 }),
         Record::Accounts(Stored::Account {
+            place: 0,
+            uses: None,
             number: 1,
             provider: 1,
             holder: Holder::Party(ALICE),

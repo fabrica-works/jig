@@ -518,42 +518,50 @@ impl Owner {
                         &mut self.files,
                     );
                 }
-                child::Request::Signing(signing) => match translate::down_signing(signing) {
-                    translate::Down::SignIn { source, provider: 1 } => {
-                        self.account = source;
-                        let registration = fixtures::party_registration(self.story);
-                        let endpoint = driver::Endpoint {
-                            address: self.address.expect("issuer"),
-                            transport: driver::Transport::Plaintext,
-                        };
-                        let mut origins = List::with_capacity(1);
-                        origins
-                            .push(driver::Origin {
-                                uri: registration.issuer.clone(),
-                                endpoint: driver::Endpoint {
-                                    address: self.address.expect("issuer"),
-                                    transport: driver::Transport::Plaintext,
-                                },
-                            })
-                            .expect("account sign-in origin fits");
-                        let account = party::party_account(&registration, endpoint, origins, &self.installation);
-                        let before = self.above.len();
-                        self.component.as_mut().expect("started account driver").add(
-                            env,
-                            source,
-                            account,
-                            &mut self.above,
-                        );
-                        if self.above.len() == before {
-                            self.records.admit(source).expect("driver admitted account");
-                            self.driver(env, driver::Request::SignIn { account: source, subject: None });
+                child::Request::Signing(signing) => {
+                    match signing {
+                        child::Signing::Restore { .. } | child::Signing::Restored => continue,
+                        child::Signing::SignIn { .. }
+                        | child::Signing::SignOut { .. }
+                        | child::Signing::Replaced { .. } => {}
+                    }
+                    match translate::down_signing(signing) {
+                        translate::Down::SignIn { source, provider: 1 } => {
+                            self.account = source;
+                            let registration = fixtures::party_registration(self.story);
+                            let endpoint = driver::Endpoint {
+                                address: self.address.expect("issuer"),
+                                transport: driver::Transport::Plaintext,
+                            };
+                            let mut origins = List::with_capacity(1);
+                            origins
+                                .push(driver::Origin {
+                                    uri: registration.issuer.clone(),
+                                    endpoint: driver::Endpoint {
+                                        address: self.address.expect("issuer"),
+                                        transport: driver::Transport::Plaintext,
+                                    },
+                                })
+                                .expect("account sign-in origin fits");
+                            let account = party::party_account(&registration, endpoint, origins, &self.installation);
+                            let before = self.above.len();
+                            self.component.as_mut().expect("started account driver").add(
+                                env,
+                                source,
+                                account,
+                                &mut self.above,
+                            );
+                            if self.above.len() == before {
+                                self.records.admit(source).expect("driver admitted account");
+                                self.driver(env, driver::Request::SignIn { account: source, subject: None });
+                            }
+                        }
+                        translate::Down::SignIn { .. } => panic!("known account sign-in provider"),
+                        translate::Down::SignOut { source } => {
+                            self.driver(env, driver::Request::SignOut { account: source });
                         }
                     }
-                    translate::Down::SignIn { .. } => panic!("known account sign-in provider"),
-                    translate::Down::SignOut { source } => {
-                        self.driver(env, driver::Request::SignOut { account: source });
-                    }
-                },
+                }
                 child::Request::Answer { answer, .. } => self.answers.push(answer),
                 child::Request::Granted { grant: _ } | child::Request::Save { .. } | child::Request::Erase { .. } => (),
                 child::Request::Closed => {

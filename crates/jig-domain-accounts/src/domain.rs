@@ -1,37 +1,27 @@
 use crate::signing::UnderWay;
 use crate::{
     Configured, Ended, Event, Fact, Failure, Form, FromComponent, Grant, Held, Holder, Kind, Limits, Pending,
-    Providers, Request, State, Stored, ToComponent, Turned,
+    Providers, Request, Signing, State, Stored, ToComponent, Turned, Use,
 };
 use alloc::boxed::Box;
 use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time, Token, Wall};
 
-/// The most one step asks: at the start, an account's want or its `none` account's two saves,
-/// each account's, and the counter's save; at close, a release an account and the close; and
-/// an account sign-in's end, at most `SIGNED_IN`, including its unanswered request.
+/// Room for restart normalization, source names and wants, account removal, and close.
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
-    out_bound(limits.accounts, limits.sign_ins).expect("account output bound")
+    out_bound(limits).expect("account output bound")
 }
-/// A sign-in's end asks the most: the counter's save, the new account's and its source's, and
-/// the source's want; or a renewal's erase, its replacement, its save and its want.
-/// An account sign-in ending before its visit also answers its pending request.
-const SIGNED_IN: u32 = 5;
-pub(crate) const fn out_bound(accounts: u32, sign_ins: u32) -> Option<u32> {
-    let Some(close) = sign_ins.checked_add(1) else { return None };
-    match accounts.checked_mul(2) {
-        Some(both) => match both.checked_add(close) {
-            Some(most) if most < SIGNED_IN => Some(SIGNED_IN),
-            Some(most) => Some(most),
-            None => None,
-        },
-        None => None,
-    }
+pub(crate) const fn out_bound(limits: &Limits) -> Option<u32> {
+    let Some(per_account) = limits.sources.checked_mul(3) else { return None };
+    let Some(per_account) = per_account.checked_add(3) else { return None };
+    let Some(all) = limits.accounts.checked_mul(per_account) else { return None };
+    let Some(all) = all.checked_add(limits.sign_ins) else { return None };
+    all.checked_add(6)
 }
 
 /// An account (accounts.md, 3.1): its provider, its holder, the subject a signed-in source gave
 /// it, the display name its holder gives it, and its sources' numbers by place, in its holder's
-/// order. Its uses (4.2) join it when accounts are chosen by them.
+/// order, with its explicit payers or the default uses (4.2).
 #[derive(Hash, Debug)]
 pub struct Account {
     pub(crate) provider: Option<u32>,
@@ -39,6 +29,9 @@ pub struct Account {
     pub(crate) subject: Box<[u8]>,
     pub(crate) display: Box<[u8]>,
     pub(crate) sources: Map<u32, u32>,
+    pub(crate) place: u32,
+    pub(crate) uses: Option<Box<[Use]>>,
+    pub(crate) plan: bool,
 }
 impl Account {
     /// None only for a configured account whose model no configured provider serves (D1).
@@ -49,6 +42,19 @@ impl Account {
     #[must_use]
     pub const fn holder(&self) -> Holder {
         self.holder
+    }
+    #[must_use]
+    pub const fn place(&self) -> u32 {
+        self.place
+    }
+    #[must_use]
+    pub fn uses(&self) -> Option<&[Use]> {
+        self.uses.as_deref()
+    }
+    /// A signed-in or program source makes this a plan's account (accounts.md, 3.2).
+    #[must_use]
+    pub const fn plan(&self) -> bool {
+        self.plan
     }
     /// Empty when no signed-in source gave one.
     #[must_use]
@@ -193,6 +199,9 @@ impl Domain {
                 subject: Box::new([]),
                 display: Box::new([]),
                 sources: places,
+                place: domain.accounts.len(),
+                uses: None,
+                plan: true,
             };
             let fresh = match domain.accounts.insert(entry.number, account) {
                 Ok(old) => old.is_none(),
@@ -204,6 +213,15 @@ impl Domain {
             domain.past(entry.number);
         }
         domain
+    }
+    pub(crate) fn last_place(&self, holder: Holder) -> u32 {
+        let mut next = 0;
+        for (_, account) in &self.accounts {
+            if account.holder == holder {
+                next = next.max(account.place.saturating_add(1));
+            }
+        }
+        next
     }
     /// The counter passes a number given or seen.
     pub(crate) fn past(&mut self, number: u32) {
@@ -436,10 +454,22 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
             domain.phase = Phase::Wanted;
             crate::restore::finish(domain, env);
+            crate::ordering::normalize(domain, env, out);
             none_accounts(domain, env, out);
             domain.counted(out);
             for (number, source) in &domain.sources {
-                if source.kind == Kind::SignIn {
+                if (source.kind == Kind::SignIn || source.kind == Kind::Key) && source.account != *number {
+                    let account = domain.accounts.get(&source.account).expect("a source's account");
+                    out.push(Request::Signing(Signing::Restore {
+                        source: *number,
+                        provider: account.provider.expect("party source has a provider"),
+                        kind: source.kind,
+                    }));
+                }
+            }
+            out.push(Request::Signing(Signing::Restored));
+            for (number, source) in &domain.sources {
+                if source.kind == Kind::SignIn || source.kind == Kind::Key {
                     out.push(Request::Component(ToComponent::Want { account: *number }));
                 }
             }
@@ -569,6 +599,9 @@ fn none_accounts(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request
             subject: Box::new([]),
             display: Box::new([]),
             sources: places,
+            place: domain.last_place(Holder::Deployment),
+            uses: None,
+            plan: false,
         };
         let fresh = match domain.accounts.insert(account, entry) {
             Ok(old) => old.is_none(),
@@ -582,6 +615,8 @@ fn none_accounts(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request
                 number: account,
                 provider,
                 holder: Holder::Deployment,
+                place: domain.accounts.get(&account).expect("just inserted").place,
+                uses: None,
                 subject: Box::new([]),
                 display: Box::new([]),
             },

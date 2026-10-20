@@ -67,7 +67,9 @@ impl World {
                 }
             }
             accounts::Signing::SignOut { source } => accounts::Event::SignedOut { source, confirmed: true },
-            accounts::Signing::Replaced { .. } => return,
+            accounts::Signing::Replaced { .. } | accounts::Signing::Restore { .. } | accounts::Signing::Restored => {
+                return;
+            }
         };
         self.events.push_back(root::Event::Core(core::Event::Account(event)));
     }

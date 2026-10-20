@@ -8,7 +8,9 @@ versioned record Installation { id: fixed 16 }
 record Next { number: u32 }
 record Party { party: u64 }
 enum Holder { deployment, party: Party }
-record Account { number: u32 provider: u32 holder: Holder subject: bytes 255 display: bytes 64 }
+record Project { project: u32 }
+enum Use { party: Party, project: Project }
+record Account { number: u32 provider: u32 holder: Holder place: u32 uses: option list 16 Use subject: bytes 255 display: bytes 64 }
 enum Kind { sign_in, key, program, none }
 record Limited { reset: option u64 }
 enum Held { limited: Limited, refused }

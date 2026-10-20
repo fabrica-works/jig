@@ -193,14 +193,28 @@ pub enum ToComponent {
 /// 5.2), each naming a source by the number the child gives it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Signing {
+    Restore {
+        source: u32,
+        provider: u32,
+        kind: Kind,
+    },
+    Restored,
     /// Start the provider's sign-in; its visit carries the address the party goes to (JP6).
-    SignIn { source: u32, provider: u32 },
+    SignIn {
+        source: u32,
+        provider: u32,
+    },
     /// Revoke the source's record at its provider and forget it: a party's sign-out, or a
     /// sign-in refused (accounts.md, 3.3).
-    SignOut { source: u32 },
+    SignOut {
+        source: u32,
+    },
     /// A renewal replaced the source by another: forget its record, revoking its refresh token
     /// where the provider issued the renewal another client id (accounts.md, 3.3).
-    Replaced { source: u32, by: u32 },
+    Replaced {
+        source: u32,
+        by: u32,
+    },
 }
 
 /// The child's answer to a party's sign-in or sign-out.

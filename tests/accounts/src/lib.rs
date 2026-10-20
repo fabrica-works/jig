@@ -106,7 +106,7 @@ pub fn providers(list: Vec<Provider>) -> Providers {
 }
 #[must_use]
 pub fn account(number: u32, provider: u32, holder: Holder, subject: &[u8]) -> Stored {
-    Stored::Account { number, provider, holder, subject: subject.into(), display: Box::new([]) }
+    Stored::Account { place: 0, uses: None, number, provider, holder, subject: subject.into(), display: Box::new([]) }
 }
 #[must_use]
 pub fn source(account: u32, number: u32, place: u32, kind: Kind) -> Stored {

@@ -28,7 +28,7 @@ pub struct Limits {
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.accounts == 0
-        || crate::domain::out_bound(limits.accounts, limits.sign_ins).is_none()
+        || crate::domain::out_bound(limits).is_none()
         || limits.holder_accounts == 0
         || limits.holder_accounts > limits.accounts
         || limits.sources == 0
@@ -46,7 +46,14 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let programs = u64::from(NAME).checked_mul(u64::from(sources))?;
     Map::<u32, Account>::worst_case(limits.accounts)?
         .checked_add(names)?
+        .checked_add(
+            u64::from(crate::USES).checked_mul(u64::try_from(size_of::<crate::Use>()).ok()?)?.checked_mul(accounts)?,
+        )?
         .checked_add(places)?
+        // Dense ordering keeps the previous source map and bounded number lists until saved.
+        .checked_add(Map::<u32, u32>::worst_case(limits.sources)?)?
+        .checked_add(List::<u32>::worst_case(limits.accounts)?.checked_mul(2)?)?
+        .checked_add(List::<u32>::worst_case(limits.sources)?)?
         .checked_add(Map::<u32, Source>::worst_case(sources)?)?
         .checked_add(programs)?
         .checked_add(Map::<u32, Granted>::worst_case(limits.credentials)?)?

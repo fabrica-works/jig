@@ -356,37 +356,50 @@ impl Accounts {
     fn dispatch(&mut self, request: domain::Request) {
         match request {
             domain::Request::Component(request) => self.down(translate::down(request)),
-            domain::Request::Signing(signing) => match translate::down_signing(signing) {
-                translate::Down::SignOut { source } => self.down(driver::Request::SignOut { account: source }),
-                translate::Down::SignIn { source, provider } => {
-                    let Some(template) = self.providers.get(&provider) else {
-                        self.above.push(driver::Event::Refused {
-                            account: source,
-                            asked: driver::Asked::Add,
-                            why: driver::Refusal::Source,
-                        });
-                        return;
-                    };
-                    let account = unkept(template);
-                    let required = match &account {
-                        driver::Account::SignIn { registration, .. } => match &registration.terms {
-                            Some(terms) => terms.required_scopes.clone(),
-                            None => None,
-                        },
-                        driver::Account::HandedIn => None,
-                    }
-                    .unwrap_or_default();
-                    let before = self.above.len();
-                    self.component.as_mut().expect("running driver").add(&self.env, source, account, &mut self.above);
-                    if self.above.len() != before {
-                        return;
-                    }
-                    self.ids.insert(source, Secret::new(Box::default())).expect("driver admitted account");
-                    self.required.insert(source, required).expect("driver admitted account");
-                    self.records.admit(source).expect("driver admitted account");
-                    self.down(driver::Request::SignIn { account: source, subject: None });
+            domain::Request::Signing(signing) => {
+                match signing {
+                    domain::Signing::Restore { .. } | domain::Signing::Restored => return,
+                    domain::Signing::SignIn { .. }
+                    | domain::Signing::SignOut { .. }
+                    | domain::Signing::Replaced { .. } => {}
                 }
-            },
+                match translate::down_signing(signing) {
+                    translate::Down::SignOut { source } => self.down(driver::Request::SignOut { account: source }),
+                    translate::Down::SignIn { source, provider } => {
+                        let Some(template) = self.providers.get(&provider) else {
+                            self.above.push(driver::Event::Refused {
+                                account: source,
+                                asked: driver::Asked::Add,
+                                why: driver::Refusal::Source,
+                            });
+                            return;
+                        };
+                        let account = unkept(template);
+                        let required = match &account {
+                            driver::Account::SignIn { registration, .. } => match &registration.terms {
+                                Some(terms) => terms.required_scopes.clone(),
+                                None => None,
+                            },
+                            driver::Account::HandedIn => None,
+                        }
+                        .unwrap_or_default();
+                        let before = self.above.len();
+                        self.component.as_mut().expect("running driver").add(
+                            &self.env,
+                            source,
+                            account,
+                            &mut self.above,
+                        );
+                        if self.above.len() != before {
+                            return;
+                        }
+                        self.ids.insert(source, Secret::new(Box::default())).expect("driver admitted account");
+                        self.required.insert(source, required).expect("driver admitted account");
+                        self.records.admit(source).expect("driver admitted account");
+                        self.down(driver::Request::SignIn { account: source, subject: None });
+                    }
+                }
+            }
             domain::Request::Granted { .. }
             | domain::Request::Save { .. }
             | domain::Request::Erase { .. }

@@ -303,7 +303,7 @@ fn route_room_checked(limits: &Limits) -> Option<u32> {
         .checked_add(limits.people.inbox_tasks)?
         .checked_add(fleet)?
         .checked_add(brief)?
-        .checked_add(limits.accounts.accounts.checked_mul(2)?.checked_add(1)?)?
+        .checked_add(accounts::max_out(&limits.accounts))?
         .checked_add(limits.people.pending.checked_mul(2)?)?
         .checked_add(limits.authority.projects.checked_mul(2)?)?
         .checked_add(limits.people.initial_owners)?

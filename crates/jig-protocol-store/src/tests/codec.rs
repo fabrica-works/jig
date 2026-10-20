@@ -71,6 +71,8 @@ fn accounts_records() -> Box<[jig_domain_accounts::Stored]> {
         Stored::Next { number: 0 },
         Stored::Next { number: u32::MAX },
         Stored::Account {
+            place: 0,
+            uses: None,
             number: 3,
             provider: 2,
             holder: Holder::Deployment,
@@ -78,6 +80,8 @@ fn accounts_records() -> Box<[jig_domain_accounts::Stored]> {
             display: Box::new([]),
         },
         Stored::Account {
+            place: 0,
+            uses: None,
             number: u32::MAX,
             provider: u32::MAX,
             holder: Holder::Party(u64::MAX),
@@ -108,6 +112,8 @@ fn the_accounts_ceilings_are_the_childs_bounds() {
     assert_eq!((SUBJECT, DISPLAY, NAME), (255, 64, 32), "the lengths the records at their bounds take");
     let subject = Box::new([0; 256]);
     let record = jig_domain_accounts::Stored::Account {
+        place: 0,
+        uses: None,
         number: 1,
         provider: 1,
         holder: jig_domain_accounts::Holder::Deployment,
@@ -856,4 +862,19 @@ fn an_application_ask_round_trips_each_scope_through_the_people_family() {
     for scope in [ApplicationScope::Project(PROJECT), ApplicationScope::Deployment, ApplicationScope::Own] {
         ask_round_trip(Ask::Application { scope, connector: CONNECTOR, digest: [8; 32] });
     }
+}
+
+#[test]
+fn an_account_with_place_and_uses_round_trips() {
+    let record = jig_domain_accounts::Stored::Account {
+        number: 17,
+        provider: 2,
+        holder: jig_domain_accounts::Holder::Party(3),
+        place: 4,
+        uses: Some(Box::new([jig_domain_accounts::Use::Party(3), jig_domain_accounts::Use::Project(9)])),
+        subject: Box::new([]),
+        display: Box::new([]),
+    };
+    let bytes = accounts::encode(&record).expect("bounded account");
+    assert_eq!(accounts::decode(&bytes), Ok(record));
 }

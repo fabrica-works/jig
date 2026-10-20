@@ -49,6 +49,8 @@ fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
     for account in 0..LIMITS.accounts {
         meter.start();
         let record = Stored::Account {
+            place: 0,
+            uses: None,
             number: number(account, None),
             provider: 1,
             holder: Holder::Party(u64::from(account)),

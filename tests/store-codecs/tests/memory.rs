@@ -104,6 +104,18 @@ fn the_longest_accounts_rows_decode_within_the_rows_heap_worst_case() {
     let account = accounts_v1::Account::new(
         &ceilings,
         accounts_v1::AccountParts {
+            place: u32::MAX,
+            uses: Some({
+                let mut uses = skein_lib::List::with_capacity(ceilings.account_uses_some);
+                for n in 0..ceilings.account_uses_some {
+                    uses.push(accounts_v1::Use::Party(
+                        accounts_v1::Party::new(&ceilings, accounts_v1::PartyParts { party: u64::from(n) })
+                            .expect("party"),
+                    ))
+                    .expect("uses fit");
+                }
+                uses
+            }),
             number: u32::MAX,
             provider: u32::MAX,
             holder: accounts_v1::Holder::Party(party),

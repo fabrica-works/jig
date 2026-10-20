@@ -11,6 +11,16 @@ pub const DISPLAY: u32 = 64;
 /// The longest program source's name (accounts.md, 3.4).
 pub const NAME: u32 = 32;
 
+/// Maximum explicit payers of an account (accounts.md, 4.2).
+pub const USES: u32 = 16;
+
+/// Whose work an account pays for (accounts.md, 4.2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Use {
+    Party(u64),
+    Project(u32),
+}
+
 /// Who holds an account (accounts.md, 3.2): the deployment, or a party by its number.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Holder {
@@ -45,13 +55,21 @@ pub enum Held {
 }
 
 /// A record of the accounts' family: the counter's one row, an account, or one of its sources.
-/// An account's uses (accounts.md, 4.2) join its record when accounts are chosen by them.
+/// An account's uses name exactly its payers, or leave the default (accounts.md, 4.2).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Stored {
     /// The number the counter gives next; no number below it is given again.
     Next { number: u32 },
     /// An empty subject is none: no signed-in source gave one.
-    Account { number: u32, provider: u32, holder: Holder, subject: Box<[u8]>, display: Box<[u8]> },
+    Account {
+        number: u32,
+        provider: u32,
+        holder: Holder,
+        place: u32,
+        uses: Option<Box<[Use]>>,
+        subject: Box<[u8]>,
+        display: Box<[u8]>,
+    },
     /// A source of an account at its place in the holder's order; the name is a program's,
     /// empty for every other kind.
     Source { account: u32, number: u32, place: u32, kind: Kind, name: Box<[u8]>, held: Option<Held> },
@@ -94,4 +112,20 @@ pub(crate) fn program_name(name: &[u8]) -> bool {
         valid &= byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-';
     }
     valid
+}
+
+/// Explicit uses are bounded and contain no repeated payer.
+pub(crate) fn valid_uses(uses: Option<&[Use]>) -> bool {
+    let Some(uses) = uses else { return true };
+    if uses.len() > usize::try_from(USES).expect("uses bound fits usize") {
+        return false;
+    }
+    for (index, payer) in uses.iter().enumerate() {
+        for other in uses.iter().take(index) {
+            if payer == other {
+                return false;
+            }
+        }
+    }
+    true
 }

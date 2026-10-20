@@ -16,7 +16,7 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored) {
             domain.kept = number;
             true
         }
-        Stored::Account { number, provider, holder, subject, display } => {
+        Stored::Account { number, provider, holder, place, uses, subject, display } => {
             domain.past(number);
             // An account of a provider no longer configured waits for it.
             domain.providers.get(provider).is_some()
@@ -24,7 +24,16 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored) {
                     domain,
                     env,
                     number,
-                    Account { provider: Some(provider), holder, subject, display, sources: Map::with_capacity(0) },
+                    Account {
+                        provider: Some(provider),
+                        holder,
+                        place,
+                        uses,
+                        plan: false,
+                        subject,
+                        display,
+                        sources: Map::with_capacity(0),
+                    },
                 )
         }
         Stored::Source { account, number, place, kind, name, held } => {
@@ -65,7 +74,11 @@ pub(crate) fn finish(domain: &mut Domain, env: &Env<Limits>) {
 /// A free number, a bounded subject and display name, and a subject no other account of its
 /// provider holds (accounts.md, 3.1 and 3.2).
 fn account(domain: &mut Domain, env: &Env<Limits>, number: u32, mut entry: Account) -> bool {
-    if !free(domain, number) || !within(&entry.subject, SUBJECT) || !within(&entry.display, DISPLAY) {
+    if !free(domain, number)
+        || !within(&entry.subject, SUBJECT)
+        || !within(&entry.display, DISPLAY)
+        || !crate::records::valid_uses(entry.uses.as_deref())
+    {
         return false;
     }
     if !entry.subject.is_empty() {
@@ -120,10 +133,13 @@ fn source(domain: &mut Domain, env: &Env<Limits>, number: u32, place: u32, entry
         }
     }
     let account = entry.account;
+    let plan = entry.kind == Kind::SignIn || entry.kind == Kind::Program;
     if domain.sources.insert(number, entry) != Ok(None) {
         return false;
     }
-    let places = &mut domain.accounts.get_mut(&account).expect("looked up above").sources;
+    let account = domain.accounts.get_mut(&account).expect("looked up above");
+    account.plan |= plan;
+    let places = &mut account.sources;
     assert!(places.insert(place, number) == Ok(None), "a free place with room, checked above");
     let _: Fact = settle(domain, env, number);
     true

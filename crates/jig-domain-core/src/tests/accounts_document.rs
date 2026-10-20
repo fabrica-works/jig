@@ -82,6 +82,8 @@ fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
 }
 fn account(number: u32, holder: accounts::Holder) -> accounts::Stored {
     accounts::Stored::Account {
+        place: 0,
+        uses: None,
         number,
         provider: PROVIDER,
         holder,

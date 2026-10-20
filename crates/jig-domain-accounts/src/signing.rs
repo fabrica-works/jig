@@ -186,6 +186,8 @@ fn make(
             number: account,
             provider: made.provider,
             holder: made.holder,
+            place: domain.last_place(made.holder),
+            uses: None,
             subject: made.subject.clone(),
             display: display.clone(),
         },
@@ -193,9 +195,12 @@ fn make(
     let entry = Account {
         provider: Some(made.provider),
         holder: made.holder,
+        place: domain.last_place(made.holder),
+        uses: None,
         subject: made.subject,
         display,
         sources: Map::with_capacity(env.limits.sources),
+        plan: true,
     };
     let fresh = match domain.accounts.insert(account, entry) {
         Ok(old) => old.is_none(),
