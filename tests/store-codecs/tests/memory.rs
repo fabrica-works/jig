@@ -1,5 +1,5 @@
 //! Full golden rows decode within their heap worst cases (skein's codec.md, 6).
-use jig_protocol_store::{component_v1, core_v3, notes_v1, people_v4, tasks_v4};
+use jig_protocol_store::{component_v1, core_v4, notes_v1, people_v5, tasks_v5};
 use skein_heap::{Counting, Meter};
 use skein_lib::Reader;
 
@@ -8,8 +8,8 @@ static HEAP: Counting = Counting;
 
 fn check<T>(family: &str, record: &str, bound: u64, decode: impl FnOnce(&[u8]) -> T) {
     let version = match family {
-        "core" => 3,
-        "tasks" | "people" => 4,
+        "core" => 4,
+        "tasks" | "people" => 5,
         _ => 1,
     };
     let golden = std::fs::read(
@@ -35,23 +35,23 @@ fn a_full_notes_row_decodes_within_its_heap_worst_case() {
 }
 #[test]
 fn a_full_tasks_row_decodes_within_its_heap_worst_case() {
-    let bound = tasks_v4::Row::worst_case_heap(&tasks_v4::CEILINGS).expect("tasks heap bound");
+    let bound = tasks_v5::Row::worst_case_heap(&tasks_v5::CEILINGS).expect("tasks heap bound");
     check("tasks", "row", bound, |golden| {
-        tasks_v4::Row::decode(&tasks_v4::CEILINGS, &mut Reader::new(golden)).expect("full row")
+        tasks_v5::Row::decode(&tasks_v5::CEILINGS, &mut Reader::new(golden)).expect("full row")
     });
 }
 #[test]
 fn a_full_core_row_decodes_within_its_heap_worst_case() {
-    let bound = core_v3::Row::worst_case_heap(&core_v3::CEILINGS).expect("core heap bound");
+    let bound = core_v4::Row::worst_case_heap(&core_v4::CEILINGS).expect("core heap bound");
     check("core", "row", bound, |golden| {
-        core_v3::Row::decode(&core_v3::CEILINGS, &mut Reader::new(golden)).expect("full row")
+        core_v4::Row::decode(&core_v4::CEILINGS, &mut Reader::new(golden)).expect("full row")
     });
 }
 #[test]
 fn a_full_people_row_decodes_within_its_heap_worst_case() {
-    let bound = people_v4::Row::worst_case_heap(&people_v4::CEILINGS).expect("people heap bound");
+    let bound = people_v5::Row::worst_case_heap(&people_v5::CEILINGS).expect("people heap bound");
     check("people", "row", bound, |golden| {
-        people_v4::Row::decode(&people_v4::CEILINGS, &mut Reader::new(golden)).expect("full row")
+        people_v5::Row::decode(&people_v5::CEILINGS, &mut Reader::new(golden)).expect("full row")
     });
 }
 #[test]

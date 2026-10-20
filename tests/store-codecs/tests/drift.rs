@@ -43,17 +43,17 @@ fn the_component_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_tasks_familys_code_and_goldens_have_no_drift() {
-    check("tasks", 4);
+    check("tasks", 5);
 }
 
 #[test]
 fn the_people_familys_code_and_goldens_have_no_drift() {
-    check("people", 4);
+    check("people", 5);
 }
 
 #[test]
 fn the_core_familys_code_and_goldens_have_no_drift() {
-    check("core", 3);
+    check("core", 4);
 }
 
 #[test]

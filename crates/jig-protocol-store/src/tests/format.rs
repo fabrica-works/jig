@@ -32,8 +32,8 @@ fn check(store: &skein_kv::Limits) -> Result<sizes::Sizes, sizes::SizeRefusal> {
 fn a_format_row_of_another_tasks_version_is_refused_naming_tasks() {
     let wanted = format::current(fixtures::APPLICATION.version, fixtures::DEPLOYMENT);
     let mut found = wanted;
-    found.tasks = 3;
-    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family: Family::Tasks, found: 3, wanted: 4 }));
+    found.tasks = 4;
+    assert_eq!(format::check(&found, &wanted), Err(OpenRefusal::Format { family: Family::Tasks, found: 4, wanted: 5 }));
 }
 #[test]
 fn a_format_row_of_another_deployment_is_refused() {
@@ -49,9 +49,9 @@ fn the_current_format_row_is_accepted() {
 fn another_family_is_refused_naming_the_first_difference() {
     let wanted = wanted();
     for (family, found) in [
-        (Family::Component, codec::component::Format { component: 2, core: 4, ..wanted }),
-        (Family::Core, codec::component::Format { core: 4, tasks: 3, ..wanted }),
-        (Family::People, codec::component::Format { people: 5, notes: 2, ..wanted }),
+        (Family::Component, codec::component::Format { component: 2, core: 5, ..wanted }),
+        (Family::Core, codec::component::Format { core: 5, tasks: 4, ..wanted }),
+        (Family::People, codec::component::Format { people: 6, notes: 2, ..wanted }),
         (Family::Notes, codec::component::Format { notes: 2, application: 2, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
     ] {
@@ -60,13 +60,13 @@ fn another_family_is_refused_naming_the_first_difference() {
             Err(OpenRefusal::Format {
                 family,
                 found: match family {
-                    Family::Core => 4,
-                    Family::People => 5,
+                    Family::Core => 5,
+                    Family::People => 6,
                     Family::Component | Family::Tasks | Family::Notes | Family::Application => 2,
                 },
                 wanted: match family {
-                    Family::Core => 3,
-                    Family::Tasks | Family::People => 4,
+                    Family::Core => 4,
+                    Family::Tasks | Family::People => 5,
                     Family::Component | Family::Notes | Family::Application => 1,
                 }
             })

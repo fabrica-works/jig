@@ -531,7 +531,7 @@ real side.
   jig-client-protocol-wire --timings`, with kache bypassed
   (`CARGO_BUILD_RUSTC_WRAPPER=`), would.
 - **Goldens nobody reads:** `jig-protocol-store/golden/core/v1`, 396
-  files. The store's schemas are `core-v3` and its peers, and its tests
+  files. The store's schemas are `core-v4` and its peers, and its tests
   read core's v3 alone (`tests/store-codecs/tests/drift.rs:34-57`,
   `fuzzy_decode.rs:42-44`); `rg -n 'core/v1|core_v1' --glob
   '!**/golden/**' --glob '!docs/**' .` finds nothing. The `people/v1`

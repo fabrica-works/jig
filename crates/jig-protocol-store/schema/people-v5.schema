@@ -1,4 +1,4 @@
-family jig-store-people 4
+family jig-store-people 5
 
 record Segment { bytes: bytes 8192 }
 record Number64 { value: u64 }

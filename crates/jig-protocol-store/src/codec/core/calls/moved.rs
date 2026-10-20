@@ -1,5 +1,5 @@
 //! Revision facts kept in the core family (protocol/store.md, 5.1).
-use crate::core_v3 as wire;
+use crate::core_v4 as wire;
 use jig_domain_people as domain;
 pub(super) fn encode_failure_class(value: domain::FailureClass, _limits: &wire::Limits) -> wire::FailureClass {
     match value {

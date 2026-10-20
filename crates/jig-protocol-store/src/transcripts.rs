@@ -89,7 +89,7 @@ pub(crate) fn reservation_count(limits: &Limits) -> Option<u32> {
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     let count = reservation_count(limits)?;
     let codec = codec::limits(&limits.core)?;
-    let frame = crate::core_v3::TurnRecord::worst_case_bytes(&codec.core)?.checked_add(12)?;
+    let frame = crate::core_v4::TurnRecord::worst_case_bytes(&codec.core)?.checked_add(12)?;
     let pending = frame
         .checked_mul(u64::from(limits.journal.writes))?
         .checked_add(u64::from(limits.store.commit))?

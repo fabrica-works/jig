@@ -1,4 +1,4 @@
-family jig-store-core 3
+family jig-store-core 4
 
 record ProposerTask { value: u64 }
 record ProposerParty { value: u64 }

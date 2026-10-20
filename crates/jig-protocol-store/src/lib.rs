@@ -113,9 +113,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let state = u64::try_from(size_of::<Store>()).ok()?;
     let rows = u64::from(limits.store.value).checked_add(u64::from(limits.store.key))?.checked_mul(2)?;
     let codec = codec::limits(&limits.core)?;
-    let decoded = core_v3::Row::worst_case_heap(&codec.core)?
-        .checked_add(tasks_v4::Row::worst_case_heap(&codec.tasks)?)?
-        .checked_add(people_v4::Row::worst_case_heap(&codec.people)?)?
+    let decoded = core_v4::Row::worst_case_heap(&codec.core)?
+        .checked_add(tasks_v5::Row::worst_case_heap(&codec.tasks)?)?
+        .checked_add(people_v5::Row::worst_case_heap(&codec.people)?)?
         .checked_add(notes_v1::Row::worst_case_heap(&codec.notes)?)?
         .checked_add(u64::try_from(size_of::<jig_domain_tasks::TaskRecord>()).ok()?)?
         .checked_mul(2)?;
@@ -201,14 +201,14 @@ pub mod component_v1;
 #[path = "generated/notes_v1.rs"]
 pub mod notes_v1;
 #[rustfmt::skip]
-#[path = "generated/people_v4.rs"]
-pub mod people_v4;
+#[path = "generated/people_v5.rs"]
+pub mod people_v5;
 #[rustfmt::skip]
-#[path = "generated/tasks_v4.rs"]
-pub mod tasks_v4;
+#[path = "generated/tasks_v5.rs"]
+pub mod tasks_v5;
 #[rustfmt::skip]
-#[path = "generated/core_v3.rs"]
-pub mod core_v3;
+#[path = "generated/core_v4.rs"]
+pub mod core_v4;
 pub mod keys;
 pub use boundary::{
     Arrived, Below, Cursor, Event, Family, Get, Io, Load, OpenRefusal, Request, Restore, Root, Row, SecretOwner,
