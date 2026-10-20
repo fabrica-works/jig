@@ -92,16 +92,17 @@ pub(super) fn offers(core: &Core, limits: &DocumentLimits) -> Result<(List<Provi
 pub(super) fn rows(core: &Core, limits: &Limits, party: u64) -> Result<(List<PayerReadiness>, bool), Missing> {
     let mut rows = List::with_capacity(limits.documents.lines);
     let mut cut = false;
-    append(core, party, tasks::Payer::Party(party), &mut rows, &mut cut)?;
+    let pending = core.accounts.pending();
+    append(core, pending.as_slice(), tasks::Payer::Party(party), &mut rows, &mut cut)?;
     let roles = core.people.project_roles(party).ok_or(Missing::Unknown)?;
     for role in &roles {
-        append(core, party, tasks::Payer::Project(role.project), &mut rows, &mut cut)?;
+        append(core, pending.as_slice(), tasks::Payer::Project(role.project), &mut rows, &mut cut)?;
     }
     Ok((rows, cut))
 }
 fn append(
     core: &Core,
-    party: u64,
+    pending: &[accounts::Pending],
     payer: tasks::Payer,
     rows: &mut List<PayerReadiness>,
     cut: &mut bool,
@@ -111,10 +112,13 @@ fn append(
             *cut = true;
             continue;
         }
-        let readiness = readiness(core, payer, provider.number);
+        let (readiness, refreshing) = readiness(core, payer, provider.number);
         let mut settled = if provider.offers.programs.is_empty() { Some(true) } else { None };
-        for pending in &core.accounts.pending() {
-            if pending.by == party && pending.provider == provider.number {
+        if refreshing {
+            settled = Some(false);
+        }
+        for pending in pending {
+            if payer == tasks::Payer::Party(pending.by) && pending.provider == provider.number {
                 settled = Some(false);
             }
         }
@@ -130,27 +134,35 @@ fn append(
 }
 
 /// Full-state selection precedes any document truncation. No task pin is chosen here.
-fn readiness(core: &Core, payer: tasks::Payer, provider: u32) -> Readiness {
+fn readiness(core: &Core, payer: tasks::Payer, provider: u32) -> (Readiness, bool) {
     let coverage = core.account_coverage(payer);
-    let selection = core.accounts.select(
-        crate::coverage::payer(payer),
-        provider,
-        None,
-        None,
-        coverage.as_slice(),
-        &[],
-        core.run_now,
-    );
-    match selection {
-        accounts::Selection::Chosen { .. } => eligible_host(core, provider),
-        accounts::Selection::Wait { why: accounts::WaitWhy::Host, .. } => Readiness::Unknown,
-        accounts::Selection::Wait { why: accounts::WaitWhy::Source(_), .. } => Readiness::Unavailable,
-        accounts::Selection::Wait { why: accounts::WaitWhy::Refreshing | accounts::WaitWhy::Empty, .. }
-        | accounts::Selection::NoAccount => match core.settings.llm_providers.get(provider) {
-            Some(offer) if !offer.offers.programs.is_empty() => Readiness::Unknown,
-            Some(_) | None => Readiness::Unavailable,
-        },
+    let candidates = core.accounts.candidates(crate::coverage::payer(payer), provider, None, None, coverage.as_slice());
+    let mut host_wait = false;
+    let mut refreshing = false;
+    for account in &candidates {
+        match core.accounts.select(
+            crate::coverage::payer(payer),
+            provider,
+            Some(*account),
+            None,
+            coverage.as_slice(),
+            &[],
+            core.run_now,
+        ) {
+            accounts::Selection::Chosen { .. } => return (eligible_host(core, provider), false),
+            accounts::Selection::Wait { why: accounts::WaitWhy::Host, .. } => host_wait = true,
+            accounts::Selection::Wait { why: accounts::WaitWhy::Refreshing, .. } => refreshing = true,
+            accounts::Selection::Wait { why: accounts::WaitWhy::Source(_) | accounts::WaitWhy::Empty, .. }
+            | accounts::Selection::NoAccount => {}
+        }
     }
+    // Until T12, absence of a program account is not a negative inventory fact.
+    let unknown_inventory = candidates.is_empty()
+        && match core.settings.llm_providers.get(provider) {
+            Some(offer) => !offer.offers.programs.is_empty(),
+            None => false,
+        };
+    (if host_wait || refreshing || unknown_inventory { Readiness::Unknown } else { Readiness::Unavailable }, refreshing)
 }
 /// Host model support does not require a free slot. Until T12, unknown personal
 /// program logins exclude workers as in `run_choice`; the engine can still serve.
@@ -198,4 +210,30 @@ pub(super) fn offers_worst_case(limits: &DocumentLimits) -> Option<u64> {
 }
 pub(super) fn rows_worst_case(limits: &DocumentLimits) -> Option<u64> {
     List::<PayerReadiness>::worst_case(limits.lines)
+}
+
+/// Pending and roles survive each payer walk; coverage and candidates survive its host check.
+/// Candidate ranking is temporary, as are source views and host/model-support facts.
+pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
+    let ranking = List::<(u8, accounts::Holder, u32, u32)>::worst_case(limits.accounts.accounts)?;
+    let hosts = List::<fleet::HostView>::worst_case(
+        limits
+            .fleet
+            .workers
+            .checked_add(limits.fleet.history)?
+            .checked_add(u32::from(limits.fleet.engine_slots > 0))?,
+    )?
+    .checked_add(u64::try_from(size_of::<fleet::ModelNeed>()).ok()?)?
+    .checked_add(u64::from(crate::MODEL_NAME_BYTES))?;
+    List::<accounts::Pending>::worst_case(limits.accounts.sign_ins)?
+        .checked_add(List::<jig_domain_people::ProjectRole>::worst_case(limits.people.projects)?)?
+        .checked_add(List::<accounts::Coverage>::worst_case(limits.accounts.accounts)?)?
+        .checked_add(List::<u32>::worst_case(limits.accounts.accounts)?)?
+        .checked_add(
+            ranking
+                .max(List::<accounts::Fact>::worst_case(
+                    limits.accounts.accounts.checked_mul(limits.accounts.sources)?,
+                )?)
+                .max(hosts),
+        )
 }

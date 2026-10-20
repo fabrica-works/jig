@@ -164,3 +164,43 @@ fn a_pending_inventory_keeps_readiness_unknown() {
     ));
     assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unknown);
 }
+
+#[test]
+fn a_limited_candidate_does_not_hide_a_program_host_wait() {
+    let mut records = own_records();
+    records.extend([
+        account(23, accounts::Holder::Party(ALICE)),
+        accounts::Stored::Source {
+            account: 23,
+            number: 18,
+            place: 0,
+            kind: accounts::Kind::Program,
+            name: b"program".as_slice().into(),
+            held: None,
+        },
+    ]);
+    let (mut core, env) = fixture(records);
+    drop(step(&mut core, &env, Event::Account(accounts::Event::Limited { account: FIRST_SOURCE, reset: None })));
+    let coverage = core.account_coverage(tasks::Payer::Party(ALICE));
+    assert_eq!(
+        core.accounts.candidates(Use::Party(ALICE), PROVIDER, None, None, coverage.as_slice()).get(0),
+        Some(&OWN)
+    );
+    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unknown);
+}
+#[test]
+fn a_restored_source_awaiting_its_grant_reads_unknown() {
+    let (core, env) = fixture(own_records());
+    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unknown);
+}
+#[test]
+fn a_restored_source_awaiting_its_grant_is_unsettled() {
+    let (core, env) = fixture(own_records());
+    assert_eq!(own(&core, &env, ALICE).settled, Some(false));
+}
+#[test]
+fn a_pending_personal_sign_in_leaves_project_settlement_alone() {
+    let (mut core, env) = fixture(vec![]);
+    ask(&mut core, &env, ALICE, 1, people::AccountHolder::Own);
+    assert_eq!(document(&core, &env, ALICE).readiness.get(1).unwrap().settled, Some(true));
+}

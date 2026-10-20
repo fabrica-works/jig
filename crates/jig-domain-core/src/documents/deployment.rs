@@ -586,5 +586,6 @@ pub(super) fn scratch_worst_case(limits: &Limits) -> Option<u64> {
         (bool, u64, u64, u64, InboxObject),
         (u64, u32, InboxObject, Option<u64>, Wall, bool, Cursor, bool),
     >::worst_case(limits.people.inbox_entries.checked_mul(2)?)?)?
-    .checked_add(List::<people::Entry>::worst_case(limits.people.inbox_entries.checked_mul(5)?)?)
+    .checked_add(List::<people::Entry>::worst_case(limits.people.inbox_entries.checked_mul(5)?)?)?
+    .checked_add(super::catalogue::scratch_worst_case(limits)?)
 }

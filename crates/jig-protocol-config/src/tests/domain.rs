@@ -289,10 +289,15 @@ fn memory_below_the_components_sum_is_refused() {
     // prices (4 lines squared + 8 * 4 + 8) task carriers, each gaining the 40-byte wait.
     // Routed/load payloads: (18,538 writes + 4 loads) * (2 members * 8) = 296,672.
     // 3,824 + 44,800 + 296,672 = 345,296; hub unchanged.
-    // JP10c-c: 18_677_344_295 + 20 * 0 document-envelope bytes + 1 * 0 scratch
-    // bytes = 18_677_344_295. Bounded catalogue/readiness heaps remain below the
-    // dominant project document; their selection scratch is below existing scratch.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_344_295 });
+    // JP10c-c keeps the document envelope unchanged (20 * 0); readiness scratch
+    // now coexists with deployment's views: 2 * 32 Pending + 2 * 12 ProjectRole
+    // + 4 * 8 Coverage + 4 * 4 candidate numbers, plus the largest temporary:
+    // max(4 * 32 ranked candidates, (4 * 3) * 64 source Facts,
+    //     (2 workers + 8 history + 0 engine) * 40 HostView + 1 * 24 ModelNeed
+    //     + 1 * 4096 model-name bytes) = 4520.
+    // Delta = 64 + 24 + 32 + 16 + 4520 = 4656; 18_677_344_295 + 4656
+    // = 18_677_348_951. Other document scratch paths remain below deployment.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_348_951 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {
