@@ -817,6 +817,10 @@ Each is configured and part of the worst case:
 - handles; the engine's watches open, `me`'s included, each until its
   terminal and one kept for `me` (8.1); reads in flight; exchanges in
   flight;
+- rows: the most items of a list, of a page and of a window, at most
+  32, the ceiling of the wire's lists (`../../protocol/client.md`,
+  section 3); a document past it is refused at decoding (section 16),
+  and limits above it at construction;
 - a path's segments: the most segments of a resource's path or a
   pattern a document may carry, a bound of its own, never a window's
   rows; the application sets it at least the most its engine admits in

@@ -170,7 +170,8 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   dependencies, a role's holdings, a pattern's segments) takes at most
   32 items, so 32 is the most the client's `rows` may be, and with it
   the rows of its pages and windows. More is a new version of the wire
-  (section 9).
+  (section 9). A client whose rows pass it is unusable: the link
+  refuses its limits at construction, and nothing is cut to fit.
 - **A document's nested collections cross as pieces.** The client bounds
   a document by its bytes in all, not each list by its count times its
   largest item. So a list whose items hold lists of their own (a page's
