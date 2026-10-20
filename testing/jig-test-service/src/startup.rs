@@ -302,7 +302,12 @@ fn connector_config(
         }
         initial.push((name.clone(), state)).expect("resource count checked");
         resources
-            .push(connector::ResourceSpec { path: name, credential: None, hold: connector::Hold::None, writable: true })
+            .push(connector::ResourceSpec {
+                path: name,
+                credential: Some(1),
+                hold: connector::Hold::None,
+                writable: true,
+            })
             .expect("resource count checked");
     }
     let config = connector::Config {
@@ -365,6 +370,19 @@ fn check_files(parsed: &Parsed, files: &Files) -> Result<(), Problems> {
         return Err(problems);
     }
     Ok(())
+}
+
+/// The application's credential table: generation 1 from its file, room for two generations of each number.
+fn application(parsed: &Parsed, files: &Files) -> Result<skein_lib::Map<(u32, u64), skein_lib::Secret>, Problems> {
+    let mut application = skein_lib::Map::with_capacity(
+        parsed.limits.root.core.accounts.credentials.checked_mul(2).expect("two application generations"),
+    );
+    let credential = files.contents(&parsed.credential).expect("credential file checked");
+    if credential.len() > usize::try_from(parsed.limits.root.connector.value_bytes).expect("credential bound") {
+        return Err(problem(Path::root().member(b"application").member(b"credential"), What::Bound));
+    }
+    application.insert((1, 1), config::secret(credential.into())).expect("one application credential");
+    Ok(application)
 }
 
 pub(super) fn engine_startup(
@@ -437,14 +455,8 @@ pub(super) fn engine_startup(
         None
     };
     let clients = clients_child(&parsed, seeds, max)?;
-    let mut application = skein_lib::Map::with_capacity(parsed.limits.root.core.accounts.credentials);
-    let credential = files.contents(&parsed.credential).expect("credential file checked");
-    if credential.len() > usize::try_from(parsed.limits.root.connector.value_bytes).expect("credential bound") {
-        return Err(problem(Path::root().member(b"application").member(b"credential"), What::Bound));
-    }
-    application.insert(1, config::secret(credential.into())).expect("one application credential");
     let values = crate::values::Values {
-        application,
+        application: application(&parsed, files)?,
         accounts: jig_protocol_accounts::table::Table::new(
             parsed.limits.root.core.accounts.accounts.checked_add(1).expect("numbered accounts"),
             parsed.limits.accounts.client.document.token_bytes,

@@ -18,6 +18,15 @@ fn a_person_s_chat_runs_on_the_test_worker_and_is_acknowledged_once() {
 }
 
 #[test]
+fn a_new_application_credential_generation_reaches_a_live_attempt() {
+    let outcome = run(Story::ApplicationGeneration);
+    assert_eq!(outcome.verdict, Verdict::Passed);
+    assert_eq!(outcome.agent_starts, 1);
+    assert_eq!(outcome.turns_committed, 1);
+    assert_eq!(outcome.answers_acknowledged, 1);
+}
+
+#[test]
 fn a_run_takes_turns_and_progresses_before_its_answer() {
     let outcome = run(Story::Progress);
     assert_eq!(outcome.verdict, Verdict::Passed);

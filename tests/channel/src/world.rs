@@ -459,6 +459,7 @@ fn make_referee(script: &Script, store: Rc<RefCell<Store>>, views: Rc<RefCell<Vi
             crate::stories::Story::InvalidTranscript => 1,
             crate::stories::Story::Window => 7,
             crate::stories::Story::Drain
+            | crate::stories::Story::ApplicationGeneration
             | crate::stories::Story::Chat
             | crate::stories::Story::Stalled
             | crate::stories::Story::Quiet
@@ -518,6 +519,8 @@ fn launch(
         processes::engine_calls
     } else if matches!(script.story, crate::stories::Story::Window) {
         processes::engine_window
+    } else if matches!(script.story, crate::stories::Story::ApplicationGeneration) {
+        processes::engine_application_generation
     } else {
         processes::engine
     };

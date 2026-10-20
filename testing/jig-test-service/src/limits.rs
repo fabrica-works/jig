@@ -104,10 +104,12 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
             limits.root.core.accounts.accounts.checked_add(1)?,
             limits.accounts.client.document.token_bytes,
         )?)?
-        .checked_add(skein_lib::Map::<u32, skein_lib::Secret>::worst_case(limits.root.core.accounts.credentials)?)?
+        .checked_add(skein_lib::Map::<(u32, u64), skein_lib::Secret>::worst_case(
+            limits.root.core.accounts.credentials.checked_mul(2)?,
+        )?)?
         .checked_add(
             u64::from(limits.root.connector.value_bytes)
-                .checked_mul(u64::from(limits.root.core.accounts.credentials))?,
+                .checked_mul(u64::from(limits.root.core.accounts.credentials).checked_mul(2)?)?,
         )?
         .checked_add(crate::accounts::worst_case(&limits.accounts, &limits.io, queue.checked_mul(3)?)?)?
         .checked_add(crate::tools::worst_case(&limits.root.core)?)?

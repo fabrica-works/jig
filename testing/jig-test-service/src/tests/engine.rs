@@ -299,6 +299,38 @@ fn a_grant_whose_generation_the_table_lacks_is_left_out() {
     }
 }
 #[test]
+fn application_grants_keep_the_two_newest_generations_per_number() {
+    use jig_domain_host::{Grant, GrantTable};
+    use skein_lib::{Duration, Secret, Time};
+    let mut values = fixtures::values();
+    for (number, generation, value) in [
+        (2, 1, b"other".as_slice()),
+        (1, 3, b"third".as_slice()),
+        (1, 2, b"second".as_slice()),
+        (1, 1, b"stale".as_slice()),
+        (1, 3, b"replacement".as_slice()),
+    ] {
+        values.put_application(number, generation, Secret::new(value.into()));
+    }
+    for (number, generation, expected) in [
+        (1, 1, None),
+        (1, 2, Some(b"second".as_slice())),
+        (1, 3, Some(b"replacement".as_slice())),
+        (1, 4, None),
+        (2, 1, Some(b"other".as_slice())),
+    ] {
+        let grants = values.grants(
+            &[Grant { table: GrantTable::Application, account: number, generation, valid: Duration::from_secs(1) }],
+            Time::ZERO,
+        );
+        match &grants[0] {
+            Some(grant) => assert_eq!(Some(grant.value.expose()), expected),
+            None => assert_eq!(expected, None),
+        }
+    }
+}
+
+#[test]
 fn the_run_s_identity_is_shared_by_a_conversation_s_attempts() {
     let config = fixtures::config();
     let workers = fixtures::workers(&config);

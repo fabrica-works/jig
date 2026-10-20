@@ -7,18 +7,33 @@ use skein_lib::{List, Map, Secret, Time};
 #[derive(Debug)]
 pub(super) struct Values {
     pub accounts: Table,
-    pub application: Map<u32, Secret>,
+    pub application: Map<(u32, u64), Secret>,
 }
 impl Values {
+    pub fn put_application(&mut self, number: u32, generation: u64, value: Secret) {
+        let key = (number, generation);
+        if !self.application.contains_key(&key) {
+            let mut held = self.application.range((number, 0)..=(number, u64::MAX));
+            if let Some((&oldest, _)) = held.next()
+                && held.next().is_some()
+            {
+                if generation < oldest.1 {
+                    return;
+                }
+                drop(self.application.remove(&oldest));
+            }
+        }
+        self.application.insert(key, value).expect("application credential capacity");
+    }
+
     pub fn grants(&self, grants: &[host::Grant], now: Time) -> Box<[Option<GrantValue>]> {
         let mut values = List::with_capacity(u32::try_from(grants.len()).expect("bounded grants"));
         for grant in grants {
             let value = match grant.table {
                 host::GrantTable::Accounts => account_grant(self.accounts.value(grant.account, grant.generation, now)),
-                host::GrantTable::Application if grant.generation == 1 => {
-                    application_grant(self.application.get(&grant.account))
+                host::GrantTable::Application => {
+                    application_grant(self.application.get(&(grant.account, grant.generation)))
                 }
-                host::GrantTable::Application => None,
             };
             values.push(value).expect("one value slot per grant");
         }

@@ -8,6 +8,7 @@ use skein_lib::Duration;
 #[derive(Clone, Copy, Debug)]
 pub enum Story {
     Chat,
+    ApplicationGeneration,
     Stalled,
     Quiet,
     Replaced,
@@ -46,7 +47,7 @@ fn script(story: Story) -> crate::world::Script {
     ) {
         script.leading_turns = 1;
     }
-    if matches!(story, Story::Restart { .. }) {
+    if matches!(story, Story::Restart { .. } | Story::ApplicationGeneration) {
         script.latency = Duration::from_secs(1);
     }
     if matches!(story, Story::Partition { .. } | Story::Facts | Story::Reconnect | Story::Shutdown | Story::Refusals(_))

@@ -95,6 +95,11 @@ impl Engine {
         &mut self.outputs
     }
 
+    /// A test puts an application credential's later generation here before announcing it.
+    pub fn put_application(&mut self, number: u32, generation: u64, value: skein_lib::Secret) {
+        self.values.put_application(number, generation, value);
+    }
+
     pub(crate) fn room(&self) -> bool {
         (match &self.drain {
             Some(drain) => drain.busy.room() >= self.max_out,

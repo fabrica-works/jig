@@ -183,6 +183,13 @@ pub(crate) fn engine_message(inherited: &Inherited) -> Proc {
 pub(crate) fn engine_window(inherited: &Inherited) -> Proc {
     engine_document(inherited, &fixtures::engine_window_document())
 }
+pub(crate) fn engine_application_generation(inherited: &Inherited) -> Proc {
+    let document = String::from_utf8(fixtures::engine_document()).expect("fixture UTF-8").replace(
+        r#""prefix":["one"],"resources":[]"#,
+        r#""prefix":["one"],"resources":[{"path":["one","item"],"state":0}]"#,
+    );
+    engine_document(inherited, document.as_bytes())
+}
 fn engine_configured(inherited: &Inherited, calls: bool) -> Proc {
     engine_document(inherited, &if calls { fixtures::engine_call_document() } else { fixtures::engine_document() })
 }
@@ -259,6 +266,7 @@ pub(crate) struct Wire {
     pub(crate) calls_answered: u32,
     pub(crate) frames: Vec<(Time, u16, Box<[u8]>)>,
     pub(crate) grants: Vec<Box<[u8]>>,
+    pub(crate) granted: Vec<(i32, jig_protocol_worker_wire::Granted)>,
     pub(crate) channel: Option<kernel::Fd>,
     pub(crate) adopting_hellos: u32,
     pub(crate) start_messages: u32,
@@ -321,6 +329,18 @@ impl Wire {
                         self.grants.push(grant.account_id().expose().into());
                     }
                 }
+            }
+            if header.kind == 0x0187 {
+                let granted = jig_protocol_worker_wire::Granted::decode(
+                    &jig_protocol_worker_wire::CEILINGS,
+                    &mut skein_lib::Reader::new(&stream[8..end]),
+                )
+                .expect("granted credential");
+                self.grants.push(granted.grant().value().expose().into());
+                if !granted.grant().account_id().is_empty() {
+                    self.grants.push(granted.grant().account_id().expose().into());
+                }
+                self.granted.push((fd.raw(), granted));
             }
             if header.kind == 0x0104 {
                 let fact = jig_protocol_worker_wire::Fact::decode(

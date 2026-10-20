@@ -371,8 +371,8 @@ pub fn values() -> crate::values::Values {
             Time::from_nanos(120_000_000_000),
         )
         .expect("fixture value");
-    let mut application = skein_lib::Map::with_capacity(1);
-    application.insert(1, Secret::new(b"application-token".as_slice().into())).expect("application value");
+    let mut application = skein_lib::Map::with_capacity(4);
+    application.insert((1, 1), Secret::new(b"application-token".as_slice().into())).expect("application value");
     crate::values::Values { accounts, application }
 }
 pub fn workers(config: &jig_protocol_config::Engine) -> crate::workers::Workers {

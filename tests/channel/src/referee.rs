@@ -74,7 +74,20 @@ impl skein_world::Referee<Proc> for Referee {
                         && !self.passed
                         && let Some(up) = self.party.tick(now)
                     {
-                        engine.parties_in().push(party_event(up, &store));
+                        let mut event = party_event(up, &store);
+                        if matches!(self.story, crate::stories::Story::ApplicationGeneration)
+                            && let core::Event::People(jig_domain_people::Event::Ask {
+                                ask: jig_domain_people::Ask::Create { batch, .. },
+                                ..
+                            }) = &mut event
+                        {
+                            batch[0].parameters = Box::new([jig_domain_people::Parameter::Resource {
+                                name: 1,
+                                connector: 1,
+                                resource: 1,
+                            }]);
+                        }
+                        engine.parties_in().push(event);
                     }
                     if self.passed && !host.stopping {
                         host.stopping = true;
@@ -155,6 +168,10 @@ impl skein_world::Referee<Proc> for Referee {
             && replied
             && self.rules.complete()
         {
+            if matches!(self.story, crate::stories::Story::ApplicationGeneration) {
+                assert!(self.injected, "generation 2 announced while the agent was running");
+                application_generation(worker);
+            }
             self.passed = true;
         }
     }
@@ -184,6 +201,40 @@ impl skein_world::Referee<Proc> for Referee {
     fn passed(&self) -> bool {
         self.passed && self.stopped
     }
+}
+
+fn application_generation(worker: &crate::processes::Wire) {
+    use jig_protocol_worker_wire::{Assignment, CEILINGS, GrantTable};
+    let assignment = worker
+        .frames
+        .iter()
+        .find_map(|(_, kind, bytes)| {
+            (*kind == 0x0180)
+                .then(|| Assignment::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes)).expect("assignment"))
+        })
+        .expect("live assignment");
+    let initial = assignment
+        .grants()
+        .iter()
+        .find(|grant| matches!(grant.table(), GrantTable::Application))
+        .expect("assignment holds the application credential");
+    assert_eq!(initial.account(), 1);
+    assert_eq!(initial.generation(), 1);
+    assert_eq!(initial.value().expose(), b"application-token");
+    let (fd, granted) = worker
+        .granted
+        .iter()
+        .find(|(_, frame)| matches!(frame.grant().table(), GrantTable::Application) && frame.grant().generation() == 2)
+        .expect("generation 2 Application grant received on the live attempt's connection (0x0187)");
+    assert_eq!((granted.task(), granted.attempt()), (assignment.task(), assignment.attempt()));
+    assert_eq!(worker.placements.get(&(granted.task(), granted.attempt())), Some(fd));
+    assert_eq!(granted.grant().account(), 1);
+    assert_eq!(granted.grant().value().expose(), b"application-token-2");
+    assert!(granted.grant().account_id().is_empty());
+    assert!(granted.grant().valid() > skein_lib::Duration::ZERO);
+    let grant = worker.frames.iter().position(|(_, kind, _)| *kind == 0x0187).expect("granted frame");
+    let answer = worker.frames.iter().position(|(_, kind, _)| *kind == 0x0103).expect("same attempt answers");
+    assert!(grant < answer, "the grant arrives before the live attempt finishes");
 }
 
 /// Event ledger used by the live referee and its planted-breach tests.
@@ -370,6 +421,20 @@ impl Referee {
         self.drain_engine(procs);
         self.resume_runs(procs);
         self.inject_refusal(procs);
+        if matches!(self.story, crate::stories::Story::ApplicationGeneration) && !self.injected
+            && procs.iter().any(|proc| matches!(proc, Proc::Peer(peer) if smith_agent_process_world::fake::queries(peer).next().is_some()))
+        {
+            self.injected = true;
+            for proc in procs.iter_mut() {
+                if let Proc::Engine(host) = proc {
+                    let engine = host.service.engine().expect("engine");
+                    engine.put_application(1, 2, skein_lib::Secret::new(b"application-token-2".as_slice().into()));
+                    engine.parties_in().push(core::Event::Account(jig_domain_accounts::Event::Credential {
+                        number: 1, generation: 2, valid: skein_lib::Duration::from_secs(60),
+                    }));
+                }
+            }
+        }
         if matches!(self.story, crate::stories::Story::Inbox) && !self.injected {
             self.injected = true;
             for proc in procs.iter_mut() {
@@ -405,6 +470,7 @@ impl Referee {
                 (skein_lib::Duration::from_secs(40), skein_lib::Duration::from_secs(40))
             }
             crate::stories::Story::Chat
+            | crate::stories::Story::ApplicationGeneration
             | crate::stories::Story::Stalled
             | crate::stories::Story::Quiet
             | crate::stories::Story::Replaced

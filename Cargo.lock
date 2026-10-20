@@ -306,6 +306,7 @@ name = "jig-channel-world"
 version = "0.0.0"
 dependencies = [
  "jig-client-test-records",
+ "jig-domain-accounts",
  "jig-domain-core",
  "jig-domain-host",
  "jig-domain-notes",
