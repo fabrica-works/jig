@@ -59,6 +59,22 @@ pub fn fixture(seed: u64, requirement: bool) -> (root::Config, root::Limits) {
 }
 
 impl World {
+    /// The local scripted host declares the same models as the worker fixtures.
+    pub(super) fn hello_engine(&mut self) {
+        if self.limits.core.fleet.engine_slots > 0 {
+            self.events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+                channel: Token::new(0),
+                hello: fleet::Hello {
+                    bounds: crate::fixtures::bounds(),
+                    stop_bound: Duration::ZERO,
+                    slots: self.limits.core.fleet.engine_slots,
+                    workstreams: Box::new([]),
+                    hosting: Box::new([]),
+                },
+            })));
+        }
+    }
+
     /// Restore configuration into a wholly empty store without a manual bootstrap.
     #[must_use]
     pub fn first_start(configuration: root::Config, limits: root::Limits) -> World {
@@ -141,6 +157,7 @@ impl World {
         world.observer.durable(world.wall, &world.store);
         world.domain = root::Domain::new(configuration, &limits);
         world.send(root::Event::RestartBegin);
+        world.hello_engine();
         for (project, budget) in projects {
             world.send(root::Event::Core(core::Event::Period { project, period: 1, budget, next: None }));
             if project != 1 {
@@ -307,6 +324,7 @@ impl World {
         world.peers = Some(peers);
         world.cut = cut;
         world.events.push_back(root::Event::RestartBegin);
+        world.hello_engine();
         world.events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
             accounts::FromComponent::Granted { account: 1, generation: 1, valid: Duration::from_secs(60) },
         ))));

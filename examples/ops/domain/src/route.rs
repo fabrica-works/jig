@@ -551,7 +551,7 @@ fn core_ask(
                 None => {}
             }
         }
-        core::Ask::ClaimDone { task, attempt, kinds } => match jig_ops_domain_connectors::connector(number) {
+        core::Ask::ClaimDone { task, attempt, kinds, charter } => match jig_ops_domain_connectors::connector(number) {
             Some(Connector::Infrastructure) => {
                 child(
                     decision,
@@ -565,6 +565,7 @@ fn core_ask(
                         workstream: task,
                         assignment: fleet::Assignment { turns: Token::new(task), answered: Token::new(task) },
                         kinds,
+                        charter,
                     }),
                 );
             }

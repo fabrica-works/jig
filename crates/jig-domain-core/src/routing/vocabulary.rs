@@ -103,7 +103,7 @@ pub enum Ask {
     /// Complete a connector-owned unsubscription after the task hub accepts it.
     UnsubscriptionDone { request: Token, key: CallKey },
     /// Complete a prepared claim through the connector that owns its writes.
-    ClaimDone { task: u64, attempt: u64, kinds: fleet::Kinds },
+    ClaimDone { task: u64, attempt: u64, kinds: fleet::Kinds, charter: u32 },
     /// Discard one rejected connector subscription flight.
     DropSubscription { request: Token },
     /// Ask a connector whether a refused repair belongs to a held task.

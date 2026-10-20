@@ -147,13 +147,15 @@ pub struct Call {
 /// parent -> fleet
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
-    /// Place a run with references to its ordered committed conversation state.
+    /// Place a run on a host declaring every model of its configured charter,
+    /// with references to its ordered committed conversation state.
     Start {
         reply_to: ReplyTo,
         run: Token,
         attempt: Token,
         workstream: u64,
         kinds: Kinds,
+        charter: u32,
         assignment: Assignment,
         grants: Box<[Grant]>,
     },

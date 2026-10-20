@@ -89,6 +89,7 @@ impl Domain {
         let mut tokens = Map::with_capacity(channels_count);
         if limits.engine_slots > 0 {
             let engine = Channel {
+                eligible: crate::needs::eligibility(&needs, &[]),
                 kind: HostKind::Engine,
                 token: Token::new(0),
                 slots: limits.engine_slots,
@@ -156,10 +157,10 @@ impl Domain {
         self.turns.len()
     }
 
-    /// The kind placement would choose now; None when no allowed slot is free.
+    /// The kind placement would choose now for this charter; None without an eligible free slot.
     #[must_use]
-    pub fn free_kind(&self, kinds: crate::Kinds, workstream: u64) -> Option<HostKind> {
-        let id = channel::choose(self, workstream, kinds)?;
+    pub fn free_kind(&self, kinds: crate::Kinds, workstream: u64, charter: u32) -> Option<HostKind> {
+        let id = channel::choose(self, workstream, kinds, charter)?;
         Some(self.channels.get(id).expect("chosen channel is connected").kind)
     }
 
@@ -326,8 +327,8 @@ impl Domain {
 /// Handles one event, emitting at most [`max_out`] requests.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Start { reply_to, run, attempt, workstream, kinds, assignment, grants } => {
-            if attempt::start(domain, env, reply_to, run, attempt, workstream, kinds, assignment, out) {
+        Event::Start { reply_to, run, attempt, workstream, kinds, charter, assignment, grants } => {
+            if attempt::start(domain, env, reply_to, run, attempt, workstream, kinds, charter, assignment, out) {
                 crate::grants::keep(domain, env, run, attempt, &[], &grants, out);
             }
         }

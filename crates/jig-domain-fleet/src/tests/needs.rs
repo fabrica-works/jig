@@ -47,13 +47,12 @@ fn a_worker_whose_model_window_is_smaller_is_refused_naming_it() {
     );
 }
 #[test]
-fn a_worker_lacking_a_charters_model_is_refused() {
+fn a_worker_lacking_a_charters_model_is_admitted() {
     let mut bounds = bounds_window(8192);
     bounds.models = Box::new([]);
-    assert_eq!(
-        rejected(needs_window(8192), bounds),
-        HelloRefusal::Agent { why: AgentShortfall::Model { charter: 1, model: 0 } }
-    );
+    let mut h = Harness::with_needs(LIMITS, needs_window(8192));
+    assert!(h.step(Event::Hello { channel: C1, hello: hello(bounds) }).is_empty());
+    assert_eq!(h.domain.workers(), 1);
 }
 #[test]
 fn a_worker_whose_inbox_holds_fewer_than_a_start_is_refused() {
@@ -161,14 +160,16 @@ fn a_worker_keeping_fewer_unacknowledged_turns_is_refused() {
     assert_eq!(rejected(needs_window(8192), bounds), HelloRefusal::Agent { why: AgentShortfall::Unacknowledged });
 }
 #[test]
-fn a_missing_alternative_names_its_position() {
+fn a_smaller_alternative_names_its_position() {
     let mut needs = needs_window(8192);
     needs.charters[0].models = Box::new([
         needs.charters[0].models[0].clone(),
         ModelNeed { name: b"alternative".as_slice().into(), window: 8192, output: 1024 },
     ]);
-    assert_eq!(
-        rejected(needs, bounds_window(8192)),
-        HelloRefusal::Agent { why: AgentShortfall::Model { charter: 1, model: 1 } }
-    );
+    let mut bounds = bounds_window(8192);
+    bounds.models = Box::new([
+        bounds.models[0].clone(),
+        ModelBound { name: b"alternative".as_slice().into(), window: 4096, output: 1024 },
+    ]);
+    assert_eq!(rejected(needs, bounds), HelloRefusal::Agent { why: AgentShortfall::Window { charter: 1, model: 1 } });
 }

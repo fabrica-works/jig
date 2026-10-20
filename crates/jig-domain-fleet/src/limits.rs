@@ -13,7 +13,7 @@ pub struct Limits {
     /// Workers in contact at once. A worker beyond them is turned away at
     /// its hello.
     pub workers: u32,
-    /// Owned charter/model requirements retained for hello admission.
+    /// Owned charter/model requirements retained for admission and placement.
     pub needs_bytes: u64,
     /// Slots hosted inside the engine; zero in applications using only workers.
     pub engine_slots: u32,
@@ -75,9 +75,14 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // Each worker: the attempts it hosts, and the workstream keys it holds.
     let hosts = Set::<Id<Attempt>>::worst_case(limits.slots)?;
     let keys = Map::<u64, u64>::worst_case(limits.workstreams)?;
-    let workers = u64::from(limits.workers).checked_mul(hosts.checked_add(keys)?)?;
+    // Each configured charter owns a CharterNeeds, and each host keeps one bool
+    // per charter. Model payloads can only lower this maximum charter count.
+    let eligibility = limits.needs_bytes.checked_div(u64::try_from(size_of::<crate::CharterNeeds>()).ok()?)?;
+    let workers = u64::from(limits.workers).checked_mul(hosts.checked_add(keys)?.checked_add(eligibility)?)?;
     let engine = if limits.engine_slots > 0 {
-        Set::<Id<Attempt>>::worst_case(limits.engine_slots)?.checked_add(Map::<u64, u64>::worst_case(0)?)?
+        Set::<Id<Attempt>>::worst_case(limits.engine_slots)?
+            .checked_add(Map::<u64, u64>::worst_case(0)?)?
+            .checked_add(eligibility)?
     } else {
         0
     };

@@ -181,8 +181,9 @@ fn start_proof(core: &Core, task: u64, attempt: u64, conversation: u64, messages
     for word in messages {
         offered = Some(word.number);
     }
-    let kinds = core.charter_of(task).hosts;
-    let host = match core.fleet.free_kind(kinds, task) {
+    let charter = core.charter_of(task);
+    let kinds = charter.hosts;
+    let host = match core.fleet.free_kind(kinds, task, charter.number) {
         Some(host) => host,
         None => match kinds {
             jig_domain_fleet::Kinds::Engine => jig_domain_fleet::HostKind::Engine,

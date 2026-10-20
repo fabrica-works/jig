@@ -33,6 +33,34 @@ fn a_task_waits_while_its_charters_account_is_unusable() {
 }
 
 #[test]
+fn a_delegate_waits_for_a_host_declaring_its_charters_model() {
+    use jig_domain_fleet as fleet;
+    let (mut config, mut limits) = world::two_charters(151);
+    limits.core.fleet.workers = 2;
+    config.core.settings.charters[1].policy.model.name = b"specialist".as_slice().into();
+    let mut world = World::configured(151, false, config, limits);
+    let chat = world.assigned.as_ref().expect("chat").task;
+    world.grant_account(2);
+    world.delegate_agent(2, b"wait for a specialist host");
+    assert_eq!(world.assigned.as_ref().expect("chat stays assigned").task, chat);
+    let mut bounds = jig_core_world::fixtures::bounds();
+    bounds.models[1].name = b"specialist".as_slice().into();
+    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+        channel: Token::new(8),
+        hello: fleet::Hello {
+            bounds,
+            stop_bound: skein_lib::Duration::from_millis(100),
+            slots: 1,
+            workstreams: Box::new([]),
+            hosting: Box::new([]),
+        },
+    })));
+    let assignment = world.assigned.as_ref().expect("delegate after suitable hello");
+    assert_eq!(assignment.charter, 2);
+    assert_eq!(assignment.run.policy.model.name.as_ref(), b"specialist");
+}
+
+#[test]
 fn a_restart_restores_a_task_on_the_second_charter() {
     let (config, limits) = world::two_charters(143);
     let mut world = World::configured(143, false, config, limits);

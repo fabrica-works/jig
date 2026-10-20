@@ -80,6 +80,7 @@ fn chip_live_observation_uses_receipt_time_and_drops_after_loss() {
         &mut core.fleet,
         &env,
         fleet::Event::Start {
+            charter: 1,
             grants: Box::new([]),
             reply_to: ReplyTo::new(Token::new(1)),
             run: Token::new(2),
@@ -231,6 +232,7 @@ fn long_operation_work(operation: fleet::Operation) -> ChipWork {
         &mut core.fleet,
         &env,
         fleet::Event::Start {
+            charter: 1,
             grants: Box::new([]),
             reply_to: ReplyTo::new(Token::new(1)),
             run: Token::new(2),

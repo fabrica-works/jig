@@ -1089,6 +1089,7 @@ impl World {
         self.calls.open(attempt, ());
         self.observe(Seen::Started { run, attempt });
         self.stage.push(Event::Start {
+            charter: 1,
             grants: Box::new([crate::fixtures::ANALYST]),
             reply_to: ReplyTo::new(Token::new(attempt)),
             run: Token::new(run),

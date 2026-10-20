@@ -43,9 +43,13 @@ struct Measured {
 
 impl Measured {
     fn new(limits: Limits) -> Measured {
+        Self::with_needs(limits, jig_fleet_world::fixtures::needs)
+    }
+
+    fn with_needs(limits: Limits, needs: impl FnOnce() -> jig_domain_fleet::Needs) -> Measured {
         let bound = worst_case(&limits).expect("the test limits fit");
         let meter = Meter::new();
-        let domain = Domain::new(&limits, jig_fleet_world::fixtures::needs());
+        let domain = Domain::new(&limits, needs());
         let out = Queue::with_capacity(max_out(&limits));
         Measured { domain, env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits }, out, meter, bound, names: 0 }
     }
@@ -119,6 +123,7 @@ impl Measured {
         let (run, attempt) = (self.name(), self.name());
         let workstream = run.raw();
         let asked = self.step(Event::Start {
+            charter: 1,
             grants: Box::new([]),
             reply_to: ReplyTo::new(attempt),
             run,
@@ -130,6 +135,38 @@ impl Measured {
         assert!(asked.is_empty(), "a start waits for placement: {asked:?}");
         (run, attempt)
     }
+}
+
+#[test]
+fn model_eligibility_on_every_host_stays_within_the_memory_bound() {
+    // Fill the needs budget with charter headers: this maximizes eligibility
+    // bytes per needs byte, independently of model name lengths.
+    const CHARTERS: usize = 32;
+    let needs_bytes = u64::try_from(CHARTERS * size_of::<jig_domain_fleet::CharterNeeds>()).expect("small fixture");
+    let limits = Limits { needs_bytes, engine_slots: 1, ..LIMITS };
+    let mut fleet = Measured::with_needs(limits, || jig_domain_fleet::Needs {
+        charters: (0..CHARTERS)
+            .map(|number| jig_domain_fleet::CharterNeeds {
+                charter: u32::try_from(number).expect("small fixture"),
+                kinds: jig_domain_fleet::Kinds::Both,
+                models: Box::new([]),
+                turns: 0,
+                time: Duration::ZERO,
+                waiting: Duration::ZERO,
+                change_reserve: None,
+            })
+            .collect(),
+        ..jig_fleet_world::fixtures::needs()
+    });
+    fleet.hello(Token::new(0), Vec::new());
+    for nth in 0..limits.workers {
+        fleet.hello(channel(nth), Vec::new());
+    }
+    for _ in 0..limits.attempts {
+        fleet.start();
+    }
+    fleet.settle();
+    assert_eq!(fleet.domain.workers(), limits.workers);
 }
 
 /// The channels of the workers, `C1` and on.
@@ -208,6 +245,7 @@ fn a_fleet_full_to_its_limits_stays_within_its_worst_case() {
     let (run, attempt) = (fleet.name(), fleet.name());
     let workstream = run.raw();
     let refused = fleet.step(Event::Start {
+        charter: 1,
         grants: Box::new([]),
         reply_to: ReplyTo::new(attempt),
         run,

@@ -38,6 +38,7 @@ fn a_run_placed_on_the_engine_slots_is_settled_as_not_started_by_a_restart_befor
             &mut domain,
             limits,
             Event::Start {
+                charter: 1,
                 grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
                 run: task,
@@ -114,6 +115,7 @@ fn a_charter_for_workers_only_waits_while_only_engine_slots_are_free() {
             &mut domain,
             limits,
             Event::Start {
+                charter: 1,
                 grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
                 run: task,
@@ -188,6 +190,7 @@ fn a_worker_holding_the_workstream_is_preferred_over_a_free_engine_slot() {
             &mut domain,
             limits,
             Event::Start {
+                charter: 1,
                 grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
                 run: task,
@@ -251,6 +254,10 @@ fn refs() -> jig_domain_fleet::Assignment {
 fn a_worker_refused_for_its_agent_hosts_nothing() {
     let limits = jig_fleet_world::LIMITS;
     let mut domain = waiting_worker(limits);
+    let bounds = fleet::Bounds {
+        models: Box::new([fleet::ModelBound { name: b"model".as_slice().into(), window: 8191, output: 1024 }]),
+        ..jig_fleet_world::fixtures::bounds()
+    };
     assert_eq!(
         step(
             &mut domain,
@@ -258,7 +265,7 @@ fn a_worker_refused_for_its_agent_hosts_nothing() {
             Event::Hello {
                 channel: Token::new(5),
                 hello: Hello {
-                    bounds: jig_fleet_world::fixtures::bounds(),
+                    bounds,
                     slots: 1,
                     stop_bound: Duration::ZERO,
                     workstreams: Box::new([]),
@@ -299,6 +306,7 @@ fn waiting_worker(limits: Limits) -> Domain {
             &mut domain,
             limits,
             Event::Start {
+                charter: 1,
                 grants: Box::new([]),
                 reply_to: ReplyTo::new(Token::new(2)),
                 run: Token::new(1),

@@ -177,7 +177,9 @@ impl World {
             peers.restart();
         }
         self.cut = None;
-        self.send(root::Event::RestartBegin);
+        self.events.push_back(root::Event::RestartBegin);
+        self.hello_engine();
+        self.drain();
         self.lose_answer = false;
     }
 }

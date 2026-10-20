@@ -39,3 +39,51 @@ pub const ANALYST: jig_domain_fleet::Grant = jig_domain_fleet::Grant {
 pub fn needs() -> jig_domain_fleet::Needs {
     jig_domain_fleet::Needs { charters: Box::new([]), spend: 0, message_bytes: 0, start_messages: 0, unacknowledged: 0 }
 }
+
+pub const MODEL_CHARTER: u32 = 17;
+pub const OTHER_CHARTER: u32 = 23;
+pub const MODEL_WINDOW: u32 = 8192;
+pub const MODEL_OUTPUT: u32 = 1024;
+
+/// Distinct charters, one requiring both its main and alternative models.
+#[must_use]
+pub fn model_needs() -> jig_domain_fleet::Needs {
+    use jig_domain_fleet::{CharterNeeds, Kinds, ModelNeed};
+    let charters = [
+        (MODEL_CHARTER, vec![b"main".as_slice(), b"alternative".as_slice()]),
+        (OTHER_CHARTER, vec![b"other".as_slice()]),
+    ];
+    jig_domain_fleet::Needs {
+        charters: charters
+            .into_iter()
+            .map(|(charter, models)| CharterNeeds {
+                charter,
+                kinds: Kinds::Both,
+                models: models
+                    .into_iter()
+                    .map(|name| ModelNeed { name: name.into(), window: MODEL_WINDOW, output: MODEL_OUTPUT })
+                    .collect(),
+                turns: 0,
+                time: skein_lib::Duration::ZERO,
+                waiting: skein_lib::Duration::ZERO,
+                change_reserve: None,
+            })
+            .collect(),
+        ..needs()
+    }
+}
+
+#[must_use]
+pub fn model_bounds(names: &[&[u8]]) -> jig_domain_fleet::Bounds {
+    jig_domain_fleet::Bounds {
+        models: names
+            .iter()
+            .map(|name| jig_domain_fleet::ModelBound {
+                name: (*name).into(),
+                window: MODEL_WINDOW,
+                output: MODEL_OUTPUT,
+            })
+            .collect(),
+        ..bounds()
+    }
+}

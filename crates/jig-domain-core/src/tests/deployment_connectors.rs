@@ -183,7 +183,7 @@ fn the_deployment_document_shows_the_last_fill_and_the_mark() {
 fn a_refused_hello_shows_its_agent_shortfall() {
     let (mut core, limits) = source(&[1], 2);
     let mut bounds = fixtures::bounds();
-    bounds.models = Box::new([]);
+    bounds.models = Box::new([fleet::ModelBound { name: b"scripted".as_slice().into(), window: 8191, output: 1024 }]);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet };
     let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
     fleet::step(
@@ -205,7 +205,7 @@ fn a_refused_hello_shows_its_agent_shortfall() {
     let value = deployment(&core, &limits);
     assert_eq!(
         value.hello_refusals.get(0).unwrap().why,
-        fleet::HelloRefusal::Agent { why: fleet::AgentShortfall::Model { charter: 1, model: 0 } }
+        fleet::HelloRefusal::Agent { why: fleet::AgentShortfall::Window { charter: 1, model: 0 } }
     );
 }
 

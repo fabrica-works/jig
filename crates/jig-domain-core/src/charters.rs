@@ -74,8 +74,9 @@ impl Core {
             fleet::HostKind::Engine => fleet::Kinds::Engine,
             fleet::HostKind::Worker => fleet::Kinds::Workers,
         };
+        let charter = self.charter_of(task).number;
         for &connector in self.connectors.as_ref() {
-            out.push(crate::Request::Ask { connector, ask: crate::Ask::ClaimDone { task, attempt, kinds } });
+            out.push(crate::Request::Ask { connector, ask: crate::Ask::ClaimDone { task, attempt, kinds, charter } });
         }
     }
 

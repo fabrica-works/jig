@@ -1,7 +1,7 @@
-//! Agent admission for the configured charters (domain/engine.md, section 8).
+//! Agent admission and model eligibility for configured charters (domain/engine.md, section 8).
 use crate::{Bounds, HostKind, Kinds};
 use alloc::boxed::Box;
-use skein_lib::Duration;
+use skein_lib::{Duration, List};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Needs {
@@ -72,9 +72,7 @@ pub(crate) fn shortfall(needs: &Needs, bounds: &Bounds, kind: HostKind) -> Optio
                     break;
                 }
             }
-            let Some(held) = held else {
-                return Some(AgentShortfall::Model { charter: charter.charter, model: number });
-            };
+            let Some(held) = held else { continue };
             if held.window < need.window {
                 return Some(AgentShortfall::Window { charter: charter.charter, model: number });
             }
@@ -112,4 +110,37 @@ pub(crate) fn shortfall(needs: &Needs, bounds: &Bounds, kind: HostKind) -> Optio
         }
     }
     None
+}
+
+/// One eligibility bit per configured charter, bounded by `Needs`' owned bytes.
+/// The parent admits charter numbers; an unconfigured number has no needs here.
+pub(crate) fn eligibility(needs: &Needs, models: &[crate::ModelBound]) -> Box<[bool]> {
+    let mut eligible = List::with_capacity(u32::try_from(needs.charters.len()).expect("configured charter count"));
+    for charter in &needs.charters {
+        let mut all = true;
+        for need in &charter.models {
+            let mut declared = false;
+            for model in models {
+                if model.name == need.name {
+                    declared = true;
+                    break;
+                }
+            }
+            if !declared {
+                all = false;
+                break;
+            }
+        }
+        eligible.push(all).expect("one bit per configured charter");
+    }
+    eligible.into_boxed()
+}
+
+pub(crate) fn allows(needs: &Needs, eligible: &[bool], charter: u32) -> bool {
+    for (index, need) in needs.charters.iter().enumerate() {
+        if need.charter == charter {
+            return *eligible.get(index).expect("one bit per configured charter");
+        }
+    }
+    true
 }

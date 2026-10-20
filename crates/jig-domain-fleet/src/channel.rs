@@ -21,12 +21,14 @@
 //! down, or fuller than the fleet knew: nothing more is placed on it until
 //! it frees a slot.
 //!
-//! Placement takes a worker in contact with a free slot that holds the
+//! Placement requires every model of the run's charter, then takes a worker
+//! in contact with a free slot that holds the
 //! workstream's workspace, the first in the order of the protocol's names for
 //! the channels; or, with none, the one with the most free slots. A worker
 //! holds the workstreams its hello listed and those of the runs placed on it
 //! since: placing one beyond the room evicts the one used longest ago.
 
+use alloc::boxed::Box;
 use core::mem;
 
 use skein_lib::{Env, Id, Map, Queue, Set, Slab, Token};
@@ -40,6 +42,8 @@ use crate::limits::Limits;
 /// A worker in contact.
 #[derive(Debug)]
 pub(crate) struct Channel {
+    /// Model eligibility in configured charter order, independent of free slots.
+    pub(crate) eligible: Box<[bool]>,
     /// Which kind of host owns these slots.
     pub(crate) kind: HostKind,
     /// The protocol's name for its channel.
@@ -116,6 +120,13 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
         return;
     }
     if engine {
+        if let Some(&id) = domain.tokens.get(&channel) {
+            let host = domain.channels.get_mut(id).expect("engine slots reserved");
+            // Drop the construction bits before allocating their replacement.
+            host.eligible = Box::new([]);
+            host.eligible = crate::needs::eligibility(&domain.needs, &hello.bounds.models);
+            domain.placing = true;
+        }
         return;
     }
     if domain.tokens.contains_key(&channel) {
@@ -142,8 +153,9 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
         out.push(Request::Refuse { channel });
         return;
     }
-    let Hello { slots, workstreams, hosting, stop_bound: _, bounds: _ } = hello;
+    let Hello { slots, workstreams, hosting, stop_bound: _, bounds } = hello;
     let mut worker = Channel {
+        eligible: crate::needs::eligibility(&domain.needs, &bounds.models),
         kind: HostKind::Worker,
         token: channel,
         slots: slots.min(limits.slots),
@@ -230,14 +242,18 @@ pub(crate) fn drain(domain: &mut Domain, channel: Id<Channel>) {
     domain.channels.get_mut(channel).expect("an answer's channel is in contact").draining = true;
 }
 
-/// The worker to place an attempt of `workstream` on: one with a free slot
-/// that holds its workspace, or else the one with the most free slots.
-pub(crate) fn choose(domain: &Domain, workstream: u64, kinds: Kinds) -> Option<Id<Channel>> {
+/// A host declaring every model of `charter`: one with a free slot that holds
+/// the workstream's workspace, or else the one with the most free slots.
+pub(crate) fn choose(domain: &Domain, workstream: u64, kinds: Kinds, charter: u32) -> Option<Id<Channel>> {
     let mut best: Option<(Id<Channel>, u32)> = None;
     for (_, &id) in &domain.tokens {
         let channel = domain.channels.get(id).expect("a named channel is in contact");
         let free = channel.slots.saturating_sub(channel.hosts.len());
-        if channel.draining || free == 0 || !kinds.allows(channel.kind) {
+        if channel.draining
+            || free == 0
+            || !kinds.allows(channel.kind)
+            || !crate::needs::allows(&domain.needs, &channel.eligible, charter)
+        {
             continue;
         }
         if channel.kind == HostKind::Worker && holds(channel, workstream).is_some() {
