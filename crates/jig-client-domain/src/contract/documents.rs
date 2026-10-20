@@ -142,6 +142,8 @@ pub struct Task {
     pub context: Option<Box<TaskContext>>,
     /// The task's LLM choice, when its executor runs a model.
     pub llm: Option<super::LlmChoice>,
+    pub kept_account: Option<u32>,
+    pub run_wait: Option<super::TaskRunWait>,
 }
 
 /// Whole separately supplied task context (client/domain/contract.md, 5.1).

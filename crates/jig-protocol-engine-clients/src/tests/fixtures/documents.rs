@@ -133,6 +133,7 @@ pub fn hold() -> d::HoldLine {
 pub fn task_with_hold() -> d::Task {
     d::Task {
         kept_account: None,
+        run_wait: None,
         waits_on: d::WaitsOn::Nothing,
         label: 0,
         flags: t::Flags::PLAIN,

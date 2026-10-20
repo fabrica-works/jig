@@ -1199,3 +1199,40 @@ fn canonical_tasks_context_reindexes_live_recurring_proposals_and_history() {
         assert_eq!(crate::codec::tasks::decode(&bytes, &limits, &names), Ok(row));
     }
 }
+
+#[test]
+fn a_people_choice_keeps_its_explicit_account() {
+    use jig_domain_people as p;
+    let mut member = fixtures::people_member();
+    member.llm = Some(p::LlmChoice {
+        account: Some(42),
+        main: p::ModelEffort { model: 0, effort: None },
+        subagents: Box::new([]),
+    });
+    let ask = p::Ask::Create { project: 1, batch: Box::new([member]) };
+    ask_round_trip(ask.clone());
+    people_round_trip(p::Stored::Answer {
+        models: Box::new([]),
+        key: p::RequestKey { person: 2, key: [9; 16] },
+        ask: Box::new(ask),
+        outcome: p::Outcome::Created { first: 3, last: 3, given: None },
+        at: skein_lib::Wall::EPOCH,
+    });
+}
+
+#[test]
+fn account_refusals_keep_their_reasons_in_the_store() {
+    use jig_domain_people as p;
+    use jig_domain_tasks as t;
+    for why in [p::AccountWhy::Unknown, p::AccountWhy::Provider, p::AccountWhy::Uses, p::AccountWhy::Limited] {
+        people_round_trip(fixtures::people_outcomes::answered(p::Outcome::Refused(p::Refusal::Account {
+            account: 42,
+            why,
+        })));
+    }
+    for why in [t::AccountWhy::Unknown, t::AccountWhy::Provider, t::AccountWhy::Uses, t::AccountWhy::Limited] {
+        let mut problem = fixtures::calls::problem();
+        problem.why = t::Refusal::Account { account: 42, why };
+        core_round_trip(fixtures::calls::call(jig_domain_core::CallPart::DelegationRefused(problem)));
+    }
+}

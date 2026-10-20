@@ -278,6 +278,10 @@ pub(super) fn encode_refusal(value: &tasks::Refusal, limits: &Limits) -> Result<
         tasks::Refusal::HoldKind => wire::Refusal::HoldKind,
         tasks::Refusal::HoldTaken => wire::Refusal::HoldTaken,
         tasks::Refusal::Holds => wire::Refusal::Holds,
+        tasks::Refusal::Account { account, why } => wire::Refusal::Account(wire::RefusalAccount::new(
+            limits,
+            wire::RefusalAccountParts { account: *account, why: encode_account_why(*why) },
+        )?),
         tasks::Refusal::Llm { model, why } => wire::Refusal::Llm(wire::RefusalLlm::new(
             limits,
             wire::RefusalLlmParts { model: *model, why: encode_llm_fault(*why) },
@@ -324,6 +328,10 @@ pub(super) fn decode_refusal(value: wire::Refusal, _limits: &Limits) -> tasks::R
         wire::Refusal::HoldKind => tasks::Refusal::HoldKind,
         wire::Refusal::HoldTaken => tasks::Refusal::HoldTaken,
         wire::Refusal::Holds => tasks::Refusal::Holds,
+        wire::Refusal::Account(value) => {
+            let wire::RefusalAccountParts { account, why } = value.into_parts();
+            tasks::Refusal::Account { account, why: decode_account_why(why) }
+        }
         wire::Refusal::Llm(value) => {
             let wire::RefusalLlmParts { model, why } = value.into_parts();
             tasks::Refusal::Llm { model, why: decode_llm_fault(why) }
@@ -555,4 +563,22 @@ pub fn read_change(bytes: &[u8], limits: &Limits) -> Result<tasks::Change, wire:
 }
 fn too_large(_: core::num::TryFromIntError) -> wire::Problem {
     wire::Problem { path: wire::Path::TaskProblemBlockedBy, reason: skein_codec::Reason::Bound }
+}
+
+fn encode_account_why(value: tasks::AccountWhy) -> wire::AccountWhy {
+    match value {
+        tasks::AccountWhy::Unknown => wire::AccountWhy::Unknown,
+        tasks::AccountWhy::Provider => wire::AccountWhy::Provider,
+        tasks::AccountWhy::Uses => wire::AccountWhy::Uses,
+        tasks::AccountWhy::Limited => wire::AccountWhy::Limited,
+    }
+}
+
+fn decode_account_why(value: wire::AccountWhy) -> tasks::AccountWhy {
+    match value {
+        wire::AccountWhy::Unknown => tasks::AccountWhy::Unknown,
+        wire::AccountWhy::Provider => tasks::AccountWhy::Provider,
+        wire::AccountWhy::Uses => tasks::AccountWhy::Uses,
+        wire::AccountWhy::Limited => tasks::AccountWhy::Limited,
+    }
 }

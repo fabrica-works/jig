@@ -47,6 +47,18 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::NotWaiting => w::Refusal::NotWaiting,
         p::Refusal::NoFurther => w::Refusal::NoFurther,
         p::Refusal::Unknown => w::Refusal::Unknown,
+        p::Refusal::Account { account, why } => w::Refusal::Account(w::RefusalAccount::new(
+            limits,
+            w::RefusalAccountParts {
+                account,
+                why: match why {
+                    p::AccountWhy::Unknown => w::AccountWhy::Unknown,
+                    p::AccountWhy::Provider => w::AccountWhy::Provider,
+                    p::AccountWhy::Uses => w::AccountWhy::Uses,
+                    p::AccountWhy::Limited => w::AccountWhy::Limited,
+                },
+            },
+        )?),
         p::Refusal::Provider => w::Refusal::Provider,
         p::Refusal::NotOffered => w::Refusal::NotOffered,
         p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,

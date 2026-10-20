@@ -49,6 +49,15 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
         }
         // A refused model reaches the party by its index, which the client's engine names (tasks.md, 3).
         tasks::Refusal::Llm { model, why } => people::Refusal::Llm { model, why: llm_why(why) },
+        tasks::Refusal::Account { account, why } => people::Refusal::Account {
+            account,
+            why: match why {
+                tasks::AccountWhy::Unknown => people::AccountWhy::Unknown,
+                tasks::AccountWhy::Provider => people::AccountWhy::Provider,
+                tasks::AccountWhy::Uses => people::AccountWhy::Uses,
+                tasks::AccountWhy::Limited => people::AccountWhy::Limited,
+            },
+        },
         tasks::Refusal::Reference => people::Refusal::Authority { proposable: None, lacking: people::Lack::Reference },
         tasks::Refusal::Funding => people::Refusal::Authority { proposable: None, lacking: people::Lack::Funding },
         tasks::Refusal::AuthorityShape => people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape },

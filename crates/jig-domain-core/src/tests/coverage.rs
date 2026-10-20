@@ -98,3 +98,106 @@ fn plan_coverage_rechecks_current_project_membership() {
     assert!(!serves(&core, Use::Project(PROJECT)));
     assert!(serves(&core, Use::Party(SERVICE)));
 }
+
+fn preferred(number: u32) -> tasks::LlmChoice {
+    tasks::LlmChoice {
+        account: Some(number),
+        main: tasks::ModelEffort { model: 0, effort: Some(0) },
+        subagents: Box::new([]),
+    }
+}
+fn with_model(core: &mut Core) {
+    core.settings.llm_providers.providers[0].models = Box::new([b"scripted".as_slice().into()]);
+}
+
+#[test]
+fn a_named_account_refusal_keeps_the_number_with_its_reason() {
+    let (mut core, _) = prepared(false, accounts::Holder::Party(ALICE), None);
+    with_model(&mut core);
+    assert_eq!(
+        core.account_preference(Some(&preferred(999)), tasks::Payer::Party(ALICE), None),
+        Err(tasks::Refusal::Account { account: 999, why: tasks::AccountWhy::Unknown })
+    );
+    assert_eq!(
+        core.account_preference(Some(&preferred(ACCOUNT)), tasks::Payer::Party(BOB), None),
+        Err(tasks::Refusal::Account { account: ACCOUNT, why: tasks::AccountWhy::Uses })
+    );
+    core.settings.llm_providers.providers[0].number = 4;
+    assert_eq!(
+        core.account_preference(Some(&preferred(ACCOUNT)), tasks::Payer::Party(ALICE), None),
+        Err(tasks::Refusal::Account { account: ACCOUNT, why: tasks::AccountWhy::Provider })
+    );
+}
+
+#[test]
+fn an_unavailable_named_account_is_admitted_for_its_payer() {
+    let (mut core, _) = prepared(false, accounts::Holder::Party(ALICE), None);
+    with_model(&mut core);
+    assert!(!core.accounts.account_views().get(0).unwrap().usable);
+    assert_eq!(core.account_preference(Some(&preferred(ACCOUNT)), tasks::Payer::Party(ALICE), None), Ok(()));
+}
+
+#[test]
+fn a_batch_preference_uses_the_prospective_financial_chain() {
+    let (mut core, _) = prepared(false, accounts::Holder::Party(ALICE), None);
+    with_model(&mut core);
+    let first = new_row(&core, 2, tasks::Funder::Pool { project: PROJECT, person: BOB, period: 1 }, None);
+    let mut child = new_row(&core, 3, tasks::Funder::Task(2), None);
+    child.llm = Some(preferred(ACCOUNT));
+    let mut batch = [first, child];
+    assert_eq!(
+        core.resolve_llm(&mut batch),
+        Err(tasks::Problem::new(Some(3), tasks::Refusal::Account { account: ACCOUNT, why: tasks::AccountWhy::Uses }))
+    );
+    batch[0].funder = tasks::Funder::Pool { project: PROJECT, person: ALICE, period: 1 };
+    assert_eq!(core.resolve_llm(&mut batch), Ok(()));
+}
+
+#[test]
+fn acceptance_rechecks_a_preference_against_the_new_funder() {
+    let (mut core, _) = prepared(false, accounts::Holder::Party(ALICE), None);
+    with_model(&mut core);
+    let alice = tasks::Funder::Pool { project: PROJECT, person: ALICE, period: 1 };
+    let bob = tasks::Funder::Pool { project: PROJECT, person: BOB, period: 1 };
+    let mut new = new_row(&core, 2, alice, None);
+    new.llm = Some(preferred(ACCOUNT));
+    assert_eq!(core.funded_accounts(&[new.clone()], alice), Ok(()));
+    assert_eq!(
+        core.funded_accounts(&[new], bob),
+        Err(tasks::Refusal::Account { account: ACCOUNT, why: tasks::AccountWhy::Uses })
+    );
+}
+
+#[test]
+fn a_limited_kept_account_refuses_a_new_account_of_its_provider() {
+    let (mut core, env) = fixture(vec![
+        account(ACCOUNT, accounts::Holder::Party(ALICE)),
+        source(ACCOUNT, SOURCE, 0, accounts::Kind::Key),
+        account(30, accounts::Holder::Party(ALICE)),
+        source(30, 31, 0, accounts::Kind::Key),
+    ]);
+    with_model(&mut core);
+    let mut out = Queue::with_capacity(accounts::max_out(&env.limits.accounts));
+    let account_env = Env { now: env.now, wall: env.wall, limits: env.limits.accounts };
+    accounts::step(
+        &mut core.accounts,
+        &account_env,
+        accounts::Event::Limited { account: SOURCE, reset: None },
+        &mut out,
+    );
+    assert_eq!(
+        core.account_preference(Some(&preferred(30)), tasks::Payer::Party(ALICE), Some(ACCOUNT)),
+        Err(tasks::Refusal::Account { account: 30, why: tasks::AccountWhy::Limited })
+    );
+    accounts::step(
+        &mut core.accounts,
+        &account_env,
+        accounts::Event::Change {
+            request: Token::new(1),
+            holder: accounts::Holder::Party(ALICE),
+            change: accounts::Change::Resume { source: SOURCE },
+        },
+        &mut out,
+    );
+    assert_eq!(core.account_preference(Some(&preferred(30)), tasks::Payer::Party(ALICE), Some(ACCOUNT)), Ok(()));
+}

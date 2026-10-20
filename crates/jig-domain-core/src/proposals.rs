@@ -228,6 +228,7 @@ impl Core {
         let Some(checked) = action_for_check(self, action, decision) else { return Err(tasks::Refusal::Executor) };
         let Some(needed) = authority::needs(&checked) else { return Err(tasks::Refusal::AuthorityShape) };
         self.proposal_admit_action(project, action, decision)?;
+        self.action_accounts(action, tasks::Funder::Task(holder))?;
         let Some(depth) = distance(self, limits, proposer, holder) else { return Err(tasks::Refusal::Reference) };
         if covers_task(self, limits, &needed, holder, depth, project) { Ok(()) } else { Err(tasks::Refusal::Funding) }
     }

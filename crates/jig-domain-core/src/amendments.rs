@@ -86,6 +86,9 @@ impl Core {
         if let Err(why) = tasks::instruction_admit(limits, row.executor, &amendment.instructions) {
             return Err(TaskAmendDenied::Refused { task: target, why });
         }
+        if let Err(why) = self.amendment_account(target, amendment, None) {
+            return Err(TaskAmendDenied::Refused { task: target, why });
+        }
         let Some(after) = &amendment.authority else { return Ok(false) };
         let before = translate::authority_value(&current.authority);
         let after = translate::authority_value(after);
@@ -146,6 +149,7 @@ impl Core {
             && amendment.wake.is_none()
             && amendment.dependencies.is_none()
             && amendment.authority.is_none()
+            && amendment.llm.is_none()
         {
             Ok(())
         } else {

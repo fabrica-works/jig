@@ -154,7 +154,7 @@ pub fn choice(
     }
     Ok(Some(w::LlmChoice::new(
         limits,
-        w::LlmChoiceParts { main: model_effort(value.main, models, limits)?, subagents },
+        w::LlmChoiceParts { account: value.account, main: model_effort(value.main, models, limits)?, subagents },
     )?))
 }
 fn model_effort(value: t::ModelEffort, models: &[Model], limits: &w::Limits) -> Result<w::ModelEffort, w::Problem> {
@@ -293,7 +293,7 @@ pub(crate) fn people(
         };
         subagents.push(item).expect("same capacity");
     }
-    Ok(Some(p::LlmChoice { main, subagents: subagents.into_boxed() }))
+    Ok(Some(p::LlmChoice { account: *value.account(), main, subagents: subagents.into_boxed() }))
 }
 fn indices(value: &w::ModelEffort, models: &[Model]) -> Result<p::ModelEffort, w::LlmWhy> {
     let mut found = None;

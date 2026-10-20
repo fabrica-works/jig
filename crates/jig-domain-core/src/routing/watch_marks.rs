@@ -75,14 +75,13 @@ impl Core {
         }
     }
 
-    /// Gather deployment facts after host, account or task capacity changes.
+    /// Gather deployment and task run-wait facts after host, account or capacity changes.
     pub fn touch_deployment(&mut self) {
         for (_, binding) in &self.view_subjects {
             let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
             let touched = match subject {
-                Subject::Deployment => true,
+                Subject::Deployment | Subject::Task { .. } => true,
                 Subject::Frame { .. }
-                | Subject::Task { .. }
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }

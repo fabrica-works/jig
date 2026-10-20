@@ -156,6 +156,7 @@ fn an_amended_choice_reaches_the_people_child_in_configuration_s_order() {
         panic!("amendment")
     };
     let expected = p::LlmChoice {
+        account: None,
         main: p::ModelEffort { model: 0, effort: Some(1) },
         subagents: Box::new([p::ModelEffort { model: 1, effort: None }]),
     };
@@ -205,5 +206,53 @@ fn original_selector_names_are_canonical_and_unknowns_reach_retained_key_lookup(
     assert_eq!(unknown.models.as_ref(), &[Box::<[u8]>::from(b"removed".as_slice())]);
     for names in [&[b"quick".as_slice(), b"quick".as_slice()][..], &[b"".as_slice()][..]] {
         translate::asks::named(selector_ask(names), &models, &w::CEILINGS).expect_err("invalid selector");
+    }
+}
+
+#[test]
+fn an_explicit_account_reaches_the_people_child() {
+    let l = fixtures::wire();
+    let mut choice = fixtures::careful_and_quick(&l).into_parts();
+    choice.account = Some(42);
+    let ask = w::Ask::Amend(amend(w::LlmChoice::new(&l, choice).unwrap()));
+    let Ok(p::Ask::Amend { amendment, .. }) = translate::asks::ask(ask, &fixtures::models(), &l) else {
+        panic!("amendment")
+    };
+    assert_eq!(amendment.llm.unwrap().account, Some(42));
+}
+
+#[test]
+fn task_documents_keep_the_claimed_account_separate_from_the_preference() {
+    let l = fixtures::wire();
+    let mut task = fixtures::task_with_hold();
+    let mut preferred = choice();
+    preferred.account = Some(42);
+    task.llm = Some(preferred);
+    task.kept_account = Some(41);
+    task.run_wait = Some(jig_domain_core::documents::TaskRunWait::Account {
+        account: Some(41),
+        source: Some(91),
+        why: jig_domain_core::documents::TaskWaitWhy::Source(jig_domain_core::documents::TaskSourceState::Limited {
+            until: None,
+        }),
+    });
+    let record = translate::task::document(&task, &fixtures::models(), &l).unwrap();
+    assert_eq!(*record.llm().as_ref().unwrap().account(), Some(42));
+    assert_eq!(*record.kept_account(), Some(41));
+    let Some(w::TaskRunWait::Account(wait)) = record.run_wait() else { panic!("account wait") };
+    assert_eq!((*wait.account(), *wait.source()), (Some(41), Some(91)));
+    let w::TaskWaitWhy::Source(reason) = wait.why() else { panic!("source wait") };
+    let w::TaskSourceState::Limited(limited) = reason.state() else { panic!("limited") };
+    assert_eq!(*limited.until(), None);
+}
+
+#[test]
+fn an_account_refusal_preserves_its_number() {
+    let l = fixtures::wire();
+    for why in [p::AccountWhy::Unknown, p::AccountWhy::Provider, p::AccountWhy::Uses, p::AccountWhy::Limited] {
+        let reply = p::Reply::Outcome(p::Outcome::Refused(p::Refusal::Account { account: 42, why }));
+        let w::Final::Refused(value) = fixtures::translated(&reply, &l) else { panic!("refusal") };
+        let w::Refusal::Account(account) = value.refusal() else { panic!("typed account refusal") };
+        assert_eq!(account.account(), 42);
     }
 }

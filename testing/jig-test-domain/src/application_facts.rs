@@ -41,6 +41,9 @@ pub(super) fn refusal(value: people::Refusal) -> application::Refusal {
         }
         people::Refusal::KeyConflict => application::Refusal::KeyConflict,
         // The application connector names no model: a refused choice is its models' lack.
+        people::Refusal::Account { .. } => {
+            application::Refusal::Authority { lacking: application::Lack::Account, proposable: None }
+        }
         people::Refusal::Llm { .. } => {
             application::Refusal::Authority { lacking: application::Lack::Models, proposable: None }
         }

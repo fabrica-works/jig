@@ -1416,8 +1416,25 @@ pub(super) fn route_task_escalation(core: &mut Core, env: &Env<Limits>, event: t
     tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, true, false)
 }
 
-pub(super) fn route_person_proposal(core: &mut Core, env: &Env<Limits>, event: tasks::Event) -> Requests {
+pub(super) fn route_person_proposal(core: &mut Core, env: &Env<Limits>, mut event: tasks::Event) -> Requests {
     let mut out = Queue::with_capacity(tasks::max_out(&env.limits.tasks));
+    if let tasks::Event::Make { batch, .. } | tasks::Event::MakeResultFollowups { batch, .. } = &mut event
+        && let Err(problem) = core.resolve_llm(batch)
+    {
+        let (tasks::Event::Make { reply_to, .. } | tasks::Event::MakeResultFollowups { reply_to, .. }) = event else {
+            unreachable!("checked batch event")
+        };
+        out.push(tasks::Request::Refused { reply_to, problem });
+        return tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), true, false, false);
+    }
+    if let tasks::Event::Amend { task, amendment, funder, .. } = &event
+        && let Err(why) = core.amendment_account(*task, amendment, *funder)
+    {
+        let problem = tasks::Problem::new(Some(*task), why);
+        let tasks::Event::Amend { reply_to, .. } = event else { unreachable!("checked amendment event") };
+        out.push(tasks::Request::Refused { reply_to, problem });
+        return tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), true, false, false);
+    }
     tasks::step(&mut core.tasks, &Env { now: env.now, wall: env.wall, limits: env.limits.tasks }, event, &mut out);
     tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), true, false, false)
 }
@@ -1477,6 +1494,14 @@ pub(super) fn route_tasks(
         return super::procedure_steps::apply(core, env, *task, *step, event);
     }
     let mut out = Queue::with_capacity(tasks::max_out(&env.limits.tasks));
+    if let tasks::Event::Amend { task, amendment, funder, .. } = &event
+        && let Err(why) = core.amendment_account(*task, amendment, *funder)
+    {
+        let problem = tasks::Problem::new(Some(*task), why);
+        let tasks::Event::Amend { reply_to, .. } = event else { unreachable!("checked amendment event") };
+        out.push(tasks::Request::Refused { reply_to, problem });
+        return tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, false, false);
+    }
     if let tasks::Event::Amend { task, amendment, .. } = &event
         && let Some(tasks::Tracking::Tracked { .. }) = amendment.tracked
         && let Some(row) = core.tasks.task(*task)

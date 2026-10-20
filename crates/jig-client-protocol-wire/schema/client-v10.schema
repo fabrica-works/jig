@@ -223,7 +223,7 @@ record ParameterResource { name: u32 connector: u16 resource: u64 }
 enum Parameter { number: ParameterNumber, bytes: ParameterBytes, resource: ParameterResource }
 record Specification { words: text 65536 parameters: list 32 Parameter inputs: list 32 u64 }
 record ModelEffort { model: text 4096 effort: option text 32 }
-record LlmChoice { main: ModelEffort subagents: list 64 ModelEffort }
+record LlmChoice { account: option u32 main: ModelEffort subagents: list 64 ModelEffort }
 record OwnerPatternEndExact { value: bytes 65536 }
 record OwnerPatternEndOpen { value: bytes 65536 }
 enum OwnerPatternEnd { exact: OwnerPatternEndExact, open: OwnerPatternEndOpen }
@@ -398,7 +398,9 @@ enum Malformed { project_mismatch, two_as_allowed, conversation_not_agent, cycle
 record RefusalMalformed { at: u32 why: Malformed }
 enum LlmWhy { unconfigured, effort, charter, authority, procedure, repeated }
 record RefusalLlm { model: text 4096 why: LlmWhy }
-enum Refusal { malformed: RefusalMalformed, role: RefusalRole, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider }
+enum AccountWhy { unknown, provider, uses, limited }
+record RefusalAccount { account: u32 why: AccountWhy }
+enum Refusal { malformed: RefusalMalformed, role: RefusalRole, taken: RefusalTaken, not_waiting, no_further, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider, account: RefusalAccount }
 record Done { outcome: Outcome }
 record Refused { refusal: Refusal at: option u32 }
 enum Final { done: Done, refused: Refused }
@@ -656,7 +658,17 @@ record SubscriptionKindTopic { connector: u16 topic: u64 }
 enum SubscriptionKind { task: SubscriptionKindTask, timer: SubscriptionKindTimer, topic: SubscriptionKindTopic }
 record Subscription { number: u64 kind: SubscriptionKind }
 record Subscriptions { entries: list 32 Subscription }
-record Task { label: u32 flags: TaskFlags last_activity: u64 waits_on: WaitsOn chip: Chip goal: option u64 priority: option u32 lineage_chips: bytes 16777216 inputs: bytes 16777216 project: u32 requester: OwnerRequester lineage: list 32 u64 spec: SpecificationDocument spec_revision: Revision person_revision: option Revision taken_by: option u64 instructions: option DocumentText wake: OwnerWakePolicy subscriptions: Subscriptions result_contract: TaskContractDocument dependencies: bytes 16777216 references: bytes 16777216 cut: bool resources: bytes 16777216 budget: OwnerBudget authority: OwnerAuthorityDocument hold: option TaskHold proposals: list 32 ProposalKey activity: u64 changed: u64 acts: bytes 16777216 result: option TaskResult delegates: bytes 16777216 context: option TaskContext llm: option LlmChoice }
+# The task's next-run wait, with source deadlines already translated to wall time.
+record TaskSourceStateUntil { until: option u64 }
+enum TaskSourcePlace { directory, file }
+enum TaskSourceUnread { unreadable, refused, failed, stalled, too_large }
+record TaskSourceStateUnloaded { at: TaskSourcePlace why: TaskSourceUnread }
+enum TaskSourceState { asking, granted, later: TaskSourceStateUntil, limited: TaskSourceStateUntil, refused, needs_sign_in, misconfigured, unloaded: TaskSourceStateUnloaded, cancelled, closing }
+record TaskWaitSource { state: TaskSourceState }
+enum TaskWaitWhy { source: TaskWaitSource, refreshing, host, empty }
+record TaskWaitAccount { account: option u32 source: option u32 why: TaskWaitWhy }
+enum TaskRunWait { account: TaskWaitAccount, credential, host }
+record Task { label: u32 flags: TaskFlags last_activity: u64 waits_on: WaitsOn chip: Chip goal: option u64 priority: option u32 lineage_chips: bytes 16777216 inputs: bytes 16777216 project: u32 requester: OwnerRequester lineage: list 32 u64 spec: SpecificationDocument spec_revision: Revision person_revision: option Revision taken_by: option u64 instructions: option DocumentText wake: OwnerWakePolicy subscriptions: Subscriptions result_contract: TaskContractDocument dependencies: bytes 16777216 references: bytes 16777216 cut: bool resources: bytes 16777216 budget: OwnerBudget authority: OwnerAuthorityDocument hold: option TaskHold proposals: list 32 ProposalKey activity: u64 changed: u64 acts: bytes 16777216 result: option TaskResult delegates: bytes 16777216 context: option TaskContext llm: option LlmChoice kept_account: option u32 run_wait: option TaskRunWait }
 record TreeNode { chip: Chip parent: option u64 dependencies: list 32 u64 proposals: list 32 ProposalKey spend: u64 folded: PhaseCounts held_below: u32 }
 record Tree { task: u64 nodes: bytes 16777216 folded: PhaseCounts held_below: u32 }
 record ReadPosition { task: u64 through: u64 }

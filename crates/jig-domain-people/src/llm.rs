@@ -19,6 +19,8 @@ pub struct ModelEffort {
 /// What an agent task's runs' LLMs are: its main model and those its sub-agents may use.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct LlmChoice {
+    /// Creator preference, separate from the task's last successfully claimed account.
+    pub account: Option<u32>,
     pub main: ModelEffort,
     /// At most `MODELS`.
     pub subagents: Box<[ModelEffort]>,
@@ -56,4 +58,13 @@ pub(crate) fn valid(choice: Option<&LlmChoice>) -> bool {
         return true;
     };
     choice.subagents.len() <= usize::try_from(MODELS).expect("u32 fits usize")
+}
+
+/// Why an explicit account cannot fund the prospective task (domain/accounts.md, 4.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AccountWhy {
+    Unknown,
+    Provider,
+    Uses,
+    Limited,
 }

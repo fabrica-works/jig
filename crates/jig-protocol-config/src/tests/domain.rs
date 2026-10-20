@@ -279,7 +279,9 @@ fn memory_below_the_components_sum_is_refused() {
     // JP10c-b adds 248 bytes over f448c8d4: 240 inline bytes for the parser and
     // two runtime provider copies, plus 8 bytes for their two "Fake" names.
     // This fixture has no manage address; supplied addresses cost three copies.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_676_998_999 });
+    // x1d's public account preferences and separate task pin/wait facts add 345,296 bytes:
+    // people's retained requests and copies, task documents, and their routed output room.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_344_295 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

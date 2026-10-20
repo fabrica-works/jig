@@ -342,6 +342,8 @@ fn counts() -> PhaseCounts {
 }
 fn task() -> Task {
     Task {
+        kept_account: None,
+        run_wait: None,
         llm: None,
         label: 0,
         flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },

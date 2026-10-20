@@ -8,6 +8,7 @@ mod attempts;
 mod carried;
 mod documents;
 mod fixtures;
+mod llm_accounts;
 mod owner_accounts;
 mod pages;
 

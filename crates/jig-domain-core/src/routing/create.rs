@@ -130,6 +130,12 @@ pub(super) fn checked(
     if !proposing {
         super::deadlines::resolve(&mut members, env.wall);
     }
+    if let Err(why) = core.funded_accounts(
+        &members,
+        tasks::Funder::Pool { project: *project, person: *person, period: core.period(*project) },
+    ) {
+        return Err(core.account_refusal(why));
+    }
     for _ in &members {
         crate::fresh(&mut core.counters, crate::Family::Task)
             .ok_or(people::Refusal::Limit { which: people::LimitKind::Arithmetic })?;

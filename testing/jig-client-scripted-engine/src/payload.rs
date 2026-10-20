@@ -384,7 +384,7 @@ fields!(MeParty { number, kind, login, name });
 fields!(Needs { questions, proposals, escalations, person_tasks });
 fields!(MeProject { templates, creating, project, name, role, pool, models });
 fields!(jig_client_domain::contract::MeModel { name, provider, window, output, efforts });
-fields!(jig_client_domain::contract::LlmChoice { main, subagents });
+fields!(jig_client_domain::contract::LlmChoice { account, main, subagents });
 fields!(jig_client_domain::contract::ModelEffort { model, effort });
 fields!(Budget { total, own, ended, reserved, left, funder });
 fields!(Chip { task, title, executor, phase, details });
@@ -447,7 +447,7 @@ impl Payload for ChipPhase {
     }
 }
 fields!(Task {
-    label, flags, last_activity, waits_on, llm,
+    label, flags, last_activity, waits_on, llm, kept_account, run_wait,
     chip,
     goal,
     priority,
@@ -1059,6 +1059,7 @@ impl Payload for Refusal {
             | Self::NoEscalationHolder
             | Self::NotOffered
             | Self::KeyConflict => Some(0),
+            Self::Account { .. } => Some(0),
             Self::Llm { model, why: _ } => model.heap(bounds),
         }
     }
@@ -1366,5 +1367,11 @@ impl Payload for EndedGroup {
             Self::None => Some(0),
             Self::Rows { rows, after, cut } => sum(&[rows.heap(bounds), after.heap(bounds), cut.heap(bounds)]),
         }
+    }
+}
+
+impl Payload for jig_client_domain::contract::TaskRunWait {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        Some(0)
     }
 }

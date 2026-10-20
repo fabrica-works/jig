@@ -417,6 +417,11 @@ Every request has one answer, of one of these kinds:
     rule (a plan's uses naming another person, or a project with
     another party; another account for a task its account limits:
     `../../domain/accounts.md`, sections 4.2 and 4.3);
+  - *account preference:* the account's number and why it cannot fund the
+    prospective task: unknown, another provider, uses that do not serve the
+    financial payer, or a different account while the kept account of that
+    provider is limited. An otherwise valid unavailable account is accepted
+    and waits; acceptance checks a proposal against its accepter's funding;
   - *moved:* the object's revision now, and what changed;
   - *ended:* the object has ended, and how;
   - *unknown:* nothing by that name the party may see;
@@ -470,7 +475,10 @@ served is held, kept and unsent, for its owner's version (client.md,
     (section 8);
   - *a task:* its header, overview, budget and authority; its fields
     (3.2): tracked and priority, label, flags, last activity, and what
-    it waits on; its LLM choice, and the account its runs take; its hold
+    it waits on; its LLM choice with the creator's optional account preference,
+    the separate account kept by the last successful claim, and its next-run
+    account/source wait with the source's typed state and optional wall reset
+    (unknown stays unknown), or a credential or host wait; its hold
     and its escalation if held; the proposals waiting in its subtree; how
     far its activity has committed; and the acts the party may make on
     it, with what each would do (5.3, 5.4);

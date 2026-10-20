@@ -152,6 +152,15 @@ impl Core {
         }
         let mut asked = List::with_capacity(limits.batch);
         for member in batch {
+            if let Some(choice) = &member.llm
+                && choice.account.is_some()
+            {
+                let payer =
+                    self.tasks.payer(key.task).ok_or(delegate_refused(Some(key.task), tasks::Refusal::Funding))?;
+                if let Err(why) = self.account_preference(Some(choice), payer, None) {
+                    return Err(delegate_refused(None, why));
+                }
+            }
             let Some(executor) = self.delegation_executor(context.project, member.executor) else {
                 return Err(delegate_refused(None, tasks::Refusal::Executor));
             };

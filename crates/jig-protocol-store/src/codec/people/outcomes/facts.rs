@@ -461,6 +461,10 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
         domain::Refusal::NotOffered => wire::Refusal::NotOffered,
         domain::Refusal::KeyConflict => wire::Refusal::KeyConflict,
         domain::Refusal::NoEscalationHolder => wire::Refusal::NoEscalationHolder,
+        domain::Refusal::Account { account, why } => wire::Refusal::Account(wire::RefusalAccount::new(
+            limits,
+            wire::RefusalAccountParts { account: *account, why: encode_account_why(*why) },
+        )?),
         domain::Refusal::Llm { model, why } => wire::Refusal::Llm(wire::RefusalLlm::new(
             limits,
             wire::RefusalLlmParts { model: *model, why: super::super::llm::encode_why(*why) },
@@ -527,6 +531,10 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
         wire::Refusal::NotOffered => domain::Refusal::NotOffered,
         wire::Refusal::KeyConflict => domain::Refusal::KeyConflict,
         wire::Refusal::NoEscalationHolder => domain::Refusal::NoEscalationHolder,
+        wire::Refusal::Account(value) => {
+            let wire::RefusalAccountParts { account, why } = value.into_parts();
+            domain::Refusal::Account { account, why: decode_account_why(why) }
+        }
         wire::Refusal::Llm(value) => {
             let wire::RefusalLlmParts { model, why } = value.into_parts();
             domain::Refusal::Llm { model, why: super::super::llm::decode_why(why) }
@@ -566,5 +574,23 @@ pub(super) fn decode_escalation_choice(value: wire::EscalationChoice) -> domain:
         wire::EscalationChoice::Released => domain::EscalationChoice::Released,
         wire::EscalationChoice::Rejected => domain::EscalationChoice::Rejected,
         wire::EscalationChoice::Passed => domain::EscalationChoice::Passed,
+    }
+}
+
+fn encode_account_why(value: domain::AccountWhy) -> wire::AccountWhy {
+    match value {
+        domain::AccountWhy::Unknown => wire::AccountWhy::Unknown,
+        domain::AccountWhy::Provider => wire::AccountWhy::Provider,
+        domain::AccountWhy::Uses => wire::AccountWhy::Uses,
+        domain::AccountWhy::Limited => wire::AccountWhy::Limited,
+    }
+}
+
+fn decode_account_why(value: wire::AccountWhy) -> domain::AccountWhy {
+    match value {
+        wire::AccountWhy::Unknown => domain::AccountWhy::Unknown,
+        wire::AccountWhy::Provider => domain::AccountWhy::Provider,
+        wire::AccountWhy::Uses => domain::AccountWhy::Uses,
+        wire::AccountWhy::Limited => domain::AccountWhy::Limited,
     }
 }

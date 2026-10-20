@@ -23,6 +23,8 @@ pub fn document(source: &documents::Task, limits: &Limits) -> Result<client::Tas
 
 fn copy(source: &documents::Task, limits: &Limits) -> Result<client::Task, owner::Invalid> {
     Ok(client::Task {
+        kept_account: source.kept_account,
+        run_wait: source.run_wait.map(wait),
         llm: None,
         label: source.label,
         flags: super::queries::flags(source.flags),
@@ -81,6 +83,46 @@ fn copy(source: &documents::Task, limits: &Limits) -> Result<client::Task, owner
     })
 }
 
+fn wait(value: documents::TaskRunWait) -> client::TaskRunWait {
+    match value {
+        documents::TaskRunWait::Credential => client::TaskRunWait::Credential,
+        documents::TaskRunWait::Host => client::TaskRunWait::Host,
+        documents::TaskRunWait::Account { account, source, why } => client::TaskRunWait::Account {
+            account,
+            source,
+            why: match why {
+                documents::TaskWaitWhy::Refreshing => client::TaskWaitWhy::Refreshing,
+                documents::TaskWaitWhy::Host => client::TaskWaitWhy::Host,
+                documents::TaskWaitWhy::Empty => client::TaskWaitWhy::Empty,
+                documents::TaskWaitWhy::Source(state) => client::TaskWaitWhy::Source(match state {
+                    documents::TaskSourceState::Asking => client::TaskSourceState::Asking,
+                    documents::TaskSourceState::Granted => client::TaskSourceState::Granted,
+                    documents::TaskSourceState::Later { until } => client::TaskSourceState::Later { until },
+                    documents::TaskSourceState::Limited { until } => client::TaskSourceState::Limited { until },
+                    documents::TaskSourceState::Refused => client::TaskSourceState::Refused,
+                    documents::TaskSourceState::NeedsSignIn => client::TaskSourceState::NeedsSignIn,
+                    documents::TaskSourceState::Misconfigured => client::TaskSourceState::Misconfigured,
+                    documents::TaskSourceState::Cancelled => client::TaskSourceState::Cancelled,
+                    documents::TaskSourceState::Closing => client::TaskSourceState::Closing,
+                    documents::TaskSourceState::Unloaded { at, why } => client::TaskSourceState::Unloaded {
+                        at: match at {
+                            jig_domain_accounts::Place::Directory => client::OwnerAccountPlace::Directory,
+                            jig_domain_accounts::Place::File => client::OwnerAccountPlace::File,
+                        },
+                        why: match why {
+                            jig_domain_accounts::Unread::Unreadable => client::OwnerAccountUnread::Unreadable,
+                            jig_domain_accounts::Unread::Refused => client::OwnerAccountUnread::Refused,
+                            jig_domain_accounts::Unread::Failed => client::OwnerAccountUnread::Failed,
+                            jig_domain_accounts::Unread::Stalled => client::OwnerAccountUnread::Stalled,
+                            jig_domain_accounts::Unread::TooLarge => client::OwnerAccountUnread::TooLarge,
+                        },
+                    },
+                }),
+            },
+        },
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     const UTF8_TEXTS: [&[u8]; 1] = [b"~\0"];
@@ -119,6 +161,7 @@ pub(crate) mod tests {
         delegates.push(documents::LiveDelegate { chip: chip.clone(), takeover_budget: u64::MAX }).expect("source room");
         documents::Task {
             kept_account: None,
+            run_wait: None,
             waits_on: documents::WaitsOn::Nothing,
             label: 0,
             flags: tasks::Flags::PLAIN,

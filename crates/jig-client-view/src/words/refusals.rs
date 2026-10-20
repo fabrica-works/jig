@@ -59,6 +59,9 @@ impl Words {
                 }
             }
             Refusal::Ended { how } => self.ending(b, how),
+            Refusal::Account { account, .. } => {
+                self.text(b, JigPhrase::Word(Word::refusal(refusal)), &[Hole::Number(u64::from(*account))])
+            }
             Refusal::Provider => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Provider)), &[]),
             Refusal::Unknown => self.text(b, JigPhrase::Word(Word::Refusal(RefusalWord::Unknown)), &[]),
             Refusal::NoEscalationHolder => {

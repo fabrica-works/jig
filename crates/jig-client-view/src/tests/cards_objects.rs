@@ -840,6 +840,8 @@ fn dialog(d: &Fixture, words: &crate::words::Words, bindings: &mut JigBindings) 
 }
 pub(super) fn task_doc(acts: &[ActKind]) -> Task {
     Task {
+        kept_account: None,
+        run_wait: None,
         llm: None,
         label: 0,
         flags: TaskFlags { conversation: false, listed: true, retention: Retention::Kept },

@@ -355,6 +355,16 @@ pub(crate) fn amendment_admit_in(
         };
         return Err(why);
     }
+    if let Some(choice) = &amendment.llm
+        && choice.account.is_some()
+    {
+        let payer = admission
+            .payer(task)
+            .ok_or(people::Refusal::Authority { lacking: people::Lack::Funding, proposable: None })?;
+        if let Err(why) = core.account_preference(Some(choice), payer, row.kept_account) {
+            return Err(core.account_refusal(why));
+        }
+    }
     let Some(after) = &amendment.authority else { return Ok(false) };
     if !tasks::valid_authority(limits, after) {
         return Err(people::Refusal::Limit { which: people::LimitKind::Authority });

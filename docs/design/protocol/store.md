@@ -233,6 +233,10 @@ secrets' store (section 9).
   So a family's limits, made from the domain's (5.4), are never past
   its ceilings for a count the domain does not have, and a record's
   worst case is the sum, not a count times its largest item.
+- **Account preferences are separate from claims.** People's retained asks
+  keep a choice's optional account number, including through amendments and
+  proposed batches. Tasks keep that preference and their last claimed account
+  separately; the run proof keeps every provider/account/source binding.
 - **Authority models retain their selector** (`../domain/authority.md`,
   section 3). Literal ALL is distinct from a named set, including an
   explicit empty set and a set of all 64 configured models. The people

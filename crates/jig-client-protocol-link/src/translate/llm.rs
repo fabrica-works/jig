@@ -15,7 +15,10 @@ pub(crate) fn wire_choice(
     for item in &value.subagents {
         subagents.push(wire_model_effort(item, limits)?).expect("same capacity");
     }
-    Ok(Some(w::LlmChoice::new(limits, w::LlmChoiceParts { main: wire_model_effort(&value.main, limits)?, subagents })?))
+    Ok(Some(w::LlmChoice::new(
+        limits,
+        w::LlmChoiceParts { account: value.account, main: wire_model_effort(&value.main, limits)?, subagents },
+    )?))
 }
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
 fn wire_model_effort(value: &c::ModelEffort, limits: &w::Limits) -> Result<w::ModelEffort, w::Problem> {
@@ -38,7 +41,7 @@ pub(crate) fn choice(value: Option<&w::LlmChoice>, limits: &Limits) -> Result<Op
     for item in value.subagents() {
         subagents.push(model_effort(item, limits)?).expect("same capacity");
     }
-    Ok(Some(c::LlmChoice { main: model_effort(value.main(), limits)?, subagents }))
+    Ok(Some(c::LlmChoice { account: *value.account(), main: model_effort(value.main(), limits)?, subagents }))
 }
 fn model_effort(value: &w::ModelEffort, limits: &Limits) -> Result<c::ModelEffort, w::Problem> {
     Ok(c::ModelEffort {

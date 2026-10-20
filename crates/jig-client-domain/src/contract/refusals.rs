@@ -149,6 +149,8 @@ pub enum Moved {
 /// A durable request refusal and all facts needed to show it.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Refusal {
+    /// An explicit account preference cannot fund the prospective task.
+    Account { account: u32, why: super::AccountWhy },
     /// A root task has no escalation holder.
     NoEscalationHolder,
     /// The provider's account use rule refuses this change.

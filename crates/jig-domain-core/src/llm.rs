@@ -46,7 +46,16 @@ impl Core {
             tasks::Executor::Agent { charter } => charter,
             tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => return Ok(()),
         };
-        if new.llm.is_some() {
+        if let Some(choice) = &new.llm {
+            if choice.account.is_some() {
+                let payer = self
+                    .tasks
+                    .prospective_payer(new.funder, links)
+                    .ok_or(tasks::Problem::new(Some(number), tasks::Refusal::Funding))?;
+                if let Err(why) = self.account_preference(Some(choice), payer, None) {
+                    return Err(tasks::Problem::new(Some(number), why));
+                }
+            }
             return Ok(());
         }
         new.llm = self.tasks.default_llm(charter, new.authority.models);
@@ -123,7 +132,7 @@ pub(crate) fn choice(value: Option<&people::LlmChoice>) -> Option<tasks::LlmChoi
     for subagent in &value.subagents {
         subagents.push(model_effort(*subagent)).expect("same number of sub-agents");
     }
-    Some(tasks::LlmChoice { account: None, main: model_effort(value.main), subagents: subagents.into_boxed() })
+    Some(tasks::LlmChoice { account: value.account, main: model_effort(value.main), subagents: subagents.into_boxed() })
 }
 
 fn model_effort(value: people::ModelEffort) -> tasks::ModelEffort {

@@ -288,6 +288,9 @@ pub(crate) fn named_propose(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
+    if let Err(why) = core.action_accounts(&action, tasks::Funder::Task(key.task)) {
+        return proposal_refused(core, to, key, why);
+    }
     if let Err(why) = core.proposal_admit_action(context.project, &action, env.wall) {
         return proposal_refused(core, to, key, why);
     }
@@ -553,6 +556,7 @@ pub(super) fn named_action(
                         | jig_domain_people::Refusal::NotWellFormed { .. }
                         | jig_domain_people::Refusal::NoEscalationHolder
                         | jig_domain_people::Refusal::Llm { .. }
+                        | jig_domain_people::Refusal::Account { .. }
                         | jig_domain_people::Refusal::KeyConflict => unreachable!(
                             "shared release admission returns revision, again, unknown or arithmetic refusals"
                         ),

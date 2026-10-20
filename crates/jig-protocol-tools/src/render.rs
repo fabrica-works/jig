@@ -296,6 +296,12 @@ fn task_problem(problem: &jig_domain_tasks::Problem) -> Rendered {
         jig_domain_tasks::Refusal::HoldKind => b"hold kind",
         jig_domain_tasks::Refusal::HoldTaken => b"hold taken",
         jig_domain_tasks::Refusal::Holds => b"holds",
+        jig_domain_tasks::Refusal::Account { why, .. } => match why {
+            jig_domain_tasks::AccountWhy::Unknown => b"account not found",
+            jig_domain_tasks::AccountWhy::Provider => b"account belongs to another provider",
+            jig_domain_tasks::AccountWhy::Uses => b"account does not serve the payer",
+            jig_domain_tasks::AccountWhy::Limited => b"kept account is limited",
+        },
         jig_domain_tasks::Refusal::Llm { why, .. } => match why {
             jig_domain_tasks::LlmFault::Unconfigured => b"model not configured",
             jig_domain_tasks::LlmFault::Effort => b"effort not declared",

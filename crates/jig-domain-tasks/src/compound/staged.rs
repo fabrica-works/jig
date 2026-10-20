@@ -27,6 +27,7 @@ pub struct CompoundTask<'a> {
     pub dependencies: &'a [u64],
     pub authority: &'a crate::Authority,
     pub llm: &'a Option<crate::LlmChoice>,
+    pub kept_account: Option<u32>,
     pub grace: Option<Grace>,
 }
 
@@ -119,6 +120,7 @@ impl Staged {
             dependencies: &base.dependencies,
             authority: &base.authority,
             llm: &base.llm,
+            kept_account: base.kept_account,
             grace: base.grace.clone(),
         };
         for plan in &self.plans {
@@ -331,7 +333,10 @@ fn project_amend<'a>(row: &mut CompoundTask<'a>, plan: &'a crate::control::Amend
     if amendment.instructions.is_some() {
         row.instructions = &amendment.instructions;
     }
-    if amendment.llm.is_some() {
+    if let Some(choice) = &amendment.llm {
+        if crate::llm::replaces_account(row.kept_account, choice) {
+            row.kept_account = None;
+        }
         row.llm = &amendment.llm;
     }
     if let Some(value) = &amendment.spec {

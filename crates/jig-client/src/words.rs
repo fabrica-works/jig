@@ -12,7 +12,7 @@ pub use decision::DecisionWord;
 use skein_lib::List;
 use skein_ui::phrases::{HoleKind, HoleShape, Language, PhraseId, PhraseShape};
 /// Phrase count, for a caller composing a bounded phrasebook.
-pub const PHRASES: u32 = 86;
+pub const PHRASES: u32 = 90;
 /// Owner of jig's public enum vocabulary.
 pub const OWNER: skein_ui::Owner = skein_ui::Owner { number: 65_537 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,6 +60,10 @@ pub enum RefusalWord {
     NotOffered,
     KeyConflict,
     Llm,
+    AccountUnknown,
+    AccountProvider,
+    AccountUses,
+    AccountLimited,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WaitingWord {
@@ -126,6 +130,12 @@ impl Word {
             Refusal::NotOffered => RefusalWord::NotOffered,
             Refusal::KeyConflict => RefusalWord::KeyConflict,
             Refusal::Llm { .. } => RefusalWord::Llm,
+            Refusal::Account { why, .. } => match why {
+                crate::contract::AccountWhy::Unknown => RefusalWord::AccountUnknown,
+                crate::contract::AccountWhy::Provider => RefusalWord::AccountProvider,
+                crate::contract::AccountWhy::Uses => RefusalWord::AccountUses,
+                crate::contract::AccountWhy::Limited => RefusalWord::AccountLimited,
+            },
         })
     }
     #[must_use]
@@ -165,7 +175,7 @@ impl Word {
     }
 }
 /// All public words, for composing phrasebook capacities without allocation.
-pub const ALL: [Word; 86] = [
+pub const ALL: [Word; 90] = [
     Word::Phase(Phase::Waiting),
     Word::Phase(Phase::Idle),
     Word::Phase(Phase::Due),
@@ -211,6 +221,10 @@ pub const ALL: [Word; 86] = [
     Word::Refusal(RefusalWord::NotOffered),
     Word::Refusal(RefusalWord::KeyConflict),
     Word::Refusal(RefusalWord::Llm),
+    Word::Refusal(RefusalWord::AccountUnknown),
+    Word::Refusal(RefusalWord::AccountProvider),
+    Word::Refusal(RefusalWord::AccountUses),
+    Word::Refusal(RefusalWord::AccountLimited),
     Word::Waiting(WaitingWord::Party),
     Word::Waiting(WaitingWord::Delegates),
     Word::Waiting(WaitingWord::News),

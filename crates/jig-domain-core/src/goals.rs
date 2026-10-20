@@ -103,6 +103,18 @@ impl Core {
         decision: skein_lib::Wall,
     ) -> Result<tasks::Funder, people::Refusal> {
         let (source, numbers) = self.person_pool(project, person);
+        match &proposal.action {
+            tasks::PersonAction::Batch(batch) => {
+                if let Err(why) = self.funded_accounts(batch, source) {
+                    return Err(self.account_refusal(why));
+                }
+            }
+            tasks::PersonAction::Amend { task, amendment, .. } => {
+                if let Err(why) = self.amendment_account(*task, amendment, Some(source)) {
+                    return Err(self.account_refusal(why));
+                }
+            }
+        }
         let action = match &proposal.action {
             tasks::PersonAction::Batch(batch) => {
                 let mut members =

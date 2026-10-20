@@ -1135,6 +1135,8 @@ impl Stored {
 /// (domain/tasks.md, sections 4–5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// An explicit account preference was refused before the task changes.
+    Account { account: u32, why: crate::AccountWhy },
     /// A cancel gave a grace longer than the configured span.
     Grace,
     /// The project has no room for more live tracked tasks.

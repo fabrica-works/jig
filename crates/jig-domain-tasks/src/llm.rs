@@ -193,3 +193,21 @@ impl Domain {
         Some(LlmChoice { account: None, main: main?, subagents: subagents.into_boxed() })
     }
 }
+
+/// Clearing the creator preference keeps the pin; an explicit different account supersedes it
+/// only in the admitted amendment (accounts.md, 4.3; tasks.md, section 7).
+pub(crate) fn replaces_account(kept: Option<u32>, choice: &LlmChoice) -> bool {
+    match choice.account {
+        Some(account) => kept.is_some() && kept != Some(account),
+        None => false,
+    }
+}
+
+/// Why an explicit account cannot fund the prospective task (domain/accounts.md, 4.3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum AccountWhy {
+    Unknown,
+    Provider,
+    Uses,
+    Limited,
+}

@@ -17,7 +17,8 @@ fn choice(main: (&[u8], Option<&[u8]>), subagents: &[(&[u8], Option<&[u8]>)]) ->
     for item in subagents {
         items.push(named(*item)).expect("same capacity");
     }
-    w::LlmChoice::new(&limits, w::LlmChoiceParts { main: named(main), subagents: items }).expect("choice")
+    w::LlmChoice::new(&limits, w::LlmChoiceParts { account: None, main: named(main), subagents: items })
+        .expect("choice")
 }
 /// A Create of one agent task in the member's project, run by the configured charter.
 fn create(llm: w::LlmChoice) -> w::Ask {

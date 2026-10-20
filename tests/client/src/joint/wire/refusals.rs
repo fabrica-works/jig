@@ -24,6 +24,15 @@ pub fn refusal(value: people::Refusal) -> client::Refusal {
         people::Refusal::NotWaiting => client::Refusal::NotWaiting,
         people::Refusal::NoFurther => client::Refusal::NoFurther,
         people::Refusal::Unknown => client::Refusal::Unknown,
+        people::Refusal::Account { account, why } => client::Refusal::Account {
+            account,
+            why: match why {
+                people::AccountWhy::Unknown => client::AccountWhy::Unknown,
+                people::AccountWhy::Provider => client::AccountWhy::Provider,
+                people::AccountWhy::Uses => client::AccountWhy::Uses,
+                people::AccountWhy::Limited => client::AccountWhy::Limited,
+            },
+        },
         people::Refusal::Provider => client::Refusal::Provider,
         people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => client::Refusal::NotOffered,
         people::Refusal::KeyConflict => client::Refusal::KeyConflict,

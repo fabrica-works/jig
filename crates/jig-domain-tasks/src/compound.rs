@@ -213,6 +213,21 @@ impl<'a> CompoundAdmission<'a> {
         }
         self.staged.record(self.domain, number)
     }
+    /// Financial payer after the preceding compound operations, including moves and refunds.
+    #[must_use]
+    pub fn payer(&self, number: u64) -> Option<crate::Payer> {
+        let mut funder = Funder::Task(number);
+        for _ in 0..=self.domain.names.capacity() {
+            funder = match funder {
+                Funder::Pool { person, .. } => return Some(crate::Payer::Party(person)),
+                Funder::Period { project, .. } | Funder::Recurring { project, .. } => {
+                    return Some(crate::Payer::Project(project));
+                }
+                Funder::Task(task) => self.task(task)?.funder,
+            };
+        }
+        None
+    }
     /// Read a funder's cumulative balances.
     #[must_use]
     pub fn funding(&self, funder: Funder) -> Option<Numbers> {

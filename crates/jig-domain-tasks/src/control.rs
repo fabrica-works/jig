@@ -378,7 +378,7 @@ pub(crate) fn check_amend(
             None => false,
         }
         || match &amendment.llm {
-            Some(llm) => old.llm.as_ref() != Some(llm),
+            Some(llm) => old.llm.as_ref() != Some(llm) || crate::llm::replaces_account(old.kept_account, llm),
             None => false,
         };
     let address_changed = match amendment.addressed {
@@ -478,6 +478,9 @@ pub(crate) fn apply_amend(
         task.record.instructions = Some(instructions);
     }
     if let Some(llm) = amendment.llm {
+        if crate::llm::replaces_account(task.record.kept_account, &llm) {
+            task.record.kept_account = None;
+        }
         task.record.llm = Some(llm);
     }
     if let Some(spec) = amendment.spec {

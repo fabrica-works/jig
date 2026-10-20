@@ -817,3 +817,26 @@ fn a_conversations_read_position_moves_to_the_ended_family_and_reads_back_after_
     );
     assert!(!world.records().contains_key(&jig_domain_people::Key::ReadConversation { task, party: person }));
 }
+
+#[test]
+fn a_retained_create_distinguishes_its_account_preference() {
+    use jig_domain_people::{LlmChoice, ModelEffort};
+    let mut world = World::new(Settings::calm(19));
+    member(&mut world);
+    let mut ask = jig_people_world::fixtures::create(b"chosen", None);
+    let Ask::Create { batch, .. } = &mut ask else { panic!("create") };
+    batch[0].llm =
+        Some(LlmChoice { account: Some(41), main: ModelEffort { model: 0, effort: None }, subagents: Box::new([]) });
+    let first = world.request(SIGN_IN, [CREATE; 16], ask.clone());
+    world.commit_all();
+    let expected = world.reply(first);
+    world.restart();
+    let replay = world.request(SIGN_IN, [CREATE; 16], ask.clone());
+    world.commit_all();
+    assert_eq!(expected, world.reply(replay));
+    let Ask::Create { batch, .. } = &mut ask else { panic!("create") };
+    batch[0].llm.as_mut().unwrap().account = Some(42);
+    let conflict = world.request(SIGN_IN, [CREATE; 16], ask);
+    assert_eq!(world.reply(conflict), Some(Reply::Refused(Refusal::KeyConflict)));
+    world.assert_settled();
+}

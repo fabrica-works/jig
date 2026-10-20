@@ -210,8 +210,9 @@ pub struct Task {
     /// An agent task's LLM choice as kept, by the core's indices; `None` takes its charter's
     /// default (domain/tasks.md, 3).
     pub llm: Option<tasks::LlmChoice>,
-    /// The last successfully claimed main account; client wire exposure follows in x1d.
+    /// The last successfully claimed main account.
     pub kept_account: Option<u32>,
+    pub run_wait: Option<super::TaskRunWait>,
     pub resources: List<ResourceLine>,
     pub inputs: List<TaskLink>,
     pub dependencies: List<TaskLink>,
@@ -780,6 +781,7 @@ pub fn task_from_row(
         },
         llm: row.llm.clone(),
         kept_account: row.kept_account,
+        run_wait: super::task_wait::waiting(core, row),
         resources,
         inputs: links(core, limits, party, &row.spec.inputs)?,
         dependencies: links(core, limits, party, &row.dependencies)?,

@@ -579,7 +579,10 @@ tasks holding it: a quota cut, a machine gone.
   `protocol/transcript.md`, section 4). An amendment naming another
   account of an LLM provider whose account the task keeps is refused
   while that account is limited (accounts.md, 4.3; providers.md, 2.5 and
-  3.4).
+  3.4). An accepted explicit different account clears the pin in that
+  amendment's commit, even when the preference itself was already the same;
+  the next successful claim keeps the new account. Clearing the optional
+  preference alone keeps the pin. The live claim retains its recorded binding.
 - **Tracking and untracking.** A task an amendment tracks is a goal from
   that commit, with all a goal has (core.md, 6.2). One it untracks is no
   goal from that commit: the core ends its goals' topics, and its

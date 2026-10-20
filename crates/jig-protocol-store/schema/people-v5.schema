@@ -84,7 +84,7 @@ record WakePolicy { words: WakeRule notices: WakeRule news: WakeRule results: Re
 record TrackingTracked { priority: u32 }
 enum Tracking { tracked: TrackingTracked, untracked }
 record ModelEffort { model: u8 effort: option u8 }
-record LlmChoice { main: ModelEffort subagents: list 64 ModelEffort }
+record LlmChoice { account: option u32 main: ModelEffort subagents: list 64 ModelEffort }
 record Amendment { tracked: option Tracking addressed: option AddressChange instructions: option bytes 8192 spec: option Spec wake: option WakePolicy dependencies: option bytes 65536 authority: option Authority llm: option LlmChoice reason: bytes 8192 }
 record TaskExecutorAgent { charter: u32 }
 record TaskExecutorProcedure { connector: u16 code: u32 }
@@ -210,7 +210,9 @@ enum Malformed { cycle, as_allowed_twice, conversation, proposed_as_allowed }
 record RefusalNotWellFormed { at: u32 why: Malformed }
 enum LlmWhy { unconfigured, effort, charter, authority, procedure, repeated }
 record RefusalLlm { model: u8 why: LlmWhy }
-enum Refusal { not_well_formed: RefusalNotWellFormed, role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider }
+enum AccountWhy { unknown, provider, uses, limited }
+record RefusalAccount { account: u32 why: AccountWhy }
+enum Refusal { not_well_formed: RefusalNotWellFormed, role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm, provider, account: RefusalAccount }
 enum ProposalChoice { accepted, rejected, passed, withdrawn, stale }
 enum EscalationChoice { released, rejected, passed }
 record OutcomeCompound { project: u32 operations: u32 first_message: u64 }

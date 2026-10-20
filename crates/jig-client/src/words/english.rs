@@ -81,6 +81,14 @@ impl Word {
             Self::Refusal(RefusalWord::KeyConflict) => (43, b"The request key names another act", &[]),
             Self::Refusal(RefusalWord::Provider) => (86, b"The provider does not permit these account uses", &[]),
             Self::Refusal(RefusalWord::Llm) => (85, b"This model cannot be chosen: ", &[HoleKind::Name]),
+            Self::Refusal(RefusalWord::AccountUnknown) => (87, b"Account not found: ", &[HoleKind::Number]),
+            Self::Refusal(RefusalWord::AccountProvider) => {
+                (88, b"Account belongs to another provider: ", &[HoleKind::Number])
+            }
+            Self::Refusal(RefusalWord::AccountUses) => (89, b"Account does not serve the payer: ", &[HoleKind::Number]),
+            Self::Refusal(RefusalWord::AccountLimited) => {
+                (90, b"Kept account is limited; cannot switch to account ", &[HoleKind::Number])
+            }
             Self::Waiting(WaitingWord::Party) => (44, b"Waiting for a party", &[]),
             Self::Waiting(WaitingWord::Delegates) => (45, b"Waiting for delegates", &[]),
             Self::Waiting(WaitingWord::News) => (46, b"Waiting for news", &[]),

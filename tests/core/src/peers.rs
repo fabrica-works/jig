@@ -552,9 +552,10 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
         people::Refusal::NotWaiting => parties::Refusal::NotWaiting,
         people::Refusal::NoFurther => parties::Refusal::NoFurther,
         people::Refusal::Unknown => parties::Refusal::Unknown,
-        people::Refusal::Provider | people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => {
-            parties::Refusal::NotOffered
-        }
+        people::Refusal::Account { .. }
+        | people::Refusal::Provider
+        | people::Refusal::NotOffered
+        | people::Refusal::NoEscalationHolder => parties::Refusal::NotOffered,
         people::Refusal::KeyConflict => parties::Refusal::KeyConflict,
         people::Refusal::Llm { model, .. } => parties::Refusal::Llm { model },
     }

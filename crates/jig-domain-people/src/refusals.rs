@@ -15,6 +15,8 @@ pub enum Accepter {
 /// A final reason a keyed request was refused.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// An explicit account preference was refused before the task changes.
+    Account { account: u32, why: crate::AccountWhy },
     /// The named batch member is not well formed.
     NotWellFormed { at: u32, why: Malformed },
     /// The held role does not permit this request here.

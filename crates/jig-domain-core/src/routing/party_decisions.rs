@@ -222,6 +222,10 @@ pub(super) fn person_proposal_accept(
         return;
     }
     let source = tasks::Funder::Pool { project: proposal.project, person, period: core.period(proposal.project) };
+    if let Err(why) = core.action_accounts(&proposal.action, source) {
+        pool_refused(work, request, core.account_refusal(why));
+        return;
+    }
     match &proposal.action {
         tasks::ProposalAction::Amend { .. } | tasks::ProposalAction::Widen { .. } => {
             let (period, pool) = core.open_person_pool(proposal.project, person);
