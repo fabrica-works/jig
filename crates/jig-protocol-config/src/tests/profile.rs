@@ -87,6 +87,11 @@ fn profiles_drivers_listen_for_each_sign_in_at_once() {
         let limits = limits(profile_name);
         assert!(limits.driver.listeners >= 1, "{profile_name:?} listens for a sign-in");
         assert_eq!(limits.driver.listeners, limits.core.accounts.sign_ins, "{profile_name:?}");
+        assert_eq!(
+            limits.driver.accounts,
+            limits.core.accounts.accounts * limits.core.accounts.sources + limits.core.accounts.sign_ins + 1
+        );
+        assert!(limits.driver.client.url_bytes <= jig_domain_accounts::ADDRESS);
         let crypto = skein_lib::CryptoRng::new(&skein_lib::Secret::new(Box::new([7; 32])), 1).unwrap();
         let driver = skein_oauth_accounts::Component::new(skein_lib::List::with_capacity(0), &limits.driver, crypto);
         assert!(driver.is_ok(), "{profile_name:?} driver is usable");

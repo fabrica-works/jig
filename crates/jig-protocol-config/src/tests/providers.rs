@@ -3,7 +3,7 @@ use crate::{Path, Problem, Segment, What};
 use jig_domain_accounts as accounts;
 
 const LLM: &[u8] = b"\"llm\": {\n";
-const PROVIDER: &[u8] = br#"{"name": "Fake", "number": 1, "models": ["small"], "sources": {"sign_in": {"issuer": "https://issuer.example", "client": "client-a", "scopes": ["chat", "offline_access"]}, "keys": true, "programs": ["claude_code"]}}"#;
+const PROVIDER: &[u8] = br#"{"name": "Fake", "number": 1, "models": ["small"], "sources": {"sign_in": {"issuer": "https://issuer.example", "client": "client-a", "scopes": ["chat", "offline_access"], "name_hint": "jig", "authorization": "https://issuer.example/authorize", "token": "https://issuer.example/token", "revocation": "https://issuer.example/revoke", "keys": "https://issuer.example/keys", "transport": "tls", "server_name": "issuer.example", "must_grant": ["chat"], "resource": "https://resource.example", "redirect_path": "callback"}, "keys": true, "programs": ["claude_code"]}}"#;
 
 /// The small engine with `llm.providers` set to `list`.
 fn with_providers(list: &[u8]) -> Box<[u8]> {
@@ -73,7 +73,7 @@ fn no_providers_section_and_an_empty_one_name_none() {
 }
 #[test]
 fn a_provider_may_offer_no_source() {
-    let bytes = one(br#"{"sign_in": {"issuer": "https://issuer.example", "client": "client-a", "scopes": ["chat", "offline_access"]}, "keys": true, "programs": ["claude_code"]}"#, b"{}");
+    let bytes = one(br#"{"sign_in": {"issuer": "https://issuer.example", "client": "client-a", "scopes": ["chat", "offline_access"], "name_hint": "jig", "authorization": "https://issuer.example/authorize", "token": "https://issuer.example/token", "revocation": "https://issuer.example/revoke", "keys": "https://issuer.example/keys", "transport": "tls", "server_name": "issuer.example", "must_grant": ["chat"], "resource": "https://resource.example", "redirect_path": "callback"}, "keys": true, "programs": ["claude_code"]}"#, b"{}");
     let providers = settings(&bytes);
     assert_eq!(
         providers.providers.first().unwrap().offers,
@@ -172,4 +172,42 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+fn an_account_sign_in_registration_names_its_endpoints_and_its_must_grant_scopes() {
+    let engine = fixtures::engine(&the_provider()).unwrap();
+    let r = engine.llm.providers[0].sign_in.as_ref().unwrap();
+    assert_eq!(&*r.authorization, b"https://issuer.example/authorize");
+    assert_eq!(&*r.token, b"https://issuer.example/token");
+    assert_eq!(r.revocation.as_deref(), Some(b"https://issuer.example/revoke".as_slice()));
+    assert_eq!(&*r.keys, b"https://issuer.example/keys");
+    assert_eq!(r.must_grant.as_ref(), [Box::<[u8]>::from(b"chat".as_slice())]);
+    assert_eq!(r.name_hint.as_deref(), Some(b"jig".as_slice()));
+    assert_eq!(r.resource.as_deref(), Some(b"https://resource.example".as_slice()));
+    assert_eq!((&*r.redirect_path, r.redirect_port), (b"callback".as_slice(), None));
+    assert!(matches!(r.endpoint_transport, crate::Transport::Tls { .. }));
+}
+#[test]
+fn an_account_sign_in_must_grant_scope_outside_the_scopes_is_refused_at_its_name() {
+    first_problem(
+        &one(br#""must_grant": ["chat"]"#, br#""must_grant": ["other"]"#),
+        sources_path().member(b"sign_in").member(b"must_grant").child(Segment::Index(0)),
+        What::Refers,
+    );
+}
+#[test]
+fn an_account_sign_in_registration_with_a_client_secret_is_still_refused() {
+    a_client_secret_is_refused_naming_the_provider();
+}
+#[test]
+fn a_profile_whose_driver_could_make_a_longer_account_visit_than_the_address_bound_is_refused() {
+    let mut engine = fixtures::engine(fixtures::ENGINE_SMALL).unwrap();
+    engine.limits.driver.client.url_bytes = accounts::ADDRESS + 1;
+    let mut problems = crate::Problems::empty();
+    crate::domain::whole(&engine, &mut problems);
+    assert_eq!(
+        problems.problems.get(0).unwrap(),
+        &Problem { path: fixtures::path(&[b"limits", b"driver.url_bytes"]), what: What::Bound }
+    );
 }

@@ -20,6 +20,8 @@ pub fn files(engine: &Engine) -> Box<[File]> {
         .len()
         .checked_mul(3)
         .expect("bounded accounts")
+        .checked_add(engine.llm.providers.len())
+        .expect("bounded LLM providers")
         .checked_add(engine.llm.endpoints.len())
         .expect("bounded endpoints")
         .checked_add(engine.hosts.workers.len())
@@ -58,6 +60,17 @@ pub fn files(engine: &Engine) -> Box<[File]> {
                 }
                 trust(&mut files, &sign_in.transport, &at);
             }
+        }
+    }
+    for (index, provider) in engine.llm.providers.iter().enumerate() {
+        if let Some(registration) = &provider.sign_in {
+            let at = Path::root()
+                .member(b"llm")
+                .member(b"providers")
+                .child(Segment::Index(u32::try_from(index).expect("bounded providers")))
+                .member(b"sources")
+                .member(b"sign_in");
+            trust(&mut files, &registration.endpoint_transport, &at);
         }
     }
     files.into_boxed()

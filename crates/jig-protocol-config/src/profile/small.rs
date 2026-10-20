@@ -285,7 +285,7 @@ pub(super) const CLIENTS: jig_protocol_engine_clients::Limits = jig_protocol_eng
 
 /// Accounts use bounded OAuth exchanges and the shared socket limits.
 pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Limits {
-    accounts: CORE.accounts.accounts.checked_add(1).expect("account zero slot"),
+    accounts: super::driver_places(&CORE.accounts).expect("all sources and pending account sign-ins"),
     file_stall: Duration::from_secs(30),
     lock_wait: Duration::from_secs(1),
     exchanges: 4,
@@ -300,9 +300,11 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
             client_bytes: 1024,
             detail_bytes: 1024,
             record_bytes: 65536,
-            issued_client_bytes: 0,
+            // Account sign-in: up to one KiB of issuer-issued client id (skein oauth.md 5).
+            issued_client_bytes: 1024,
             granted_bytes: 4096,
-            subject_bytes: 0,
+            // Account sign-in: one KiB of OpenID subject (skein oauth.md 5).
+            subject_bytes: 1024,
             id_token_bytes: 7934,
             depth: 16,
             tokens: 4096,
@@ -311,17 +313,20 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
         scope_bytes: 4096,
         state_bytes: 64,
         code_bytes: 4096,
-        url_bytes: 16384,
+        url_bytes: jig_domain_accounts::ADDRESS,
         request_bytes: 65536,
-        // The registration's one parameter, the installation's identifier
-        // (providers.md 2.2): `ext_agent_host_id`'s 17 bytes and a
-        // `urn:uuid:`'s 45.
-        parameter_bytes: 62,
-        resource_bytes: 0,
-        nonce_bytes: 0,
-        metadata_bytes: 0,
-        key_set_bytes: 0,
-        keys: 0,
+        // Account sign-in terms (skein oauth.md 5, 6.7): host id 17 + 45,
+        // agent_name_hint 15 + up to 256 bytes.
+        parameter_bytes: 62 + 15 + 256,
+        // One URI's 4096 bytes for the account sign-in resource.
+        resource_bytes: 4096,
+        // 32 random bytes, above the OAuth client's 16-byte minimum.
+        nonce_bytes: 32,
+        // Account sign-in discovery and key-set documents: 64 KiB each.
+        metadata_bytes: 65_536,
+        key_set_bytes: 65_536,
+        // Four rotating issuer keys (skein oauth.md 5).
+        keys: 4,
         modulus_bits: 2048,
         skew: Duration::ZERO,
         sign_in_time: Duration::from_secs(300),

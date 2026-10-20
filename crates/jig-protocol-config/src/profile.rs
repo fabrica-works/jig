@@ -70,3 +70,11 @@ pub(crate) const fn authority_executors(
 ) -> u32 {
     if tasks.executor_kinds > authority.executors { tasks.executor_kinds } else { authority.executors }
 }
+
+/// All retained sources, pending account sign-ins and the configured zero slot.
+#[must_use]
+pub const fn driver_places(accounts: &jig_domain_accounts::Limits) -> Option<u32> {
+    let Some(sources) = accounts.accounts.checked_mul(accounts.sources) else { return None };
+    let Some(pending) = sources.checked_add(accounts.sign_ins) else { return None };
+    pending.checked_add(1)
+}

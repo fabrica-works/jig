@@ -31,6 +31,7 @@ pub fn apply(limits: &mut Limits, name: &[u8], value: u64) -> Result<(), What> {
         b"accounts" => {
             set_accounts(&mut core.accounts, field, value)?;
             driver.listeners = core.accounts.sign_ins;
+            driver.accounts = profile::driver_places(&core.accounts).ok_or(What::Override)?;
             Ok(())
         }
         b"views" => set_views(&mut core.views, field, value),
@@ -654,7 +655,8 @@ fn driver_fits(driver: &skein_oauth_accounts::Limits) -> bool {
     let Some(sockets) = listening.checked_add(driver.exchanges) else {
         return false;
     };
-    driver.listeners > 0
+    driver.client.url_bytes <= jig_domain_accounts::ADDRESS
+        && driver.listeners > 0
         && sockets <= driver.io.sockets
         && driver.client.sign_in_time > Duration::ZERO
         && skein_oauth_accounts::worst_case(driver).is_some()

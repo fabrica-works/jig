@@ -175,6 +175,9 @@ fn operations(limits: &jig_domain_core::Limits, problems: &mut Problems) {
     }
 }
 pub(crate) fn whole(engine: &crate::Engine, problems: &mut Problems) {
+    if engine.limits.driver.client.url_bytes > jig_domain_accounts::ADDRESS {
+        problems.push(Path::root().member(b"limits").member(b"driver.url_bytes"), What::Bound);
+    }
     let limits = &engine.limits.core;
     operations(limits, problems);
     if limits.people.words > limits.tasks.message_bytes

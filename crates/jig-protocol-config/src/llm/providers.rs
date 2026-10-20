@@ -28,6 +28,16 @@ pub struct Registration {
     pub issuer: Box<[u8]>,
     pub client: Box<[u8]>,
     pub scopes: Box<[Box<[u8]>]>,
+    pub name_hint: Option<Box<[u8]>>,
+    pub authorization: Box<[u8]>,
+    pub token: Box<[u8]>,
+    pub revocation: Option<Box<[u8]>>,
+    pub keys: Box<[u8]>,
+    pub endpoint_transport: super::Transport,
+    pub must_grant: Box<[Box<[u8]>]>,
+    pub resource: Option<Box<[u8]>>,
+    pub redirect_path: Box<[u8]>,
+    pub redirect_port: Option<u16>,
 }
 
 /// The sources a provider offers, each optional: `{}` offers none.
@@ -213,6 +223,39 @@ fn registration(document: &Document, at: u32, path: &Path, problems: &mut Proble
     if let Some(items) = check::list(&mut object, document, b"scopes", document.len(), path, problems) {
         scopes = scope_tokens(document, &items, &path.member(b"scopes"), problems);
     }
+    let name_hint = super::optional_text(&mut object, document, b"name_hint", path, problems);
+    let authorization =
+        present(check::text(&mut object, document, b"authorization", path, problems), b"authorization", path, problems);
+    let token = present(check::text(&mut object, document, b"token", path, problems), b"token", path, problems);
+    let revocation = super::optional_text(&mut object, document, b"revocation", path, problems);
+    let keys = present(check::text(&mut object, document, b"keys", path, problems), b"keys", path, problems);
+    let endpoint_transport = super::transport(&mut object, document, path, b"token", None, problems);
+    let mut must_grant = None;
+    if let Some(items) = check::list(&mut object, document, b"must_grant", document.len(), path, problems) {
+        must_grant = scope_tokens(document, &items, &path.member(b"must_grant"), problems);
+    }
+    if let (Some(scopes), Some(required)) = (&scopes, &must_grant) {
+        for (index, scope) in required.iter().enumerate() {
+            if !scopes.contains(scope) {
+                problems.push(check::index(&path.member(b"must_grant"), index), What::Refers);
+            }
+        }
+    }
+    let resource = super::optional_text(&mut object, document, b"resource", path, problems);
+    let redirect_path = check::text(&mut object, document, b"redirect_path", path, problems);
+    if let Some(value) = &redirect_path
+        && (value.is_empty() || value.starts_with(b"/") || value.contains(&b'?') || value.contains(&b'#'))
+    {
+        problems.push(path.member(b"redirect_path"), What::Form);
+    }
+    let mut redirect_port = None;
+    if let Some(at) = object.member(document, b"redirect_port") {
+        match read::integer(document, at, u64::from(u16::MAX)) {
+            Ok(value) if value > 0 => redirect_port = Some(u16::try_from(value).expect("port bounded")),
+            Ok(_) => problems.push(path.member(b"redirect_port"), What::Form),
+            Err(what) => problems.push(path.member(b"redirect_port"), what),
+        }
+    }
     let secret = object.member(document, b"secret");
     if secret.is_some() {
         problems.push(path.member(b"secret"), What::Confidential);
@@ -221,7 +264,21 @@ fn registration(document: &Document, at: u32, path: &Path, problems: &mut Proble
     if secret.is_some() {
         return None;
     }
-    Some(Registration { issuer: issuer?, client: client?, scopes: scopes? })
+    Some(Registration {
+        issuer: issuer?,
+        client: client?,
+        scopes: scopes?,
+        name_hint,
+        authorization: authorization?,
+        token: token?,
+        revocation,
+        keys: keys?,
+        endpoint_transport: endpoint_transport?,
+        must_grant: must_grant?,
+        resource,
+        redirect_path: redirect_path?,
+        redirect_port,
+    })
 }
 
 /// RFC 6749, 3.3: a scope token is one or more of `%x21 / %x23-5B / %x5D-7E`.
