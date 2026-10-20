@@ -244,6 +244,9 @@ impl Core {
                 | people::Outcome::PoolSet { .. }
                 | people::Outcome::EscalationDecided { .. }
                 | people::Outcome::AccountSignInStarted { .. }
+                | people::Outcome::AccountKeyKept { .. }
+                | people::Outcome::AccountChanged
+                | people::Outcome::AccountRemoved { .. }
                 | people::Outcome::AccountSignedOut { .. }
                 | people::Outcome::Refused(..) => true,
             },

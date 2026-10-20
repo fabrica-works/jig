@@ -188,6 +188,9 @@ pub(super) fn tag_people(
                     | people::Outcome::PoolSet { .. }
                     | people::Outcome::EscalationDecided { .. }
                     | people::Outcome::AccountSignInStarted { .. }
+                    | people::Outcome::AccountKeyKept { .. }
+                    | people::Outcome::AccountChanged
+                    | people::Outcome::AccountRemoved { .. }
                     | people::Outcome::AccountSignedOut { .. }
                     | people::Outcome::Refused(..),
                 )) => Request::Held(Box::new(Held::PeopleReply { to, reply })),
@@ -300,6 +303,12 @@ pub(super) fn tag_people(
                             },
                         ),
                     },
+                    people::Ask::AccountChange { .. } => {
+                        work.push(Event::People(people::Event::Decided {
+                            request,
+                            outcome: people::Outcome::Refused(people::Refusal::NotOffered),
+                        }));
+                    }
                     people::Ask::AccountSignIn { holder, provider } => {
                         let holder = super::account_requests::holder(holder, person);
                         work.push(Event::Account(accounts::Event::SignIn { request, holder, by: person, provider }));

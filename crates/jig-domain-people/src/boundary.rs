@@ -297,6 +297,8 @@ pub enum Ask {
     AccountSignIn { holder: AccountHolder, provider: u32 },
     /// Sign this holder's account's source out; admitted like a sign-in.
     AccountSignOut { holder: AccountHolder, source: u32 },
+    /// Change this holder's LLM accounts; only the digest of an LLM key is retained.
+    AccountChange { holder: AccountHolder, change: AccountChange },
 }
 
 /// A person's answer to a report, choice or failure contract; root translates it for tasks.
@@ -447,6 +449,12 @@ pub enum Outcome {
     AccountSignInStarted { source: u32, address: Box<[u8]> },
     /// The source was signed out, and whether its provider confirmed the revocation.
     AccountSignedOut { confirmed: bool },
+    /// The LLM key was kept at this source.
+    AccountKeyKept { source: u32 },
+    /// The holder's account change finished.
+    AccountChanged,
+    /// Every signed-in source answered its sign-out.
+    AccountRemoved { confirmed: bool },
     /// Final refusal, retained under the request key.
     Refused(/** Final refusal facts, retained under the request key. */ Refusal),
 }
@@ -767,4 +775,27 @@ pub enum Request {
 pub struct ProjectRole {
     pub project: u32,
     pub role: Role,
+}
+
+/// Maximum explicit account uses (domain/accounts.md, 4.2).
+pub const USES: u32 = 16;
+
+/// A payer an LLM account may serve (domain/accounts.md, 4.2).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Use {
+    Party(u64),
+    Project(u32),
+}
+
+/// Holder changes to LLM accounts (domain/accounts.md, section 5).
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum AccountChange {
+    AddKey { provider: u32, join: Option<u32>, digest: [u8; 32] },
+    ReplaceKey { source: u32, digest: [u8; 32] },
+    RemoveKey { source: u32 },
+    Resume { source: u32 },
+    Remove { account: u32 },
+    MoveAccount { account: u32, place: u32 },
+    MoveSource { account: u32, source: u32, place: u32 },
+    SetUses { account: u32, uses: Option<Box<[Use]>> },
 }

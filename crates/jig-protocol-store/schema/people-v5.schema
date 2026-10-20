@@ -143,7 +143,20 @@ record AskDecideEscalation { project: u32 task: u64 revision: u64 decision: Esca
 enum AccountHolder { own, deployment }
 record AskAccountSignIn { holder: AccountHolder provider: u32 }
 record AskAccountSignOut { holder: AccountHolder source: u32 }
-enum Ask { compound: AskCompound, create: AskCreate, mark_seen: AskMarkSeen, application: AskApplication, edit_note: AskEditNote, make_service: AskMakeService, adopt: AskAdopt, stop: AskStop, cancel: AskCancel, release: AskRelease, take_person: AskTakePerson, hand_back_person: AskHandBackPerson, answer_person: AskAnswerPerson, move_task: AskMove, decide_proposal: AskDecideProposal, say: AskSay, answer_question: AskAnswerQuestion, amend: boxed AskAmend, set_roles: AskSetRoles, change_policy: AskChangePolicy, set_pool: AskSetPool, decide_escalation: AskDecideEscalation, propose: AskPropose, withdraw: AskWithdraw, account_sign_in: AskAccountSignIn, account_sign_out: AskAccountSignOut }
+record AccountUseParty { number: u64 }
+record AccountUseProject { number: u32 }
+enum AccountUse { party: AccountUseParty, project: AccountUseProject }
+record AccountChangeAddKey { provider: u32 join: option u32 digest: bytes 32 }
+record AccountChangeReplaceKey { source: u32 digest: bytes 32 }
+record AccountChangeRemoveKey { source: u32 }
+record AccountChangeResume { source: u32 }
+record AccountChangeRemove { account: u32 }
+record AccountChangeMoveAccount { account: u32 place: u32 }
+record AccountChangeMoveSource { account: u32 source: u32 place: u32 }
+record AccountChangeSetUses { account: u32 uses: option list 16 AccountUse }
+enum AccountChange { add_key: AccountChangeAddKey, replace_key: AccountChangeReplaceKey, remove_key: AccountChangeRemoveKey, resume: AccountChangeResume, remove: AccountChangeRemove, move_account: AccountChangeMoveAccount, move_source: AccountChangeMoveSource, set_uses: AccountChangeSetUses }
+record AskAccountChange { holder: AccountHolder change: AccountChange }
+enum Ask { compound: AskCompound, create: AskCreate, mark_seen: AskMarkSeen, application: AskApplication, edit_note: AskEditNote, make_service: AskMakeService, adopt: AskAdopt, stop: AskStop, cancel: AskCancel, release: AskRelease, take_person: AskTakePerson, hand_back_person: AskHandBackPerson, answer_person: AskAnswerPerson, move_task: AskMove, decide_proposal: AskDecideProposal, say: AskSay, answer_question: AskAnswerQuestion, amend: boxed AskAmend, set_roles: AskSetRoles, change_policy: AskChangePolicy, set_pool: AskSetPool, decide_escalation: AskDecideEscalation, propose: AskPropose, withdraw: AskWithdraw, account_sign_in: AskAccountSignIn, account_sign_out: AskAccountSignOut, account_change: AskAccountChange }
 record StoredPerson { number: u64 identity: Identity }
 record StoredReadResults { party: u64 through: u64 }
 record StoredReadConversation { party: u64 task: u64 through: u64 }
@@ -226,9 +239,11 @@ record OutcomeEscalationDecided { task: u64 revision: u64 by: u64 at: u64 choice
 record OutcomeRefused { value: Refusal }
 record OutcomeAccountSignInStarted { source: u32 address: bytes 2048 }
 record OutcomeAccountSignedOut { confirmed: bool }
+record OutcomeAccountKeyKept { source: u32 }
+record OutcomeAccountRemoved { confirmed: bool }
 record Given { task: u64 amount: u64 }
 record OutcomeCreated { first: u64 last: u64 given: option Given }
-enum Outcome { compound: OutcomeCompound, compound_refused: OutcomeCompoundRefused, created: OutcomeCreated, marked_seen: OutcomeMarkedSeen, applied: OutcomeApplied, again: OutcomeAgain, signed_out, note_edited: OutcomeNoteEdited, service_made: OutcomeServiceMade, adopted: OutcomeAdopted, proposed: OutcomeProposed, stopped: OutcomeStopped, cancelled: OutcomeCancelled, released: OutcomeReleased, person_taken: OutcomePersonTaken, person_handed_back: OutcomePersonHandedBack, person_answered: OutcomePersonAnswered, moved: OutcomeMoved, proposal_decided: OutcomeProposalDecided, said: OutcomeSaid, question_answered: OutcomeQuestionAnswered, amended: OutcomeAmended, roles_set: OutcomeRolesSet, policy_changed: OutcomePolicyChanged, pool_set: OutcomePoolSet, escalation_decided: OutcomeEscalationDecided, refused: OutcomeRefused, withdrawn: OutcomeWithdrawn, account_sign_in_started: OutcomeAccountSignInStarted, account_signed_out: OutcomeAccountSignedOut }
+enum Outcome { compound: OutcomeCompound, compound_refused: OutcomeCompoundRefused, created: OutcomeCreated, marked_seen: OutcomeMarkedSeen, applied: OutcomeApplied, again: OutcomeAgain, signed_out, note_edited: OutcomeNoteEdited, service_made: OutcomeServiceMade, adopted: OutcomeAdopted, proposed: OutcomeProposed, stopped: OutcomeStopped, cancelled: OutcomeCancelled, released: OutcomeReleased, person_taken: OutcomePersonTaken, person_handed_back: OutcomePersonHandedBack, person_answered: OutcomePersonAnswered, moved: OutcomeMoved, proposal_decided: OutcomeProposalDecided, said: OutcomeSaid, question_answered: OutcomeQuestionAnswered, amended: OutcomeAmended, roles_set: OutcomeRolesSet, policy_changed: OutcomePolicyChanged, pool_set: OutcomePoolSet, escalation_decided: OutcomeEscalationDecided, refused: OutcomeRefused, withdrawn: OutcomeWithdrawn, account_sign_in_started: OutcomeAccountSignInStarted, account_signed_out: OutcomeAccountSignedOut, account_key_kept: OutcomeAccountKeyKept, account_changed, account_removed: OutcomeAccountRemoved }
 record StoredAnswer { key: RequestKey ask: Ask outcome: Outcome at: u64 }
 enum Value { person: StoredPerson, read_results: StoredReadResults, read_conversation: StoredReadConversation, sign_in: StoredSignIn, roles: StoredRoles, policy: StoredPolicy, answer: StoredAnswer, ended_read: EndedRead }
 versioned record Row { value: Value }

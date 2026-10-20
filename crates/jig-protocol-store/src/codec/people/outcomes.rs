@@ -34,6 +34,14 @@ pub(super) fn encode_outcome(value: &domain::Outcome, limits: &wire::Limits) -> 
             limits,
             wire::OutcomeAgainParts { value: encode_again(*value, limits) },
         )?),
+        domain::Outcome::AccountKeyKept { source } => wire::Outcome::AccountKeyKept(wire::OutcomeAccountKeyKept::new(
+            limits,
+            wire::OutcomeAccountKeyKeptParts { source: *source },
+        )?),
+        domain::Outcome::AccountChanged => wire::Outcome::AccountChanged,
+        domain::Outcome::AccountRemoved { confirmed } => wire::Outcome::AccountRemoved(
+            wire::OutcomeAccountRemoved::new(limits, wire::OutcomeAccountRemovedParts { confirmed: *confirmed })?,
+        ),
         domain::Outcome::SignedOut => wire::Outcome::SignedOut,
         domain::Outcome::AccountSignInStarted { source, address } => account_sign_in_started(*source, address, limits)?,
         domain::Outcome::AccountSignedOut { confirmed } => account_signed_out(*confirmed, limits)?,
@@ -133,6 +141,11 @@ pub(super) fn decode_outcome(value: wire::Outcome) -> domain::Outcome {
         wire::Outcome::Again(value) => {
             let wire::OutcomeAgainParts { value } = value.into_parts();
             domain::Outcome::Again(decode_again(value))
+        }
+        wire::Outcome::AccountKeyKept(value) => domain::Outcome::AccountKeyKept { source: value.into_parts().source },
+        wire::Outcome::AccountChanged => domain::Outcome::AccountChanged,
+        wire::Outcome::AccountRemoved(value) => {
+            domain::Outcome::AccountRemoved { confirmed: value.into_parts().confirmed }
         }
         wire::Outcome::SignedOut => domain::Outcome::SignedOut,
         wire::Outcome::AccountSignInStarted(value) => {

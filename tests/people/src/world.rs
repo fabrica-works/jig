@@ -498,7 +498,10 @@ impl World {
                         project == 1
                             || matches!(
                                 ask.as_ref(),
-                                Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. }
+                                Ask::MarkSeen { .. }
+                                    | Ask::AccountSignIn { .. }
+                                    | Ask::AccountSignOut { .. }
+                                    | Ask::AccountChange { .. }
                             )
                     );
                     let key = self.context.expect("a routed call carries the client's key");
@@ -520,7 +523,9 @@ impl World {
                         Ask::MarkSeen { .. } | Ask::Release { .. } | Ask::Amend { .. } | Ask::Say { .. } => {
                             RouteKind::Control
                         }
-                        Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => RouteKind::Account,
+                        Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } | Ask::AccountChange { .. } => {
+                            RouteKind::Account
+                        }
                         Ask::EditNote { .. }
                         | Ask::Adopt { .. }
                         | Ask::Stop { .. }
@@ -630,6 +635,26 @@ impl World {
                                             address: b"https://issuer.test/visit".as_slice().into(),
                                         },
                                     },
+                                    &mut self.out,
+                                );
+                            }
+                            Ask::AccountChange { change, .. } => {
+                                assert_eq!(role, None, "account admission needs no role");
+                                let outcome = match change {
+                                    people::AccountChange::AddKey { .. } | people::AccountChange::ReplaceKey { .. } => {
+                                        Outcome::AccountKeyKept { source: 1 }
+                                    }
+                                    people::AccountChange::Remove { .. } => Outcome::AccountRemoved { confirmed: true },
+                                    people::AccountChange::RemoveKey { .. }
+                                    | people::AccountChange::Resume { .. }
+                                    | people::AccountChange::MoveAccount { .. }
+                                    | people::AccountChange::MoveSource { .. }
+                                    | people::AccountChange::SetUses { .. } => Outcome::AccountChanged,
+                                };
+                                people::step(
+                                    &mut self.domain,
+                                    &self.env,
+                                    Event::Decided { request, outcome },
                                     &mut self.out,
                                 );
                             }
@@ -839,7 +864,8 @@ impl World {
                                         | Ask::SetPool { .. }
                                         | Ask::DecideEscalation { .. }
                                         | Ask::AccountSignIn { .. }
-                                        | Ask::AccountSignOut { .. } => unreachable!("person task act"),
+                                        | Ask::AccountSignOut { .. }
+                                        | Ask::AccountChange { .. } => unreachable!("person task act"),
                                     },
                                     None => Outcome::Refused(Refusal::Unknown),
                                 };

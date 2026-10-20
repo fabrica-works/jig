@@ -878,3 +878,39 @@ fn an_account_with_place_and_uses_round_trips() {
     let bytes = accounts::encode(&record).expect("bounded account");
     assert_eq!(accounts::decode(&bytes), Ok(record));
 }
+
+#[test]
+fn every_account_change_and_answer_round_trips() {
+    use jig_domain_people::{AccountChange as C, AccountHolder, Ask, Outcome, RequestKey, Stored, Use};
+    let changes = [
+        C::AddKey { provider: 3, join: Some(2), digest: [7; 32] },
+        C::ReplaceKey { source: 1, digest: [8; 32] },
+        C::RemoveKey { source: 1 },
+        C::Resume { source: 1 },
+        C::Remove { account: 2 },
+        C::MoveAccount { account: 2, place: 1 },
+        C::MoveSource { account: 2, source: 1, place: 0 },
+        C::SetUses { account: 2, uses: Some(Box::new([Use::Party(1), Use::Project(1)])) },
+        C::SetUses { account: 2, uses: None },
+        C::SetUses { account: 2, uses: Some(Box::new([])) },
+    ];
+    for holder in [AccountHolder::Own, AccountHolder::Deployment] {
+        for change in &changes {
+            let ask = Ask::AccountChange { holder, change: change.clone() };
+            ask_round_trip(ask.clone());
+            for outcome in [
+                Outcome::AccountKeyKept { source: 1 },
+                Outcome::AccountChanged,
+                Outcome::AccountRemoved { confirmed: true },
+                Outcome::AccountRemoved { confirmed: false },
+            ] {
+                people_round_trip(Stored::Answer {
+                    key: RequestKey { person: 1, key: [2; 16] },
+                    ask: Box::new(ask.clone()),
+                    outcome,
+                    at: skein_lib::Wall::from_nanos(3),
+                });
+            }
+        }
+    }
+}

@@ -84,7 +84,7 @@ pub(crate) fn action(ask: &Ask, person: u64) -> Option<CapacityAction> {
         Ask::Cancel { task, .. } => CapacityAction::Cancel { task: *task },
         Ask::Release { task, .. } => CapacityAction::Release { task: *task },
         Ask::MarkSeen { seen } => CapacityAction::MarkSeen { seen: *seen },
-        Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => return None,
+        Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } | Ask::AccountChange { .. } => return None,
     })
 }
 
@@ -117,7 +117,9 @@ pub(crate) fn project(ask: &Ask) -> Option<u32> {
             crate::ApplicationScope::Project(project) => Some(*project),
             crate::ApplicationScope::Deployment => Some(0),
         },
-        Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => None,
+        Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } | Ask::AccountChange { .. } => {
+            None
+        }
     }
 }
 
@@ -150,6 +152,9 @@ pub(crate) fn permanent(outcome: &Outcome) -> Option<CapacityCause> {
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountKeyKept { .. }
+        | Outcome::AccountChanged
+        | Outcome::AccountRemoved { .. }
         | Outcome::AccountSignedOut { .. }
         | Outcome::MarkedSeen { .. } => None,
     }

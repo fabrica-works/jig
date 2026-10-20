@@ -141,7 +141,8 @@ impl Core {
             | people::Ask::Propose { .. }
             | people::Ask::Withdraw { .. }
             | people::Ask::AccountSignIn { .. }
-            | people::Ask::AccountSignOut { .. } => unreachable!("control route owns its ask"),
+            | people::Ask::AccountSignOut { .. }
+            | people::Ask::AccountChange { .. } => unreachable!("control route owns its ask"),
         };
         if let people::Ask::Cancel { grace: Some(span), .. } = ask
             && *span > limits.grace

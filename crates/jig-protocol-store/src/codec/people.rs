@@ -29,6 +29,10 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
     let people = &domain.people;
     let authority = &domain.authority;
     let mut limits = wire::Limits {
+        account_change_add_key_digest: 32,
+        account_change_replace_key_digest: 32,
+        account_change_set_uses_uses_some: domain::USES
+            .min(people.words / u32::try_from(size_of::<domain::Use>()).ok()?),
         outcome_account_sign_in_started_address: domain::ADDRESS,
         ask_compound_operations: people.operations,
         operation_cancel_reason: people.words,

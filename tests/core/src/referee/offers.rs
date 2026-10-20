@@ -279,6 +279,7 @@ fn request(ask: &people::Ask) -> Option<(Act, Subject)> {
         | people::Ask::Application { .. }
         | people::Ask::AccountSignIn { .. }
         | people::Ask::AccountSignOut { .. }
+        | people::Ask::AccountChange { .. }
         | people::Ask::MarkSeen { seen: people::Seen::Results { .. } } => return None,
     })
 }

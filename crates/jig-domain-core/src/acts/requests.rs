@@ -22,7 +22,8 @@ pub(crate) fn request(
         | people::Ask::Compound { .. }
         | people::Ask::Withdraw { .. }
         | people::Ask::AccountSignIn { .. }
-        | people::Ask::AccountSignOut { .. } => return Ok(()),
+        | people::Ask::AccountSignOut { .. }
+        | people::Ask::AccountChange { .. } => return Ok(()),
         people::Ask::Create { .. } | people::Ask::Propose { .. } => {
             return standing::role(core, project, role, Act::Amend);
         }
@@ -131,7 +132,8 @@ pub(crate) fn request(
         | people::Ask::MakeService { .. }
         | people::Ask::SetPool { .. }
         | people::Ask::AccountSignIn { .. }
-        | people::Ask::AccountSignOut { .. } => {}
+        | people::Ask::AccountSignOut { .. }
+        | people::Ask::AccountChange { .. } => {}
     }
     match &subject {
         documents::Subject::PersonTask { task } => {

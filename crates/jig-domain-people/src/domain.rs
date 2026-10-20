@@ -546,6 +546,9 @@ fn outcome_reply(outcome: Outcome) -> Reply {
         | Outcome::PoolSet { .. }
         | Outcome::EscalationDecided { .. }
         | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountKeyKept { .. }
+        | Outcome::AccountChanged
+        | Outcome::AccountRemoved { .. }
         | Outcome::AccountSignedOut { .. }
         | Outcome::Refused(_) => Reply::Outcome(outcome),
     }
@@ -603,7 +606,8 @@ fn apply_roles(
         | Ask::Propose { .. }
         | Ask::Withdraw { .. }
         | Ask::AccountSignIn { .. }
-        | Ask::AccountSignOut { .. } => {
+        | Ask::AccountSignOut { .. }
+        | Ask::AccountChange { .. } => {
             return Err(Outcome::Refused(Refusal::Unknown));
         }
     };
@@ -650,7 +654,8 @@ fn apply_roles(
         | Ask::Propose { .. }
         | Ask::Withdraw { .. }
         | Ask::AccountSignIn { .. }
-        | Ask::AccountSignOut { .. } => {
+        | Ask::AccountSignOut { .. }
+        | Ask::AccountChange { .. } => {
             unreachable!("validated roster flight")
         }
     };
@@ -757,7 +762,8 @@ fn make_service(domain: &mut Domain, env: &Env<Limits>, request: Token, person: 
         | Ask::SetPool { .. }
         | Ask::DecideEscalation { .. }
         | Ask::AccountSignIn { .. }
-        | Ask::AccountSignOut { .. } => unreachable!("service creation is routed only from its ask"),
+        | Ask::AccountSignOut { .. }
+        | Ask::AccountChange { .. } => unreachable!("service creation is routed only from its ask"),
     };
     let identity = Identity {
         key: IdentityKey { provider: domain.deployment_provider, subject: person.to_be_bytes().into() },
@@ -939,7 +945,7 @@ fn project(ask: &Ask) -> u32 {
             crate::ApplicationScope::Own | crate::ApplicationScope::Deployment => 0,
         },
         // An account request names no project; its check is its holder (domain/authority.md, 8.4).
-        Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => 0,
+        Ask::MarkSeen { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } | Ask::AccountChange { .. } => 0,
         Ask::Compound { project, .. }
         | Ask::EditNote { project, .. }
         | Ask::MakeService { project, .. }
@@ -1063,7 +1069,17 @@ pub(crate) fn valid_ask(limits: &Limits, ask: &Ask) -> bool {
             Seen::Results { .. } => true,
             Seen::Conversation { task, .. } => *task != 0,
         },
-        Ask::Application { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => true,
+        Ask::AccountChange { change: crate::AccountChange::SetUses { uses: Some(uses), .. }, .. } => {
+            uses.len() <= usize::try_from(crate::USES).expect("account uses fit usize")
+                && match uses.len().checked_mul(size_of::<crate::Use>()) {
+                    Some(bytes) => bytes <= usize::try_from(limits.words).expect("word bound fits usize"),
+                    None => false,
+                }
+        }
+        Ask::Application { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. }
+        | Ask::AccountChange { .. } => true,
         Ask::EditNote { name, scope, change, .. } => valid_note(limits, *name, scope, change),
         Ask::MakeService { name, .. } => {
             let Some(bytes) = name.len().checked_add(size_of::<u64>()) else {
@@ -1166,6 +1182,7 @@ pub(crate) fn invalid_ask(limits: &Limits, ask: &Ask) -> Refusal {
         | Ask::Withdraw { .. }
         | Ask::AccountSignIn { .. }
         | Ask::AccountSignOut { .. } => return Refusal::Unknown,
+        Ask::AccountChange { .. } => LimitKind::Words,
         Ask::Adopt { .. } => LimitKind::Resource,
         Ask::SetRoles { .. } => LimitKind::Roles,
         Ask::ChangePolicy { .. } => LimitKind::Policy,
@@ -1237,6 +1254,9 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Escalation,
         AccountSignIn,
         AccountSignOut,
+        AccountKey,
+        AccountChanged,
+        AccountRemoved,
     }
 
     let expected = match ask {
@@ -1279,6 +1299,15 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Ask::DecideEscalation { .. } => Expected::Escalation,
         Ask::AccountSignIn { .. } => Expected::AccountSignIn,
         Ask::AccountSignOut { .. } => Expected::AccountSignOut,
+        Ask::AccountChange { change, .. } => match change {
+            crate::AccountChange::AddKey { .. } | crate::AccountChange::ReplaceKey { .. } => Expected::AccountKey,
+            crate::AccountChange::Remove { .. } => Expected::AccountRemoved,
+            crate::AccountChange::RemoveKey { .. }
+            | crate::AccountChange::Resume { .. }
+            | crate::AccountChange::MoveAccount { .. }
+            | crate::AccountChange::MoveSource { .. }
+            | crate::AccountChange::SetUses { .. } => Expected::AccountChanged,
+        },
     };
 
     match outcome {
@@ -1320,6 +1349,9 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::PoolSet { project, person } => expected == Expected::Pool(project, person),
         Outcome::EscalationDecided { .. } => expected == Expected::Escalation,
         Outcome::AccountSignInStarted { .. } => expected == Expected::AccountSignIn,
+        Outcome::AccountKeyKept { source } => expected == Expected::AccountKey && source != 0,
+        Outcome::AccountChanged => expected == Expected::AccountChanged,
+        Outcome::AccountRemoved { .. } => expected == Expected::AccountRemoved,
         Outcome::AccountSignedOut { .. } => expected == Expected::AccountSignOut,
         Outcome::Refused(_) => true,
         Outcome::Again(_) | Outcome::SignedOut => false,
@@ -1393,7 +1425,8 @@ fn admit_ask(
     // An account request's check is its holder, never a role (domain/authority.md, 8.4).
     let role = if let Ask::Application { scope: crate::ApplicationScope::Own, .. }
     | Ask::AccountSignIn { .. }
-    | Ask::AccountSignOut { .. } = &ask
+    | Ask::AccountSignOut { .. }
+    | Ask::AccountChange { .. } = &ask
     {
         None
     } else {
@@ -1510,6 +1543,9 @@ pub(super) fn answer_decided(
         | Outcome::EscalationDecided { .. }
         | Outcome::ProposalDecided { .. }
         | Outcome::AccountSignInStarted { .. }
+        | Outcome::AccountKeyKept { .. }
+        | Outcome::AccountChanged
+        | Outcome::AccountRemoved { .. }
         | Outcome::AccountSignedOut { .. }
         | Outcome::Refused(_) => save_answer(domain, env, key, ask, outcome.clone(), out),
     }
@@ -1678,7 +1714,8 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
                 | Ask::Propose { .. }
                 | Ask::Withdraw { .. }
                 | Ask::AccountSignIn { .. }
-                | Ask::AccountSignOut { .. } => {
+                | Ask::AccountSignOut { .. }
+                | Ask::AccountChange { .. } => {
                     unreachable!("restored role success has a matching roster ask");
                 }
             },
@@ -1706,6 +1743,9 @@ fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
             | Outcome::EscalationDecided { .. }
             | Outcome::ProposalDecided { .. }
             | Outcome::AccountSignInStarted { .. }
+            | Outcome::AccountKeyKept { .. }
+            | Outcome::AccountChanged
+            | Outcome::AccountRemoved { .. }
             | Outcome::AccountSignedOut { .. }
             | Outcome::Refused(_) => {}
             Outcome::Again(_) | Outcome::SignedOut => {
@@ -1775,12 +1815,16 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
         | Ask::Release { .. }
         | Ask::EditNote { .. }
         | Ask::AccountSignIn { .. }
-        | Ask::AccountSignOut { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
+        | Ask::AccountSignOut { .. }
+        | Ask::AccountChange { .. } => return Err(Outcome::Refused(Refusal::NotOffered)),
     };
     match &ask {
         // An account request is its holder's own and a sign-out waits on the accounts'
         // component, so neither is a synchronous part of an application's request.
-        Ask::Application { .. } | Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } => {
+        Ask::Application { .. }
+        | Ask::AccountSignIn { .. }
+        | Ask::AccountSignOut { .. }
+        | Ask::AccountChange { .. } => {
             return Err(Outcome::Refused(Refusal::NotOffered));
         }
         Ask::Compound { .. }
@@ -1833,7 +1877,7 @@ fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, as
                 Some(Refusal::Role { held: None })
             }
         }
-        Ask::AccountSignIn { holder, .. } | Ask::AccountSignOut { holder, .. } => {
+        Ask::AccountSignIn { holder, .. } | Ask::AccountSignOut { holder, .. } | Ask::AccountChange { holder, .. } => {
             if holds(domain, person, *holder) {
                 None
             } else {

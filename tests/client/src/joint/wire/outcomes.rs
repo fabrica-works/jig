@@ -102,6 +102,11 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::AccountSignedOut { confirmed } => {
             client::OwnerOutcome::AccountSignedOut { confirmed: *confirmed }
         }
+        people::Outcome::AccountKeyKept { .. }
+        | people::Outcome::AccountChanged
+        | people::Outcome::AccountRemoved { .. } => {
+            unreachable!("LLM key and account change answers wait for w1d")
+        }
     };
     Outcome::Owner(owner)
 }

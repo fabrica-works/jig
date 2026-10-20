@@ -982,6 +982,9 @@ fn application_answer(outcome: people::Outcome) -> connector::ApplicationCoreAns
         | people::Outcome::PoolSet { .. }
         | people::Outcome::EscalationDecided { .. }
         | people::Outcome::AccountSignInStarted { .. }
+        | people::Outcome::AccountKeyKept { .. }
+        | people::Outcome::AccountChanged
+        | people::Outcome::AccountRemoved { .. }
         | people::Outcome::AccountSignedOut { .. }
         | people::Outcome::MarkedSeen { .. } => unreachable!("release core part returns a release terminal"),
     }

@@ -1,4 +1,5 @@
 //! Asks values retained by people (protocol/store.md, 5.1).
+mod account_changes;
 use super::{
     Box, decode_amendment, decode_holdings, decode_numbers, decode_pattern, decode_policy_change, decode_role,
     decode_segments, domain, encode_amendment, encode_holdings, encode_numbers, encode_pattern, encode_policy_change,
@@ -462,6 +463,13 @@ pub fn encode_ask(value: &domain::Ask, limits: &wire::Limits) -> Result<wire::As
                 },
             )?)
         }
+        domain::Ask::AccountChange { holder, change } => wire::Ask::AccountChange(wire::AskAccountChange::new(
+            limits,
+            wire::AskAccountChangeParts {
+                holder: encode_account_holder(*holder),
+                change: account_changes::encode(change, limits)?,
+            },
+        )?),
         domain::Ask::AccountSignIn { holder, provider } => wire::Ask::AccountSignIn(wire::AskAccountSignIn::new(
             limits,
             wire::AskAccountSignInParts { holder: encode_account_holder(*holder), provider: *provider },
@@ -598,6 +606,13 @@ pub fn decode_ask(value: wire::Ask, limits: &wire::Limits) -> Result<domain::Ask
         wire::Ask::DecideEscalation(value) => {
             let wire::AskDecideEscalationParts { project, task, revision, decision } = value.into_parts();
             domain::Ask::DecideEscalation { project, task, revision, decision: decode_escalation_decision(decision) }
+        }
+        wire::Ask::AccountChange(value) => {
+            let value = value.into_parts();
+            domain::Ask::AccountChange {
+                holder: decode_account_holder(value.holder),
+                change: account_changes::decode(value.change)?,
+            }
         }
         wire::Ask::AccountSignIn(value) => {
             let wire::AskAccountSignInParts { holder, provider } = value.into_parts();
