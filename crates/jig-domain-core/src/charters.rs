@@ -32,15 +32,18 @@ pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
             assert!(earlier.name != model.name, "unique configured model names");
         }
         assert!(u8::try_from(model.efforts.len()).is_ok(), "efforts named by a byte");
+        assert!(declares(model), "a model's effort among those it declares");
     }
     let mut seen = List::with_capacity(limits.tasks.charters);
     for charter in &settings.charters {
         assert!(charter.number != 0 && !seen.as_slice().contains(&charter.number), "unique nonzero charter number");
         seen.push(charter.number).expect("configured charter count");
         assert!(configured(settings, &charter.policy.model).is_some(), "charter model configured");
+        assert!(declares(&charter.policy.model), "a model's effort among those it declares");
         for model in &charter.policy.alternatives {
             assert_eq!(model.account, charter.account(), "one account per charter");
             assert!(configured(settings, model).is_some(), "charter model configured");
+            assert!(declares(model), "a model's effort among those it declares");
         }
         let policy = &charter.policy;
         assert!(
@@ -92,6 +95,14 @@ pub(crate) fn efforts(settings: &Settings) -> Box<[u8]> {
         efforts.push(u8::try_from(model.efforts.len()).expect("efforts named by a byte")).expect("model count");
     }
     efforts.into_boxed()
+}
+
+/// Whether `model`'s effort, if any, is one it declares (domain/tasks.md, 3).
+fn declares(model: &crate::Model) -> bool {
+    match &model.effort {
+        Some(effort) => model.efforts.contains(effort),
+        None => true,
+    }
 }
 
 /// A model's index in configuration's order, matched by name.

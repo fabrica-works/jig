@@ -16,6 +16,9 @@ pub struct Model {
     pub window: u32,
     /// The most output tokens one completion may have, thinking included.
     pub output: u32,
+    /// The reasoning effort the task's LLM choice names for this model, one it declares; `None`
+    /// is the LLM provider's default (domain/tasks.md, section 3; domain/engine.md, 7.1).
+    pub effort: Option<Box<[u8]>>,
 }
 
 /// Prices per `unit` tokens, rounded once for each completion by Smith.

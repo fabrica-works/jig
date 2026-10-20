@@ -137,7 +137,7 @@ fn profile() -> root::Limits {
             },
             connectors: 2,
             resume_bytes: 256,
-            run_bytes: 256,
+            run_bytes: 512,
             policy_bytes: 8192,
             escalation_reason_bytes: 128,
             load_slots: 2,
@@ -232,7 +232,8 @@ fn authority_value(spend: u64, kinds: Box<[authority::Executor]>) -> authority::
     }
 }
 
-/// The one configured model, which the charter names (`../protocol/configuration.md`, section 3).
+/// The one configured model, which the charter names and which declares two efforts
+/// (`../protocol/configuration.md`, section 3; domain/tasks.md, section 3).
 #[must_use]
 pub fn scripted_model() -> core::Model {
     core::Model {
@@ -247,7 +248,8 @@ pub fn scripted_model() -> core::Model {
         cache_write_price: None,
         output_price: 1,
         price_unit: 1_000_000,
-        efforts: Box::default(),
+        efforts: Box::new([b"low".as_slice().into(), b"high".as_slice().into()]),
+        effort: None,
     }
 }
 
@@ -340,7 +342,6 @@ pub fn config(seed: u64) -> root::Config {
                 templates: crate::fixtures::templates(),
                 deployment_provider: 3,
                 models: Box::new([scripted_model()]),
-
                 charters: Box::new([core::Charter {
                     number: 1,
                     hosts: fleet::Kinds::Workers,

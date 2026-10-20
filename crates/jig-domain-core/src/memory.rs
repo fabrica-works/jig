@@ -17,27 +17,44 @@ use skein_lib::{Id, List, Map, Queue, Set, Slab};
 
 use crate::{CallKey, Event, HistoricalResult, Limits, Request};
 
+/// The bytes a run's policy from `policy`, a charter's, owns whatever its task's LLM choice: its
+/// models, and its largest once more for a main model its sub-agents name again, each with its
+/// longest declared effort chosen (domain/engine.md, 7.1).
 #[must_use]
 pub fn policy_owned_bytes(policy: &crate::RunPolicy) -> Option<u64> {
+    let mut largest = model_owned_bytes(&policy.model)?;
     let mut bytes = sizeof(size_of::<crate::RunPolicy>())?
         .checked_add(u64::try_from(policy.instructions.len()).ok()?)?
-        .checked_add(model_owned_bytes(&policy.model)?)?
-        .checked_add(u64::try_from(policy.alternatives.len()).ok()?.checked_mul(sizeof(size_of::<crate::Model>())?)?)?;
+        .checked_add(largest)?
+        .checked_add(
+            u64::try_from(policy.alternatives.len())
+                .ok()?
+                .checked_add(1)?
+                .checked_mul(sizeof(size_of::<crate::Model>())?)?,
+        )?;
     for model in &policy.alternatives {
-        bytes = bytes.checked_add(model_owned_bytes(model)?)?;
+        let owned = model_owned_bytes(model)?;
+        bytes = bytes.checked_add(owned)?;
+        largest = largest.max(owned);
     }
-    Some(bytes)
+    bytes.checked_add(largest)
 }
 
-/// A model's name and its efforts' names (tasks.md, 3).
+/// A model's name, its efforts' names and its chosen one's, at most its longest (tasks.md, 3).
 fn model_owned_bytes(model: &crate::Model) -> Option<u64> {
+    let mut longest = 0_u64;
     let mut bytes = u64::try_from(model.name.len())
         .ok()?
         .checked_add(u64::try_from(model.efforts.len()).ok()?.checked_mul(sizeof(size_of::<Box<[u8]>>())?)?)?;
     for effort in &model.efforts {
-        bytes = bytes.checked_add(u64::try_from(effort.len()).ok()?)?;
+        let length = u64::try_from(effort.len()).ok()?;
+        bytes = bytes.checked_add(length)?;
+        longest = longest.max(length);
     }
-    Some(bytes)
+    if let Some(effort) = &model.effort {
+        longest = longest.max(u64::try_from(effort.len()).ok()?);
+    }
+    bytes.checked_add(longest)
 }
 
 fn bytes(count: u32, each: u64) -> Option<u64> {

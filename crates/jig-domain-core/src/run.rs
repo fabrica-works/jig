@@ -60,9 +60,10 @@ impl Core {
         }
         usable.into_boxed()
     }
-    /// Current charter policy with this task's durable instruction replacement.
+    /// Current charter policy with this task's LLM choice's models and its durable instruction
+    /// replacement (domain/engine.md, 7.1).
     pub(crate) fn run_policy(&self, task: u64, resume: bool) -> RunPolicy {
-        let mut policy = self.charter_of(task).policy.clone();
+        let mut policy = self.chosen_policy(task);
         if let Some(instructions) = &self.tasks.task(task).expect("prepared task is live").instructions {
             policy.instructions.clone_from(instructions);
         }
@@ -92,7 +93,7 @@ impl Core {
                 authority: translate::authority_value(&task.authority),
                 numbers,
                 budget: authority::left(numbers).min(self.authority.rules().maximum_run_spend),
-                reserve: reserve_floor(&self.charter_of(task.task).policy).expect("configured reserve floor"),
+                reserve: self.run_reserve(task.task),
                 wall,
                 accounts: self.run_accounts(task.task),
                 writes,
@@ -315,6 +316,11 @@ pub struct Model {
     /// The efforts the model declares, by name in its order; a task's LLM choice names one by
     /// index, and none for a model that declares none (domain/tasks.md, 3).
     pub efforts: Box<[Box<[u8]>]>,
+    /// The effort a run uses on this model, one of `efforts` by name, or `None` for the LLM
+    /// provider's default: a run's charter carries its task's choice's (domain/engine.md, 7.1).
+    /// Configured models and charters carry none until configuration gives a charter's models
+    /// their own (k1).
+    pub effort: Option<Box<[u8]>>,
 }
 
 /// Root-owned charter policy, independent of Smith's run vocabulary.
@@ -418,4 +424,13 @@ pub fn most_costly(model: &Model) -> Option<u64> {
 #[must_use]
 pub fn reserve_floor(policy: &RunPolicy) -> Option<u64> {
     most_costly(&policy.model)?.checked_mul(u64::from(policy.reserve_turns).checked_add(1)?)
+}
+
+impl Core {
+    /// The spend a run of `task` reserves: its reserve turns and one completion more of its LLM
+    /// choice's main model (domain/authority.md, 7 and 8.3).
+    pub(crate) fn run_reserve(&self, task: u64) -> u64 {
+        // No spend holds a reserve beyond the numbers' range, so no run of it starts.
+        reserve_floor(&self.chosen_policy(task)).unwrap_or(u64::MAX)
+    }
 }

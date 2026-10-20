@@ -588,8 +588,7 @@ impl Core {
                 authority: translate::authority_value(&context.authority),
                 numbers,
                 budget: authority::left(numbers).min(self.authority.rules().maximum_run_spend),
-                reserve: crate::run::reserve_floor(&self.charter_of(context.task).policy)
-                    .expect("configured reserve floor"),
+                reserve: self.run_reserve(context.task),
                 wall: now,
                 accounts: self.run_accounts(context.task),
                 writes: Box::new([authority::Write {

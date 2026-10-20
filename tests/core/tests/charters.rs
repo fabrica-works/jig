@@ -304,3 +304,24 @@ fn a_claim_for_the_engine_is_placed_only_on_the_engine() {
     assert_eq!(world.assigned.as_ref().expect("delegate assigned").task, task);
     assert_eq!(current_claim_host(&world), jig_domain_fleet::HostKind::Engine);
 }
+
+#[test]
+fn a_task_created_without_an_llm_choice_records_its_default_and_its_run_uses_it() {
+    let world = World::new(153, false);
+    let assignment = world.assigned.as_ref().expect("chat assigned");
+    let chat = world
+        .store
+        .rows
+        .values()
+        .find_map(|row| match row {
+            root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task))) if task.number == assignment.task => {
+                Some(task)
+            }
+            root::Record::Core(_) | root::Record::Connector { .. } => None,
+        })
+        .expect("durable chat");
+    let default = tasks::ModelEffort { model: 0, effort: Some(0) };
+    assert_eq!(chat.llm, Some(tasks::LlmChoice { main: default, subagents: Box::new([]) }), "recorded as given");
+    assert_eq!(assignment.run.policy.model.name.as_ref(), b"scripted");
+    assert_eq!(assignment.run.policy.model.effort.as_deref(), Some(b"low".as_slice()), "its first declared effort");
+}

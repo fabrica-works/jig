@@ -282,6 +282,7 @@ fn model(value: core::Model) -> jig_protocol_charter::Model {
         name: value.name,
         window: value.window,
         output: value.output,
+        effort: value.effort,
     }
 }
 fn contract(value: tasks::Contract) -> Option<jig_protocol_charter::Contract> {

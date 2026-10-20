@@ -17,6 +17,7 @@ fn core_charter_encodes_with_the_same_sections_tools_contract_and_model() {
         name: Box::from(&b"small"[..]),
         window: 4096,
         output: 128,
+        effort: Some(Box::from(&b"low"[..])),
     };
     let source = Charter {
         instructions: Box::from(&b"help"[..]),
@@ -63,6 +64,7 @@ fn core_charter_encodes_with_the_same_sections_tools_contract_and_model() {
     assert_eq!(decoded.main().window(), 4096);
     assert_eq!(decoded.main().output(), 128);
     assert_eq!(*decoded.main().prices().cache_write(), Some(4));
+    assert_eq!(decoded.main().effort().as_deref(), Some(b"low".as_slice()), "the choice's effort reaches smith");
     assert!(!decoded.resume(), "a resume requires a validated transcript");
 }
 

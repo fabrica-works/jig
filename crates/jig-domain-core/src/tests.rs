@@ -137,7 +137,7 @@ fn limits() -> Limits {
         },
         connectors: 2,
         resume_bytes: 256,
-        run_bytes: 384,
+        run_bytes: 512,
         policy_bytes: 8192,
         escalation_reason_bytes: 128,
         load_slots: 2,
@@ -226,6 +226,7 @@ fn scripted_model() -> Model {
         output_price: 1,
         price_unit: 1_000_000,
         efforts: Box::new([b"low".as_slice().into(), b"high".as_slice().into()]),
+        effort: None,
     }
 }
 
@@ -3009,6 +3010,7 @@ mod read_activity;
 
 mod own_watches;
 
+mod default_llm;
 mod goal_of;
 mod kept_models;
 mod task_query;

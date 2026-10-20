@@ -169,6 +169,7 @@ pub fn run() -> Box<core::RunCharter> {
                 output_price: 1,
                 price_unit: 1_000_000,
                 efforts: Box::new([]),
+                effort: None,
             },
             alternatives: Box::new([]),
             inspect: true,

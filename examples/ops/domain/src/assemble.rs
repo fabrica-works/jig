@@ -149,6 +149,7 @@ fn model(value: core::Model) -> charter::Model {
         name: value.name,
         window: value.window,
         output: value.output,
+        effort: value.effort,
     }
 }
 fn contract(value: tasks::Contract) -> Option<charter::Contract> {

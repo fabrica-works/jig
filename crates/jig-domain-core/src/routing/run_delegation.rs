@@ -6,7 +6,8 @@ use super::HoldingsNeed;
 use super::runs::{call_decision, named_propose, proposal_refused};
 use super::{BatchKind, DelegateCreation, ProcedureCreation};
 use crate::{
-    Ask, CallKey, CallPart, Core, Delegate, Dependency, Event, Limits, ProcedureStep, Request, Requests, ToolKind,
+    Ask, CallKey, CallPart, Core, Delegate, Dependency, Event, Limits, ProcedureStep, Request, Requests, StepRefusal,
+    ToolKind,
 };
 use alloc::boxed::Box;
 use jig_domain_tasks as tasks;
@@ -505,7 +506,10 @@ pub(super) fn procedure_step(
                     })
                     .expect("bounded procedure batch");
             }
-            let members = created.into_boxed();
+            let mut members = created.into_boxed();
+            if let Err(problem) = core.resolve_llm(&mut members) {
+                return super::procedure_steps::refused(core, task, step, StepRefusal::Refused(problem));
+            }
             let remaining = u32::try_from(core.connectors.len()).expect("configured connector count fits u32");
             assert!(remaining > 0, "procedure has a numbered connector");
             let mut asked = List::with_capacity(u32::try_from(members.len()).expect("bounded procedure batch"));

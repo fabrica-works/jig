@@ -41,6 +41,7 @@ pub use goals::CreateStart;
 mod historical;
 mod inbox;
 mod indexes;
+mod llm;
 mod memory;
 
 pub use memory::{policy_owned_bytes, worst_case};

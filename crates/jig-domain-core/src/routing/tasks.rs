@@ -1510,7 +1510,11 @@ pub(super) fn route_tasks(
             return tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, false, false);
         }
     }
-    let event = if let tasks::Event::Make { reply_to, creator, batch } = event {
+    let event = if let tasks::Event::Make { reply_to, creator, mut batch } = event {
+        if let Err(problem) = core.resolve_llm(&mut batch) {
+            out.push(tasks::Request::Refused { reply_to, problem });
+            return tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, false, false);
+        }
         match crate::resources::defer(
             core,
             env,
@@ -1522,7 +1526,11 @@ pub(super) fn route_tasks(
             Some(event) => event,
             None => return tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, false, false),
         }
-    } else if let tasks::Event::MakeResultFollowups { reply_to, proposer, proposal, batch } = event {
+    } else if let tasks::Event::MakeResultFollowups { reply_to, proposer, proposal, mut batch } = event {
+        if let Err(problem) = core.resolve_llm(&mut batch) {
+            out.push(tasks::Request::Refused { reply_to, problem });
+            return tag_tasks(core, env, out, tasks::max_out(&env.limits.tasks), false, false, false);
+        }
         match crate::resources::defer(
             core,
             env,

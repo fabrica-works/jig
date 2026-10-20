@@ -24,7 +24,7 @@ fn model(model: boundary::Model) -> run::charter::Llm {
         account: Some(model.account),
         endpoint: run::charter::Endpoint(model.endpoint),
         model: model.name,
-        effort: None,
+        effort: model.effort,
         window: model.window,
         output: model.output,
     }

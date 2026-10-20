@@ -356,6 +356,7 @@ fn price(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
         price_unit: price_unit?,
         // k1 reads each model's declared efforts (domain/tasks.md, section 3).
         efforts: Box::default(),
+        effort: None,
     })
 }
 
