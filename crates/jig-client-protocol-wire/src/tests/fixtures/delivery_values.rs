@@ -16,7 +16,7 @@ macro_rules! value {
 pub fn delivery_values(limits: &Limits) -> List<(&'static str, DeliveryValue)> {
     let mut values = List::with_capacity(16);
     value!(values, limits, OwnerProject, OwnerProject, 111);
-    value!(values, limits, Me, Me, 66);
+    value!(values, limits, Me, Me, 75);
     value!(values, limits, Task, Task, 255, Box::new);
     value!(values, limits, OwnerProposal, OwnerProposal, 57);
     value!(values, limits, Tree, Tree, 48);
@@ -28,6 +28,6 @@ pub fn delivery_values(limits: &Limits) -> List<(&'static str, DeliveryValue)> {
     value!(values, limits, Run, RunText, 39);
     value!(values, limits, RunState, RunState, 15);
     value!(values, limits, Deployment, Deployment, 24);
-    value!(values, limits, OwnerDeployment, OwnerDeployment, 134);
+    value!(values, limits, OwnerDeployment, OwnerDeployment, 148);
     values
 }

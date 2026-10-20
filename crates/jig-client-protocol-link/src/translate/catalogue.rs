@@ -17,6 +17,9 @@ pub(super) fn offers(bytes: &[u8], limits: &Limits, room: &mut u64) -> Result<Li
         };
         let Some(item) = item else { return Err(piece_problem(skein_codec::Reason::Malformed)) };
         let value = w::ProviderOffer::decode(&limits.wire, &mut Reader::new(&item))?;
+        if value.key_bytes() > limits.wire.keyed_value_some {
+            return Err(too_large());
+        }
         if value.programs().len() > limits.client.rows {
             return Err(too_large());
         }
@@ -40,6 +43,7 @@ pub(super) fn offers(bytes: &[u8], limits: &Limits, room: &mut u64) -> Result<Li
         }
         rows.push(c::ProviderOffer {
             provider: value.provider(),
+            key_bytes: value.key_bytes(),
             name: crate::translate::facts::document_text(value.name(), limits)?,
             sign_in: value.sign_in(),
             key: value.key(),

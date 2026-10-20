@@ -8,6 +8,7 @@ use skein_lib::{Duration, List, Wall};
 
 /// Whole supplied deployment facts with independent bounded loss counters.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[expect(clippy::struct_excessive_bools, reason = "independent aggregate and list loss facts")]
 pub struct OwnerDeployment {
     pub store: StoreFill,
     pub hosts: List<OwnerHost>,
@@ -33,10 +34,15 @@ pub struct OwnerDeployment {
     pub connectors: List<u16>,
     /// Independently supplied configured catalogue loss.
     pub connectors_cut: bool,
+    /// Public configured provider offers within the document line bound.
     pub providers: List<super::ProviderOffer>,
+    /// Whether additional provider offers were omitted.
     pub providers_cut: bool,
+    /// Actual startup key ceiling, including the client carried-value bound.
     pub key_bytes: u32,
+    /// Current observation from the engine selection and host checks.
     pub readiness: List<super::PayerReadiness>,
+    /// Whether additional provider/payer rows were omitted.
     pub readiness_cut: bool,
 }
 

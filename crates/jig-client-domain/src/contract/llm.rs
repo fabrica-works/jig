@@ -1,6 +1,7 @@
 //! A task's LLM choice and the models a party may choose, named as configuration names them
 //! (client/domain/contract.md, 3.2 and 5.1; domain/tasks.md, 3). The engine maps the names.
 use super::Text;
+use alloc::boxed::Box;
 use skein_lib::List;
 
 /// One model and its effort, each by its configured name.
@@ -93,15 +94,26 @@ pub enum TaskSourceState {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[expect(clippy::struct_excessive_bools, reason = "independent configured source offers and cut facts")]
 pub struct ProviderOffer {
+    /// Stable configured LLM provider number.
     pub provider: u32,
+    /// Actual startup key ceiling for this provider's key offer.
+    pub key_bytes: u32,
+    /// Configured display name, carrying its own text loss.
     pub name: super::DocumentText,
+    /// Whether a sign-in source is offered.
     pub sign_in: bool,
+    /// Whether a key source is offered.
     pub key: bool,
+    /// Whole configured program names within the list bound.
     pub programs: List<Text>,
+    /// Whether additional program names were omitted.
     pub programs_cut: bool,
+    /// Whether configuration offers a source needing no credential.
     pub none: bool,
+    /// Whether configured sign-ins use plan terms.
     pub signed_in_plan: bool,
-    pub manage_usage: Option<alloc::boxed::Box<[u8]>>,
+    /// Whole optional public HTTPS manage target, at most 2,048 bytes.
+    pub manage_usage: Option<Box<[u8]>>,
 }
 /// Availability does not reserve a run's account, host, slots or budget.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -113,8 +125,11 @@ pub enum Readiness {
 /// A provider's readiness for one authorized payer, independent of private account rows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PayerReadiness {
+    /// Stable configured LLM provider number.
     pub provider: u32,
+    /// The authenticated party or a project it may read.
     pub payer: super::OwnerAccountUse,
+    /// Current observation from the engine selection and host checks.
     pub readiness: Readiness,
     /// Unknown until the engine has program check facts; pending sign-ins are false.
     pub settled: Option<bool>,

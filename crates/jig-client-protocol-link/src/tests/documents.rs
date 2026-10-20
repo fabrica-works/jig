@@ -202,6 +202,7 @@ fn catalogue_frame(address: &[u8]) -> w::Me {
         &limits,
         w::ProviderOfferParts {
             provider: 37,
+            key_bytes: 256,
             name: w::DocumentText::new(
                 &limits,
                 w::DocumentTextParts { bytes: b"Arbitrary".as_slice().into(), cut: false },
@@ -235,4 +236,22 @@ fn catalogue_keeps_the_configured_provider_words() {
     assert_eq!(row.provider, 37);
     assert_eq!(row.name.bytes(), b"Arbitrary");
     assert!(row.sign_in && row.key && row.signed_in_plan);
+}
+
+fn repeated_catalogue(count: usize) -> w::Me {
+    let mut frame = catalogue_frame(b"https://usage.example/").into_parts();
+    let mut writer = skein_lib::Writer::new(frame.providers.len().checked_mul(count).unwrap());
+    for _ in 0..count {
+        writer.put(&frame.providers).unwrap();
+    }
+    frame.providers = writer.finish();
+    w::Me::new(&fixtures::limits().wire, frame).unwrap()
+}
+#[test]
+fn catalogue_repeated_providers_are_refused() {
+    assert_eq!(documents::frame(repeated_catalogue(2), &fixtures::limits()), Err(Undecodable::Malformed));
+}
+#[test]
+fn catalogue_row_capacity_is_bounded() {
+    assert_eq!(documents::frame(repeated_catalogue(3), &fixtures::limits()), Err(Undecodable::TooLarge));
 }

@@ -9,6 +9,7 @@
 
 extern crate alloc;
 
+pub mod account_catalogue;
 mod binding;
 pub mod cards;
 pub mod confirmation;

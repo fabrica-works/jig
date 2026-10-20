@@ -48,6 +48,7 @@ pub struct LastEnd {
 /// or leave the default; `usable` follows those uses for this party;
 /// `settled` currently counts only sign-ins the party asked for.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[expect(clippy::struct_excessive_bools, reason = "independent aggregate and list loss facts")]
 pub struct Accounts {
     pub accounts: List<AccountLine>,
     pub signing: List<SignInLine>,
@@ -55,7 +56,9 @@ pub struct Accounts {
     pub usable: bool,
     pub settled: bool,
     pub cut: bool,
+    /// Current observation from the engine selection and host checks.
     pub readiness: List<super::PayerReadiness>,
+    /// Whether additional provider/payer rows were omitted.
     pub readiness_cut: bool,
 }
 

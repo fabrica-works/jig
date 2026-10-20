@@ -17,8 +17,11 @@ pub struct Me {
     pub cut: bool,
     pub retention: Duration,
     pub deployment_role: Option<HeldRole>,
+    /// Public configured provider offers within the document line bound.
     pub providers: List<super::ProviderOffer>,
+    /// Whether additional provider offers were omitted.
     pub providers_cut: bool,
+    /// Actual startup key ceiling, including the client carried-value bound.
     pub key_bytes: u32,
 }
 

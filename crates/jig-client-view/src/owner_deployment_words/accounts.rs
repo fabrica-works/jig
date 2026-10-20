@@ -26,16 +26,40 @@ pub enum AccountPhrase {
     PaysParty,
     PaysProject,
     ManageUsage,
+    Catalogue,
+    KeyBytes,
+    Ready,
+    Unavailable,
+    UnknownReadiness,
+    Settled,
+    Pending,
+    UnknownSettlement,
+    OffersCut,
+    ReadinessCut,
+    SignInPlan,
 }
 impl AccountPhrase {
     pub(super) const fn hole(self) -> Option<skein_ui::phrases::HoleKind> {
         use skein_ui::phrases::HoleKind;
         match self {
             Self::Later => Some(HoleKind::Wall),
-            Self::Provider | Self::HeldByParty | Self::Source | Self::PaysParty | Self::PaysProject => {
-                Some(HoleKind::Number)
-            }
-            Self::ManageUsage
+            Self::KeyBytes
+            | Self::Provider
+            | Self::HeldByParty
+            | Self::Source
+            | Self::PaysParty
+            | Self::PaysProject => Some(HoleKind::Number),
+            Self::SignInPlan
+            | Self::Catalogue
+            | Self::Ready
+            | Self::Unavailable
+            | Self::UnknownReadiness
+            | Self::Settled
+            | Self::Pending
+            | Self::UnknownSettlement
+            | Self::OffersCut
+            | Self::ReadinessCut
+            | Self::ManageUsage
             | Self::LaterUnknown
             | Self::Unloaded
             | Self::Cancelled
@@ -83,6 +107,17 @@ impl AccountPhrase {
             Self::PaysParty => 9463,
             Self::PaysProject => 9464,
             Self::ManageUsage => 9473,
+            Self::Catalogue => 9474,
+            Self::KeyBytes => 9475,
+            Self::Ready => 9476,
+            Self::Unavailable => 9477,
+            Self::UnknownReadiness => 9478,
+            Self::Settled => 9479,
+            Self::Pending => 9480,
+            Self::UnknownSettlement => 9481,
+            Self::OffersCut => 9482,
+            Self::ReadinessCut => 9483,
+            Self::SignInPlan => 9484,
         }
     }
     pub(super) const fn label(self) -> &'static [u8] {
@@ -99,6 +134,18 @@ impl AccountPhrase {
             Self::Stalled => b"Record stalled",
             Self::TooLarge => b"Record too large",
             Self::ManageUsage => b"Manage usage",
+            Self::Catalogue => b"LLM provider offers",
+            Self::KeyBytes => b"Maximum key bytes ",
+            Self::Ready => b"Ready for this payer",
+            Self::Unavailable => b"No usable account for this payer",
+            Self::UnknownReadiness => b"Readiness unknown",
+            Self::Settled => b"Account requests settled",
+            Self::Pending => b"Account request pending",
+            Self::UnknownSettlement => b"Program checks unknown",
+            Self::OffersCut => b"More provider offers omitted",
+            Self::ReadinessCut => b"More payer readiness omitted",
+            Self::SignInPlan => b"Sign-ins use plan terms",
+
             Self::Provider => b"LLM provider ",
             Self::HeldByDeployment => b"Held by the deployment",
             Self::HeldByParty => b"Held by party ",

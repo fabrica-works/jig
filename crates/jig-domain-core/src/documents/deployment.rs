@@ -108,6 +108,7 @@ pub struct ProjectCapacity {
 /// Deployment facts and configured connector references; connector values remain
 /// their owners' documents (`client/domain/pages.md`, 7; `client/domain/root.md`, 6).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[expect(clippy::struct_excessive_bools, reason = "independent aggregate and list loss facts")]
 pub struct Deployment {
     pub store: StoreFill,
     pub hosts: List<Host>,
@@ -133,10 +134,15 @@ pub struct Deployment {
     pub connectors: List<u16>,
     pub connectors_cut: bool,
     pub cut: bool,
+    /// Public configured provider offers within the document line bound.
     pub providers: List<super::ProviderOffer>,
+    /// Whether additional provider offers were omitted.
     pub providers_cut: bool,
+    /// Actual startup key ceiling, including the client carried-value bound.
     pub key_bytes: u32,
+    /// Current observation from the engine selection and host checks.
     pub readiness: List<super::PayerReadiness>,
+    /// Whether additional provider/payer rows were omitted.
     pub readiness_cut: bool,
 }
 /// Recent refused hello facts, without protocol rights or advertised workstream payloads.

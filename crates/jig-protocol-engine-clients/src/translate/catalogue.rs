@@ -12,6 +12,7 @@ pub(super) fn offers(values: &List<d::ProviderOffer>, bound: u32, limits: &w::Li
             w::ProviderOfferParts {
                 skein_bools: [value.sign_in, value.key, value.programs_cut, value.none, value.signed_in_plan],
                 provider: value.provider,
+                key_bytes: value.key_bytes,
                 name: owner::text(&value.name, limits)?,
                 programs: value.programs.clone(),
                 manage_usage: value.manage_usage.clone(),

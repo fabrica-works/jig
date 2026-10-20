@@ -328,7 +328,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 246);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 257);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -916,5 +916,135 @@ fn deployment_manage_addresses_one_past_the_bound_are_refused() {
     let mut address = b"https://usage.example/".to_vec();
     address.resize(usize::try_from(ACCOUNT_MANAGE_USAGE).unwrap() + 1, b'a');
     value.accounts.get_mut(0).unwrap().manage_usage = Some(address.into_boxed_slice());
+    assert!(view::required(&value, &CLIENT, shared_words()).is_none());
+}
+
+fn catalogue() -> OwnerDeployment {
+    let mut value = empty();
+    value.providers = list(vec![ProviderOffer {
+        provider: 37,
+        key_bytes: 123,
+        name: DocumentText::complete(Text::new(b"Quasar Example".as_slice().into(), CLIENT.text).unwrap()),
+        sign_in: true,
+        key: true,
+        programs: list(vec![Text::new(b"arbitrary".as_slice().into(), CLIENT.text).unwrap()]),
+        programs_cut: true,
+        none: false,
+        signed_in_plan: true,
+        manage_usage: Some(b"https://usage.example/other".as_slice().into()),
+    }]);
+    value.providers_cut = true;
+    value.readiness = list(vec![PayerReadiness {
+        provider: 37,
+        payer: OwnerAccountUse::Project(91),
+        readiness: Readiness::Unknown,
+        settled: None,
+    }]);
+    value.readiness_cut = true;
+    value.key_bytes = 123;
+    value
+}
+#[test]
+fn deployment_renders_the_public_provider_catalogue() {
+    let tree = round_trip(catalogue());
+    for words in [
+        b"Quasar Example".as_slice(),
+        b"arbitrary",
+        b"Sign-in",
+        b"Key",
+        b"Sign-ins use plan terms",
+        b"Maximum key bytes 123",
+        b"More provider offers omitted",
+    ] {
+        assert!(contains(&tree, words), "{}", String::from_utf8_lossy(words));
+    }
+    assert!(
+        tree.nodes().iter().any(|node| node.external.as_deref() == Some(b"https://usage.example/other".as_slice()))
+    );
+}
+fn fragment(value: &OwnerDeployment, limits: skein_ui::Limits) -> Tree {
+    let mut builder = Builder::new(&limits);
+    builder.open(Role::Region);
+    crate::account_catalogue::render(
+        &mut builder,
+        shared_words(),
+        &value.providers,
+        value.providers_cut,
+        value.key_bytes,
+        &value.readiness,
+        value.readiness_cut,
+    );
+    builder.close();
+    builder.finish()
+}
+#[test]
+fn the_reusable_fragment_labels_payer_readiness() {
+    for (ready, settled, words, settlement) in [
+        (Readiness::Unknown, None, b"Readiness unknown".as_slice(), b"Program checks unknown".as_slice()),
+        (Readiness::Usable, Some(true), b"Ready for this payer", b"Account requests settled"),
+        (Readiness::Unavailable, Some(false), b"No usable account for this payer", b"Account request pending"),
+    ] {
+        let mut value = catalogue();
+        value.readiness.get_mut(0).unwrap().readiness = ready;
+        value.readiness.get_mut(0).unwrap().settled = settled;
+        let tree = fragment(&value, view::limits(&CLIENT, shared_words()).unwrap());
+        assert!(contains(&tree, words));
+        assert!(contains(&tree, settlement));
+        assert!(contains(&tree, b"Pays for project 91"));
+        assert!(contains(&tree, b"More payer readiness omitted"));
+    }
+}
+#[test]
+fn catalogue_program_capacity_holds_at_its_bound() {
+    let mut value = catalogue();
+    value.providers.get_mut(0).unwrap().programs = List::with_capacity(CLIENT.rows);
+    assert!(view::required(&value, &CLIENT, shared_words()).is_some());
+    value.providers.get_mut(0).unwrap().programs = List::with_capacity(CLIENT.rows + 1);
+    assert!(view::required(&value, &CLIENT, shared_words()).is_none());
+}
+#[test]
+fn catalogue_fragment_storage_holds_at_its_exact_size() {
+    let value = catalogue();
+    let bounds = view::limits(&CLIENT, shared_words()).unwrap();
+    let tree = fragment(&value, bounds);
+    assert!(tree.len() <= crate::account_catalogue::max_nodes(&CLIENT).unwrap() + 1);
+    let exact = skein_ui::Limits { nodes: tree.len(), ..bounds };
+    assert_eq!(fragment(&value, exact).len(), tree.len());
+    std::panic::catch_unwind(|| fragment(&value, skein_ui::Limits { nodes: exact.nodes - 1, ..exact }))
+        .expect_err("one node short refuses");
+}
+
+#[test]
+fn a_key_offer_has_no_plan_label() {
+    let mut value = catalogue();
+    let offer = value.providers.get_mut(0).unwrap();
+    offer.sign_in = false;
+    offer.signed_in_plan = false;
+    offer.programs.clear();
+    let tree = round_trip(value);
+    assert!(contains(&tree, b"Key"));
+    assert!(!contains(&tree, b"Sign-ins use plan terms"));
+}
+#[test]
+fn a_none_offer_labels_its_absent_credential() {
+    let mut value = catalogue();
+    let offer = value.providers.get_mut(0).unwrap();
+    offer.sign_in = false;
+    offer.signed_in_plan = false;
+    offer.key = false;
+    offer.programs.clear();
+    offer.none = true;
+    assert!(contains(&round_trip(value), b"No credential"));
+}
+
+#[test]
+fn catalogue_manage_targets_hold_at_the_address_bound() {
+    let mut value = catalogue();
+    let mut address = b"https://usage.example/".to_vec();
+    address.resize(usize::try_from(ACCOUNT_MANAGE_USAGE).unwrap(), b'a');
+    value.providers.get_mut(0).unwrap().manage_usage = Some(address.clone().into_boxed_slice());
+    round_trip(value.clone());
+    address.push(b'a');
+    value.providers.get_mut(0).unwrap().manage_usage = Some(address.into_boxed_slice());
     assert!(view::required(&value, &CLIENT, shared_words()).is_none());
 }

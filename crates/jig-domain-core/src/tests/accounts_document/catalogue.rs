@@ -119,6 +119,7 @@ fn catalogue_keeps_public_offers_for_an_ordinary_party() {
     assert_eq!(offer.programs.get(0).unwrap().as_ref(), b"arbitrary");
     assert_eq!(offer.manage_usage.as_deref(), Some(b"https://usage.example/".as_slice()));
     assert_eq!(frame.key_bytes, 123);
+    assert_eq!(offer.key_bytes, frame.key_bytes);
 }
 
 #[test]
@@ -138,4 +139,28 @@ fn readiness_rechecks_a_projects_current_members() {
         }),
     ));
     assert_eq!(project(&core), Readiness::Unavailable);
+}
+
+#[test]
+fn readiness_keeps_providers_separate() {
+    let (mut core, env) = serving();
+    let mut other = core.settings.llm_providers.providers[0].clone();
+    other.number = 4;
+    core.settings.llm_providers.providers = Box::new([core.settings.llm_providers.providers[0].clone(), other]);
+    let doc = document(&core, &env, ALICE);
+    assert_eq!(doc.readiness.get(0).unwrap().readiness, Readiness::Usable);
+    assert_eq!(doc.readiness.get(1).unwrap().readiness, Readiness::Unavailable);
+}
+
+#[test]
+fn a_pending_inventory_keeps_readiness_unknown() {
+    let (mut core, env) = serving();
+    drop(step(
+        &mut core,
+        &env,
+        Event::Fleet(fleet::Event::Sources {
+            sources: Box::new([fleet::SourceName::new(b"program").expect("bounded fixture name")]),
+        }),
+    ));
+    assert_eq!(own(&core, &env, ALICE).readiness, Readiness::Unknown);
 }

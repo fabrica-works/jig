@@ -275,8 +275,11 @@ pub struct Frame {
     pub results_seen: u64,
     pub retention: Duration,
     pub cut: bool,
+    /// Public configured provider offers within the document line bound.
     pub providers: List<ProviderOffer>,
+    /// Whether additional provider offers were omitted.
     pub providers_cut: bool,
+    /// Actual startup key ceiling, including the client carried-value bound.
     pub key_bytes: u32,
 }
 
@@ -465,6 +468,8 @@ pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
                 List::<jig_domain_accounts::Coverage>::worst_case(limits.accounts.accounts)?
                     .checked_add(List::<jig_domain_accounts::Pending>::worst_case(limits.accounts.sign_ins)?)?
                     .checked_add(List::<jig_domain_accounts::Fact>::worst_case(limits.accounts.sources)?)?
+                    .checked_add(u64::try_from(size_of::<jig_domain_fleet::ModelNeed>()).ok()?)?
+                    .checked_add(u64::from(crate::MODEL_NAME_BYTES))?
                     .checked_add(List::<jig_domain_fleet::HostView>::worst_case(
                         limits.fleet.workers.checked_add(limits.fleet.history)?.checked_add(1)?,
                     )?)?,

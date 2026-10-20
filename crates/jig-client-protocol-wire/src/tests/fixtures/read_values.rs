@@ -17,7 +17,7 @@ pub fn read_values(limits: &Limits) -> List<(&'static str, ReadValue)> {
     let mut values = List::with_capacity(26);
     value!(values, limits, OwnerProject, OwnerProject, 111);
     value!(values, limits, Historical, OwnerHistorical, 282, Box::new);
-    value!(values, limits, Me, Me, 66);
+    value!(values, limits, Me, Me, 75);
     value!(values, limits, Turn, ArchivedTurn, 42);
     value!(values, limits, Task, Task, 255);
     value!(values, limits, Proposal, Proposal, 149);
@@ -39,6 +39,6 @@ pub fn read_values(limits: &Limits) -> List<(&'static str, ReadValue)> {
     value!(values, limits, Project, Project, 159);
     value!(values, limits, Notes, NotePage, 7);
     value!(values, limits, Deployment, Deployment, 24);
-    value!(values, limits, OwnerDeployment, OwnerDeployment, 134);
+    value!(values, limits, OwnerDeployment, OwnerDeployment, 148);
     values
 }

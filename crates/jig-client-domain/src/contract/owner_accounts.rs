@@ -25,6 +25,7 @@ pub fn valid_manage_usage(value: &[u8]) -> bool {
     true
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[expect(clippy::struct_excessive_bools, reason = "independent aggregate and list loss facts")]
 pub struct OwnerAccounts {
     pub accounts: List<OwnerAccountLine>,
     pub signing: List<OwnerAccountSignIn>,
@@ -32,7 +33,9 @@ pub struct OwnerAccounts {
     pub usable: bool,
     pub settled: bool,
     pub cut: bool,
+    /// Current observation from the engine selection and host checks.
     pub readiness: List<super::PayerReadiness>,
+    /// Whether additional provider/payer rows were omitted.
     pub readiness_cut: bool,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

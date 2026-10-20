@@ -17,11 +17,11 @@ use jig_client::contract::{
     OwnerTaskCapacityAction, OwnerTaskCapacityCause, OwnerTaskLink, Proposer, SeenThrough,
 };
 use skein_lib::{Duration, Wall};
-fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
+pub(crate) fn text(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole]) {
     let saying = words.book().say(words.language(), phrase.id(), holes).expect("deployment sayings checked");
     b.text(Run::Plain, &saying.text);
 }
-fn field_number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
+pub(crate) fn field_number(b: &mut Builder, words: &Words, phrase: P, value: u64) {
     text(b, words, phrase, &[Hole::Number(value)]);
 }
 fn region(b: &mut Builder, words: &Words, phrase: P, holes: &[Hole], key: Option<Key>) {
@@ -513,6 +513,15 @@ fn render_accounts(
     words: &Words,
     bindings: &mut JigBindings,
 ) {
+    crate::account_catalogue::render(
+        b,
+        words,
+        &value.providers,
+        value.providers_cut,
+        value.key_bytes,
+        &value.readiness,
+        value.readiness_cut,
+    );
     list(b, words, P::Accounts);
     for account in &value.accounts {
         region(
@@ -678,6 +687,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
     hosts
         .checked_add(attempts)?
         .checked_add(accounts)?
+        .checked_add(crate::account_catalogue::max_nodes(l)?)?
         .checked_add(l.rows.checked_mul(80)?)?
         .checked_add(l.rows)?
         .checked_add(46)
@@ -696,7 +706,7 @@ pub fn limits(l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
         text_per_node,
         text_bytes: nodes
             .checked_mul(text)?
-            .checked_add(l.rows.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?,
+            .checked_add(l.rows.checked_mul(2)?.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?,
         drawing_bytes: 0,
         styles_per_node: 2,
         patches: 0,
@@ -762,6 +772,7 @@ fn run_fits(value: &OwnerHostRun, l: &Limits, words: &Words) -> Option<()> {
 /// Validate all independently allocated owner lists before using the finite fragment.
 #[must_use]
 pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
+    crate::account_catalogue::fits(&value.providers, &value.readiness, l)?;
     if value.connectors.capacity() > l.rows
         || value.hosts.capacity() > l.rows
         || value.attempts.capacity() > l.rows

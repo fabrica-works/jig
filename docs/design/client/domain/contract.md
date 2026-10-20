@@ -564,7 +564,8 @@ keyed retention and bounded entrance-history rules as other actions.
 The public provider catalogue in `me` carries the configured provider number,
 cut-aware name, sign-in and key offers, whole program names (at most 32 bytes
 each), the no-credential offer, signed-in-plan flag and whole manage-usage
-address. The maximum key bytes is the smaller of startup's accounts token
+address. Each offer carries the actual key ceiling; `me` also carries that shared
+ceiling for a common key input. It is the smaller of startup's accounts token
 limit and the client wire's carried-value limit. Offers describe configuration,
 not a running backend. Provider and program lists use the document line bound;
 each has its own cut flag. Absence from a cut catalogue means nothing.

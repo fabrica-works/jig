@@ -66,7 +66,7 @@ impl Limits {
         tree.patches = nodes.checked_mul(5)?;
         tree.text_bytes = nodes
             .checked_mul(text)?
-            .checked_add(domain.jig.rows.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?;
+            .checked_add(domain.jig.rows.checked_mul(2)?.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?;
         tree.drawing_bytes = drawing::BYTES;
         let limits = Self { tree, text: domain.first.text };
         worst_case(&limits, domain, jig, first)?;

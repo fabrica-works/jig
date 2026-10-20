@@ -11,14 +11,25 @@ use skein_lib::List;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 #[expect(clippy::struct_excessive_bools, reason = "independent configured source offers and cut facts")]
 pub struct ProviderOffer {
+    /// Stable configured LLM provider number.
     pub provider: u32,
+    /// Actual startup key ceiling for this provider's key offer.
+    pub key_bytes: u32,
+    /// Configured display name, carrying its own text loss.
     pub name: Text,
+    /// Whether a sign-in source is offered.
     pub sign_in: bool,
+    /// Whether a key source is offered.
     pub key: bool,
+    /// Whole configured program names within the list bound.
     pub programs: List<Box<[u8]>>,
+    /// Whether additional program names were omitted.
     pub programs_cut: bool,
+    /// Whether configuration offers a source needing no credential.
     pub none: bool,
+    /// Whether configured sign-ins use plan terms.
     pub signed_in_plan: bool,
+    /// Whole optional public HTTPS manage target, at most 2,048 bytes.
     pub manage_usage: Option<Box<[u8]>>,
 }
 /// Availability is an observation, never a run reservation.
@@ -30,8 +41,11 @@ pub enum Readiness {
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct PayerReadiness {
+    /// Stable configured LLM provider number.
     pub provider: u32,
+    /// The authenticated party or a project it may read.
     pub payer: accounts::Use,
+    /// Current observation from the engine selection and host checks.
     pub readiness: Readiness,
     /// None until program check facts can establish settlement.
     pub settled: Option<bool>,
@@ -60,6 +74,7 @@ pub(super) fn offers(core: &Core, limits: &DocumentLimits) -> Result<(List<Provi
         result
             .push(ProviderOffer {
                 provider: provider.number,
+                key_bytes: core.settings.key_bytes,
                 name: super::small::text(&provider.name, limits.text_bytes),
                 sign_in: provider.offers.sign_in,
                 key: provider.offers.key,
@@ -138,7 +153,7 @@ fn readiness(core: &Core, payer: tasks::Payer, provider: u32) -> Readiness {
     }
 }
 /// Host model support does not require a free slot. Until T12, unknown personal
-/// program logins exclude workers as in run_choice; the engine can still serve.
+/// program logins exclude workers as in `run_choice`; the engine can still serve.
 fn eligible_host(core: &Core, provider: u32) -> Readiness {
     let mut unknown = false;
     let mut unknown_logins = false;
@@ -152,14 +167,13 @@ fn eligible_host(core: &Core, provider: u32) -> Readiness {
             continue;
         }
         match host.kind {
-            fleet::HostKind::Engine => {}
             fleet::HostKind::Worker
                 if core.fleet.awaiting_logins(host.channel) || !fleet::host_rule(!unknown_logins, &[], &[]) =>
             {
                 unknown = true;
                 continue;
             }
-            fleet::HostKind::Worker => {}
+            fleet::HostKind::Engine | fleet::HostKind::Worker => {}
         }
         for model in &core.settings.models {
             if core.provider(model) == Some(provider)

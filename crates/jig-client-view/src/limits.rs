@@ -50,7 +50,7 @@ fn with_phrase_bytes(
     limits.text_bytes = limits
         .nodes
         .checked_mul(node_text(client.text, phrase)?)?
-        .checked_add(client.rows.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?;
+        .checked_add(client.rows.checked_mul(2)?.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?;
     limits.patches = limits.nodes.checked_mul(5)?;
     Some(limits)
 }

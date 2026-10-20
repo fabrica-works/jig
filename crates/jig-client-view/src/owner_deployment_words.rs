@@ -225,7 +225,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 246] = [
+pub const ALL: [DeploymentPhrase; 257] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -363,6 +363,17 @@ pub const ALL: [DeploymentPhrase; 246] = [
     DeploymentPhrase::AccountDetail(AccountPhrase::PaysParty),
     DeploymentPhrase::AccountDetail(AccountPhrase::PaysProject),
     DeploymentPhrase::AccountDetail(AccountPhrase::ManageUsage),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Catalogue),
+    DeploymentPhrase::AccountDetail(AccountPhrase::KeyBytes),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Ready),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Unavailable),
+    DeploymentPhrase::AccountDetail(AccountPhrase::UnknownReadiness),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Settled),
+    DeploymentPhrase::AccountDetail(AccountPhrase::Pending),
+    DeploymentPhrase::AccountDetail(AccountPhrase::UnknownSettlement),
+    DeploymentPhrase::AccountDetail(AccountPhrase::OffersCut),
+    DeploymentPhrase::AccountDetail(AccountPhrase::ReadinessCut),
+    DeploymentPhrase::AccountDetail(AccountPhrase::SignInPlan),
     DeploymentPhrase::AccountStateClosing,
     DeploymentPhrase::HelloRefusalReservedChannel,
     DeploymentPhrase::HelloRefusalWorkers,
