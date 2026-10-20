@@ -55,7 +55,7 @@ fn escalation_read_retains_original_reply_until_whole_identity_and_reserved_enve
         value.acts.iter().map(|offer| offer.act).collect::<Vec<_>>(),
         [client::ActKind::Release, client::ActKind::PassUp, client::ActKind::Release]
     );
-    assert_eq!(value.as_ref(), &wire::escalations::document(&original, &limits).expect("complete owner facts"));
+    assert_eq!(value.as_ref(), &wire::escalations::document(&original, &limits, &[]).expect("complete owner facts"));
     assert!(transport.reply(to).is_none());
     assert_eq!(read(&mut transport, to, &whole, &limits).err(), Some(Invalid::MissingRoute));
 }

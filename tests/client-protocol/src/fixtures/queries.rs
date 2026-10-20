@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn the_wait_story_creates_a_tracked_person_task() {
         let limits = query_limits();
-        let ask = jig_client_world::joint::wire::asks::ask(&c::Ask::Create { project: 1, tasks: person_tasks() })
+        let ask = jig_client_world::joint::wire::asks::ask(&c::Ask::Create { project: 1, tasks: person_tasks() }, &[])
             .expect("whole create");
         let world = jig_core_world::effects::World::configured_with(
             super::super::SEED,

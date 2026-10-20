@@ -21,21 +21,36 @@ pub struct Driver {
     pub transport: Transport,
     pub referee: super::referee::Referee,
     paused_sources: Vec<root::Event>,
+    refused: Vec<(skein_lib::Token, jig_client_domain::contract::Answer)>,
 }
 
 impl Driver {
     #[must_use]
     pub fn new(configuration: root::Config, limits: root::Limits, peers: Peers, now: Time, wall: Wall) -> Self {
         let configured = limits.core.documents.versions;
+        let models = configuration.core.settings.models.clone();
+        let providers = configuration.core.settings.llm_providers.clone();
+        let mut transport = Transport::new(VersionRange { first: configured.minimum, last: configured.maximum });
+        transport.models = models;
+        transport.providers = providers;
         let mut world = World::scripted_clock(configuration, limits, peers, now, wall);
         world.client_peer = Some(ClientPeer::routed());
         world.store_peer = Some(jig_core_world::store_peer::StorePeer::after(world.store.applied));
         Self {
             world,
-            transport: Transport::new(VersionRange { first: configured.minimum, last: configured.maximum }),
+            transport,
             referee: super::referee::Referee::default(),
             paused_sources: Vec::new(),
+            refused: Vec::new(),
         }
+    }
+
+    pub(super) fn refuse(&mut self, to: skein_lib::Token, answer: jig_client_domain::contract::Answer) {
+        self.refused.push((to, answer));
+    }
+
+    pub(super) fn take_refusals(&mut self) -> Vec<(skein_lib::Token, jig_client_domain::contract::Answer)> {
+        std::mem::take(&mut self.refused)
     }
 
     pub fn send(&mut self, now: Time, wall: Wall, event: root::Event) {
@@ -80,12 +95,15 @@ impl Driver {
     /// packets of the old connection cannot cross into its replacement.
     pub fn restart(&mut self, configuration: root::Config, now: Time, wall: Wall) {
         self.paused_sources.clear();
+        self.refused.clear();
         self.world.reached_cut = None;
         self.register_replies();
         self.world.set_clock(now, wall);
         let peer = self.world.client_peer.as_mut().expect("actual protocol peer");
         peer.delivered.clear();
         peer.now.clear();
+        self.transport.models.clone_from(&configuration.core.settings.models);
+        self.transport.providers.clone_from(&configuration.core.settings.llm_providers);
         self.world.restart_with(configuration);
     }
 
@@ -149,7 +167,7 @@ impl Driver {
     #[must_use]
     pub fn next_due(&self) -> Option<Time> {
         let peer = self.world.client_peer.as_ref().expect("actual protocol peer");
-        if peer.delivered.is_empty() && peer.now.is_empty() {
+        if peer.delivered.is_empty() && peer.now.is_empty() && self.refused.is_empty() {
             self.world.next_due()
         } else {
             Some(self.world.clocks().0)

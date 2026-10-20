@@ -23,15 +23,18 @@ pub fn key(proposer: documents::Proposer, number: u64) -> client::ProposalKey {
 pub fn action(
     value: &documents::ProposalAction,
     limits: &Limits,
+    models: &[jig_domain_core::Model],
 ) -> Result<client::OwnerProposalAction, owner::Invalid> {
     Ok(match value {
         documents::ProposalAction::Batch(values) => {
-            client::OwnerProposalAction::Batch(owner::list(values, limits, |value| history::proposed(value, limits))?)
+            client::OwnerProposalAction::Batch(owner::list(values, limits, |value| {
+                history::proposed(value, limits, models)
+            })?)
         }
         documents::ProposalAction::Effect { part, authority, attempt, completion, position, purpose } => {
             client::OwnerProposalAction::Effect {
                 part: owner::part(part, limits)?,
-                authority: owner::authority(authority, limits)?,
+                authority: owner::authority(authority, limits, models)?,
                 attempt: *attempt,
                 completion: *completion,
                 position: *position,
@@ -41,7 +44,7 @@ pub fn action(
         documents::ProposalAction::ProcedureEffect { part, authority, step, purpose } => {
             client::OwnerProposalAction::ProcedureEffect {
                 part: owner::part(part, limits)?,
-                authority: owner::authority(authority, limits)?,
+                authority: owner::authority(authority, limits, models)?,
                 step: *step,
                 purpose: *purpose,
             }
@@ -53,16 +56,16 @@ pub fn action(
                     revision: client::Revision { value: value.revision },
                     address: chips::address(value.address),
                 }),
-                before: Box::new(owner::amendment(before, limits)?),
-                after: Box::new(owner::amendment(after, limits)?),
+                before: Box::new(owner::amendment(before, limits, models)?),
+                after: Box::new(owner::amendment(after, limits, models)?),
                 reason: owner::text(reason, limits)?,
                 release: *release,
             }
         }
         documents::ProposalAction::Widen { task, before, after } => client::OwnerProposalAction::Widen {
             task: results::link(task, limits)?,
-            before: owner::authority(before, limits)?,
-            after: owner::authority(after, limits)?,
+            before: owner::authority(before, limits, models)?,
+            after: owner::authority(after, limits, models)?,
         },
         documents::ProposalAction::Release { task, hold } => client::OwnerProposalAction::Release {
             task: results::link(task, limits)?,
@@ -74,12 +77,16 @@ pub fn action(
 /// # Errors
 /// Rejects any complete source allocation above receiving bounds. The pending
 /// envelope supplies no terminal state, earlier holder trail or display price.
-pub fn document(value: &documents::Proposal, limits: &Limits) -> Result<client::OwnerProposal, owner::Invalid> {
+pub fn document(
+    value: &documents::Proposal,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerProposal, owner::Invalid> {
     Ok(client::OwnerProposal {
         key: key(value.proposer, value.number),
         project: value.project,
         reason: owner::text(&value.reason, limits)?,
-        action: action(&value.action, limits)?,
+        action: action(&value.action, limits, models)?,
         as_holder: value.as_holder,
         waiting: client::OwnerProposalWaiting {
             holder: history::holder(value.waiting.holder),
@@ -93,7 +100,7 @@ pub fn document(value: &documents::Proposal, limits: &Limits) -> Result<client::
                 after: value.after,
             })
         })?,
-        acts: offers::offered(&value.acts, limits)?,
+        acts: offers::offered(&value.acts, limits, models)?,
     })
 }
 
@@ -144,7 +151,8 @@ pub(crate) mod tests {
         ] {
             source.proposer = maker;
             let before = source.clone();
-            let actual = document(&source, &limits).expect("whole pending source");
+            let actual =
+                document(&source, &limits, &[jig_core_world::world::scripted_model()]).expect("whole pending source");
             assert_eq!(actual.key, client::ProposalKey { proposer: expected, number: u64::MAX });
             assert_eq!(actual.project, u32::MAX);
             assert_eq!(actual.reason.bytes.bytes(), UTF8_TEXTS[0]);
@@ -225,12 +233,17 @@ pub(crate) mod tests {
         ];
         for (index, source) in actions.drain(..).enumerate() {
             let before = source.clone();
-            let actual = action(&source, &limits).expect("whole pending action");
+            let actual =
+                action(&source, &limits, &[jig_core_world::world::scripted_model()]).expect("whole pending action");
             match (index, actual) {
                 (0, client::OwnerProposalAction::Batch(values)) => {
                     assert_eq!(values.capacity(), 4);
                     assert!(values.is_empty());
-                    assert_eq!(action(&source, &Limits { rows: 3, ..limits }).err(), Some(owner::Invalid::TooLarge));
+                    assert_eq!(
+                        action(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()])
+                            .err(),
+                        Some(owner::Invalid::TooLarge)
+                    );
                 }
                 (
                     1,
@@ -285,7 +298,8 @@ pub(crate) mod tests {
         };
         let before = source.clone();
         let limits = super::super::rows::tests::limits();
-        let native = document(&source, &limits).expect("whole pending release");
+        let native =
+            document(&source, &limits, &[jig_core_world::world::scripted_model()]).expect("whole pending release");
         let client::OwnerProposalAction::Release { hold: Some(hold), .. } = &native.action else {
             panic!("supplied whole hold")
         };
@@ -303,12 +317,22 @@ pub(crate) mod tests {
             .checked_add(u64::try_from(size_of::<client::ReadValue>()).expect("read envelope"))
             .expect("whole read bytes");
         let exact = Limits { document_bytes: bytes, ..limits };
-        assert!(super::super::documents::proposal_read(&source, &exact).is_ok());
+        assert!(
+            super::super::documents::proposal_read(&source, &exact, &[jig_core_world::world::scripted_model()]).is_ok()
+        );
         assert_eq!(
-            super::super::documents::proposal_read(&source, &Limits { document_bytes: bytes - 1, ..exact }).err(),
+            super::super::documents::proposal_read(
+                &source,
+                &Limits { document_bytes: bytes - 1, ..exact },
+                &[jig_core_world::world::scripted_model()]
+            )
+            .err(),
             Some(super::super::documents::Invalid::Payload)
         );
-        assert_eq!(document(&source, &Limits { rows: 3, ..limits }).err(), Some(owner::Invalid::TooLarge));
+        assert_eq!(
+            document(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]).err(),
+            Some(owner::Invalid::TooLarge)
+        );
         assert_eq!(source, before);
     }
 }

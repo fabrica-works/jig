@@ -87,6 +87,7 @@ pub fn history_page(
     subtree: bool,
     page: &reads::Page,
     limits: &Limits,
+    models: &[jig_domain_core::Model],
 ) -> Result<client::ReadValue, Invalid> {
     let after = continuation(page, &reads::Scope::History { task, subtree }, limits)?;
     if page.rows.capacity() > limits.rows {
@@ -96,7 +97,7 @@ pub fn history_page(
     for row in &page.rows {
         let copied = match row {
             reads::PageRow::History(value) if subtree || value.task == task => {
-                client::HistoryRow::Change(Box::new(history::line(value, limits).map_err(Invalid::Owner)?))
+                client::HistoryRow::Change(Box::new(history::line(value, limits, models).map_err(Invalid::Owner)?))
             }
             reads::PageRow::Milestone(value) if subtree || value.task == task => {
                 client::HistoryRow::Milestone(Box::new(history::milestone(value, limits).map_err(Invalid::Owner)?))
@@ -164,6 +165,7 @@ pub fn notes_page(
     description: Option<&client::Text>,
     page: &reads::Page,
     limits: &Limits,
+    models: &[jig_domain_core::Model],
 ) -> Result<client::ReadValue, Invalid> {
     let expected = reads::Scope::ScopedNotes {
         scope: super::reads::note_scope(scope),
@@ -176,7 +178,7 @@ pub fn notes_page(
     let mut rows = List::with_capacity(page.rows.capacity());
     for row in &page.rows {
         let value = match row {
-            reads::PageRow::Note(value) => notes::note(value, limits).map_err(Invalid::Owner)?,
+            reads::PageRow::Note(value) => notes::note(value, limits, models).map_err(Invalid::Owner)?,
             reads::PageRow::EndedDelegate(_)
             | reads::PageRow::History(_)
             | reads::PageRow::Milestone(_)
@@ -235,7 +237,9 @@ mod tests {
             cut: true,
         };
         let limits = history::tests::limits();
-        let client::ReadValue::History(copied) = history_page(task, false, &page, &limits).expect("whole mixed page")
+        let client::ReadValue::History(copied) =
+            history_page(task, false, &page, &limits, &[jig_core_world::world::scripted_model()])
+                .expect("whole mixed page")
         else {
             panic!("history")
         };
@@ -250,16 +254,31 @@ mod tests {
             matches!(copied.rows.get(1), Some(client::HistoryRow::Change(value)) if value.revision == 0 && value.at.is_none())
         );
         assert_eq!(
-            history_page(task, false, &page, &Limits { rows: 5, ..limits }),
+            history_page(task, false, &page, &Limits { rows: 5, ..limits }, &[jig_core_world::world::scripted_model()]),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
-        assert_eq!(history_page(task, false, &page, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
-        assert_eq!(history_page(0, false, &page, &limits), Err(Invalid::Identity));
+        assert_eq!(
+            history_page(
+                task,
+                false,
+                &page,
+                &Limits { document_bytes: 0, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            ),
+            Err(Invalid::Payload)
+        );
+        assert_eq!(
+            history_page(0, false, &page, &limits, &[jig_core_world::world::scripted_model()]),
+            Err(Invalid::Identity)
+        );
         page.next = None;
-        assert_eq!(history_page(0, false, &page, &limits), Err(Invalid::Identity));
+        assert_eq!(
+            history_page(0, false, &page, &limits, &[jig_core_world::world::scripted_model()]),
+            Err(Invalid::Identity)
+        );
         assert!(matches!(page.rows.get(0), Some(reads::PageRow::Milestone(value)) if value.position == 0));
         assert!(
-            history_page(0, true, &page, &limits).is_ok(),
+            history_page(0, true, &page, &limits, &[jig_core_world::world::scripted_model()]).is_ok(),
             "actual owner-selected subtree rows need no invented ancestry"
         );
     }
@@ -493,7 +512,8 @@ mod tests {
         let scope = client::NoteScope::Task { project: u32::MAX, task: u64::MAX };
         let empty = client::Text::new(Box::new([]), limits().text).expect("explicit empty search");
         let client::ReadValue::Notes(page) =
-            notes_page(&scope, Some(&empty), &source, &limits()).expect("whole note page")
+            notes_page(&scope, Some(&empty), &source, &limits(), &[jig_core_world::world::scripted_model()])
+                .expect("whole note page")
         else {
             panic!("Notes page")
         };
@@ -512,9 +532,18 @@ mod tests {
         assert_eq!(row.writer, client::NoteAuthor::Task { task: u64::MAX, attempt: u64::MAX });
         assert_eq!(row.tasks.capacity(), 4);
         assert_eq!(row.acts.capacity(), 2);
-        assert_eq!(notes_page(&scope, None, &source, &limits()), Err(Invalid::Identity));
         assert_eq!(
-            notes_page(&client::NoteScope::Task { project: 0, task: u64::MAX }, Some(&empty), &source, &limits()),
+            notes_page(&scope, None, &source, &limits(), &[jig_core_world::world::scripted_model()]),
+            Err(Invalid::Identity)
+        );
+        assert_eq!(
+            notes_page(
+                &client::NoteScope::Task { project: 0, task: u64::MAX },
+                Some(&empty),
+                &source,
+                &limits(),
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(Invalid::Identity)
         );
     }
@@ -525,11 +554,23 @@ mod tests {
         let scope = client::NoteScope::Task { project: u32::MAX, task: u64::MAX };
         let empty = client::Text::new(Box::new([]), limits().text).expect("empty search");
         assert_eq!(
-            notes_page(&scope, Some(&empty), &source, &Limits { rows: 2, ..limits() }),
+            notes_page(
+                &scope,
+                Some(&empty),
+                &source,
+                &Limits { rows: 2, ..limits() },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
         assert_eq!(
-            notes_page(&scope, Some(&empty), &source, &Limits { document_bytes: 0, ..limits() }),
+            notes_page(
+                &scope,
+                Some(&empty),
+                &source,
+                &Limits { document_bytes: 0, ..limits() },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(Invalid::Payload)
         );
         let mut wrong = source.clone();
@@ -542,7 +583,10 @@ mod tests {
             },
             turn: None,
         };
-        assert_eq!(notes_page(&scope, Some(&empty), &wrong, &limits()), Err(Invalid::Identity));
+        assert_eq!(
+            notes_page(&scope, Some(&empty), &wrong, &limits(), &[jig_core_world::world::scripted_model()]),
+            Err(Invalid::Identity)
+        );
         assert_eq!(source, before);
     }
 }

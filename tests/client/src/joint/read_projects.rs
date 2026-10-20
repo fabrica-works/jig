@@ -51,7 +51,11 @@ fn project_read_retains_original_project_client_and_token_until_whole_native_adm
     };
     assert_eq!(actual_client, ClientId(0));
     assert_eq!(actual, native);
-    assert_eq!(value.as_ref(), &wire::projects::document(&original, &limits).expect("complete authentic facts"));
+    assert_eq!(
+        value.as_ref(),
+        &wire::projects::document(&original, &limits, &[jig_core_world::world::scripted_model()])
+            .expect("complete authentic facts")
+    );
     assert_eq!((value.number, value.configured_period), (u32::MAX, 0));
     assert_eq!(value.members.get(4).expect("service").party, u64::MAX);
     assert!(transport.reply(to).is_none());

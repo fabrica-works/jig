@@ -47,7 +47,12 @@ fn key(query: &client::Read) -> Result<client::ObjectKey, Invalid> {
 /// # Errors
 /// Refuses wrong original identities, unsupported archive carriers, unadmitted
 /// recurrence and any whole source or receiving allocation above its bound.
-pub fn read(query: &client::Read, source: &reads::Historical, limits: &Limits) -> Result<client::ReadValue, Invalid> {
+pub fn read(
+    query: &client::Read,
+    source: &reads::Historical,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadValue, Invalid> {
     let key = key(query)?;
     let supplied = match &source.value {
         reads::Past::Task { document, .. } => client::ObjectKey::Task(document.chip.number),
@@ -71,24 +76,24 @@ pub fn read(query: &client::Read, source: &reads::Historical, limits: &Limits) -
     }
     let value = match &source.value {
         reads::Past::Task { document, result } => client::OwnerHistoricalValue::Task {
-            document: Box::new(task::document(document, limits).map_err(Invalid::Document)?),
-            result: Box::new(results::document(result, limits).map_err(Invalid::Owner)?),
+            document: Box::new(task::document(document, limits, models).map_err(Invalid::Document)?),
+            result: Box::new(results::document(result, limits, models).map_err(Invalid::Owner)?),
         },
         reads::Past::Proposal(value) => {
-            client::OwnerHistoricalValue::Proposal(history::proposal(value, limits).map_err(Invalid::Owner)?)
+            client::OwnerHistoricalValue::Proposal(history::proposal(value, limits, models).map_err(Invalid::Owner)?)
         }
         reads::Past::PersonProposal { proposal, decision } => client::OwnerHistoricalValue::PersonProposal {
-            proposal: Box::new(person_proposal(proposal, limits)?),
+            proposal: Box::new(person_proposal(proposal, limits, models)?),
             decision: decision.map(proposal_decision),
         },
         reads::Past::Escalation { task: document, decision, hold } => client::OwnerHistoricalValue::Escalation {
-            task: Box::new(task::document(document, limits).map_err(Invalid::Document)?),
+            task: Box::new(task::document(document, limits, models).map_err(Invalid::Document)?),
             decision: escalation_decision(decision, limits)?,
             hold: hold.as_ref().map(|value| history::milestone(value, limits).map_err(Invalid::Owner)).transpose()?,
         },
         reads::Past::Question { question, answer, ending } => {
             let client::ReadValue::Question(question) =
-                documents::question_read(question, limits).map_err(Invalid::Document)?
+                documents::question_read(question, limits, models).map_err(Invalid::Document)?
             else {
                 unreachable!("whole Question translator returns its declared carrier")
             };
@@ -107,13 +112,13 @@ pub fn read(query: &client::Read, source: &reads::Historical, limits: &Limits) -
                 answer,
                 ending: ending
                     .as_ref()
-                    .map(|value| results::document(value, limits).map(Box::new).map_err(Invalid::Owner))
+                    .map(|value| results::document(value, limits, models).map(Box::new).map_err(Invalid::Owner))
                     .transpose()?,
             }
         }
         reads::Past::PersonTask { document, result } => client::OwnerHistoricalValue::PersonTask {
-            document: Box::new(person_tasks::document(document, limits).map_err(Invalid::Owner)?),
-            result: Box::new(results::document(result, limits).map_err(Invalid::Owner)?),
+            document: Box::new(person_tasks::document(document, limits, models).map_err(Invalid::Owner)?),
+            result: Box::new(results::document(result, limits, models).map_err(Invalid::Owner)?),
         },
         // Archive references have their own exact protocol routes; these are not
         // near neighbours of the six historical object documents.
@@ -177,12 +182,16 @@ pub fn turn(
     }))))
 }
 
-fn person_proposal(value: &tasks::PersonProposal, limits: &Limits) -> Result<client::OwnerPersonProposal, Invalid> {
+fn person_proposal(
+    value: &tasks::PersonProposal,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerPersonProposal, Invalid> {
     Ok(client::OwnerPersonProposal {
         number: value.number,
         proposer: value.proposer,
         project: value.project,
-        goal: historical_goal::goal(value.batch().first().expect("one v10 goal"), limits)?,
+        goal: historical_goal::goal(value.batch().first().expect("one v10 goal"), limits, models)?,
         state: match &value.state {
             tasks::PersonProposalState::Withdrawn { .. } => unreachable!("no v10 withdrawal"),
             tasks::PersonProposalState::Pending { since } => {

@@ -31,9 +31,14 @@ fn the_joint_referee_catches_a_translation_answering_stop_before_its_actual_comm
         })
         .expect("the actual pending Stop's original attempt");
     // Deliberate fault: translate the proper owner outcome but release it before its commit.
-    let (envelope, answer) = crate::joint::wire::answers::keyed(crate::joint::wire::answers::reply(
-        people::Reply::Outcome(people::Outcome::Stopped { task: 1 }),
-    ))
+    let (envelope, answer) = crate::joint::wire::answers::keyed(
+        crate::joint::wire::answers::reply(
+            people::Reply::Outcome(people::Outcome::Stopped { task: 1 }),
+            &[],
+            &crate::test::limits().client.domain,
+        )
+        .expect("bounded answer"),
+    )
     .expect("complete actual translation");
     world.event(
         client,

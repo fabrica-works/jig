@@ -15,23 +15,61 @@ pub enum Invalid {
     NoteRevision,
     NoteProject,
     CompoundProject,
-    /// A model choice or nonempty named selector; the joint transport has no model registry.
+    /// A compound operation position cannot be represented in a refusal.
+    OperationIndex,
+    /// An unconfigured model/effort, or an invalid authority name context.
     Llm,
 }
 
 /// # Errors
 /// Refuses an inapplicable closed decision, an overflowing recalled revision, a mismatched note project
 /// or a model choice.
+pub fn ask(value: &client::Ask, models: &[jig_domain_core::Model]) -> Result<people::Ask, Invalid> {
+    Ok(request(value, models)?.ask)
+}
+
+/// The canonical original name context accompanies every explicit authority selector.
+pub struct Request {
+    pub ask: people::Ask,
+    pub models: Box<[Box<[u8]>]>,
+}
+
+/// # Errors
+/// Refuses unsupported values or a model-name context beyond people's bounds.
+pub fn request(value: &client::Ask, models: &[jig_domain_core::Model]) -> Result<Request, Invalid> {
+    let mut names = List::with_capacity(people::MODELS);
+    let mut ask = translate(value, models, &mut names)?;
+    let original = names.into_boxed();
+    let mut canonical = original.clone();
+    canonical.sort_unstable();
+    let mut moved = [0_u64; 64];
+    for (old, name) in original.iter().enumerate() {
+        for (new, candidate) in canonical.iter().enumerate() {
+            if name == candidate {
+                let bit = 1_u64.checked_shl(u32::try_from(new).map_err(|_| Invalid::Llm)?).ok_or(Invalid::Llm)?;
+                *moved.get_mut(old).ok_or(Invalid::Llm)? = bit;
+                break;
+            }
+        }
+    }
+    people::remap_models(&mut ask, &moved);
+    Ok(Request { ask, models: canonical })
+}
+
 #[expect(
     clippy::too_many_lines,
     reason = "one exhaustive closed request match keeps every supported and pending wire arm explicit"
 )]
-pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
+fn translate(
+    value: &client::Ask,
+    models: &[jig_domain_core::Model],
+    names: &mut List<Box<[u8]>>,
+) -> Result<people::Ask, Invalid> {
     Ok(match value {
-        client::Ask::Propose { project, action, reason } => create::propose(*project, action, reason)?,
+        client::Ask::Propose { project, action, reason } => create::propose(*project, action, reason, models, names)?,
         client::Ask::Withdraw { project, proposal } => people::Ask::Withdraw { project: *project, proposal: *proposal },
-        client::Ask::Create { project, tasks } => create::ask(*project, tasks)?,
-        client::Ask::Compound { project, operations } => compound::ask(*project, operations)?,
+        client::Ask::Create { project, tasks } => create::ask(*project, tasks, models, names)?,
+        client::Ask::Compound { project, operations } => compound::ask(*project, operations, models, names)?,
         client::Ask::Message { project, task, words } => {
             people::Ask::Say { project: *project, task: *task, words: Box::from(words.bytes()) }
         }
@@ -116,32 +154,15 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
                 recalled: u32::try_from(revision.value).map_err(|_| Invalid::NoteRevision)?,
             }),
         },
-        client::Ask::Amend { change, .. } if change.llm.is_some() => return Err(Invalid::Llm),
         client::Ask::Amend { project, task, revision, change, reason } => people::Ask::Amend {
             project: *project,
             task: *task,
             revision: revision.map_or(0, |value| value.value),
-            amendment: people::Amendment {
-                tracked: change.tracked.map(request_arguments::tracking),
-                addressed: change.addressed.map(|value| people::AddressChange {
-                    revision: value.revision.value,
-                    address: match value.address {
-                        client::PersonAddress::Party(number) => people::PersonAddress::Person(number),
-                        client::PersonAddress::Role(number) => people::PersonAddress::Role(number),
-                    },
-                }),
-                instructions: change.instructions.as_ref().map(|value| Box::from(value.bytes())),
-                spec: change.spec.as_ref().map(specification),
-                wake: change.wake.map(request_arguments::wake),
-                dependencies: change.dependencies.as_ref().map(|values| values.iter().copied().collect()),
-                authority: change.authority.as_ref().map(authority).transpose()?,
-                llm: None,
-                reason: Box::from(reason.bytes()),
-            },
+            amendment: amend(change, reason, models, names)?,
             release: None,
         },
         client::Ask::ChangePolicy { project, edit } => {
-            people::Ask::ChangePolicy { project: *project, change: policy_edit(edit)? }
+            people::Ask::ChangePolicy { project: *project, change: policy_edit(edit, names)? }
         }
         client::Ask::SetRoles { project, holdings } => people::Ask::SetRoles {
             project: *project,
@@ -154,6 +175,38 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
             people::Ask::MakeService { project: *project, name: Box::from(name.bytes()), role: role(*held) }
         }
     })
+}
+
+fn amend(
+    change: &client::Amendment,
+    reason: &client::Text,
+    models: &[jig_domain_core::Model],
+    names: &mut List<Box<[u8]>>,
+) -> Result<people::Amendment, Invalid> {
+    Ok(people::Amendment {
+        tracked: change.tracked.map(request_arguments::tracking),
+        addressed: change.addressed.map(|value| people::AddressChange {
+            revision: value.revision.value,
+            address: match value.address {
+                client::PersonAddress::Party(number) => people::PersonAddress::Person(number),
+                client::PersonAddress::Role(number) => people::PersonAddress::Role(number),
+            },
+        }),
+        instructions: change.instructions.as_ref().map(|value| Box::from(value.bytes())),
+        spec: change.spec.as_ref().map(specification),
+        wake: change.wake.map(request_arguments::wake),
+        dependencies: change.dependencies.as_ref().map(|values| values.iter().copied().collect()),
+        authority: change.authority.as_ref().map(|value| authority(value, names)).transpose()?,
+        llm: super::llm::requested(change.llm.as_ref(), models)?,
+        reason: Box::from(reason.bytes()),
+    })
+}
+
+/// A configured-name refusal precedes translating the request into people's indices.
+/// # Errors
+/// Refuses an operation position beyond the client refusal index range.
+pub fn refused(value: &client::Ask, models: &[jig_domain_core::Model]) -> Result<Option<client::Answer>, Invalid> {
+    super::llm::refused(value, models)
 }
 
 fn specification(value: &client::Specification) -> people::Spec {
@@ -200,15 +253,39 @@ fn grant(value: &client::OwnerGrant) -> people::Grant {
     people::Grant { connector: value.connector, kind: value.kind, pattern: pattern(&value.pattern) }
 }
 
-fn authority(value: &client::OwnerAuthority) -> Result<people::Authority, Invalid> {
+fn authority(value: &client::OwnerAuthority, names: &mut List<Box<[u8]>>) -> Result<people::Authority, Invalid> {
     let models = match &value.models {
         None => None,
         Some(client::AuthorityModels::All) => Some(people::Models::ALL),
-        Some(client::AuthorityModels::Named(names)) => {
-            if !names.is_empty() {
-                return Err(Invalid::Llm);
+        Some(client::AuthorityModels::Named(selected)) => {
+            let mut bits = 0_u64;
+            for name in selected {
+                if name.is_empty()
+                    || name.len() > usize::try_from(people::MODEL_NAME_BYTES).map_err(|_| Invalid::Llm)?
+                {
+                    return Err(Invalid::Llm);
+                }
+                let mut found = None;
+                for (at, previous) in names.iter().enumerate() {
+                    if name == previous {
+                        found = Some(u32::try_from(at).map_err(|_| Invalid::Llm)?);
+                        break;
+                    }
+                }
+                let index = if let Some(at) = found {
+                    at
+                } else {
+                    let at = names.len();
+                    names.push(name.clone()).map_err(|_| Invalid::Llm)?;
+                    at
+                };
+                let bit = 1_u64.checked_shl(index).ok_or(Invalid::Llm)?;
+                if bits & bit != 0 {
+                    return Err(Invalid::Llm);
+                }
+                bits |= bit;
             }
-            Some(people::Models::NONE)
+            Some(people::Models::Named(bits))
         }
     };
     Ok(people::Authority {
@@ -333,6 +410,153 @@ mod tests {
         client::Text::new(Box::from(value), 128).expect("the complete supplied fixture is admitted")
     }
 
+    fn chosen() -> client::LlmChoice {
+        client::LlmChoice {
+            account: Some(17),
+            main: client::ModelEffort { model: text(b"scripted"), effort: Some(text(b"high")) },
+            subagents: crate::test::list([client::ModelEffort { model: text(b"scripted"), effort: None }]),
+        }
+    }
+
+    fn expected_choice() -> people::LlmChoice {
+        people::LlmChoice {
+            account: Some(17),
+            main: people::ModelEffort { model: 0, effort: Some(1) },
+            subagents: Box::new([people::ModelEffort { model: 0, effort: None }]),
+        }
+    }
+
+    fn change(llm: client::LlmChoice) -> Box<client::Amendment> {
+        Box::new(client::Amendment {
+            addressed: None,
+            spec: None,
+            wake: None,
+            dependencies: None,
+            authority: None,
+            instructions: None,
+            tracked: None,
+            llm: Some(llm),
+        })
+    }
+
+    fn member(llm: client::LlmChoice) -> client::NewTask {
+        let source = super::super::owner::tests::amendment_source();
+        let models = [jig_core_world::world::scripted_model()];
+        let limits = super::super::rows::tests::limits();
+        client::NewTask {
+            executor: client::OwnerExecutor::Agent { charter: 1 },
+            spec: client::Specification {
+                words: text(b"task"),
+                parameters: List::with_capacity(0),
+                inputs: List::with_capacity(0),
+            },
+            contract: client::NewContract::Report { words: 16 },
+            authority: super::super::owner::authority(&source.authority, &limits, &models)
+                .expect("fixture authority")
+                .authority,
+            budget: client::NewBudget::Named,
+            deadline: client::NewDeadline::Named,
+            wake: None,
+            dependencies: List::with_capacity(0),
+            named: List::with_capacity(0),
+            tracked: None,
+            label: 0,
+            flags: client::TaskFlags { conversation: false, listed: false, retention: client::Retention::Kept },
+            llm: Some(llm),
+        }
+    }
+
+    #[test]
+    fn amendment_carries_the_chosen_llm() {
+        let request = client::Ask::Amend {
+            project: 1,
+            task: 2,
+            revision: None,
+            change: change(chosen()),
+            reason: text(b"choice"),
+        };
+        let people::Ask::Amend { amendment, .. } =
+            ask(&request, &[jig_core_world::world::scripted_model()]).expect("translated amendment")
+        else {
+            panic!("amendment")
+        };
+        assert_eq!(amendment.llm, Some(expected_choice()));
+    }
+
+    #[test]
+    fn creation_carries_the_chosen_llm() {
+        let request = client::Ask::Create { project: 1, tasks: crate::test::list([member(chosen())]) };
+        let people::Ask::Create { batch, .. } =
+            ask(&request, &[jig_core_world::world::scripted_model()]).expect("translated creation")
+        else {
+            panic!("creation")
+        };
+        assert_eq!(batch.first().expect("one task").llm, Some(expected_choice()));
+    }
+
+    #[test]
+    fn missing_models_are_refused_at_the_request_entrance() {
+        let mut llm = chosen();
+        llm.main.model = text(b"removed");
+        let tasks = crate::test::list([member(llm.clone())]);
+        let amendment = client::Ask::Amend {
+            project: 1,
+            task: 2,
+            revision: None,
+            change: change(llm.clone()),
+            reason: text(b"choice"),
+        };
+        let cases = [
+            (client::Ask::Create { project: 1, tasks: tasks.clone() }, None),
+            (
+                client::Ask::Propose {
+                    project: 1,
+                    action: client::ProposeAction::Batch { tasks },
+                    reason: text(b"choice"),
+                },
+                None,
+            ),
+            (
+                client::Ask::Propose {
+                    project: 1,
+                    action: client::ProposeAction::Amendment {
+                        task: 2,
+                        revision: client::Revision { value: 3 },
+                        change: change(llm.clone()),
+                    },
+                    reason: text(b"choice"),
+                },
+                None,
+            ),
+            (amendment, None),
+            (
+                client::Ask::Compound {
+                    project: 1,
+                    operations: crate::test::list([
+                        client::Operation::Stop { project: 1, task: 2 },
+                        client::Operation::Amend {
+                            project: 1,
+                            task: 2,
+                            revision: None,
+                            change: change(llm),
+                            reason: text(b"choice"),
+                        },
+                    ]),
+                },
+                Some(1),
+            ),
+        ];
+        for (request, at) in cases {
+            assert_eq!(
+                refused(&request, &[jig_core_world::world::scripted_model()]),
+                Ok(Some(client::Answer::Refused {
+                    refusal: client::Refusal::Llm { model: text(b"removed"), why: client::LlmWhy::Unconfigured },
+                    at
+                }))
+            );
+        }
+    }
+
     #[test]
     fn amendment_requests_keep_supplied_empty_or_opaque_reason_and_independent_address_spec_and_release_revisions() {
         for reason in [text(b""), text(UTF8_TEXTS[0])] {
@@ -370,7 +594,7 @@ mod tests {
                     .expect("two operations fit");
                 let request = client::Ask::Compound { project, operations };
                 let before = request.clone();
-                let Ok(people::Ask::Compound { project, operations }) = ask(&request) else {
+                let Ok(people::Ask::Compound { project, operations }) = ask(&request, &[]) else {
                     panic!("whole compound");
                 };
                 let [
@@ -412,7 +636,10 @@ mod tests {
         let selected = client::Specification { words: text(b""), parameters, inputs: inputs.clone() };
         let source = super::super::owner::tests::amendment_source();
         let limits = jig_client::DomainLimits { rows: 4, text: 128, ..crate::test::limits().client.domain };
-        let authority = super::super::owner::authority(&source.authority, &limits).expect("whole authority").authority;
+        let authority =
+            super::super::owner::authority(&source.authority, &limits, &[jig_core_world::world::scripted_model()])
+                .expect("whole authority")
+                .authority;
         let wake = client::OwnerWakePolicy {
             words: client::WakeRule::Batch { count: u32::MAX, age: skein_lib::Duration::ZERO },
             notices: client::WakeRule::Immediate,
@@ -438,7 +665,7 @@ mod tests {
             }),
             reason: text(b"supplied"),
         };
-        let Ok(people::Ask::Amend { project, task, revision, amendment, release }) = ask(&request) else {
+        let Ok(people::Ask::Amend { project, task, revision, amendment, release }) = ask(&request, &[]) else {
             panic!("whole amendment")
         };
         assert_eq!((project, task, revision, release), (0, u64::MAX, u64::MAX, None));
@@ -455,7 +682,10 @@ mod tests {
             ]
         );
         assert_eq!(amendment.dependencies.as_deref(), Some([u64::MAX, 0].as_slice()));
-        assert_eq!(amendment.authority, Some(super::authority(&authority).expect("supported authority")));
+        assert_eq!(
+            amendment.authority,
+            Some(super::authority(&authority, &mut List::with_capacity(people::MODELS)).expect("supported authority"))
+        );
         assert_eq!(
             amendment.wake,
             Some(people::WakePolicy {
@@ -474,20 +704,26 @@ mod tests {
     #[test]
     fn request_translation_keeps_named_question_person_hold_and_proposal_identities_and_empty_words() {
         assert_eq!(
-            ask(&client::Ask::Answer {
-                project: u32::MAX,
-                on: client::AnswerOn::Question { task: u64::MAX, message: 42, words: text(b"") }
-            }),
+            ask(
+                &client::Ask::Answer {
+                    project: u32::MAX,
+                    on: client::AnswerOn::Question { task: u64::MAX, message: 42, words: text(b"") }
+                },
+                &[]
+            ),
             Ok(people::Ask::AnswerQuestion { project: u32::MAX, task: u64::MAX, question: 42, words: Box::new([]) })
         );
         for again in [None, Some(false), Some(true)] {
             assert_eq!(
-                ask(&client::Ask::Release {
-                    project: 4,
-                    task: 99,
-                    revision: client::Revision { value: u64::MAX },
-                    again
-                }),
+                ask(
+                    &client::Ask::Release {
+                        project: 4,
+                        task: 99,
+                        revision: client::Revision { value: u64::MAX },
+                        again
+                    },
+                    &[]
+                ),
                 Ok(people::Ask::Release { project: 4, task: 99, revision: u64::MAX, again })
             );
         }
@@ -497,13 +733,16 @@ mod tests {
                 client::Proposer::Party(n) => people::Proposer::Party(n),
             };
             assert_eq!(
-                ask(&client::Ask::Decide {
-                    project: 4,
-                    on: client::DecideOn::Proposal {
-                        proposal: client::ProposalKey { proposer, number: 7 },
-                        decision: client::Decision::Rejected { reason: text(UTF8_TEXTS[0]) }
-                    }
-                }),
+                ask(
+                    &client::Ask::Decide {
+                        project: 4,
+                        on: client::DecideOn::Proposal {
+                            proposal: client::ProposalKey { proposer, number: 7 },
+                            decision: client::Decision::Rejected { reason: text(UTF8_TEXTS[0]) }
+                        }
+                    },
+                    &[]
+                ),
                 Ok(people::Ask::DecideProposal {
                     project: 4,
                     proposer: owner,
@@ -529,7 +768,7 @@ mod tests {
             references,
         };
         assert_eq!(
-            ask(&value),
+            ask(&value, &[]),
             Ok(people::Ask::EditNote {
                 project: 4,
                 name: 99,
@@ -543,21 +782,27 @@ mod tests {
             })
         );
         assert_eq!(
-            ask(&client::Ask::DeleteNote {
-                project: 4,
-                note: 99,
-                scope: client::NoteScope::Project(5),
-                revision: client::Revision { value: 1 }
-            }),
+            ask(
+                &client::Ask::DeleteNote {
+                    project: 4,
+                    note: 99,
+                    scope: client::NoteScope::Project(5),
+                    revision: client::Revision { value: 1 }
+                },
+                &[]
+            ),
             Err(Invalid::NoteProject)
         );
         assert_eq!(
-            ask(&client::Ask::DeleteNote {
-                project: 4,
-                note: 99,
-                scope: client::NoteScope::Task { project: 4, task: u64::MAX },
-                revision: client::Revision { value: u64::from(u32::MAX) + 1 }
-            }),
+            ask(
+                &client::Ask::DeleteNote {
+                    project: 4,
+                    note: 99,
+                    scope: client::NoteScope::Task { project: 4, task: u64::MAX },
+                    revision: client::Revision { value: u64::from(u32::MAX) + 1 }
+                },
+                &[]
+            ),
             Err(Invalid::NoteRevision)
         );
     }
@@ -622,10 +867,13 @@ mod tests {
                     .expect("the complete supplied fixture is admitted");
             }
             let Ok(people::Ask::ChangePolicy { project, change: people::PolicyChange::Requirements { requirements } }) =
-                ask(&client::Ask::ChangePolicy {
-                    project: u32::MAX,
-                    edit: client::PolicyEdit::Requirements { requirements },
-                })
+                ask(
+                    &client::Ask::ChangePolicy {
+                        project: u32::MAX,
+                        edit: client::PolicyEdit::Requirements { requirements },
+                    },
+                    &[],
+                )
             else {
                 panic!("one whole policy request");
             };
@@ -647,7 +895,7 @@ mod tests {
                 .push(client::PolicyPermission { connector: u16::MAX, permission: u16::MAX, role: u32::MAX })
                 .expect("the complete supplied fixture is admitted");
             assert_eq!(
-                ask(&client::Ask::ChangePolicy { project: 4, edit: client::PolicyEdit::Permissions { mappings } }),
+                ask(&client::Ask::ChangePolicy { project: 4, edit: client::PolicyEdit::Permissions { mappings } }, &[]),
                 Ok(people::Ask::ChangePolicy {
                     project: 4,
                     change: people::PolicyChange::Permissions {
@@ -696,7 +944,7 @@ mod tests {
             decides: u8::MAX,
         };
         let Ok(people::Ask::ChangePolicy { project: 4, change: people::PolicyChange::Role(now) }) =
-            ask(&client::Ask::ChangePolicy { project: 4, edit: client::PolicyEdit::Role(role) })
+            ask(&client::Ask::ChangePolicy { project: 4, edit: client::PolicyEdit::Role(role) }, &[])
         else {
             panic!("closed role replacement");
         };
@@ -715,14 +963,17 @@ mod tests {
         assert_eq!(now.authority.grants[0], super::grant(&grant));
         assert_eq!(now.authority.note_resources[0].pattern, pattern(&literal_pattern(false)));
         assert_eq!(
-            ask(&client::Ask::ChangePolicy { project: 4, edit: client::PolicyEdit::Projections { grants } }),
+            ask(&client::Ask::ChangePolicy { project: 4, edit: client::PolicyEdit::Projections { grants } }, &[]),
             Ok(people::Ask::ChangePolicy {
                 project: 4,
                 change: people::PolicyChange::Projections { grants: Box::from([super::grant(&grant)]) }
             })
         );
         assert_eq!(
-            ask(&client::Ask::ChangePolicy { project: 4, edit: client::PolicyEdit::ProjectSpend { period_spend: 0 } }),
+            ask(
+                &client::Ask::ChangePolicy { project: 4, edit: client::PolicyEdit::ProjectSpend { period_spend: 0 } },
+                &[]
+            ),
             Ok(people::Ask::ChangePolicy {
                 project: 4,
                 change: people::PolicyChange::ProjectSpend { period_spend: 0 }
@@ -733,7 +984,8 @@ mod tests {
             client::PolicyEdit::Projections { grants: List::with_capacity(5) },
             client::PolicyEdit::Permissions { mappings: List::with_capacity(5) },
         ] {
-            let Ok(people::Ask::ChangePolicy { change, .. }) = ask(&client::Ask::ChangePolicy { project: 4, edit })
+            let Ok(people::Ask::ChangePolicy { change, .. }) =
+                ask(&client::Ask::ChangePolicy { project: 4, edit }, &[])
             else {
                 panic!("explicit empty replacement");
             };
@@ -768,16 +1020,16 @@ mod tests {
                 .expect("the complete supplied fixture is admitted");
             expected.push(people::Holding { person: party, role: actual });
             assert_eq!(
-                ask(&client::Ask::MakeService { project: u32::MAX, name: text(UTF8_TEXTS[0]), role: supplied }),
+                ask(&client::Ask::MakeService { project: u32::MAX, name: text(UTF8_TEXTS[0]), role: supplied }, &[]),
                 Ok(people::Ask::MakeService { project: u32::MAX, name: Box::from(UTF8_TEXTS[0]), role: actual })
             );
         }
         assert_eq!(
-            ask(&client::Ask::SetRoles { project: u32::MAX, holdings }),
+            ask(&client::Ask::SetRoles { project: u32::MAX, holdings }, &[]),
             Ok(people::Ask::SetRoles { project: u32::MAX, holdings: expected.into_boxed_slice() })
         );
         assert_eq!(
-            ask(&client::Ask::SetRoles { project: 0, holdings: List::with_capacity(7) }),
+            ask(&client::Ask::SetRoles { project: 0, holdings: List::with_capacity(7) }, &[]),
             Ok(people::Ask::SetRoles { project: 0, holdings: Box::new([]) })
         );
     }
@@ -795,7 +1047,7 @@ mod tests {
             };
             let before = request.clone();
             assert_eq!(
-                ask(&request),
+                ask(&request, &[]),
                 Ok(people::Ask::EditNote {
                     project: u32::MAX,
                     name: u64::MAX,

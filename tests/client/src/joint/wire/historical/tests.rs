@@ -131,7 +131,7 @@ pub(crate) fn sources() -> Vec<(client::Read, reads::Historical)> {
         .collect()
 }
 fn value(query: &client::Read, source: &reads::Historical) -> client::OwnerHistorical {
-    let client::ReadValue::Historical(value) = read(query, source, &limits()).expect("whole source") else {
+    let client::ReadValue::Historical(value) = read(query, source, &limits(), &[]).expect("whole source") else {
         panic!("whole historical carrier")
     };
     *value
@@ -227,14 +227,14 @@ fn historical_unadmitted_recurrence_is_refused_before_copying_any_raw_goal_field
         overlap: tasks::RecurringOverlap::Wait,
     }));
     let l = Limits { text: 0, rows: 0, ..limits() };
-    assert_eq!(read(&query, &source, &l), Err(Invalid::Recurrence));
+    assert_eq!(read(&query, &source, &l, &[]), Err(Invalid::Recurrence));
 }
 
 #[test]
 fn historical_original_query_and_all_nested_companion_identities_are_checked_before_route_admission() {
     for (query, source) in sources() {
-        assert_eq!(read(&client::Read::Me, &source, &limits()), Err(Invalid::Query));
-        assert_eq!(read(&client::Read::Task { task: 0 }, &source, &limits()), Err(Invalid::Identity));
+        assert_eq!(read(&client::Read::Me, &source, &limits(), &[]), Err(Invalid::Query));
+        assert_eq!(read(&client::Read::Task { task: 0 }, &source, &limits(), &[]), Err(Invalid::Identity));
         let mut wrong = source.clone();
         match &mut wrong.value {
             reads::Past::Task { result, .. } | reads::Past::PersonTask { result, .. } => result.task.number = 0,
@@ -247,7 +247,7 @@ fn historical_original_query_and_all_nested_companion_identities_are_checked_bef
             reads::Past::Question { question, .. } => question.message = 0,
             reads::Past::Reply(_) | reads::Past::Turn(_) => unreachable!("six object fixtures"),
         }
-        assert_eq!(read(&query, &wrong, &limits()), Err(Invalid::Identity));
+        assert_eq!(read(&query, &wrong, &limits(), &[]), Err(Invalid::Identity));
     }
 }
 
@@ -340,16 +340,16 @@ fn historical_whole_six_boxed_envelopes_have_exact_receiving_byte_boundaries() {
         let mut high = limits().document_bytes;
         while low < high {
             let at = low + (high - low) / 2;
-            if read(&query, &source, &Limits { document_bytes: at, ..limits() }).is_ok() {
+            if read(&query, &source, &Limits { document_bytes: at, ..limits() }, &[]).is_ok() {
                 high = at;
             } else {
                 low = at + 1;
             }
         }
         assert!(low > 0);
-        assert_eq!(read(&query, &source, &Limits { document_bytes: low - 1, ..limits() }), Err(Invalid::Payload));
-        assert!(read(&query, &source, &Limits { document_bytes: low, ..limits() }).is_ok());
-        assert!(read(&query, &source, &Limits { document_bytes: low + 1, ..limits() }).is_ok());
+        assert_eq!(read(&query, &source, &Limits { document_bytes: low - 1, ..limits() }, &[]), Err(Invalid::Payload));
+        assert!(read(&query, &source, &Limits { document_bytes: low, ..limits() }, &[]).is_ok());
+        assert!(read(&query, &source, &Limits { document_bytes: low + 1, ..limits() }, &[]).is_ok());
     }
 }
 
@@ -360,7 +360,7 @@ fn historical_late_nested_allocations_are_refused_whole_without_trimming_empty_r
     result.delegates = List::with_capacity(9);
     assert_eq!(result.delegates.capacity(), 9);
     let before = source.clone();
-    assert_eq!(read(&query, &source, &limits()), Err(Invalid::Owner(owner::Invalid::TooLarge)));
+    assert_eq!(read(&query, &source, &limits(), &[]), Err(Invalid::Owner(owner::Invalid::TooLarge)));
     assert_eq!(source, before);
 }
 
@@ -441,7 +441,7 @@ fn historical_person_proposal_states_keep_the_independent_whole_decision_and_cre
     let mut missing = base;
     let reads::Past::PersonProposal { proposal, .. } = &mut missing.value else { panic!("person source") };
     proposal.state = tasks::PersonProposalState::Accepted { by: tasks::Party::Person(0) };
-    assert_eq!(read(&query, &missing, &limits()), Err(Invalid::Identity));
+    assert_eq!(read(&query, &missing, &limits(), &[]), Err(Invalid::Identity));
 }
 
 #[test]
@@ -469,7 +469,8 @@ fn historical_raw_goal_contracts_keep_opaque_state_closed_machine_fields_and_cha
     for contract in contracts {
         let mut source = raw_goal();
         source.contract = contract;
-        let actual = historical_goal::goal(&source, &limits()).expect("whole raw goal");
+        let actual = historical_goal::goal(&source, &limits(), &[jig_core_world::world::scripted_model()])
+            .expect("whole raw goal");
         match actual.contract {
             client::TaskContractDocument::Approval { state, part } => {
                 assert_eq!(*state, [255, 0]);

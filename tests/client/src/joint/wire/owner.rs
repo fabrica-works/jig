@@ -10,6 +10,8 @@ use skein_lib::List;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Invalid {
     TooLarge,
+    /// A model or effort index does not name a configured choice.
+    Llm,
     /// The whole offered-act allocation exceeds the receiving offer bound.
     OfferCapacity {
         allocated: u32,
@@ -65,15 +67,20 @@ pub fn held_role(value: jig_domain_people::Role) -> client::HeldRole {
 
 /// # Errors
 /// Refuses inconsistent executor or specification resource facts, any whole text/list allocation above bounds.
-pub fn frame(value: &documents::Frame, limits: &Limits) -> Result<client::Me, Invalid> {
+pub fn frame(
+    value: &documents::Frame,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+    providers: &jig_domain_accounts::Providers,
+) -> Result<client::Me, Invalid> {
     if value.projects.capacity() > limits.projects {
         return Err(Invalid::TooLarge);
     }
     let projects = list(&value.projects, limits, |row| {
         Ok(client::MeProject {
-            models: skein_lib::List::with_capacity(0),
-            templates: super::me::templates(&row.templates, limits)?,
-            creating: row.creating.as_ref().map(|v| super::me::creating(v, limits)).transpose()?,
+            models: super::llm::models(row.models, models, providers, limits)?,
+            templates: super::me::templates(&row.templates, limits, models)?,
+            creating: row.creating.as_ref().map(|v| super::me::creating(v, limits, models)).transpose()?,
             project: row.project,
             name: row.name.as_ref().map(|value| text(value, limits)).transpose()?,
             role: held_role(row.role),
@@ -154,7 +161,11 @@ pub fn specification(value: &documents::SpecLine, limits: &Limits) -> Result<cli
 /// this state neither reconstructs that context nor adds a person revision.
 /// # Errors
 /// Refuses inconsistent executor or specification resource facts, any whole text/list allocation above bounds.
-pub fn amendment(value: &documents::AmendmentState, limits: &Limits) -> Result<client::OwnerAmendmentState, Invalid> {
+pub fn amendment(
+    value: &documents::AmendmentState,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerAmendmentState, Invalid> {
     Ok(client::OwnerAmendmentState {
         addressed: value.addressed.map(|value| match value {
             tasks::PersonAddress::Person(number) => client::PersonAddress::Party(number),
@@ -163,7 +174,7 @@ pub fn amendment(value: &documents::AmendmentState, limits: &Limits) -> Result<c
         taken_by: value.taken_by,
         instructions: value.instructions.as_ref().map(|value| text(value, limits)).transpose()?,
         spec: specification(&value.spec, limits)?,
-        authority: authority(&value.authority, limits)?,
+        authority: authority(&value.authority, limits, models)?,
         wake: wake(value.wake),
         dependencies: list(&value.dependencies, limits, |number| Ok(*number))?,
         cut: value.cut,
@@ -211,11 +222,15 @@ pub(super) fn pattern(
 
 /// # Errors
 /// Refuses inconsistent executor or specification resource facts, any whole text/list allocation above bounds.
-pub fn authority(value: &documents::AuthorityLine, limits: &Limits) -> Result<client::OwnerAuthorityDocument, Invalid> {
+pub fn authority(
+    value: &documents::AuthorityLine,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerAuthorityDocument, Invalid> {
     let limits = &Limits { rows: crate::test::AUTHORITY_ENTRIES, ..*limits };
     Ok(client::OwnerAuthorityDocument {
         authority: client::OwnerAuthority {
-            models: Some(models(value.models)),
+            models: Some(self::models(value.models, models)?),
             tools: value.tools.0,
             grants: list(&value.grants, limits, |value| {
                 Ok(client::OwnerGrant {
@@ -379,15 +394,31 @@ fn subscription(value: tasks::Subscription) -> client::Subscription {
     }
 }
 
-pub(super) fn models(value: tasks::Models) -> client::AuthorityModels {
+pub(super) fn models(
+    value: tasks::Models,
+    models: &[jig_domain_core::Model],
+) -> Result<client::AuthorityModels, Invalid> {
     if value.is_all() {
-        return client::AuthorityModels::All;
+        return Ok(client::AuthorityModels::All);
     }
-    let mut names = List::with_capacity(1);
-    if value.bits() & 1 != 0 {
-        names.push(jig_core_world::world::scripted_model().name).expect("one configured model");
+    let count = u32::try_from(models.len()).map_err(|_| Invalid::TooLarge)?;
+    if count > tasks::MODELS {
+        return Err(Invalid::TooLarge);
     }
-    client::AuthorityModels::Named(names)
+    let mut names = List::with_capacity(count);
+    for (at, model) in models.iter().enumerate() {
+        let bit = 1_u64.checked_shl(u32::try_from(at).map_err(|_| Invalid::Llm)?).ok_or(Invalid::Llm)?;
+        if value.bits() & bit != 0 {
+            names.push(model.name.clone()).map_err(|_| Invalid::TooLarge)?;
+        }
+    }
+    let mut names = names.into_boxed();
+    names.sort_unstable();
+    let mut result = List::with_capacity(u32::try_from(names.len()).map_err(|_| Invalid::TooLarge)?);
+    for name in names {
+        result.push(name).map_err(|_| Invalid::TooLarge)?;
+    }
+    Ok(client::AuthorityModels::Named(result))
 }
 
 #[cfg(test)]
@@ -447,7 +478,8 @@ pub(super) mod tests {
                 let mut source = amendment_source();
                 source.instructions = instructions.clone();
                 source.addressed = addressed;
-                let actual = amendment(&source, &limits).expect("whole supplied snapshot fits");
+                let actual = amendment(&source, &limits, &[jig_core_world::world::scripted_model()])
+                    .expect("whole supplied snapshot fits");
                 assert_eq!(
                     actual.instructions.as_ref().map(|value| value.bytes.bytes()),
                     instructions.as_ref().map(|value| value.bytes.as_ref())
@@ -481,15 +513,22 @@ pub(super) mod tests {
             let mut source = amendment_source();
             source.spec.cut = spec_loss;
             source.cut = dependency_loss;
-            let actual = amendment(&source, &limits).expect("independent loss facts fit");
+            let actual = amendment(&source, &limits, &[jig_core_world::world::scripted_model()])
+                .expect("independent loss facts fit");
             assert_eq!(actual.spec.cut, spec_loss);
             assert!(actual.spec.specification.words.cut, "supplied word loss is independent of list loss");
             assert!(!actual.authority.cut);
             assert_eq!(actual.cut, dependency_loss);
         }
         let source = amendment_source();
-        assert_eq!(amendment(&source, &Limits { rows: 3, ..limits }), Err(Invalid::TooLarge));
-        assert_eq!(amendment(&source, &Limits { text: 2, ..limits }), Err(Invalid::TooLarge));
+        assert_eq!(
+            amendment(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+            Err(Invalid::TooLarge)
+        );
+        assert_eq!(
+            amendment(&source, &Limits { text: 2, ..limits }, &[jig_core_world::world::scripted_model()]),
+            Err(Invalid::TooLarge)
+        );
         assert_eq!(source.dependencies.capacity(), 4);
         assert_eq!(source.dependencies.as_slice(), &[u64::MAX, 0]);
         assert_eq!(source.spec.words.bytes.as_ref(), b"a/b");
@@ -656,7 +695,8 @@ pub(super) mod tests {
                 notes: tasks::Scopes(u8::MAX),
                 note_resources: resources.clone(),
             };
-            let actual = authority(&source, &limits).expect("the complete supplied fixture is admitted");
+            let actual = authority(&source, &limits, &[jig_core_world::world::scripted_model()])
+                .expect("the complete supplied fixture is admitted");
             assert!(!actual.cut);
             assert_eq!(actual.authority.tools, u64::MAX);
             assert_eq!(actual.authority.notes, u8::MAX);
@@ -688,7 +728,10 @@ pub(super) mod tests {
             );
             let mut oversized = source.clone();
             oversized.note_resources = List::with_capacity(crate::test::AUTHORITY_ENTRIES + 1);
-            assert_eq!(authority(&oversized, &Limits { rows: 3, ..limits }), Err(Invalid::TooLarge));
+            assert_eq!(
+                authority(&oversized, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+                Err(Invalid::TooLarge)
+            );
         }
         assert_whole_verdict_contract(&limits);
     }
@@ -840,7 +883,8 @@ pub(super) mod tests {
             cut: true,
         };
         let limits = Limits { projects: 7, rows: 7, text: 2, ..crate::test::limits().client.domain };
-        let translated = frame(&source, &limits).expect("the complete supplied fixture is admitted");
+        let translated = frame(&source, &limits, &[], &jig_domain_accounts::Providers::none())
+            .expect("the complete supplied fixture is admitted");
         assert_eq!(translated.party.number, u64::MAX);
         assert_eq!(translated.party.kind, client::PartyKind::Service);
         assert_eq!(translated.party.login.bytes.bytes(), UTF8_TEXTS[1]);
@@ -864,12 +908,19 @@ pub(super) mod tests {
             assert_eq!(row.name, None);
             assert_eq!(row.pool, None);
         }
-        assert_eq!(frame(&source, &Limits { projects: 6, ..limits }), Err(Invalid::TooLarge));
-        assert_eq!(frame(&source, &Limits { text: 1, ..limits }), Err(Invalid::TooLarge));
+        assert_eq!(
+            frame(&source, &Limits { projects: 6, ..limits }, &[], &jig_domain_accounts::Providers::none()),
+            Err(Invalid::TooLarge)
+        );
+        assert_eq!(
+            frame(&source, &Limits { text: 1, ..limits }, &[], &jig_domain_accounts::Providers::none()),
+            Err(Invalid::TooLarge)
+        );
         let mut known = source;
         known.updates = documents::Count::Known(0);
         known.kind = jig_domain_people::Kind::Person;
-        let translated = frame(&known, &limits).expect("the complete supplied fixture is admitted");
+        let translated = frame(&known, &limits, &[], &jig_domain_accounts::Providers::none())
+            .expect("the complete supplied fixture is admitted");
         assert_eq!(translated.updates, client::Count { value: 0, limited: false });
         assert_eq!(translated.party.kind, client::PartyKind::Person);
     }

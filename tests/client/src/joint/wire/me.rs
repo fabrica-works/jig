@@ -6,19 +6,27 @@ use jig_domain_core::{Template, acts};
 use jig_domain_people as p;
 use jig_domain_tasks as t;
 use skein_lib::List;
-pub(super) fn templates(values: &List<Template>, limits: &Limits) -> Result<List<c::Template>, owner::Invalid> {
+pub(super) fn templates(
+    values: &List<Template>,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<List<c::Template>, owner::Invalid> {
     if values.len() > limits.rows {
         return Err(owner::Invalid::TooLarge);
     }
     let mut rows = List::with_capacity(values.len());
     for value in values {
-        rows.push(template(value, limits)?).expect("same length");
+        rows.push(template(value, limits, models)?).expect("same length");
     }
     Ok(rows)
 }
-fn template(value: &Template, limits: &Limits) -> Result<c::Template, owner::Invalid> {
+fn template(
+    value: &Template,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<c::Template, owner::Invalid> {
     Ok(c::Template {
-        llm: None,
+        llm: super::llm::choice(value.llm.as_ref(), models, limits)?,
         number: value.number,
         name: owner::text(&jig_domain_core::documents::Text { bytes: value.name.clone(), cut: false }, limits)?,
         executor: match value.executor {
@@ -50,7 +58,11 @@ fn template(value: &Template, limits: &Limits) -> Result<c::Template, owner::Inv
         grace: value.grace,
     })
 }
-pub(super) fn creating(value: &acts::Creating, limits: &Limits) -> Result<c::Creating, owner::Invalid> {
+pub(super) fn creating(
+    value: &acts::Creating,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<c::Creating, owner::Invalid> {
     let mut value = value.clone();
     match &mut value.within {
         acts::Bounds::Create { charters, procedures, .. } => {
@@ -63,10 +75,10 @@ pub(super) fn creating(value: &acts::Creating, limits: &Limits) -> Result<c::Cre
         acts::Beyond::Proposed { to: acts::Recipient::Roles { roles, .. } } => *roles = entries(roles),
         acts::Beyond::Proposed { .. } | acts::Beyond::Refused(_) => (),
     }
-    let c::Bounds::Create(within) = offers::bounds(&value.within, limits)? else { panic!("creating bound") };
+    let c::Bounds::Create(within) = offers::bounds(&value.within, limits, models)? else { panic!("creating bound") };
     let beyond = match &value.beyond {
         acts::Beyond::Proposed { to } => c::Beyond::Proposed { to: offers::recipient(to, limits)? },
-        acts::Beyond::Refused(why) => c::Beyond::Refused(refusals::refusal(*why)),
+        acts::Beyond::Refused(why) => c::Beyond::Refused(refusals::refusal(*why)?),
     };
     Ok(c::Creating { within, beyond })
 }

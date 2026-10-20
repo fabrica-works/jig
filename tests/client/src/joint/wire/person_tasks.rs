@@ -7,7 +7,11 @@ use jig_domain_core::documents;
 
 /// # Errors
 /// Refuses any complete nested allocation above the receiving bounds.
-pub fn document(source: &documents::PersonTask, limits: &Limits) -> Result<client::OwnerPersonTask, owner::Invalid> {
+pub fn document(
+    source: &documents::PersonTask,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerPersonTask, owner::Invalid> {
     Ok(client::OwnerPersonTask {
         task: chips::chip(&source.task, limits)?,
         revision: client::Revision { value: source.revision },
@@ -25,12 +29,12 @@ pub fn document(source: &documents::PersonTask, limits: &Limits) -> Result<clien
                 result: value
                     .result
                     .as_ref()
-                    .map(|value| results::document(value, limits).map(Box::new))
+                    .map(|value| results::document(value, limits, models).map(Box::new))
                     .transpose()?,
             })
         })?,
         cut: source.cut,
-        acts: offers::offered(&source.acts, limits)?,
+        acts: offers::offered(&source.acts, limits, models)?,
     })
 }
 
@@ -82,7 +86,8 @@ pub(crate) mod tests {
         let source = source();
         let original = source.clone();
         let limits = Limits { rows: 8, ..super::super::rows::tests::limits() };
-        let actual = document(&source, &limits).expect("whole pending person work");
+        let actual =
+            document(&source, &limits, &[jig_core_world::world::scripted_model()]).expect("whole pending person work");
         assert_eq!(actual.revision.value, u64::MAX);
         assert_eq!(actual.project(), Some(u32::MAX));
         assert_eq!(actual.requester, client::OwnerRequester::Deployment { project: 0 });
@@ -127,7 +132,8 @@ pub(crate) mod tests {
                     source.stall = present.then_some(Duration::ZERO);
                     source.deadline = present.then_some(Wall::EPOCH);
                     source.cut = false;
-                    let actual = document(&source, &limits).expect("whole independent optional facts");
+                    let actual = document(&source, &limits, &[jig_core_world::world::scripted_model()])
+                        .expect("whole independent optional facts");
                     assert_eq!(actual.requester, results::requester(requester));
                     assert_eq!(actual.address, chips::address(address));
                     assert_eq!(
@@ -145,7 +151,9 @@ pub(crate) mod tests {
         let source = source();
         let original = source.clone();
         let limits = Limits { rows: 8, ..super::super::rows::tests::limits() };
-        let value = super::super::documents::person_task_read(&source, &limits).expect("whole read");
+        let value =
+            super::super::documents::person_task_read(&source, &limits, &[jig_core_world::world::scripted_model()])
+                .expect("whole read");
         let bounds = jig_client_scripted_engine::Bounds {
             text: limits.text,
             rows: limits.rows,
@@ -158,15 +166,29 @@ pub(crate) mod tests {
         let bytes = jig_client_scripted_engine::owner_person_task::bytes(actual, &bounds).expect("whole reserved heap")
             + u64::try_from(core::mem::size_of::<client::ReadValue>()).expect("inline envelope");
         assert_eq!(
-            super::super::documents::person_task_read(&source, &Limits { document_bytes: bytes, ..limits }),
+            super::super::documents::person_task_read(
+                &source,
+                &Limits { document_bytes: bytes, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Ok(value)
         );
         assert_eq!(
-            super::super::documents::person_task_read(&source, &Limits { document_bytes: bytes - 1, ..limits }),
+            super::super::documents::person_task_read(
+                &source,
+                &Limits { document_bytes: bytes - 1, ..limits },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(super::super::documents::Invalid::Payload)
         );
-        assert_eq!(document(&source, &Limits { rows: 7, ..limits }), Err(owner::Invalid::TooLarge));
-        assert_eq!(document(&source, &Limits { text: 1, ..limits }), Err(owner::Invalid::TooLarge));
+        assert_eq!(
+            document(&source, &Limits { rows: 7, ..limits }, &[jig_core_world::world::scripted_model()]),
+            Err(owner::Invalid::TooLarge)
+        );
+        assert_eq!(
+            document(&source, &Limits { text: 1, ..limits }, &[jig_core_world::world::scripted_model()]),
+            Err(owner::Invalid::TooLarge)
+        );
         assert_eq!(source, original);
     }
 }

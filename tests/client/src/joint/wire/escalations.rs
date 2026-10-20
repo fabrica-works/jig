@@ -7,10 +7,14 @@ use jig_domain_core::documents;
 /// # Errors
 /// Refuses inconsistent whole Task facts or any nested reserved allocation;
 /// the escalation's acts never replace its Task's independent acts or result.
-pub fn document(source: &documents::Escalation, limits: &Limits) -> Result<client::OwnerEscalation, Invalid> {
+pub fn document(
+    source: &documents::Escalation,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerEscalation, Invalid> {
     Ok(client::OwnerEscalation {
-        acts: offers::offered(&source.acts, limits).map_err(Invalid::Owner)?,
-        task: Box::new(task::document(&source.task, limits)?),
+        acts: offers::offered(&source.acts, limits, models).map_err(Invalid::Owner)?,
+        task: Box::new(task::document(&source.task, limits, models)?),
     })
 }
 
@@ -40,7 +44,7 @@ pub(crate) mod tests {
         let source = source();
         let original = source.clone();
         let limits = super::super::rows::tests::limits();
-        let actual = document(&source, &limits).expect("whole supplied escalation");
+        let actual = document(&source, &limits, &[]).expect("whole supplied escalation");
         assert_eq!(actual.acts.capacity(), client::MAX_OFFERED_ACTS);
         assert_eq!(
             actual.acts.iter().map(|value| value.act).collect::<Vec<_>>(),
@@ -60,7 +64,10 @@ pub(crate) mod tests {
         assert!(actual.task.result.is_some());
         assert!(actual.task.context.is_none());
         assert!(actual.task.cut);
-        assert_eq!(actual.task.as_ref(), &task::document(&source.task, &limits).expect("same whole task contract"));
+        assert_eq!(
+            actual.task.as_ref(),
+            &task::document(&source.task, &limits, &[]).expect("same whole task contract")
+        );
         let body = jig_client_view::objects::Body::OwnerEscalation(Box::new(actual));
         assert_eq!(body.ending(), None);
         assert_eq!(body.terminal(), None);
@@ -72,12 +79,14 @@ pub(crate) mod tests {
         let source = source();
         let original = source.clone();
         let limits = super::super::rows::tests::limits();
-        let read = super::super::documents::escalation_read(&source, &limits).expect("whole read");
+        let read = super::super::documents::escalation_read(&source, &limits, &[]).expect("whole read");
         let mut lower = 0;
         let mut upper = limits.document_bytes;
         while lower < upper {
             let middle = lower + (upper - lower) / 2;
-            if super::super::documents::escalation_read(&source, &Limits { document_bytes: middle, ..limits }).is_ok() {
+            if super::super::documents::escalation_read(&source, &Limits { document_bytes: middle, ..limits }, &[])
+                .is_ok()
+            {
                 upper = middle;
             } else {
                 lower = middle + 1;
@@ -86,15 +95,15 @@ pub(crate) mod tests {
         let exact = lower;
         assert!(exact > 0);
         assert_eq!(
-            super::super::documents::escalation_read(&source, &Limits { document_bytes: exact, ..limits }),
+            super::super::documents::escalation_read(&source, &Limits { document_bytes: exact, ..limits }, &[]),
             Ok(read.clone())
         );
         assert_eq!(
-            super::super::documents::escalation_read(&source, &Limits { document_bytes: exact - 1, ..limits }),
+            super::super::documents::escalation_read(&source, &Limits { document_bytes: exact - 1, ..limits }, &[]),
             Err(Invalid::Payload)
         );
         assert_eq!(
-            super::super::documents::escalation_read(&source, &Limits { rows: 3, ..limits }),
+            super::super::documents::escalation_read(&source, &Limits { rows: 3, ..limits }, &[]),
             Err(Invalid::Owner(owner::Invalid::TooLarge))
         );
         for outer in [false, true] {
@@ -106,7 +115,7 @@ pub(crate) mod tests {
             }
             let untouched = oversized.clone();
             assert_eq!(
-                document(&oversized, &limits),
+                document(&oversized, &limits, &[]),
                 Err(Invalid::Owner(owner::Invalid::OfferCapacity {
                     allocated: client::MAX_OFFERED_ACTS + 1,
                     maximum: client::MAX_OFFERED_ACTS,
@@ -116,7 +125,7 @@ pub(crate) mod tests {
         }
         let mut inconsistent = source.clone();
         inconsistent.task.project = 0;
-        assert_eq!(document(&inconsistent, &limits), Err(Invalid::Identity));
+        assert_eq!(document(&inconsistent, &limits, &[]), Err(Invalid::Identity));
         assert_eq!(source, original);
     }
 }

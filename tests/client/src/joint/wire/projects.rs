@@ -11,9 +11,13 @@ use jig_domain_tasks as tasks;
 
 /// # Errors
 /// Refuses inconsistent owner facts or any whole reserved allocation above bounds.
-pub fn document(source: &documents::Project, limits: &Limits) -> Result<client::OwnerProject, owner::Invalid> {
+pub fn document(
+    source: &documents::Project,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerProject, owner::Invalid> {
     Ok(client::OwnerProject {
-        acts: offers::offered(&source.acts, limits)?,
+        acts: offers::offered(&source.acts, limits, models)?,
         number: source.number,
         resources: owner::list(&source.resources, limits, |value| {
             Ok(client::OwnerProjectResource {
@@ -26,7 +30,7 @@ pub fn document(source: &documents::Project, limits: &Limits) -> Result<client::
                 },
             })
         })?,
-        policy: policy(&source.policy, limits)?,
+        policy: policy(&source.policy, limits, models)?,
         members: owner::list(&source.members, limits, |value| {
             Ok(client::OwnerProjectMember {
                 party: value.party,
@@ -51,22 +55,26 @@ pub fn document(source: &documents::Project, limits: &Limits) -> Result<client::
                 numbers: owner::numbers(value.numbers),
             })
         })?,
-        recurring: owner::list(&source.recurring, limits, |value| recurring(value, limits))?,
+        recurring: owner::list(&source.recurring, limits, |value| recurring(value, limits, models))?,
         cut: source.cut,
     })
 }
 
-fn policy(source: &documents::Policy, limits: &Limits) -> Result<client::OwnerProjectPolicy, owner::Invalid> {
+fn policy(
+    source: &documents::Policy,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerProjectPolicy, owner::Invalid> {
     Ok(client::OwnerProjectPolicy {
         templates: super::me::overrides(&source.templates, limits)?,
-        ceiling: owner::authority(&source.ceiling, limits)?,
+        ceiling: owner::authority(&source.ceiling, limits, models)?,
         period_spend: source.period_spend,
         escalation_role: source.escalation_role,
         projections: owner::list(&source.projections, limits, |value| grant(value, limits))?,
         roles: owner::list(&source.roles, limits, |value| {
             Ok(client::OwnerProjectPolicyRole {
                 number: value.number,
-                authority: owner::authority(&value.authority, limits)?,
+                authority: owner::authority(&value.authority, limits, models)?,
                 period_spend: value.period_spend,
                 requests: value.requests.0,
                 decides: value.decides.0,
@@ -115,11 +123,15 @@ fn grant(source: &documents::GrantLine, limits: &Limits) -> Result<client::Owner
     })
 }
 
-fn recurring(source: &documents::Recurring, limits: &Limits) -> Result<client::Recurring, owner::Invalid> {
+fn recurring(
+    source: &documents::Recurring,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::Recurring, owner::Invalid> {
     Ok(client::Recurring {
         chip: chips::chip(&source.chip, limits)?,
         key: source.key,
-        batch: owner::list(&source.batch, limits, |value| history::proposed(value, limits))?,
+        batch: owner::list(&source.batch, limits, |value| history::proposed(value, limits, models))?,
         budget: source.budget,
         overlap: match source.overlap {
             tasks::RecurringOverlap::Skip => client::RecurringOverlap::Skip,

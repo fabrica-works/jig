@@ -3,8 +3,10 @@
 use jig_client_domain::contract as client;
 use jig_domain_people as people;
 
-pub fn refusal(value: people::Refusal) -> client::Refusal {
-    match value {
+/// # Errors
+/// Refuses unsupported sparse facts; LLM refusals need the catalogue at the answer boundary.
+pub fn refusal(value: people::Refusal) -> Result<client::Refusal, super::owner::Invalid> {
+    Ok(match value {
         people::Refusal::Role { held } => client::Refusal::Role { held: held.map(super::owner::held_role) },
         people::Refusal::Authority { lacking, proposable } => client::Refusal::Authority {
             lacking: lack(lacking),
@@ -20,7 +22,15 @@ pub fn refusal(value: people::Refusal) -> client::Refusal {
         people::Refusal::Moved { now } => moved(now),
         people::Refusal::Ended { how } => client::Refusal::Ended { how: ending(how) },
         people::Refusal::Taken { by } => client::Refusal::Taken { by },
-        people::Refusal::NotWellFormed { .. } => unreachable!("no v10 ask leads to NotWellFormed"),
+        people::Refusal::NotWellFormed { at, why } => client::Refusal::Malformed {
+            at,
+            why: match why {
+                people::Malformed::AsAllowedTwice => client::Malformed::TwoAsAllowed,
+                people::Malformed::Conversation => client::Malformed::ConversationNotAgent,
+                people::Malformed::Cycle => client::Malformed::Cycle,
+                people::Malformed::ProposedAsAllowed => client::Malformed::ProposedAsAllowed,
+            },
+        },
         people::Refusal::NotWaiting => client::Refusal::NotWaiting,
         people::Refusal::NoFurther => client::Refusal::NoFurther,
         people::Refusal::Unknown => client::Refusal::Unknown,
@@ -36,8 +46,8 @@ pub fn refusal(value: people::Refusal) -> client::Refusal {
         people::Refusal::Provider => client::Refusal::Provider,
         people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => client::Refusal::NotOffered,
         people::Refusal::KeyConflict => client::Refusal::KeyConflict,
-        people::Refusal::Llm { .. } => unreachable!("the joint world sends no model choice"),
-    }
+        people::Refusal::Llm { .. } => return Err(super::owner::Invalid::Llm),
+    })
 }
 
 #[must_use]
@@ -185,6 +195,21 @@ mod tests {
     use skein_lib::Wall;
 
     #[test]
+    fn malformed_refusals_keep_their_reason() {
+        for (why, expected) in [
+            (people::Malformed::AsAllowedTwice, client::Malformed::TwoAsAllowed),
+            (people::Malformed::Conversation, client::Malformed::ConversationNotAgent),
+            (people::Malformed::Cycle, client::Malformed::Cycle),
+            (people::Malformed::ProposedAsAllowed, client::Malformed::ProposedAsAllowed),
+        ] {
+            assert_eq!(
+                refusal(people::Refusal::NotWellFormed { at: 7, why }),
+                Ok(client::Refusal::Malformed { at: 7, why: expected })
+            );
+        }
+    }
+
+    #[test]
     fn sparse_refusals_preserve_absent_facts_and_full_width_supplied_identities() {
         let cases = [
             (people::Refusal::Role { held: None }, client::Refusal::Role { held: None }),
@@ -201,7 +226,7 @@ mod tests {
             (people::Refusal::NoEscalationHolder, client::Refusal::NotOffered),
         ];
         for (source, expected) in cases {
-            let actual = refusal(source);
+            let actual = refusal(source).expect("representable owner value");
             assert_eq!(actual, expected);
             assert!(client::EntranceRefusal::new(actual).is_ok());
         }
@@ -210,7 +235,7 @@ mod tests {
         {
             let source = people::Refusal::Authority { lacking: people::Lack::TaskKind { executor: None }, proposable };
             assert_eq!(
-                refusal(source),
+                refusal(source).expect("representable owner value"),
                 client::Refusal::Authority {
                     lacking: client::Lacking::TaskKind { executor: None },
                     proposable: boolean
@@ -341,7 +366,7 @@ mod tests {
         ];
         assert_eq!(cases.len(), 35);
         for (source, expected) in cases {
-            let actual = refusal(people::Refusal::Limit { which: source });
+            let actual = refusal(people::Refusal::Limit { which: source }).expect("representable owner value");
             assert_eq!(actual, client::Refusal::Limit { which: client::Limit::Admission { which: expected } });
             assert!(client::EntranceRefusal::new(actual).is_ok());
         }

@@ -37,9 +37,13 @@ fn pattern(value: &tasks::Pattern, limits: &Limits) -> Result<client::OwnerPatte
         },
     })
 }
-fn authority(value: &tasks::Authority, limits: &Limits) -> Result<client::OwnerAuthority, owner::Invalid> {
+fn authority(
+    value: &tasks::Authority,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerAuthority, owner::Invalid> {
     Ok(client::OwnerAuthority {
-        models: Some(owner::models(value.models)),
+        models: Some(owner::models(value.models, models)?),
         tools: value.tools.0,
         grants: list(&value.grants, limits, |value| {
             Ok(client::OwnerGrant {
@@ -113,7 +117,11 @@ pub(super) fn contract(
         }
     })
 }
-pub(super) fn goal(value: &tasks::New, limits: &Limits) -> Result<client::OwnerPersonProposalGoal, Invalid> {
+pub(super) fn goal(
+    value: &tasks::New,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerPersonProposalGoal, Invalid> {
     if value.recurring.is_some() {
         return Err(Invalid::Recurrence);
     }
@@ -123,7 +131,7 @@ pub(super) fn goal(value: &tasks::New, limits: &Limits) -> Result<client::OwnerP
         executor: owner::executor(value.executor),
         spec: spec(&value.spec, limits).map_err(Invalid::Owner)?,
         contract: contract(&value.contract, limits).map_err(Invalid::Owner)?,
-        authority: authority(&value.authority, limits).map_err(Invalid::Owner)?,
+        authority: authority(&value.authority, limits, models).map_err(Invalid::Owner)?,
         numbers: owner::numbers(value.numbers),
         funder: owner::funder(value.funder),
         dependencies: list(&value.dependencies, limits, |value| Ok(*value)).map_err(Invalid::Owner)?,

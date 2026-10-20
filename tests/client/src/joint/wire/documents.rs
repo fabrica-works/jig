@@ -29,58 +29,91 @@ fn bounds(limits: &Limits) -> admission::Bounds {
 
 /// # Errors
 /// Refuses any owner fact or complete boxed document above the receiving bounds.
-pub fn frame_read(value: &documents::Frame, limits: &Limits) -> Result<client::ReadValue, Invalid> {
-    let value = client::ReadValue::Me(Box::new(owner::frame(value, limits).map_err(Invalid::Owner)?));
+pub fn frame_read(
+    value: &documents::Frame,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+    providers: &jig_domain_accounts::Providers,
+) -> Result<client::ReadValue, Invalid> {
+    let value =
+        client::ReadValue::Me(Box::new(owner::frame(value, limits, models, providers).map_err(Invalid::Owner)?));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
 
 /// # Errors
 /// Refuses any owner fact or complete boxed document above the receiving bounds.
-pub fn frame_delivery(value: &documents::Frame, limits: &Limits) -> Result<client::Delivery, Invalid> {
-    let value = client::Delivery::Me(Box::new(owner::frame(value, limits).map_err(Invalid::Owner)?));
+pub fn frame_delivery(
+    value: &documents::Frame,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+    providers: &jig_domain_accounts::Providers,
+) -> Result<client::Delivery, Invalid> {
+    let value = client::Delivery::Me(Box::new(owner::frame(value, limits, models, providers).map_err(Invalid::Owner)?));
     admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
 
 /// # Errors
 /// Refuses inconsistent facts or any complete Task payload above bounds.
-pub fn task_read(source: &documents::Task, limits: &Limits) -> Result<client::ReadValue, Invalid> {
-    let value = client::ReadValue::Task(Box::new(super::task::document(source, limits)?));
+pub fn task_read(
+    source: &documents::Task,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadValue, Invalid> {
+    let value = client::ReadValue::Task(Box::new(super::task::document(source, limits, models)?));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
 
 /// # Errors
 /// Refuses inconsistent facts or any complete Task payload above bounds.
-pub fn task_delivery(source: &documents::Task, limits: &Limits) -> Result<client::Delivery, Invalid> {
-    let value = client::Delivery::Task(Box::new(super::task::document(source, limits)?));
+pub fn task_delivery(
+    source: &documents::Task,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::Delivery, Invalid> {
+    let value = client::Delivery::Task(Box::new(super::task::document(source, limits, models)?));
     admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
 
 /// # Errors
 /// Refuses any whole pending proposal or reserved nested allocation above bounds.
-pub fn proposal_read(source: &documents::Proposal, limits: &Limits) -> Result<client::ReadValue, Invalid> {
-    let value =
-        client::ReadValue::OwnerProposal(Box::new(super::proposals::document(source, limits).map_err(Invalid::Owner)?));
+pub fn proposal_read(
+    source: &documents::Proposal,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadValue, Invalid> {
+    let value = client::ReadValue::OwnerProposal(Box::new(
+        super::proposals::document(source, limits, models).map_err(Invalid::Owner)?,
+    ));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
 
 /// # Errors
 /// Refuses any whole held Task or independent escalation allocation above bounds.
-pub fn escalation_read(source: &documents::Escalation, limits: &Limits) -> Result<client::ReadValue, Invalid> {
-    let value = client::ReadValue::OwnerEscalation(Box::new(super::escalations::document(source, limits)?));
+pub fn escalation_read(
+    source: &documents::Escalation,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadValue, Invalid> {
+    let value = client::ReadValue::OwnerEscalation(Box::new(super::escalations::document(source, limits, models)?));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
 
 /// # Errors
 /// Refuses any owner fact, reserved allocation or complete Project envelope above bounds.
-pub fn project_read(source: &documents::Project, limits: &Limits) -> Result<client::ReadValue, Invalid> {
-    let value =
-        client::ReadValue::OwnerProject(Box::new(super::projects::document(source, limits).map_err(Invalid::Owner)?));
+pub fn project_read(
+    source: &documents::Project,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadValue, Invalid> {
+    let value = client::ReadValue::OwnerProject(Box::new(
+        super::projects::document(source, limits, models).map_err(Invalid::Owner)?,
+    ));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
@@ -107,9 +140,13 @@ pub fn deployment_delivery(source: &documents::Deployment, limits: &Limits) -> R
 
 /// # Errors
 /// Refuses any whole pending person work or optional complete shown result above bounds.
-pub fn person_task_read(source: &documents::PersonTask, limits: &Limits) -> Result<client::ReadValue, Invalid> {
+pub fn person_task_read(
+    source: &documents::PersonTask,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadValue, Invalid> {
     let value = client::ReadValue::OwnerPersonTask(Box::new(
-        super::person_tasks::document(source, limits).map_err(Invalid::Owner)?,
+        super::person_tasks::document(source, limits, models).map_err(Invalid::Owner)?,
     ));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
@@ -213,8 +250,12 @@ pub fn tree_delivery(
 
 /// # Errors
 /// Refuses any whole result metadata, terminal fact or reserved allocation above bounds.
-pub fn result_read(source: &documents::ResultDoc, limits: &Limits) -> Result<client::ReadValue, Invalid> {
-    let value = client::ReadValue::Result(Box::new(results::document(source, limits).map_err(Invalid::Owner)?));
+pub fn result_read(
+    source: &documents::ResultDoc,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadValue, Invalid> {
+    let value = client::ReadValue::Result(Box::new(results::document(source, limits, models).map_err(Invalid::Owner)?));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
     Ok(value)
 }
@@ -222,14 +263,18 @@ pub fn result_read(source: &documents::ResultDoc, limits: &Limits) -> Result<cli
 /// An admitted live Question supplies whole words and no retained ending.
 /// # Errors
 /// Refuses any source text, chip, offer or complete receiving envelope above bounds.
-pub fn question_read(source: &documents::Question, limits: &Limits) -> Result<client::ReadValue, Invalid> {
+pub fn question_read(
+    source: &documents::Question,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadValue, Invalid> {
     let value = client::ReadValue::Question(Box::new(client::Question {
         task: chips::chip(&source.task, limits).map_err(Invalid::Owner)?,
         from: Some(results::requester(source.from)),
         message: source.message,
         words: raw_text(&source.words, limits)?,
         since: source.at,
-        acts: offers::offered(&source.acts, limits).map_err(Invalid::Owner)?,
+        acts: offers::offered(&source.acts, limits, models).map_err(Invalid::Owner)?,
         ending: None,
     }));
     admission::admit_read_value(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
@@ -478,7 +523,9 @@ pub(crate) mod tests {
         ] {
             source.from = sender;
             let original = source.clone();
-            let client::ReadValue::Question(value) = question_read(&source, &limits).expect("whole admitted question")
+            let client::ReadValue::Question(value) =
+                question_read(&source, &limits, &[jig_core_world::world::scripted_model()])
+                    .expect("whole admitted question")
             else {
                 panic!("question read")
             };
@@ -494,18 +541,27 @@ pub(crate) mod tests {
                 &client::Offered { effect: None, act: client::ActKind::Answer, admission: client::Admission::Allowed }
             );
             assert_eq!(source, original);
-            assert_eq!(question_read(&source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
             assert_eq!(
-                question_read(&source, &Limits { rows: 3, ..limits }),
+                question_read(
+                    &source,
+                    &Limits { document_bytes: 0, ..limits },
+                    &[jig_core_world::world::scripted_model()]
+                ),
+                Err(Invalid::Payload)
+            );
+            assert_eq!(
+                question_read(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
                 Err(Invalid::Owner(owner::Invalid::TooLarge))
             );
             assert_eq!(
-                question_read(&source, &Limits { text: 1, ..limits }),
+                question_read(&source, &Limits { text: 1, ..limits }, &[jig_core_world::world::scripted_model()]),
                 Err(Invalid::Owner(owner::Invalid::TooLarge))
             );
         }
         source.words = Box::new([]);
-        let client::ReadValue::Question(value) = question_read(&source, &limits).expect("whole empty source words")
+        let client::ReadValue::Question(value) =
+            question_read(&source, &limits, &[jig_core_world::world::scripted_model()])
+                .expect("whole empty source words")
         else {
             panic!("empty question")
         };
@@ -614,7 +670,9 @@ pub(crate) mod tests {
                     })
                     .expect("original offer");
                 let before = source.clone();
-                let client::ReadValue::Result(value) = result_read(&source, &limits).expect("whole Result") else {
+                let client::ReadValue::Result(value) =
+                    result_read(&source, &limits, &[jig_core_world::world::scripted_model()]).expect("whole Result")
+                else {
                     panic!("Result")
                 };
                 assert_eq!(value.at, at);
@@ -646,9 +704,16 @@ pub(crate) mod tests {
                 assert_eq!(details.chosen_by, None);
                 assert_eq!(details.delegates.capacity(), 8);
                 assert_eq!(details.followups.expect("known empty batch").capacity(), 4);
-                assert_eq!(result_read(&source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
                 assert_eq!(
-                    result_read(&source, &Limits { rows: 7, ..limits }),
+                    result_read(
+                        &source,
+                        &Limits { document_bytes: 0, ..limits },
+                        &[jig_core_world::world::scripted_model()]
+                    ),
+                    Err(Invalid::Payload)
+                );
+                assert_eq!(
+                    result_read(&source, &Limits { rows: 7, ..limits }, &[jig_core_world::world::scripted_model()]),
                     Err(Invalid::Owner(owner::Invalid::TooLarge))
                 );
                 assert_eq!(source, before);
@@ -656,7 +721,7 @@ pub(crate) mod tests {
         }
     }
 
-    fn frame() -> documents::Frame {
+    pub(crate) fn frame() -> documents::Frame {
         documents::Frame {
             providers: skein_lib::List::with_capacity(0),
             providers_cut: false,
@@ -697,9 +762,11 @@ pub(crate) mod tests {
         let before = source.clone();
         // This fixture deliberately reserves three unfilled offer rows.
         let limits = Limits { projects: 3, rows: 3, ..crate::test::limits().client.domain };
-        let read = frame_read(&source, &limits).expect("whole frame read fits");
+        let read =
+            frame_read(&source, &limits, &[], &jig_domain_accounts::Providers::none()).expect("whole frame read fits");
         let client::ReadValue::Me(read) = read else { panic!("actual Me read envelope") };
-        let delivery = frame_delivery(&source, &limits).expect("whole frame watch fits");
+        let delivery = frame_delivery(&source, &limits, &[], &jig_domain_accounts::Providers::none())
+            .expect("whole frame watch fits");
         let client::Delivery::Me(delivery) = delivery else { panic!("actual Me watch envelope") };
         assert_eq!(read, delivery);
         assert_eq!(read.party.login.bytes.bytes(), UTF8_TEXTS[0]);
@@ -707,8 +774,19 @@ pub(crate) mod tests {
         assert!(read.cut);
         assert_eq!(read.projects.capacity(), 2);
         assert_eq!(read.needs_total, 17);
-        assert_eq!(frame_read(&source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
-        assert_eq!(frame_delivery(&source, &Limits { document_bytes: 0, ..limits }), Err(Invalid::Payload));
+        assert_eq!(
+            frame_read(&source, &Limits { document_bytes: 0, ..limits }, &[], &jig_domain_accounts::Providers::none()),
+            Err(Invalid::Payload)
+        );
+        assert_eq!(
+            frame_delivery(
+                &source,
+                &Limits { document_bytes: 0, ..limits },
+                &[],
+                &jig_domain_accounts::Providers::none()
+            ),
+            Err(Invalid::Payload)
+        );
         assert_eq!(source, before);
     }
 

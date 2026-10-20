@@ -9,7 +9,11 @@ use jig_domain_tasks as tasks;
 
 /// # Errors
 /// Refuses any complete nested text/list allocation above receiving bounds.
-pub fn proposed(value: &documents::ProposedTask, limits: &Limits) -> Result<client::ProposedTask, owner::Invalid> {
+pub fn proposed(
+    value: &documents::ProposedTask,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ProposedTask, owner::Invalid> {
     Ok(client::ProposedTask {
         deadline: match value.deadline {
             tasks::Deadline::Named => client::NewDeadline::Named,
@@ -19,7 +23,7 @@ pub fn proposed(value: &documents::ProposedTask, limits: &Limits) -> Result<clie
         spec: owner::specification(&value.spec, limits)?,
         executor: owner::executor(value.executor),
         contract: owner::contract(&value.contract, limits)?,
-        authority: owner::authority(&value.authority, limits)?,
+        authority: owner::authority(&value.authority, limits, models)?,
         budget: value.budget,
         funder: owner::funder(value.funder),
         dependencies: owner::list(&value.dependencies, limits, |value| Ok(*value))?,
@@ -33,6 +37,7 @@ pub fn proposed(value: &documents::ProposedTask, limits: &Limits) -> Result<clie
 fn amendment(
     value: &documents::AmendmentChange,
     limits: &Limits,
+    models: &[jig_domain_core::Model],
 ) -> Result<client::OwnerRetainedAmendment, owner::Invalid> {
     Ok(client::OwnerRetainedAmendment {
         addressed: value.addressed.map(|value| client::AddressChange {
@@ -42,7 +47,7 @@ fn amendment(
         instructions: value.instructions.as_ref().map(|value| owner::text(value, limits)).transpose()?,
         release: value.release,
         spec: value.spec.as_ref().map(|value| owner::specification(value, limits)).transpose()?,
-        authority: value.authority.as_ref().map(|value| owner::authority(value, limits)).transpose()?,
+        authority: value.authority.as_ref().map(|value| owner::authority(value, limits, models)).transpose()?,
         wake: value.wake.map(owner::wake),
         dependencies: value
             .dependencies
@@ -60,15 +65,16 @@ fn amendment(
 pub fn action(
     value: &documents::RetainedAction,
     limits: &Limits,
+    models: &[jig_domain_core::Model],
 ) -> Result<client::OwnerRetainedAction, owner::Invalid> {
     Ok(match value {
         documents::RetainedAction::Batch(value) => {
-            client::OwnerRetainedAction::Batch(owner::list(value, limits, |value| proposed(value, limits))?)
+            client::OwnerRetainedAction::Batch(owner::list(value, limits, |value| proposed(value, limits, models))?)
         }
         documents::RetainedAction::Effect { part, authority, attempt, completion, position, purpose } => {
             client::OwnerRetainedAction::Effect {
                 part: owner::part(part, limits)?,
-                authority: owner::authority(authority, limits)?,
+                authority: owner::authority(authority, limits, models)?,
                 attempt: *attempt,
                 completion: *completion,
                 position: *position,
@@ -78,16 +84,16 @@ pub fn action(
         documents::RetainedAction::ProcedureEffect { part, authority, step, purpose } => {
             client::OwnerRetainedAction::ProcedureEffect {
                 part: owner::part(part, limits)?,
-                authority: owner::authority(authority, limits)?,
+                authority: owner::authority(authority, limits, models)?,
                 step: *step,
                 purpose: *purpose,
             }
         }
         documents::RetainedAction::Amend { task, change } => {
-            client::OwnerRetainedAction::Amend { task: *task, change: Box::new(amendment(change, limits)?) }
+            client::OwnerRetainedAction::Amend { task: *task, change: Box::new(amendment(change, limits, models)?) }
         }
         documents::RetainedAction::Widen { task, authority } => {
-            client::OwnerRetainedAction::Widen { task: *task, authority: owner::authority(authority, limits)? }
+            client::OwnerRetainedAction::Widen { task: *task, authority: owner::authority(authority, limits, models)? }
         }
         documents::RetainedAction::Release { task } => client::OwnerRetainedAction::Release { task: *task },
     })
@@ -116,9 +122,10 @@ pub(super) fn holder(value: tasks::ProposalHolder) -> client::OwnerHistoryHolder
 pub(super) fn proposal(
     value: &documents::ProposalHistory,
     limits: &Limits,
+    models: &[jig_domain_core::Model],
 ) -> Result<client::OwnerProposalHistory, owner::Invalid> {
     Ok(client::OwnerProposalHistory {
-        action: action(&value.action, limits)?,
+        action: action(&value.action, limits, models)?,
         number: value.number,
         proposer: value.proposer,
         as_holder: value.as_holder,
@@ -140,7 +147,11 @@ pub(super) fn proposal(
 
 /// # Errors
 /// Refuses any complete history snapshot/action above receiving bounds.
-pub fn line(value: &documents::HistoryLine, limits: &Limits) -> Result<client::OwnerHistoryLine, owner::Invalid> {
+pub fn line(
+    value: &documents::HistoryLine,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::OwnerHistoryLine, owner::Invalid> {
     Ok(client::OwnerHistoryLine {
         task: value.task,
         revision: value.revision,
@@ -157,12 +168,15 @@ pub fn line(value: &documents::HistoryLine, limits: &Limits) -> Result<client::O
             tasks::Change::ProposalWithdrawn => client::OwnerHistoryChange::ProposalWithdrawn,
         },
         reason: owner::text(&value.reason, limits)?,
-        proposal: value.proposal.as_ref().map(|value| proposal(value, limits)).transpose()?,
+        proposal: value.proposal.as_ref().map(|value| proposal(value, limits, models)).transpose()?,
         amendment: value
             .amendment
             .as_ref()
             .map(|(before, after)| {
-                Ok((Box::new(owner::amendment(before, limits)?), Box::new(owner::amendment(after, limits)?)))
+                Ok((
+                    Box::new(owner::amendment(before, limits, models)?),
+                    Box::new(owner::amendment(after, limits, models)?),
+                ))
             })
             .transpose()?,
         at: value.at,
@@ -241,7 +255,7 @@ pub(super) mod tests {
     #[test]
     fn immutable_history_keeps_raw_proposer_stored_override_absence_and_independent_revisions_clocks_and_losses() {
         let mut source = source();
-        let copied = line(&source, &limits()).expect("whole history");
+        let copied = line(&source, &limits(), &[jig_core_world::world::scripted_model()]).expect("whole history");
         assert_eq!((copied.task, copied.revision, copied.at), (u64::MAX, 0, None));
         assert_eq!(copied.by, client::OwnerRequester::Deployment { project: u32::MAX });
         assert_eq!(copied.reason.bytes.bytes(), UTF8_TEXTS[0]);
@@ -273,13 +287,17 @@ pub(super) mod tests {
             by: tasks::Party::Person(u64::MAX),
             reason: documents::Text { bytes: Box::new([]), cut: true },
         };
-        let copied = line(&source, &limits()).expect("independent optional facts");
+        let copied =
+            line(&source, &limits(), &[jig_core_world::world::scripted_model()]).expect("independent optional facts");
         assert_eq!(copied.at, Some(Wall::EPOCH));
         assert_eq!(copied.amendment, None);
         assert!(
             matches!(copied.proposal.expect("proposal").state, client::OwnerProposalHistoryState::Rejected { by: client::OwnerRequester::Person(u64::MAX), reason } if reason.cut && reason.bytes.bytes().is_empty())
         );
-        assert_eq!(line(&source, &Limits { text: 1, ..limits() }), Err(owner::Invalid::TooLarge));
+        assert_eq!(
+            line(&source, &Limits { text: 1, ..limits() }, &[jig_core_world::world::scripted_model()]),
+            Err(owner::Invalid::TooLarge)
+        );
     }
     #[test]
     fn retained_batches_keep_allocated_nested_capacity_exact_executor_funding_and_independent_loss() {
@@ -301,9 +319,12 @@ pub(super) mod tests {
         };
         let mut batch = List::with_capacity(6);
         batch.push(proposed).expect("one source task");
-        let client::OwnerRetainedAction::Batch(copied) =
-            action(&documents::RetainedAction::Batch(batch.clone()), &limits()).expect("whole batch")
-        else {
+        let client::OwnerRetainedAction::Batch(copied) = action(
+            &documents::RetainedAction::Batch(batch.clone()),
+            &limits(),
+            &[jig_core_world::world::scripted_model()],
+        )
+        .expect("whole batch") else {
             panic!("batch")
         };
         assert_eq!((copied.capacity(), copied.len()), (6, 1));
@@ -313,7 +334,11 @@ pub(super) mod tests {
         assert_eq!(task.executor, client::OwnerExecutor::Person(client::PersonAddress::Role(u32::MAX)));
         assert_eq!(task.dependencies.capacity(), 4);
         assert_eq!(
-            action(&documents::RetainedAction::Batch(batch), &Limits { rows: 5, ..limits() }),
+            action(
+                &documents::RetainedAction::Batch(batch),
+                &Limits { rows: 5, ..limits() },
+                &[jig_core_world::world::scripted_model()]
+            ),
             Err(owner::Invalid::TooLarge)
         );
     }
@@ -331,7 +356,7 @@ pub(super) mod tests {
             purpose: u64::MAX,
         };
         assert!(
-            matches!(action(&effect, &limits()).expect("whole raw effect"), client::OwnerRetainedAction::Effect { part, attempt: u64::MAX, completion: u32::MAX, position: 0, purpose: u64::MAX, .. } if part.connector == u16::MAX && part.kind == client::OwnerPartKind::Outbox && part.key == client::OwnerPartKey::Number(u64::MAX))
+            matches!(action(&effect, &limits(), &[jig_core_world::world::scripted_model()]).expect("whole raw effect"), client::OwnerRetainedAction::Effect { part, attempt: u64::MAX, completion: u32::MAX, position: 0, purpose: u64::MAX, .. } if part.connector == u16::MAX && part.kind == client::OwnerPartKind::Outbox && part.key == client::OwnerPartKey::Number(u64::MAX))
         );
     }
     #[test]
@@ -348,10 +373,12 @@ pub(super) mod tests {
             reason: documents::Text { bytes: Box::from([0]), cut: false },
             cut: true,
         };
-        let client::OwnerRetainedAction::Amend { task, change } =
-            action(&documents::RetainedAction::Amend { task: u64::MAX, change: Box::new(change) }, &limits())
-                .expect("whole selected delta")
-        else {
+        let client::OwnerRetainedAction::Amend { task, change } = action(
+            &documents::RetainedAction::Amend { task: u64::MAX, change: Box::new(change) },
+            &limits(),
+            &[jig_core_world::world::scripted_model()],
+        )
+        .expect("whole selected delta") else {
             panic!("amend")
         };
         assert_eq!(task, u64::MAX);
@@ -363,13 +390,19 @@ pub(super) mod tests {
         assert!(matches!(
             action(
                 &documents::RetainedAction::Widen { task: 0, authority: owner::tests::amendment_source().authority },
-                &limits()
+                &limits(),
+                &[jig_core_world::world::scripted_model()]
             )
             .expect("widen"),
             client::OwnerRetainedAction::Widen { task: 0, .. }
         ));
         assert_eq!(
-            action(&documents::RetainedAction::Release { task: 0 }, &limits()).expect("release"),
+            action(
+                &documents::RetainedAction::Release { task: 0 },
+                &limits(),
+                &[jig_core_world::world::scripted_model()]
+            )
+            .expect("release"),
             client::OwnerRetainedAction::Release { task: 0 }
         );
     }

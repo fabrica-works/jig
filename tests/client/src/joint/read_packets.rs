@@ -46,11 +46,11 @@ pub fn read_with_codec(
                     wire::pages::activity_page_with_codec(*task, value, limits, codec)
                 }
                 client::Read::Notes { scope, description, .. } => {
-                    wire::pages::notes_page(scope, description.as_ref(), value, limits)
+                    wire::pages::notes_page(scope, description.as_ref(), value, limits, &transport.models)
                 }
                 client::Read::Inbox { .. } => wire::pages::inbox_page(what, value, limits),
                 client::Read::History { task, subtree, .. } => {
-                    wire::pages::history_page(*task, *subtree, value, limits)
+                    wire::pages::history_page(*task, *subtree, value, limits, &transport.models)
                 }
                 client::Read::Ended { task, .. } => wire::ledger_pages::ended(*task, value, limits),
                 client::Read::Spend { project, .. } => wire::ledger_pages::spend(*project, value, limits),
@@ -74,40 +74,35 @@ pub fn read_with_codec(
                 if *what != client::Read::Me || value.party != transport.party(client) {
                     return Err(Invalid::OwnerRoute);
                 }
-                client::ReadResult::Value(wire::documents::frame_read(value, limits).map_err(Invalid::Document)?)
+                client::ReadResult::Value(
+                    wire::documents::frame_read(value, limits, &transport.models, &transport.providers)
+                        .map_err(Invalid::Document)?,
+                )
             }
-            documents::Document::Task(value) => {
-                let client::Read::Task { task } = what else { return Err(Invalid::OwnerRoute) };
-                if *task != value.chip.number {
-                    return Err(Invalid::OwnerRoute);
-                }
-                client::ReadResult::Value(wire::documents::task_read(value, limits).map_err(Invalid::Document)?)
-            }
-            documents::Document::Proposal(value) => {
-                let client::Read::Proposal { proposal } = what else { return Err(Invalid::OwnerRoute) };
-                if *proposal != wire::proposals::key(value.proposer, value.number) {
-                    return Err(Invalid::OwnerRoute);
-                }
-                client::ReadResult::Value(wire::documents::proposal_read(value, limits).map_err(Invalid::Document)?)
-            }
-            documents::Document::Escalation(value) => escalation(what, value, limits)?,
-            documents::Document::Project(value) => project(what, value, limits)?,
+            documents::Document::Task(value) => task(what, value, limits, &transport.models)?,
+            documents::Document::Proposal(value) => proposal(what, value, limits, &transport.models)?,
+            documents::Document::Escalation(value) => escalation(what, value, limits, &transport.models)?,
+            documents::Document::Project(value) => project(what, value, limits, &transport.models)?,
             documents::Document::Deployment(value) => deployment(what, value, limits)?,
             documents::Document::PersonTask(value) => {
                 let client::Read::PersonTask { task } = what else { return Err(Invalid::OwnerRoute) };
                 if *task != value.task.number {
                     return Err(Invalid::OwnerRoute);
                 }
-                client::ReadResult::Value(wire::documents::person_task_read(value, limits).map_err(Invalid::Document)?)
+                client::ReadResult::Value(
+                    wire::documents::person_task_read(value, limits, &transport.models).map_err(Invalid::Document)?,
+                )
             }
             documents::Document::Result(value) => {
                 let client::Read::Result { task } = what else { return Err(Invalid::OwnerRoute) };
                 if *task != value.task.number {
                     return Err(Invalid::OwnerRoute);
                 }
-                client::ReadResult::Value(wire::documents::result_read(value, limits).map_err(Invalid::Document)?)
+                client::ReadResult::Value(
+                    wire::documents::result_read(value, limits, &transport.models).map_err(Invalid::Document)?,
+                )
             }
-            documents::Document::Question(value) => question(what, value, limits)?,
+            documents::Document::Question(value) => question(what, value, limits, &transport.models)?,
             documents::Document::Chips(_)
             | documents::Document::Run(_)
             | documents::Document::Tree(_)
@@ -120,7 +115,9 @@ pub fn read_with_codec(
             if let reads::Past::Turn(record) = &value.value {
                 wire::historical::turn(what, record, limits, codec).map_err(Invalid::Historical)?
             } else {
-                client::ReadResult::Value(wire::historical::read(what, value, limits).map_err(Invalid::Historical)?)
+                client::ReadResult::Value(
+                    wire::historical::read(what, value, limits, &transport.models).map_err(Invalid::Historical)?,
+                )
             }
         }
     };
@@ -131,16 +128,43 @@ pub fn read_with_codec(
     })
 }
 
+fn proposal(
+    what: &client::Read,
+    value: &documents::Proposal,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadResult, Invalid> {
+    let client::Read::Proposal { proposal } = what else { return Err(Invalid::OwnerRoute) };
+    if *proposal != wire::proposals::key(value.proposer, value.number) {
+        return Err(Invalid::OwnerRoute);
+    }
+    Ok(client::ReadResult::Value(wire::documents::proposal_read(value, limits, models).map_err(Invalid::Document)?))
+}
+
+fn task(
+    what: &client::Read,
+    value: &documents::Task,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadResult, Invalid> {
+    let client::Read::Task { task } = what else { return Err(Invalid::OwnerRoute) };
+    if *task != value.chip.number {
+        return Err(Invalid::OwnerRoute);
+    }
+    Ok(client::ReadResult::Value(wire::documents::task_read(value, limits, models).map_err(Invalid::Document)?))
+}
+
 fn escalation(
     what: &client::Read,
     value: &documents::Escalation,
     limits: &Limits,
+    models: &[jig_domain_core::Model],
 ) -> Result<client::ReadResult, Invalid> {
     let client::Read::Escalation { task } = what else { return Err(Invalid::OwnerRoute) };
     if *task != value.task.chip.number {
         return Err(Invalid::OwnerRoute);
     }
-    Ok(client::ReadResult::Value(wire::documents::escalation_read(value, limits).map_err(Invalid::Document)?))
+    Ok(client::ReadResult::Value(wire::documents::escalation_read(value, limits, models).map_err(Invalid::Document)?))
 }
 
 fn task_page(what: &client::Read, page: &reads::TaskPage, limits: &Limits) -> Result<client::ReadResult, Invalid> {
@@ -152,12 +176,17 @@ fn task_page(what: &client::Read, page: &reads::TaskPage, limits: &Limits) -> Re
     ))
 }
 
-fn project(what: &client::Read, value: &documents::Project, limits: &Limits) -> Result<client::ReadResult, Invalid> {
+fn project(
+    what: &client::Read,
+    value: &documents::Project,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadResult, Invalid> {
     let client::Read::Project { project } = what else { return Err(Invalid::OwnerRoute) };
     if *project != value.number {
         return Err(Invalid::OwnerRoute);
     }
-    Ok(client::ReadResult::Value(wire::documents::project_read(value, limits).map_err(Invalid::Document)?))
+    Ok(client::ReadResult::Value(wire::documents::project_read(value, limits, models).map_err(Invalid::Document)?))
 }
 
 /// Translate a fixture read with the shared small codec.
@@ -733,12 +762,17 @@ fn missing(why: reads::Why) -> client::ReadNone {
     }
 }
 
-fn question(what: &client::Read, value: &documents::Question, limits: &Limits) -> Result<client::ReadResult, Invalid> {
+fn question(
+    what: &client::Read,
+    value: &documents::Question,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::ReadResult, Invalid> {
     let client::Read::Question { task, message } = what else { return Err(Invalid::OwnerRoute) };
     if *task != value.task.number || *message != value.message {
         return Err(Invalid::OwnerRoute);
     }
-    Ok(client::ReadResult::Value(wire::documents::question_read(value, limits).map_err(Invalid::Document)?))
+    Ok(client::ReadResult::Value(wire::documents::question_read(value, limits, models).map_err(Invalid::Document)?))
 }
 
 #[cfg(test)]

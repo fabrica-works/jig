@@ -49,7 +49,11 @@ pub fn recipient(value: &acts::Recipient, limits: &Limits) -> Result<client::Rec
 
 /// # Errors
 /// Refuses overflowing or pending owner facts and any whole offer allocation above bounds.
-pub fn bounds(value: &acts::Bounds, limits: &Limits) -> Result<client::Bounds, owner::Invalid> {
+pub fn bounds(
+    value: &acts::Bounds,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::Bounds, owner::Invalid> {
     Ok(match value {
         acts::Bounds::Create {
             authority,
@@ -61,7 +65,7 @@ pub fn bounds(value: &acts::Bounds, limits: &Limits) -> Result<client::Bounds, o
             maximum_budget,
             maximum_deadline,
         } => client::Bounds::Create(client::CreateBounds {
-            authority: Box::new(owner::authority(authority, limits)?),
+            authority: Box::new(owner::authority(authority, limits, models)?),
             pool_left: *pool_left,
             charters: owner::list(charters, limits, |number| Ok(*number))?,
             procedures: owner::list(procedures, limits, |value| {
@@ -92,24 +96,28 @@ pub fn bounds(value: &acts::Bounds, limits: &Limits) -> Result<client::Bounds, o
                     })
                 },
             )?,
-            authority: Box::new(owner::authority(authority, limits)?),
-            ceiling: Box::new(owner::authority(ceiling, limits)?),
+            authority: Box::new(owner::authority(authority, limits, models)?),
+            ceiling: Box::new(owner::authority(ceiling, limits, models)?),
         },
     })
 }
 
 /// # Errors
 /// Refuses overflowing or pending owner facts and any whole offer allocation above bounds.
-pub fn admission(value: &acts::Admission, limits: &Limits) -> Result<client::Admission, owner::Invalid> {
+pub fn admission(
+    value: &acts::Admission,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::Admission, owner::Invalid> {
     Ok(match value {
         acts::Admission::Allowed => client::Admission::Allowed,
         acts::Admission::Proposed { to } => client::Admission::Proposed { to: recipient(to, limits)? },
-        acts::Admission::Refused(value) => client::Admission::Refused(refusals::refusal(*value)),
+        acts::Admission::Refused(value) => client::Admission::Refused(refusals::refusal(*value)?),
         acts::Admission::Bounded { within, beyond } => client::Admission::Bounded {
-            within: bounds(within, limits)?,
+            within: bounds(within, limits, models)?,
             beyond: match beyond {
                 acts::Beyond::Proposed { to } => client::Beyond::Proposed { to: recipient(to, limits)? },
-                acts::Beyond::Refused(value) => client::Beyond::Refused(refusals::refusal(*value)),
+                acts::Beyond::Refused(value) => client::Beyond::Refused(refusals::refusal(*value)?),
             },
         },
     })
@@ -117,7 +125,11 @@ pub fn admission(value: &acts::Admission, limits: &Limits) -> Result<client::Adm
 
 /// # Errors
 /// Refuses overflowing or pending owner facts and any whole offer allocation above bounds.
-pub fn offered(value: &List<acts::Offered>, limits: &Limits) -> Result<List<client::Offered>, owner::Invalid> {
+pub fn offered(
+    value: &List<acts::Offered>,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<List<client::Offered>, owner::Invalid> {
     if value.capacity() > client::MAX_OFFERED_ACTS {
         return Err(owner::Invalid::OfferCapacity { allocated: value.capacity(), maximum: client::MAX_OFFERED_ACTS });
     }
@@ -127,7 +139,7 @@ pub fn offered(value: &List<acts::Offered>, limits: &Limits) -> Result<List<clie
             .push(client::Offered {
                 effect: value.effect.map(effect),
                 act: act(value.act),
-                admission: admission(&value.admission, limits)?,
+                admission: admission(&value.admission, limits, models)?,
             })
             .map_err(|_| owner::Invalid::TooLarge)?;
     }
@@ -189,7 +201,8 @@ mod tests {
             beyond: acts::Beyond::Proposed { to: acts::Recipient::Roles { project: u32::MAX, roles } },
         };
         let before = source.clone();
-        let copied = admission(&source, &limits).expect("whole bounded offer");
+        let copied =
+            admission(&source, &limits, &[jig_core_world::world::scripted_model()]).expect("whole bounded offer");
         let client::Admission::Bounded {
             within:
                 client::Bounds::Create(client::CreateBounds {
@@ -216,7 +229,10 @@ mod tests {
         assert_eq!(project, u32::MAX);
         assert_eq!(roles.capacity(), 4);
         assert_eq!(roles.as_slice(), &[0, u32::MAX]);
-        assert_eq!(admission(&source, &Limits { rows: 3, ..limits }), Err(owner::Invalid::TooLarge));
+        assert_eq!(
+            admission(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+            Err(owner::Invalid::TooLarge)
+        );
         assert_eq!(source, before);
     }
 
@@ -232,17 +248,32 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                admission(&acts::Admission::Proposed { to: source }, &limits),
+                admission(
+                    &acts::Admission::Proposed { to: source },
+                    &limits,
+                    &[jig_core_world::world::scripted_model()]
+                ),
                 Ok(client::Admission::Proposed { to: expected })
             );
         }
-        assert_eq!(admission(&acts::Admission::Allowed, &limits), Ok(client::Admission::Allowed));
         assert_eq!(
-            admission(&acts::Admission::Refused(people::Refusal::Role { held: None }), &limits),
+            admission(&acts::Admission::Allowed, &limits, &[jig_core_world::world::scripted_model()]),
+            Ok(client::Admission::Allowed)
+        );
+        assert_eq!(
+            admission(
+                &acts::Admission::Refused(people::Refusal::Role { held: None }),
+                &limits,
+                &[jig_core_world::world::scripted_model()]
+            ),
             Ok(client::Admission::Refused(client::Refusal::Role { held: None }))
         );
         assert_eq!(
-            admission(&acts::Admission::Refused(people::Refusal::KeyConflict), &limits),
+            admission(
+                &acts::Admission::Refused(people::Refusal::KeyConflict),
+                &limits,
+                &[jig_core_world::world::scripted_model()]
+            ),
             Ok(client::Admission::Refused(client::Refusal::KeyConflict))
         );
     }
@@ -273,7 +304,8 @@ mod tests {
         };
         let before = source.clone();
         let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
-        let actual = bounds(&source, &limits).expect("whole supplied bounded amendment");
+        let actual = bounds(&source, &limits, &[jig_core_world::world::scripted_model()])
+            .expect("whole supplied bounded amendment");
         let client::Bounds::Amend { budget_left, grants, implications, authority, ceiling } = actual else {
             panic!("actual amendment bound")
         };
@@ -293,7 +325,10 @@ mod tests {
         let mut oversized = source.clone();
         let acts::Bounds::Amend { implications, .. } = &mut oversized else { panic!("amendment") };
         *implications = List::with_capacity(crate::test::AUTHORITY_ENTRIES + 1);
-        assert_eq!(bounds(&oversized, &Limits { rows: 3, ..limits }), Err(owner::Invalid::TooLarge));
+        assert_eq!(
+            bounds(&oversized, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+            Err(owner::Invalid::TooLarge)
+        );
         assert_eq!(source, before);
     }
 }

@@ -32,6 +32,7 @@ pub mod task;
 pub mod turns;
 pub mod watches;
 
+mod llm;
 mod me;
 
 pub(crate) mod queries;

@@ -22,7 +22,11 @@ pub fn scope(value: &documents::NoteLocation, limits: &Limits) -> Result<client:
 
 /// # Errors
 /// Refuses any supplied text, pattern or reference allocation above the receiving bounds.
-pub fn note(value: &documents::Note, limits: &Limits) -> Result<client::Note, owner::Invalid> {
+pub fn note(
+    value: &documents::Note,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::Note, owner::Invalid> {
     Ok(client::Note {
         number: value.number,
         revision: client::Revision { value: u64::from(value.revision) },
@@ -35,7 +39,7 @@ pub fn note(value: &documents::Note, limits: &Limits) -> Result<client::Note, ow
         },
         tasks: owner::list(&value.tasks, limits, |number| Ok(*number))?,
         changed: value.changed,
-        acts: offers::offered(&value.acts, limits)?,
+        acts: offers::offered(&value.acts, limits, models)?,
         cut: value.cut,
     })
 }
@@ -107,7 +111,8 @@ mod tests {
                 source.writer = writer;
                 source.changed = changed;
                 let before = source.clone();
-                let value = note(&source, &limits).expect("whole note fits");
+                let value =
+                    note(&source, &limits, &[jig_core_world::world::scripted_model()]).expect("whole note fits");
                 assert_eq!(value.writer, expected);
                 assert_eq!(value.changed, changed);
                 assert_eq!(value.number, u64::MAX);
@@ -152,8 +157,14 @@ mod tests {
         let source = document();
         let before = source.clone();
         let limits = Limits { rows: 4, ..crate::test::limits().client.domain };
-        assert_eq!(note(&source, &Limits { rows: 3, ..limits }), Err(owner::Invalid::TooLarge));
-        assert_eq!(note(&source, &Limits { text: 2, ..limits }), Err(owner::Invalid::TooLarge));
+        assert_eq!(
+            note(&source, &Limits { rows: 3, ..limits }, &[jig_core_world::world::scripted_model()]),
+            Err(owner::Invalid::TooLarge)
+        );
+        assert_eq!(
+            note(&source, &Limits { text: 2, ..limits }, &[jig_core_world::world::scripted_model()]),
+            Err(owner::Invalid::TooLarge)
+        );
         assert_eq!(source, before);
         for (source, expected) in [
             (documents::NoteLocation::Deployment, client::NoteScope::Deployment),

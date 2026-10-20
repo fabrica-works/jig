@@ -1,6 +1,11 @@
 //! The joint peer preserves each operation's standalone meaning.
 use super::{Invalid, List, client, people};
-pub(super) fn ask(project: u32, values: &List<client::Operation>) -> Result<people::Ask, Invalid> {
+pub(super) fn ask(
+    project: u32,
+    values: &List<client::Operation>,
+    models: &[jig_domain_core::Model],
+    names: &mut List<Box<[u8]>>,
+) -> Result<people::Ask, Invalid> {
     let mut operations = List::with_capacity(values.len());
     for value in values {
         let ask = match value.clone() {
@@ -17,7 +22,7 @@ pub(super) fn ask(project: u32, values: &List<client::Operation>) -> Result<peop
             client::Operation::Stop { project, task } => client::Ask::Stop { project, task },
             client::Operation::Move { project, task, reason } => client::Ask::Move { project, task, reason },
         };
-        let operation = match super::ask(&ask)? {
+        let operation = match super::translate(&ask, models, names)? {
             people::Ask::Say { project: owner, task, words } if owner == project => {
                 people::Operation::Message { task, words }
             }

@@ -72,14 +72,14 @@ pub fn document(
             if subject != client::Subject::Me || value.party != transport.party(client) {
                 return Err(Invalid::OwnerRoute);
             }
-            wire::documents::frame_delivery(value, limits)
+            wire::documents::frame_delivery(value, limits, &transport.models, &transport.providers)
         }
         jig_domain_core::documents::Document::Task(value) => {
             let client::Subject::Task { task } = subject else { return Err(Invalid::OwnerRoute) };
             if value.chip.number != task {
                 return Err(Invalid::OwnerRoute);
             }
-            wire::documents::task_delivery(value, limits)
+            wire::documents::task_delivery(value, limits, &transport.models)
         }
         jig_domain_core::documents::Document::Chips(values) => {
             let client::Subject::Chips { tasks } = subject else { return Err(Invalid::OwnerRoute) };
@@ -299,8 +299,32 @@ pub fn people_reply(
     reply: people::Reply,
     limits: &Limits,
 ) -> Result<Incoming, Invalid> {
+    let translated = wire::answers::reply(reply, &transport.models, limits)
+        .map_err(|why| Invalid::Document(wire::documents::Invalid::Owner(why)))?;
+    translated_reply(transport, to, translated, limits)
+}
+
+/// # Errors
+/// Refuses a missing or non-jig keyed route, or an oversized answer.
+pub fn keyed_refusal(
+    transport: &mut Transport,
+    to: Token,
+    answer: client::Answer,
+    limits: &Limits,
+) -> Result<Incoming, Invalid> {
+    let Some(Reply::Keyed { owner: KeyedOwner::Jig, .. }) = transport.reply(to) else {
+        return Err(Invalid::OwnerRoute);
+    };
+    translated_reply(transport, to, wire::answers::Reply::Final(answer), limits)
+}
+
+fn translated_reply(
+    transport: &mut Transport,
+    to: Token,
+    translated: wire::answers::Reply,
+    limits: &Limits,
+) -> Result<Incoming, Invalid> {
     let route = transport.reply(to).ok_or(Invalid::MissingRoute)?.clone();
-    let translated = wire::answers::reply(reply);
     let incoming = match route {
         Reply::SignIn { client } => match translated {
             wire::answers::Reply::SignedIn { person, sign_in, expires } => {

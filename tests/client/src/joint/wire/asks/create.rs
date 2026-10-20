@@ -1,14 +1,22 @@
 //! The direct joint world's independent batch translation.
 use super::{authority, client as c, people as p, request_arguments, specification};
 use skein_lib::List;
-pub(super) fn ask(project: u32, values: &List<c::NewTask>) -> Result<p::Ask, super::Invalid> {
-    Ok(p::Ask::Create { project, batch: values.iter().map(member).collect::<Result<_, _>>()? })
+pub(super) fn ask(
+    project: u32,
+    values: &List<c::NewTask>,
+    models: &[jig_domain_core::Model],
+    names: &mut List<Box<[u8]>>,
+) -> Result<p::Ask, super::Invalid> {
+    Ok(p::Ask::Create {
+        project,
+        batch: values.iter().map(|value| member(value, models, names)).collect::<Result<_, _>>()?,
+    })
 }
-/// The joint world configures no models to name a choice by: the engine's translation owns that.
-fn member(v: &c::NewTask) -> Result<p::Member, super::Invalid> {
-    if v.llm.is_some() {
-        return Err(super::Invalid::Llm);
-    }
+fn member(
+    v: &c::NewTask,
+    models: &[jig_domain_core::Model],
+    names: &mut List<Box<[u8]>>,
+) -> Result<p::Member, super::Invalid> {
     let spec = specification(&v.spec);
     Ok(p::Member {
         executor: match v.executor {
@@ -22,7 +30,7 @@ fn member(v: &c::NewTask) -> Result<p::Member, super::Invalid> {
         words: spec.words,
         parameters: spec.parameters,
         inputs: spec.inputs,
-        authority: authority(&v.authority)?,
+        authority: authority(&v.authority, names)?,
         deadline: match v.deadline {
             c::NewDeadline::Named => p::Deadline::Named,
             c::NewDeadline::Span(value) => p::Deadline::Span(value),
@@ -79,26 +87,26 @@ fn member(v: &c::NewTask) -> Result<p::Member, super::Invalid> {
                 c::Retention::ForgottenOnceRead => p::Retention::ForgottenOnceRead,
             },
         },
-        llm: None,
+        llm: super::super::llm::requested(v.llm.as_ref(), models)?,
     })
 }
 
-pub(super) fn propose(project: u32, action: &c::ProposeAction, reason: &c::Text) -> Result<p::Ask, super::Invalid> {
+pub(super) fn propose(
+    project: u32,
+    action: &c::ProposeAction,
+    reason: &c::Text,
+    models: &[jig_domain_core::Model],
+    names: &mut List<Box<[u8]>>,
+) -> Result<p::Ask, super::Invalid> {
     let action = match action {
-        c::ProposeAction::Batch { tasks } => p::Action::Batch(tasks.iter().map(member).collect::<Result<_, _>>()?),
-        c::ProposeAction::Amendment { task, revision, change } => {
-            let ask = c::Ask::Amend {
-                project,
-                task: *task,
-                revision: Some(*revision),
-                change: change.clone(),
-                reason: reason.clone(),
-            };
-            let p::Ask::Amend { task, revision, amendment, .. } = super::ask(&ask)? else {
-                unreachable!("amend translation")
-            };
-            p::Action::Amend { task, revision, amendment: Box::new(amendment) }
+        c::ProposeAction::Batch { tasks } => {
+            p::Action::Batch(tasks.iter().map(|value| member(value, models, names)).collect::<Result<_, _>>()?)
         }
+        c::ProposeAction::Amendment { task, revision, change } => p::Action::Amend {
+            task: *task,
+            revision: revision.value,
+            amendment: Box::new(super::amend(change, reason, models, names)?),
+        },
     };
     Ok(p::Ask::Propose { project, action, reason: reason.bytes().into() })
 }

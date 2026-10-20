@@ -46,7 +46,27 @@ pub fn send(
     let sign_in = driver.transport.sign_in(client);
     let event = match down {
         Down::Send { attempt, key, request: ask, value } => {
-            keyed(driver, client, sign_in.ok_or(Invalid::Session)?, (*attempt, *key), ask, value.as_ref())?
+            let sign_in = sign_in.ok_or(Invalid::Session)?;
+            let refusal = match ask {
+                Ask::Jig(ask) => {
+                    if value.is_some() {
+                        return Err(Invalid::Carried);
+                    }
+                    wire::asks::refused(ask, &driver.transport.models).map_err(Invalid::Ask)?
+                }
+                Ask::Family { .. } => None,
+            };
+            if let Some(answer) = refusal {
+                let reply = driver.transport.reply_to(Reply::Keyed {
+                    client,
+                    attempt: *attempt,
+                    key: *key,
+                    owner: KeyedOwner::Jig,
+                });
+                driver.refuse(reply.into_token(), answer);
+                return Ok(());
+            }
+            keyed(driver, client, sign_in, (*attempt, *key), ask, value.as_ref())?
         }
         Down::Read { read, what: Readable::Jig(what) } => {
             let sign_in = sign_in.ok_or(Invalid::Session)?;
@@ -138,14 +158,14 @@ fn keyed(
             if carried.is_some() {
                 return Err(Invalid::Carried);
             }
-            let ask = wire::asks::ask(value).map_err(Invalid::Ask)?;
+            let request = wire::asks::request(value, &driver.transport.models).map_err(Invalid::Ask)?;
             let reply_to = driver.transport.reply_to(Reply::Keyed { client, attempt, key, owner: KeyedOwner::Jig });
             root::Event::Core(core::Event::People(people::Event::Ask {
-                models: Box::new([]),
+                models: request.models,
                 reply_to,
                 sign_in,
                 key,
-                ask,
+                ask: request.ask,
             }))
         }
         Ask::Family { scope, record } => {
@@ -343,7 +363,8 @@ mod tests {
             driver.transport.take_reply(to.into_token()),
             Some(Reply::Keyed { client: ClientId(0), attempt, key, owner: KeyedOwner::Jig })
         );
-        let translated = wire::answers::reply(reply);
+        let translated =
+            wire::answers::reply(reply, &[], &crate::test::limits().client.domain).expect("bounded answer");
         let (envelope, answer) = wire::answers::keyed(translated).expect("actual final body uses its keyed route");
         assert_eq!(envelope, skein_lib::RequestEnvelope::Final);
         assert!(answer.is_some());

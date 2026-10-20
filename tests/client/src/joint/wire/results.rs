@@ -116,7 +116,11 @@ pub fn details(value: &documents::ResultDoc, limits: &Limits) -> Result<client::
 /// exact copy of the result carried by Done or Cancelled, never a synthetic one.
 /// # Errors
 /// Refuses any nested source allocation above the receiving bounds.
-pub fn document(source: &documents::ResultDoc, limits: &Limits) -> Result<client::Result, owner::Invalid> {
+pub fn document(
+    source: &documents::ResultDoc,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::Result, owner::Invalid> {
     let result = match &source.ending {
         documents::Ending::Done(value) => Some(self::value(value, limits)?),
         documents::Ending::Failed(_) => None,
@@ -130,7 +134,7 @@ pub fn document(source: &documents::ResultDoc, limits: &Limits) -> Result<client
         value: result,
         at: source.at,
         details: Some(Box::new(details(source, limits)?)),
-        acts: offers::offered(&source.acts, limits)?,
+        acts: offers::offered(&source.acts, limits, models)?,
     })
 }
 

@@ -815,6 +815,14 @@ impl Session {
             self.delay_until = None;
             self.callbacks.append(&mut self.delayed);
         }
+        for (to, answer) in self.driver.take_refusals() {
+            if self.driver.transport.reply(to).is_none() {
+                continue;
+            }
+            let value = packets::keyed_refusal(&mut self.driver.transport, to, answer, &self.limits.client.domain)
+                .map_err(Invalid::Packet)?;
+            self.incoming(value, now, wall)?;
+        }
         loop {
             let packets = self.driver.poll(now, wall);
             self.stopping()?;

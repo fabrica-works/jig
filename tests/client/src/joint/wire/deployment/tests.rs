@@ -673,9 +673,15 @@ fn me_deployment_role_is_independent_of_project_rows() {
             retention: Duration::ZERO,
             cut: true,
         };
-        assert_eq!(owner::frame(&source, &limits()).expect("supplied Me").deployment_role, expected);
+        assert_eq!(
+            owner::frame(&source, &limits(), &[], &jig_domain_accounts::Providers::none())
+                .expect("supplied Me")
+                .deployment_role,
+            expected
+        );
         source.projects = List::with_capacity(1);
-        let value = owner::frame(&source, &limits()).expect("clipped supplied Me");
+        let value = owner::frame(&source, &limits(), &[], &jig_domain_accounts::Providers::none())
+            .expect("clipped supplied Me");
         assert_eq!(value.deployment_role, expected);
         assert!(value.cut && value.projects.is_empty());
     }

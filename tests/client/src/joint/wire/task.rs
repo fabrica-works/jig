@@ -9,7 +9,11 @@ use jig_domain_core::documents;
 /// # Errors
 /// Rejects inconsistent repeated owner facts or any whole nested allocation
 /// above the receiving limits, without clipping a list or inventing context.
-pub fn document(source: &documents::Task, limits: &Limits) -> Result<client::Task, Invalid> {
+pub fn document(
+    source: &documents::Task,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::Task, Invalid> {
     if source.project != source.chip.details.project
         || source.executor != source.chip.details.executor
         || source.words != source.spec.words
@@ -18,14 +22,18 @@ pub fn document(source: &documents::Task, limits: &Limits) -> Result<client::Tas
     {
         return Err(Invalid::Identity);
     }
-    copy(source, limits).map_err(Invalid::Owner)
+    copy(source, limits, models).map_err(Invalid::Owner)
 }
 
-fn copy(source: &documents::Task, limits: &Limits) -> Result<client::Task, owner::Invalid> {
+fn copy(
+    source: &documents::Task,
+    limits: &Limits,
+    models: &[jig_domain_core::Model],
+) -> Result<client::Task, owner::Invalid> {
     Ok(client::Task {
         kept_account: source.kept_account,
         run_wait: source.run_wait.map(wait),
-        llm: None,
+        llm: super::llm::choice(source.llm.as_ref(), models, limits)?,
         label: source.label,
         flags: super::queries::flags(source.flags),
         last_activity: source.last_activity,
@@ -53,7 +61,7 @@ fn copy(source: &documents::Task, limits: &Limits) -> Result<client::Task, owner
             Ok(client::TaskResource::Owner(Box::new(chips::resource(value, limits)?)))
         })?,
         budget: owner::budget(&source.budget),
-        authority: owner::authority(&source.authority, limits)?,
+        authority: owner::authority(&source.authority, limits, models)?,
         hold: source
             .hold
             .as_ref()
@@ -70,7 +78,7 @@ fn copy(source: &documents::Task, limits: &Limits) -> Result<client::Task, owner
         })?,
         activity: source.activity,
         changed: source.changed,
-        acts: offers::offered(&source.acts, limits)?,
+        acts: offers::offered(&source.acts, limits, models)?,
         result: source
             .result
             .as_ref()
@@ -220,7 +228,7 @@ pub(crate) mod tests {
     fn whole_current_task_keeps_owner_fields_absent_context_and_independent_revisions_without_fabricating_a_result() {
         let source = source();
         let original = source.clone();
-        let actual = document(&source, &super::super::rows::tests::limits()).expect("whole Task");
+        let actual = document(&source, &super::super::rows::tests::limits(), &[]).expect("whole Task");
         assert!(actual.context.is_none());
         assert_eq!(actual.project, u32::MAX);
         assert_eq!(actual.requester, client::OwnerRequester::Deployment { project: 0 });
@@ -240,7 +248,12 @@ pub(crate) mod tests {
         assert_eq!(actual.wake, owner::wake(source.wake));
         assert_eq!(
             actual.authority,
-            owner::authority(&source.authority, &super::super::rows::tests::limits()).expect("whole source authority")
+            owner::authority(
+                &source.authority,
+                &super::super::rows::tests::limits(),
+                &[jig_core_world::world::scripted_model()]
+            )
+            .expect("whole source authority")
         );
         assert_eq!(
             actual.result_contract,
@@ -270,35 +283,42 @@ pub(crate) mod tests {
         let source = source();
         let original = source.clone();
         let limits = super::super::rows::tests::limits();
-        assert!(super::super::documents::task_read(&source, &limits).is_ok());
-        assert!(super::super::documents::task_delivery(&source, &limits).is_ok());
+        assert!(super::super::documents::task_read(&source, &limits, &[]).is_ok());
+        assert!(super::super::documents::task_delivery(&source, &limits, &[]).is_ok());
         assert_eq!(
-            super::super::documents::task_delivery(&source, &Limits { document_bytes: 0, ..limits }),
+            super::super::documents::task_delivery(&source, &Limits { document_bytes: 0, ..limits }, &[]),
             Err(Invalid::Payload)
         );
-        assert_eq!(document(&source, &Limits { rows: 3, ..limits }), Err(Invalid::Owner(owner::Invalid::TooLarge)));
+        assert_eq!(
+            document(&source, &Limits { rows: 3, ..limits }, &[]),
+            Err(Invalid::Owner(owner::Invalid::TooLarge))
+        );
         let mut changed = source.clone();
         changed.project = 0;
-        assert_eq!(document(&changed, &limits), Err(Invalid::Identity));
+        assert_eq!(document(&changed, &limits, &[]), Err(Invalid::Identity));
         changed = source.clone();
         changed.words.cut = !changed.words.cut;
-        assert_eq!(document(&changed, &limits), Err(Invalid::Identity));
+        assert_eq!(document(&changed, &limits, &[]), Err(Invalid::Identity));
         changed = source.clone();
         changed.parameters = List::with_capacity(0);
-        assert_eq!(document(&changed, &limits), Err(Invalid::Identity));
+        assert_eq!(document(&changed, &limits, &[]), Err(Invalid::Identity));
         let mut lower = 0;
         let mut upper = limits.document_bytes;
         while lower < upper {
             let middle = lower + (upper - lower) / 2;
-            if super::super::documents::task_delivery(&source, &Limits { document_bytes: middle, ..limits }).is_ok() {
+            if super::super::documents::task_delivery(&source, &Limits { document_bytes: middle, ..limits }, &[])
+                .is_ok()
+            {
                 upper = middle;
             } else {
                 lower = middle + 1;
             }
         }
-        assert!(super::super::documents::task_delivery(&source, &Limits { document_bytes: lower, ..limits }).is_ok());
+        assert!(
+            super::super::documents::task_delivery(&source, &Limits { document_bytes: lower, ..limits }, &[]).is_ok()
+        );
         assert_eq!(
-            super::super::documents::task_delivery(&source, &Limits { document_bytes: lower - 1, ..limits }),
+            super::super::documents::task_delivery(&source, &Limits { document_bytes: lower - 1, ..limits }, &[]),
             Err(Invalid::Payload)
         );
         assert_eq!(source, original);

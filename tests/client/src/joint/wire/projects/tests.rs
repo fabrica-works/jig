@@ -209,7 +209,8 @@ pub(crate) fn source() -> documents::Project {
 fn whole_project_keeps_all_resource_roles_members_raw_text_and_independent_source_order() {
     let source = source();
     let original = source.clone();
-    let actual = document(&source, &limits()).expect("whole source project");
+    let actual =
+        document(&source, &limits(), &[jig_core_world::world::scripted_model()]).expect("whole source project");
     assert_eq!(actual.number, u32::MAX);
     assert_eq!((actual.resources.capacity(), actual.resources.len()), (7, 4));
     assert_eq!(
@@ -256,8 +257,12 @@ fn whole_project_keeps_all_resource_roles_members_raw_text_and_independent_sourc
 fn project_policy_keeps_raw_bits_literal_patterns_both_guards_and_independent_permission_loss() {
     let source = source();
     let original = source.clone();
-    let policy = document(&source, &limits()).expect("policy").policy;
-    assert_eq!(policy.ceiling, owner::authority(&source.policy.ceiling, &limits()).expect("complete ceiling"));
+    let policy = document(&source, &limits(), &[jig_core_world::world::scripted_model()]).expect("policy").policy;
+    assert_eq!(
+        policy.ceiling,
+        owner::authority(&source.policy.ceiling, &limits(), &[jig_core_world::world::scripted_model()])
+            .expect("complete ceiling")
+    );
     assert_eq!(policy.period_spend, u64::MAX);
     assert_eq!(policy.escalation_role, Some(0));
     assert_eq!((policy.projections.capacity(), policy.projections.len()), (4, 1));
@@ -303,7 +308,7 @@ fn project_policy_keeps_raw_bits_literal_patterns_both_guards_and_independent_pe
 fn project_ledgers_keep_current_and_configured_periods_separate_all_funders_counters_and_optional_clocks() {
     let mut source = source();
     let original = source.clone();
-    let actual = document(&source, &limits()).expect("independent ledgers");
+    let actual = document(&source, &limits(), &[jig_core_world::world::scripted_model()]).expect("independent ledgers");
     assert_eq!(actual.configured_period, 0);
     let current = actual.current_period.expect("retained current ledger");
     assert_eq!(current.source, client::Funder::Period { project: u32::MAX, period: u64::MAX });
@@ -325,7 +330,7 @@ fn project_ledgers_keep_current_and_configured_periods_separate_all_funders_coun
     assert_eq!(source, original);
     source.current_period = None;
     source.configured_pools = List::with_capacity(6);
-    let absent = document(&source, &limits()).expect("no current ledger");
+    let absent = document(&source, &limits(), &[jig_core_world::world::scripted_model()]).expect("no current ledger");
     assert_eq!(absent.current_period, None);
     assert_eq!(absent.configured_period, 0);
     assert_eq!((absent.configured_pools.capacity(), absent.configured_pools.len()), (6, 0));
@@ -341,7 +346,7 @@ fn project_ledgers_keep_current_and_configured_periods_separate_all_funders_coun
 fn project_recurring_keeps_both_overlap_policies_whole_batches_reservations_and_supplied_period_facts() {
     let source = source();
     let original = source.clone();
-    let actual = document(&source, &limits()).expect("recurring");
+    let actual = document(&source, &limits(), &[jig_core_world::world::scripted_model()]).expect("recurring");
     assert_eq!((actual.recurring.capacity(), actual.recurring.len()), (4, 2));
     assert_eq!(source.recurring.len(), 2);
     for (index, (value, raw)) in actual.recurring.iter().zip(source.recurring.iter()).enumerate() {
@@ -357,7 +362,12 @@ fn project_recurring_keeps_both_overlap_policies_whole_batches_reservations_and_
         let proposed = value.batch.get(0).expect("whole batch task");
         assert_eq!(
             proposed,
-            &history::proposed(raw.batch.get(0).expect("source"), &limits()).expect("whole proposed task")
+            &history::proposed(
+                raw.batch.get(0).expect("source"),
+                &limits(),
+                &[jig_core_world::world::scripted_model()]
+            )
+            .expect("whole proposed task")
         );
         assert_eq!((proposed.number, proposed.budget, proposed.priority), (u64::MAX, u64::MAX, Some(0)));
         assert_eq!(proposed.resources.capacity(), 7);
@@ -382,7 +392,8 @@ fn project_permissions_distinguish_absent_empty_reserved_and_lost_mappings_witho
         source.policy.permissions_cut = cut;
         source.policy.escalation_role = None;
         source.policy.cut = !cut;
-        let actual = document(&source, &limits()).expect("independent absence and loss");
+        let actual = document(&source, &limits(), &[jig_core_world::world::scripted_model()])
+            .expect("independent absence and loss");
         assert_eq!(actual.policy.permissions.as_ref().map(List::capacity), capacity);
         assert!(actual.policy.permissions.as_ref().is_none_or(List::is_empty));
         assert_eq!(actual.policy.permissions_cut, cut);
@@ -397,21 +408,40 @@ fn project_read_admits_the_complete_boxed_envelope_at_the_exact_byte_boundary_wi
     let source = source();
     let original = source.clone();
     let limits = limits();
-    let read = super::super::documents::project_read(&source, &limits).expect("whole read");
+    let read = super::super::documents::project_read(&source, &limits, &[jig_core_world::world::scripted_model()])
+        .expect("whole read");
     let mut lower = 0;
     let mut upper = limits.document_bytes;
     while lower < upper {
         let middle = lower + (upper - lower) / 2;
-        if super::super::documents::project_read(&source, &Limits { document_bytes: middle, ..limits }).is_ok() {
+        if super::super::documents::project_read(
+            &source,
+            &Limits { document_bytes: middle, ..limits },
+            &[jig_core_world::world::scripted_model()],
+        )
+        .is_ok()
+        {
             upper = middle;
         } else {
             lower = middle + 1;
         }
     }
     assert!(lower > 0);
-    assert_eq!(super::super::documents::project_read(&source, &Limits { document_bytes: lower, ..limits }), Ok(read));
     assert_eq!(
-        super::super::documents::project_read(&source, &Limits { document_bytes: lower - 1, ..limits }).err(),
+        super::super::documents::project_read(
+            &source,
+            &Limits { document_bytes: lower, ..limits },
+            &[jig_core_world::world::scripted_model()]
+        ),
+        Ok(read)
+    );
+    assert_eq!(
+        super::super::documents::project_read(
+            &source,
+            &Limits { document_bytes: lower - 1, ..limits },
+            &[jig_core_world::world::scripted_model()]
+        )
+        .err(),
         Some(super::super::documents::Invalid::Payload)
     );
     assert_eq!(source, original);
@@ -428,23 +458,35 @@ fn project_read_rejects_reserved_empty_collections_final_nested_text_and_the_twe
             .push(acts::Offered { effect: None, act: acts::Act::Release, admission: acts::Admission::Allowed })
             .expect("offer");
     }
-    assert!(super::super::documents::project_read(&source, &limits).is_ok());
+    assert!(
+        super::super::documents::project_read(&source, &limits, &[jig_core_world::world::scripted_model()]).is_ok()
+    );
     source.acts = List::with_capacity(client::MAX_OFFERED_ACTS + 1);
-    assert!(super::super::documents::project_read(&source, &limits).is_err());
+    assert!(
+        super::super::documents::project_read(&source, &limits, &[jig_core_world::world::scripted_model()]).is_err()
+    );
     source.acts = List::with_capacity(client::MAX_OFFERED_ACTS);
     source.policy.permissions = Some(List::with_capacity(9));
-    assert!(super::super::documents::project_read(&source, &limits).is_err());
+    assert!(
+        super::super::documents::project_read(&source, &limits, &[jig_core_world::world::scripted_model()]).is_err()
+    );
     source.policy.permissions = None;
     source.recurring.get_mut(1).expect("last template").batch.get_mut(0).expect("last nested task").resources =
         List::with_capacity(9);
-    assert!(super::super::documents::project_read(&source, &limits).is_err());
+    assert!(
+        super::super::documents::project_read(&source, &limits, &[jig_core_world::world::scripted_model()]).is_err()
+    );
     source.recurring.get_mut(1).expect("last template").batch.get_mut(0).expect("last nested task").resources =
         List::with_capacity(7);
     source.members.get_mut(4).expect("final member").name.bytes =
         vec![255; limits.text as usize + 1].into_boxed_slice();
-    assert!(super::super::documents::project_read(&source, &limits).is_err());
+    assert!(
+        super::super::documents::project_read(&source, &limits, &[jig_core_world::world::scripted_model()]).is_err()
+    );
     source.members.get_mut(4).expect("final member").name.bytes = Box::new([]);
-    assert!(super::super::documents::project_read(&source, &limits).is_ok());
+    assert!(
+        super::super::documents::project_read(&source, &limits, &[jig_core_world::world::scripted_model()]).is_ok()
+    );
 }
 
 const UTF8_TEXTS: [&[u8]; 1] = [b"~\0"];

@@ -71,6 +71,8 @@ struct Client {
 /// One transport's globally unique reply/watch namespace, shared across tabs.
 pub struct Transport {
     versions: VersionRange,
+    pub models: Box<[jig_domain_core::Model]>,
+    pub providers: jig_domain_accounts::Providers,
     next: u64,
     clients: BTreeMap<ClientId, Client>,
     replies: BTreeMap<Token, Reply>,
@@ -90,6 +92,8 @@ impl Transport {
     pub fn new(versions: VersionRange) -> Self {
         Self {
             versions,
+            models: Box::new([]),
+            providers: jig_domain_accounts::Providers::none(),
             next: 1,
             clients: BTreeMap::new(),
             replies: BTreeMap::new(),
