@@ -96,3 +96,30 @@ fn deployment_watch_keeps_original_subject_and_ack_until_whole_delivery_admissio
     assert!(transport.taken(ClientId(0), native).is_none());
     assert!(transport.taken(ClientId(0), Token::new(1)).is_none());
 }
+
+#[test]
+fn accounts_and_deployment_deliveries_require_their_own_subjects() {
+    let limits = wire::deployment::tests::limits();
+    let accounts = documents::Document::Accounts(Box::new(documents::Accounts {
+        accounts: skein_lib::List::with_capacity(0),
+        signing: skein_lib::List::with_capacity(0),
+        last_end: None,
+        usable: false,
+        settled: true,
+        cut: false,
+    }));
+    let rows = [
+        (client::Subject::Deployment, accounts),
+        (client::Subject::Accounts, documents::Document::Deployment(Box::new(wire::deployment::tests::source()))),
+    ];
+    for (subject, document) in rows {
+        let mut transport = super::tests::transport();
+        let native = Token::new(u64::MAX);
+        let watcher = transport.open(ClientId(0), native, Watched::Jig(subject));
+        assert_eq!(
+            super::super::packets::document(&mut transport, watcher, &document, &limits).err(),
+            Some(super::super::packets::Invalid::OwnerRoute)
+        );
+        assert!(transport.taken(ClientId(0), native).is_none());
+    }
+}

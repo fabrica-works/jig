@@ -262,7 +262,7 @@ pub(crate) fn needed(domain: &Ui, subject: &jig_client::contract::Subject) -> bo
 pub(crate) fn uses(section: Section, subject: &jig_client::contract::Subject) -> bool {
     use jig_client::contract::Subject;
     match subject {
-        Subject::Me => false,
+        Subject::Me | Subject::Accounts => false,
         Subject::Task { task } => match section {
             Section::Task { task: named, .. } => named == *task,
             Section::Inbox { .. } | Section::Conversations { .. } | Section::Project { .. } | Section::Deployment => {
@@ -296,7 +296,6 @@ pub(crate) fn uses(section: Section, subject: &jig_client::contract::Subject) ->
             Section::Inbox { .. } | Section::Task { .. } | Section::Project { .. } | Section::Deployment => false,
         },
         Subject::Deployment => section == Section::Deployment,
-        Subject::Accounts => false,
     }
 }
 

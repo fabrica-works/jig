@@ -467,10 +467,30 @@ pub fn english(text: u32) -> Result<Words, Invalid> {
     english.wall = WallFormat::Nanos;
     english.plural = PluralRule::English;
     let count = u32::try_from(english.phrases.len()).expect("composed phrases fit");
+    // The composed literal language determines its complete storage allowance.
+    let mut segments = 0_u32;
+    let mut text_bytes = 0_u32;
+    for phrase in &english.phrases {
+        for form in &phrase.forms {
+            segments = segments
+                .checked_add(u32::try_from(form.segments.len()).expect("literal segments fit"))
+                .expect("composed literal segments fit");
+            for segment in &form.segments {
+                match segment {
+                    Segment::Text(text) => {
+                        text_bytes = text_bytes
+                            .checked_add(u32::try_from(text.len()).expect("literal text fits"))
+                            .expect("composed literal text fits");
+                    }
+                    Segment::Hole { .. } => {}
+                }
+            }
+        }
+    }
     let book = Phrasebook::load(
         shapes(jig_client_view::phrases::jig::shapes(text)),
         Box::new([english]),
-        &PhraseLimits { languages: 1, phrases: count, holes: 4, segments: 3000, text_bytes: 32000, hole_bytes: text },
+        &PhraseLimits { languages: 1, phrases: count, holes: 4, segments, text_bytes, hole_bytes: text },
     )?;
     Ok(Words::new(book, 0, 0))
 }

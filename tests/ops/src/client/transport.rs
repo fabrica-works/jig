@@ -512,7 +512,8 @@ fn run_position(subject: &jig_client_domain::contract::Subject) -> SubjectRun {
         | jig_client_domain::contract::Subject::Chips { .. }
         | jig_client_domain::contract::Subject::Inbox { .. }
         | jig_client_domain::contract::Subject::Tasks { .. }
-        | jig_client_domain::contract::Subject::Deployment => unreachable!("only run watches continue"),
+        | jig_client_domain::contract::Subject::Deployment
+        | jig_client_domain::contract::Subject::Accounts => unreachable!("only run watches continue"),
     }
 }
 fn source_facts(source: &engine::Source, commit: u64, out: &mut Vec<Observed>) {

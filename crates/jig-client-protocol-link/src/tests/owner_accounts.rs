@@ -33,6 +33,7 @@ fn source_lines() -> List<c::OwnerAccountSource> {
         },
     ])
 }
+#[expect(clippy::manual_map, reason = "optional fixture facts follow the step crate lint configuration")]
 fn document(end: Option<c::OwnerAccountEnd>) -> c::OwnerAccounts {
     c::OwnerAccounts {
         accounts: list([
@@ -63,14 +64,17 @@ fn document(end: Option<c::OwnerAccountEnd>) -> c::OwnerAccounts {
             },
         ]),
         signing: list([c::OwnerAccountSignIn { source: 19, provider: 3, holder: c::OwnerAccountHolder::Party(23) }]),
-        last_end: end.map(|end| c::OwnerAccountLastEnd { source: 11, end }),
+        last_end: match end {
+            Some(end) => Some(c::OwnerAccountLastEnd { source: 11, end }),
+            None => None,
+        },
         usable: true,
         settled: false,
         cut: true,
     }
 }
-fn ends() -> Vec<c::OwnerAccountEnd> {
-    vec![
+fn ends() -> Box<[c::OwnerAccountEnd]> {
+    Box::new([
         c::OwnerAccountEnd::Made { account: 7, declined: false },
         c::OwnerAccountEnd::Renewed { account: 7, declined: true },
         c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::Configured },
@@ -104,7 +108,7 @@ fn ends() -> Vec<c::OwnerAccountEnd> {
             },
         },
         c::OwnerAccountEnd::Failed { failure: c::OwnerAccountFailure::Cancelled },
-    ]
+    ])
 }
 fn bytes(end: Option<w::OwnerAccountEnd>) -> Box<[u8]> {
     delivery(jig_client_test_records::accounts_record(end))

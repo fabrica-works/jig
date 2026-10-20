@@ -151,6 +151,13 @@ fn deployment_accounts_five_states_independent_flags_spend_overlay_and_generatio
             value
                 .accounts
                 .push(OwnerAccount {
+                    place: 0,
+                    uses: None,
+                    plan: false,
+                    provider: None,
+                    display: DocumentText { bytes: Text::new(Box::from([]), 32).expect("empty display"), cut: false },
+                    holder: OwnerAccountHolder::Deployment,
+                    sources: List::with_capacity(0),
                     number: u32::MAX,
                     generation: Some(u64::MAX),
                     state,
@@ -406,6 +413,13 @@ fn deployment_heap_counts_every_reserved_list_box_chip_text_and_exact_carrier_th
     value
         .accounts
         .push(OwnerAccount {
+            place: 0,
+            uses: None,
+            plan: false,
+            provider: None,
+            display: DocumentText { bytes: Text::new(Box::from([]), 32).expect("empty display"), cut: false },
+            holder: OwnerAccountHolder::Deployment,
+            sources: List::with_capacity(0),
             number: 1,
             generation: Some(2),
             state: OwnerAccountState::Granted,

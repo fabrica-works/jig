@@ -30,6 +30,7 @@ fn source_lines() -> List<d::SourceLine> {
         },
     ])
 }
+#[expect(clippy::manual_map, reason = "optional fixture facts follow the step crate lint configuration")]
 fn document(end: Option<a::End>) -> d::Accounts {
     d::Accounts {
         accounts: list([
@@ -57,14 +58,17 @@ fn document(end: Option<a::End>) -> d::Accounts {
             },
         ]),
         signing: list([d::SignInLine { source: 19, provider: 3, holder: a::Holder::Party(23) }]),
-        last_end: end.map(|end| d::LastEnd { source: 11, end }),
+        last_end: match end {
+            Some(end) => Some(d::LastEnd { source: 11, end }),
+            None => None,
+        },
         usable: true,
         settled: false,
         cut: true,
     }
 }
-fn ends() -> Vec<a::End> {
-    vec![
+fn ends() -> Box<[a::End]> {
+    Box::new([
         a::End::Made { account: 7, declined: false },
         a::End::Renewed { account: 7, declined: true },
         a::End::Refused { refusal: a::Refusal::Configured },
@@ -87,7 +91,7 @@ fn ends() -> Vec<a::End> {
         a::End::Failed { failure: a::Failure::Misconfigured },
         a::End::Failed { failure: a::Failure::Unloaded { at: a::Place::File, why: a::Unread::Stalled } },
         a::End::Failed { failure: a::Failure::Cancelled },
-    ]
+    ])
 }
 #[test]
 fn an_accounts_watch_binds_its_party_at_core_admission() {

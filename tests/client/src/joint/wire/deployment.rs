@@ -96,6 +96,13 @@ fn run(value: &documents::HostRun, limits: &Limits) -> Result<client::OwnerHostR
 fn account(value: &documents::Account, limits: &Limits) -> Result<client::OwnerAccount, owner::Invalid> {
     Ok(client::OwnerAccount {
         number: value.number,
+        place: value.place,
+        uses: super::accounts::uses(value.uses.as_ref()),
+        plan: value.plan,
+        provider: value.provider,
+        display: owner::text(&value.display, limits)?,
+        holder: super::accounts::holder(value.holder),
+        sources: super::accounts::sources(&value.sources, limits)?,
         generation: value.generation,
         state: account_state(value.state),
         usable: value.usable,
@@ -159,7 +166,7 @@ fn attempt(value: fleet::AttemptState) -> client::OwnerAttemptState {
     }
 }
 
-fn account_state(value: documents::AccountState) -> client::OwnerAccountState {
+pub(super) fn account_state(value: documents::AccountState) -> client::OwnerAccountState {
     match value {
         documents::AccountState::Granted => client::OwnerAccountState::Granted,
         documents::AccountState::Asking => client::OwnerAccountState::Asking,

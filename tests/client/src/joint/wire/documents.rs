@@ -306,6 +306,15 @@ pub fn run_delivery(value: &documents::Run, limits: &Limits) -> Result<client::D
     Ok(value)
 }
 
+/// # Errors
+/// Refuses any whole account allocation or complete delivery above the receiving bounds.
+pub fn accounts_delivery(source: &documents::Accounts, limits: &Limits) -> Result<client::Delivery, Invalid> {
+    let value =
+        client::Delivery::OwnerAccounts(Box::new(super::accounts::document(source, limits).map_err(Invalid::Owner)?));
+    admission::admit_delivery(&value, &bounds(limits)).map_err(|_| Invalid::Payload)?;
+    Ok(value)
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     const UTF8_TEXTS: [&[u8]; 4] = [b"~\0", b"\0~", b"~\0/", b"/~"];

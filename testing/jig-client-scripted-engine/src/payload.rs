@@ -1080,7 +1080,7 @@ fields!(VersionRange { first, last });
 impl Payload for Subject {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Me | Self::Deployment => Some(0),
+            Self::Me | Self::Deployment | Self::Accounts => Some(0),
             Self::Task { task } => sum(&[task.heap(bounds)]),
             Self::Tree { task, window } => sum(&[task.heap(bounds), window.heap(bounds)]),
             Self::Chips { tasks } => sum(&[tasks.heap(bounds)]),
@@ -1107,6 +1107,7 @@ impl Payload for Delivery {
             Self::RunState(value0) => sum(&[value0.heap(bounds)]),
             Self::Deployment(value0) => sum(&[value0.heap(bounds)]),
             Self::OwnerDeployment(value0) => value0.heap(bounds),
+            Self::OwnerAccounts(value0) => value0.heap(bounds),
         }
     }
 }

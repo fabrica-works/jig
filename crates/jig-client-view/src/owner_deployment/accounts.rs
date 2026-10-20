@@ -44,7 +44,7 @@ pub(super) fn details(b: &mut Builder, words: &Words, account: &OwnerAccount) {
                 match payer {
                     OwnerAccountUse::Party(party) => field_number(b, words, P::AccountDetail(A::PaysParty), *party),
                     OwnerAccountUse::Project(project) => {
-                        field_number(b, words, P::AccountDetail(A::PaysProject), u64::from(*project))
+                        field_number(b, words, P::AccountDetail(A::PaysProject), u64::from(*project));
                     }
                 }
             }

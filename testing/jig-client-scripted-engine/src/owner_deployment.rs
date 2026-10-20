@@ -46,6 +46,9 @@ impl Payload for OwnerAccount {
         let mut total = 0_u64;
         total = total.checked_add(self.runs.heap(bounds)?)?;
         total = total.checked_add(self.waiting.heap(bounds)?)?;
+        total = total.checked_add(self.display.heap(bounds)?)?;
+        total = total.checked_add(self.sources.heap(bounds)?)?;
+        total = total.checked_add(self.uses.heap(&Bounds { rows: 16, ..*bounds })?)?;
         Some(total)
     }
 }
@@ -215,5 +218,34 @@ pub fn worst_case(bounds: &Bounds) -> Option<u64> {
         None
     } else {
         Some(bounds.document_bytes)
+    }
+}
+
+impl Payload for jig_client_domain::contract::OwnerAccountUse {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        Some(0)
+    }
+}
+impl Payload for jig_client_domain::contract::OwnerAccountSource {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        Some(0)
+    }
+}
+impl Payload for jig_client_domain::contract::OwnerAccountSignIn {
+    fn heap(&self, _bounds: &Bounds) -> Option<u64> {
+        Some(0)
+    }
+}
+impl Payload for jig_client_domain::contract::OwnerAccountLine {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.display
+            .heap(bounds)?
+            .checked_add(self.sources.heap(bounds)?)?
+            .checked_add(self.uses.heap(&Bounds { rows: 16, ..*bounds })?)
+    }
+}
+impl Payload for jig_client_domain::contract::OwnerAccounts {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        self.accounts.heap(bounds)?.checked_add(self.signing.heap(bounds)?)
     }
 }

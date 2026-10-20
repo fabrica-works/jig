@@ -21,6 +21,17 @@ impl Story {
         assert!(story.run_until(|s| s.client.link().state == client::Link::Live, Duration::from_secs(1)));
         story
     }
+    /// The fake accounts component supplies the newly signed-in source's first grant.
+    pub fn grant_account_sign_in(&mut self, source: u32) {
+        self.engine.driver.world.send(jig_test_domain::Event::Core(jig_domain_core::Event::Account(
+            accounts::Event::Component(accounts::FromComponent::Granted {
+                form: accounts::Form::Credential(accounts::Scheme::Bearer),
+                account: source,
+                generation: 1,
+                valid: Duration::from_secs(60),
+            }),
+        )));
+    }
     /// Queue complete client account sign-in inputs as one burst into the existing core world.
     pub fn hold_account_sign_in_burst(&mut self) {
         self.engine.account_sign_in_burst = Some(Vec::new());

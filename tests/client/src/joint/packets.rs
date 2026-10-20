@@ -115,6 +115,12 @@ pub fn document(
             let client::Subject::Tree { task, window } = subject else { return Err(Invalid::OwnerRoute) };
             wire::documents::tree_delivery(task, window, value, limits)
         }
+        jig_domain_core::documents::Document::Accounts(value) => {
+            if subject != client::Subject::Accounts {
+                return Err(Invalid::OwnerRoute);
+            }
+            wire::documents::accounts_delivery(value, limits)
+        }
         jig_domain_core::documents::Document::Deployment(value) => {
             if subject != client::Subject::Deployment {
                 return Err(Invalid::OwnerRoute);
@@ -127,7 +133,6 @@ pub fn document(
         | jig_domain_core::documents::Document::PersonTask(_)
         | jig_domain_core::documents::Document::Result(_)
         | jig_domain_core::documents::Document::Project(_)
-        | jig_domain_core::documents::Document::Accounts(_)
         | jig_domain_core::documents::Document::Note(_) => return Err(Invalid::PendingDocument),
     }
     .map_err(Invalid::Document)?;

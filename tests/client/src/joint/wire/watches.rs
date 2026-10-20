@@ -38,6 +38,7 @@ fn subject(value: &client::Subject, default_rows: u32) -> Result<(documents::Wat
             (documents::Watched::Query { query: super::queries::query(query)? }, *window)
         }
         client::Subject::Run { task, turn: _, offset: _ } => (documents::Watched::Run { task: *task }, default_rows),
+        client::Subject::Accounts => (documents::Watched::Accounts, default_rows),
         client::Subject::Deployment => (documents::Watched::Deployment, default_rows),
     };
     Ok((subject, documents::Window { rows, after: None }))

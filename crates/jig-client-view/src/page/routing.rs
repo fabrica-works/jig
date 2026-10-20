@@ -328,7 +328,7 @@ pub(crate) fn delivery(
 ) {
     let source = Source::Watch(watch);
     match value {
-        Delivery::Me(_) | Delivery::OwnerProject(_) => {}
+        Delivery::Me(_) | Delivery::OwnerProject(_) | Delivery::OwnerAccounts(_) => {}
         Delivery::Run(_) | Delivery::RunState(_) => crate::activity::routing::text(domain, env, watch, out, lent),
         Delivery::OwnerProposal(proposal) => {
             let key = ObjectKey::Proposal(proposal.key);
@@ -391,7 +391,6 @@ pub(crate) fn delivery(
                 crate::page::project::task_rows(domain, env, source, *tasks, out, lent);
             }
         }
-        Delivery::OwnerAccounts(_) => {}
         Delivery::Deployment(_) | Delivery::OwnerDeployment(_) => {
             crate::page::deployment::watched(domain, env, out, lent);
         }

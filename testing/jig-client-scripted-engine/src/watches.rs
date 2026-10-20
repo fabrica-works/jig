@@ -186,6 +186,7 @@ impl<A: crate::Application> Engine<A> {
                     None => (query.requester != Some(OwnerRequester::Person(party))).then_some(hidden),
                 };
             }
+            Subject::Accounts => return Some(WatchEnd::Unknown),
             Subject::Me => return (!self.truth.frames.contains_key(&party)).then_some(hidden),
             Subject::Inbox { .. } => return None,
             Subject::Deployment => return (!self.read_visible(party, &Read::Deployment)).then_some(hidden),
@@ -280,6 +281,7 @@ impl<A: crate::Application> Engine<A> {
                     .expect("retained run fits");
                 Delivery::Run(Box::new(value))
             }
+            Subject::Accounts => return Err(WatchEnd::Unknown),
             Subject::Deployment => {
                 if let Some(value) = &self.truth.owner_deployment {
                     Delivery::OwnerDeployment(Box::new(value.clone()))
@@ -323,7 +325,8 @@ impl<A: crate::Application> Engine<A> {
                 | Delivery::Run(_)
                 | Delivery::RunState(_)
                 | Delivery::Deployment(_)
-                | Delivery::OwnerDeployment(_) => return Err(WatchEnd::Busy),
+                | Delivery::OwnerDeployment(_)
+                | Delivery::OwnerAccounts(_) => return Err(WatchEnd::Busy),
             }
         }
     }

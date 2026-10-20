@@ -358,7 +358,8 @@ impl Front<Test> for Scripted {
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
                 | Subject::Tasks { .. }
-                | Subject::Deployment => unreachable!("only runs continue"),
+                | Subject::Deployment
+                | Subject::Accounts => unreachable!("only runs continue"),
             },
             Down::Close { watch } => self.engine.close(now, watch),
             Down::Read { read, what: Readable::Family { scope, record, .. } } => {

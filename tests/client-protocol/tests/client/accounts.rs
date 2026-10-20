@@ -81,3 +81,51 @@ fn a_sign_in_sent_again_after_its_answer_gets_the_same_answer() {
     story.send_named(SECOND, [37; 16], ask());
     assert_eq!(answered(&mut story, SECOND), first);
 }
+
+const ACCOUNTS: jig_client::Handle = jig_client::Handle { asker: Asker(7), number: 1 };
+fn accounts(story: &Story) -> Option<&c::OwnerAccounts> {
+    let jig_client::Latest::Jig(c::Delivery::OwnerAccounts(value)) = story.client.document(ACCOUNTS)?.latest? else {
+        panic!("an accounts document");
+    };
+    Some(value)
+}
+#[test]
+fn an_accounts_watch_delivers_the_partys_completed_sign_in() {
+    let mut story = Story::account_sign_in(fixtures::SEED, true);
+    story.watch(ACCOUNTS, jig_client::Watchable::Jig(c::Subject::Accounts));
+    assert!(story.run_until(|s| accounts(s).is_some(), WAIT));
+    let initial = accounts(&story).expect("initial accounts");
+    assert!(initial.accounts.is_empty());
+    assert!(initial.signing.is_empty());
+    assert!(initial.settled);
+    story.send(FIRST, ask());
+    let (source, _) = started(&answered(&mut story, FIRST));
+    assert!(story.run_until(|s| accounts(s).is_some_and(|d| d.settled && d.last_end.is_some()), WAIT));
+    story.grant_account_sign_in(source);
+    assert!(story.run_until(
+        |s| accounts(s).is_some_and(|d| d.usable
+            && d.settled
+            && d.last_end.is_some()
+            && d.accounts.iter().any(|a| a.sources.iter().any(|s| s.state == c::OwnerAccountState::Granted))),
+        WAIT
+    ));
+    let document = accounts(&story).expect("completed sign-in accounts");
+    assert!(document.usable);
+    assert!(document.settled);
+    assert!(document.signing.is_empty());
+    let [account] = document.accounts.as_slice() else { panic!("one signed-in account: {document:?}") };
+    assert_eq!(account.provider, Some(3));
+    assert_eq!(account.holder, c::OwnerAccountHolder::Party(fixtures::FIRST_OWNER));
+    let [grant] = account.sources.as_slice() else { panic!("one sign-in source: {account:?}") };
+    assert_eq!(grant.number, source);
+    assert_eq!(grant.kind, c::OwnerAccountKind::SignIn);
+    assert_eq!(grant.state, c::OwnerAccountState::Granted);
+    assert!(grant.usable);
+    assert_eq!(
+        document.last_end,
+        Some(c::OwnerAccountLastEnd {
+            source,
+            end: c::OwnerAccountEnd::Made { account: account.number, declined: false }
+        })
+    );
+}
