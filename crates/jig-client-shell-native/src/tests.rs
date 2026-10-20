@@ -359,9 +359,32 @@ fn the_native_shell_sends_its_engine_s_address_as_host() {
         io: file_io_limits(),
     });
     let mut peer = Peer::new();
-    peer.shell = shell.connections;
+    peer.shell = shell.transport.connections;
     peer.exchange();
     peer.respond(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
     let text = std::str::from_utf8(&peer.wire.received).expect("HTTP request");
     assert!(text.to_ascii_lowercase().contains("host: [::1]:7180\r\n"), "{text}");
+}
+
+#[test]
+fn transport_tags_socket_events_and_waits_for_connection() {
+    const OWNER: u64 = 1 << 60;
+    let engine = skein_io::Addr::Ip("127.0.0.1:8080".parse().expect("engine"));
+    for (tag, expected) in [(0, Token::new(1)), (OWNER, Token::new(OWNER | 1))] {
+        let mut transport = Transport::new(engine, &limits(), file_io_limits().sockets, tag);
+        let mut events = Queue::with_capacity(1);
+        let mut requests = Queue::with_capacity(1); // Exercise io output backpressure.
+        transport.down(Time::ZERO, client::Request::OpenStream { credential: None });
+        transport.iterate(Time::ZERO, &mut events, &mut requests);
+        let Some(skein_io::Request::Connect { owner, .. }) = requests.pop() else { panic!("connect first") };
+        assert_eq!(owner, expected);
+        transport.iterate(Time::ZERO, &mut events, &mut requests);
+        assert!(requests.is_empty());
+        assert!(transport.owns(owner));
+        let socket = Token::new(7);
+        transport.event(Time::ZERO, skein_io::Event::Connecting { owner, socket });
+        transport.event(Time::ZERO, skein_io::Event::Connected { owner });
+        transport.iterate(Time::ZERO, &mut events, &mut requests);
+        assert!(matches!(requests.pop(), Some(skein_io::Request::Stream { stream, .. }) if stream == socket));
+    }
 }

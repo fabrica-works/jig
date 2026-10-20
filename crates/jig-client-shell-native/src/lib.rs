@@ -4,6 +4,6 @@ mod connections;
 mod files;
 mod shell;
 pub use connections::{Conn, Connections, Limits};
-pub use shell::{Settings, Shell};
+pub use shell::{Settings, Shell, Transport};
 #[cfg(test)]
 mod tests;

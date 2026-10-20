@@ -104,7 +104,7 @@ impl Connections {
         self.flush(now, u32::MAX, below);
     }
     /// Queues a request without starting its exchange; `take_with_room` starts it.
-    pub fn queue(&mut self, now: Time, request: client::Request, below: &mut Queue<(Conn, Down)>) {
+    pub(crate) fn queue(&mut self, now: Time, request: client::Request, below: &mut Queue<(Conn, Down)>) {
         match request {
             client::Request::Exchange { exchange, message, credential } => {
                 self.enqueue(
@@ -133,11 +133,11 @@ impl Connections {
     }
     /// Whether a call waits for a free socket.
     #[must_use]
-    pub fn waiting(&self) -> bool {
+    pub(crate) fn waiting(&self) -> bool {
         !self.pending.is_empty()
     }
     /// Expires, then starts at most `free` waiting calls, then hands the link its events.
-    pub fn take_with_room(
+    pub(crate) fn take_with_room(
         &mut self,
         now: Time,
         free: u32,
@@ -252,7 +252,7 @@ impl Connections {
         self.take(now, to_link, below);
     }
     /// Feeds one socket's answer without starting waiting calls; `take_with_room` starts them.
-    pub fn receive(&mut self, now: Time, conn: Conn, up: Up, below: &mut Queue<(Conn, Down)>) {
+    pub(crate) fn receive(&mut self, now: Time, conn: Conn, up: Up, below: &mut Queue<(Conn, Down)>) {
         self.expire(now, below);
         let env = self.env(now);
         if let Some(value) = self.exchanges.get_mut(&conn) {

@@ -691,6 +691,9 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
   none, and reads back at start for its host to give as held (section
   8); for Linux and for the worlds that make bytes real. With no
   presentation, it is a service's shell, and a one-shot command's.
+  Its public `Transport` owns the socket loop and admission, including
+  sockets still closing, for both this shell and a caller's shared io,
+  with a caller-chosen owner tag.
 - **jig's browser parts,** `jig-client-shell-web`: the client's
   adapter, which carries the default mapping's calls over skein's
   fetch, the printed link's sign-in, and jig's look, over skein's
