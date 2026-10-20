@@ -307,7 +307,10 @@ fn appended(disk: &[u8], pending: &[u8]) -> Box<[u8]> {
 }
 fn reopen(store: Store) -> Store {
     let mut store = fixtures::over(store.into_stores());
-    fixtures::run(&mut store, crate::Request::Open { owner: Token::new(800), root: fixtures::ROOT });
+    fixtures::run(
+        &mut store,
+        crate::Request::Open { owner: Token::new(800), root: fixtures::ROOT, installation: fixtures::INSTALLATION },
+    );
     store
 }
 fn unread(events: &[Event]) {
@@ -593,9 +596,10 @@ fn a_read_waiting_on_a_writer_keeps_its_durable_places() {
 }
 fn cut_open(length: Option<u64>, claimed: bool) -> (Store, Box<[Event]>, Below) {
     let mut store = fixtures::over(fixtures::stores());
-    let mut ops = skein_lib::List::with_capacity(4);
+    let mut ops = skein_lib::List::with_capacity(5);
     ops.push(fixtures::format_put(fixtures::DEPLOYMENT)).expect("format");
     ops.push(fixtures::header_put(fixtures::DEPLOYMENT, 1)).expect("header");
+    ops.push(fixtures::installation_put(fixtures::INSTALLATION)).expect("installation");
     if claimed {
         let record = fixtures::run_proof(LIVE);
         ops.push(skein_kv::Op::Put {
@@ -618,7 +622,7 @@ fn cut_open(length: Option<u64>, claimed: bool) -> (Store, Box<[Event]>, Below) 
     crate::down(
         &mut store,
         &fixtures::env(),
-        crate::Request::Open { owner: Token::new(801), root: fixtures::ROOT },
+        crate::Request::Open { owner: Token::new(801), root: fixtures::ROOT, installation: fixtures::INSTALLATION },
         &mut above,
         &mut below,
     );
@@ -648,7 +652,7 @@ fn cut_done(store: &mut Store, request: file::Request, mut below: Below) -> Box<
     fixtures::script(store, below, &[Answer::Cut, Answer::Synced, Answer::Closed])
 }
 fn opened(events: &[Event]) {
-    let [Event::Opened { owner, last }] = events else {
+    let [Event::Opened { owner, last, installation: _ }] = events else {
         panic!("open after cuts: {events:?}");
     };
     assert_eq!(*owner, Token::new(801));
@@ -777,7 +781,7 @@ fn orphan_erases_are_included_in_the_commits_operation_bound() {
     let limits = fixtures::store_limits();
     let sizes =
         crate::sizes::check(&limits.core, &fixtures::APPLICATION, &limits.journal, &limits.store, 1).expect("fits");
-    assert_eq!(sizes.ops, 10);
+    assert_eq!(sizes.ops, 11);
 }
 #[test]
 fn dropping_a_transcript_fails_without_submitting_the_commit() {

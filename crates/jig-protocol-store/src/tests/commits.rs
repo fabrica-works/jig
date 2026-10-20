@@ -77,19 +77,25 @@ fn committed_note() -> Store {
 }
 
 #[test]
-fn a_first_commit_puts_the_format_row_with_its_header() {
+fn a_first_commit_puts_the_format_row_and_the_installation_with_its_header() {
     let mut store = committed_header();
     assert_eq!(
         format_row(&mut store),
         codec::component::Format {
-            component: 1,
+            component: 2,
             core: 4,
             tasks: 5,
             people: 5,
             notes: 1,
+            accounts: 1,
             application: 1,
             deployment: fixtures::DEPLOYMENT,
         },
+    );
+    let installation = fixtures::get_kv(&mut store, &[1, 4, 3]).expect("installation row exists");
+    assert_eq!(
+        codec::accounts::Installation::decode(&installation),
+        Ok(codec::accounts::Installation { id: fixtures::INSTALLATION })
     );
     let Some(Record::Core(CoreRecord::Deployment(header))) = jig_row(&mut store, &Key::Core(CoreKey::Deployment))
     else {
@@ -205,15 +211,20 @@ fn the_first_commit_without_a_header_is_an_owners_bug() {
 }
 
 #[test]
-fn a_committed_store_reopens_at_its_last_number() {
+fn a_committed_store_reopens_at_its_last_number_with_its_kept_installation() {
     let store = committed_header();
     let mut restarted = fixtures::over(store.into_stores());
-    let events = fixtures::run(&mut restarted, Request::Open { owner: Token::new(1), root: fixtures::ROOT });
-    let [Event::Opened { owner, last }] = &*events else {
+    let drawn = [6; 16];
+    let events = fixtures::run(
+        &mut restarted,
+        Request::Open { owner: Token::new(1), root: fixtures::ROOT, installation: drawn },
+    );
+    let [Event::Opened { owner, last, installation }] = &*events else {
         panic!("committed store opens: {events:?}");
     };
     assert_eq!(*owner, Token::new(1));
     assert_eq!(*last, 1);
+    assert_eq!(*installation, fixtures::INSTALLATION);
 }
 
 fn pending_operations(writes: Box<[Write]>) -> Box<[skein_kv::Op]> {

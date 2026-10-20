@@ -12,6 +12,9 @@ pub struct Files {
 #[derive(Debug)]
 pub struct Seeds {
     pub deployment: [u8; 16],
+    /// The installation's identifier drawn for a first start; a later start
+    /// sends the one its store keeps (configuration.md, 8).
+    pub installation: [u8; 16],
     pub seed: u64,
     pub crypto: Secret,
 }

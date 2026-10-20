@@ -1,6 +1,6 @@
 //! The notes family's translation both ways (protocol/store.md 5.1).
 use super::fixtures;
-use crate::codec::{component, notes};
+use crate::codec::{accounts, component, notes};
 use jig_domain_notes as domain;
 
 const PROJECT: u32 = 1;
@@ -35,10 +35,27 @@ fn notes_limits_past_the_ceilings_are_refused() {
     }
 }
 fn the_format_row_reads_back_with_its_versions_and_deployment() {
-    let row =
-        component::Format { component: 1, core: 2, tasks: 3, people: 4, notes: 5, application: 6, deployment: [7; 16] };
+    let row = component::Format {
+        component: 1,
+        core: 2,
+        tasks: 3,
+        people: 4,
+        notes: 5,
+        accounts: 8,
+        application: 6,
+        deployment: [7; 16],
+    };
     let bytes = row.encode().expect("fixed width fields fit");
     assert_eq!(component::Format::decode(&bytes), Ok(row));
+    assert_eq!(component::Format::version(&bytes), Some(2));
+}
+fn the_installation_reads_back_and_another_version_does_not() {
+    let row = accounts::Installation { id: [9; 16] };
+    let mut bytes = row.encode();
+    assert_eq!(bytes.len(), 18);
+    assert_eq!(accounts::Installation::decode(&bytes), Ok(row));
+    *bytes.get_mut(1).expect("version prefix") = 2;
+    accounts::Installation::decode(&bytes).expect_err("another accounts version");
 }
 fn a_transcript_place_reads_back_with_its_window() {
     let row = component::Transcript { length: u64::MAX, window: 42 };

@@ -144,7 +144,7 @@ pub fn files(_document: &[u8]) -> Files {
     Files { entries }
 }
 pub fn seeds() -> Seeds {
-    Seeds { deployment: [7; 16], seed: 7, crypto: Secret::new(Box::new([7; 32])) }
+    Seeds { deployment: [7; 16], installation: [9; 16], seed: 7, crypto: Secret::new(Box::new([7; 32])) }
 }
 pub fn journal(limits: &jig_test_domain::Limits) -> skein_lib::JournalLimits {
     let room = core::room_max(&limits.core).expect("final core limits");
@@ -191,6 +191,7 @@ pub fn memory_store(engine: &mut crate::Engine) {
     engine.store.ask(jig_protocol_store::Request::Open {
         owner: OWNER,
         root: jig_protocol_store::Root { token: OWNER, fd: skein_io::kernel::Fd::new(1) },
+        installation: seeds().installation,
     });
 }
 pub fn turn(service: &mut Service) {

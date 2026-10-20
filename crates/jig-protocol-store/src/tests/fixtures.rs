@@ -691,6 +691,8 @@ pub mod people_outcomes;
 
 pub const APPLICATION: crate::sizes::Application = crate::sizes::Application { version: 1, key: 64, value: 128 };
 pub const DEPLOYMENT: [u8; 16] = [7; 16];
+/// The installation's identifier the fixtures' opens draw.
+pub const INSTALLATION: [u8; 16] = [5; 16];
 
 mod reads;
 mod store;
@@ -702,9 +704,9 @@ pub use reads::{
 };
 pub use store::{
     ALICE, ENDED, LIVE, OTHER_DEPLOYMENT, PROJECT, ROOT, answer, below, call, codec_limits, commit, committed,
-    directory, ended_task, env, format_put, get_kv, header, header_put, header_record, history, live_task, notes_entry,
-    notes_line, opened, opened_with_budget, over, person, plant, result_index, run, run_proof, save, sign_in_secret,
-    stores, turn, window_turn,
+    directory, ended_task, env, format_put, get_kv, header, header_put, header_record, history, installation_put,
+    live_task, notes_entry, notes_line, opened, opened_with_budget, over, person, plant, result_index, run, run_proof,
+    save, sign_in_secret, stores, turn, window_turn,
 };
 
 pub use store::limits as store_limits;

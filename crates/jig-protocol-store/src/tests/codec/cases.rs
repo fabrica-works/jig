@@ -37,6 +37,10 @@ fn component_rows_read_back_as_written() {
         ),
         ("a_transcript_place_reads_back_with_its_window", a_transcript_place_reads_back_with_its_window),
         ("an_attempt_place_reads_back_with_its_first_turn", an_attempt_place_reads_back_with_its_first_turn),
+        (
+            "the_installation_reads_back_and_another_version_does_not",
+            the_installation_reads_back_and_another_version_does_not,
+        ),
     ]);
 }
 

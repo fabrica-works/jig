@@ -38,7 +38,12 @@ fn the_notes_familys_code_and_goldens_have_no_drift() {
 
 #[test]
 fn the_component_familys_code_and_goldens_have_no_drift() {
-    check("component", 1);
+    check("component", 2);
+}
+
+#[test]
+fn the_accounts_familys_code_and_goldens_have_no_drift() {
+    check("accounts", 1);
 }
 
 #[test]

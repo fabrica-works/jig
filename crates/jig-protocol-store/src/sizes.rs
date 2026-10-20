@@ -1,5 +1,5 @@
 //! Checked store admission bounds (protocol/store.md, 5.4 and 6).
-use crate::{codec, component_v1, core_v4, notes_v1, people_v5, tasks_v5};
+use crate::{accounts_v1, codec, component_v2, core_v4, notes_v1, people_v5, tasks_v5};
 use jig_domain_core as core;
 
 /// The application's largest encodings, before the component's key tag.
@@ -85,14 +85,16 @@ fn largest(
             .max(tasks_v5::Row::worst_case_bytes(&limits.tasks)?)
             .max(people_v5::Row::worst_case_bytes(&limits.people)?)
             .max(notes_v1::Row::worst_case_bytes(&limits.notes)?)
-            .max(component_v1::worst_case_bytes(&component_v1::CEILINGS)?)
+            .max(component_v2::worst_case_bytes(&component_v2::CEILINGS)?)
+            .max(accounts_v1::worst_case_bytes(&accounts_v1::CEILINGS)?)
             .max(u64::from(application.value)),
     )
     .ok()?;
     // Each journal write can produce two turn places; the first commit also
-    // inserts the format row. Each put costs a tag and two u32 lengths; a
-    // skein-kv frame costs 22 header bytes and four checksum bytes.
-    let ops = journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(orphan_erases)?;
+    // inserts the format row and the installation's identifier. Each put
+    // costs a tag and two u32 lengths; a skein-kv frame costs 22 header bytes
+    // and four checksum bytes.
+    let ops = crate::commits::most_ops(journal.writes, orphan_erases)?;
     let commit = u32::try_from(
         budget.checked_add(u64::from(key).checked_add(9)?.checked_mul(u64::from(ops))?)?.checked_add(26)?,
     )

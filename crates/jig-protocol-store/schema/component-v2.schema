@@ -1,4 +1,4 @@
-family jig-store-component 1
+family jig-store-component 2
 
 versioned record Format {
     component: u16
@@ -6,6 +6,7 @@ versioned record Format {
     tasks: u16
     people: u16
     notes: u16
+    accounts: u16
     application: u32
     deployment: fixed 16
 }

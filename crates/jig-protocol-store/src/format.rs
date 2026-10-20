@@ -4,7 +4,7 @@ use crate::codec::component;
 
 #[must_use]
 pub fn current(application: u32, deployment: [u8; 16]) -> component::Format {
-    component::Format { component: 1, core: 4, tasks: 5, people: 5, notes: 1, application, deployment }
+    component::Format { component: 2, core: 4, tasks: 5, people: 5, notes: 1, accounts: 1, application, deployment }
 }
 
 pub fn check(found: &component::Format, wanted: &component::Format) -> Result<(), OpenRefusal> {
@@ -14,6 +14,7 @@ pub fn check(found: &component::Format, wanted: &component::Format) -> Result<()
         (Family::Tasks, u32::from(found.tasks), u32::from(wanted.tasks)),
         (Family::People, u32::from(found.people), u32::from(wanted.people)),
         (Family::Notes, u32::from(found.notes), u32::from(wanted.notes)),
+        (Family::Accounts, u32::from(found.accounts), u32::from(wanted.accounts)),
         (Family::Application, found.application, wanted.application),
     ] {
         if found != wanted {

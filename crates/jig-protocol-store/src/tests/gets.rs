@@ -181,6 +181,7 @@ fn planted_note(value: Box<[u8]>) -> Store {
         &[
             fixtures::format_put(fixtures::DEPLOYMENT),
             fixtures::header_put(fixtures::DEPLOYMENT, 1),
+            fixtures::installation_put(fixtures::INSTALLATION),
             skein_kv::Op::Put {
                 key: keys::encode(&fixtures::notes_entry(17).key(), fixtures::KEY_LIMIT).expect("note key fits"),
                 value,
@@ -188,7 +189,10 @@ fn planted_note(value: Box<[u8]>) -> Store {
         ],
     );
     let mut store = fixtures::over(stores);
-    let events = fixtures::run(&mut store, Request::Open { owner: OWNER, root: fixtures::ROOT });
+    let events = fixtures::run(
+        &mut store,
+        Request::Open { owner: OWNER, root: fixtures::ROOT, installation: fixtures::INSTALLATION },
+    );
     let [Event::Opened { .. }] = &*events else { panic!("fixture opens: {events:?}") };
     store
 }

@@ -48,6 +48,10 @@ pub struct World {
     transcript_sync: Option<u32>,
     next: u64,
     pub model: Model,
+    /// The identifier the shell draws for the next start (configuration.md 8).
+    pub drawn: [u8; 16],
+    /// The installation's identifier the last open answered (store.md 4.4).
+    pub installation: [u8; 16],
 }
 
 fn drivers(root: skein_io::kernel::Fd, limits: &jig_protocol_store::Limits) -> [FileIo; 3] {
@@ -92,6 +96,8 @@ impl World {
             transcript_sync: None,
             next: 1,
             model: Model::default(),
+            drawn: [1; 16],
+            installation: [0; 16],
         };
         assert_eq!(world.open(), 0);
         world
@@ -208,8 +214,9 @@ impl World {
     }
 
     fn open(&mut self) -> u64 {
-        let events = self.request(Request::Open { owner: OWNER, root: self.root });
-        let [Event::Opened { last, .. }] = events.as_slice() else { panic!("open terminal: {events:?}") };
+        let events = self.request(Request::Open { owner: OWNER, root: self.root, installation: self.drawn });
+        let [Event::Opened { last, installation, .. }] = events.as_slice() else { panic!("open terminal: {events:?}") };
+        self.installation = *installation;
         *last
     }
 

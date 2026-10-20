@@ -98,10 +98,8 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(pending.checked_mul(u64::from(limits.queue.checked_add(1)?))?)?
         .checked_add(frame.checked_mul(u64::from(limits.journal.writes.checked_add(2)?))?)?
         .checked_add(
-            List::<skein_kv::Op>::worst_case(
-                limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(limits.orphan_erases)?,
-            )?
-            .checked_mul(u64::from(limits.queue.checked_add(3)?))?,
+            List::<skein_kv::Op>::worst_case(crate::commits::most_ops(limits.journal.writes, limits.orphan_erases)?)?
+                .checked_mul(u64::from(limits.queue.checked_add(3)?))?,
         )?
         .checked_add(List::<u64>::worst_case(count)?)?
         .checked_add(List::<(u64, u64)>::worst_case(count)?)?

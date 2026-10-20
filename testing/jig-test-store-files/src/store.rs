@@ -7,6 +7,10 @@ use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt;
 
+/// The installation's identifier these worlds draw: an empty store keeps it,
+/// and a reopened one answers the one it kept (configuration.md, 8).
+const INSTALLATION: [u8; 16] = [0; 16];
+
 /// Faults between the root and the component.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fault {
@@ -218,7 +222,7 @@ impl Store {
     fn open(&mut self) {
         let root = self.files.root();
         self.drive(
-            VecDeque::from([Request::Open { owner: Token::new(0), root }]),
+            VecDeque::from([Request::Open { owner: Token::new(0), root, installation: INSTALLATION }]),
             Queue::with_capacity(protocol::MAX_OUT_DOWN),
         );
         assert!(!self.failed, "durable stores reopen after their files are cut");

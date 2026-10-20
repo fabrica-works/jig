@@ -173,7 +173,8 @@ pub fn component() -> Component {
     let mut component = Component { store, files: jig_test_store_files::Files::new(), limits };
     let root = component.files.root();
     let mut above = skein_lib::Queue::with_capacity(jig_protocol_store::MAX_OUT_DOWN);
-    send(&mut component, jig_protocol_store::Request::Open { owner: Token::new(900), root }, &mut above);
+    let open = jig_protocol_store::Request::Open { owner: Token::new(900), root, installation: [0; 16] };
+    send(&mut component, open, &mut above);
     assert!(matches_opened(&mut above));
     component
 }

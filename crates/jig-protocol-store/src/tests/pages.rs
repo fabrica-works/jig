@@ -140,6 +140,7 @@ fn corrupt_store() -> Store {
         &[
             fixtures::format_put(fixtures::DEPLOYMENT),
             fixtures::header_put(fixtures::DEPLOYMENT, 1),
+            fixtures::installation_put(fixtures::INSTALLATION),
             skein_kv::Op::Put {
                 key: keys::encode(&fixtures::notes_line(&scope(), 1).key(), fixtures::KEY_LIMIT)
                     .expect("line key fits"),
@@ -148,7 +149,10 @@ fn corrupt_store() -> Store {
         ],
     );
     let mut store = fixtures::over(stores);
-    let events = fixtures::run(&mut store, Request::Open { owner: OWNER, root: fixtures::ROOT });
+    let events = fixtures::run(
+        &mut store,
+        Request::Open { owner: OWNER, root: fixtures::ROOT, installation: fixtures::INSTALLATION },
+    );
     let [Event::Opened { .. }] = &*events else { panic!("fixture opens: {events:?}") };
     store
 }

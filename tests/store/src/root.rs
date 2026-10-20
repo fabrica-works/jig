@@ -196,7 +196,7 @@ pub fn limits() -> Limits {
     let mut map = skein_kv::Limits {
         key: 1024,
         value: 65_536,
-        ops: 4002,
+        ops: 4003,
         commit: 1_073_741_824,
         queued: 2,
         queued_bytes: 2_147_483_648,

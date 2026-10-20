@@ -6,7 +6,11 @@ use jig_domain_core::{CoreKey, Key};
 use skein_lib::Token;
 
 fn open(store: &mut Store) -> Box<[Event]> {
-    fixtures::run(store, Request::Open { owner: Token::new(1), root: fixtures::ROOT })
+    open_drawing(store, fixtures::INSTALLATION)
+}
+
+fn open_drawing(store: &mut Store, installation: [u8; 16]) -> Box<[Event]> {
+    fixtures::run(store, Request::Open { owner: Token::new(1), root: fixtures::ROOT, installation })
 }
 
 fn planted(ops: &[skein_kv::Op]) -> Store {
@@ -15,8 +19,19 @@ fn planted(ops: &[skein_kv::Op]) -> Store {
     fixtures::over(stores)
 }
 
-fn opened_rows() -> [skein_kv::Op; 2] {
-    [fixtures::format_put(fixtures::DEPLOYMENT), fixtures::header_put(fixtures::DEPLOYMENT, 1)]
+fn opened_rows() -> [skein_kv::Op; 3] {
+    [
+        fixtures::format_put(fixtures::DEPLOYMENT),
+        fixtures::header_put(fixtures::DEPLOYMENT, 1),
+        fixtures::installation_put(fixtures::INSTALLATION),
+    ]
+}
+
+fn fixture_format() -> (Box<[u8]>, codec::component::Format) {
+    let skein_kv::Op::Put { key, value } = fixtures::format_put(fixtures::DEPLOYMENT) else {
+        panic!("format is a put");
+    };
+    (key, codec::component::Format::decode(&value).expect("format fixture"))
 }
 
 fn stores_with_header() -> Stores {
@@ -30,13 +45,16 @@ fn header_without_format() -> Store {
 }
 
 fn version_put(tasks: u16, people: u16, core: u16) -> skein_kv::Op {
-    let skein_kv::Op::Put { key, value } = fixtures::format_put(fixtures::DEPLOYMENT) else {
-        panic!("format is a put");
-    };
-    let mut format = codec::component::Format::decode(&value).expect("format fixture");
+    let (key, mut format) = fixture_format();
     format.tasks = tasks;
     format.people = people;
     format.core = core;
+    skein_kv::Op::Put { key, value: format.encode().expect("format fits") }
+}
+
+fn accounts_put(accounts: u16) -> skein_kv::Op {
+    let (key, mut format) = fixture_format();
+    format.accounts = accounts;
     skein_kv::Op::Put { key, value: format.encode().expect("format fits") }
 }
 
@@ -49,11 +67,16 @@ fn assert_refusal(events: &[Event], why: OpenRefusal) {
 }
 
 fn assert_opened(events: &[Event], last: u64) {
-    let [Event::Opened { owner, last: found }] = events else {
+    assert_opened_with(events, last, fixtures::INSTALLATION);
+}
+
+fn assert_opened_with(events: &[Event], last: u64, installation: [u8; 16]) {
+    let [Event::Opened { owner, last: found, installation: answered }] = events else {
         panic!("one opened terminal: {events:?}");
     };
     assert_eq!(*owner, Token::new(1));
     assert_eq!(*found, last);
+    assert_eq!(*answered, installation);
 }
 
 fn assert_corrupt(events: &[Event]) {
@@ -77,6 +100,53 @@ fn an_empty_store_opens_with_its_format_row_due() {
     let stores = store.into_stores();
     assert_eq!(stores.store.last(), 0);
     assert!(stores.store.is_empty());
+}
+
+#[test]
+fn an_empty_store_answers_the_drawn_installation() {
+    let mut store = fixtures::over(fixtures::stores());
+    assert_opened_with(&open_drawing(&mut store, [6; 16]), 0, [6; 16]);
+}
+
+#[test]
+fn a_store_answers_its_kept_installation_not_the_drawn_one() {
+    let mut store = planted(&opened_rows());
+    assert_opened_with(&open_drawing(&mut store, [6; 16]), 1, fixtures::INSTALLATION);
+}
+
+#[test]
+fn a_checked_store_without_its_installation_is_corrupt() {
+    let mut store =
+        planted(&[fixtures::format_put(fixtures::DEPLOYMENT), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_corrupt(&open(&mut store));
+    assert_eq!(store.phase, Phase::Stopped);
+}
+
+#[test]
+fn an_undecodable_installation_is_corrupt() {
+    let mut store = planted(&[
+        fixtures::format_put(fixtures::DEPLOYMENT),
+        fixtures::header_put(fixtures::DEPLOYMENT, 1),
+        skein_kv::Op::Put { key: keys::installation(fixtures::KEY_LIMIT).expect("key fits"), value: Box::new([0, 1]) },
+    ]);
+    assert_corrupt(&open(&mut store));
+}
+
+#[test]
+fn a_format_row_of_another_component_version_refuses_naming_it() {
+    let skein_kv::Op::Put { key, mut value } = fixtures::format_put(fixtures::DEPLOYMENT) else {
+        panic!("format is a put");
+    };
+    let [high, low, ..] = &mut *value else { panic!("a version prefix") };
+    (*high, *low) = (0, 1);
+    let mut store = planted(&[skein_kv::Op::Put { key, value }, fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 1, wanted: 2 });
+}
+
+#[test]
+fn a_store_of_another_accounts_version_refuses_naming_accounts() {
+    let mut store = planted(&[accounts_put(2), fixtures::header_put(fixtures::DEPLOYMENT, 1)]);
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Accounts, found: 2, wanted: 1 });
 }
 
 #[test]
@@ -109,7 +179,7 @@ fn a_header_behind_the_last_commit_refuses_naming_both_numbers() {
 #[test]
 fn a_header_without_its_format_row_refuses_as_format() {
     let mut store = header_without_format();
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 0, wanted: 1 });
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 0, wanted: 2 });
 }
 
 #[test]
@@ -151,12 +221,12 @@ fn a_corrupt_format_stops_the_open() {
 #[test]
 fn a_stopped_open_answers_nothing_further() {
     let mut store = header_without_format();
-    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 0, wanted: 1 });
+    assert_refusal(&open(&mut store), OpenRefusal::Format { family: Family::Component, found: 0, wanted: 2 });
     assert!(open(&mut store).is_empty());
 }
 
 #[test]
-fn opening_checks_no_row_beyond_the_format_and_header() {
+fn opening_checks_no_row_beyond_the_format_header_and_installation() {
     let mut stores = stores_with_header();
     fixtures::plant(&mut stores, &[skein_kv::Op::Put { key: Box::new([1, 0, 255]), value: Box::new([]) }]);
     fixtures::plant(&mut stores, &[fixtures::header_put(fixtures::DEPLOYMENT, 3)]);

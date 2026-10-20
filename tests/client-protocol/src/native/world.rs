@@ -218,7 +218,12 @@ fn run_mode(seed: u64, script: Script, terminal: bool) -> (Outcome, Box<[u8]>) {
     .with_machine(Machine(machine));
     world.spawn_root(skein_sim::Handle::new(engine_root.raw()), |root| {
         let document = config::document();
-        let seeds = jig_test_service::Seeds { deployment: [7; 16], seed, crypto: skein_world::crypto_seed(seed) };
+        let seeds = jig_test_service::Seeds {
+            deployment: [7; 16],
+            installation: [9; 16],
+            seed,
+            crypto: skein_world::crypto_seed(seed),
+        };
         let mut service =
             jig_test_service::startup(&document, &files(), None, &seeds, None, None).expect("engine configuration");
         service.adopt_store(root, 1000).expect("real store directory");

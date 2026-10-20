@@ -124,7 +124,11 @@ fn finish(store: &mut Store, result: Result<bool, ()>, above: &mut Queue<Event>)
             if super::drop::restore(store).is_err() {
                 open::refuse(store, store.directory.owner, OpenRefusal::Failed, above);
             } else {
-                above.push(Event::Opened { owner: store.directory.owner, last: store.stores.store.last() });
+                above.push(Event::Opened {
+                    owner: store.directory.owner,
+                    last: store.stores.store.last(),
+                    installation: store.installation,
+                });
             }
         }
         Ok(false) => {}

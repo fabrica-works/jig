@@ -1,7 +1,7 @@
 //! Memory component fixtures (protocol/store.md, section 14).
 use super::{
-    APPLICATION, CORE_LIMITS, DEPLOYMENT, KEY_LIMIT, calls, core_rows, identity, note_entry, note_line, task_history,
-    task_record,
+    APPLICATION, CORE_LIMITS, DEPLOYMENT, INSTALLATION, KEY_LIMIT, calls, core_rows, identity, note_entry, note_line,
+    task_history, task_record,
 };
 use crate::{Arrived, Below, Io, Root, SecretOwner, Secrets};
 use crate::{Event, Limits, Request, Store, Stores, Write, codec, format, keys};
@@ -84,6 +84,13 @@ pub fn header_put(deployment: [u8; 16], commits: u64) -> skein_kv::Op {
     }
 }
 
+pub fn installation_put(id: [u8; 16]) -> skein_kv::Op {
+    skein_kv::Op::Put {
+        key: keys::installation(KEY_LIMIT).expect("installation key fits"),
+        value: codec::accounts::Installation { id }.encode(),
+    }
+}
+
 fn deployment_record(deployment: [u8; 16], commits: u64) -> Record {
     let mut header = core_rows::deployment();
     header.id = deployment;
@@ -116,8 +123,8 @@ pub fn opened_with_budget(budget: u64) -> Store {
     let mut limits = limits();
     limits.store.budget = budget;
     let mut store = Store::over(&limits, APPLICATION, stores_with(&limits));
-    let events = run(&mut store, Request::Open { owner: Token::new(1), root: ROOT });
-    let [Event::Opened { owner: _, last: 0 }] = &*events else {
+    let events = run(&mut store, Request::Open { owner: Token::new(1), root: ROOT, installation: INSTALLATION });
+    let [Event::Opened { owner: _, last: 0, installation: _ }] = &*events else {
         panic!("empty store opens: {events:?}");
     };
     store
@@ -243,7 +250,13 @@ pub fn directory() -> (Store, Below) {
     let mut store = Store::on_directory(&limits(), APPLICATION);
     let mut below = below();
     let mut above = Queue::with_capacity(crate::MAX_OUT_DOWN);
-    crate::down(&mut store, &env(), Request::Open { owner: Token::new(1), root: ROOT }, &mut above, &mut below);
+    crate::down(
+        &mut store,
+        &env(),
+        Request::Open { owner: Token::new(1), root: ROOT, installation: INSTALLATION },
+        &mut above,
+        &mut below,
+    );
     assert!(above.is_empty());
     (store, below)
 }

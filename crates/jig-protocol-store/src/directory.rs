@@ -49,9 +49,14 @@ pub(crate) fn open(
     _env: &Env<Limits>,
     owner: Token,
     root: Root,
+    installation: [u8; 16],
     above: &mut Queue<Event>,
     below: &mut Below,
 ) {
+    // A store that holds an identifier replaces the drawn one as it opens.
+    if store.phase == Phase::Closed {
+        store.installation = installation;
+    }
     if !store.directory.disk {
         store.directory.transcripts = Some(root);
         open::open(store, owner, above, below);

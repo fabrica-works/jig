@@ -148,7 +148,7 @@ pub fn files(worker: bool) -> Files {
 }
 #[must_use]
 pub fn seeds() -> Seeds {
-    Seeds { deployment: [7; 16], seed: SEED, crypto: Secret::new(Box::new([7; 32])) }
+    Seeds { deployment: [7; 16], installation: [9; 16], seed: SEED, crypto: Secret::new(Box::new([7; 32])) }
 }
 pub(crate) fn endpoints() -> smith_protocol_channel::Endpoints {
     let mut entries = List::with_capacity(1);

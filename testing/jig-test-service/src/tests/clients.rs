@@ -321,6 +321,7 @@ fn prepared(clients: bool) -> crate::Service {
     let store = crate::store::Store::new(
         &limits.root,
         &crate::store::limits(&limits.root, &limits.store).expect("fixture store admission"),
+        f::seeds().installation,
     );
     let children = engine::Children { accounts: None, workers: None, clients };
     let mut engine = crate::Engine::new(root, &limits.root, systems, children, values, store);

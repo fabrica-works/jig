@@ -32,8 +32,7 @@ pub(crate) fn operations(
     if writes.len() > usize::try_from(store.limits.journal.writes).ok()? {
         return None;
     }
-    let capacity =
-        store.limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(store.limits.orphan_erases)?;
+    let capacity = most_ops(store.limits.journal.writes, store.limits.orphan_erases)?;
     let mut ops = List::with_capacity(capacity);
     let mut frames = Queue::with_capacity(store.limits.journal.writes);
     let mut drops = Queue::with_capacity(store.limits.journal.writes);
@@ -81,6 +80,11 @@ pub(crate) fn operations(
         ops.push(skein_kv::Op::Put {
             key: keys::encode_own(&keys::Own::Format, store.limits.store.key)?,
             value: format::current(store.application.version, id).encode().ok()?,
+        })
+        .ok()?;
+        ops.push(skein_kv::Op::Put {
+            key: keys::installation(store.limits.store.key)?,
+            value: codec::accounts::Installation { id: store.installation }.encode(),
         })
         .ok()?;
     }
@@ -161,8 +165,15 @@ fn unique(ops: Box<[skein_kv::Op]>, capacity: u32) -> Option<Box<[skein_kv::Op]>
     Some(kept.into_boxed())
 }
 
+/// A commit's most operations: two turn places per write, the first commit's
+/// own rows (the format row and the installation's identifier), and the
+/// orphans' erases it carries.
+pub(crate) fn most_ops(writes: u32, orphan_erases: u32) -> Option<u32> {
+    writes.checked_mul(2)?.checked_add(2)?.checked_add(orphan_erases)
+}
+
 pub(crate) fn worst_case(limits: &crate::Limits) -> Option<u64> {
-    let capacity = limits.journal.writes.checked_mul(2)?.checked_add(1)?.checked_add(limits.orphan_erases)?;
+    let capacity = most_ops(limits.journal.writes, limits.orphan_erases)?;
     Map::<Box<[u8]>, u32>::worst_case(capacity)?
         .checked_add(u64::from(limits.store.key).checked_mul(u64::from(capacity))?)
 }

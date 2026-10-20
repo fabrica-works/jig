@@ -1,5 +1,5 @@
 //! Arbitrary and mutated family bytes (protocol/store.md, sections 5.1 and 14).
-use jig_protocol_store::{component_v1, notes_v1, people_v5};
+use jig_protocol_store::{accounts_v1, component_v2, notes_v1, people_v5};
 use skein_lib::{Reader, Rng, Writer};
 use std::{fs, path::Path};
 
@@ -11,17 +11,24 @@ fn notes(bytes: &[u8]) {
     }
 }
 fn component(bytes: &[u8]) {
-    if let Ok(row) = component_v1::Format::decode(&component_v1::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = component_v2::Format::decode(&component_v2::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
     }
-    if let Ok(row) = component_v1::Transcript::decode(&component_v1::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = component_v2::Transcript::decode(&component_v2::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
     }
-    if let Ok(row) = component_v1::Attempt::decode(&component_v1::CEILINGS, &mut Reader::new(bytes)) {
+    if let Ok(row) = component_v2::Attempt::decode(&component_v2::CEILINGS, &mut Reader::new(bytes)) {
+        let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
+        row.encode(&mut writer).expect("measured room");
+        assert_eq!(writer.finish().as_ref(), bytes);
+    }
+}
+fn accounts(bytes: &[u8]) {
+    if let Ok(row) = accounts_v1::Installation::decode(&accounts_v1::CEILINGS, &mut Reader::new(bytes)) {
         let mut writer = Writer::new(usize::try_from(row.measure()).expect("measured length"));
         row.encode(&mut writer).expect("measured room");
         assert_eq!(writer.finish().as_ref(), bytes);
@@ -42,6 +49,7 @@ fn mutated(family: &str, seed: u64, check: fn(&[u8])) {
     let version = match family {
         "core" => "v4",
         "tasks" | "people" => "v5",
+        "component" => "v2",
         _ => "v1",
     };
     let root =
@@ -85,6 +93,14 @@ fn arbitrary_component_rows_never_panic_and_round_trip_when_they_decode() {
 #[test]
 fn mutated_component_goldens_never_panic() {
     mutated("component", 0x5704_e014, component);
+}
+#[test]
+fn arbitrary_accounts_rows_never_panic_and_round_trip_when_they_decode() {
+    arbitrary(0x570a_e014, accounts);
+}
+#[test]
+fn mutated_accounts_goldens_never_panic() {
+    mutated("accounts", 0x570b_e014, accounts);
 }
 
 fn tasks(bytes: &[u8]) {

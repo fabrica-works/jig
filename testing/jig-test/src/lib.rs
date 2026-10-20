@@ -236,7 +236,12 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String
     let mut deployment = [0_u8; 16];
     let drawn = skein_shell::crypto_seed().map_err(|errno| format!("deployment id: errno {errno}"))?;
     deployment.copy_from_slice(drawn.expose().get(..16).expect("32-byte seed"));
-    let seeds = Seeds { deployment, seed, crypto };
+    // Drawn at every start; the service keeps it at the first and restores
+    // the kept one at every later start (configuration.md 8).
+    let mut installation = [0_u8; 16];
+    let drawn = skein_shell::crypto_seed().map_err(|errno| format!("installation id: errno {errno}"))?;
+    installation.copy_from_slice(drawn.expose().get(..16).expect("32-byte seed"));
+    let seeds = Seeds { deployment, installation, seed, crypto };
     let mut service =
         service::startup(bytes, &files, agent.as_ref(), &seeds, runtime, Some(service::WorkerRuntime { roots }))
             .map_err(|why| format!("startup: {why:?}"))?;

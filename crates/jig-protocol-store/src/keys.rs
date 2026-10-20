@@ -11,6 +11,20 @@ pub use own::Own;
 pub const COMPONENT: u8 = 0;
 pub const JIG: u8 = 1;
 pub const APPLICATION: u8 = 2;
+/// The accounts child's tag under jig's, after the core's own and the tasks',
+/// people's and notes' children (4.2).
+pub const ACCOUNTS: u8 = 4;
+/// The installation's identifier's key (4.4): the accounts' one row without a
+/// key of its own, after the tags of the domain's accounts keys (the counter,
+/// an account, a source: 0 to 2).
+#[must_use]
+pub fn installation(limit: u32) -> Option<Box<[u8]>> {
+    let mut writer = KeyWriter::new(limit);
+    writer.tag(JIG);
+    writer.tag(ACCOUNTS);
+    writer.tag(3);
+    writer.finish()
+}
 #[must_use]
 pub fn encode_own(key: &Own, limit: u32) -> Option<Box<[u8]>> {
     let mut writer = KeyWriter::new(limit);

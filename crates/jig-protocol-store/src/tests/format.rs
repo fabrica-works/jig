@@ -49,10 +49,11 @@ fn the_current_format_row_is_accepted() {
 fn another_family_is_refused_naming_the_first_difference() {
     let wanted = wanted();
     for (family, found) in [
-        (Family::Component, codec::component::Format { component: 2, core: 5, ..wanted }),
+        (Family::Component, codec::component::Format { component: 3, core: 5, ..wanted }),
         (Family::Core, codec::component::Format { core: 5, tasks: 4, ..wanted }),
         (Family::People, codec::component::Format { people: 6, notes: 2, ..wanted }),
-        (Family::Notes, codec::component::Format { notes: 2, application: 2, ..wanted }),
+        (Family::Notes, codec::component::Format { notes: 2, accounts: 2, ..wanted }),
+        (Family::Accounts, codec::component::Format { accounts: 2, application: 2, ..wanted }),
         (Family::Application, codec::component::Format { application: 2, deployment: [9; 16], ..wanted }),
     ] {
         assert_eq!(
@@ -62,12 +63,14 @@ fn another_family_is_refused_naming_the_first_difference() {
                 found: match family {
                     Family::Core => 5,
                     Family::People => 6,
-                    Family::Component | Family::Tasks | Family::Notes | Family::Application => 2,
+                    Family::Component => 3,
+                    Family::Tasks | Family::Notes | Family::Accounts | Family::Application => 2,
                 },
                 wanted: match family {
                     Family::Core => 4,
                     Family::Tasks | Family::People => 5,
-                    Family::Component | Family::Notes | Family::Application => 1,
+                    Family::Component => 2,
+                    Family::Notes | Family::Accounts | Family::Application => 1,
                 }
             })
         );
@@ -95,17 +98,17 @@ fn a_page_smaller_than_one_row_is_refused() {
 }
 #[test]
 fn fixture_limits_fit_their_store() {
-    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 81_241, ops: 9, commit: 17_499 }));
+    assert_eq!(check(&store()), Ok(sizes::Sizes { key: 112, value: 81_241, ops: 10, commit: 17_620 }));
 }
 fn too_few_operations_are_refused() {
     let mut limits = store();
-    limits.ops = 8;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Ops { needs: 9, has: 8 }));
+    limits.ops = 9;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Ops { needs: 10, has: 9 }));
 }
 fn too_few_commit_bytes_are_refused() {
     let mut limits = store();
-    limits.commit = 17_498;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 17_499, has: 17_498 }));
+    limits.commit = 17_619;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::Commit { needs: 17_620, has: 17_619 }));
 }
 fn too_few_in_flight_slots_are_refused() {
     let mut limits = store();
@@ -121,8 +124,8 @@ fn a_journal_bound_past_the_queue_is_refused_at_start() {
 }
 fn too_few_queued_bytes_are_refused() {
     let mut limits = store();
-    limits.queued_bytes = 34_997;
-    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 34_998, has: 34_997 }));
+    limits.queued_bytes = 35_239;
+    assert_eq!(check(&limits), Err(sizes::SizeRefusal::QueuedBytes { needs: 35_240, has: 35_239 }));
 }
 #[test]
 fn a_domain_limit_past_its_family_ceiling_is_refused_at_start() {
@@ -191,7 +194,7 @@ fn larger_application_encodings_are_included_in_the_bounds() {
     let application = sizes::Application { version: 1, key: 256, value: 9_000_000 };
     assert_eq!(
         sizes::check(&fixtures::CORE_LIMITS, &application, &JOURNAL, &store(), 0),
-        Ok(sizes::Sizes { key: 257, value: 9_000_000, ops: 9, commit: 18_804 }),
+        Ok(sizes::Sizes { key: 257, value: 9_000_000, ops: 10, commit: 19_070 }),
     );
 }
 #[test]
@@ -206,8 +209,8 @@ fn a_journal_whose_operation_count_overflows_is_refused() {
 #[test]
 fn a_map_budget_past_the_commit_envelope_is_refused() {
     for (label, budget, expected) in [
-        ("exact_u32_commit", 4_294_966_180, Ok(sizes::Sizes { key: 112, value: 81_241, ops: 9, commit: u32::MAX })),
-        ("one_byte_past_u32", 4_294_966_181, Err(sizes::SizeRefusal::Ceiling)),
+        ("exact_u32_commit", 4_294_966_059, Ok(sizes::Sizes { key: 112, value: 81_241, ops: 10, commit: u32::MAX })),
+        ("one_byte_past_u32", 4_294_966_060, Err(sizes::SizeRefusal::Ceiling)),
         ("u64_sum_overflows", u64::MAX, Err(sizes::SizeRefusal::Ceiling)),
     ] {
         let limits = skein_kv::Limits { budget, commit: u32::MAX, queued_bytes: u64::MAX, ..store() };

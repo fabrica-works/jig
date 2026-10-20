@@ -13,7 +13,10 @@ pub enum Request {
     /// Open both stores in the deployment's directory (store.md 10); the
     /// component's own rows and the core's header are checked before
     /// `Opened`. In skein-kv's memory mode, the worlds' component needs none.
-    Open { owner: Token, root: Root },
+    /// `installation` is the identifier the shell drew for this start
+    /// (configuration.md 8): an empty store keeps it in its first commit; a
+    /// store that holds one answers its own instead.
+    Open { owner: Token, root: Root, installation: [u8; 16] },
     /// Commit `number` (store.md 6): its writes, in order, one skein-kv
     /// commit with the same number. Terminal: `Committed` or `Failed`.
     Commit { number: u64, writes: Box<[Write]> },
@@ -168,6 +171,7 @@ pub enum Family {
     Tasks,
     People,
     Notes,
+    Accounts,
     Application,
 }
 
@@ -188,9 +192,12 @@ pub enum OpenRefusal {
 #[derive(Debug)]
 pub enum Event {
     /// Both stores are open and checked; `last` is the last durable commit.
+    /// `installation` is the installation's identifier (store.md 4.4): the
+    /// kept one, or, in an empty store, the drawn one its first commit keeps.
     Opened {
         owner: Token,
         last: u64,
+        installation: [u8; 16],
     },
     OpenRefused {
         owner: Token,

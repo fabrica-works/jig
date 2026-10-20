@@ -467,7 +467,7 @@ pub(super) fn engine_startup(
         systems,
         crate::engine::Children { accounts, workers, clients },
         values,
-        crate::store::Store::new(&parsed.limits.root, &store_limits),
+        crate::store::Store::new(&parsed.limits.root, &store_limits, seeds.installation),
     );
     // configuration.md, 5: the smallest source opens only an empty deployment.
     for project in &parsed.engine.projects {

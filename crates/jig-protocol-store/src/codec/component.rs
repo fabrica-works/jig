@@ -1,5 +1,5 @@
 //! The component's own durable rows (protocol/store.md, sections 5.3 and 8.1).
-use crate::component_v1 as wire;
+use crate::component_v2 as wire;
 use alloc::boxed::Box;
 use skein_lib::{Reader, Writer};
 
@@ -11,6 +11,7 @@ pub struct Format {
     pub tasks: u16,
     pub people: u16,
     pub notes: u16,
+    pub accounts: u16,
     pub application: u32,
     pub deployment: [u8; 16],
 }
@@ -26,6 +27,7 @@ impl Format {
                 tasks: self.tasks,
                 people: self.people,
                 notes: self.notes,
+                accounts: self.accounts,
                 application: self.application,
                 deployment: self.deployment,
             },
@@ -37,9 +39,16 @@ impl Format {
 
     /// Decode one row, refusing another version or trailing bytes.
     pub fn decode(bytes: &[u8]) -> Result<Self, wire::Problem> {
-        let wire::FormatParts { component, core, tasks, people, notes, application, deployment } =
+        let wire::FormatParts { component, core, tasks, people, notes, accounts, application, deployment } =
             wire::Format::decode(&wire::CEILINGS, &mut Reader::new(bytes))?.into_parts();
-        Ok(Self { component, core, tasks, people, notes, application, deployment })
+        Ok(Self { component, core, tasks, people, notes, accounts, application, deployment })
+    }
+
+    /// The component family's version a stored row begins with, read before
+    /// the row decodes, so that opening can say which version it found.
+    #[must_use]
+    pub fn version(bytes: &[u8]) -> Option<u16> {
+        Reader::new(bytes).u16()
     }
 }
 

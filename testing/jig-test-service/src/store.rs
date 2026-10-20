@@ -33,6 +33,9 @@ pub(super) struct Store {
     drivers: [Driver; 3],
     pub(super) submitted: Queue<Submit>,
     pub(super) opened: bool,
+    /// The installation's identifier: the drawn one until the store opens,
+    /// then the one it keeps (store.md 4.4).
+    pub(super) installation: [u8; 16],
     adopted: bool,
     root: Option<Fd>,
     closing: bool,
@@ -70,7 +73,7 @@ pub(super) fn limits(root: &root::Limits, profile: &protocol::Limits) -> Option<
     })
 }
 impl Store {
-    pub(super) fn new(application: &root::Limits, limits: &protocol::Limits) -> Self {
+    pub(super) fn new(application: &root::Limits, limits: &protocol::Limits, installation: [u8; 16]) -> Self {
         let room = root::max_out(application).checked_mul(2).expect("store route room");
         let mut routes = route::Routes::new(room);
         routes.configure(application);
@@ -90,6 +93,7 @@ impl Store {
             drivers: [driver(limits, room), driver(limits, room), driver(limits, room)],
             submitted: Queue::with_capacity(room),
             opened: false,
+            installation,
             adopted: false,
             root: None,
             closing: false,
@@ -363,6 +367,7 @@ impl Store {
                         self.ask(protocol::Request::Open {
                             owner: Token::new(1),
                             root: protocol::Root { token: Token::new(1), fd },
+                            installation: self.installation,
                         });
                     }
                     continue;
@@ -450,7 +455,10 @@ pub(super) fn answer(engine: &mut crate::Engine) {
         }
         let event = engine.store.above.pop().expect("store terminals");
         match event {
-            protocol::Event::Opened { .. } => engine.store.opened = true,
+            protocol::Event::Opened { installation, .. } => {
+                engine.store.opened = true;
+                engine.store.installation = installation;
+            }
             protocol::Event::OpenRefused { .. } => crate::stop::unavailable(engine, b"deployment"),
             event @ (protocol::Event::Kept { owner }
             | protocol::Event::Stale { owner }

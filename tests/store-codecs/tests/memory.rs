@@ -1,5 +1,5 @@
 //! Full golden rows decode within their heap worst cases (skein's codec.md, 6).
-use jig_protocol_store::{component_v1, core_v4, notes_v1, people_v5, tasks_v5};
+use jig_protocol_store::{accounts_v1, component_v2, core_v4, notes_v1, people_v5, tasks_v5};
 use skein_heap::{Counting, Meter};
 use skein_lib::Reader;
 
@@ -10,6 +10,7 @@ fn check<T>(family: &str, record: &str, bound: u64, decode: impl FnOnce(&[u8]) -
     let version = match family {
         "core" => 4,
         "tasks" | "people" => 5,
+        "component" => 2,
         _ => 1,
     };
     let golden = std::fs::read(
@@ -59,24 +60,31 @@ fn each_full_component_row_decodes_within_its_heap_worst_case() {
     check(
         "component",
         "format",
-        component_v1::Format::worst_case_heap(&component_v1::CEILINGS).expect("format bound"),
-        |golden| component_v1::Format::decode(&component_v1::CEILINGS, &mut Reader::new(golden)).expect("full format"),
+        component_v2::Format::worst_case_heap(&component_v2::CEILINGS).expect("format bound"),
+        |golden| component_v2::Format::decode(&component_v2::CEILINGS, &mut Reader::new(golden)).expect("full format"),
     );
     check(
         "component",
         "transcript",
-        component_v1::Transcript::worst_case_heap(&component_v1::CEILINGS).expect("transcript bound"),
+        component_v2::Transcript::worst_case_heap(&component_v2::CEILINGS).expect("transcript bound"),
         |golden| {
-            component_v1::Transcript::decode(&component_v1::CEILINGS, &mut Reader::new(golden))
+            component_v2::Transcript::decode(&component_v2::CEILINGS, &mut Reader::new(golden))
                 .expect("full transcript")
         },
     );
     check(
         "component",
         "attempt",
-        component_v1::Attempt::worst_case_heap(&component_v1::CEILINGS).expect("attempt bound"),
+        component_v2::Attempt::worst_case_heap(&component_v2::CEILINGS).expect("attempt bound"),
         |golden| {
-            component_v1::Attempt::decode(&component_v1::CEILINGS, &mut Reader::new(golden)).expect("full attempt")
+            component_v2::Attempt::decode(&component_v2::CEILINGS, &mut Reader::new(golden)).expect("full attempt")
         },
     );
+}
+#[test]
+fn a_full_installation_row_decodes_within_its_heap_worst_case() {
+    let bound = accounts_v1::Installation::worst_case_heap(&accounts_v1::CEILINGS).expect("installation bound");
+    check("accounts", "installation", bound, |golden| {
+        accounts_v1::Installation::decode(&accounts_v1::CEILINGS, &mut Reader::new(golden)).expect("full installation")
+    });
 }

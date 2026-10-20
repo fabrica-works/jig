@@ -1,0 +1,4 @@
+family jig-store-accounts 1
+
+# The installation's identifier (store.md 4.4), kept at the first start.
+versioned record Installation { id: fixed 16 }

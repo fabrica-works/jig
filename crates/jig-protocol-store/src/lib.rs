@@ -61,6 +61,9 @@ pub struct Store {
     directory: directory::Directory,
     secret_state: secrets::State,
     transcripts: transcripts::State,
+    /// The installation's identifier (store.md 4.4): drawn by the shell and
+    /// kept by an empty store's first commit, or restored from the store.
+    installation: [u8; 16],
 }
 
 impl Store {
@@ -86,6 +89,7 @@ impl Store {
             directory: directory::Directory::new(),
             secret_state: secrets::State::new(limits.secrets.queued),
             transcripts: transcripts::State::new(limits),
+            installation: [0; 16],
         }
     }
 
@@ -153,7 +157,9 @@ pub fn down(store: &mut Store, env: &Env<Limits>, request: Request, above: &mut 
         return;
     }
     match request {
-        Request::Open { owner, root } => directory::open(store, env, owner, root, above, below),
+        Request::Open { owner, root, installation } => {
+            directory::open(store, env, owner, root, installation, above, below);
+        }
         Request::Commit { number, writes } => transcripts::write::begin(store, env, number, writes, above, below),
         Request::Restore { owner, range, after, rows, bytes } => {
             restore::restore(store, env, owner, restore::Page { range, after, rows, bytes }, above, below);
@@ -195,8 +201,11 @@ fn memory_env(limits: skein_kv::Limits) -> Env<skein_kv::Limits> {
 }
 
 #[rustfmt::skip]
-#[path = "generated/component_v1.rs"]
-pub mod component_v1;
+#[path = "generated/accounts_v1.rs"]
+pub mod accounts_v1;
+#[rustfmt::skip]
+#[path = "generated/component_v2.rs"]
+pub mod component_v2;
 #[rustfmt::skip]
 #[path = "generated/notes_v1.rs"]
 pub mod notes_v1;

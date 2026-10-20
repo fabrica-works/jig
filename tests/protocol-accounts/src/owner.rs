@@ -160,10 +160,10 @@ impl Owner {
         };
         // Memory stores open no file: the root is never read.
         let root = store::Root { token: OPEN, fd: kernel::Fd::new(3) };
-        owner.ask(Time::ZERO, Wall::EPOCH, store::Request::Open { owner: OPEN, root });
+        owner.ask(Time::ZERO, Wall::EPOCH, store::Request::Open { owner: OPEN, root, installation: [0; 16] });
         let opened = owner.store_above.pop();
         assert!(
-            matches!(opened, Some(store::Event::Opened { owner: OPEN, last: 0 })),
+            matches!(opened, Some(store::Event::Opened { owner: OPEN, last: 0, .. })),
             "the memory store opens at once"
         );
         if let Some(held) = held {

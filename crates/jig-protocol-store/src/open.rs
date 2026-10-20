@@ -40,7 +40,17 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>, be
         return;
     };
     let Ok(found) = codec::component::Format::decode(&found) else {
-        corrupt(store, owner, above);
+        // Another version of the component's own rows says which (5.3).
+        let wanted = format::current(store.application.version, [0; 16]).component;
+        match codec::component::Format::version(&found) {
+            Some(version) if version != wanted => refuse(
+                store,
+                owner,
+                OpenRefusal::Format { family: Family::Component, found: u32::from(version), wanted: u32::from(wanted) },
+                above,
+            ),
+            Some(_) | None => corrupt(store, owner, above),
+        }
         return;
     };
     // Refuse another family's version before decoding its header.
@@ -65,7 +75,7 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>, be
             } else if header.commits != last {
                 refuse(store, owner, OpenRefusal::Numbers { store: last, header: header.commits }, above);
             } else {
-                ready(store, owner, last, false, above, below);
+                restore_installation(store, owner, last, above, below);
             }
         }
         Record::Core(
@@ -81,6 +91,32 @@ pub(crate) fn open(store: &mut Store, owner: Token, above: &mut Queue<Event>, be
         | Record::People(_)
         | Record::Notes(_) => corrupt(store, owner, above),
     }
+}
+
+/// The identifier kept by the first commit replaces the drawn one (4.4); a
+/// checked store without it is corrupt.
+fn restore_installation(
+    store: &mut Store,
+    owner: Token,
+    last: u64,
+    above: &mut Queue<Event>,
+    below: &mut crate::Below,
+) {
+    let key = keys::installation(store.limits.store.key).expect("installation key fits");
+    let Ok(found) = get(store, owner, key) else {
+        refuse(store, owner, OpenRefusal::Failed, above);
+        return;
+    };
+    let Some(bytes) = found else {
+        corrupt(store, owner, above);
+        return;
+    };
+    let Ok(kept) = codec::accounts::Installation::decode(&bytes) else {
+        corrupt(store, owner, above);
+        return;
+    };
+    store.installation = kept.id;
+    ready(store, owner, last, false, above, below);
 }
 
 pub(crate) fn get(store: &mut Store, owner: Token, key: Box<[u8]>) -> Result<Option<Box<[u8]>>, OpenRefusal> {
