@@ -149,8 +149,6 @@ impl Core {
     }
 
     pub(crate) fn touch_project_parties(&mut self, project: u32) {
-        self.touch_accounts(None);
-        self.touch_deployment();
         self.touch_project_objects(project);
         let mut parties = List::with_capacity(self.view_subjects.len());
         for (_, binding) in &self.view_subjects {
@@ -299,7 +297,11 @@ pub(super) fn touch_people_row(core: &mut Core, row: &people::Stored) {
 
 pub(super) fn touch_people_event(core: &mut Core, limits: &Limits, event: &people::Event) {
     match event {
-        people::Event::Roles { project, .. } => core.touch_project_parties(*project),
+        people::Event::Roles { project, .. } => {
+            core.touch_accounts(None);
+            core.touch_deployment();
+            core.touch_project_parties(*project);
+        }
         people::Event::ChatState { party, .. } => core.touch_party(*party),
         people::Event::MoveChat { from, to, .. } => {
             core.touch_party(*from);

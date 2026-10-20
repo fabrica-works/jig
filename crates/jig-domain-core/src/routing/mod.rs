@@ -453,7 +453,6 @@ pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
     if !child.is_empty() {
         core.touch_deployment();
         core.touch_run_waits();
-        core.touch_accounts(None);
     }
     tag_fleet(core, env, child, fleet::max_out(&env.limits.fleet))
 }

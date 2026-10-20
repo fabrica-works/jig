@@ -297,6 +297,8 @@ pub(super) fn roles_route(
         pool_refused(work, request, why);
         return;
     }
+    core.touch_accounts(None);
+    core.touch_deployment();
     core.touch_project_parties(project);
     let mut applied = Queue::with_capacity(people::max_out(&env.limits.people));
     people::step(

@@ -141,3 +141,144 @@ fn an_own_accounts_subject_names_the_sign_ins_party() {
     assert_eq!(named(&core, 31), &Subject::Accounts { party: 2 });
     assert_eq!(core.view_names.len(), 2);
 }
+
+fn watching_accounts() -> (Core, Limits) {
+    let (mut core, limits, sign_in, _) = signed_core();
+    drop(open(&mut core, &limits, sign_in, 30, Watched::Accounts));
+    drop(watch_outputs(&mut core, &limits, Event::Delivered { watcher: Token::new(30) }));
+    drop(finish_watch_outputs(&mut core, &limits));
+    (core, limits)
+}
+
+fn accounts_marked(core: &Core) -> bool {
+    core.changed_views.contains(&core.view_subjects.get(&Token::new(30)).unwrap().subject)
+}
+
+fn hello() -> fleet::Event {
+    fleet::Event::Hello {
+        channel: Token::new(77),
+        hello: fleet::Hello {
+            bounds: fixtures::bounds(),
+            stop_bound: Duration::ZERO,
+            slots: 1,
+            workstreams: Box::new([]),
+            hosting: Box::new([]),
+        },
+    }
+}
+
+#[test]
+fn a_fleet_hello_marks_an_open_accounts_watch() {
+    let (mut core, limits) = watching_accounts();
+    drop(watch_outputs(&mut core, &limits, Event::Fleet(hello())));
+    assert!(accounts_marked(&core));
+}
+
+#[test]
+fn a_fleet_loss_marks_an_open_accounts_watch() {
+    let (mut core, limits) = watching_accounts();
+    drop(watch_outputs(&mut core, &limits, Event::Fleet(hello())));
+    drop(finish_watch_outputs(&mut core, &limits));
+    drop(watch_outputs(&mut core, &limits, Event::Fleet(fleet::Event::Lost { channel: Token::new(77) })));
+    assert!(accounts_marked(&core));
+}
+
+#[test]
+fn a_host_grace_expiry_marks_an_open_accounts_watch() {
+    let (mut core, limits) = watching_accounts();
+    drop(watch_outputs(&mut core, &limits, Event::Fleet(fleet::Event::Loaded)));
+    drop(watch_outputs(&mut core, &limits, Event::Fleet(listed_host())));
+    drop(finish_watch_outputs(&mut core, &limits));
+    let now = core.fleet.next_deadline().expect("adopted worker grace");
+    drop(fire(&mut core, &Env { now, wall: Wall::EPOCH, limits }, Timer::Fleet));
+    assert!(accounts_marked(&core));
+}
+
+#[test]
+fn a_role_change_marks_an_open_accounts_watch() {
+    let (mut core, limits) = watching_accounts();
+    drop(watch_outputs(
+        &mut core,
+        &limits,
+        Event::People(people::Event::Roles {
+            project: 0,
+            holdings: Box::new([people::Holding { person: 1, role: people::Role::Owner }]),
+        }),
+    ));
+    assert!(accounts_marked(&core));
+}
+
+#[test]
+fn a_period_ledger_save_leaves_an_accounts_watch_unmarked() {
+    let (mut core, limits) = watching_accounts();
+    drop(watch_outputs(&mut core, &limits, Event::Tasks(tasks::Event::Restored)));
+    let out = watch_outputs(
+        &mut core,
+        &limits,
+        Event::Tasks(tasks::Event::OpenPeriod {
+            reply_to: ReplyTo::new(Token::new(91)),
+            project: 1,
+            period: 1,
+            budget: 1000,
+        }),
+    );
+    let mut saved = false;
+    for request in &out {
+        if let Request::Write(Write::Save(Record::Tasks(tasks::Stored::Ledger(_)))) = request {
+            saved = true;
+        }
+    }
+    assert!(saved, "exercise a real period-ledger save");
+    assert!(!accounts_marked(&core));
+}
+
+#[test]
+fn an_attempt_acknowledgement_leaves_an_accounts_watch_unmarked() {
+    let (mut core, limits) = watching_accounts();
+    drop(watch_outputs(
+        &mut core,
+        &limits,
+        Event::Fleet(fleet::Event::Acknowledge { run: Token::new(90), attempt: Token::new(92) }),
+    ));
+    assert!(!accounts_marked(&core));
+}
+
+fn listed_host() -> fleet::Event {
+    let fleet::Event::Hello { channel, mut hello } = hello() else { panic!("hello fixture") };
+    hello.hosting =
+        Box::new([fleet::Hosted { run: Token::new(90), attempt: Token::new(92), phase: fleet::Phase::Active }]);
+    fleet::Event::Hello { channel, hello }
+}
+
+fn busy() -> fleet::Event {
+    fleet::Event::Answer {
+        channel: Token::new(77),
+        run: Token::new(90),
+        attempt: Token::new(92),
+        answer: fleet::Answer::Busy,
+        payload: Token::new(93),
+    }
+}
+
+#[test]
+fn a_host_drain_marks_an_open_accounts_watch() {
+    let (mut core, limits) = watching_accounts();
+    drop(watch_outputs(&mut core, &limits, Event::Fleet(listed_host())));
+    drop(finish_watch_outputs(&mut core, &limits));
+    drop(watch_outputs(&mut core, &limits, Event::Fleet(busy())));
+    assert!(accounts_marked(&core));
+}
+
+#[test]
+fn lifting_a_host_drain_marks_an_open_accounts_watch() {
+    let (mut core, limits) = watching_accounts();
+    drop(watch_outputs(&mut core, &limits, Event::Fleet(listed_host())));
+    drop(watch_outputs(&mut core, &limits, Event::Fleet(busy())));
+    drop(finish_watch_outputs(&mut core, &limits));
+    drop(watch_outputs(
+        &mut core,
+        &limits,
+        Event::Fleet(fleet::Event::Cancel { run: Token::new(90), attempt: Token::new(92) }),
+    ));
+    assert!(accounts_marked(&core));
+}

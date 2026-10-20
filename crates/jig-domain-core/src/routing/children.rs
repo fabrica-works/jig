@@ -621,10 +621,14 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::
     if touched {
         core.touch_deployment();
         core.touch_run_waits();
-        core.touch_accounts(None);
     }
+    let shape = host_shape(&event);
+    let draining = draining_hosts(core);
     let mut out = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
     fleet::step(&mut core.fleet, &Env { now: env.now, wall: env.wall, limits: env.limits.fleet }, event, &mut out);
+    if shape || draining != draining_hosts(core) {
+        core.touch_accounts(None);
+    }
     tag_fleet(core, env, out, fleet::max_out(&env.limits.fleet))
 }
 
@@ -665,4 +669,46 @@ fn claim_source(
         out.push(Request::Write(Write::Save(Record::Core(CoreRecord::RunProof(proof.clone())))));
     }
     true
+}
+
+/// Account readiness ignores attempt occupancy; only host eligibility can change it.
+fn host_shape(event: &fleet::Event) -> bool {
+    match event {
+        fleet::Event::Sources { .. }
+        | fleet::Event::Logins { .. }
+        | fleet::Event::Check { .. }
+        | fleet::Event::SignOut { .. }
+        | fleet::Event::SignedOut { .. }
+        | fleet::Event::Loaded
+        | fleet::Event::Hello { .. }
+        | fleet::Event::Lost { .. } => true,
+        fleet::Event::Start { .. }
+        | fleet::Event::Adopt { .. }
+        | fleet::Event::Cancel { .. }
+        | fleet::Event::Acknowledge { .. }
+        | fleet::Event::Answer { .. }
+        | fleet::Event::Inbound { .. }
+        | fleet::Event::Relay { .. }
+        | fleet::Event::Relayed { .. }
+        | fleet::Event::Grant { .. }
+        | fleet::Event::Unauthorized { .. }
+        | fleet::Event::Limited { .. }
+        | fleet::Event::AccountRefused { .. }
+        | fleet::Event::Turn { .. }
+        | fleet::Event::TurnKept { .. }
+        | fleet::Event::TurnBusy { .. }
+        | fleet::Event::Observe { .. } => false,
+    }
+}
+
+// An attempt may start or lift a host drain. Ignore occupancy, which readiness never uses.
+// This temporary HostView list fits the document scratch envelope and is dropped before routing output.
+fn draining_hosts(core: &Core) -> u32 {
+    let mut draining = 0_u32;
+    for host in &core.fleet.host_views() {
+        if host.connected && host.draining {
+            draining = draining.saturating_add(1);
+        }
+    }
+    draining
 }
