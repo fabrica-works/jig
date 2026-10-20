@@ -121,6 +121,8 @@ fn signing(seed: u64) -> World {
         }]),
     };
     limits.core.accounts.accounts = 2;
+    // The accounts story also opens the deployment watch, beside the project role.
+    limits.core.people.projects = 2;
     jig_core_world::peers::journal(&mut limits);
     World::configured(seed, false, config, limits)
 }
@@ -166,4 +168,142 @@ fn a_partys_sign_out_removes_its_source_and_account() {
     assert!(world.domain.accounts().account(account).is_none());
     assert!(!world.store.rows.contains_key(&row(accounts::Key::Account { number: account })));
     assert!(!world.store.rows.contains_key(&row(accounts::Key::Source { account, number: source })));
+}
+
+const CONFIGURED_SOURCE: u32 = 1;
+const OWN_WATCH: u64 = 61_001;
+const OTHER_WATCH: u64 = 61_002;
+const DEPLOYMENT_WATCH: u64 = 61_003;
+
+fn watch(world: &mut World, sign_in: u64, watcher: u64, subject: core::documents::Watched) {
+    world.send(root::Event::Core(core::Event::Watch {
+        watcher: Token::new(watcher),
+        sign_in,
+        subject,
+        window: core::documents::Window { rows: 8, after: None },
+    }));
+}
+fn take(world: &mut World, watcher: u64) {
+    world.send(root::Event::Core(core::Event::Delivered { watcher: Token::new(watcher) }));
+}
+fn delivered(world: &World, watcher: u64) -> &core::documents::Document {
+    world
+        .client_peer
+        .as_ref()
+        .expect("client peer")
+        .delivered
+        .iter()
+        .rev()
+        .find_map(|(_, delivery)| {
+            let root::Delivery::Core(core::Held::Delivery { watcher: name, document }) = delivery else { return None };
+            if name.raw() == watcher { Some(document.as_ref()) } else { None }
+        })
+        .expect("the watch delivered")
+}
+fn accounts_document(world: &World, watcher: u64) -> &core::documents::Accounts {
+    let core::documents::Document::Accounts(document) = delivered(world, watcher) else { panic!("accounts document") };
+    document
+}
+fn start_account(world: &mut World) -> u32 {
+    let sign_in = world.sign_in.expect("signed in");
+    ask_as(world, sign_in, 42, people::Ask::AccountSignIn { holder: people::AccountHolder::Own, provider: PROVIDER });
+    // The independent component answers within send; the first watch delivery remains in flight.
+    world
+        .domain
+        .accounts()
+        .account_views()
+        .iter()
+        .find_map(|fact| {
+            let account = world.domain.accounts().account(fact.account).expect("account view");
+            matches!(account.holder(), accounts::Holder::Party(_)).then_some(fact.source)
+        })
+        .expect("the fake component made the party's source")
+}
+
+#[test]
+fn a_partys_accounts_watch_follows_its_sign_in_from_start_to_end() {
+    let mut world = signing(156);
+    world.send(root::Event::Core(core::Event::Account(accounts::Event::Component(accounts::FromComponent::Failed {
+        account: CONFIGURED_SOURCE,
+        failure: accounts::Failure::SignInAgain,
+    }))));
+    let first = world.sign_in.expect("first sign-in");
+    let second = jig_core_world::fixtures::second_party(&mut world, b"accounts-observer", people::Role::Observer);
+    world.sign_in = Some(first);
+    world.client_peer = Some(jig_core_world::client_peer::ClientPeer::default());
+    watch(&mut world, first, OWN_WATCH, core::documents::Watched::Accounts);
+    watch(&mut world, second, OTHER_WATCH, core::documents::Watched::Accounts);
+    let empty = accounts_document(&world, OWN_WATCH);
+    assert!(empty.accounts.is_empty());
+    assert!(empty.settled);
+    assert!(!empty.usable);
+    take(&mut world, OWN_WATCH);
+    take(&mut world, OTHER_WATCH);
+    let source = start_account(&mut world);
+    let underway = accounts_document(&world, OWN_WATCH);
+    assert_eq!(underway.signing.len(), 1);
+    let pending = underway.signing.get(0).expect("the party's sign-in is under way");
+    assert_eq!((pending.source, pending.provider), (source, PROVIDER));
+    assert!(!underway.settled);
+    take(&mut world, OWN_WATCH);
+    let finished = accounts_document(&world, OWN_WATCH);
+    let account = finished.accounts.get(0).expect("own account");
+    let first_source = account.sources.get(0).expect("the account's first source");
+    assert_eq!((first_source.number, first_source.place), (source, 0));
+    assert!(finished.signing.is_empty());
+    assert!(finished.settled);
+    assert_eq!(
+        finished.last_end,
+        Some(core::documents::LastEnd {
+            source,
+            end: accounts::End::Made { account: account.number, declined: false }
+        })
+    );
+    assert!(accounts_document(&world, OTHER_WATCH).accounts.is_empty());
+    assert!(accounts_document(&world, OTHER_WATCH).signing.is_empty());
+    assert_eq!(accounts_document(&world, OTHER_WATCH).last_end, None);
+    assert!(world.client_peer.as_ref().expect("client peer").delivered.iter().all(|(_, delivery)| {
+        let root::Delivery::Core(core::Held::Delivery { watcher, document }) = delivery else { return true };
+        watcher.raw() != OTHER_WATCH || matches!(document.as_ref(), core::documents::Document::Accounts(doc) if doc.accounts.is_empty() && doc.signing.is_empty() && doc.last_end.is_none())
+    }));
+}
+
+#[test]
+fn the_deployment_watch_shows_the_deployments_accounts_and_not_a_partys_own() {
+    let mut world = signing(157);
+    let sign_in = world.sign_in.expect("signed in");
+    let person = world
+        .store
+        .rows
+        .values()
+        .find_map(|record| {
+            let root::Record::Core(core::Record::People(people::Stored::SignIn { number, person, .. })) = record else {
+                return None;
+            };
+            if *number == sign_in { Some(*person) } else { None }
+        })
+        .expect("the store kept the live sign-in");
+    world.send(root::Event::Core(core::Event::People(people::Event::Roles {
+        project: 0,
+        holdings: Box::new([people::Holding { person, role: people::Role::Owner }]),
+    })));
+    world.client_peer = Some(jig_core_world::client_peer::ClientPeer::default());
+    watch(&mut world, sign_in, OWN_WATCH, core::documents::Watched::Accounts);
+    watch(&mut world, sign_in, DEPLOYMENT_WATCH, core::documents::Watched::Deployment);
+    take(&mut world, OWN_WATCH);
+    take(&mut world, DEPLOYMENT_WATCH);
+    let source = start_account(&mut world);
+    take(&mut world, OWN_WATCH);
+    let own = accounts_document(&world, OWN_WATCH).accounts.get(0).expect("own account").number;
+    take(&mut world, DEPLOYMENT_WATCH);
+    let core::documents::Document::Deployment(deployment) = delivered(&world, DEPLOYMENT_WATCH) else {
+        panic!("deployment document")
+    };
+    assert_eq!(deployment.accounts.len(), 1);
+    assert_eq!(deployment.accounts.get(0).expect("the configured deployment account").number, CONFIGURED_SOURCE);
+    assert!(!deployment.accounts.iter().any(|account| account.number == own));
+    assert!(deployment.accounts.iter().all(|account| account.holder == accounts::Holder::Deployment));
+    take(&mut world, OWN_WATCH);
+    ask_as(&mut world, sign_in, 43, people::Ask::AccountSignOut { holder: people::AccountHolder::Own, source });
+    assert!(accounts_document(&world, OWN_WATCH).accounts.is_empty());
 }

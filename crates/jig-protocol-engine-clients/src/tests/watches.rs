@@ -272,3 +272,26 @@ fn an_absent_stream_digest_is_answered_signed_out() {
     assert_eq!(world.response(owner), (401, &[][..]));
     assert!(world.component.streams.is_empty());
 }
+
+#[test]
+fn an_accounts_document_is_not_carried_to_a_client_before_jp10() {
+    use jig_domain_core::{documents as d, reads};
+    use skein_lib::List;
+    let document = d::Document::Accounts(Box::new(d::Accounts {
+        accounts: List::with_capacity(0),
+        signing: List::with_capacity(0),
+        last_end: None,
+        usable: false,
+        settled: true,
+        cut: false,
+    }));
+    let limits = fixtures::wire();
+    assert_eq!(
+        watches::delivery(&document, 0, 1, &[], &limits),
+        Err(w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Tag })
+    );
+    assert_eq!(
+        crate::translate::objects::document(&reads::Answer::Document(Box::new(document)), &[], &limits),
+        Err(w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag })
+    );
+}

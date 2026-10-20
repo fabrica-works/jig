@@ -16,9 +16,9 @@ fn ask(world: &mut World, by: u64, holder: Holder) -> u32 {
     let requests = world.step(Event::SignIn { request: Token::new(by), holder, by, provider: PROVIDER });
     requests
         .into_iter()
-        .find_map(|request| match request {
-            Request::Signing(Signing::SignIn { source, .. }) => Some(source),
-            _ => None,
+        .find_map(|request| {
+            let Request::Signing(Signing::SignIn { source, .. }) = request else { return None };
+            Some(source)
         })
         .expect("a sign-in started")
 }
@@ -63,11 +63,11 @@ fn a_deployment_sign_in_is_asked_by_a_person_and_held_by_the_deployment() {
 
 #[test]
 fn an_end_names_who_asked_it() {
+    // The new source is numbered first; its account takes the following number.
+    const ACCOUNT: u32 = 1;
     let mut world = started();
     let made = ask(&mut world, ALICE, Holder::Party(ALICE));
     finish(&mut world, made);
-    // The new source is numbered first; its account takes the following number.
-    const ACCOUNT: u32 = 1;
     assert_eq!(world.domain.last_end(ALICE), Some(end(ALICE, made, End::Made { account: ACCOUNT, declined: false })));
     let renewed = ask(&mut world, ALICE, Holder::Party(ALICE));
     finish(&mut world, renewed);

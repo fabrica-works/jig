@@ -30,7 +30,7 @@ fn restored_application_tokens_cannot_exceed_the_deployments_allocations() {
     assert!(!core.restore_people_row(&record));
 }
 
-fn limits() -> Limits {
+pub(super) fn limits() -> Limits {
     let retry = tasks::Retry { retries: 1, base: Duration::from_millis(10), max: Duration::from_secs(1) };
     let tasks = tasks::Limits {
         tasks: 2,
@@ -3002,6 +3002,7 @@ fn an_answer_payload_for_a_replaced_attempt_is_dropped() {
 }
 
 mod account_signing;
+mod accounts_document;
 mod credentials;
 
 mod funding_fixtures;

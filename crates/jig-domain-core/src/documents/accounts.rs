@@ -81,6 +81,7 @@ pub(super) fn source_lines(
     sources
 }
 
+#[expect(clippy::manual_map, reason = "step code has no closures (programming-model.md, section 10)")]
 pub(super) fn make(
     core: &Core,
     limits: &Limits,
@@ -161,4 +162,14 @@ pub(super) fn worst_case(limits: &DocumentLimits) -> Option<u64> {
         .checked_add(List::<AccountLine>::worst_case(limits.lines)?)?
         .checked_add(u64::from(limits.lines).checked_mul(account_heap)?)?
         .checked_add(List::<SignInLine>::worst_case(limits.lines)?)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_accounts_document_is_priced() {
+        let limits = crate::tests::limits();
+        let accounts = super::worst_case(&limits.documents).expect("accounts bound");
+        assert!(accounts <= crate::documents::document_worst_case(&limits.documents).expect("document bound"));
+    }
 }
