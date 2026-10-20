@@ -1,7 +1,9 @@
 //! Small browser application capacities.
 use jig_client_test_domain::first;
 use skein_lib::{Duration, RequestLimits};
-const LINGER: Duration = Duration::from_millis(25);
+/// Long enough for a person, or the browser tier's polling fake person on a
+/// loaded machine, to read a leaving card's outcome before it goes.
+const LINGER: Duration = Duration::from_secs(5);
 const AUTHORITY_ENTRIES: u32 = 8;
 pub fn limits() -> jig_client_test_domain::Limits {
     jig_client_test_domain::Limits {
