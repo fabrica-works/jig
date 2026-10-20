@@ -561,6 +561,7 @@ fn party_lack(value: people::Lack) -> parties::Lack {
         people::Lack::Tasks { left } => parties::Lack::Tasks { left },
         people::Lack::Tool => parties::Lack::Tool,
         people::Lack::Scope => parties::Lack::Scope,
+        people::Lack::Models => parties::Lack::Models,
         people::Lack::Reference => parties::Lack::Reference,
         people::Lack::ResourceAccess => parties::Lack::ResourceAccess,
         people::Lack::ResourceUnavailable => parties::Lack::ResourceUnavailable,

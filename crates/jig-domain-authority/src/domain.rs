@@ -3,7 +3,8 @@
 use skein_lib::{List, Map, Queue};
 
 use crate::limits::{authority_within, requirements_within, within};
-use crate::{Limits, Models, Policy, Requirement, Role, Rules, at_most, max_out, worst_case};
+use crate::order::at_most_but_models;
+use crate::{Limits, Models, Policy, Requirement, Role, Rules, max_out, worst_case};
 
 /// Bounded live project-policy table and immutable deployment rules; contains no task ledger,
 /// connector state or authentication. (domain/authority.md, sections 2 and 6).
@@ -207,7 +208,7 @@ fn invalid(domain: &Domain, policy: &Policy) -> Option<PolicyRefusal> {
     {
         return Some(PolicyRefusal::Oversized);
     }
-    if !at_most(&policy.ceiling, &domain.rules.ceiling, &domain.rules.implies)
+    if !at_most_but_models(&policy.ceiling, &domain.rules.ceiling, &domain.rules.implies)
         || policy.period_spend > domain.rules.period_spend
     {
         return Some(PolicyRefusal::AboveRules);
@@ -228,7 +229,7 @@ fn invalid(domain: &Domain, policy: &Policy) -> Option<PolicyRefusal> {
         if !authority_within(&role.authority, &domain.limits) {
             return Some(PolicyRefusal::Oversized);
         }
-        if !at_most(&role.authority, &policy.ceiling, &domain.rules.implies)
+        if !at_most_but_models(&role.authority, &policy.ceiling, &domain.rules.implies)
             || role.period_spend > policy.period_spend
             || role.requests.0 & !crate::Requests::ALL.0 != 0
             || role.decides.0 & !crate::Proposals::ALL.0 != 0

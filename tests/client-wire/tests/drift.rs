@@ -6,8 +6,9 @@ use std::{fs, path::Path};
 fn client_wire_schema_matches_generated_code_and_goldens() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../crates/jig-client-protocol-wire");
     let mut source = fs::read_to_string(root.join("schema/client-v10.schema")).expect("client schema");
-    source
-        .push_str(&fs::read_to_string(root.join("schema/client-v10-part1.schema")).expect("client schema continuation"));
+    source.push_str(
+        &fs::read_to_string(root.join("schema/client-v10-part1.schema")).expect("client schema continuation"),
+    );
     check(&root, &source, "v10");
 }
 #[test]

@@ -67,6 +67,7 @@ pub fn lack_values() -> Box<[domain::Lack]> {
         domain::Lack::Tasks { left: 2 },
         domain::Lack::Tool,
         domain::Lack::Scope,
+        domain::Lack::Models,
         domain::Lack::Reference,
         domain::Lack::ResourceAccess,
         domain::Lack::ResourceUnavailable,

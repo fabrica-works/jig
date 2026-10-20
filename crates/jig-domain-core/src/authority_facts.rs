@@ -47,6 +47,8 @@ impl Core {
                     people::Lack::TaskKind { executor: None }
                 } else if lacks.tools {
                     people::Lack::Tool
+                } else if lacks.models {
+                    people::Lack::Models
                 } else if lacks.notes {
                     people::Lack::Scope
                 } else {

@@ -54,6 +54,7 @@ pub(super) fn lack(value: people::Lack) -> application::Lack {
         people::Lack::Tasks { left } => application::Lack::Tasks { left },
         people::Lack::Tool => application::Lack::Tool,
         people::Lack::Scope => application::Lack::Scope,
+        people::Lack::Models => application::Lack::Models,
         people::Lack::Reference => application::Lack::Reference,
         people::Lack::ResourceAccess => application::Lack::ResourceAccess,
         people::Lack::ResourceUnavailable => application::Lack::ResourceUnavailable,

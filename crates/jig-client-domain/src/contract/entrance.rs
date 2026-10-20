@@ -34,6 +34,7 @@ fn fixed(refusal: &Refusal) -> bool {
             | Lacking::Funding
             | Lacking::Tool
             | Lacking::Scope
+            | Lacking::Models
             | Lacking::Reference
             | Lacking::ResourceAccess
             | Lacking::ResourceUnavailable

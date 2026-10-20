@@ -175,7 +175,7 @@ record LackRequired { connector: u16 kind: u16 }
 record LackFailed { connector: u16 kind: u16 }
 record LackUnguarded { connector: u16 kind: u16 }
 record LackTaskKind { executor: option TaskExecutor }
-enum Lack { approver, budget: LackBudget, grant: LackGrant, funding, task_kind: LackTaskKind, depth: LackDepth, deadline, tasks: LackTasks, tool, scope, reference, resource_access, resource_unavailable, shape, again: LackAgain, account, writer, required: LackRequired, failed: LackFailed, unguarded: LackUnguarded }
+enum Lack { approver, budget: LackBudget, grant: LackGrant, funding, task_kind: LackTaskKind, depth: LackDepth, deadline, tasks: LackTasks, tool, scope, reference, resource_access, resource_unavailable, shape, again: LackAgain, account, writer, required: LackRequired, failed: LackFailed, unguarded: LackUnguarded, models }
 enum LimitKind { operations, words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service, grace, goals }
 record RefusalRole { held: option Role }
 record AccepterRole { role: u32 }

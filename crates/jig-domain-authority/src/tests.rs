@@ -287,6 +287,12 @@ fn naive_authority(a: &Authority, b: &Authority, patterns: &[Pattern], sets: &[[
             return false;
         }
     }
+    for bit in 0_u32..64 {
+        let mask = 1_u64 << bit;
+        if a.models.0 & mask != 0 && b.models.0 & mask == 0 {
+            return false;
+        }
+    }
     for executor in &a.delegation.kinds {
         let mut included = false;
         for ceiling in &b.delegation.kinds {
@@ -357,6 +363,7 @@ fn authorities(patterns: &[Pattern]) -> Box<[Authority]> {
         let mut authority = empty();
         authority.tools = Tools((1_u64 << level).checked_sub(1).unwrap());
         authority.notes = Scopes(u8::try_from(authority.tools.0).unwrap());
+        authority.models = Models(u64::from(index.checked_rem(7).unwrap()));
         authority.delegation.tasks = level;
         authority.delegation.depth = level;
         authority.budget.spend = u64::from(level);
@@ -444,6 +451,13 @@ fn each_component_can_independently_prevent_the_order() {
     child = ceiling.clone();
     child.notes = Scopes::DEPLOYMENT;
     assert!(!at_most(&child, &ceiling, &table), "notes need their scope");
+    let mut named = ceiling.clone();
+    named.models = Models(0b01);
+    child = named.clone();
+    child.models = Models(0b10);
+    assert!(!at_most(&child, &named, &table), "models need membership");
+    child.models = Models::NONE;
+    assert!(at_most(&child, &named, &table), "no models fit under any");
     child = ceiling.clone();
     child.delegation.kinds = Box::new([Executor::Role(7)]);
     assert!(!at_most(&child, &ceiling, &table), "executors need membership");

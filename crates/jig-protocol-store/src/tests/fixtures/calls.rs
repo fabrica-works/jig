@@ -38,6 +38,7 @@ pub fn call_parts() -> Box<[core::CallPart]> {
             spend: false,
             deadline: true,
             notes: false,
+            models: true,
         },
     }]);
     Box::new([

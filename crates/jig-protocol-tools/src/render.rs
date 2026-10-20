@@ -164,8 +164,8 @@ fn denied(answer: authority::Answer, findings: &[authority::Finding]) -> Rendere
     };
     let count = u32::try_from(findings.len())
         .expect("bounded findings")
-        .checked_mul(8)
-        .expect("eight authority components")
+        .checked_mul(9)
+        .expect("nine authority components")
         .checked_add(1)
         .expect("status");
     let mut parts = List::with_capacity(count);
@@ -182,6 +182,7 @@ fn denied(answer: authority::Answer, findings: &[authority::Finding]) -> Rendere
                     (lacks.spend, b"spend"),
                     (lacks.deadline, b"deadline"),
                     (lacks.notes, b"notes"),
+                    (lacks.models, b"models"),
                 ] {
                     if missing {
                         parts.push(text(&[b"; missing ", name], true).text).expect("component slot");

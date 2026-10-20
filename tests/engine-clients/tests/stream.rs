@@ -148,7 +148,9 @@ fn hello(stream: [u8; 16]) -> w::StreamEvent {
     let lim = jig_client_test_records::limits();
     let mut served = List::with_capacity(1);
     served
-        .push(w::Served::new(&lim, w::ServedParts { owner: w::Owner::Jig, first: 10, last: 10 }).expect("literal range"))
+        .push(
+            w::Served::new(&lim, w::ServedParts { owner: w::Owner::Jig, first: 10, last: 10 }).expect("literal range"),
+        )
         .expect("one range");
     w::StreamEvent::Hello(
         w::Hello::new(&lim, w::HelloParts { stream, served, heartbeat: Duration::from_secs(5) })

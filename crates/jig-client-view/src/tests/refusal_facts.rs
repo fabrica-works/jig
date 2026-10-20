@@ -89,6 +89,7 @@ fn engine_refusals_keep_categories_supplied_hold_reasons_and_absent_ending_detai
         Lacking::Tasks { needed: None, left: 4 },
         Lacking::Tool,
         Lacking::Scope,
+        Lacking::Models,
         Lacking::Reference,
         Lacking::ResourceAccess,
         Lacking::ResourceUnavailable,

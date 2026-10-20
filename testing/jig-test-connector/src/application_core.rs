@@ -53,6 +53,8 @@ pub enum Lack {
     Tool,
     /// The note scope is absent.
     Scope,
+    /// A requested model is absent.
+    Models,
     /// No verified reference permits this action.
     Reference,
     /// Current resource access forbids this action.

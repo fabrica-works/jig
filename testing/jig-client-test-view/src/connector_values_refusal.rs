@@ -46,6 +46,7 @@ fn lack(value: owner::Lack) -> client::Lacking {
         owner::Lack::Funding => client::Lacking::Funding,
         owner::Lack::Tool => client::Lacking::Tool,
         owner::Lack::Scope => client::Lacking::Scope,
+        owner::Lack::Models => client::Lacking::Models,
         owner::Lack::Reference => client::Lacking::Reference,
         owner::Lack::ResourceAccess => client::Lacking::ResourceAccess,
         owner::Lack::ResourceUnavailable => client::Lacking::ResourceUnavailable,

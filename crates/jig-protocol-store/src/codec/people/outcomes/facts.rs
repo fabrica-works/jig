@@ -231,6 +231,7 @@ pub(super) fn encode_lack(value: &domain::Lack, limits: &wire::Limits) -> Result
         }
         domain::Lack::Tool => wire::Lack::Tool,
         domain::Lack::Scope => wire::Lack::Scope,
+        domain::Lack::Models => wire::Lack::Models,
         domain::Lack::Reference => wire::Lack::Reference,
         domain::Lack::ResourceAccess => wire::Lack::ResourceAccess,
         domain::Lack::ResourceUnavailable => wire::Lack::ResourceUnavailable,
@@ -284,6 +285,7 @@ pub(super) fn decode_lack(value: wire::Lack) -> domain::Lack {
         }
         wire::Lack::Tool => domain::Lack::Tool,
         wire::Lack::Scope => domain::Lack::Scope,
+        wire::Lack::Models => domain::Lack::Models,
         wire::Lack::Reference => domain::Lack::Reference,
         wire::Lack::ResourceAccess => domain::Lack::ResourceAccess,
         wire::Lack::ResourceUnavailable => domain::Lack::ResourceUnavailable,

@@ -42,6 +42,7 @@ pub fn lack(value: people::Lack) -> client::Lacking {
         people::Lack::Tasks { left } => client::Lacking::Tasks { needed: None, left },
         people::Lack::Tool => client::Lacking::Tool,
         people::Lack::Scope => client::Lacking::Scope,
+        people::Lack::Models => client::Lacking::Models,
         people::Lack::Reference => client::Lacking::Reference,
         people::Lack::ResourceAccess => client::Lacking::ResourceAccess,
         people::Lack::ResourceUnavailable => client::Lacking::ResourceUnavailable,

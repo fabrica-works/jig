@@ -124,6 +124,7 @@ fn filled(why: Refusal) -> bool {
             | Lack::Tasks { .. }
             | Lack::Tool
             | Lack::Scope
+            | Lack::Models
             | Lack::Reference
             | Lack::ResourceAccess
             | Lack::ResourceUnavailable

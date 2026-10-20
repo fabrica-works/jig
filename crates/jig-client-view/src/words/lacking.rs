@@ -65,6 +65,7 @@ impl Words {
             Lacking::Funding => self.text(b, JigPhrase::FundingMissing, &[]),
             Lacking::Tool => self.text(b, JigPhrase::ToolMissing, &[]),
             Lacking::Scope => self.text(b, JigPhrase::ScopeMissing, &[]),
+            Lacking::Models => self.text(b, JigPhrase::ModelMissing, &[]),
             Lacking::Reference => self.text(b, JigPhrase::ReferenceMissing, &[]),
             Lacking::ResourceAccess => self.text(b, JigPhrase::ResourceAccessMissing, &[]),
             Lacking::ResourceUnavailable => self.text(b, JigPhrase::ResourceUnavailable, &[]),

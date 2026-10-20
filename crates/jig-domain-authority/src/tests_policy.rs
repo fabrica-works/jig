@@ -9,9 +9,9 @@ use skein_lib::{Duration, Map, Queue, Wall, bytes::copy_of};
 use crate::{
     Action, Answer, Authority, BatchAsk, Call, CallAsk, Delegate, Domain, Effect, EffectAccess, EffectAsk,
     EffectResource, Event, FITS_MAX_OUT, Finding, Given, Grant, Guard, Holder, Implication, Judge, Lack, Last, Limits,
-    Name, Numbers, Pattern, PersonAsk, PersonRequest, Policy, PolicyFact, PolicyRefusal, ProposalKind, Proposals,
-    Requests, Requirement, RunAsk, Scopes, Source, Tools, Verdict, Write, Writer, at_most, check_batch, check_call,
-    check_effect, check_request, check_run, covers, fits, max_out, needs, resolve_task_grants, worst_case,
+    Models, Name, Numbers, Pattern, PersonAsk, PersonRequest, Policy, PolicyFact, PolicyRefusal, ProposalKind,
+    Proposals, Requests, Requirement, RunAsk, Scopes, Source, Tools, Verdict, Write, Writer, at_most, check_batch,
+    check_call, check_effect, check_request, check_run, covers, fits, max_out, needs, resolve_task_grants, worst_case,
 };
 
 use crate::tests_fixtures::*;
@@ -854,6 +854,7 @@ fn fitting_laws_needs_and_holder_depth_use_separate_current_inputs() {
     bottom.delegation.kinds = Box::new([]);
     bottom.budget.deadline = Some(Wall::EPOCH);
     bottom.notes = Scopes(0);
+    bottom.models = Models::NONE;
     assert!(!fits(&creator, &bottom, &numbers(0), 0, &domain.rules().implies, &mut lacks), "all deficits are reported");
     assert_eq!(lacks.len(), FITS_MAX_OUT);
     let mut depth_lacked = false;

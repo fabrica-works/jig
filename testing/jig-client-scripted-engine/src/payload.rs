@@ -984,6 +984,7 @@ impl Payload for Lacking {
             | Self::Funding
             | Self::Tool
             | Self::Scope
+            | Self::Models
             | Self::Reference
             | Self::ResourceAccess
             | Self::ResourceUnavailable

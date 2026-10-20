@@ -641,6 +641,7 @@ fn connector_values_view_all_sparse_authority_categories_keep_absent_requested_f
         (Lack::Tasks { left: u32::MAX }, b"Lifetime tasks left: 4294967295"),
         (Lack::Tool, b"tool family"),
         (Lack::Scope, b"note scope"),
+        (Lack::Models, b"requested model"),
         (Lack::Reference, b"verified reference"),
         (Lack::ResourceAccess, b"resource access"),
         (Lack::ResourceUnavailable, b"unavailable"),

@@ -68,6 +68,8 @@ pub enum Lack {
     Deadline,
     /// Requested note scopes do not fit.
     Notes,
+    /// Requested models do not fit: some is not among the creator's.
+    Models,
 }
 
 /// Every independent component that failed; a check can name all of them
@@ -90,6 +92,8 @@ pub struct Lacks {
     /// Requested deadline is later than permitted.
     pub deadline: bool,
     pub notes: bool,
+    /// Some requested model is not among the other's.
+    pub models: bool,
 }
 
 impl Lacks {
@@ -104,12 +108,13 @@ impl Lacks {
             || self.depth
             || self.spend
             || self.deadline
-            || self.notes)
+            || self.notes
+            || self.models)
     }
 }
 
-/// Maximum deficits emitted by one fitting query: one for each of eight components.
-pub const FITS_MAX_OUT: u32 = 8;
+/// Maximum deficits emitted by one fitting query: one for each of nine components.
+pub const FITS_MAX_OUT: u32 = 9;
 
 /// On one connector, granting `kind` also grants `implies`.
 /// Root-configured connector-kind inclusion pair, validated as part of `Implies`.
@@ -266,6 +271,14 @@ pub fn at_most(a: &Authority, b: &Authority, implies: &Implies) -> bool {
     differences(a, b, b.delegation.tasks, b.delegation.depth, b.budget.spend, implies).is_empty()
 }
 
+/// Whether every part of `a` but its models is at most `b`. A policy's ceiling or a role naming
+/// models beyond the rules' or the ceiling's is narrowed to their intersection (`Domain::models`,
+/// section 6), not refused, so a policy's validity leaves models out.
+pub(crate) fn at_most_but_models(a: &Authority, b: &Authority, implies: &Implies) -> bool {
+    let lacks = differences(a, b, b.delegation.tasks, b.delegation.depth, b.budget.spend, implies);
+    Lacks { models: false, ..lacks }.is_empty()
+}
+
 /// Whether the child's authority fits, with spend and lifetime task capacity taken from separate
 /// current inputs. The caller reserves `FITS_MAX_OUT` queue slots. A batch additionally consumes
 /// one task slot for each immediate child and sums reservations. Pure fitting query over
@@ -306,6 +319,9 @@ pub fn fits(
     }
     if parts.notes {
         lacks.push(Lack::Notes);
+    }
+    if parts.models {
+        lacks.push(Lack::Models);
     }
     parts.is_empty()
 }
@@ -358,6 +374,7 @@ pub(crate) fn differences(
         spend: a.budget.spend > spend,
         deadline: !deadline_fits,
         notes: a.notes.0 & !b.notes.0 != 0,
+        models: a.models.0 & !b.models.0 != 0,
     };
     for kind in &a.delegation.kinds {
         if !b.delegation.kinds.contains(kind) {

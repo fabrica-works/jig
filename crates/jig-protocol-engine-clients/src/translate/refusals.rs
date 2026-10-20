@@ -69,6 +69,7 @@ fn lack(value: p::Lack, limits: &w::Limits) -> Result<w::Lacking, w::Problem> {
         p::Lack::Funding => w::Lacking::Funding,
         p::Lack::Tool => w::Lacking::Tool,
         p::Lack::Scope => w::Lacking::Scope,
+        p::Lack::Models => w::Lacking::Models,
         p::Lack::Reference => w::Lacking::Reference,
         p::Lack::ResourceAccess => w::Lacking::ResourceAccess,
         p::Lack::ResourceUnavailable => w::Lacking::ResourceUnavailable,

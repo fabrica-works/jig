@@ -94,6 +94,7 @@ fn encode_lack(value: &d::application_core::Lack) -> w::Lack {
         ),
         d::application_core::Lack::Tool => w::Lack::Tool,
         d::application_core::Lack::Scope => w::Lack::Scope,
+        d::application_core::Lack::Models => w::Lack::Models,
         d::application_core::Lack::Reference => w::Lack::Reference,
         d::application_core::Lack::ResourceAccess => w::Lack::ResourceAccess,
         d::application_core::Lack::ResourceUnavailable => w::Lack::ResourceUnavailable,
@@ -142,6 +143,7 @@ fn decode_lack(value: w::Lack) -> d::application_core::Lack {
         }
         w::Lack::Tool => d::application_core::Lack::Tool,
         w::Lack::Scope => d::application_core::Lack::Scope,
+        w::Lack::Models => d::application_core::Lack::Models,
         w::Lack::Reference => d::application_core::Lack::Reference,
         w::Lack::ResourceAccess => d::application_core::Lack::ResourceAccess,
         w::Lack::ResourceUnavailable => d::application_core::Lack::ResourceUnavailable,

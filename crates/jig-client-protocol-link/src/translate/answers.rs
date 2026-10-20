@@ -247,6 +247,7 @@ pub(crate) fn lacking(value: &w::Lacking, limits: &Limits) -> c::Lacking {
         w::Lacking::Funding => c::Lacking::Funding,
         w::Lacking::Tool => c::Lacking::Tool,
         w::Lacking::Scope => c::Lacking::Scope,
+        w::Lacking::Models => c::Lacking::Models,
         w::Lacking::Reference => c::Lacking::Reference,
         w::Lacking::ResourceAccess => c::Lacking::ResourceAccess,
         w::Lacking::ResourceUnavailable => c::Lacking::ResourceUnavailable,

@@ -969,6 +969,7 @@ pub enum JigPhrase {
     TasksLeft,
     ToolMissing,
     ScopeMissing,
+    ModelMissing,
     ReferenceMissing,
     ResourceAccessMissing,
     ResourceUnavailable,
@@ -1565,6 +1566,7 @@ impl JigPhrase {
             Self::TasksLeft => 470,
             Self::ToolMissing => 471,
             Self::ScopeMissing => 472,
+            Self::ModelMissing => 810,
             Self::ReferenceMissing => 473,
             Self::ResourceAccessMissing => 474,
             Self::ResourceUnavailable => 475,
@@ -1705,6 +1707,7 @@ impl JigPhrase {
             | Self::DeadlineAuthorityMissing
             | Self::ToolMissing
             | Self::ScopeMissing
+            | Self::ModelMissing
             | Self::ReferenceMissing
             | Self::ResourceAccessMissing
             | Self::ResourceUnavailable
@@ -2219,7 +2222,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 582] = [
+pub const ALL: [JigPhrase; 583] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2776,6 +2779,7 @@ pub const ALL: [JigPhrase; 582] = [
     JigPhrase::TasksLeft,
     JigPhrase::ToolMissing,
     JigPhrase::ScopeMissing,
+    JigPhrase::ModelMissing,
     JigPhrase::ReferenceMissing,
     JigPhrase::ResourceAccessMissing,
     JigPhrase::ResourceUnavailable,

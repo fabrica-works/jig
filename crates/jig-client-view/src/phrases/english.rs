@@ -411,6 +411,7 @@ pub fn language() -> Language {
             ]),
             JigPhrase::ToolMissing => Box::new([Segment::Text(copy_of(b"The tool family is absent"))]),
             JigPhrase::ScopeMissing => Box::new([Segment::Text(copy_of(b"The note scope is absent"))]),
+            JigPhrase::ModelMissing => Box::new([Segment::Text(copy_of(b"A requested model is absent"))]),
             JigPhrase::ReferenceMissing => {
                 Box::new([Segment::Text(copy_of(b"No verified reference permits this action"))])
             }

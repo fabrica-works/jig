@@ -23,6 +23,8 @@ pub enum Lacking {
     Funding,
     Tool,
     Scope,
+    /// A model the request names is beyond authority (domain/authority.md, sections 3 and 5).
+    Models,
     Reference,
     ResourceAccess,
     ResourceUnavailable,

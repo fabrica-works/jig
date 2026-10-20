@@ -25,9 +25,11 @@ fn request() -> Box<[u8]> {
     );
     let mut out = Writer::new(usize::try_from(ask.measure()).expect("ask size"));
     ask.encode(&mut out).expect("ask bytes");
-    let record =
-        w::Keyed::new(&limits, w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 10, request: out.finish() })
-            .expect("keyed request");
+    let record = w::Keyed::new(
+        &limits,
+        w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 10, request: out.finish() },
+    )
+    .expect("keyed request");
     let mut out = Writer::new(usize::try_from(record.measure()).expect("record size"));
     record.encode(&mut out).expect("request bytes");
     out.finish()

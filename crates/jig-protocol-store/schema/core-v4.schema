@@ -11,7 +11,7 @@ record EscalationOutcomePassed { revision: u64 }
 enum EscalationOutcome { released, rejected, passed: EscalationOutcomePassed, stale, no_further, limit }
 enum ProposalOutcome { accepted, rejected, passed, withdrawn, stale }
 enum Source { task, role, project, deployment }
-record Lacks { tools: bool grants: bool executors: bool tasks: bool depth: bool spend: bool deadline: bool notes: bool }
+record Lacks { tools: bool grants: bool executors: bool tasks: bool depth: bool spend: bool deadline: bool notes: bool models: bool }
 record Judge { connector: u16 requirement: u16 parameters: u32 }
 enum Answer { allow, wait, propose, refuse }
 record FindingAuthority { source: Source lacks: Lacks }

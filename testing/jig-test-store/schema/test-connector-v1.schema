@@ -16,7 +16,7 @@ record LackTasks { left: u32 }
 record LackRequired { connector: u16 kind: u16 }
 record LackFailed { connector: u16 kind: u16 }
 record LackUnguarded { connector: u16 kind: u16 }
-enum Lack { approver, again: LackAgain, budget: LackBudget, grant: LackGrant, funding, task_kind, depth: LackDepth, deadline, tasks: LackTasks, tool, scope, reference, resource_access, resource_unavailable, shape, account, writer, required: LackRequired, failed: LackFailed, unguarded: LackUnguarded }
+enum Lack { approver, again: LackAgain, budget: LackBudget, grant: LackGrant, funding, task_kind, depth: LackDepth, deadline, tasks: LackTasks, tool, scope, reference, resource_access, resource_unavailable, shape, account, writer, required: LackRequired, failed: LackFailed, unguarded: LackUnguarded, models }
 enum LimitKind { words, identity, roles, arithmetic, duplicate, empty, batch, project_live_tasks, live_tasks, tree, depth, delegates, subscription, dependencies, cycle, spec, contract, authority, inputs, attempts, live_delegates, restore, read, turn, hold_kind, hold_taken, holds, inbox_full, notes, revision, question, priority, policy, resource, service }
 record PartyPerson { value: u64 }
 record PartyTask { value: u64 }

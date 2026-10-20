@@ -81,6 +81,8 @@ pub enum Lack {
     Tool,
     /// The note scope is absent.
     Scope,
+    /// A requested model is absent (domain/authority.md, sections 3 and 5).
+    Models,
     /// No verified reference permits this action.
     Reference,
     /// Current resource access forbids this action.

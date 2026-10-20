@@ -103,6 +103,8 @@ pub enum Path {
     LacksDeadline,
     /// The `notes` field of `Lacks`.
     LacksNotes,
+    /// The `models` field of `Lacks`.
+    LacksModels,
     /// Bytes after `Lacks`.
     LacksTail,
     /// The `connector` field of `Judge`.
@@ -995,13 +997,13 @@ impl Source {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LacksParts {
     /// Boolean fields in schema order.
-    pub skein_bools: [bool; 8],
+    pub skein_bools: [bool; 9],
 }
 
 /// `Lacks` in this codec family.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Lacks {
-    skein_bools: [bool; 8],
+    skein_bools: [bool; 9],
 }
 
 impl Lacks {
@@ -1014,35 +1016,39 @@ impl Lacks {
 
     /// Reads the `tools` field.
     #[must_use]
-    pub fn tools(&self) -> bool { { let [value, _, _, _, _, _, _, _] = self.skein_bools; value } }
+    pub fn tools(&self) -> bool { { let [value, _, _, _, _, _, _, _, _] = self.skein_bools; value } }
 
     /// Reads the `grants` field.
     #[must_use]
-    pub fn grants(&self) -> bool { { let [_, value, _, _, _, _, _, _] = self.skein_bools; value } }
+    pub fn grants(&self) -> bool { { let [_, value, _, _, _, _, _, _, _] = self.skein_bools; value } }
 
     /// Reads the `executors` field.
     #[must_use]
-    pub fn executors(&self) -> bool { { let [_, _, value, _, _, _, _, _] = self.skein_bools; value } }
+    pub fn executors(&self) -> bool { { let [_, _, value, _, _, _, _, _, _] = self.skein_bools; value } }
 
     /// Reads the `tasks` field.
     #[must_use]
-    pub fn tasks(&self) -> bool { { let [_, _, _, value, _, _, _, _] = self.skein_bools; value } }
+    pub fn tasks(&self) -> bool { { let [_, _, _, value, _, _, _, _, _] = self.skein_bools; value } }
 
     /// Reads the `depth` field.
     #[must_use]
-    pub fn depth(&self) -> bool { { let [_, _, _, _, value, _, _, _] = self.skein_bools; value } }
+    pub fn depth(&self) -> bool { { let [_, _, _, _, value, _, _, _, _] = self.skein_bools; value } }
 
     /// Reads the `spend` field.
     #[must_use]
-    pub fn spend(&self) -> bool { { let [_, _, _, _, _, value, _, _] = self.skein_bools; value } }
+    pub fn spend(&self) -> bool { { let [_, _, _, _, _, value, _, _, _] = self.skein_bools; value } }
 
     /// Reads the `deadline` field.
     #[must_use]
-    pub fn deadline(&self) -> bool { { let [_, _, _, _, _, _, value, _] = self.skein_bools; value } }
+    pub fn deadline(&self) -> bool { { let [_, _, _, _, _, _, value, _, _] = self.skein_bools; value } }
 
     /// Reads the `notes` field.
     #[must_use]
-    pub fn notes(&self) -> bool { { let [_, _, _, _, _, _, _, value] = self.skein_bools; value } }
+    pub fn notes(&self) -> bool { { let [_, _, _, _, _, _, _, value, _] = self.skein_bools; value } }
+
+    /// Reads the `models` field.
+    #[must_use]
+    pub fn models(&self) -> bool { { let [_, _, _, _, _, _, _, _, value] = self.skein_bools; value } }
 
     /// Moves the fields out without copying.
     #[must_use]
@@ -5414,6 +5420,7 @@ impl Lacks {
         size = size.checked_add(1).expect("schema ceilings fit u32");
         size = size.checked_add(1).expect("schema ceilings fit u32");
         size = size.checked_add(1).expect("schema ceilings fit u32");
+        size = size.checked_add(1).expect("schema ceilings fit u32");
         size
     }
 
@@ -5435,6 +5442,8 @@ impl Lacks {
         writer.put(&[u8::from(*field_deadline)])?;
         let field_notes = &self.notes();
         writer.put(&[u8::from(*field_notes)])?;
+        let field_models = &self.models();
+        writer.put(&[u8::from(*field_models)])?;
         Ok(())
     }
 
@@ -5454,7 +5463,8 @@ impl Lacks {
         let decoded_spend = match reader.u8().ok_or(Problem { path: Path::LacksSpend, reason: skein_codec::Reason::Short })? { 0 => false, 1 => true, _ => return Err(Problem { path: Path::LacksSpend, reason: skein_codec::Reason::Bool }) };
         let decoded_deadline = match reader.u8().ok_or(Problem { path: Path::LacksDeadline, reason: skein_codec::Reason::Short })? { 0 => false, 1 => true, _ => return Err(Problem { path: Path::LacksDeadline, reason: skein_codec::Reason::Bool }) };
         let decoded_notes = match reader.u8().ok_or(Problem { path: Path::LacksNotes, reason: skein_codec::Reason::Short })? { 0 => false, 1 => true, _ => return Err(Problem { path: Path::LacksNotes, reason: skein_codec::Reason::Bool }) };
-        Ok(Self { skein_bools: [decoded_tools, decoded_grants, decoded_executors, decoded_tasks, decoded_depth, decoded_spend, decoded_deadline, decoded_notes] })
+        let decoded_models = match reader.u8().ok_or(Problem { path: Path::LacksModels, reason: skein_codec::Reason::Short })? { 0 => false, 1 => true, _ => return Err(Problem { path: Path::LacksModels, reason: skein_codec::Reason::Bool }) };
+        Ok(Self { skein_bools: [decoded_tools, decoded_grants, decoded_executors, decoded_tasks, decoded_depth, decoded_spend, decoded_deadline, decoded_notes, decoded_models] })
     }
 }
 
@@ -9679,6 +9689,7 @@ impl Lacks {
         size = size.checked_add(1_u64)?.checked_add(1_u64)?;
         size = size.checked_add(1_u64)?.checked_add(1_u64)?;
         size = size.checked_add(1_u64)?.checked_add(1_u64)?;
+        size = size.checked_add(1_u64)?;
         size.checked_add(0)
     }
 
@@ -9695,6 +9706,7 @@ impl Lacks {
         heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
         heap = heap.checked_add(0_u64)?.checked_add(0_u64)?;
+        heap = heap.checked_add(0_u64)?;
         heap.checked_add(0)
     }
 }
@@ -12987,8 +12999,8 @@ mod golden_tests {
         ("enum_source_project_full", || { let value = Source::Project; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Source::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_source_deployment_smallest", || { let value = Source::Deployment; let bytes: &[u8] = &[3]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Source::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_source_deployment_full", || { let value = Source::Deployment; let bytes: &[u8] = &[3]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Source::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_lacks_smallest", || { let value = Lacks::new(&CEILINGS, LacksParts { skein_bools: [false, false, false, false, false, false, false, false] }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Lacks::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_lacks_full", || { let value = Lacks::new(&CEILINGS, LacksParts { skein_bools: [true, true, true, true, true, true, true, true] }).expect("golden within ceilings"); let bytes: &[u8] = &[1, 1, 1, 1, 1, 1, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Lacks::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_lacks_smallest", || { let value = Lacks::new(&CEILINGS, LacksParts { skein_bools: [false, false, false, false, false, false, false, false, false] }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Lacks::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_lacks_full", || { let value = Lacks::new(&CEILINGS, LacksParts { skein_bools: [true, true, true, true, true, true, true, true, true] }).expect("golden within ceilings"); let bytes: &[u8] = &[1, 1, 1, 1, 1, 1, 1, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Lacks::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_judge_smallest", || { let value = Judge::new(&CEILINGS, JudgeParts { connector: 0_u16, requirement: 0_u16, parameters: 0_u32 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Judge::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_judge_full", || { let value = Judge::new(&CEILINGS, JudgeParts { connector: u16::MAX, requirement: u16::MAX, parameters: u32::MAX }).expect("golden within ceilings"); let bytes: &[u8] = &[255, 255, 255, 255, 255, 255, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Judge::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_answer_allow_smallest", || { let value = Answer::Allow; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Answer::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -12999,8 +13011,8 @@ mod golden_tests {
         ("enum_answer_propose_full", || { let value = Answer::Propose; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Answer::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_answer_refuse_smallest", || { let value = Answer::Refuse; let bytes: &[u8] = &[3]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Answer::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_answer_refuse_full", || { let value = Answer::Refuse; let bytes: &[u8] = &[3]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Answer::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_finding_authority_smallest", || { let value = FindingAuthority::new(&CEILINGS, FindingAuthorityParts { source: Source::Task, lacks: Lacks::new(&CEILINGS, LacksParts { skein_bools: [false, false, false, false, false, false, false, false] }).expect("golden within ceilings") }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FindingAuthority::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_finding_authority_full", || { let value = FindingAuthority::new(&CEILINGS, FindingAuthorityParts { source: Source::Task, lacks: Lacks::new(&CEILINGS, LacksParts { skein_bools: [true, true, true, true, true, true, true, true] }).expect("golden within ceilings") }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 1, 1, 1, 1, 1, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FindingAuthority::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_finding_authority_smallest", || { let value = FindingAuthority::new(&CEILINGS, FindingAuthorityParts { source: Source::Task, lacks: Lacks::new(&CEILINGS, LacksParts { skein_bools: [false, false, false, false, false, false, false, false, false] }).expect("golden within ceilings") }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FindingAuthority::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_finding_authority_full", || { let value = FindingAuthority::new(&CEILINGS, FindingAuthorityParts { source: Source::Task, lacks: Lacks::new(&CEILINGS, LacksParts { skein_bools: [true, true, true, true, true, true, true, true, true] }).expect("golden within ceilings") }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 1, 1, 1, 1, 1, 1, 1, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FindingAuthority::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_finding_executor_smallest", || { let value = FindingExecutor::new(&CEILINGS, FindingExecutorParts { source: Source::Task }).expect("golden within ceilings"); let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FindingExecutor::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_finding_executor_full", || { let value = FindingExecutor::new(&CEILINGS, FindingExecutorParts { source: Source::Task }).expect("golden within ceilings"); let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FindingExecutor::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_finding_tasks_smallest", || { let value = FindingTasks::new(&CEILINGS, FindingTasksParts { source: Source::Task }).expect("golden within ceilings"); let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, FindingTasks::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -13025,8 +13037,8 @@ mod golden_tests {
         ("enum_finding_unknown_project_full", || { let value = Finding::UnknownProject; let bytes: &[u8] = &[1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_finding_unknown_role_smallest", || { let value = Finding::UnknownRole; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_finding_unknown_role_full", || { let value = Finding::UnknownRole; let bytes: &[u8] = &[2]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_finding_authority_smallest", || { let value = Finding::Authority(FindingAuthority::new(&CEILINGS, FindingAuthorityParts { source: Source::Task, lacks: Lacks::new(&CEILINGS, LacksParts { skein_bools: [false, false, false, false, false, false, false, false] }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("enum_finding_authority_full", || { let value = Finding::Authority(FindingAuthority::new(&CEILINGS, FindingAuthorityParts { source: Source::Task, lacks: Lacks::new(&CEILINGS, LacksParts { skein_bools: [true, true, true, true, true, true, true, true] }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 0, 1, 1, 1, 1, 1, 1, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_finding_authority_smallest", || { let value = Finding::Authority(FindingAuthority::new(&CEILINGS, FindingAuthorityParts { source: Source::Task, lacks: Lacks::new(&CEILINGS, LacksParts { skein_bools: [false, false, false, false, false, false, false, false, false] }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("enum_finding_authority_full", || { let value = Finding::Authority(FindingAuthority::new(&CEILINGS, FindingAuthorityParts { source: Source::Task, lacks: Lacks::new(&CEILINGS, LacksParts { skein_bools: [true, true, true, true, true, true, true, true, true] }).expect("golden within ceilings") }).expect("golden within ceilings")); let bytes: &[u8] = &[3, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_finding_executor_smallest", || { let value = Finding::Executor(FindingExecutor::new(&CEILINGS, FindingExecutorParts { source: Source::Task }).expect("golden within ceilings")); let bytes: &[u8] = &[4, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_finding_executor_full", || { let value = Finding::Executor(FindingExecutor::new(&CEILINGS, FindingExecutorParts { source: Source::Task }).expect("golden within ceilings")); let bytes: &[u8] = &[4, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_finding_tasks_smallest", || { let value = Finding::Tasks(FindingTasks::new(&CEILINGS, FindingTasksParts { source: Source::Task }).expect("golden within ceilings")); let bytes: &[u8] = &[5, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Finding::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),

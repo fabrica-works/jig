@@ -270,17 +270,19 @@ pub fn decode_source(value: wire::Source, _limits: &Limits) -> authority::Source
 }
 
 pub fn encode_lacks(value: &authority::Lacks, limits: &Limits) -> Result<wire::Lacks, wire::Problem> {
-    let authority::Lacks { tools, grants, executors, tasks, depth, spend, deadline, notes } = value;
+    let authority::Lacks { tools, grants, executors, tasks, depth, spend, deadline, notes, models } = value;
     wire::Lacks::new(
         &limits.core,
-        wire::LacksParts { skein_bools: [*tools, *grants, *executors, *tasks, *depth, *spend, *deadline, *notes] },
+        wire::LacksParts {
+            skein_bools: [*tools, *grants, *executors, *tasks, *depth, *spend, *deadline, *notes, *models],
+        },
     )
 }
 #[must_use]
 pub fn decode_lacks(value: wire::Lacks, _limits: &Limits) -> authority::Lacks {
-    let wire::LacksParts { skein_bools: [tools, grants, executors, tasks, depth, spend, deadline, notes] } =
+    let wire::LacksParts { skein_bools: [tools, grants, executors, tasks, depth, spend, deadline, notes, models] } =
         value.into_parts();
-    authority::Lacks { tools, grants, executors, tasks, depth, spend, deadline, notes }
+    authority::Lacks { tools, grants, executors, tasks, depth, spend, deadline, notes, models }
 }
 
 pub fn encode_judge(value: &authority::Judge, limits: &Limits) -> Result<wire::Judge, wire::Problem> {
