@@ -89,7 +89,7 @@ impl Link {
             Event::Close { watch } => self.close(now, watch, out),
             Event::Streamed { message } => self.streamed(now, message, out),
             Event::StreamGone => self.drop_stream(now, out),
-            Event::Send { attempt, key, ask } => self.send(now, attempt, key, ask, out),
+            Event::Send { attempt, key, ask, value } => self.send(now, attempt, key, ask, value, out),
             Event::Read { read, what } => self.read(now, read, what, out),
             Event::Reply { exchange, message } => self.answered(exchange, &message, out),
             Event::Lost { exchange } => {
@@ -106,7 +106,15 @@ impl Link {
             self.drop_stream(now, out);
         }
     }
-    fn send(&mut self, _now: Time, attempt: Token, key: RequestKey, ask: Ask, out: &mut Queue<Request>) {
+    fn send(
+        &mut self,
+        _now: Time,
+        attempt: Token,
+        key: RequestKey,
+        ask: Ask,
+        value: Option<Secret>,
+        out: &mut Queue<Request>,
+    ) {
         if self.attempts.len() == self.attempts.capacity() {
             lost(attempt, out);
             return;
@@ -115,7 +123,7 @@ impl Link {
             lost(attempt, out);
             return;
         };
-        let Ok(record) = keyed(key, ask, &self.limits.wire) else {
+        let Ok(record) = keyed(key, ask, value, &self.limits.wire) else {
             lost(attempt, out);
             return;
         };
@@ -352,7 +360,7 @@ fn failed(attempt: Attempt, out: &mut Queue<Request>) {
 fn lost(attempt: Token, out: &mut Queue<Request>) {
     out.push(Request::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None, why: Some(Retry::Lost) });
 }
-fn keyed(key: RequestKey, ask: Ask, limits: &w::Limits) -> Result<w::Keyed, w::Problem> {
+fn keyed(key: RequestKey, ask: Ask, value: Option<Secret>, limits: &w::Limits) -> Result<w::Keyed, w::Problem> {
     let (owner, version, request) = match ask {
         Ask::Jig(ask) => {
             let record = translate::asks::ask(&ask, limits)?;
@@ -365,7 +373,7 @@ fn keyed(key: RequestKey, ask: Ask, limits: &w::Limits) -> Result<w::Keyed, w::P
             (w::Owner::Family(owner), record.version, translate::envelope::request(scope, &record, limits)?)
         }
     };
-    w::Keyed::new(limits, w::KeyedParts { key, owner, version, request })
+    w::Keyed::new(limits, w::KeyedParts { key, owner, version, request, value })
 }
 
 impl Link {

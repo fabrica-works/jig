@@ -77,6 +77,9 @@ pub enum ToApplication {
         scope: people::ApplicationScope,
         record: Box<[u8]>,
         digest: [u8; 32],
+        /// The value the request carried, by its number and digest: kept in
+        /// the secrets' store before this request (protocol/client.md, 5).
+        carried: Option<core::Carried>,
     },
     Read {
         reply: ReplyTo,
@@ -103,23 +106,34 @@ pub enum FromApplication {
     Read { reply: ReplyTo, family: u16, record: Option<Box<[u8]>> },
     Delivery { watcher: Token, family: u16, record: Box<[u8]> },
     Undecodable { to: ReplyTo },
+    // The core left a carried value unused (`core::Held::CarriedUnused`):
+    // erased when this component's own decode kept it (store.md 9).
+    Unused { number: u64 },
 }
 #[derive(Debug)]
 pub enum SecretsRequest {
     Keep { owner: SecretOwner, value: Kept },
     Erase { owner: SecretOwner },
     Get { owner: SecretOwner },
+    // Keep the value `exchange`'s request carried, under a number the store
+    // draws itself (store.md 9): answered `Carried`.
+    Carry { exchange: Token, value: Secret },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SecretOwner {
     SignIn(u64),
     Service(u64),
+    /// A value a request carried, by the number the store drew; only erased.
+    Carried(u64),
 }
 #[derive(Debug)]
 pub enum SecretsAnswer {
     Kept { owner: SecretOwner },
     Erased { owner: SecretOwner },
     Got { owner: SecretOwner, value: Option<Kept> },
+    // `exchange`'s carried value is durable under `number`; none when the
+    // store kept nothing.
+    Carried { exchange: Token, number: Option<u64> },
     Failed,
 }
 #[derive(Clone, Debug)]

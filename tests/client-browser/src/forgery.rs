@@ -53,6 +53,7 @@ pub(super) fn request() -> Box<[u8]> {
             owner: w::Owner::Jig,
             version: jig_client_protocol_wire::VERSION,
             request: writer.finish(),
+            value: None,
         },
     )
     .expect("bounded keyed request");

@@ -99,7 +99,11 @@ impl Harness {
         Self { link: Link::new(limits).unwrap(), out: Queue::with_capacity(32) }
     }
     pub fn send(&mut self, attempt: Token, key: RequestKey, ask: c::Ask) -> Token {
-        self.link.step(Time::ZERO, Event::Send { attempt, key, ask: Ask::Jig(Box::new(ask)) }, &mut self.out);
+        self.link.step(
+            Time::ZERO,
+            Event::Send { attempt, key, ask: Ask::Jig(Box::new(ask)), value: None },
+            &mut self.out,
+        );
         match self.out.iter().next().expect("one exchange") {
             Request::Exchange { exchange, .. } => *exchange,
             other @ (Request::Answer { .. }
@@ -289,7 +293,7 @@ impl Harness {
     pub fn sending_family() -> (Self, Token) {
         let mut harness = Self::new(&limits());
         let ask = Ask::Family { scope: c::Scope::Own, record: family_read() };
-        harness.link.step(Time::ZERO, Event::Send { attempt: ATTEMPT, key: KEY, ask }, &mut harness.out);
+        harness.link.step(Time::ZERO, Event::Send { attempt: ATTEMPT, key: KEY, ask, value: None }, &mut harness.out);
         let Some(Request::Exchange { exchange, .. }) = harness.out.iter().next() else { panic!("exchange") };
         let exchange = *exchange;
         (harness, exchange)

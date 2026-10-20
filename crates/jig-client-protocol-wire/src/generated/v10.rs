@@ -7,6 +7,7 @@ use skein_lib::List;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Limits {
     pub keyed_request: u32,
+    pub keyed_value_some: u32,
     pub owned_record: u32,
     pub not_served_served: u32,
     pub link_sign_in_secret: u32,
@@ -283,6 +284,7 @@ pub struct Limits {
 /// The schema's maximum limits.
 pub const CEILINGS: Limits = Limits {
     keyed_request: 1_114_240,
+    keyed_value_some: 4_096,
     owned_record: 16_777_216,
     not_served_served: 16,
     link_sign_in_secret: 64,
@@ -573,6 +575,8 @@ pub enum Path {
     KeyedVersion,
     /// The `request` field of `Keyed`.
     KeyedRequest,
+    /// The `value` field of `Keyed`.
+    KeyedValue,
     /// Bytes after `Keyed`.
     KeyedTail,
     /// The `owner` field of `Owned`.
@@ -5837,6 +5841,7 @@ pub fn check_limits(limits: &Limits) -> Result<(), Problem> {
 
 fn check_limits_0(limits: &Limits) -> Result<(), Problem> {
     if limits.keyed_request > CEILINGS.keyed_request { return Err(Problem { path: Path::KeyedRequest, reason: skein_codec::Reason::Bound }); }
+    if limits.keyed_value_some > CEILINGS.keyed_value_some { return Err(Problem { path: Path::KeyedValue, reason: skein_codec::Reason::Bound }); }
     if limits.owned_record > CEILINGS.owned_record { return Err(Problem { path: Path::OwnedRecord, reason: skein_codec::Reason::Bound }); }
     if limits.not_served_served > CEILINGS.not_served_served { return Err(Problem { path: Path::NotServedServed, reason: skein_codec::Reason::Bound }); }
     if limits.link_sign_in_secret > CEILINGS.link_sign_in_secret { return Err(Problem { path: Path::LinkSignInSecret, reason: skein_codec::Reason::Bound }); }
@@ -5925,11 +5930,11 @@ fn check_limits_0(limits: &Limits) -> Result<(), Problem> {
     if limits.new_task_named > CEILINGS.new_task_named { return Err(Problem { path: Path::NewTaskNamed, reason: skein_codec::Reason::Bound }); }
     if limits.create_tasks > CEILINGS.create_tasks { return Err(Problem { path: Path::CreateTasks, reason: skein_codec::Reason::Bound }); }
     if limits.propose_batch_tasks > CEILINGS.propose_batch_tasks { return Err(Problem { path: Path::ProposeBatchTasks, reason: skein_codec::Reason::Bound }); }
-    if limits.propose_reason > CEILINGS.propose_reason { return Err(Problem { path: Path::ProposeReason, reason: skein_codec::Reason::Bound }); }
     Ok(())
 }
 
 fn check_limits_1(limits: &Limits) -> Result<(), Problem> {
+    if limits.propose_reason > CEILINGS.propose_reason { return Err(Problem { path: Path::ProposeReason, reason: skein_codec::Reason::Bound }); }
     if limits.made_tasks_tasks > CEILINGS.made_tasks_tasks { return Err(Problem { path: Path::MadeTasksTasks, reason: skein_codec::Reason::Bound }); }
     if limits.made_service_credential > CEILINGS.made_service_credential { return Err(Problem { path: Path::MadeServiceCredential, reason: skein_codec::Reason::Bound }); }
     if limits.cursor_value > CEILINGS.cursor_value { return Err(Problem { path: Path::CursorValue, reason: skein_codec::Reason::Bound }); }
@@ -6019,11 +6024,11 @@ fn check_limits_1(limits: &Limits) -> Result<(), Problem> {
     if limits.call_objects > CEILINGS.call_objects { return Err(Problem { path: Path::CallObjects, reason: skein_codec::Reason::Bound }); }
     if limits.call_parts > CEILINGS.call_parts { return Err(Problem { path: Path::CallParts, reason: skein_codec::Reason::Bound }); }
     if limits.current_call_tool > CEILINGS.current_call_tool { return Err(Problem { path: Path::CurrentCallTool, reason: skein_codec::Reason::Bound }); }
-    if limits.current_call_input > CEILINGS.current_call_input { return Err(Problem { path: Path::CurrentCallInput, reason: skein_codec::Reason::Bound }); }
     Ok(())
 }
 
 fn check_limits_2(limits: &Limits) -> Result<(), Problem> {
+    if limits.current_call_input > CEILINGS.current_call_input { return Err(Problem { path: Path::CurrentCallInput, reason: skein_codec::Reason::Bound }); }
     if limits.run_text_text > CEILINGS.run_text_text { return Err(Problem { path: Path::RunTextText, reason: skein_codec::Reason::Bound }); }
     if limits.proposal_action_batch_tasks > CEILINGS.proposal_action_batch_tasks { return Err(Problem { path: Path::ProposalActionBatchTasks, reason: skein_codec::Reason::Bound }); }
     if limits.authority_grants > CEILINGS.authority_grants { return Err(Problem { path: Path::AuthorityGrants, reason: skein_codec::Reason::Bound }); }
@@ -6113,11 +6118,11 @@ fn check_limits_2(limits: &Limits) -> Result<(), Problem> {
     if limits.kept_record > CEILINGS.kept_record { return Err(Problem { path: Path::KeptRecord, reason: skein_codec::Reason::Bound }); }
     if limits.table_entry_request > CEILINGS.table_entry_request { return Err(Problem { path: Path::TableEntryRequest, reason: skein_codec::Reason::Bound }); }
     if limits.chips_rows > CEILINGS.chips_rows { return Err(Problem { path: Path::ChipsRows, reason: skein_codec::Reason::Bound }); }
-    if limits.owner_inbox_needs > CEILINGS.owner_inbox_needs { return Err(Problem { path: Path::OwnerInboxNeeds, reason: skein_codec::Reason::Bound }); }
     Ok(())
 }
 
 fn check_limits_3(limits: &Limits) -> Result<(), Problem> {
+    if limits.owner_inbox_needs > CEILINGS.owner_inbox_needs { return Err(Problem { path: Path::OwnerInboxNeeds, reason: skein_codec::Reason::Bound }); }
     if limits.owner_inbox_updates > CEILINGS.owner_inbox_updates { return Err(Problem { path: Path::OwnerInboxUpdates, reason: skein_codec::Reason::Bound }); }
     if limits.owner_inbox_selection_some > CEILINGS.owner_inbox_selection_some { return Err(Problem { path: Path::OwnerInboxSelection, reason: skein_codec::Reason::Bound }); }
     Ok(())
@@ -6182,6 +6187,8 @@ pub struct KeyedParts {
     pub version: u32,
     /// The `request` field.
     pub request: Box<[u8]>,
+    /// The `value` field.
+    pub value: Option<skein_lib::Secret>,
 }
 
 /// `Keyed` in this codec family.
@@ -6191,13 +6198,14 @@ pub struct Keyed {
     owner: Owner,
     version: u32,
     request: Box<[u8]>,
+    value: Option<skein_lib::Secret>,
 }
 
 impl Keyed {
     /// Makes a value within the given limits.
     pub fn new(limits: &Limits, parts: KeyedParts) -> Result<Self, Problem> {
-        let KeyedParts { key, owner, version, request } = parts;
-        let value = Self { key, owner, version, request };
+        let KeyedParts { key, owner, version, request, value } = parts;
+        let value = Self { key, owner, version, request, value };
         value.check(limits)?;
         Ok(value)
     }
@@ -6218,12 +6226,17 @@ impl Keyed {
     #[must_use]
     pub fn request(&self) -> &[u8] { &self.request }
 
+    /// Reads the `value` field.
+    #[must_use]
+    pub fn value(&self) -> &Option<skein_lib::Secret> { &self.value }
+
     /// Moves the fields out without copying.
     #[must_use]
-    pub fn into_parts(self) -> KeyedParts { KeyedParts { key: self.key, owner: self.owner, version: self.version, request: self.request } }
+    pub fn into_parts(self) -> KeyedParts { KeyedParts { key: self.key, owner: self.owner, version: self.version, request: self.request, value: self.value } }
 
     fn check(&self, limits: &Limits) -> Result<(), Problem> {
         if self.request.len() > usize::try_from(limits.keyed_request.min(CEILINGS.keyed_request)).expect("u32 fits usize") { return Err(Problem { path: Path::KeyedRequest, reason: skein_codec::Reason::Bound }); }
+        if let Some(some_0) = self.value.as_ref() && some_0.len() > usize::try_from(limits.keyed_value_some.min(CEILINGS.keyed_value_some)).expect("u32 fits usize") { return Err(Problem { path: Path::KeyedValue, reason: skein_codec::Reason::Bound }); }
         Ok(())
     }
 }
@@ -41664,6 +41677,12 @@ impl Keyed {
         let field_request = &self.request;
         size = size.checked_add(4).expect("schema ceilings fit u32");
         size = size.checked_add(u32::try_from(field_request.len()).expect("field ceiling fits u32")).expect("schema ceilings fit u32");
+        let field_value = &self.value;
+        size = size.checked_add(1).expect("schema ceilings fit u32");
+        if let Some(some_0) = field_value {
+        size = size.checked_add(4).expect("schema ceilings fit u32");
+        size = size.checked_add(u32::try_from(some_0.len()).expect("field ceiling fits u32")).expect("schema ceilings fit u32");
+        }
         size
     }
 
@@ -41678,6 +41697,15 @@ impl Keyed {
         let field_request = &self.request;
         writer.put(&u32::try_from(field_request.len()).expect("field ceiling fits u32").to_be_bytes())?;
         writer.put(field_request.as_ref())?;
+        let field_value = &self.value;
+        match field_value {
+            Some(some_0) => {
+                writer.put(&[1_u8])?;
+        writer.put(&u32::try_from(some_0.len()).expect("field ceiling fits u32").to_be_bytes())?;
+        writer.put(some_0.expose())?;
+            }
+            None => writer.put(&[0_u8])?,
+        }
         Ok(())
     }
 
@@ -41693,7 +41721,8 @@ impl Keyed {
         let decoded_owner = Owner::decode_from(limits, reader)?;
         let decoded_version = reader.u32().ok_or(Problem { path: Path::KeyedVersion, reason: skein_codec::Reason::Short })?;
         let decoded_request = { let length = match skein_codec::read_len(reader, limits.keyed_request.min(CEILINGS.keyed_request)) { Ok(length) => length, Err(reason) => return Err(Problem { path: Path::KeyedRequest, reason }), }; Box::from(reader.bytes(length).ok_or(Problem { path: Path::KeyedRequest, reason: skein_codec::Reason::Short })?) };
-        Ok(Self { key: decoded_key, owner: decoded_owner, version: decoded_version, request: decoded_request })
+        let decoded_value = match reader.u8().ok_or(Problem { path: Path::KeyedValue, reason: skein_codec::Reason::Short })? { 0 => None, 1 => Some(skein_lib::Secret::new({ let length = match skein_codec::read_len(reader, limits.keyed_value_some.min(CEILINGS.keyed_value_some)) { Ok(length) => length, Err(reason) => return Err(Problem { path: Path::KeyedValue, reason }), }; Box::from(reader.bytes(length).ok_or(Problem { path: Path::KeyedValue, reason: skein_codec::Reason::Short })?) })), _ => return Err(Problem { path: Path::KeyedValue, reason: skein_codec::Reason::Tag }) };
+        Ok(Self { key: decoded_key, owner: decoded_owner, version: decoded_version, request: decoded_request, value: decoded_value })
     }
 }
 
@@ -77145,6 +77174,7 @@ impl Keyed {
         let mut size = 0_u64;
         size = size.checked_add(u64::from(16_u32))?.checked_add(Owner::worst_case_bytes_within(limits)?)?;
         size = size.checked_add(4_u64)?.checked_add(4_u64.checked_add(u64::from(limits.keyed_request))?)?;
+        size = size.checked_add(1_u64.checked_add(4_u64.checked_add(u64::from(limits.keyed_value_some))?)?)?;
         size.checked_add(0)
     }
 
@@ -77159,6 +77189,7 @@ impl Keyed {
         let mut heap = 0_u64;
         heap = heap.checked_add(0_u64)?.checked_add(Owner::worst_case_heap_within(limits)?)?;
         heap = heap.checked_add(0_u64)?.checked_add(u64::from(limits.keyed_request))?;
+        heap = heap.checked_add(u64::from(limits.keyed_value_some))?;
         heap.checked_add(0)
     }
 }
@@ -103187,8 +103218,8 @@ mod golden_tests {
         ("enum_owner_jig_full", || { let value = Owner::Jig; let bytes: &[u8] = &[0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Owner::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_owner_family_smallest", || { let value = Owner::Family(Family::new(&CEILINGS, FamilyParts { number: 0_u16 }).expect("golden within ceilings")); let bytes: &[u8] = &[1, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Owner::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("enum_owner_family_full", || { let value = Owner::Family(Family::new(&CEILINGS, FamilyParts { number: u16::MAX }).expect("golden within ceilings")); let bytes: &[u8] = &[1, 255, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Owner::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_keyed_smallest", || { let value = Keyed::new(&CEILINGS, KeyedParts { key: [0_u8; 16], owner: Owner::Jig, version: 0_u32, request: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Keyed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
-        ("record_keyed_full", || { let value = Keyed::new(&CEILINGS, KeyedParts { key: [165_u8; 16], owner: Owner::Jig, version: u32::MAX, request: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 0, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Keyed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_keyed_smallest", || { let value = Keyed::new(&CEILINGS, KeyedParts { key: [0_u8; 16], owner: Owner::Jig, version: 0_u32, request: Box::from([].as_slice()), value: None }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Keyed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
+        ("record_keyed_full", || { let value = Keyed::new(&CEILINGS, KeyedParts { key: [165_u8; 16], owner: Owner::Jig, version: u32::MAX, request: Box::from([0_u8, 127_u8, 255_u8].as_slice()), value: Some(skein_lib::Secret::new(Box::from([0_u8, 127_u8, 255_u8].as_slice()))) }).expect("golden within ceilings"); let bytes: &[u8] = &[165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165, 0, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255, 1, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Keyed::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_owned_smallest", || { let value = Owned::new(&CEILINGS, OwnedParts { owner: Owner::Jig, version: 0_u32, record: Box::from([].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Owned::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_owned_full", || { let value = Owned::new(&CEILINGS, OwnedParts { owner: Owner::Jig, version: u32::MAX, record: Box::from([0_u8, 127_u8, 255_u8].as_slice()) }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 255, 255, 255, 255, 0, 0, 0, 3, 0, 127, 255]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Owned::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
         ("record_served_smallest", || { let value = Served::new(&CEILINGS, ServedParts { owner: Owner::Jig, first: 0_u32, last: 0_u32 }).expect("golden within ceilings"); let bytes: &[u8] = &[0, 0, 0, 0, 0, 0, 0, 0, 0]; let mut writer = skein_lib::Writer::new(usize::try_from(value.measure()).expect("size fits usize")); let encoded = match value.encode(&mut writer) { Ok(()) => Ok(writer.finish()), Err(problem) => Err(problem) }; golden(value, bytes, encoded, Served::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes))) }),
@@ -106331,7 +106362,8 @@ mod golden_tests {
     }
 
     static BOUNDS_0: [Case; 64] = [
-        ("bound_keyed_request", || bound((Path::KeyedRequest, skein_codec::Reason::Bound), &Limits { keyed_request: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Keyed::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_keyed_request", || bound((Path::KeyedRequest, skein_codec::Reason::Bound), &Limits { keyed_request: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0], |limits, bytes| match Keyed::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
+        ("bound_keyed_value_some", || bound((Path::KeyedValue, skein_codec::Reason::Bound), &Limits { keyed_value_some: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Keyed::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owned_record", || bound((Path::OwnedRecord, skein_codec::Reason::Bound), &Limits { owned_record: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Owned::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_not_served_served", || bound((Path::NotServedServed, skein_codec::Reason::Bound), &Limits { not_served_served: 3, ..CEILINGS }, &[0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match NotServed::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_link_sign_in_secret", || bound((Path::LinkSignInSecret, skein_codec::Reason::Bound), &Limits { link_sign_in_secret: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match LinkSignIn::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
@@ -106394,7 +106426,6 @@ mod golden_tests {
         ("bound_owner_pattern_segments", || bound((Path::OwnerPatternSegments, skein_codec::Reason::Bound), &Limits { owner_pattern_segments: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerPattern::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_pattern_segments_item", || bound((Path::OwnerPatternSegments, skein_codec::Reason::Bound), &Limits { owner_pattern_segments_item: 3, ..CEILINGS }, &[0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerPattern::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_delegation_kinds", || bound((Path::OwnerDelegationKinds, skein_codec::Reason::Bound), &Limits { owner_delegation_kinds: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerDelegation::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_owner_authority_grants", || bound((Path::OwnerAuthorityGrants, skein_codec::Reason::Bound), &Limits { owner_authority_grants: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerAuthority::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
     ];
 
     #[test]
@@ -106403,6 +106434,7 @@ mod golden_tests {
     }
 
     static BOUNDS_1: [Case; 64] = [
+        ("bound_owner_authority_grants", || bound((Path::OwnerAuthorityGrants, skein_codec::Reason::Bound), &Limits { owner_authority_grants: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerAuthority::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_authority_note_resources", || bound((Path::OwnerAuthorityNoteResources, skein_codec::Reason::Bound), &Limits { owner_authority_note_resources: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match OwnerAuthority::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_amendment_dependencies_some", || bound((Path::AmendmentDependencies, skein_codec::Reason::Bound), &Limits { amendment_dependencies_some: 3, ..CEILINGS }, &[0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Amendment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_amendment_instructions_some", || bound((Path::AmendmentInstructions, skein_codec::Reason::Bound), &Limits { amendment_instructions_some: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0], |limits, bytes| match Amendment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
@@ -106466,7 +106498,6 @@ mod golden_tests {
         ("bound_proposed_task_dependencies", || bound((Path::ProposedTaskDependencies, skein_codec::Reason::Bound), &Limits { proposed_task_dependencies: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ProposedTask::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_proposed_task_resources", || bound((Path::ProposedTaskResources, skein_codec::Reason::Bound), &Limits { proposed_task_resources: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match ProposedTask::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_retained_amendment_dependencies_some", || bound((Path::OwnerRetainedAmendmentDependencies, skein_codec::Reason::Bound), &Limits { owner_retained_amendment_dependencies_some: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerRetainedAmendment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_owner_retained_action_batch_value", || bound((Path::OwnerRetainedActionBatchValue, skein_codec::Reason::Bound), &Limits { owner_retained_action_batch_value: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match OwnerRetainedActionBatch::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
     ];
 
     #[test]
@@ -106475,6 +106506,7 @@ mod golden_tests {
     }
 
     static BOUNDS_2: [Case; 64] = [
+        ("bound_owner_retained_action_batch_value", || bound((Path::OwnerRetainedActionBatchValue, skein_codec::Reason::Bound), &Limits { owner_retained_action_batch_value: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match OwnerRetainedActionBatch::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_amendment_state_dependencies", || bound((Path::OwnerAmendmentStateDependencies, skein_codec::Reason::Bound), &Limits { owner_amendment_state_dependencies: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerAmendmentState::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_history_page_rows", || bound((Path::HistoryPageRows, skein_codec::Reason::Bound), &Limits { history_page_rows: 3, ..CEILINGS }, &[0, 0, 0, 0, 3, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0], |limits, bytes| match HistoryPage::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_runtime_waiting_dependencies", || bound((Path::RuntimeWaitingDependencies, skein_codec::Reason::Bound), &Limits { runtime_waiting_dependencies: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match RuntimeWaiting::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
@@ -106538,7 +106570,6 @@ mod golden_tests {
         ("bound_proposal_trail", || bound((Path::ProposalTrail, skein_codec::Reason::Bound), &Limits { proposal_trail: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Proposal::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_proposal_acts", || bound((Path::ProposalActs, skein_codec::Reason::Bound), &Limits { proposal_acts: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0], |limits, bytes| match Proposal::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_proposal_action_batch_value", || bound((Path::OwnerProposalActionBatchValue, skein_codec::Reason::Bound), &Limits { owner_proposal_action_batch_value: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match OwnerProposalActionBatch::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_owner_proposal_funding", || bound((Path::OwnerProposalFunding, skein_codec::Reason::Bound), &Limits { owner_proposal_funding: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerProposal::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
     ];
 
     #[test]
@@ -106547,6 +106578,7 @@ mod golden_tests {
     }
 
     static BOUNDS_3: [Case; 64] = [
+        ("bound_owner_proposal_funding", || bound((Path::OwnerProposalFunding, skein_codec::Reason::Bound), &Limits { owner_proposal_funding: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerProposal::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_proposal_acts", || bound((Path::OwnerProposalActs, skein_codec::Reason::Bound), &Limits { owner_proposal_acts: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match OwnerProposal::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_escalation_acts", || bound((Path::OwnerEscalationActs, skein_codec::Reason::Bound), &Limits { owner_escalation_acts: 3, ..CEILINGS }, &[0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerEscalation::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_question_words", || bound((Path::QuestionWords, skein_codec::Reason::Bound), &Limits { question_words: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Question::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
@@ -106610,7 +106642,6 @@ mod golden_tests {
         ("bound_deployment_refusals", || bound((Path::DeploymentRefusals, skein_codec::Reason::Bound), &Limits { deployment_refusals: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Deployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_deployment_parts", || bound((Path::DeploymentParts, skein_codec::Reason::Bound), &Limits { deployment_parts: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0], |limits, bytes| match Deployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_host_runs", || bound((Path::OwnerHostRuns, skein_codec::Reason::Bound), &Limits { owner_host_runs: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0], |limits, bytes| match OwnerHost::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
-        ("bound_hello_served", || bound((Path::HelloServed, skein_codec::Reason::Bound), &Limits { hello_served: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Hello::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
     ];
 
     #[test]
@@ -106618,7 +106649,8 @@ mod golden_tests {
         table(&BOUNDS_3);
     }
 
-    static BOUNDS_4: [Case; 16] = [
+    static BOUNDS_4: [Case; 17] = [
+        ("bound_hello_served", || bound((Path::HelloServed, skein_codec::Reason::Bound), &Limits { hello_served: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match Hello::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_account_runs", || bound((Path::OwnerAccountRuns, skein_codec::Reason::Bound), &Limits { owner_account_runs: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerAccount::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_account_waiting", || bound((Path::OwnerAccountWaiting, skein_codec::Reason::Bound), &Limits { owner_account_waiting: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0], |limits, bytes| match OwnerAccount::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),
         ("bound_owner_deployment_hosts", || bound((Path::OwnerDeploymentHosts, skein_codec::Reason::Bound), &Limits { owner_deployment_hosts: 3, ..CEILINGS }, &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], |limits, bytes| match OwnerDeployment::decode(limits, &mut skein_lib::Reader::new(bytes)) { Ok(value) => Ok(value), Err(problem) => Err((problem.path, problem.reason)) })),

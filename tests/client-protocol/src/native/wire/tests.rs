@@ -31,6 +31,7 @@ fn request() -> Request {
             owner: w::Owner::Jig,
             version: jig_client_protocol_wire::VERSION,
             request: encoded(&ask, w::Ask::measure, w::Ask::encode),
+            value: None,
         },
     )
     .expect("bounded wire fixture");

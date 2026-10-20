@@ -98,7 +98,8 @@ pub fn keyed(owner: w::Owner, version: u32, request: Box<[u8]>) -> Box<[u8]> {
         w::Owner::Jig => request,
         w::Owner::Family(_) => family_request(request),
     };
-    let value = w::Keyed::new(&wire(), w::KeyedParts { key: [5; 16], owner, version, request }).expect("keyed");
+    let value =
+        w::Keyed::new(&wire(), w::KeyedParts { key: [5; 16], owner, version, request, value: None }).expect("keyed");
     let mut out = Writer::new(usize::try_from(value.measure()).expect("short keyed record"));
     value.encode(&mut out).expect("bounded keyed");
     out.finish()

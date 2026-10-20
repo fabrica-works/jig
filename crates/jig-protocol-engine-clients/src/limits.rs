@@ -47,6 +47,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     Map::<Token, Exchange>::worst_case(limits.exchanges)?
         .checked_add(each.checked_mul(u64::from(limits.exchanges))?)?
         .checked_add(Map::<Token, Waiting>::worst_case(limits.exchanges.checked_add(limits.exchanges)?)?)?
+        .checked_add(Map::<Token, Option<u64>>::worst_case(limits.exchanges.checked_add(limits.exchanges)?)?)?
         .checked_add(
             u64::from(limits.exchanges.checked_add(limits.exchanges)?)
                 .checked_mul(body.checked_mul(128)?.checked_add(80)?)?,

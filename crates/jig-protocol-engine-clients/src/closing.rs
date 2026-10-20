@@ -41,6 +41,7 @@ impl Component {
                     | Waiting::Read { sign_in: number, .. }
                     | Waiting::ApplicationRead { sign_in: number, .. }
                     | Waiting::Ask { sign_in: number, .. }
+                    | Waiting::Carry { sign_in: number, .. }
                         if *number == sign_in =>
                     {
                         found = Some(*exchange);
@@ -55,7 +56,8 @@ impl Component {
                     | Waiting::Checked { .. }
                     | Waiting::Read { .. }
                     | Waiting::ApplicationRead { .. }
-                    | Waiting::Ask { .. } => {}
+                    | Waiting::Ask { .. }
+                    | Waiting::Carry { .. } => {}
                 }
             }
             let Some(exchange) = found else {
@@ -76,7 +78,9 @@ impl Component {
                 Waiting::Get { route, .. } | Waiting::Checked { route, .. } => {
                     self.denied(env, exchange, route);
                 }
-                Waiting::Ask { .. } => self.respond(env, exchange, routes::signed_out(&env.limits.wire)),
+                Waiting::Ask { .. } | Waiting::Carry { .. } => {
+                    self.respond(env, exchange, routes::signed_out(&env.limits.wire));
+                }
                 Waiting::Watch { opening, .. } => {
                     let body = if opening {
                         routes::open_answer(Some(core::WatchRefusal::SignedOut), &env.limits.wire)
@@ -104,6 +108,7 @@ impl Component {
         self.end_streams(None);
         self.link = None;
         self.pending.exchanges = Map::with_capacity(self.pending.exchanges.capacity());
+        self.pending.carried = Map::with_capacity(self.pending.carried.capacity());
     }
 
     pub(super) fn sign_out(
@@ -155,6 +160,7 @@ impl Component {
                     | Waiting::Read { .. }
                     | Waiting::ApplicationRead { .. }
                     | Waiting::Ask { .. }
+                    | Waiting::Carry { .. }
                     | Waiting::Checked { .. } => {}
                 }
             }
@@ -176,7 +182,15 @@ impl Component {
         }
     }
     pub(super) fn settled(&self) -> bool {
-        !self.closed() && self.connections.is_empty() && self.streams.is_empty() && self.pending.mints.is_empty()
+        let mut carrying = false;
+        for (_, kept) in &self.pending.carried {
+            carrying |= kept.is_none();
+        }
+        !self.closed()
+            && !carrying
+            && self.connections.is_empty()
+            && self.streams.is_empty()
+            && self.pending.mints.is_empty()
     }
     pub(super) fn close_up(&mut self, _env: &Env<Limits>, out: &mut Queue<Request>) -> bool {
         if !self.closing() {

@@ -194,6 +194,9 @@ pub struct Peer {
     hold_closes: bool,
     closing_sockets: BTreeSet<Token>,
     erases: VecDeque<SecretOwner>,
+    carries: VecDeque<(Token, skein_lib::Secret)>,
+    carried: BTreeMap<u64, skein_lib::Secret>,
+    next_carried: u64,
 }
 impl Peer {
     #[must_use]
@@ -237,6 +240,9 @@ impl Peer {
             hold_closes: false,
             closing_sockets: BTreeSet::new(),
             erases: VecDeque::new(),
+            carries: VecDeque::new(),
+            carried: BTreeMap::new(),
+            next_carried: 1 << 63,
         };
         peer.pump();
         peer
@@ -378,6 +384,9 @@ impl Peer {
                             Event::Secrets(SecretsAnswer::Got { owner, value: self.digests.get(&owner).cloned() }),
                             &mut self.out,
                         );
+                    }
+                    Request::Secrets(SecretsRequest::Carry { exchange, value }) => {
+                        self.carries.push_back((exchange, value));
                     }
                     Request::Secrets(SecretsRequest::Erase { owner }) => {
                         self.erases.push_back(owner);
@@ -698,6 +707,7 @@ impl Peer {
     pub fn digest_kept(&self) -> Option<u64> {
         self.keep.as_ref().map(|(owner, _)| match owner {
             SecretOwner::SignIn(number) | SecretOwner::Service(number) => *number,
+            SecretOwner::Carried(_) => panic!("a carried value is kept by its own request"),
         })
     }
     #[must_use]

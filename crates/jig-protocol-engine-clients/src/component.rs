@@ -70,6 +70,9 @@ impl Component {
                 exchanges: Map::with_capacity(
                     env.limits.exchanges.checked_add(env.limits.exchanges).expect("checked pending capacity"),
                 ),
+                carried: Map::with_capacity(
+                    env.limits.exchanges.checked_add(env.limits.exchanges).expect("checked pending capacity"),
+                ),
             },
             streams: Map::with_capacity(env.limits.streams),
             next: 1,
@@ -107,6 +110,7 @@ impl Component {
             Event::Application(crate::FromApplication::Undecodable { to }) => {
                 let exchange = to.into_token();
                 self.pending.exchanges.remove(&exchange);
+                self.unused(exchange, out);
                 if let Some(owner) = self.owner(exchange) {
                     self.connections
                         .get_mut(&owner)
@@ -136,6 +140,18 @@ impl Component {
                 self.application_delivery(env, watcher, family, record);
             }
             Event::Mint { exchange, identity } => self.mint(env, exchange, identity, out),
+            Event::Application(crate::FromApplication::Unused { number }) => {
+                let mut found = None;
+                for (exchange, kept) in &self.pending.carried {
+                    if *kept == Some(number) {
+                        found = Some(*exchange);
+                        break;
+                    }
+                }
+                if let Some(exchange) = found {
+                    self.unused(exchange, out);
+                }
+            }
         }
     }
     /// Advances one queued HTTP transition, bounding each invocation's output.
@@ -177,7 +193,8 @@ impl Component {
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
                 | Waiting::ApplicationRead { .. }
-                | Waiting::Ask { .. } => {}
+                | Waiting::Ask { .. }
+                | Waiting::Carry { .. } => {}
             }
         }
         if let Some(exchange) = ready {
@@ -199,7 +216,8 @@ impl Component {
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
                 | Waiting::ApplicationRead { .. }
-                | Waiting::Ask { .. } => {}
+                | Waiting::Ask { .. }
+                | Waiting::Carry { .. } => {}
             }
             return true;
         }
@@ -352,6 +370,9 @@ impl Component {
         }
     }
     fn reply(&mut self, env: &Env<Limits>, exchange: Token, reply: people::Reply, out: &mut Queue<Request>) {
+        // The core names a value it leaves unused before its answer; one
+        // still here is the request's to use (store.md 9).
+        self.pending.carried.remove(&exchange);
         let Some(waiting) = self.pending.exchanges.remove(&exchange) else {
             return;
         };
@@ -386,9 +407,19 @@ impl Component {
             | Waiting::Keep { .. }
             | Waiting::Get { .. }
             | Waiting::Made { .. }
+            | Waiting::Carry { .. }
             | Waiting::Checked { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
             }
+        }
+    }
+    /// Erases the value `exchange`'s decode kept, which its request will
+    /// not use (store.md 9).
+    fn unused(&mut self, exchange: Token, out: &mut Queue<Request>) {
+        if let Some(Some(number)) = self.pending.carried.remove(&exchange)
+            && !self.aborting()
+        {
+            out.push(Request::Secrets(SecretsRequest::Erase { owner: SecretOwner::Carried(number) }));
         }
     }
     fn ask_reply(
@@ -446,6 +477,8 @@ impl Component {
         record: Box<[u8]>,
         out: &mut Queue<Request>,
     ) {
+        // The application's answer: its request used its carried value.
+        self.pending.carried.remove(&exchange);
         let Some(waiting) = self.pending.exchanges.remove(&exchange) else {
             return;
         };
@@ -468,7 +501,8 @@ impl Component {
             | Waiting::Checked { .. }
             | Waiting::Read { .. }
             | Waiting::ApplicationRead { .. }
-            | Waiting::Ask { .. } => {
+            | Waiting::Ask { .. }
+            | Waiting::Carry { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");
             }
         }
@@ -512,7 +546,8 @@ impl Component {
                 | Waiting::Made { .. }
                 | Waiting::Read { .. }
                 | Waiting::ApplicationRead { .. }
-                | Waiting::Ask { .. } => {
+                | Waiting::Ask { .. }
+                | Waiting::Carry { .. } => {
                     count = count.saturating_add(1);
                 }
                 Waiting::Get { .. } | Waiting::Checked { .. } => {}

@@ -165,7 +165,7 @@ impl Harness {
     pub fn send_kept(&mut self, attempt: Token) {
         self.link.step(
             Time::ZERO,
-            Event::Send { attempt, key: KEY, ask: Ask::Jig(Box::new(message())) },
+            Event::Send { attempt, key: KEY, ask: Ask::Jig(Box::new(message())), value: None },
             &mut self.out,
         );
     }

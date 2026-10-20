@@ -27,7 +27,7 @@ fn request() -> Box<[u8]> {
     ask.encode(&mut out).expect("ask bytes");
     let record = w::Keyed::new(
         &limits,
-        w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 10, request: out.finish() },
+        w::KeyedParts { key: [5; 16], owner: w::Owner::Jig, version: 10, request: out.finish(), value: None },
     )
     .expect("keyed request");
     let mut out = Writer::new(usize::try_from(record.measure()).expect("record size"));
@@ -130,7 +130,7 @@ fn amend_request(revision: u64, spend: u64) -> Box<[u8]> {
     ask.encode(&mut out).expect("ask bytes");
     let keyed = w::Keyed::new(
         &limits,
-        w::KeyedParts { key: [61; 16], owner: w::Owner::Jig, version: 10, request: out.finish() },
+        w::KeyedParts { key: [61; 16], owner: w::Owner::Jig, version: 10, request: out.finish(), value: None },
     )
     .expect("keyed");
     let mut out = Writer::new(usize::try_from(keyed.measure()).expect("keyed size"));
@@ -272,3 +272,55 @@ fn propose_request(revision: u64, spend: u64) -> Box<[u8]> {
 }
 
 const CREATE_TASK: u8 = 30;
+
+fn carrying_request(value: &[u8]) -> Box<[u8]> {
+    let limits = fixtures::limits().wire;
+    let request =
+        w::FamilyRequest::new(&limits, w::FamilyRequestParts { scope: w::Scope::Own, record: Box::new([255]) })
+            .expect("family request");
+    let mut out = Writer::new(usize::try_from(request.measure()).expect("request size"));
+    request.encode(&mut out).expect("family request bytes");
+    let owner = w::Owner::Family(w::Family::new(&limits, w::FamilyParts { number: 1 }).expect("family"));
+    let keyed = w::Keyed::new(
+        &limits,
+        w::KeyedParts {
+            key: [6; 16],
+            owner,
+            version: 1,
+            request: out.finish(),
+            value: Some(skein_lib::Secret::new(Box::from(value))),
+        },
+    )
+    .expect("carrying request");
+    let mut out = Writer::new(usize::try_from(keyed.measure()).expect("keyed size"));
+    keyed.encode(&mut out).expect("carrying bytes");
+    out.finish()
+}
+#[test]
+fn a_carried_value_is_kept_before_the_application_sees_its_request() {
+    use jig_protocol_engine_clients::{Event, FromApplication, Served, ToApplication};
+    let mut settings = fixtures::settings();
+    settings.served = skein_lib::List::with_capacity(2);
+    settings.served.push(Served { family: None, first: 10, last: 10 }).expect("jig");
+    settings.served.push(Served { family: Some(1), first: 1, last: 1 }).expect("family");
+    let mut peer = Peer::started(&settings);
+    let bearer = fixtures::signed_in(&mut peer);
+    let socket = peer.post(b"/jig/v1/request", carrying_request(b"a carried key"), Some(&bearer));
+    assert_eq!(peer.carry_asked().map(skein_lib::Secret::expose), Some(b"a carried key".as_slice()));
+    assert!(peer.take_application().is_none(), "the application waits for the kept value");
+    let number = peer.keep_carried();
+    let Some(ToApplication::Request { reply_to, record, carried, .. }) = peer.take_application() else {
+        panic!("application request")
+    };
+    assert_eq!(record.as_ref(), [255]);
+    assert_eq!(carried, Some(core::Carried { number, digest: skein_lib::sha256::digest(b"a carried key") }));
+    peer.event(Event::Application(FromApplication::Answered { to: reply_to, family: 1, record: Box::new([7]) }));
+    let limits = fixtures::limits().wire;
+    let Ok(w::KeyedAnswer::FinalAnswer(answer)) =
+        w::KeyedAnswer::decode(&limits, &mut skein_lib::Reader::new(peer.answered(socket).expect("http answer")))
+    else {
+        panic!("final answer")
+    };
+    assert_eq!(answer.record(), [7]);
+    assert_eq!(peer.carried(number).map(skein_lib::Secret::expose), Some(b"a carried key".as_slice()), "used, so kept");
+}

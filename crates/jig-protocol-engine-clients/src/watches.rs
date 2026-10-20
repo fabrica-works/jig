@@ -241,6 +241,7 @@ impl Component {
             let number = match waiting {
                 Waiting::Watch { sign_in, .. }
                 | Waiting::Ask { sign_in, .. }
+                | Waiting::Carry { sign_in, .. }
                 | Waiting::Read { sign_in, .. }
                 | Waiting::ApplicationRead { sign_in, .. } => Some(*sign_in),
                 Waiting::Core

@@ -12,8 +12,8 @@ pub(crate) fn to_component(held: core::Held) -> Option<kit::Event> {
         core::Held::Read { reply, answer } => Some(kit::Event::Read { reply, answer }),
         core::Held::Delivery { watcher, document } => Some(kit::Event::Delivery { watcher, document }),
         core::Held::WatchEnded { watcher, why } => Some(kit::Event::WatchEnded { watcher, why }),
+        core::Held::CarriedUnused { number } => Some(kit::Event::Application(kit::FromApplication::Unused { number })),
         core::Held::Drained
-        | core::Held::CarriedUnused { .. }
         | core::Held::ApplicationDelivery { .. }
         | core::Held::ApplicationWatchEnded { .. }
         | core::Held::ReadLoad { .. }

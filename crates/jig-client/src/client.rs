@@ -450,7 +450,7 @@ fn down_event(down: Down) -> link::Event {
     match down {
         Down::Save { record } => link::Event::Save { record: link::Saved { version: domain::TABLE_VERSION, record } },
         Down::Erase { key } => link::Event::Erase { key },
-        Down::Send { attempt, key, request } => link::Event::Send { attempt, key, ask: request },
+        Down::Send { attempt, key, request } => link::Event::Send { attempt, key, ask: request, value: None },
         Down::Open { watch, subject } => link::Event::Open { watch, subject },
         Down::Continue { watch, subject } => link::Event::Continue { watch, subject },
         Down::Close { watch } => link::Event::Close { watch },

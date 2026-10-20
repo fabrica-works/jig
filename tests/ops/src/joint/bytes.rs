@@ -488,6 +488,7 @@ impl Bytes {
                     SecretsRequest::Get { owner } => {
                         SecretsAnswer::Got { owner, value: self.secrets.get(&owner).cloned() }
                     }
+                    SecretsRequest::Carry { .. } => panic!("the ops world carries no values"),
                 };
                 self.event(clients::Event::Secrets(answer));
             }

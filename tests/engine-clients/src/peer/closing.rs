@@ -24,7 +24,33 @@ impl Peer {
     pub(super) fn erase_one(&mut self) {
         let owner = self.erases.pop_front().expect("erase requested");
         self.digests.remove(&owner);
+        if let SecretOwner::Carried(number) = owner {
+            self.carried.remove(&number);
+        }
         self.component.down(&self.env, Event::Secrets(SecretsAnswer::Erased { owner }), &mut self.out);
+    }
+    /// The value the oldest unanswered carry asks the store to keep.
+    #[must_use]
+    pub fn carry_asked(&self) -> Option<&skein_lib::Secret> {
+        self.carries.front().map(|(_, value)| value)
+    }
+    /// Keeps the oldest asked value under the store's next number and answers it.
+    pub fn keep_carried(&mut self) -> u64 {
+        let (exchange, value) = self.carries.pop_front().expect("carry asked");
+        let number = self.next_carried;
+        self.next_carried += 1;
+        self.carried.insert(number, value);
+        self.event(Event::Secrets(SecretsAnswer::Carried { exchange, number: Some(number) }));
+        number
+    }
+    /// Answers the oldest carry as the store's refusal: nothing kept.
+    pub fn refuse_carry(&mut self) {
+        let (exchange, _) = self.carries.pop_front().expect("carry asked");
+        self.event(Event::Secrets(SecretsAnswer::Carried { exchange, number: None }));
+    }
+    #[must_use]
+    pub fn carried(&self, number: u64) -> Option<&skein_lib::Secret> {
+        self.carried.get(&number)
     }
     pub fn hold_closes(&mut self) {
         self.hold_closes = true;

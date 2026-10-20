@@ -19,29 +19,7 @@ impl Component {
         out: &mut Queue<Request>,
     ) {
         let Some(owner) = self.owner(exchange) else { return };
-        let mut active = 0_u32;
-        for (_, waiting) in &self.pending.exchanges {
-            match waiting {
-                Waiting::Watch { sign_in: number, .. }
-                | Waiting::Ask { sign_in: number, .. }
-                | Waiting::Read { sign_in: number, .. }
-                | Waiting::ApplicationRead { sign_in: number, .. }
-                    if *number == sign_in =>
-                {
-                    active = active.saturating_add(1);
-                }
-                Waiting::Core
-                | Waiting::SignOut { .. }
-                | Waiting::Watch { .. }
-                | Waiting::Keep { .. }
-                | Waiting::Get { .. }
-                | Waiting::Made { .. }
-                | Waiting::Ask { .. }
-                | Waiting::Read { .. }
-                | Waiting::ApplicationRead { .. }
-                | Waiting::Checked { .. } => {}
-            }
-        }
+        let active = self.active(sign_in);
         if active >= env.limits.exchanges_per_client || self.admitted() >= env.limits.exchanges {
             self.respond(env, exchange, routes::read_none(core::reads::Why::Busy, &env.limits.wire));
             return;
@@ -153,6 +131,7 @@ impl Component {
             | Waiting::Get { .. }
             | Waiting::Made { .. }
             | Waiting::Ask { .. }
+            | Waiting::Carry { .. }
             | Waiting::Checked { .. } => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same unrelated slot");
             }
@@ -187,6 +166,7 @@ impl Component {
             | Waiting::Get { .. }
             | Waiting::Made { .. }
             | Waiting::Ask { .. }
+            | Waiting::Carry { .. }
             | Waiting::Read { .. }
             | Waiting::ApplicationRead { .. }
             | Waiting::Checked { .. } => {

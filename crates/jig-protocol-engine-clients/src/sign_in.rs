@@ -19,6 +19,9 @@ pub(crate) enum Waiting {
     Read { sign_in: u64, what: Box<jig_domain_core::reads::Read> },
     ApplicationRead { sign_in: u64, family: u16, version: u32 },
     Ask { sign_in: u64, family: Option<u16>, version: u32 },
+    // A request whose carried value the store is keeping: the core sees
+    // `request` only once the value is durable (store.md 9).
+    Carry { sign_in: u64, family: u16, version: u32, request: Box<crate::ToApplication> },
     Checked { sign_in: u64, body: Box<[u8]>, route: Route },
 }
 #[derive(Debug)]
@@ -31,6 +34,10 @@ pub(crate) enum Answer {
 pub(crate) struct Pending {
     pub exchanges: Map<Token, Waiting>,
     pub mints: Map<Token, Token>,
+    /// The values this component's decodes kept, by exchange: none while
+    /// the store keeps it, then its number until the core answers or
+    /// leaves it unused (store.md 9).
+    pub carried: Map<Token, Option<u64>>,
 }
 pub(crate) fn draw(rng: &mut CryptoRng) -> Secret {
     let mut bytes = [0; 32];
@@ -45,6 +52,16 @@ pub(crate) fn token(rng: &mut CryptoRng, number: u64) -> Secret {
 }
 pub(crate) fn digest(bytes: &[u8]) -> Secret {
     Secret::new(Box::new(skein_lib::sha256::digest(bytes)))
+}
+/// A carrying request's digest: its record and its value, each after its
+/// length, so the same key sent with another value is a conflict.
+pub(crate) fn carrying(record: &[u8], value: &Secret) -> [u8; 32] {
+    let mut hash = skein_lib::sha256::Sha256::new();
+    for part in [record, value.expose()] {
+        hash.update(&u64::try_from(part.len()).expect("usize fits u64").to_be_bytes());
+        hash.update(part);
+    }
+    hash.finish()
 }
 pub(crate) fn credential(value: Option<&Secret>) -> Option<(u64, Secret)> {
     let bytes = value?.expose();

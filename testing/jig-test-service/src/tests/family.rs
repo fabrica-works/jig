@@ -15,6 +15,7 @@ fn request(record: Box<[u8]>) -> ToApplication {
         version: 1,
         record,
         digest: [29; 32],
+        carried: None,
     }
 }
 #[test]

@@ -49,6 +49,7 @@ impl Component {
                             | Waiting::Watch { .. }
                             | Waiting::Keep { .. }
                             | Waiting::Ask { .. }
+                            | Waiting::Carry { .. }
                             | Waiting::Read { .. }
                             | Waiting::ApplicationRead { .. }
                             | Waiting::Checked { .. } => None,
@@ -70,6 +71,7 @@ impl Component {
                                             .expect("same get slot");
                                     }
                                     SecretOwner::Service(party) => self.service_sign_in(env, exchange, party, out),
+                                    SecretOwner::Carried(_) => unreachable!("carried values are only erased"),
                                 }
                             } else {
                                 match owner {
@@ -77,6 +79,7 @@ impl Component {
                                     SecretOwner::Service(_) => {
                                         self.respond(env, exchange, routes::refused(&env.limits.wire));
                                     }
+                                    SecretOwner::Carried(_) => unreachable!("carried values are only erased"),
                                 }
                             }
                         }
@@ -88,14 +91,53 @@ impl Component {
                         | Waiting::Watch { .. }
                         | Waiting::Keep { .. }
                         | Waiting::Ask { .. }
+                        | Waiting::Carry { .. }
                         | Waiting::Read { .. }
                         | Waiting::ApplicationRead { .. }
                         | Waiting::Checked { .. } => {}
                     }
                 }
             }
+            SecretsAnswer::Carried { exchange, number } => self.carried(env, exchange, number, out),
             SecretsAnswer::Failed => self.abort(out),
             SecretsAnswer::Erased { owner } => self.erased(env, owner),
+        }
+    }
+    /// The store kept a request's carried value: the core sees the request
+    /// now; one whose exchange is gone, or not kept, is answered or erased.
+    fn carried(&mut self, env: &Env<Limits>, exchange: Token, number: Option<u64>, out: &mut Queue<Request>) {
+        let Some(slot) = self.pending.carried.get_mut(&exchange) else {
+            unreachable!("the store answers each carry once")
+        };
+        let waiting = self.pending.exchanges.remove(&exchange);
+        let Some(number) = number else {
+            self.pending.carried.remove(&exchange);
+            if let Some(waiting) = waiting {
+                if let Waiting::Carry { .. } = waiting {
+                    self.respond(env, exchange, routes::busy());
+                } else {
+                    self.pending.exchanges.insert(exchange, waiting).expect("same slot");
+                }
+            }
+            return;
+        };
+        *slot = Some(number);
+        match waiting {
+            Some(Waiting::Carry { sign_in, family, version, mut request }) => {
+                if let crate::ToApplication::Request { carried: Some(carried), .. } = &mut *request {
+                    carried.number = number;
+                }
+                self.pending
+                    .exchanges
+                    .insert(exchange, Waiting::Ask { sign_in, family: Some(family), version })
+                    .expect("same carry slot");
+                out.push(Request::Application(*request));
+            }
+            Some(waiting) => {
+                self.pending.exchanges.insert(exchange, waiting).expect("same slot");
+                self.unused(exchange, out);
+            }
+            None => self.unused(exchange, out),
         }
     }
     fn service_sign_in(&mut self, env: &Env<Limits>, exchange: Token, party: u64, out: &mut Queue<Request>) {

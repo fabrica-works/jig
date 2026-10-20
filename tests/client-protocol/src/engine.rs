@@ -24,6 +24,10 @@ pub(super) struct Engine {
     pub limits: root::Limits,
     pub seed: u64,
     secrets: BTreeMap<SecretOwner, clients::Kept>,
+    /// The values requests carried, by the number this peer drew, from
+    /// 2^63 up as the store draws them (store.md 9).
+    pub carried: BTreeMap<u64, skein_lib::Secret>,
+    next_carried: u64,
     replies: BTreeSet<Token>,
     truth: Truth,
     observed: Vec<Observed>,
@@ -67,6 +71,8 @@ impl Engine {
             limits,
             seed,
             secrets: BTreeMap::new(),
+            carried: BTreeMap::new(),
+            next_carried: 1 << 63,
             replies: BTreeSet::new(),
             truth,
             observed: Vec::new(),
@@ -114,7 +120,16 @@ impl Engine {
                     }
                     SecretsRequest::Erase { owner } => {
                         self.secrets.remove(&owner);
+                        if let SecretOwner::Carried(number) = owner {
+                            self.carried.remove(&number);
+                        }
                         SecretsAnswer::Erased { owner }
+                    }
+                    SecretsRequest::Carry { exchange, value } => {
+                        let number = self.next_carried;
+                        self.next_carried = number.checked_add(1).expect("carried numbers left");
+                        self.carried.insert(number, value);
+                        SecretsAnswer::Carried { exchange, number: Some(number) }
                     }
                     SecretsRequest::Get { owner } => {
                         SecretsAnswer::Got { owner, value: self.secrets.get(&owner).cloned() }
@@ -327,8 +342,8 @@ pub fn held_event(held: core::Held) -> Option<Event> {
         core::Held::Read { reply, answer } => Event::Read { reply, answer },
         core::Held::Delivery { watcher, document } => Event::Delivery { watcher, document },
         core::Held::WatchEnded { watcher, why } => Event::WatchEnded { watcher, why },
+        core::Held::CarriedUnused { number } => Event::Application(clients::FromApplication::Unused { number }),
         core::Held::Drained
-        | core::Held::CarriedUnused { .. }
         | core::Held::ApplicationDelivery { .. }
         | core::Held::ApplicationWatchEnded { .. }
         | core::Held::ReadLoad { .. }

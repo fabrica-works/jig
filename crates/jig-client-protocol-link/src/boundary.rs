@@ -36,6 +36,8 @@ pub enum Event {
         attempt: Token,
         key: RequestKey,
         ask: Ask,
+        /// A value the request carries once, put into `Keyed` and never kept (protocol/client.md, 5).
+        value: Option<Secret>,
     },
     Read {
         read: Token,

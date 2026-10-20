@@ -6,7 +6,7 @@ use skein_lib::Reader;
 fn a_keyed_request_past_its_bound_is_refused_naming_it() {
     let limits = fixtures::limits();
     let request = fixtures::bytes(limits.keyed_request.checked_add(1).expect("small bound"));
-    let refused = Keyed::new(&limits, KeyedParts { key: [7; 16], owner: Owner::Jig, version: 1, request });
+    let refused = Keyed::new(&limits, KeyedParts { key: [7; 16], owner: Owner::Jig, version: 1, request, value: None });
     assert_eq!(refused, Err(Problem { path: Path::KeyedRequest, reason: skein_codec::Reason::Bound }));
 }
 

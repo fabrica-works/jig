@@ -38,8 +38,15 @@ pub(super) struct Clients {
     endings: Map<u64, Endings>,
     durable: u64,
     writes: u32,
-    secret_owners: Map<Token, kit::SecretOwner>,
+    secret_owners: Map<Token, Asked>,
     next_secret: u64,
+}
+/// What a secrets request in flight was for: a kept value's owner, or the
+/// exchange whose carried value the store numbers itself.
+#[derive(Clone, Copy, Debug)]
+enum Asked {
+    Owner(kit::SecretOwner),
+    Carry(Token),
 }
 #[derive(Debug)]
 struct Endings {
@@ -440,8 +447,10 @@ pub(super) fn worst_case(
         .checked_add(Queue::<Box<[u8]>>::worst_case(room)?)?
         .checked_add(u64::from(room).checked_mul(512)?)?
         .checked_add(Queue::<kit::SecretsRequest>::worst_case(room)?)?
-        .checked_add(Map::<Token, kit::SecretOwner>::worst_case(room)?)?
+        .checked_add(Map::<Token, Asked>::worst_case(room)?)?
         .checked_add(u64::from(room).checked_mul(40)?)?
+        // A carried value waits here on its way to the store.
+        .checked_add(u64::from(room).checked_mul(u64::from(limits.wire.keyed_value_some))?)?
         .checked_add(Map::<u64, Endings>::worst_case(journal.commits)?)?
         .checked_add(List::<u64>::worst_case(journal.writes)?.checked_mul(u64::from(journal.commits))?)
 }
@@ -629,14 +638,17 @@ impl Clients {
     fn secret_answer(&mut self, answer: jig_protocol_store::Event) {
         use jig_protocol_store::Event;
         let event = match answer {
-            Event::Kept { owner } => {
-                kit::SecretsAnswer::Kept { owner: self.secret_owners.remove(&owner).expect("secret keep owner") }
+            Event::Kept { owner } => kit::SecretsAnswer::Kept { owner: self.owner(owner) },
+            Event::Erased { owner } => kit::SecretsAnswer::Erased { owner: self.owner(owner) },
+            Event::Carried { owner, number } => {
+                kit::SecretsAnswer::Carried { exchange: self.carry(owner), number: Some(number) }
             }
-            Event::Erased { owner } => {
-                kit::SecretsAnswer::Erased { owner: self.secret_owners.remove(&owner).expect("secret erase owner") }
-            }
+            Event::Stale { owner } => match self.secret_owners.remove(&owner).expect("secret stale owner") {
+                Asked::Carry(exchange) => kit::SecretsAnswer::Carried { exchange, number: None },
+                Asked::Owner(_) => kit::SecretsAnswer::Failed,
+            },
             Event::Secret { owner, value } => {
-                let owner = self.secret_owners.remove(&owner).expect("secret get owner");
+                let owner = self.owner(owner);
                 let value = match value {
                     Some(value) => match kept(value) {
                         Some(value) => Some(value),
@@ -650,8 +662,6 @@ impl Clients {
                 kit::SecretsAnswer::Got { owner, value }
             }
             Event::SecretsLoaded { .. }
-            | Event::Stale { .. }
-            | Event::Carried { .. }
             | Event::Opened { .. }
             | Event::OpenRefused { .. }
             | Event::Committed { .. }
@@ -666,29 +676,49 @@ impl Clients {
         };
         self.down(kit::Event::Secrets(event));
     }
+    fn owner(&mut self, token: Token) -> kit::SecretOwner {
+        match self.secret_owners.remove(&token).expect("secret request owner") {
+            Asked::Owner(owner) => owner,
+            Asked::Carry(_) => unreachable!("the store answers a carry Carried or Stale"),
+        }
+    }
+    fn carry(&mut self, token: Token) -> Token {
+        match self.secret_owners.remove(&token).expect("secret carry owner") {
+            Asked::Carry(exchange) => exchange,
+            Asked::Owner(_) => unreachable!("the store answers Carried only to a carry"),
+        }
+    }
 }
-fn secret_request(request: kit::SecretsRequest) -> (kit::SecretOwner, jig_protocol_store::Secrets) {
-    use jig_protocol_store::{SecretOwner, Secrets};
-    let owner = match &request {
-        kit::SecretsRequest::Keep { owner, .. }
-        | kit::SecretsRequest::Erase { owner }
-        | kit::SecretsRequest::Get { owner } => *owner,
-    };
-    let (kind, number) = match owner {
-        kit::SecretOwner::SignIn(number) => (SecretOwner::SignIn, number),
-        kit::SecretOwner::Service(number) => (SecretOwner::Service, number),
-    };
-    let request = match request {
-        kit::SecretsRequest::Keep { value, .. } => {
+fn secret_request(request: kit::SecretsRequest) -> (Asked, jig_protocol_store::Secrets) {
+    use jig_protocol_store::Secrets;
+    match request {
+        kit::SecretsRequest::Keep { owner, value } => {
+            let (kind, number) = place(owner);
             let mut writer = skein_lib::Writer::new(40);
             writer.put(&value.expires.as_nanos().to_be_bytes()).expect("expiry bytes");
             writer.put(value.digest.expose()).expect("32-byte digest");
-            Secrets::Keep { owner: kind, number, value: skein_lib::Secret::new(writer.finish()) }
+            (Asked::Owner(owner), Secrets::Keep { owner: kind, number, value: skein_lib::Secret::new(writer.finish()) })
         }
-        kit::SecretsRequest::Erase { .. } => Secrets::Erase { owner: kind, number },
-        kit::SecretsRequest::Get { .. } => Secrets::Get { owner: kind, number },
-    };
-    (owner, request)
+        kit::SecretsRequest::Erase { owner } => {
+            let (kind, number) = place(owner);
+            (Asked::Owner(owner), Secrets::Erase { owner: kind, number })
+        }
+        kit::SecretsRequest::Get { owner } => {
+            let (kind, number) = place(owner);
+            (Asked::Owner(owner), Secrets::Get { owner: kind, number })
+        }
+        kit::SecretsRequest::Carry { exchange, value } => (Asked::Carry(exchange), Secrets::Carry { value }),
+    }
+}
+/// Where the store keeps an owner's value; a carried value is the
+/// application's, under the number the store drew (store.md 9).
+fn place(owner: kit::SecretOwner) -> (jig_protocol_store::SecretOwner, u64) {
+    use jig_protocol_store::SecretOwner;
+    match owner {
+        kit::SecretOwner::SignIn(number) => (SecretOwner::SignIn, number),
+        kit::SecretOwner::Service(number) => (SecretOwner::Service, number),
+        kit::SecretOwner::Carried(number) => (SecretOwner::Application, number),
+    }
 }
 fn kept(value: skein_lib::Secret) -> Option<kit::Kept> {
     let bytes = value.expose();

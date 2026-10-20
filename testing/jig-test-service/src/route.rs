@@ -222,16 +222,15 @@ fn core_held(engine: &mut Engine, held: core::Held) {
         held @ (core::Held::Read { .. }
         | core::Held::Delivery { .. }
         | core::Held::WatchEnded { .. }
-        | core::Held::PeopleReply { .. }) => {
+        | core::Held::PeopleReply { .. }
+        | core::Held::CarriedUnused { .. }) => {
             if let Some(client) = &mut engine.clients {
                 client.down(clients::to_component(held).expect("clients output"));
             } else {
                 engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
             }
         }
-        held @ (core::Held::Result { .. } | core::Held::CarriedUnused { .. }) => {
-            engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
-        }
+        held @ core::Held::Result { .. } => engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held))),
         core::Held::MakeEffect { connector: number, entry } => {
             engine.events.push(root::Event::Connector { number, event: connector::Event::Make { entry } });
         }
