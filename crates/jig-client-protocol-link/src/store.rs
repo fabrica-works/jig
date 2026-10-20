@@ -69,8 +69,12 @@ impl Link {
         if !self.attempts.contains_key(&exchange) && tracked {
             return;
         }
+        // A request carrying a value is never kept, so never waits on a write.
         let keyed = match &message {
-            Message::Request(_) => true,
+            Message::Request(_) => match self.attempts.get(&exchange) {
+                Some(attempt) => !attempt.carrying(),
+                None => true,
+            },
             Message::Read(_)
             | Message::Watch(_)
             | Message::Unwatch(_)

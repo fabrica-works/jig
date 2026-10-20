@@ -1,7 +1,7 @@
 //! Client handles and exchanges (client/domain/client.md, 3 and 8).
 use crate::contract;
 use alloc::boxed::Box;
-use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Token};
+use skein_lib::{List, RequestEnvelope, RequestKey, RequestRecord, Secret, Token};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Spoken {
     pub family: u16,
@@ -88,6 +88,8 @@ pub enum Why {
 pub enum Event {
     Start { kept: List<RequestRecord<Held>> },
     Send { key: Key, name: Option<RequestKey>, request: Ask },
+    // A request carrying a value: sent once under its name, never kept (client.md, 6).
+    Carry { key: Key, name: RequestKey, request: Ask, value: Secret },
     Watch { handle: Handle, subject: Watchable },
     Unwatch { handle: Handle },
     Read { handle: Handle, read: Readable },
@@ -115,7 +117,8 @@ pub enum Request {
 pub enum Down {
     Save { record: RequestRecord<Held> },
     Erase { key: RequestKey },
-    Send { attempt: Token, key: RequestKey, request: Ask },
+    // `value` only for a request carrying one, sent once (client.md, 6).
+    Send { attempt: Token, key: RequestKey, request: Ask, value: Option<Secret> },
     Open { watch: Token, subject: Watchable },
     Continue { watch: Token, subject: contract::Subject },
     Close { watch: Token },
@@ -154,6 +157,11 @@ pub enum Outcome {
     Unconfirmed,
     /// Its name is held by another request in the table; nothing of it kept or sent.
     Held,
+    /// A request carrying a value the engine did not make; its caller asks again.
+    Unsent,
+    /// A request carrying a value whose exchange ended with no whole answer:
+    /// the engine may have made it; its caller asks again under its name.
+    Lost,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Progress {

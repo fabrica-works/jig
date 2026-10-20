@@ -314,7 +314,7 @@ impl App for Ops {
             return Some(infrastructure_sent(*exchange, *keyed.key(), &ask));
         }
         let Request::Client {
-            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key, request } },
+            request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key, request, .. } },
         } = request
         else {
             return None;

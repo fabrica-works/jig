@@ -102,6 +102,7 @@ fn raw_release(revision: jig_client::contract::Revision) {
                         revision,
                         again: None,
                     })),
+                    value: None,
                 },
             },
         },

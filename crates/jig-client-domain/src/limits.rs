@@ -1,6 +1,9 @@
 //! Bounded client handles and engine watch documents (client/domain/client.md, 14).
 use crate::{Handle, domain::HandleState, watches::Watch};
 use skein_lib::{Duration, List, Map, RequestLimits, RequestTable};
+/// A carried value's most bytes: the client wire's bound on `Keyed.value`
+/// (protocol/client.md, 5).
+pub const VALUE_BYTES: usize = 4096;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Backoff {
     pub first: Duration,
@@ -77,6 +80,11 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(RequestTable::<crate::Key, crate::Held>::worst_case(&limits.requests)?)?
         .checked_add(Map::<crate::Key, crate::requests::PendingRequest>::worst_case(limits.requests.requests)?)?
         .checked_add(limits.requests.bytes.checked_mul(2)?)?;
+    // Requests carrying a value, held beside the table within its bytes; one value passes through a step.
+    let own = own
+        .checked_add(Map::<crate::Key, crate::carried::Carrying>::worst_case(limits.requests.requests)?)?
+        .checked_add(limits.requests.bytes)?
+        .checked_add(u64::try_from(VALUE_BYTES).ok()?)?;
     let own = own.checked_add(
         u64::from(limits.handles.checked_add(limits.watches)?).checked_mul(u64::from(limits.turn_bytes))?,
     )?;

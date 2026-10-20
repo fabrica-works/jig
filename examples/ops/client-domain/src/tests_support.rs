@@ -104,7 +104,7 @@ fn collect(root: &mut Domain, raw: &mut Queue<d::Request>, out: &mut Queue<Reque
 fn observed(row: d::Request, watches: &mut alloc::collections::BTreeMap<Token, u16>) -> Request {
     match row {
         d::Request::Client { request: jig_client::Request::Down { down } } => match down {
-            Down::Send { attempt, key, request } => Request::Send {
+            Down::Send { attempt, key, request, .. } => Request::Send {
                 attempt,
                 key,
                 ask: match request {

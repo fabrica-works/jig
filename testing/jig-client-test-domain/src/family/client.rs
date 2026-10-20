@@ -182,6 +182,8 @@ pub(crate) fn told(root: &mut Domain, env: &Env<Limits>, told: Told, out: &mut Q
             | Outcome::NotKept
             | Outcome::Limit
             | Outcome::Held
+            | Outcome::Unsent
+            | Outcome::Lost
             | Outcome::Unconfirmed
             | Outcome::Unknown => first::Event::Progress {
                 request: Token::new(key.number ^ root.salt),

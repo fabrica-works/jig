@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 mod boundary;
+mod carried;
 pub mod contract;
 mod domain;
 pub mod limits;
@@ -15,6 +16,6 @@ mod watches;
 pub const TABLE_VERSION: u16 = 2;
 pub use boundary::*;
 pub use domain::{Domain, fire, next_deadline, reclaim, step};
-pub use limits::{Backoff, Limits, max_out, worst_case};
+pub use limits::{Backoff, Limits, VALUE_BYTES, max_out, worst_case};
 #[cfg(test)]
 mod tests;

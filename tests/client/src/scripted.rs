@@ -253,9 +253,9 @@ impl Scripted {
     fn routed(&mut self, client: ClientId, request: Request) -> Request {
         let Request::Client { request: jig_client::Request::Down { down } } = request else { return request };
         let down = match down {
-            Down::Send { attempt, key, request } => {
+            Down::Send { attempt, key, request, value } => {
                 let first = matches!(&request, Ask::Family { .. });
-                Down::Send { attempt: self.transport(client, attempt, first, true), key, request }
+                Down::Send { attempt: self.transport(client, attempt, first, true), key, request, value }
             }
             Down::Read { read, what } => {
                 let first = matches!(&what, Readable::Family { .. });
@@ -298,7 +298,8 @@ impl Front<Test> for Scripted {
             unreachable!("shell classified a wire request")
         };
         match down {
-            Down::Send { attempt, key, request: ask } => {
+            Down::Send { attempt, key, request: ask, value } => {
+                assert!(value.is_none(), "the scripted engine carries no value");
                 self.last_attempt = Some(attempt);
                 match ask {
                     Ask::Jig(ask) => {

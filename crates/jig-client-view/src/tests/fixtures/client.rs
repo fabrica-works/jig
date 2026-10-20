@@ -239,7 +239,8 @@ impl Fixture {
     fn native(&mut self, event: jig_client::Event, ui_out: &mut Queue<Request>) {
         let sending = match &event {
             jig_client::Event::Send { key, .. } => Some(*key),
-            jig_client::Event::Start { .. }
+            jig_client::Event::Carry { .. }
+            | jig_client::Event::Start { .. }
             | jig_client::Event::StartUnlinked { .. }
             | jig_client::Event::SignIn { .. }
             | jig_client::Event::SignOut
@@ -265,6 +266,7 @@ impl Fixture {
             | jig_client::Event::Watch { .. }
             | jig_client::Event::Unwatch { .. }
             | jig_client::Event::Send { .. }
+            | jig_client::Event::Carry { .. }
             | jig_client::Event::Reply { .. }
             | jig_client::Event::Lost { .. }
             | jig_client::Event::Streamed { .. }
@@ -470,7 +472,8 @@ fn copy_client_event(event: &jig_client::Event) -> jig_client::Event {
             jig_client::Event::Send { key: *key, name: *name, request: request.clone() }
         }
         jig_client::Event::SignOut => jig_client::Event::SignOut,
-        jig_client::Event::Start { .. }
+        jig_client::Event::Carry { .. }
+        | jig_client::Event::Start { .. }
         | jig_client::Event::StartUnlinked { .. }
         | jig_client::Event::SignIn { .. }
         | jig_client::Event::SignOutLost

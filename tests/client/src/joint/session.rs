@@ -656,12 +656,13 @@ impl Session {
             root::Delivery::ApplicationRead { reply, number, answer } => {
                 self.application_read(reply.into_token(), number, answer, now, wall)?;
             }
+            // The core's decision; the clients' component's erase (store.md, 9).
+            root::Delivery::Core(core::Held::CarriedUnused { number }) => self.driver.transport.unused(number),
             other @ (root::Delivery::Core(
                 core::Held::ApplicationDelivery { .. }
                 | core::Held::ApplicationWatchEnded { .. }
                 | core::Held::ReadLoad { .. }
                 | core::Held::Applied { .. }
-                | core::Held::CarriedUnused { .. }
                 | core::Held::MakeEffect { .. }
                 | core::Held::SettledCall { .. }
                 | core::Held::Assign { .. }
@@ -1412,6 +1413,7 @@ mod tests {
                     attempt,
                     key,
                     request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                    value: None,
                 },
             },
         };
@@ -1469,6 +1471,7 @@ mod tests {
                     attempt,
                     key,
                     request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                    value: None,
                 },
             },
         };
@@ -1539,6 +1542,7 @@ mod tests {
                     attempt,
                     key,
                     request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                    value: None,
                 },
             },
         };
@@ -1636,6 +1640,7 @@ mod tests {
         assert!(session.driver.transport.taken(ClientId(0), native).is_none());
         assert!(matches!(session.driver.transport.taken(ClientId(1), native), Some(core::Event::Delivered { .. })));
     }
+    mod carried;
     mod offline;
 }
 

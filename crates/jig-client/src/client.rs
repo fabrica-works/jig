@@ -18,6 +18,8 @@ pub enum Event {
     Unwatch { handle: Handle },
     Read { handle: Handle, read: Readable },
     Send { key: Key, name: Option<skein_lib::RequestKey>, request: Ask },
+    // A request carrying a value: sent once under its name, never kept (client.md, 6).
+    Carry { key: Key, name: skein_lib::RequestKey, request: Ask, value: Secret },
     Reply { exchange: Token, message: Box<[u8]> },
     Lost { exchange: Token },
     Streamed { message: Streamed },
@@ -140,6 +142,9 @@ impl Client {
             Event::Unwatch { handle } => self.domain_step(&env, domain::Event::Unwatch { handle }),
             Event::Read { handle, read } => self.domain_step(&env, domain::Event::Read { handle, read }),
             Event::Send { key, name, request } => self.domain_step(&env, domain::Event::Send { key, name, request }),
+            Event::Carry { key, name, request, value } => {
+                self.domain_step(&env, domain::Event::Carry { key, name, request, value });
+            }
             Event::SignIn { with } => {
                 self.service = match &with {
                     With::Service(credential) if credential.len() == 40 => Some(credential.clone()),
@@ -245,6 +250,9 @@ impl Client {
             Event::Unwatch { handle } => self.domain_step(env, domain::Event::Unwatch { handle }),
             Event::Read { handle, read } => self.domain_step(env, domain::Event::Read { handle, read }),
             Event::Send { key, name, request } => self.domain_step(env, domain::Event::Send { key, name, request }),
+            Event::Carry { key, name, request, value } => {
+                self.domain_step(env, domain::Event::Carry { key, name, request, value });
+            }
             Event::Up { up } => {
                 match &up {
                     Up::SignedIn | Up::SignedOut => {
@@ -450,7 +458,7 @@ fn down_event(down: Down) -> link::Event {
     match down {
         Down::Save { record } => link::Event::Save { record: link::Saved { version: domain::TABLE_VERSION, record } },
         Down::Erase { key } => link::Event::Erase { key },
-        Down::Send { attempt, key, request } => link::Event::Send { attempt, key, ask: request, value: None },
+        Down::Send { attempt, key, request, value } => link::Event::Send { attempt, key, ask: request, value },
         Down::Open { watch, subject } => link::Event::Open { watch, subject },
         Down::Continue { watch, subject } => link::Event::Continue { watch, subject },
         Down::Close { watch } => link::Event::Close { watch },

@@ -5,6 +5,7 @@ use jig_client_domain::{Answered, Ask, Family, Readable, Readout, Watchable};
 use jig_client_protocol_wire::v10 as w;
 use skein_lib::{Queue, Reader, RequestEnvelope, Time, Token};
 mod attempts;
+mod carried;
 mod documents;
 mod fixtures;
 mod pages;

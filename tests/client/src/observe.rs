@@ -28,7 +28,7 @@ pub fn key(object: ObjectKey) -> CardKey {
 #[must_use]
 pub fn sent(request: &Request) -> Option<Sent> {
     let Request::Client {
-        request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key: k, request: ask } },
+        request: jig_client::Request::Down { down: jig_client::Down::Send { attempt, key: k, request: ask, .. } },
     } = request
     else {
         return None;

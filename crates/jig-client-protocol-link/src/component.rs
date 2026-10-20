@@ -11,11 +11,25 @@ pub(crate) struct Attempt {
     pub(super) version: u32,
     pub(super) kind: ExchangeKind,
 }
+impl Attempt {
+    pub(super) fn carrying(&self) -> bool {
+        match self.kind {
+            ExchangeKind::Attempt { carrying } => carrying,
+            ExchangeKind::SignIn
+            | ExchangeKind::SignOut { .. }
+            | ExchangeKind::Read { .. }
+            | ExchangeKind::WatchOpen { .. }
+            | ExchangeKind::WatchClose { .. } => false,
+        }
+    }
+}
 #[derive(Clone, Copy, Debug)]
 pub(super) enum ExchangeKind {
     SignIn,
     SignOut { generation: u64 },
-    Attempt,
+    // `carrying`: a request carrying a value, sent once and never held
+    // behind the store (protocol/client.md, 5 and 10).
+    Attempt { carrying: bool },
     Read { turn: Option<(u64, u64, u32)> },
     WatchOpen { name: u64 },
     WatchClose { name: u64 },
@@ -115,16 +129,19 @@ impl Link {
         value: Option<Secret>,
         out: &mut Queue<Request>,
     ) {
+        let carrying = value.is_some();
+        // A request carrying a value that never left is one the engine did not make.
+        let refuse: fn(Token, &mut Queue<Request>) = if carrying { unsent } else { lost };
         if self.attempts.len() == self.attempts.capacity() {
-            lost(attempt, out);
+            refuse(attempt, out);
             return;
         }
         let Some(next) = self.next.checked_add(1) else {
-            lost(attempt, out);
+            refuse(attempt, out);
             return;
         };
         let Ok(record) = keyed(key, ask, value, &self.limits.wire) else {
-            lost(attempt, out);
+            refuse(attempt, out);
             return;
         };
         let exchange = Token::new(self.next);
@@ -133,7 +150,7 @@ impl Link {
             token: attempt,
             owner: record.owner().clone(),
             version: record.version(),
-            kind: ExchangeKind::Attempt,
+            kind: ExchangeKind::Attempt { carrying },
         };
         self.attempts.insert(exchange, state).expect("checked exchange capacity");
         let mut writer = Writer::new(usize::try_from(record.measure()).expect("u32 fits usize"));
@@ -180,7 +197,7 @@ impl Link {
                 self.signing_answer(attempt.kind, body, out);
                 return;
             }
-            ExchangeKind::Attempt => {}
+            ExchangeKind::Attempt { .. } => {}
             ExchangeKind::WatchOpen { name } | ExchangeKind::WatchClose { name } => {
                 self.watch_answer(attempt, name, body, out);
                 return;
@@ -311,7 +328,7 @@ impl Link {
                         read_none(attempt.token, &attempt.owner, jig_client_domain::contract::ReadNone::Malformed, out);
                     }
                     ExchangeKind::Read { turn: None }
-                    | ExchangeKind::Attempt
+                    | ExchangeKind::Attempt { .. }
                     | ExchangeKind::SignIn
                     | ExchangeKind::SignOut { .. }
                     | ExchangeKind::WatchOpen { .. }
@@ -345,7 +362,7 @@ fn read_none(read: Token, owner: &w::Owner, why: jig_client_domain::contract::Re
 }
 fn failed(attempt: Attempt, out: &mut Queue<Request>) {
     match attempt.kind {
-        ExchangeKind::Attempt => lost(attempt.token, out),
+        ExchangeKind::Attempt { .. } => lost(attempt.token, out),
         ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
             out.push(Request::Signing { signing: crate::Signing::Lost });
         }
@@ -359,6 +376,9 @@ fn failed(attempt: Attempt, out: &mut Queue<Request>) {
 }
 fn lost(attempt: Token, out: &mut Queue<Request>) {
     out.push(Request::Answer { attempt, envelope: RequestEnvelope::Lost, answer: None, why: Some(Retry::Lost) });
+}
+fn unsent(attempt: Token, out: &mut Queue<Request>) {
+    out.push(Request::Answer { attempt, envelope: RequestEnvelope::Again, answer: None, why: None });
 }
 fn keyed(key: RequestKey, ask: Ask, value: Option<Secret>, limits: &w::Limits) -> Result<w::Keyed, w::Problem> {
     let (owner, version, request) = match ask {
@@ -489,7 +509,7 @@ impl Link {
                         tokens.push(*exchange).expect("bounded exchanges");
                     }
                 }
-                ExchangeKind::Attempt
+                ExchangeKind::Attempt { .. }
                 | ExchangeKind::Read { .. }
                 | ExchangeKind::SignIn
                 | ExchangeKind::SignOut { .. } => {}
@@ -558,7 +578,10 @@ impl Link {
                     Err(_) => self.failure(attempt, out),
                 }
             }
-            ExchangeKind::Attempt | ExchangeKind::Read { .. } | ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
+            ExchangeKind::Attempt { .. }
+            | ExchangeKind::Read { .. }
+            | ExchangeKind::SignIn
+            | ExchangeKind::SignOut { .. } => {
                 unreachable!("watch exchange kind")
             }
         }
@@ -582,7 +605,7 @@ impl Link {
             ExchangeKind::SignIn | ExchangeKind::SignOut { .. } => {
                 out.push(Request::Signing { signing: crate::Signing::Lost });
             }
-            ExchangeKind::Attempt | ExchangeKind::Read { .. } => failed(attempt, out),
+            ExchangeKind::Attempt { .. } | ExchangeKind::Read { .. } => failed(attempt, out),
         }
     }
     fn streamed(&mut self, now: Time, message: Streamed, out: &mut Queue<Request>) {
@@ -705,7 +728,11 @@ impl Link {
         self.credential = None;
         while let Some((key, _)) = (&self.attempts).into_iter().next() {
             let key = *key;
-            self.attempts.remove(&key);
+            let attempt = self.attempts.remove(&key).expect("listed attempt");
+            // The table's attempts end with the sign-in; a carried one has no other answer.
+            if attempt.carrying() {
+                lost(attempt.token, out);
+            }
         }
         while let Some((watch, _)) = (&self.watches.0).into_iter().next() {
             let watch = *watch;

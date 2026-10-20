@@ -211,7 +211,8 @@ impl Front<Ops> for Scripted {
         };
         let party = self.parties[&client];
         match down {
-            jig_client::Down::Send { attempt, key, request } => {
+            jig_client::Down::Send { attempt, key, request, value } => {
+                assert!(value.is_none(), "the ops engine carries no value");
                 let channel = match &request {
                     jig_client::Ask::Jig(_) => Channel::Jig,
                     jig_client::Ask::Family { .. } => Channel::Infrastructure,

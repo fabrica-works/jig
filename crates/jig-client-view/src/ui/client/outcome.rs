@@ -31,7 +31,9 @@ pub(super) fn answered(
                 Outcome::NotKept => kept::show(domain, Kind::NotSent(NotSent::NotKept)),
                 Outcome::Limit => kept::show(domain, Kind::NotSent(NotSent::Limit)),
                 Outcome::Unconfirmed => kept::show(domain, Kind::NotSent(NotSent::Unconfirmed)),
-                Outcome::Held => unreachable!("the reference UI names no send"),
+                Outcome::Held | Outcome::Unsent | Outcome::Lost => {
+                    unreachable!("the reference UI names no send and carries no value")
+                }
             }
             return;
         }
@@ -44,7 +46,9 @@ pub(super) fn answered(
         Outcome::NotKept => not_sent(domain, token, NotSent::NotKept),
         Outcome::Limit => not_sent(domain, token, NotSent::Limit),
         Outcome::Unconfirmed => not_sent(domain, token, NotSent::Unconfirmed),
-        Outcome::Held => unreachable!("the reference UI names no send"),
+        Outcome::Held | Outcome::Unsent | Outcome::Lost => {
+            unreachable!("the reference UI names no send and carries no value")
+        }
     }
 }
 fn not_sent(domain: &mut Ui, token: Token, why: NotSent) {

@@ -30,6 +30,9 @@ pub struct Domain {
     pub(crate) not_served: List<u16>,
     pub(crate) jig_versions: Option<crate::contract::VersionRange>,
     pub(crate) blocked: List<Token>,
+    pub(crate) carried: Map<crate::Key, crate::carried::Carrying>,
+    // Attempts of requests carrying a value, apart from the table's, which count from 1.
+    pub(crate) next_carried: u64,
 }
 impl Domain {
     #[must_use]
@@ -56,6 +59,8 @@ impl Domain {
             link: crate::Link::SignedOut,
             table: RequestTable::new(&limits.requests, seed),
             requests: Map::with_capacity(limits.requests.requests),
+            carried: Map::with_capacity(limits.requests.requests),
+            next_carried: 1 << 63,
         }
     }
     #[must_use]
@@ -268,6 +273,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             domain.restore_record(env, kept, out);
         }
         Event::Send { key, name, request } => domain.send(env, key, name, request, out),
+        Event::Carry { key, name, request, value } => domain.carry(env, key, name, request, value, out),
         Event::Watch { handle, subject } => domain.watch(env, handle, subject, out),
         Event::Unwatch { handle } => domain.unwatch(handle, out),
         Event::Read { handle, read } => domain.read(env, handle, read, out),

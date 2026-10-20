@@ -215,6 +215,7 @@ impl Wire {
             | Event::Unwatch { .. }
             | Event::Read { .. }
             | Event::Send { .. }
+            | Event::Carry { .. }
             | Event::Streamed { message: Streamed::Heartbeat | Streamed::SignedOut }
             | Event::StreamGone
             | Event::Stored

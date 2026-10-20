@@ -125,6 +125,7 @@ impl Side {
             | Event::Unwatch { .. }
             | Event::Read { .. }
             | Event::Send { .. }
+            | Event::Carry { .. }
             | Event::Lost { .. }
             | Event::Streamed { .. }
             | Event::StreamGone
@@ -315,6 +316,7 @@ fn callback(event: &Event) -> Option<Callback> {
         | Event::Unwatch { .. }
         | Event::Read { .. }
         | Event::Send { .. }
+        | Event::Carry { .. }
         | Event::Lost { .. }
         | Event::Stored
         | Event::NotStored

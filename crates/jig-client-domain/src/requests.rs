@@ -17,6 +17,9 @@ pub(crate) struct PendingRequest {
 impl Domain {
     #[must_use]
     pub fn pending(&self, key: Key) -> Option<Pending> {
+        if let Some(carrying) = self.carried.get(&key) {
+            return Some(carrying.pending());
+        }
         let mut pending = self.requests.get(&key)?.pending;
         for owner in &self.owners {
             if Some(owner.spoken.family) == pending.owner && !owner.served {
@@ -25,7 +28,7 @@ impl Domain {
         }
         Some(pending)
     }
-    fn identity(&self) -> Option<(u64, skein_lib::Duration, bool)> {
+    pub(crate) fn identity(&self) -> Option<(u64, skein_lib::Duration, bool)> {
         for (_, w) in &self.watches {
             if w.own {
                 let Some(crate::Latest::Jig(contract::Delivery::Me(frame))) = &w.latest else {
@@ -51,6 +54,7 @@ impl Domain {
         if let Ask::Family { record, .. } = &request {
             self.family(record);
         }
+        assert!(!self.carried.contains_key(&key), "request key conflict");
         if let Some(held) = self.requests.get(&key) {
             let named = match name {
                 None => true,
@@ -63,6 +67,12 @@ impl Domain {
             tell(out, Told::Answered { key, outcome: Outcome::Unconfirmed });
             return;
         };
+        if let Some(name) = name
+            && self.carrying(name)
+        {
+            tell(out, Told::Answered { key, outcome: Outcome::Held });
+            return;
+        }
         let size = declared(&env.limits, &request);
         let pending = pending(party, &request);
         let held = Held { key, request: request.clone() };
@@ -91,7 +101,7 @@ impl Domain {
                 Ask::Family { record, .. } => !self.declared(record),
                 Ask::Jig(_) => false,
             };
-            let admission = if invalid || self.requests.contains_key(&key) {
+            let admission = if invalid || self.requests.contains_key(&key) || self.carried.contains_key(&key) {
                 None
             } else {
                 self.table.restore(key, declared(&env.limits, &request), record).ok()
@@ -133,6 +143,10 @@ impl Domain {
     ) {
         let envelope =
             if answer.is_none() && envelope == RequestEnvelope::Final { RequestEnvelope::Lost } else { envelope };
+        if let Some(key) = self.carried_by(attempt) {
+            self.carried_answered(key, envelope, answer, out);
+            return;
+        }
         match self.table.answered(env.now, attempt, envelope) {
             RequestAnswered::Final(key) => {
                 self.requests.remove(&key);
@@ -186,7 +200,7 @@ impl Domain {
                             self.requests.get_mut(&request.key).expect("sending request").pending.progress =
                                 Progress::NotServed;
                         } else {
-                            down(out, Down::Send { attempt, key, request: request.request.clone() });
+                            down(out, Down::Send { attempt, key, request: request.request.clone(), value: None });
                         }
                     }
                     None => break,
@@ -226,13 +240,13 @@ impl Domain {
         }
     }
 }
-fn declared(limits: &Limits, request: &Ask) -> u64 {
+pub(crate) fn declared(limits: &Limits, request: &Ask) -> u64 {
     match request {
         Ask::Jig(_) => limits.ask_bytes,
         Ask::Family { record: f, .. } => u64::try_from(f.bytes.len()).expect("family bytes fit"),
     }
 }
-fn pending(party: u64, request: &Ask) -> Pending {
+pub(crate) fn pending(party: u64, request: &Ask) -> Pending {
     let owner = match request {
         Ask::Jig(_) => None,
         Ask::Family { record: f, .. } => Some(f.family),

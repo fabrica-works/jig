@@ -86,11 +86,11 @@ impl ClientPeer {
                 core::Held::PeopleReply { .. }
                 | core::Held::Read { .. }
                 | core::Held::Delivery { .. }
-                | core::Held::WatchEnded { .. } => true,
+                | core::Held::WatchEnded { .. }
+                | core::Held::CarriedUnused { .. } => true,
                 core::Held::ApplicationDelivery { .. }
                 | core::Held::ApplicationWatchEnded { .. }
                 | core::Held::Applied { .. }
-                | core::Held::CarriedUnused { .. }
                 | core::Held::ReadLoad { .. }
                 | core::Held::MakeEffect { .. }
                 | core::Held::SettledCall { .. }

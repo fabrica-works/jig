@@ -7,7 +7,7 @@ use jig_client_test_domain::family;
 use jig_domain_core::Event;
 use jig_domain_people as people;
 use jig_domain_people::ApplicationScope;
-use skein_lib::{ReplyTo, Token};
+use skein_lib::{ReplyTo, Secret, Token};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -78,6 +78,10 @@ pub struct Transport {
     closing: BTreeSet<Token>,
     documents: BTreeSet<Token>,
     streams: BTreeSet<Token>,
+    // The secrets' store's stand-in: each carried value under the number this
+    // transport drew for it, from 2^63 up, never reused (store.md, 9).
+    carried: BTreeMap<u64, Secret>,
+    next_carried: u64,
 }
 
 impl Transport {
@@ -93,7 +97,30 @@ impl Transport {
             closing: BTreeSet::new(),
             documents: BTreeSet::new(),
             streams: BTreeSet::new(),
+            carried: BTreeMap::new(),
+            next_carried: 1 << 63,
         }
+    }
+
+    /// Keeps a request's carried value before the core sees the request; the
+    /// number it is kept under.
+    pub fn carry(&mut self, value: Secret) -> u64 {
+        let number = self.next_carried;
+        self.next_carried = number.checked_add(1).expect("carried numbers fit");
+        assert!(self.carried.insert(number, value).is_none(), "a carried number is never reused");
+        number
+    }
+
+    /// Erases a carried value the core left unused; another number is not this
+    /// transport's to erase.
+    pub fn unused(&mut self, number: u64) {
+        self.carried.remove(&number);
+    }
+
+    /// The carried values kept, by number.
+    #[must_use]
+    pub const fn carried(&self) -> &BTreeMap<u64, Secret> {
+        &self.carried
     }
 
     pub fn bind(&mut self, client: ClientId, party: u64, identity: people::Identity) {

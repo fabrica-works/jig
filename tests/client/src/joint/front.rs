@@ -499,6 +499,7 @@ mod tests {
                     attempt,
                     key: [62; 16],
                     request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                    value: None,
                 },
             },
         };
@@ -605,6 +606,7 @@ mod tests {
                     attempt,
                     key: [63; 16],
                     request: jig_client::Ask::Jig(Box::new(client::Ask::Stop { project: 1, task: u64::MAX })),
+                    value: None,
                 },
             },
         };

@@ -25,6 +25,8 @@ pub enum Invalid {
     Read(wire::reads::Invalid),
     Watch(wire::watches::Invalid),
     Family(jig_client_test_domain::family::wire::Invalid),
+    // Jig's own ask carries no value until a key is a source (llm.md).
+    Carried,
     Continuation,
     Shell,
 }
@@ -43,8 +45,8 @@ pub fn send(
     let Request::Client { request: jig_client::Request::Down { down } } = request else { return Err(Invalid::Shell) };
     let sign_in = driver.transport.sign_in(client);
     let event = match down {
-        Down::Send { attempt, key, request: ask } => {
-            keyed(driver, client, sign_in.ok_or(Invalid::Session)?, *attempt, *key, ask)?
+        Down::Send { attempt, key, request: ask, value } => {
+            keyed(driver, client, sign_in.ok_or(Invalid::Session)?, (*attempt, *key), ask, value.as_ref())?
         }
         Down::Read { read, what: Readable::Jig(what) } => {
             let sign_in = sign_in.ok_or(Invalid::Session)?;
@@ -121,16 +123,21 @@ pub fn send(
     Ok(())
 }
 
+/// A carried value is kept before the core sees its request, which names it
+/// by number and digest alone (protocol/client.md, 5).
 fn keyed(
     driver: &mut Driver,
     client: ClientId,
     sign_in: u64,
-    attempt: skein_lib::Token,
-    key: [u8; 16],
+    (attempt, key): (skein_lib::Token, [u8; 16]),
     ask: &Ask,
+    carried: Option<&skein_lib::Secret>,
 ) -> Result<root::Event, Invalid> {
     Ok(match ask {
         Ask::Jig(value) => {
+            if carried.is_some() {
+                return Err(Invalid::Carried);
+            }
             let ask = wire::asks::ask(value).map_err(Invalid::Ask)?;
             let reply_to = driver.transport.reply_to(Reply::Keyed { client, attempt, key, owner: KeyedOwner::Jig });
             root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask }))
@@ -140,7 +147,14 @@ fn keyed(
                 jig_client_test_domain::family::wire::connector_request(&crate::test::family_request(record))
                     .map_err(Invalid::Family)?;
             let number = 1;
-            let digest = application_digest(number, project, &value);
+            let mut digest = application_digest(number, project, &value);
+            let carried = carried.map(|value| {
+                digest = carrying_digest(&digest, value);
+                core::Carried {
+                    number: driver.transport.carry(value.clone()),
+                    digest: skein_lib::sha256::digest(value.expose()),
+                }
+            });
             let reply_to = driver.transport.reply_to(Reply::Keyed {
                 client,
                 attempt,
@@ -155,7 +169,7 @@ fn keyed(
                 number,
                 digest,
                 value,
-                carried: None,
+                carried,
             }
         }
     })
@@ -203,6 +217,17 @@ pub fn application_digest(connector: u16, project: u32, value: &ApplicationReque
             }]);
         }
     }
+    digest.finalize().into()
+}
+
+/// The request's digest with its carried value's: the same key sent again
+/// with another value is another request.
+fn carrying_digest(request: &[u8; 32], value: &skein_lib::Secret) -> [u8; 32] {
+    let mut digest = Sha256::new();
+    digest.update(b"jig-test-application/carrying/1");
+    digest.update(request);
+    digest.update(u64::try_from(value.len()).expect("value length fits").to_be_bytes());
+    digest.update(value.expose());
     digest.finalize().into()
 }
 
@@ -288,6 +313,7 @@ mod tests {
                     attempt,
                     key,
                     request: Ask::Jig(Box::new(jig_client_domain::contract::Ask::Stop { project: 1, task: u64::MAX })),
+                    value: None,
                 },
             },
         };

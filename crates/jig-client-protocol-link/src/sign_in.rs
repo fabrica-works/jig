@@ -85,7 +85,7 @@ impl Link {
             ExchangeKind::SignOut { generation } if generation != self.generation => return,
             ExchangeKind::SignOut { .. }
             | ExchangeKind::SignIn
-            | ExchangeKind::Attempt
+            | ExchangeKind::Attempt { .. }
             | ExchangeKind::Read { .. }
             | ExchangeKind::WatchOpen { .. }
             | ExchangeKind::WatchClose { .. } => {}
@@ -119,7 +119,7 @@ impl Link {
                     Ok(w::SignOutAnswer::NotReady) if reader.remaining() == 0 => Signing::Again,
                     Ok(_) | Err(_) => Signing::Lost,
                 },
-                ExchangeKind::Attempt
+                ExchangeKind::Attempt { .. }
                 | ExchangeKind::Read { .. }
                 | ExchangeKind::WatchOpen { .. }
                 | ExchangeKind::WatchClose { .. } => unreachable!("signing exchange"),
