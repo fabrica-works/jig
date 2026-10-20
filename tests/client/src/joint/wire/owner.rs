@@ -12,6 +12,8 @@ pub enum Invalid {
     TooLarge,
     /// A model or effort index does not name a configured choice.
     Llm,
+    /// A provider catalogue or payer observation has inconsistent public facts.
+    Catalogue,
     /// The whole offered-act allocation exceeds the receiving offer bound.
     OfferCapacity {
         allocated: u32,
@@ -88,9 +90,9 @@ pub fn frame(
         })
     })?;
     Ok(client::Me {
-        providers: skein_lib::List::with_capacity(0),
-        providers_cut: false,
-        key_bytes: 256,
+        providers: super::catalogue::offers(&value.providers, limits)?,
+        providers_cut: value.providers_cut,
+        key_bytes: value.key_bytes,
         party: client::MeParty {
             number: value.party,
             kind: match value.kind {

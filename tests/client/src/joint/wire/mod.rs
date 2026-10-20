@@ -32,6 +32,7 @@ pub mod task;
 pub mod turns;
 pub mod watches;
 
+mod catalogue;
 mod llm;
 mod me;
 

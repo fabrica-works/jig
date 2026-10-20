@@ -14,11 +14,11 @@ use jig_domain_tasks as tasks;
 /// Refuses any whole reserved collection or nested owner value above bounds.
 pub fn document(source: &documents::Deployment, limits: &Limits) -> Result<client::OwnerDeployment, owner::Invalid> {
     Ok(client::OwnerDeployment {
-        providers: skein_lib::List::with_capacity(0),
-        providers_cut: false,
-        key_bytes: 256,
-        readiness: skein_lib::List::with_capacity(0),
-        readiness_cut: false,
+        providers: super::catalogue::offers(&source.providers, limits)?,
+        providers_cut: source.providers_cut,
+        key_bytes: source.key_bytes,
+        readiness: super::catalogue::readiness(&source.readiness, limits)?,
+        readiness_cut: source.readiness_cut,
         store: client::StoreFill { bytes: source.store.bytes, mark: source.store.mark },
         hosts: owner::list(&source.hosts, limits, |value| host(value, limits))?,
         attempts: owner::list(&source.attempts, limits, |value| run(value, limits))?,
@@ -106,7 +106,7 @@ fn account(value: &documents::Account, limits: &Limits) -> Result<client::OwnerA
         plan: value.plan,
         provider: value.provider,
         provider_name: value.provider_name.as_ref().map(|name| owner::text(name, limits)).transpose()?,
-        manage_usage: value.manage_usage.clone(),
+        manage_usage: super::catalogue::manage_usage(value.manage_usage.as_deref())?,
         display: owner::text(&value.display, limits)?,
         holder: super::accounts::holder(value.holder),
         sources: super::accounts::sources(&value.sources, limits)?,
