@@ -76,3 +76,44 @@ fn both_shipped_profiles_are_admitted_by_the_store() {
         );
     }
 }
+
+#[test]
+fn both_shipped_profiles_round_trip_a_policy_whose_roles_name_models() {
+    use jig_domain_people as people;
+    // As many models as a role's bits name, each name as long as configuration admits.
+    let models = u8::try_from(u64::BITS).expect("one bit per model");
+    let name_bytes = usize::try_from(jig_domain_core::MODEL_NAME_BYTES).expect("name bound");
+    let names: Box<[Box<[u8]>]> = (0..models).map(|model| vec![model; name_bytes].into_boxed_slice()).collect();
+    let role = |number, models| people::PolicyRole {
+        number,
+        authority: people::Authority {
+            tools: 1,
+            models,
+            grants: Box::new([]),
+            delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
+            spend: 0,
+            deadline: None,
+            notes: 0,
+            note_resources: Box::new([]),
+        },
+        period_spend: 0,
+        requests: 0,
+        decides: 0,
+    };
+    let row = people::Stored::Policy {
+        project: 1,
+        value: people::PolicyValue {
+            period_spend: 0,
+            projections: Box::new([]),
+            roles: Box::new([role(0, u64::MAX), role(1, (1 << 63) | 0b101)]),
+            requirements: Box::new([]),
+            permissions: Box::new([]),
+            templates: Box::new([]),
+        },
+    };
+    for profile_name in [Profile::Small, Profile::Standard] {
+        let limits = codec::people::limits(&profile(profile_name).core).expect("shipped profile within ceilings");
+        let bytes = codec::people::encode(&row, &limits, &names).expect("every name within people's bounds");
+        assert_eq!(codec::people::decode(&bytes, &limits, &names), Ok(row.clone()), "{profile_name:?}");
+    }
+}
