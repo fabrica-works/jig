@@ -135,6 +135,7 @@ pub(crate) fn document(
                 | core::Held::Inbound { .. }
                 | core::Held::Relay { .. }
                 | core::Held::PeopleReply { .. }
+                | core::Held::CarriedUnused { .. }
                 | core::Held::CallAnswer { .. }
                 | core::Held::Result { .. }
                 | core::Held::Acknowledge { .. }

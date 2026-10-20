@@ -179,7 +179,9 @@ pub enum Event {
         subject: connector::ClientSubject,
         window: core::documents::Window,
     },
-    /// A protocol-decoded application value with its independently computed digest.
+    /// A protocol-decoded application value with its independently computed
+    /// digest, and the number and digest of a value it carried, already kept
+    /// in the secrets' store (`protocol/client.md`, section 5).
     Application {
         reply_to: ReplyTo,
         sign_in: u64,
@@ -188,6 +190,7 @@ pub enum Event {
         number: u16,
         digest: [u8; 32],
         value: connector::ApplicationRequest,
+        carried: Option<core::Carried>,
     },
     /// A correlated reply to the connector's fresh read after a lost writer.
     WriterRead {
@@ -466,8 +469,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event) {
         Event::Link { channel, link } => decide(domain, env, Work::Link { channel, link }),
         Event::ResultRead { payload, end } => link::read(domain, env, payload, end),
         Event::Stop => decide(domain, env, Work::Core(core::Event::Stopping)),
-        Event::Application { reply_to, sign_in, key, scope, number, digest, value } => {
-            decide(domain, env, Work::Application { reply_to, sign_in, key, scope, number, digest, value });
+        Event::Application { reply_to, sign_in, key, scope, number, digest, value, carried } => {
+            decide(domain, env, Work::Application { reply_to, sign_in, key, scope, number, digest, value, carried });
         }
         Event::ConnectorTimer { number } => decide(domain, env, Work::ConnectorFire { number }),
         Event::WriterRead { connector, resource, event } => {
@@ -639,7 +642,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                     read: core::reads::Read::Application { scope, connector: number, read: token, window },
                 }));
             }
-            Work::Application { reply_to, sign_in, key, scope, number, digest, value } => {
+            Work::Application { reply_to, sign_in, key, scope, number, digest, value, carried } => {
                 let owner = Token::new(domain.next_payload);
                 domain.next_payload = domain.next_payload.checked_add(1).expect("root token room");
                 if number == 1 || number == 2 {
@@ -653,6 +656,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                     connector: number,
                     digest,
                     owner,
+                    carried,
                 }));
             }
             Work::ConnectorFire { number } => {

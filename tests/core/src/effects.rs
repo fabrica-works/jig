@@ -64,6 +64,9 @@ pub struct World {
     pub(crate) creating: crate::fixtures::Creating,
     pub people_answers: Vec<people::Reply>,
     pub application_answers: Vec<(Token, u16, connector::ApplicationOutcome)>,
+    /// Each carried value the core left unused, with how many answers
+    /// (people's and applications') were delivered before it.
+    pub carried_unused: Vec<(usize, u64)>,
     pub procedure: Option<u64>,
     /// Whole held protocol inputs received by the independent procedure connector.
     pub procedure_inputs: Vec<(u64, u16, u16, Box<tasks::RunContext>)>,

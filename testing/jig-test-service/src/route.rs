@@ -229,7 +229,9 @@ fn core_held(engine: &mut Engine, held: core::Held) {
                 engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
             }
         }
-        held @ core::Held::Result { .. } => engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held))),
+        held @ (core::Held::Result { .. } | core::Held::CarriedUnused { .. }) => {
+            engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
+        }
         core::Held::MakeEffect { connector: number, entry } => {
             engine.events.push(root::Event::Connector { number, event: connector::Event::Make { entry } });
         }

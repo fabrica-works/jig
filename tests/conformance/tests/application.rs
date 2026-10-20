@@ -35,6 +35,7 @@ fn ask(sign_in: u64, key: u8, value: connector::ApplicationRequest) -> root::Eve
         number: 2,
         digest: Sha256::digest(bytes).into(),
         value,
+        carried: None,
     }
 }
 

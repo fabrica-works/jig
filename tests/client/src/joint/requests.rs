@@ -147,7 +147,16 @@ fn keyed(
                 key,
                 owner: KeyedOwner::Application { connector: number },
             });
-            root::Event::Application { reply_to, sign_in, key, scope: application_scope(*scope), number, digest, value }
+            root::Event::Application {
+                reply_to,
+                sign_in,
+                key,
+                scope: application_scope(*scope),
+                number,
+                digest,
+                value,
+                carried: None,
+            }
         }
     })
 }

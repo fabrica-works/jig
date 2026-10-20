@@ -50,6 +50,7 @@ fn change(world: &mut World, revision: u8, value: u64) {
         number: 1,
         digest: [revision + 1; 32],
         value: connector::ApplicationRequest { object: 1, revision: u64::from(revision), value, release: None },
+        carried: None,
     });
 }
 
@@ -267,6 +268,7 @@ fn an_own_scope_application_request_reaches_its_connector_with_no_role() {
         number: CONNECTOR,
         digest: [8; 32],
         value: connector::ApplicationRequest { object: OBJECT, revision: 0, value: 42, release: None },
+        carried: None,
     });
     assert_eq!(
         world.application_answers,
@@ -291,4 +293,53 @@ fn a_task_document_keeps_a_held_name_past_the_short_list_bound() {
     let resource = value.resources.get(0).expect("held resource");
     let core::documents::PartKey::Path(segments) = &resource.part.key else { panic!("resource path") };
     assert_eq!(segments.as_slice(), path.segments());
+}
+
+const CARRIED: u64 = 1 << 63;
+
+/// Sends the own-scope request under its one key, carrying a kept value,
+/// and returns how many answers were delivered before it.
+fn carry(world: &mut World, reply: u64, digest: u8, number: u64) -> usize {
+    let before = world.people_answers.len() + world.application_answers.len();
+    world.send(root::Event::Application {
+        reply_to: ReplyTo::new(Token::new(reply)),
+        sign_in: world.sign_in.expect("signed in"),
+        key: [OWN_KEY; 16],
+        scope: ApplicationScope::Own,
+        number: CONNECTOR,
+        digest: [digest; 32],
+        value: connector::ApplicationRequest { object: OBJECT, revision: 0, value: 42, release: None },
+        carried: Some(core::Carried { number, digest: [digest; 32] }),
+    });
+    before
+}
+
+#[test]
+fn a_carried_value_the_core_leaves_unused_is_named_before_its_answer() {
+    let mut world = world(888);
+    let changed = connector::ApplicationOutcome::Changed {
+        object: OBJECT,
+        now: connector::ApplicationObject { revision: 1, value: 42 },
+    };
+    carry(&mut world, OWN_REQUEST, 8, CARRIED);
+    assert!(world.carried_unused.is_empty(), "an admitted request uses its value");
+    let replayed = carry(&mut world, OWN_REQUEST + 1, 8, CARRIED + 1);
+    assert_eq!(
+        world.application_answers,
+        vec![(Token::new(OWN_REQUEST), CONNECTOR, changed), (Token::new(OWN_REQUEST + 1), CONNECTOR, changed)],
+        "the retained answer is replayed"
+    );
+    let conflicting = carry(&mut world, OWN_REQUEST + 2, 9, CARRIED + 2);
+    assert_eq!(
+        world.people_answers.last(),
+        Some(&jig_domain_people::Reply::Refused(jig_domain_people::Refusal::KeyConflict))
+    );
+    world.stop();
+    let stopping = carry(&mut world, OWN_REQUEST + 3, 8, CARRIED + 3);
+    assert_eq!(world.people_answers.last(), Some(&jig_domain_people::Reply::Again(jig_domain_people::Again::NotReady)));
+    assert_eq!(
+        world.carried_unused,
+        vec![(replayed, CARRIED + 1), (conflicting, CARRIED + 2), (stopping, CARRIED + 3)],
+        "each unused value is named once, before its request's answer"
+    );
 }

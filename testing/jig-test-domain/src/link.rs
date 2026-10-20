@@ -403,6 +403,7 @@ pub(super) enum Work {
         number: u16,
         digest: [u8; 32],
         value: connector::ApplicationRequest,
+        carried: Option<core::Carried>,
     },
     ProjectionEffect {
         goal: u64,

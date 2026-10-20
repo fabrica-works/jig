@@ -12,6 +12,15 @@ use jig_domain_tasks as tasks;
 use jig_domain_views as views;
 use skein_lib::{List, Queue, ReplyTo, Token, Wall};
 
+/// A value a client's request carried, kept in the secrets' store before
+/// the core sees the request (`protocol/client.md`, section 5): the core
+/// gets its number and digest, never the value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Carried {
+    pub number: u64,
+    pub digest: [u8; 32],
+}
+
 /// A request from the core to its application root. Its variant fixes the
 /// commit relationship before the root translates or wraps it.
 #[derive(Debug)]
@@ -140,6 +149,10 @@ pub enum Held {
     Read { reply: ReplyTo, answer: crate::reads::Answer },
     /// The root assembles the outcome retained by its numbered connector.
     Applied { to: ReplyTo, connector: u16, token: Token },
+    /// A request's carried value went unused (refused, sent again, joined
+    /// or stopped): the clients' component erases it, if its own decode
+    /// kept it, before the request's answer (`protocol/store.md`, 9).
+    CarriedUnused { number: u64 },
     /// Current subject document, held until every preceding commit is durable.
     Delivery { watcher: Token, document: Box<crate::documents::Document> },
     /// A watch has ended after every outstanding terminal.
@@ -375,6 +388,7 @@ pub enum Event {
     /// An unkeyed one-shot read on the supplied live sign-in.
     Read { reply: ReplyTo, sign_in: u64, read: crate::reads::Read },
     /// Admit an application request by metadata; its owner retains the value.
+    /// A value the request carried is named by its number and digest only.
     Application {
         reply_to: ReplyTo,
         sign_in: u64,
@@ -383,6 +397,7 @@ pub enum Event {
         connector: u16,
         digest: [u8; 32],
         owner: Token,
+        carried: Option<Carried>,
     },
     /// A connector asks the core within the admitted party decision.
     ApplicationPart { request: Token, ask: Box<people::Ask> },

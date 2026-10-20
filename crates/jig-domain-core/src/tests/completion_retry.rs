@@ -90,6 +90,7 @@ fn has_watch_end(out: &[Request]) -> bool {
                 | Held::ReadLoad { .. }
                 | Held::Read { .. }
                 | Held::Applied { .. }
+                | Held::CarriedUnused { .. }
                 | Held::Delivery { .. }
                 | Held::MakeEffect { .. }
                 | Held::SettledCall { .. }

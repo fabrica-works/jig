@@ -50,8 +50,9 @@ pub(crate) fn gate(core: &mut Core, event: Event) -> Result<Event, Requests> {
     }
     match event {
         Event::SignIn { reply_to, .. } => Err(party(reply_to)),
-        Event::Application { reply_to, connector, owner, .. } => {
-            let Requests::Out(mut out) = party(reply_to);
+        Event::Application { reply_to, connector, owner, carried, .. } => {
+            let unused = crate::routing::application_routes::number(carried);
+            let Requests::Out(mut out) = crate::routing::application_routes::first(unused, party(reply_to));
             if core.connectors.contains(&connector) {
                 out.push(Request::Ask { connector, ask: crate::Ask::DropApplication { owner } });
             }

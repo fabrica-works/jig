@@ -69,9 +69,9 @@ mod run;
 mod sibling_routes;
 pub use numbers::{Counters, Deployment, Family, fresh};
 pub use routing::{
-    Ask, CoreBriefBudgets, EscalationChoice, Event, Held, Limits, NamedAction, Now, PayloadRefusal, ProposalChoice,
-    Request, Requests, StepRefusal, Timer, ToolKind, WatchRefusal, Write, fire, resume_fleet, room, room_max, step,
-    want_accounts,
+    Ask, Carried, CoreBriefBudgets, EscalationChoice, Event, Held, Limits, NamedAction, Now, PayloadRefusal,
+    ProposalChoice, Request, Requests, StepRefusal, Timer, ToolKind, WatchRefusal, Write, fire, resume_fleet, room,
+    room_max, step, want_accounts,
 };
 pub use sibling_routes::{MadeRoute, PersonMessage, SentRoute};
 mod conversation;
@@ -246,7 +246,7 @@ pub struct Core {
     pub(crate) census_position: Option<(u64, u64, u64)>,
     pub(crate) ended_marks: Map<Token, ended_marks::Loaded>,
     pub(crate) archived_chats: Map<u64, inbox::ArchivedChat>,
-    pub(crate) application_input: Option<(u16, Token)>,
+    pub(crate) application_input: Option<routing::application_routes::Input>,
     pub(crate) task_capacity_mark: u64,
     pub(crate) applications: Map<Token, routing::application_routes::Flight>,
     pub(crate) restart: restart::Restart,

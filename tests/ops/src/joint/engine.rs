@@ -299,7 +299,8 @@ impl Application for OpsApplication {
                 | core::Held::Read { .. }
                 | core::Held::Delivery { .. }
                 | core::Held::WatchEnded { .. }
-                | core::Held::ApplicationWatchEnded { .. },
+                | core::Held::ApplicationWatchEnded { .. }
+                | core::Held::CarriedUnused { .. },
             )
             | root::Output::ApplicationDocument { .. }
             | root::Output::ApplicationRead { .. }

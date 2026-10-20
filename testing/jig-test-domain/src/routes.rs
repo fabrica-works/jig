@@ -78,6 +78,7 @@ pub(super) fn route_core(
                 | core::Held::WatchEnded { .. }
                 | core::Held::Relay { .. }
                 | core::Held::PeopleReply { .. }
+                | core::Held::CarriedUnused { .. }
                 | core::Held::CallAnswer { .. }
                 | core::Held::Result { .. }
                 | core::Held::Acknowledge { .. }

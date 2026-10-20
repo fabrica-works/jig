@@ -661,6 +661,7 @@ impl Session {
                 | core::Held::ApplicationWatchEnded { .. }
                 | core::Held::ReadLoad { .. }
                 | core::Held::Applied { .. }
+                | core::Held::CarriedUnused { .. }
                 | core::Held::MakeEffect { .. }
                 | core::Held::SettledCall { .. }
                 | core::Held::Assign { .. }

@@ -27,6 +27,7 @@ pub fn to_root(
                 number: family,
                 digest,
                 value: decoded.value,
+                carried: None,
             })
         }
         ToApplication::Read { reply, sign_in, family, version, scope, window, record } => {

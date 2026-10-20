@@ -55,6 +55,10 @@ impl World {
             root::Delivery::Application { to, number, outcome } => {
                 self.application_answers.push((to.into_token(), number, outcome));
             }
+            root::Delivery::Core(core::Held::CarriedUnused { number }) => {
+                let before = self.people_answers.len().checked_add(self.application_answers.len());
+                self.carried_unused.push((before.expect("bounded story answers"), number));
+            }
             root::Delivery::Projection { connector, feed } => {
                 if feed.closing && !self.hold_projection_settlements {
                     self.events.push_back(root::Event::Core(core::Event::ProjectionSettled {

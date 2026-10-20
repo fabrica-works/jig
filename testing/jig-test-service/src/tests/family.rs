@@ -32,13 +32,13 @@ fn an_application_request_round_trips_through_its_record() {
             Ok(codec::DecodedRequest { project: f::PROJECT, value }),
             "{label}"
         );
-        let root::Event::Application { reply_to, sign_in, key, scope, number, digest, value: request_value } =
+        let root::Event::Application { reply_to, sign_in, key, scope, number, digest, value: request_value, carried } =
             crate::family::to_root(request(record), &f::limits(), 2).expect("root input")
         else {
             panic!("{label}: application input")
         };
         assert_eq!(
-            (reply_to.into_token(), sign_in, key, scope, number, digest, request_value),
+            (reply_to.into_token(), sign_in, key, scope, number, digest, request_value, carried),
             (
                 Token::new(27),
                 19,
@@ -46,7 +46,8 @@ fn an_application_request_round_trips_through_its_record() {
                 jig_domain_people::ApplicationScope::Project(f::PROJECT),
                 1,
                 [29; 32],
-                value
+                value,
+                None
             ),
             "{label}"
         );

@@ -328,6 +328,7 @@ pub fn held_event(held: core::Held) -> Option<Event> {
         core::Held::Delivery { watcher, document } => Event::Delivery { watcher, document },
         core::Held::WatchEnded { watcher, why } => Event::WatchEnded { watcher, why },
         core::Held::Drained
+        | core::Held::CarriedUnused { .. }
         | core::Held::ApplicationDelivery { .. }
         | core::Held::ApplicationWatchEnded { .. }
         | core::Held::ReadLoad { .. }

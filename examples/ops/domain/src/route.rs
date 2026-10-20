@@ -134,6 +134,7 @@ fn event_in(
                 connector: jig_ops_domain_connectors::number(Connector::Infrastructure),
                 digest,
                 owner,
+                carried: None,
             }));
         }
         Event::Core(event) => work.push(Work::Core(event)),
@@ -361,6 +362,7 @@ fn core_held(
         | core::Held::Delivery { .. }
         | core::Held::WatchEnded { .. }
         | core::Held::PeopleReply { .. }
+        | core::Held::CarriedUnused { .. }
         | core::Held::Result { .. }
         | core::Held::Drained
         | core::Held::Refuse { .. }

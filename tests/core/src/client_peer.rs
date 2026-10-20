@@ -90,6 +90,7 @@ impl ClientPeer {
                 core::Held::ApplicationDelivery { .. }
                 | core::Held::ApplicationWatchEnded { .. }
                 | core::Held::Applied { .. }
+                | core::Held::CarriedUnused { .. }
                 | core::Held::ReadLoad { .. }
                 | core::Held::MakeEffect { .. }
                 | core::Held::SettledCall { .. }

@@ -1,7 +1,8 @@
 //! Connector-owned keyed requests and their synchronous party parts
 //! (`domain/connectors.md`, section 5.5; `domain/core.md`, section 5).
 
-use crate::{Ask, Core, Event, Family, Limits, Request, Requests, fresh};
+use crate::{Ask, Core, Event, Family, Held, Limits, Request, Requests, fresh};
+use alloc::boxed::Box;
 use jig_domain_people as people;
 use skein_lib::{Env, Queue, ReplyTo, Token};
 
@@ -10,6 +11,18 @@ pub(crate) struct Flight {
     pub connector: u16,
     pub token: Token,
     pub part: bool,
+    /// The number of the value the request carried, unused if the
+    /// connector cannot decide this time.
+    pub carried: Option<u64>,
+}
+
+/// The request in admission: its connector, the owner retaining its
+/// value, and the number of the value it carried.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Input {
+    pub connector: u16,
+    pub owner: Token,
+    pub carried: Option<u64>,
 }
 
 #[expect(clippy::too_many_arguments, reason = "metadata envelope without an application value")]
@@ -21,21 +34,56 @@ pub(super) fn start(
     sign_in: u64,
     key: [u8; 16],
     scope: people::ApplicationScope,
-    connector: u16,
     digest: [u8; 32],
-    owner: Token,
+    input: Input,
 ) -> Requests {
     assert!(core.application_input.is_none(), "one admission at a time");
-    core.application_input = Some((connector, owner));
-    let Requests::Out(mut out) = super::people_routes::route_people(
+    core.application_input = Some(input);
+    let connector = input.connector;
+    let routed = super::people_routes::route_people(
         core,
         env,
         work,
         people::Event::Ask { reply_to, sign_in, key, ask: people::Ask::Application { scope, connector, digest } },
     );
-    core.application_input = None;
+    // Still here only when people did not admit it: refused, answered
+    // from a retained answer, or joined to the flight of its key.
+    let unused = match core.application_input.take() {
+        Some(input) => input.carried,
+        None => None,
+    };
+    let Requests::Out(mut out) = first(unused, routed);
     if core.connectors.contains(&connector) {
-        out.push(Request::Ask { connector, ask: Ask::DropApplication { owner } });
+        out.push(Request::Ask { connector, ask: Ask::DropApplication { owner: input.owner } });
+    }
+    Requests::Out(out)
+}
+
+/// The number of a carried value, which is all the core keeps of it.
+#[expect(clippy::manual_map, reason = "step code has no closures (programming-model.md, section 10)")]
+pub(crate) fn number(carried: Option<crate::Carried>) -> Option<u64> {
+    match carried {
+        Some(value) => Some(value.number),
+        None => None,
+    }
+}
+
+/// The output naming a carried value the core left unused.
+pub(crate) fn unused(number: u64) -> Request {
+    Request::Held(Box::new(Held::CarriedUnused { number }))
+}
+
+/// Puts the carried value's unused output before every other output, so
+/// the clients' component hears of it before the request's answer. The
+/// outputs keep the room they had for what their caller adds.
+pub(crate) fn first(unused: Option<u64>, requests: Requests) -> Requests {
+    let Some(number) = unused else { return requests };
+    let Requests::Out(mut rest) = requests;
+    let capacity = rest.len().checked_add(rest.room()).expect("bounded route output");
+    let mut out = Queue::with_capacity(capacity.checked_add(1).expect("bounded route output"));
+    out.push(self::unused(number));
+    for _ in 0..rest.len() {
+        out.push(rest.pop().expect("route output count"));
     }
     Requests::Out(out)
 }
@@ -53,9 +101,16 @@ pub(super) fn admitted(
     role: Option<people::Role>,
 ) {
     let input = core.application_input.take();
+    let carried = match input {
+        Some(input) => input.carried,
+        None => None,
+    };
     let owner = match input {
-        Some((number, owner)) if number == connector && core.connectors.contains(&connector) => owner,
+        Some(input) if input.connector == connector && core.connectors.contains(&connector) => input.owner,
         Some(_) | None => {
+            if let Some(number) = carried {
+                out.push(unused(number));
+            }
             work.push(Event::People(people::Event::Decided {
                 request,
                 outcome: people::Outcome::Refused(people::Refusal::NotOffered),
@@ -64,6 +119,9 @@ pub(super) fn admitted(
         }
     };
     let Some(number) = fresh(&mut core.counters, Family::Application) else {
+        if let Some(number) = carried {
+            out.push(unused(number));
+        }
         work.push(Event::People(people::Event::Decided {
             request,
             outcome: people::Outcome::Refused(people::Refusal::Limit { which: people::LimitKind::Arithmetic }),
@@ -72,7 +130,7 @@ pub(super) fn admitted(
     };
     let token = Token::new(number);
     assert!(
-        core.applications.insert(request, Flight { connector, token, part: false }).is_ok(),
+        core.applications.insert(request, Flight { connector, token, part: false, carried }).is_ok(),
         "one application per people flight"
     );
     out.push(Request::Ask {
@@ -132,14 +190,14 @@ pub(super) fn finished(
 ) -> Requests {
     let Some(flight) = core.applications.remove(&request) else { return empty() };
     assert!(!flight.part, "core part settled before whole outcome");
-    let outcome = match outcome {
+    let (outcome, unused) = match outcome {
         Ok(token) => {
             assert!(token == flight.token, "the owner kept the allocated token");
-            people::Outcome::Applied { connector: flight.connector, token }
+            (people::Outcome::Applied { connector: flight.connector, token }, None)
         }
-        Err(why) => people::Outcome::Again(why),
+        Err(why) => (people::Outcome::Again(why), flight.carried),
     };
-    super::people_routes::route_people(core, env, work, people::Event::Decided { request, outcome })
+    first(unused, super::people_routes::route_people(core, env, work, people::Event::Decided { request, outcome }))
 }
 
 fn empty() -> Requests {

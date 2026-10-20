@@ -35,6 +35,7 @@ pub(super) fn route_people(
     if let people::Event::Forget { task, .. } = &event {
         drop(core.archived_chats.remove(task));
     }
+    let mut unused = None;
     let event = match event {
         people::Event::Decided { request, outcome } => {
             if let Some(flight) = core.applications.get_mut(&request)
@@ -44,7 +45,12 @@ pub(super) fn route_people(
                 people::application_part_done(&mut core.people, request);
                 return super::application_routes::answer(flight.connector, request, outcome);
             }
-            let _finished = core.applications.remove(&request);
+            if let Some(flight) = core.applications.remove(&request) {
+                unused = flight.carried;
+                if let people::Outcome::Applied { .. } = &outcome {
+                    unused = None;
+                }
+            }
             people::Event::Decided { request, outcome }
         }
         other @ (people::Event::ChatState { .. }
@@ -65,7 +71,7 @@ pub(super) fn route_people(
     super::view_routes::touch_people_event(core, &env.limits, &event);
     let mut child = Queue::with_capacity(people::max_out(&env.limits.people));
     people::step(&mut core.people, &Env { now: env.now, wall: env.wall, limits: env.limits.people }, event, &mut child);
-    tag_people(core, env, child, work)
+    super::application_routes::first(unused, tag_people(core, env, child, work))
 }
 
 pub(super) fn sign_in(
