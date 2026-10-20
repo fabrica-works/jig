@@ -221,18 +221,12 @@ pub(crate) fn whole(engine: &crate::Engine, problems: &mut Problems) {
                 problems.push(path.member(b"policy"), What::Bound);
             }
         }
-        for (index, entry) in project.templates.iter().enumerate() {
-            let mut known = false;
-            for template in &engine.templates {
-                known |= template.number == entry.template;
-            }
-            if !known {
-                problems.push(
-                    check::index(&path.member(b"policy").member(b"templates"), index).member(b"template"),
-                    What::Refers,
-                );
-            }
-        }
+        crate::templates::check_overrides(
+            engine,
+            &project.templates,
+            &path.member(b"policy").member(b"templates"),
+            problems,
+        );
         for (index, role) in project.roles.iter().enumerate() {
             let path = check::index(&path.member(b"roles"), index);
             connector(engine, role.connector, &path.member(b"connector"), problems);

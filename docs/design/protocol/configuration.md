@@ -215,13 +215,20 @@ the application's main (its shell)
   override of the same policy names, is refused when the policy is
   changed (as unknown, or as a repeated identity), and a seeded
   policy's refuses the start.
+  The effective executor must name a configured charter, or be chosen.
+  A template's retained LLM choice must fit that executor: its main and
+  every sub-agent model must be allowed by a named charter, each with an
+  effort the model declares, or none only when it declares none. An
+  override that invalidates the retained choice is refused atomically
+  at configuration, policy change and restore, before `me` is served.
 - **Merged for `me`:** a project's merged templates are the
   configuration's, in its order, each with that project's override
   applied: its executor, budget and deadline where the override gives
   them, and its priority where the template is tracked. An override of
   the default priority of an untracked template is kept, and shown with
   the policy, but has no effect: the merged template stays untracked.
-- **The engine never expands or checks one.** The core keeps the
+- **The engine never expands one into work.** The core validates the
+  merged defaults above and keeps the
   configuration's templates, and each policy's overrides, only to serve
   each project's merged templates in `me` (`../domain/engine.md`, 11.1;
   `../client/domain/contract.md`, 5.1). The client fills a template

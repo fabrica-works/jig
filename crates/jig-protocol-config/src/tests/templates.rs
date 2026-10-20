@@ -271,6 +271,64 @@ fn a_templates_llm_choice_problems_name_the_invalid_fields() {
 
 type Case = (&'static str, fn());
 
+fn with_executor_override(llm: &[u8], executor: &[u8]) -> Box<[u8]> {
+    let document = with_models(br#""alternatives": []"#, llm);
+    let document = fixtures::with(&document, br#""executor": {"charter": 1}"#, br#""executor": "chosen""#);
+    let overrides = fixtures::with(
+        br#""templates": [{"template": 1, "executor": EXECUTOR, "budget": null, "deadline": null, "priority": null}]"#,
+        b"EXECUTOR",
+        executor,
+    );
+    fixtures::with(&document, br#""templates": []"#, &overrides)
+}
+
+#[test]
+fn a_seeded_executor_override_cannot_invalidate_the_retained_llm_choice() {
+    for (name, llm, executor) in [
+        (
+            "main outside charter",
+            br#""grace_ms": 5000, "llm": {"main": {"model": "large", "effort": null}, "sub_agents": []}"#.as_slice(),
+            br#"{"charter": 1}"#.as_slice(),
+        ),
+        (
+            "sub-agent outside charter",
+            br#""grace_ms": 5000, "llm": {"main": {"model": "small", "effort": "high"}, "sub_agents": [{"model": "large", "effort": null}]}"#,
+            br#"{"charter": 1}"#,
+        ),
+        ("unknown charter without choice", br#""grace_ms": 5000, "llm": null"#, br#"{"charter": 99}"#),
+    ] {
+        let problems = fixtures::engine(&with_executor_override(llm, executor)).expect_err(name);
+        assert_eq!(
+            problems.problems.get(0),
+            Some(&crate::Problem {
+                path: fixtures::path(&[b"projects"]).child(Segment::Index(0)).member(b"policy")
+                    .member(b"templates").child(Segment::Index(0)).member(b"executor"),
+                what: What::Refers,
+            }),
+            "{name}",
+        );
+    }
+}
+
+#[test]
+fn a_seeded_executor_override_keeps_a_compatible_choice() {
+    let document = with_executor_override(
+        br#""grace_ms": 5000, "llm": {"main": {"model": "small", "effort": "high"}, "sub_agents": []}"#,
+        br#"{"charter": 1}"#,
+    );
+    let engine = fixtures::engine(&document).expect("compatible override");
+    let config = crate::core(&engine, [0; 16], 7);
+    let merged = jig_domain_core::templates::merged(
+        &config.settings.templates,
+        config.template_overrides.get(&CHAT).expect("project templates"),
+    );
+    assert_eq!(merged.first().expect("chat").executor, TemplateExecutor::Charter(CHAT));
+    assert_eq!(
+        merged.first().expect("chat").llm,
+        Some(LlmChoice { account: None, main: ModelEffort { model: 0, effort: Some(1) }, subagents: Box::new([]) })
+    );
+}
+
 fn table<const N: usize>(cases: [Case; N]) {
     let mut failures = [None; N];
     let mut passed = true;

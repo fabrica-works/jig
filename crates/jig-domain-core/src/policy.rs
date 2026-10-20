@@ -367,6 +367,9 @@ impl Core {
         {
             return Err(people::Refusal::Unknown);
         }
+        if !crate::templates::valid(&self.settings, &templates) {
+            return Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape });
+        }
         let Some(snapshot) = snapshot(&policy, &permissions, &templates) else {
             return Err(people::Refusal::Limit { which: people::LimitKind::Policy });
         };
@@ -409,6 +412,7 @@ impl Core {
         }
         let mut templates: Box<[people::TemplateOverride]> = Box::new([]);
         if restore(&mut policy, &mut permissions, &mut templates, value, self.authority.limits().requirements).is_none()
+            || !crate::templates::valid(&self.settings, &templates)
         {
             return false;
         }

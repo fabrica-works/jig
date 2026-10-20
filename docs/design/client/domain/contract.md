@@ -1006,7 +1006,9 @@ What `../../domain/` owes this contract, each designed where named:
    templates and each policy's overrides, kept only to serve each
    project's merged templates in `me`; an override naming no template,
    or one another override of the same policy names, refused when the
-   policy is changed (`../../domain/engine.md`, 11.1;
+   policy is changed; a retained LLM choice incompatible with the
+   effective executor refused at startup, policy change and restore
+   (`../../domain/engine.md`, 11.1;
    `../../protocol/configuration.md`, 3.1).
 8. **Credentials minted on the server's word:** a sign-in committed for
    an identity the application's server verified, its provider of kind

@@ -142,7 +142,33 @@ fn chosen(settings: &Settings, policy: &RunPolicy, choice: &tasks::LlmChoice) ->
     Some(chosen)
 }
 
+/// The same charter model/effort rules used to construct a run's chosen policy, without
+/// allocating its models. Templates use these before publishing their retained choice.
+pub(crate) fn takes(models: &[Model], policy: &RunPolicy, choice: &tasks::LlmChoice) -> bool {
+    if !takes_model(models, policy, choice.main) {
+        return false;
+    }
+    for chosen in &choice.subagents {
+        if !takes_model(models, policy, *chosen) {
+            return false;
+        }
+    }
+    true
+}
+
+fn takes_model(models: &[Model], policy: &RunPolicy, chosen: tasks::ModelEffort) -> bool {
+    let Some(configured) = models.get(usize::from(chosen.model)) else { return false };
+    let Some(model) = charter_model(policy, &configured.name) else { return false };
+    match chosen.effort {
+        Some(effort) => usize::from(effort) < model.efforts.len(),
+        None => model.efforts.is_empty(),
+    }
+}
+
 fn model(settings: &Settings, policy: &RunPolicy, chosen: tasks::ModelEffort) -> Option<Model> {
+    if !takes_model(&settings.models, policy, chosen) {
+        return None;
+    }
     let name = &settings.models.get(usize::from(chosen.model))?.name;
     let mut model = charter_model(policy, name)?.clone();
     model.effort = match chosen.effort {

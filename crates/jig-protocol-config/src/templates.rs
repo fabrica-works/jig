@@ -52,6 +52,32 @@ pub(crate) fn templates(
     Some(templates)
 }
 
+/// Validate the retained choice after applying each project's executor override.
+pub(crate) fn check_overrides(
+    engine: &crate::Engine,
+    overrides: &[jig_domain_people::TemplateOverride],
+    path: &Path,
+    problems: &mut Problems,
+) {
+    for (index, entry) in overrides.iter().enumerate() {
+        let path = check::index(path, index);
+        let mut known = false;
+        for template in &engine.templates {
+            if template.number == entry.template {
+                known = true;
+                let executor = entry.executor.unwrap_or(template.executor);
+                if !jig_domain_core::templates::valid_executor(template, executor, &engine.charters, &engine.llm.models)
+                {
+                    problems.push(path.member(b"executor"), What::Refers);
+                }
+            }
+        }
+        if !known {
+            problems.push(path.member(b"template"), What::Refers);
+        }
+    }
+}
+
 fn report(value: Result<u64, What>, path: &Path, problems: &mut Problems) -> Option<u64> {
     match value {
         Ok(value) => Some(value),
