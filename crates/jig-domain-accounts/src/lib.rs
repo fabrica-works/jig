@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 mod boundary;
+mod checks;
 mod domain;
 mod limits;
 mod providers;
@@ -15,6 +16,7 @@ mod restore;
 pub use boundary::{
     Event, Fact, Failure, FromComponent, Grant, GrantTable, Place, Request, State, ToComponent, Turned, Unread,
 };
+pub use checks::{Bound, Refusal, SignIn, room_for_sign_in};
 pub use domain::{Account, Domain, fire, max_out, step};
 pub use limits::{Limits, worst_case};
 pub use providers::{Offers, Provider, Providers};

@@ -1,6 +1,9 @@
 //! Accounts as accounts.md, 3 has them: numbered, held, with sources each in its own state.
-use jig_accounts_world::{World, account, provider, providers, source};
-use jig_domain_accounts::{Configured, Event, FromComponent, Held, Holder, Kind, Request, State, Stored, ToComponent};
+use jig_accounts_world::{LIMITS, World, account, provider, providers, source};
+use jig_domain_accounts::{
+    Bound, Configured, Event, FromComponent, Held, Holder, Kind, Refusal, Request, SignIn, State, Stored, ToComponent,
+    room_for_sign_in,
+};
 use skein_lib::{Duration, Time, Wall};
 
 const ALICE: Holder = Holder::Party(9);
@@ -15,6 +18,9 @@ fn granted(source: u32) -> Event {
 /// Providers 1 and 2 offer a sign-in and a key; 3 offers none of its own: the `none` source.
 fn fresh() -> World {
     World::with(providers(vec![provider(1, true, true), provider(2, true, false), provider(3, false, false)]), &[])
+}
+fn limit<T>(bound: Bound) -> Result<T, Refusal> {
+    Err(Refusal::Limit { bound })
 }
 fn signed_in(number: u32, provider: u32, holder: Holder, subject: &[u8]) -> Vec<Stored> {
     vec![account(number, provider, holder, subject), source(number, number + 1, 0, Kind::SignIn)]
@@ -75,6 +81,50 @@ fn the_none_account_is_made_at_the_first_start_alone() {
     ]);
     again.step(Event::Want);
     assert_eq!((again.domain.accounts(), again.domain.next_number()), (1, 2));
+}
+
+#[test]
+fn a_subject_has_one_holder() {
+    let mut world = fresh();
+    world.restore(signed_in(5, 1, ALICE, b"alice"));
+    let domain = &world.domain;
+    assert_eq!(domain.sign_in(&LIMITS, ALICE, 1, b"alice"), Ok(SignIn::Renew { account: 5 }));
+    assert_eq!(domain.sign_in(&LIMITS, BOB, 1, b"alice"), Err(Refusal::Held { provider: 1 }));
+    assert_eq!(domain.sign_in(&LIMITS, BOB, 1, b"bob"), Ok(SignIn::New));
+    assert_eq!(domain.sign_in(&LIMITS, BOB, 2, b"alice"), Ok(SignIn::New), "a subject is its provider's");
+    assert_eq!(domain.sign_in(&LIMITS, BOB, 3, b"bob"), Err(Refusal::Provider { provider: 3 }));
+    assert_eq!(domain.sign_in(&LIMITS, BOB, 1, b""), Err(Refusal::Subject));
+}
+
+#[test]
+fn each_bound_is_refused_naming_it() {
+    let mut world = fresh();
+    world.restore(signed_in(0, 1, ALICE, b"a"));
+    world.restore(signed_in(2, 1, ALICE, b"b"));
+    assert_eq!(world.domain.sign_in(&LIMITS, ALICE, 1, b"c"), limit(Bound::HolderAccounts));
+    assert_eq!(world.domain.sign_in(&LIMITS, BOB, 1, b"c"), Ok(SignIn::New));
+    world.restore(signed_in(4, 1, BOB, b"c"));
+    world.restore(vec![
+        source(4, 6, 1, Kind::Key),
+        Stored::Source {
+            account: 4,
+            number: 7,
+            place: 2,
+            kind: Kind::Program,
+            name: Box::from(&b"claude-code"[..]),
+            held: None,
+        },
+    ]);
+    assert_eq!(world.domain.unrestored(), 0);
+    assert_eq!(world.domain.sign_in(&LIMITS, BOB, 1, b"d"), limit(Bound::Accounts));
+    assert_eq!(world.domain.room_for_source(&LIMITS, 4), limit(Bound::Sources));
+    assert_eq!(world.domain.room_for_source(&LIMITS, 0), Ok(()));
+    assert_eq!(world.domain.room_for_source(&LIMITS, 9), Err(Refusal::Unknown));
+    assert_eq!(room_for_sign_in(&LIMITS, LIMITS.sign_ins), limit(Bound::SignIns));
+    assert_eq!(room_for_sign_in(&LIMITS, LIMITS.sign_ins - 1), Ok(()));
+    let mut world = World::with(providers(vec![provider(1, true, false)]), &[]);
+    world.restore(vec![Stored::Next { number: u32::MAX - 1 }]);
+    assert_eq!(world.domain.sign_in(&LIMITS, BOB, 1, b"d"), Err(Refusal::Numbers));
 }
 
 #[test]
