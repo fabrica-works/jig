@@ -276,6 +276,21 @@ pub(crate) struct Wire {
     stop_bounds: BTreeMap<i32, skein_lib::Duration>,
     pub(crate) placements: BTreeMap<(u64, u64), i32>,
 }
+/// Every secret a grant carries joins those no record may hold.
+fn secrets(grants: &mut Vec<Box<[u8]>>, grant: &jig_protocol_worker_wire::Grant) {
+    use jig_protocol_worker_wire::GrantValue;
+    match grant.value() {
+        GrantValue::Credential(value) => grants.push(value.bytes().expose().into()),
+        GrantValue::Withdrawn(value) => {
+            grants.push(value.bearer().expose().into());
+            if !value.id().is_empty() {
+                grants.push(value.id().expose().into());
+            }
+        }
+        GrantValue::Application(value) => grants.push(value.secret().expose().into()),
+    }
+}
+
 impl Wire {
     pub(crate) fn complete(&mut self, complete: &kernel::Complete, worker: bool, now: Time) {
         if worker
@@ -324,10 +339,7 @@ impl Wire {
                 self.placements.insert((assignment.task(), assignment.attempt()), fd.raw());
                 self.start_messages += assignment.messages().len();
                 for grant in assignment.grants() {
-                    self.grants.push(grant.value().expose().into());
-                    if !grant.account_id().is_empty() {
-                        self.grants.push(grant.account_id().expose().into());
-                    }
+                    secrets(&mut self.grants, grant);
                 }
             }
             if header.kind == 0x0187 {
@@ -336,10 +348,7 @@ impl Wire {
                     &mut skein_lib::Reader::new(&stream[8..end]),
                 )
                 .expect("granted credential");
-                self.grants.push(granted.grant().value().expose().into());
-                if !granted.grant().account_id().is_empty() {
-                    self.grants.push(granted.grant().account_id().expose().into());
-                }
+                secrets(&mut self.grants, granted.grant());
                 self.granted.push((fd.raw(), granted));
             }
             if header.kind == 0x0104 {
@@ -427,14 +436,10 @@ pub(crate) fn window_provider(scripts: Box<[skein_fake_llm_domain::api::Script]>
             echo: skein_llm::openai::Echo::NONE,
             usage_fields: documents::UsageFields::ALL,
             provider: documents::Provider::OpenAi,
-            path: skein_llm_world::call(1).endpoint.target,
+            path: skein_llm::Endpoint::openai().target,
             headers: Box::default(),
         },
-        skein_llm::Credential {
-            value: fixtures::TOKEN.into(),
-            account_id: b"acc".as_slice().into(),
-            scheme: skein_llm::Scheme::Bearer,
-        },
+        skein_llm::Credential::bearer(fixtures::TOKEN.into()),
         protocol,
         skein_fake_llm_domain::Domain::try_scripted(&config, 12, scripts).expect("window provider script"),
         config,

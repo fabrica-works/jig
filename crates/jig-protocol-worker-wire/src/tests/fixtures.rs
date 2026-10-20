@@ -37,8 +37,10 @@ pub const LIMITS: v3::Limits = v3::Limits {
     delivery_answer_evidence: 32,
     answered_call_name: 16,
     answered_call_tool: 16,
-    grant_value: 32,
-    grant_account_id: 16,
+    credential_value_bytes: 32,
+    withdrawn_value_id: 16,
+    withdrawn_value_bearer: 32,
+    application_value_secret: 32,
     assignment_charter: 32,
     assignment_transcript: 32,
     assignment_answered: 2,
@@ -204,26 +206,57 @@ pub fn fact_long() -> crate::Fact {
 
 pub const IDENTITY_FIRST: [u8; 16] = [7; 16];
 pub const TOKEN_ONE: &[u8] = b"token-one";
+pub const KEY_ONE: &[u8] = b"key-one";
 pub const CREDENTIAL_ONE: &[u8] = b"credential-one";
 pub const ACCOUNT_ONE: &[u8] = b"account-one";
 
-pub fn grant(table: crate::GrantTable, account: u32, generation: u64) -> crate::Grant {
-    let (value, account_id) = match table {
-        crate::GrantTable::Accounts => (TOKEN_ONE, ACCOUNT_ONE),
-        crate::GrantTable::Application => (CREDENTIAL_ONE, b"".as_slice()),
-    };
-    crate::Grant::new(
+pub fn credential_value(scheme: crate::Scheme, bytes: &[u8]) -> crate::GrantValue {
+    let value =
+        crate::CredentialValue::new(&LIMITS, crate::CredentialValueParts { scheme, bytes: Secret::new(bytes.into()) })
+            .expect("credential within small limits");
+    crate::GrantValue::Credential(value)
+}
+
+pub fn withdrawn_value() -> crate::GrantValue {
+    let value = crate::WithdrawnValue::new(
         &LIMITS,
+        crate::WithdrawnValueParts { id: Secret::new(ACCOUNT_ONE.into()), bearer: Secret::new(TOKEN_ONE.into()) },
+    )
+    .expect("withdrawn value within small limits");
+    crate::GrantValue::Withdrawn(value)
+}
+
+pub fn application_value() -> crate::GrantValue {
+    let value = crate::ApplicationValue::new(
+        &LIMITS,
+        crate::ApplicationValueParts { secret: Secret::new(CREDENTIAL_ONE.into()) },
+    )
+    .expect("application value within small limits");
+    crate::GrantValue::Application(value)
+}
+
+pub fn grant(value: crate::GrantValue, number: u32, generation: u64) -> crate::Grant {
+    crate::Grant::new(&LIMITS, crate::GrantParts { number, generation, valid: Duration::from_secs(60), value })
+        .expect("grant within small limits")
+}
+
+pub fn granted_key(limits: &v3::Limits, key: &[u8]) -> crate::Granted {
+    let value = crate::CredentialValue::new(
+        limits,
+        crate::CredentialValueParts { scheme: crate::Scheme::Key, bytes: Secret::new(key.into()) },
+    )
+    .expect("key within the limits");
+    let grant = crate::Grant::new(
+        limits,
         crate::GrantParts {
-            table,
-            account,
-            generation,
+            number: 5,
+            generation: 9,
             valid: Duration::from_secs(60),
-            value: Secret::new(value.into()),
-            account_id: Secret::new(account_id.into()),
+            value: crate::GrantValue::Credential(value),
         },
     )
-    .expect("grant within small limits")
+    .expect("grant within the limits");
+    crate::Granted::new(limits, crate::GrantedParts { task: 3, attempt: 4, grant }).expect("granted within the limits")
 }
 
 fn start_message(name: u64) -> crate::Message {
@@ -257,8 +290,8 @@ pub fn assignment_resumed() -> crate::Assignment {
         messages.push(start_message(name)).expect("two start message slots");
     }
     let mut grants = List::with_capacity(2);
-    for table in [crate::GrantTable::Accounts, crate::GrantTable::Application] {
-        grants.push(grant(table, 5, 9)).expect("two grant slots");
+    for value in [credential_value(crate::Scheme::Bearer, TOKEN_ONE), application_value()] {
+        grants.push(grant(value, 5, 9)).expect("two grant slots");
     }
     let workspace = crate::Workspace::new(
         &LIMITS,
@@ -391,16 +424,19 @@ fn fullest_call(limits: &v3::Limits) -> crate::AnsweredCall {
 
 fn fullest_grants(limits: &v3::Limits) -> List<crate::Grant> {
     let mut grants = List::with_capacity(2);
-    for account in [5, 6] {
+    for number in [5, 6] {
+        let value = crate::WithdrawnValue::new(
+            limits,
+            crate::WithdrawnValueParts { id: Secret::new(full_bytes()), bearer: Secret::new(full_bytes()) },
+        )
+        .expect("full withdrawn value");
         let grant = crate::Grant::new(
             limits,
             crate::GrantParts {
-                table: crate::GrantTable::Accounts,
-                account,
+                number,
                 generation: 9,
                 valid: Duration::from_secs(60),
-                value: Secret::new(full_bytes()),
-                account_id: Secret::new(full_bytes()),
+                value: crate::GrantValue::Withdrawn(value),
             },
         )
         .expect("full grant");

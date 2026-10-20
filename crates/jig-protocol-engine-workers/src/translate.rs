@@ -513,21 +513,33 @@ fn transcript(turns: &[Box<[u8]>], bound: u32) -> Option<Box<[u8]>> {
     }
     Some(writer.finish())
 }
+/// A grant's table and its value's arm agree, or the grant is not sent.
 fn grant_record(grant: host::Grant, value: crate::GrantValue, limits: &wire::v3::Limits) -> Option<wire::Grant> {
-    let table = match grant.table {
-        host::GrantTable::Accounts => wire::GrantTable::Accounts,
-        host::GrantTable::Application => wire::GrantTable::Application,
+    let value = match (grant.table, value) {
+        (host::GrantTable::Accounts, crate::GrantValue::Credential { scheme, token }) => {
+            let scheme = match scheme {
+                crate::Scheme::Bearer => wire::Scheme::Bearer,
+                crate::Scheme::Key => wire::Scheme::Key,
+            };
+            wire::GrantValue::Credential(
+                wire::CredentialValue::new(limits, wire::CredentialValueParts { scheme, bytes: token }).ok()?,
+            )
+        }
+        (host::GrantTable::Accounts, crate::GrantValue::Withdrawn { id, bearer }) => wire::GrantValue::Withdrawn(
+            wire::WithdrawnValue::new(limits, wire::WithdrawnValueParts { id, bearer }).ok()?,
+        ),
+        (host::GrantTable::Application, crate::GrantValue::Application { secret }) => wire::GrantValue::Application(
+            wire::ApplicationValue::new(limits, wire::ApplicationValueParts { secret }).ok()?,
+        ),
+        (host::GrantTable::Accounts, crate::GrantValue::Application { .. })
+        | (host::GrantTable::Application, crate::GrantValue::Credential { .. } | crate::GrantValue::Withdrawn { .. }) =>
+        {
+            return None;
+        }
     };
     wire::Grant::new(
         limits,
-        wire::GrantParts {
-            table,
-            account: grant.account,
-            generation: grant.generation,
-            valid: grant.valid,
-            value: value.value,
-            account_id: value.account_id,
-        },
+        wire::GrantParts { number: grant.account, generation: grant.generation, valid: grant.valid, value },
     )
     .ok()
 }

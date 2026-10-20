@@ -1,7 +1,7 @@
 mod grants {
     use jig_domain_host::{self as host, LinkDown};
     use jig_engine_workers_world::{World, fixtures};
-    use jig_protocol_engine_workers::{Event, Request};
+    use jig_protocol_engine_workers::{Event, GrantValue, Request, Scheme};
     use jig_protocol_worker_wire as wire;
     use skein_lib::{Reader, Token};
 
@@ -28,16 +28,32 @@ mod grants {
             world.observed(connection).iter().find(|record| record.kind == 0x0180).expect("assignment crossed");
         wire::Assignment::decode(&codec(), &mut Reader::new(&record.body)).expect("assignment decodes")
     }
-    fn send_grant(world: &mut World, channel: Token, table: host::GrantTable) {
-        let mut values = fixtures::values();
-        let index = usize::from(table != host::GrantTable::Accounts);
+    fn send_grant(world: &mut World, channel: Token, table: host::GrantTable, value: GrantValue) {
         world.down(Event::Down {
             channel,
             down: LinkDown::Grant { run: Token::new(7), attempt: Token::new(2), grant: fixtures::grant(table) },
             parts: Box::new([]),
-            values: Box::new([values[index].take()]),
+            values: Box::new([Some(value)]),
         });
         world.run();
+    }
+    fn withdrawn() -> GrantValue {
+        fixtures::values()[0].take().expect("withdrawn value")
+    }
+    fn application() -> GrantValue {
+        fixtures::values()[1].take().expect("application value")
+    }
+    fn credential(grant: &wire::Grant) -> (&wire::Scheme, &[u8]) {
+        let wire::GrantValue::Credential(value) = grant.value() else { panic!("credential value") };
+        (value.scheme(), value.bytes().expose())
+    }
+    fn withdrawn_parts(grant: &wire::Grant) -> (&[u8], &[u8]) {
+        let wire::GrantValue::Withdrawn(value) = grant.value() else { panic!("withdrawn value") };
+        (value.id().expose(), value.bearer().expose())
+    }
+    fn application_secret(grant: &wire::Grant) -> &[u8] {
+        let wire::GrantValue::Application(value) = grant.value() else { panic!("application value") };
+        value.secret().expose()
     }
     fn received_grants(world: &World, connection: Token) -> Vec<wire::Granted> {
         world
@@ -48,24 +64,24 @@ mod grants {
             .collect()
     }
     #[test]
-    fn a_grant_of_each_table_reaches_the_worker_with_its_value() {
+    fn a_grant_of_each_arm_reaches_the_worker_with_its_value() {
         let (mut world, connection, channel) = joined();
-        send_grant(&mut world, channel, host::GrantTable::Accounts);
-        send_grant(&mut world, channel, host::GrantTable::Application);
+        send_grant(&mut world, channel, host::GrantTable::Accounts, fixtures::credential_value(Scheme::Bearer));
+        send_grant(&mut world, channel, host::GrantTable::Accounts, fixtures::credential_value(Scheme::Key));
+        send_grant(&mut world, channel, host::GrantTable::Accounts, withdrawn());
+        send_grant(&mut world, channel, host::GrantTable::Application, application());
         let grants = received_grants(&world, connection);
-        assert_eq!(grants.len(), 2);
-        for (record, table, value, account_id) in [
-            (&grants[0], wire::GrantTable::Accounts, fixtures::TOKEN_ONE, fixtures::ACCOUNT_ID),
-            (&grants[1], wire::GrantTable::Application, fixtures::TOKEN_TWO, b"".as_slice()),
-        ] {
+        assert_eq!(grants.len(), 4);
+        for record in &grants {
             assert_eq!((record.task(), record.attempt()), (7, 2));
             let grant = record.grant();
-            assert_eq!(grant.table(), &table);
-            assert_eq!((grant.account(), grant.generation()), (1, 4));
+            assert_eq!((grant.number(), grant.generation()), (1, 4));
             assert_eq!(grant.valid(), skein_lib::Duration::from_secs(30));
-            assert_eq!(grant.value().expose(), value);
-            assert_eq!(grant.account_id().expose(), account_id);
         }
+        assert_eq!(credential(grants[0].grant()), (&wire::Scheme::Bearer, fixtures::TOKEN_ONE));
+        assert_eq!(credential(grants[1].grant()), (&wire::Scheme::Key, fixtures::TOKEN_ONE));
+        assert_eq!(withdrawn_parts(grants[2].grant()), (fixtures::ACCOUNT_ID, fixtures::TOKEN_ONE));
+        assert_eq!(application_secret(grants[3].grant()), fixtures::TOKEN_TWO);
     }
     #[test]
     fn an_assignment_reaches_the_worker_with_its_start_and_identity() {
@@ -81,10 +97,8 @@ mod grants {
         assert_eq!(assignment.messages().len(), 1);
         assert_eq!(assignment.messages().get(0).expect("message").words(), b"message");
         assert_eq!(assignment.grants().len(), 2);
-        assert_eq!(assignment_grant(&assignment, 0).value().expose(), fixtures::TOKEN_ONE);
-        assert_eq!(assignment_grant(&assignment, 0).account_id().expose(), fixtures::ACCOUNT_ID);
-        assert_eq!(assignment_grant(&assignment, 1).value().expose(), fixtures::TOKEN_TWO);
-        assert!(assignment_grant(&assignment, 1).account_id().expose().is_empty());
+        assert_eq!(withdrawn_parts(assignment_grant(&assignment, 0)), (fixtures::ACCOUNT_ID, fixtures::TOKEN_ONE));
+        assert_eq!(application_secret(assignment_grant(&assignment, 1)), fixtures::TOKEN_TWO);
     }
     #[test]
     fn an_assignment_drops_the_grant_the_table_no_longer_holds() {
@@ -100,14 +114,13 @@ mod grants {
         world.run();
         let assignment = received_assignment(&world, connection);
         assert_eq!(assignment.grants().len(), 1);
-        assert_eq!(assignment_grant(&assignment, 0).table(), &wire::GrantTable::Application);
-        assert_eq!(assignment_grant(&assignment, 0).value().expose(), fixtures::TOKEN_TWO);
+        assert_eq!(application_secret(assignment_grant(&assignment, 0)), fixtures::TOKEN_TWO);
     }
     #[test]
     fn a_down_record_for_a_lost_channel_is_dropped() {
         let (mut world, connection, channel) = joined();
         world.down(Event::Gone { connection });
-        send_grant(&mut world, channel, host::GrantTable::Accounts);
+        send_grant(&mut world, channel, host::GrantTable::Accounts, withdrawn());
         assert!(received_grants(&world, connection).is_empty());
         assert_eq!(world.dropped_down(), 1);
     }
@@ -116,7 +129,7 @@ mod grants {
         let mut world = world();
         let connection = world.connect(fixtures::worker(fixtures::WORKER_A, fixtures::SECRET_A, fixtures::PAYLOAD));
         world.run();
-        send_grant(&mut world, Token::new(1), host::GrantTable::Accounts);
+        send_grant(&mut world, Token::new(1), host::GrantTable::Accounts, withdrawn());
         assert!(received_grants(&world, connection).is_empty());
         assert_eq!(world.dropped_down(), 1);
     }

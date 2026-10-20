@@ -10,7 +10,7 @@ pub fn granted(account: u32, token: &[u8], generation: u64, valid: Duration) -> 
 }
 
 pub fn value(token: &[u8]) -> crate::table::Value {
-    crate::table::Value { token: Secret::new(bytes::copy_of(token)), account_id: Secret::new(bytes::copy_of(b"")) }
+    crate::table::Value { token: Secret::new(bytes::copy_of(token)), scheme: crate::table::Scheme::Bearer }
 }
 
 pub fn driver_limits() -> driver::Limits {

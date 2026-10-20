@@ -301,12 +301,15 @@ pub fn grant(table: jig_domain_host::GrantTable) -> jig_domain_host::Grant {
 }
 pub fn values() -> Box<[Option<crate::GrantValue>]> {
     Box::new([
-        Some(crate::GrantValue {
-            value: Secret::new(Box::from(TOKEN_ONE)),
-            account_id: Secret::new(Box::from(ACCOUNT_ID)),
+        Some(crate::GrantValue::Withdrawn {
+            id: Secret::new(Box::from(ACCOUNT_ID)),
+            bearer: Secret::new(Box::from(TOKEN_ONE)),
         }),
-        Some(crate::GrantValue { value: Secret::new(Box::from(TOKEN_TWO)), account_id: Secret::new(Box::new([])) }),
+        Some(crate::GrantValue::Application { secret: Secret::new(Box::from(TOKEN_TWO)) }),
     ])
+}
+pub fn credential_value(scheme: crate::Scheme) -> crate::GrantValue {
+    crate::GrantValue::Credential { scheme, token: Secret::new(Box::from(TOKEN_ONE)) }
 }
 pub fn parts() -> Box<[jig_protocol_worker_wire::Part]> {
     Box::new([jig_protocol_worker_wire::Part {

@@ -187,7 +187,7 @@ fn a_paused_core_timer_does_not_pin_the_service_while_stopping() {
     let live = due.saturating_add(LIVE_GAP);
     let value = jig_protocol_accounts::table::Value {
         token: Secret::new(fixtures::TOKEN.into()),
-        account_id: Secret::new(b"acc".as_slice().into()),
+        scheme: jig_protocol_accounts::table::Scheme::Bearer,
     };
     engine.values.accounts.granted(ACCOUNT, GENERATION, value, live).unwrap();
     engine.env.now = due;

@@ -172,6 +172,9 @@ impl skein_world::Referee<Proc> for Referee {
                 assert!(self.injected, "generation 2 announced while the agent was running");
                 application_generation(worker);
             }
+            if matches!(self.story, crate::stories::Story::Chat) {
+                assert_eq!(&*presented(worker, procs, false).1, crate::fixtures::TOKEN);
+            }
             self.passed = true;
         }
     }
@@ -203,34 +206,82 @@ impl skein_world::Referee<Proc> for Referee {
     }
 }
 
-fn application_generation(worker: &crate::processes::Wire) {
-    use jig_protocol_worker_wire::{Assignment, CEILINGS, GrantTable};
-    let assignment = worker
+fn assignment(worker: &crate::processes::Wire) -> jig_protocol_worker_wire::Assignment {
+    use jig_protocol_worker_wire::{Assignment, CEILINGS};
+    worker
         .frames
         .iter()
         .find_map(|(_, kind, bytes)| {
             (*kind == 0x0180)
                 .then(|| Assignment::decode(&CEILINGS, &mut skein_lib::Reader::new(bytes)).expect("assignment"))
         })
-        .expect("live assignment");
-    let initial = assignment
+        .expect("live assignment")
+}
+
+/// The live assignment's account grant is a credential in its scheme, and the
+/// provider saw it presented so: Anthropic's path tells a key from a bearer.
+/// Returns the grant's generation and bytes.
+fn presented(worker: &crate::processes::Wire, procs: &[Proc], key: bool) -> (u64, Box<[u8]>) {
+    use jig_protocol_worker_wire::{GrantValue, Scheme};
+    let assignment = assignment(worker);
+    let (grant, value) = assignment
         .grants()
         .iter()
-        .find(|grant| matches!(grant.table(), GrantTable::Application))
+        .find_map(|grant| match grant.value() {
+            GrantValue::Credential(value) => Some((grant, value)),
+            GrantValue::Withdrawn(_) | GrantValue::Application(_) => None,
+        })
+        .expect("assignment holds the account's credential");
+    assert_eq!(*value.scheme(), if key { Scheme::Key } else { Scheme::Bearer });
+    let (route, scheme) = if key {
+        (skein_llm::Provider::Anthropic, skein_llm::Scheme::Key)
+    } else {
+        (skein_llm::Provider::OpenAi, skein_llm::Scheme::Bearer)
+    };
+    let peer = procs
+        .iter()
+        .find_map(|proc| match proc {
+            Proc::Peer(peer) => Some(peer),
+            Proc::Engine(_) | Proc::Worker(_) | Proc::Agent { .. } | Proc::Probe(_) => None,
+        })
+        .expect("provider");
+    assert!(
+        peer.observations().iter().any(|observation| matches!(
+            observation,
+            skein_fake_peers::llm::Observation::Credential { route: seen, scheme: Some(presented), index: Some(0), .. }
+                if *seen == route && *presented == scheme
+        )),
+        "the provider matched the granted credential in its scheme"
+    );
+    (grant.generation(), value.bytes().expose().into())
+}
+
+fn application_generation(worker: &crate::processes::Wire) {
+    use jig_protocol_worker_wire::GrantValue;
+    let assignment = assignment(worker);
+    let (initial, secret) = assignment
+        .grants()
+        .iter()
+        .find_map(|grant| match grant.value() {
+            GrantValue::Application(value) => Some((grant, value.secret())),
+            GrantValue::Credential(_) | GrantValue::Withdrawn(_) => None,
+        })
         .expect("assignment holds the application credential");
-    assert_eq!(initial.account(), 1);
+    assert_eq!(initial.number(), 1);
     assert_eq!(initial.generation(), 1);
-    assert_eq!(initial.value().expose(), b"application-token");
-    let (fd, granted) = worker
+    assert_eq!(secret.expose(), b"application-token");
+    let (fd, granted, secret) = worker
         .granted
         .iter()
-        .find(|(_, frame)| matches!(frame.grant().table(), GrantTable::Application) && frame.grant().generation() == 2)
+        .find_map(|(fd, frame)| match frame.grant().value() {
+            GrantValue::Application(value) if frame.grant().generation() == 2 => Some((fd, frame, value.secret())),
+            GrantValue::Application(_) | GrantValue::Credential(_) | GrantValue::Withdrawn(_) => None,
+        })
         .expect("generation 2 Application grant received on the live attempt's connection (0x0187)");
     assert_eq!((granted.task(), granted.attempt()), (assignment.task(), assignment.attempt()));
     assert_eq!(worker.placements.get(&(granted.task(), granted.attempt())), Some(fd));
-    assert_eq!(granted.grant().account(), 1);
-    assert_eq!(granted.grant().value().expose(), b"application-token-2");
-    assert!(granted.grant().account_id().is_empty());
+    assert_eq!(granted.grant().number(), 1);
+    assert_eq!(secret.expose(), b"application-token-2");
     assert!(granted.grant().valid() > skein_lib::Duration::ZERO);
     let grant = worker.frames.iter().position(|(_, kind, _)| *kind == 0x0187).expect("granted frame");
     let answer = worker.frames.iter().position(|(_, kind, _)| *kind == 0x0103).expect("same attempt answers");

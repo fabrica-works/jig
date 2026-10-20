@@ -1,7 +1,7 @@
 //! Both real channel components, with scripted roots and seeded stream cuts.
 use jig_domain_host as host;
 use jig_protocol_engine_workers as engine;
-use jig_protocol_worker_link::{Component, Credential, Event, Limits, Request};
+use jig_protocol_worker_link::{Component, Credential, Event, GrantValue, Limits, Request, Scheme};
 use jig_protocol_worker_wire::Part;
 use jig_worker_link_world::fixtures;
 use skein_channel::{Lower, LowerEvent};
@@ -399,14 +399,51 @@ impl Joined {
     }
 }
 #[must_use]
-pub fn grant_value(table: host::GrantTable) -> engine::GrantValue {
-    let (token, account) = match table {
-        host::GrantTable::Accounts => (fixtures::TOKEN_ONE, fixtures::ACCOUNT_ONE),
-        host::GrantTable::Application => (fixtures::TOKEN_TWO, b"".as_slice()),
-    };
-    engine::GrantValue { value: Secret::new(token.into()), account_id: Secret::new(account.into()) }
+pub fn credential(scheme: engine::Scheme) -> engine::GrantValue {
+    engine::GrantValue::Credential { scheme, token: Secret::new(fixtures::TOKEN_ONE.into()) }
+}
+#[must_use]
+pub fn withdrawn() -> engine::GrantValue {
+    engine::GrantValue::Withdrawn {
+        id: Secret::new(fixtures::ACCOUNT_ONE.into()),
+        bearer: Secret::new(fixtures::TOKEN_ONE.into()),
+    }
+}
+#[must_use]
+pub fn application() -> engine::GrantValue {
+    engine::GrantValue::Application { secret: Secret::new(fixtures::TOKEN_TWO.into()) }
 }
 #[must_use]
 pub fn values() -> Box<[Option<engine::GrantValue>]> {
-    Box::new([Some(grant_value(host::GrantTable::Accounts)), Some(grant_value(host::GrantTable::Application))])
+    Box::new([Some(withdrawn()), Some(application())])
+}
+/// The host table a value belongs to.
+#[must_use]
+pub fn table(value: &engine::GrantValue) -> host::GrantTable {
+    match value {
+        engine::GrantValue::Credential { .. } | engine::GrantValue::Withdrawn { .. } => host::GrantTable::Accounts,
+        engine::GrantValue::Application { .. } => host::GrantTable::Application,
+    }
+}
+/// A value's arm and its bytes, so the engine's value and the layer's
+/// compare across their vocabularies.
+#[must_use]
+pub fn sent(value: &engine::GrantValue) -> (&'static str, Vec<u8>, Vec<u8>) {
+    match value {
+        engine::GrantValue::Credential { scheme: engine::Scheme::Bearer, token } => {
+            ("bearer", token.expose().into(), vec![])
+        }
+        engine::GrantValue::Credential { scheme: engine::Scheme::Key, token } => ("key", token.expose().into(), vec![]),
+        engine::GrantValue::Withdrawn { id, bearer } => ("withdrawn", bearer.expose().into(), id.expose().into()),
+        engine::GrantValue::Application { secret } => ("application", secret.expose().into(), vec![]),
+    }
+}
+#[must_use]
+pub fn received(value: &GrantValue) -> (&'static str, Vec<u8>, Vec<u8>) {
+    match value {
+        GrantValue::Credential { scheme: Scheme::Bearer, token } => ("bearer", token.expose().into(), vec![]),
+        GrantValue::Credential { scheme: Scheme::Key, token } => ("key", token.expose().into(), vec![]),
+        GrantValue::Withdrawn { id, bearer } => ("withdrawn", bearer.expose().into(), id.expose().into()),
+        GrantValue::Application { secret } => ("application", secret.expose().into(), vec![]),
+    }
 }

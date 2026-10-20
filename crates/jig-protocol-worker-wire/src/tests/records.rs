@@ -413,55 +413,70 @@ fn an_assignment_keeps_its_sixteen_byte_identity() {
     assert_eq!(decoded.identity(), &fixtures::IDENTITY_FIRST);
 }
 
+fn every_grant_value() -> [crate::GrantValue; 4] {
+    [
+        fixtures::credential_value(crate::Scheme::Bearer, fixtures::TOKEN_ONE),
+        fixtures::credential_value(crate::Scheme::Key, fixtures::KEY_ONE),
+        fixtures::withdrawn_value(),
+        fixtures::application_value(),
+    ]
+}
+
 #[test]
-fn a_grant_names_the_table_its_value_comes_from() {
-    for (table, value) in
-        [(crate::GrantTable::Accounts, fixtures::TOKEN_ONE), (crate::GrantTable::Application, fixtures::CREDENTIAL_ONE)]
-    {
-        let grant = fixtures::grant(table.clone(), 5, 9);
+fn each_grant_value_round_trips() {
+    for value in every_grant_value() {
+        let grant = fixtures::grant(value.clone(), 5, 9);
         let decoded = grant_through_bytes(&grant);
-        assert_eq!(decoded.table(), &table);
-        assert_eq!(decoded.value().expose(), value);
+        assert_eq!(decoded.value(), &value);
         assert_eq!(decoded, grant);
     }
 }
 
 #[test]
-fn an_accounts_grant_keeps_its_account_id_separate_from_its_token() {
-    let decoded = grant_through_bytes(&fixtures::grant(crate::GrantTable::Accounts, 5, 9));
-    assert_eq!(decoded.value().expose(), fixtures::TOKEN_ONE);
-    assert_eq!(decoded.account_id().expose(), fixtures::ACCOUNT_ONE);
+fn a_credential_grant_keeps_its_scheme_with_its_bytes() {
+    for (scheme, bytes) in [(crate::Scheme::Bearer, fixtures::TOKEN_ONE), (crate::Scheme::Key, fixtures::KEY_ONE)] {
+        let decoded = grant_through_bytes(&fixtures::grant(fixtures::credential_value(scheme.clone(), bytes), 5, 9));
+        let crate::GrantValue::Credential(value) = decoded.value() else { panic!("a credential: {decoded:?}") };
+        assert_eq!((value.scheme(), value.bytes().expose()), (&scheme, bytes));
+    }
 }
 
 #[test]
-fn an_applications_grant_carries_an_empty_account_id() {
-    let decoded = grant_through_bytes(&fixtures::grant(crate::GrantTable::Application, 5, 9));
-    assert_eq!(decoded.account_id().expose(), b"");
+fn a_withdrawn_grant_keeps_its_account_id_separate_from_its_bearer() {
+    let decoded = grant_through_bytes(&fixtures::grant(fixtures::withdrawn_value(), 5, 9));
+    let crate::GrantValue::Withdrawn(value) = decoded.value() else { panic!("a withdrawn value: {decoded:?}") };
+    assert_eq!(value.bearer().expose(), fixtures::TOKEN_ONE);
+    assert_eq!(value.id().expose(), fixtures::ACCOUNT_ONE);
 }
 
-fn granted_debug() -> Box<[u8]> {
+fn granted_debug(value: crate::GrantValue) -> Box<[u8]> {
     let record = crate::Granted::new(
         &fixtures::LIMITS,
-        crate::GrantedParts { task: 3, attempt: 4, grant: fixtures::grant(crate::GrantTable::Accounts, 5, 9) },
+        crate::GrantedParts { task: 3, attempt: 4, grant: fixtures::grant(value, 5, 9) },
     )
     .expect("granted record");
     alloc::fmt::format(format_args!("{record:?}")).into_bytes().into_boxed_slice()
 }
 
 #[test]
-fn a_granted_record_debug_shows_the_value_length_only() {
-    let debug = granted_debug();
-    assert!(skein_lib::bytes::find(&debug, b"len: 9").is_some());
-    assert_eq!(skein_lib::bytes::find(&debug, fixtures::TOKEN_ONE), None);
-    assert_eq!(skein_lib::bytes::find(&debug, b"116, 111, 107, 101, 110, 45, 111, 110, 101"), None);
+fn a_granted_record_debug_shows_the_credentials_length_only() {
+    let debug = granted_debug(fixtures::credential_value(crate::Scheme::Key, fixtures::KEY_ONE));
+    assert!(skein_lib::bytes::find(&debug, b"len: 7").is_some());
+    assert_eq!(skein_lib::bytes::find(&debug, fixtures::KEY_ONE), None);
+    assert_eq!(skein_lib::bytes::find(&debug, b"107, 101, 121, 45, 111, 110, 101"), None);
 }
 
 #[test]
-fn a_granted_record_debug_shows_the_account_id_length_only() {
-    let debug = granted_debug();
-    assert!(skein_lib::bytes::find(&debug, b"len: 11").is_some());
-    assert_eq!(skein_lib::bytes::find(&debug, fixtures::ACCOUNT_ONE), None);
-    assert_eq!(skein_lib::bytes::find(&debug, b"97, 99, 99, 111, 117, 110, 116, 45, 111, 110, 101"), None);
+fn a_granted_record_debug_shows_a_withdrawn_values_lengths_only() {
+    let debug = granted_debug(fixtures::withdrawn_value());
+    for (secret, length, bytes) in [
+        (fixtures::TOKEN_ONE, b"len: 9".as_slice(), b"116, 111, 107, 101, 110, 45, 111, 110, 101".as_slice()),
+        (fixtures::ACCOUNT_ONE, b"len: 11", b"97, 99, 99, 111, 117, 110, 116, 45, 111, 110, 101"),
+    ] {
+        assert!(skein_lib::bytes::find(&debug, length).is_some());
+        assert_eq!(skein_lib::bytes::find(&debug, secret), None);
+        assert_eq!(skein_lib::bytes::find(&debug, bytes), None);
+    }
 }
 
 #[test]
@@ -488,8 +503,8 @@ fn a_relayed_busy_answer_carries_no_text() {
 fn an_assignment_past_its_grant_bound_is_refused() {
     let mut parts = fixtures::assignment_resumed().into_parts();
     let mut grants = List::with_capacity(3);
-    for account in [5, 6, 7] {
-        grants.push(fixtures::grant(crate::GrantTable::Accounts, account, 9)).expect("three fixture slots");
+    for number in [5, 6, 7] {
+        grants.push(fixtures::grant(fixtures::application_value(), number, 9)).expect("three fixture slots");
     }
     parts.grants = grants;
     assert_eq!(
@@ -509,16 +524,6 @@ fn the_schema_lists_every_down_kind_from_the_responder() {
             Some(skein_channel::Kind { kind: term.kind, direction: Direction::FromResponder, largest: term.largest })
         );
     }
-}
-
-#[test]
-fn an_accounts_grant_without_a_provider_id_carries_an_empty_account_id() {
-    let mut parts = fixtures::grant(crate::GrantTable::Accounts, 5, 9).into_parts();
-    parts.account_id = skein_lib::Secret::new(b"".as_slice().into());
-    let grant = crate::Grant::new(&fixtures::LIMITS, parts).expect("provider without an account id");
-    let decoded = grant_through_bytes(&grant);
-    assert_eq!(decoded.account_id().expose(), b"");
-    assert_eq!(decoded.value().expose(), fixtures::TOKEN_ONE);
 }
 
 #[test]

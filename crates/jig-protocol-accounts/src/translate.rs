@@ -1,18 +1,20 @@
 //! Total vocabulary translation (protocol/llm.md, section 5.2).
+use crate::table;
 use jig_domain_accounts as accounts;
 use skein_lib::{Secret, Time};
 use skein_oauth as oauth;
 use skein_oauth_accounts as driver;
 
-/// A grant's value travels beside the child's secret-free event; a record
-/// to keep goes to the owner's store, never to the child.
+/// A grant's value travels beside the child's secret-free event; the
+/// driver's tokens are bearer credentials. A record to keep goes to the
+/// owner's store, never to the child.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Up {
     Granted {
         event: accounts::FromComponent,
         account: u32,
         generation: u64,
-        value: Secret,
+        value: table::Value,
         expires: Time,
     },
     Child(accounts::FromComponent),
@@ -51,7 +53,7 @@ pub fn up(event: driver::Event, now: Time) -> Up {
             event: accounts::FromComponent::Granted { account, generation, valid },
             account,
             generation,
-            value: Secret::new(token),
+            value: table::Value { token: Secret::new(token), scheme: table::Scheme::Bearer },
             expires: now.saturating_add(valid),
         },
         driver::Event::Expiring { account, generation } => {

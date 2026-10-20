@@ -46,7 +46,7 @@ fn a_rejected_generation_reaches_the_driver_unchanged() {
     );
 }
 #[test]
-fn a_granted_token_is_handed_out_as_a_secret() {
+fn a_granted_token_is_handed_out_as_a_bearer_secret() {
     for (token, generation) in [(TOKEN_FIRST, 1_u64), (TOKEN_SECOND, 2_u64)] {
         let up =
             translate::up(fixtures::granted(ACCOUNT_CHAT, token, generation, Duration::from_nanos(10)), fixtures::NOW);
@@ -60,7 +60,7 @@ fn a_granted_token_is_handed_out_as_a_secret() {
                 },
                 account: ACCOUNT_CHAT,
                 generation,
-                value: Secret::new(bytes::copy_of(token)),
+                value: fixtures::value(token),
                 expires: Time::from_nanos(15),
             }
         );

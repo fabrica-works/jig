@@ -79,17 +79,20 @@ fn a_turn_is_encoded_against_the_worker_s_endpoints() {
 }
 #[test]
 fn a_grant_s_value_reaches_smith_s_host_half_in_its_envelope() {
-    let largest_id = Box::new([b'i'; 256]);
+    use jig_protocol_accounts::table::{Scheme, Value};
+    use skein_lib::Secret;
     let largest_token = Box::new([b't'; 7934]);
-    for (label, id, token) in [
-        ("short envelope", b"account".as_slice(), b"access".as_slice()),
-        ("full envelope", largest_id.as_slice(), largest_token.as_slice()),
+    let short = Secret::new(b"account".as_slice().into());
+    let largest_id = Secret::new(Box::new([b'i'; 256]));
+    for (label, scheme, token) in [
+        ("bearer", Scheme::Bearer, b"access".as_slice()),
+        ("key", Scheme::Key, b"access".as_slice()),
+        ("withdrawn", Scheme::Withdrawn { id: short }, b"access".as_slice()),
+        ("full key", Scheme::Key, largest_token.as_slice()),
+        ("full withdrawn", Scheme::Withdrawn { id: largest_id }, largest_token.as_slice()),
     ] {
         let mut service = fixtures::worker_service();
-        let value = jig_protocol_accounts::table::Value {
-            token: skein_lib::Secret::new(token.into()),
-            account_id: skein_lib::Secret::new(id.into()),
-        };
+        let value = Value { token: Secret::new(token.into()), scheme: scheme.clone() };
         worker(&mut service).granted(1, 1, value, Time::from_nanos(30_000_000_000));
         let body = start_on_pipes(&mut service);
         let agent = fixtures::agent();
@@ -98,9 +101,19 @@ fn a_grant_s_value_reaches_smith_s_host_half_in_its_envelope() {
         let grant = start.grants().get(0).expect(label);
         assert_eq!(grant.account(), 1, "{label}");
         assert_eq!(grant.generation(), 1, "{label}");
-        let smith_channel::GrantValue::Withdrawn(value) = grant.value() else { panic!("{label}: withdrawn grant") };
-        assert_eq!(value.id(), id, "{label}");
-        assert_eq!(value.bearer(), &skein_lib::Secret::new(token.into()), "{label}");
+        let token = Secret::new(token.into());
+        match (&scheme, grant.value()) {
+            (Scheme::Bearer, smith_channel::GrantValue::Credential(value)) => {
+                assert_eq!((value.scheme(), value.bytes()), (&smith_channel::Scheme::Bearer, &token), "{label}");
+            }
+            (Scheme::Key, smith_channel::GrantValue::Credential(value)) => {
+                assert_eq!((value.scheme(), value.bytes()), (&smith_channel::Scheme::Key, &token), "{label}");
+            }
+            (Scheme::Withdrawn { id }, smith_channel::GrantValue::Withdrawn(value)) => {
+                assert_eq!((value.id(), value.bearer()), (id.expose(), &token), "{label}");
+            }
+            _ => panic!("{label}: the grant's own arm"),
+        }
     }
 }
 #[test]
@@ -294,15 +307,18 @@ fn the_engine_s_listener_opens_before_its_workers_start() {
 fn a_worker_refuses_limits_that_cannot_carry_its_account_envelope() {
     let large =
         fixtures::with(fixtures::WORKER_DOCUMENT, b"\"hub.turns\":1", b"\"hub.turns\":1,\"accounts.token\":8192");
-    let id = jig_protocol_worker_wire::CEILINGS.grant_account_id;
+    let id = jig_protocol_worker_wire::CEILINGS.withdrawn_value_id;
     let bearer = smith_channel::CEILINGS.withdrawn_value_bearer;
-    for (label, document, id, bearer) in [
-        ("caller bearer too small", large.as_ref(), id, bearer - 1),
-        ("caller account id too small", fixtures::WORKER_DOCUMENT, id - 1, bearer),
+    let credential = smith_channel::CEILINGS.credential_value_bytes;
+    for (label, document, id, bearer, credential) in [
+        ("caller credential too small", large.as_ref(), id, bearer, credential - 1),
+        ("caller bearer too small", large.as_ref(), id, bearer - 1, credential),
+        ("caller account id too small", fixtures::WORKER_DOCUMENT, id - 1, bearer, credential),
     ] {
         let mut agent = fixtures::agent();
         agent.limits.bodies.withdrawn_value_id = id;
         agent.limits.bodies.withdrawn_value_bearer = bearer;
+        agent.limits.bodies.credential_value_bytes = credential;
         let found = crate::startup(
             document,
             &fixtures::worker_files(),

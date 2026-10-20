@@ -370,15 +370,16 @@ pub fn grant(table: jig_domain_host::GrantTable) -> jig_domain_host::Grant {
 #[must_use]
 pub fn values() -> Box<[Option<jig_protocol_engine_workers::GrantValue>]> {
     Box::new([
-        Some(jig_protocol_engine_workers::GrantValue {
-            value: Secret::new(Box::from(TOKEN_ONE)),
-            account_id: Secret::new(Box::from(ACCOUNT_ID)),
+        Some(jig_protocol_engine_workers::GrantValue::Withdrawn {
+            id: Secret::new(Box::from(ACCOUNT_ID)),
+            bearer: Secret::new(Box::from(TOKEN_ONE)),
         }),
-        Some(jig_protocol_engine_workers::GrantValue {
-            value: Secret::new(Box::from(TOKEN_TWO)),
-            account_id: Secret::new(Box::new([])),
-        }),
+        Some(jig_protocol_engine_workers::GrantValue::Application { secret: Secret::new(Box::from(TOKEN_TWO)) }),
     ])
+}
+#[must_use]
+pub fn credential_value(scheme: jig_protocol_engine_workers::Scheme) -> jig_protocol_engine_workers::GrantValue {
+    jig_protocol_engine_workers::GrantValue::Credential { scheme, token: Secret::new(Box::from(TOKEN_ONE)) }
 }
 #[must_use]
 pub fn parts() -> Box<[jig_protocol_worker_wire::Part]> {

@@ -1,6 +1,6 @@
 use jig_protocol_accounts::{
     ACCOUNT_ID_BYTES,
-    table::{self, Table, Value},
+    table::{self, Scheme, Table, Value},
 };
 use skein_heap::{Counting, Meter};
 use skein_lib::{Secret, Time, bytes};
@@ -24,7 +24,7 @@ fn the_table_at_its_limits_stays_within_its_worst_case() {
                     generation,
                     Value {
                         token: Secret::new(bytes::zeroed(token_length)),
-                        account_id: Secret::new(bytes::zeroed(id_length)),
+                        scheme: Scheme::Withdrawn { id: Secret::new(bytes::zeroed(id_length)) },
                     },
                     Time::from_nanos(1000),
                 )

@@ -1,7 +1,7 @@
 #[path = "../src/joined.rs"]
 pub mod joined;
 mod agreement {
-    use super::joined::{Joined, grant_value, values};
+    use super::joined::{Joined, application, credential, received, sent, table, values, withdrawn};
     use jig_domain_host as host;
     use jig_protocol_engine_workers as engine;
     use jig_protocol_worker_link::Request;
@@ -124,32 +124,27 @@ mod agreement {
     }
     #[test]
     fn a_grant_crosses_as_a_name_and_a_value() {
-        for table in [host::GrantTable::Accounts, host::GrantTable::Application] {
+        for sent_value in
+            [credential(engine::Scheme::Bearer), credential(engine::Scheme::Key), withdrawn(), application()]
+        {
+            let (table, expected) = (table(&sent_value), sent(&sent_value));
             let mut world = world();
             world.engine_down(
                 host::LinkDown::Grant { run: RUN_SEVEN, attempt: ATTEMPT_TWO, grant: fixtures::grant(table) },
                 Box::new([]),
-                Box::new([Some(grant_value(table))]),
+                Box::new([Some(sent_value)]),
             );
             world.run();
             assert_eq!(
                 down(&world).0,
                 &host::LinkDown::Grant { run: RUN_SEVEN, attempt: ATTEMPT_TWO, grant: fixtures::grant(table) }
             );
-            let Request::Value { table: owner, account, generation, expires, value, account_id } = &world.values[0]
-            else {
-                panic!("value")
-            };
+            let Request::Value { account, generation, expires, value } = &world.values[0] else { panic!("value") };
             assert_eq!(
-                (*owner, *account, *generation, *expires),
-                (table, 1, 3, skein_lib::Time::ZERO.saturating_add(Duration::from_secs(60)))
+                (*account, *generation, *expires),
+                (1, 3, skein_lib::Time::ZERO.saturating_add(Duration::from_secs(60)))
             );
-            let (token, id) = match table {
-                host::GrantTable::Accounts => (fixtures::TOKEN_ONE, fixtures::ACCOUNT_ONE),
-                host::GrantTable::Application => (fixtures::TOKEN_TWO, b"".as_slice()),
-            };
-            assert_eq!(value.expose(), token);
-            assert_eq!(account_id.expose(), id);
+            assert_eq!(received(value), expected);
             assert_eq!(world.worker_order, ["value", "down"]);
             world.finish();
         }

@@ -120,19 +120,22 @@ pub fn work_parts() -> Box<[Part]> {
         Part { token: Token::new(11), bytes: b"saved".as_slice().into() },
     ])
 }
-pub fn grant_record(table: wire::GrantTable) -> wire::Grant {
-    wire::Grant::new(
-        &codec(),
-        wire::GrantParts {
-            table,
-            account: 1,
-            generation: 3,
-            valid: Duration::from_secs(60),
-            value: Secret::new(TOKEN_ONE.into()),
-            account_id: Secret::new(ACCOUNT_ONE.into()),
-        },
-    )
-    .expect("grant")
+pub fn credential_value(scheme: wire::Scheme) -> wire::GrantValue {
+    let parts = wire::CredentialValueParts { scheme, bytes: Secret::new(TOKEN_ONE.into()) };
+    wire::GrantValue::Credential(wire::CredentialValue::new(&codec(), parts).expect("credential"))
+}
+pub fn withdrawn_value() -> wire::GrantValue {
+    let parts =
+        wire::WithdrawnValueParts { id: Secret::new(ACCOUNT_ONE.into()), bearer: Secret::new(TOKEN_ONE.into()) };
+    wire::GrantValue::Withdrawn(wire::WithdrawnValue::new(&codec(), parts).expect("withdrawn"))
+}
+pub fn application_value() -> wire::GrantValue {
+    let parts = wire::ApplicationValueParts { secret: Secret::new(TOKEN_ONE.into()) };
+    wire::GrantValue::Application(wire::ApplicationValue::new(&codec(), parts).expect("application"))
+}
+pub fn grant_record(value: wire::GrantValue) -> wire::Grant {
+    wire::Grant::new(&codec(), wire::GrantParts { number: 1, generation: 3, valid: Duration::from_secs(60), value })
+        .expect("grant")
 }
 pub fn assignment_record(transcript: Box<[u8]>) -> wire::Assignment {
     let limits = codec();
@@ -150,8 +153,8 @@ pub fn assignment_record(transcript: Box<[u8]>) -> wire::Assignment {
         )
         .expect("room");
     let mut grants = List::with_capacity(2);
-    grants.push(grant_record(wire::GrantTable::Accounts)).expect("room");
-    grants.push(grant_record(wire::GrantTable::Application)).expect("room");
+    grants.push(grant_record(withdrawn_value())).expect("room");
+    grants.push(grant_record(application_value())).expect("room");
     let mut answered = List::with_capacity(1);
     let answer =
         wire::HostAnswer::new(&limits, wire::HostAnswerParts { error: false, body: b"answer".as_slice().into() })

@@ -21,6 +21,7 @@ fn configuration(directory: &Path, source: &Path) -> codec::Limits {
     engine["llm"]["accounts"][0]["source"]["handed_in"]["file"] = settings["account_file"].clone();
     let endpoint = &mut engine["llm"]["endpoints"][0];
     endpoint["provider"] = "codex".into();
+    endpoint["dialect"] = 1.into();
     endpoint["address"] = serde_json::json!({"socket":settings["address"]});
     endpoint["transport"] = "tls".into();
     endpoint["server_name"] = "chatgpt.com".into();
@@ -44,7 +45,10 @@ fn configuration(directory: &Path, source: &Path) -> codec::Limits {
     let path = directory.join("agent.json");
     let mut agent: serde_json::Value =
         serde_json::from_slice(&fs::read(&path).expect("agent fixture")).expect("agent JSON");
+    // The live record names its account: the withdrawn Codex arm, kept for this test only.
     let endpoint = &mut agent["endpoints"][0];
+    endpoint["provider"] = "codex".into();
+    endpoint["dialect"] = 1.into();
     endpoint["address"] = settings["address"].clone();
     endpoint["server_name"] = "chatgpt.com".into();
     endpoint.as_object_mut().expect("endpoint").remove("trust_der");

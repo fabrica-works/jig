@@ -1,7 +1,10 @@
 use super::fixtures;
 use crate::{End, Stop};
 use jig_domain_core as core;
+use jig_protocol_accounts::table::{Scheme, Value};
+use jig_protocol_engine_workers::{self as engine, GrantValue};
 use jig_protocol_store::Event as StoreEvent;
+use skein_lib::Secret;
 
 #[test]
 fn the_restart_asks_one_load_at_a_time() {
@@ -198,7 +201,19 @@ fn a_handed_in_record_is_kept_before_its_value_is_lent() {
     assert_eq!((record.key, &*record.access_token), (1, fixtures::TOKEN));
     let value = engine.values.accounts.value(1, 1, skein_lib::Time::from_nanos(1)).expect("lent value");
     assert_eq!(value.token.expose(), fixtures::TOKEN);
-    assert_eq!(value.account_id.expose(), b"acc");
+    assert_eq!(value.scheme, Scheme::Bearer);
+}
+#[test]
+fn a_handed_in_record_with_an_account_id_is_lent_withdrawn_beside_it() {
+    let document = fixtures::with(&fixtures::accounts_document(), b"accounts/chat.json", b"accounts/live.json");
+    let mut service = fixtures::started(&document);
+    for _ in 0_u32..8 {
+        fixtures::turn(&mut service);
+    }
+    let engine = fixtures::engine(&mut service);
+    let value = engine.values.accounts.value(1, 1, skein_lib::Time::from_nanos(1)).expect("lent value");
+    assert_eq!(value.token.expose(), fixtures::TOKEN);
+    assert_eq!(value.scheme, Scheme::Withdrawn { id: Secret::new(b"acc".as_slice().into()) });
 }
 
 #[test]
@@ -239,7 +254,7 @@ fn encoded_assignment(
     config: &jig_protocol_config::Engine,
     values: &crate::values::Values,
     attempt: u64,
-) -> (jig_domain_host::Assignment, Box<[Option<jig_protocol_engine_workers::GrantValue>]>) {
+) -> (jig_domain_host::Assignment, Box<[Option<GrantValue>]>) {
     let mut assignment = fixtures::assignment(config);
     assignment.attempt = attempt;
     let event = workers
@@ -276,12 +291,36 @@ fn an_assignment_leaves_with_its_charter_encoded_and_grants_filled() {
     assert_eq!(decoded.brief.sections[1].title.as_ref(), b"Results");
     assert_eq!(decoded.brief.sections[1].text.as_ref(), b"Prior result");
     assert_eq!(grants.len(), 2);
-    let account = grants[0].as_ref().expect("account grant value");
-    assert_eq!(account.value.expose(), fixtures::TOKEN);
-    assert_eq!(account.account_id.expose(), b"acc");
-    let application = grants[1].as_ref().expect("application grant value");
-    assert_eq!(application.value.expose(), b"application-token");
-    assert!(application.account_id.expose().is_empty());
+    let Some(GrantValue::Credential { scheme: engine::Scheme::Bearer, token }) = &grants[0] else {
+        panic!("a bearer account grant");
+    };
+    assert_eq!(token.expose(), fixtures::TOKEN);
+    let Some(GrantValue::Application { secret }) = &grants[1] else { panic!("an application grant") };
+    assert_eq!(secret.expose(), b"application-token");
+}
+#[test]
+fn each_scheme_reaches_the_engine_s_grant_value() {
+    use jig_domain_host::{Grant, GrantTable};
+    use skein_lib::{Duration, Time};
+    let id = Secret::new(b"acc".as_slice().into());
+    for (scheme, expected) in [
+        (Scheme::Bearer, ("bearer", b"".as_slice())),
+        (Scheme::Key, ("key", b"".as_slice())),
+        (Scheme::Withdrawn { id: id.clone() }, ("withdrawn", b"acc".as_slice())),
+    ] {
+        let mut values = fixtures::values();
+        let value = Value { token: Secret::new(fixtures::TOKEN.into()), scheme };
+        values.accounts.granted(1, 2, value, Time::from_nanos(1)).expect("room");
+        let grant = Grant { table: GrantTable::Accounts, account: 1, generation: 2, valid: Duration::from_secs(1) };
+        let grants = values.grants(&[grant], Time::ZERO);
+        let found = match &grants[0] {
+            Some(GrantValue::Credential { scheme: engine::Scheme::Bearer, token }) => ("bearer", token, b"".as_slice()),
+            Some(GrantValue::Credential { scheme: engine::Scheme::Key, token }) => ("key", token, b"".as_slice()),
+            Some(GrantValue::Withdrawn { id, bearer }) => ("withdrawn", bearer, id.expose()),
+            Some(GrantValue::Application { .. }) | None => panic!("an account grant"),
+        };
+        assert_eq!((found.0, found.1.expose(), found.2), (expected.0, fixtures::TOKEN, expected.1));
+    }
 }
 #[test]
 fn a_grant_whose_generation_the_table_lacks_is_left_out() {
@@ -324,7 +363,8 @@ fn application_grants_keep_the_two_newest_generations_per_number() {
             Time::ZERO,
         );
         match &grants[0] {
-            Some(grant) => assert_eq!(Some(grant.value.expose()), expected),
+            Some(GrantValue::Application { secret }) => assert_eq!(Some(secret.expose()), expected),
+            Some(GrantValue::Credential { .. } | GrantValue::Withdrawn { .. }) => panic!("an application grant"),
             None => assert_eq!(expected, None),
         }
     }

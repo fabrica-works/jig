@@ -16,6 +16,21 @@ pub enum Event {
     Gone { connection: Token },
     CancelRelay { run: Token, attempt: Token, call: Box<[u8]> },
 }
+/// A grant's value: a credential with its scheme, or an application's
+/// secret. `Withdrawn` keeps a provider account id beside a bearer token for
+/// jig's live test only, until JP13 removes it.
+#[derive(Debug)]
+pub enum GrantValue {
+    Credential { scheme: Scheme, token: Secret },
+    Withdrawn { id: Secret, bearer: Secret },
+    Application { secret: Secret },
+}
+/// How a credential is presented (protocol/channel.md, 8).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Scheme {
+    Bearer,
+    Key,
+}
 #[derive(Debug)]
 pub enum Request {
     Ready,
@@ -37,12 +52,10 @@ pub enum Request {
         parts: Box<[Part]>,
     },
     Value {
-        table: host::GrantTable,
         account: u32,
         generation: u64,
         expires: Time,
-        value: Secret,
-        account_id: Secret,
+        value: GrantValue,
     },
     Dial,
     Lower {

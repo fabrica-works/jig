@@ -19,21 +19,45 @@ fn assigned() -> (host::Assignment, Box<[Part]>, Queue<Request>) {
 fn body(frame: &skein_channel::Frame) -> Reader<'_> {
     Reader::new(frame.bytes().get(8..).expect("body after header"))
 }
-#[test]
-fn a_granted_record_hands_its_value_out_and_the_hub_hears_the_name() {
+fn granted(value: wire::GrantValue) -> (host::Grant, crate::GrantValue) {
     let record = wire::Granted::new(
         &fixtures::codec(),
-        wire::GrantedParts { task: 7, attempt: 2, grant: fixtures::grant_record(wire::GrantTable::Accounts) },
+        wire::GrantedParts { task: 7, attempt: 2, grant: fixtures::grant_record(value) },
     )
     .expect("grant");
     let bytes = fixtures::granted_bytes(&record);
     let (link, _, mut values) = translated(0x0187, &bytes, &fixtures::codec());
     let host::LinkDown::Grant { run, attempt, grant } = link else { panic!("grant: {link:?}") };
-    assert_eq!((run, attempt, grant.generation), (Token::new(7), Token::new(2), 3));
-    let Request::Value { value, account_id, expires, .. } = values.pop().expect("one value") else { panic!("value") };
-    assert_eq!(value.expose(), fixtures::TOKEN_ONE);
-    assert_eq!(account_id.expose(), fixtures::ACCOUNT_ONE);
+    assert_eq!((run, attempt, grant.account, grant.generation), (Token::new(7), Token::new(2), 1, 3));
+    let Request::Value { account, generation, value, expires } = values.pop().expect("one value") else {
+        panic!("value")
+    };
+    assert_eq!((account, generation), (1, 3));
     assert_eq!(expires, Time::ZERO.saturating_add(skein_lib::Duration::from_secs(60)));
+    (grant, value)
+}
+#[test]
+fn a_granted_credential_hands_its_scheme_and_token_out_and_the_hub_hears_the_account() {
+    for (scheme, expected) in [(wire::Scheme::Bearer, crate::Scheme::Bearer), (wire::Scheme::Key, crate::Scheme::Key)] {
+        let (grant, value) = granted(fixtures::credential_value(scheme));
+        assert_eq!(grant.table, host::GrantTable::Accounts);
+        let crate::GrantValue::Credential { scheme, token } = value else { panic!("credential: {value:?}") };
+        assert_eq!((scheme, token.expose()), (expected, fixtures::TOKEN_ONE));
+    }
+}
+#[test]
+fn a_granted_withdrawn_value_keeps_its_account_id_apart_from_its_bearer() {
+    let (grant, value) = granted(fixtures::withdrawn_value());
+    assert_eq!(grant.table, host::GrantTable::Accounts);
+    let crate::GrantValue::Withdrawn { id, bearer } = value else { panic!("withdrawn: {value:?}") };
+    assert_eq!((id.expose(), bearer.expose()), (fixtures::ACCOUNT_ONE, fixtures::TOKEN_ONE));
+}
+#[test]
+fn a_granted_application_secret_names_the_application_table() {
+    let (grant, value) = granted(fixtures::application_value());
+    assert_eq!(grant.table, host::GrantTable::Application);
+    let crate::GrantValue::Application { secret } = value else { panic!("application: {value:?}") };
+    assert_eq!(secret.expose(), fixtures::TOKEN_ONE);
 }
 #[test]
 fn a_hub_turn_becomes_a_turn_record_with_its_refusals() {

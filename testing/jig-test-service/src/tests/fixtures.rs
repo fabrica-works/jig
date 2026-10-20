@@ -131,10 +131,11 @@ pub const NAMES: [&[u8]; 5] = [
     b"app.secret",
 ];
 pub fn files(_document: &[u8]) -> Files {
-    let mut entries = List::with_capacity(5);
-    for name in NAMES {
+    let mut entries = List::with_capacity(6);
+    for name in [b"accounts/live.json".as_slice()].into_iter().chain(NAMES) {
         let contents = match name {
             b"accounts/chat.json" => ACCOUNT,
+            b"accounts/live.json" => LIVE_ACCOUNT,
             b"secrets/worker-a.digest" => DIGEST_A,
             b"secrets/worker-b.digest" => DIGEST_B,
             _ => b"fixture contents",
@@ -334,7 +335,10 @@ pub fn engine(service: &mut Service) -> &mut crate::Engine {
     service.engine().expect("fixture engine")
 }
 
-pub const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":120,"account_id":"acc"}"#;
+pub const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":120}"#;
+/// jig's live test's record: a provider account id beside the bearer (D2,
+/// until JP13).
+pub const LIVE_ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":120,"account_id":"acc"}"#;
 pub const TOKEN: &[u8] = b"test-token";
 pub const SIGNED_SOURCE: &[u8] = br#"{"sign_in":{"client":"client","authorization":"http://127.0.0.1:7101/authorize","token":"http://127.0.0.1:7101/token","endpoint":{"socket":"127.0.0.1:7101"},"transport":"plaintext","redirect":"http://localhost:7123/callback","scope":"read"}}"#;
 pub const DIGEST_A: &[u8] = b"8766b9cb08e6040b704f1e3ee1e186efccf2635b1d2634d6525333007e6aeae1";
@@ -366,7 +370,7 @@ pub fn values() -> crate::values::Values {
             1,
             jig_protocol_accounts::table::Value {
                 token: Secret::new(TOKEN.into()),
-                account_id: Secret::new(b"acc".as_slice().into()),
+                scheme: jig_protocol_accounts::table::Scheme::Bearer,
             },
             Time::from_nanos(120_000_000_000),
         )
@@ -636,7 +640,7 @@ pub fn combined_document() -> Box<[u8]> {
 }
 
 pub fn combined_files(document: &[u8]) -> Files {
-    let mut entries = List::with_capacity(7);
+    let mut entries = List::with_capacity(8);
     for file in files(document).entries.into_boxed() {
         entries.push(file).expect("engine files");
     }

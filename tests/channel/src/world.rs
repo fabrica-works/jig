@@ -565,14 +565,12 @@ fn launch(
             let peer = if matches!(script.story, crate::stories::Story::Window) {
                 processes::window_provider(scripts)
             } else {
-                smith_agent_process_world::fake::configured(
+                fixtures::provider(
                     scripts,
-                    skein_llm::Credential {
-                        value: fixtures::TOKEN.into(),
-                        account_id: b"acc".as_slice().into(),
-                        scheme: skein_llm::Scheme::Bearer,
-                    },
+                    skein_llm::Credential::bearer(fixtures::TOKEN.into()),
                     script.latency,
+                    skein_fake_peers::Transport::Plaintext,
+                    skein_fake_llm_protocol::documents::Provider::OpenAi,
                 )
             };
             Proc::Peer(Box::new(peer))

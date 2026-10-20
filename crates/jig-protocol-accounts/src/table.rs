@@ -1,14 +1,22 @@
 //! The two newest lent generations per account (protocol/llm.md, 5.3).
-//! Routing supplies the token and provider account id as separate secrets.
+//! A value is a credential with its scheme (protocol/channel.md, 8).
 use skein_lib::{List, Secret, Time};
 
-/// The provider account id bound; empty when the provider names none.
+/// The withdrawn arm's provider account id bound.
 pub const ACCOUNT_ID_BYTES: u32 = 256;
-/// A grant's two secret parts, put in its taker's form only when handed over.
+/// A grant's credential, put in its taker's form only when handed over.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Value {
     pub token: Secret,
-    pub account_id: Secret,
+    pub scheme: Scheme,
+}
+/// How the credential is presented. `Withdrawn` keeps a provider account id
+/// beside a bearer token for jig's live test only, until JP13 removes it.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Scheme {
+    Bearer,
+    Key,
+    Withdrawn { id: Secret },
 }
 #[derive(Debug)]
 pub struct Table {
@@ -40,8 +48,12 @@ impl Table {
         Table { accounts: slots, token_bytes }
     }
     pub fn granted(&mut self, account: u32, generation: u64, value: Value, expires: Time) -> Result<(), Unfit> {
+        let id = match &value.scheme {
+            Scheme::Bearer | Scheme::Key => 0,
+            Scheme::Withdrawn { id } => id.len(),
+        };
         if value.token.len() > usize::try_from(self.token_bytes).expect("u32 fits usize")
-            || value.account_id.len() > usize::try_from(ACCOUNT_ID_BYTES).expect("u32 fits usize")
+            || id > usize::try_from(ACCOUNT_ID_BYTES).expect("u32 fits usize")
         {
             return Err(Unfit);
         }

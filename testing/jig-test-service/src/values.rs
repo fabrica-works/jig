@@ -1,8 +1,8 @@
 //! Credential values travel between protocol components only (channel.md, 8).
 use alloc::boxed::Box;
 use jig_domain_host as host;
-use jig_protocol_accounts::table::Table;
-use jig_protocol_engine_workers::GrantValue;
+use jig_protocol_accounts::table::{self, Table};
+use jig_protocol_engine_workers::{GrantValue, Scheme};
 use skein_lib::{List, Map, Secret, Time};
 #[derive(Debug)]
 pub(super) struct Values {
@@ -40,14 +40,18 @@ impl Values {
         values.into_boxed()
     }
 }
-fn account_value(value: &jig_protocol_accounts::table::Value) -> GrantValue {
-    GrantValue { value: value.token.clone(), account_id: value.account_id.clone() }
+fn account_value(value: &table::Value) -> GrantValue {
+    match &value.scheme {
+        table::Scheme::Bearer => GrantValue::Credential { scheme: Scheme::Bearer, token: value.token.clone() },
+        table::Scheme::Key => GrantValue::Credential { scheme: Scheme::Key, token: value.token.clone() },
+        table::Scheme::Withdrawn { id } => GrantValue::Withdrawn { id: id.clone(), bearer: value.token.clone() },
+    }
 }
 fn application_value(value: &Secret) -> GrantValue {
-    GrantValue { value: value.clone(), account_id: Secret::new(Box::default()) }
+    GrantValue::Application { secret: value.clone() }
 }
 
-fn account_grant(value: Option<&jig_protocol_accounts::table::Value>) -> Option<GrantValue> {
+fn account_grant(value: Option<&table::Value>) -> Option<GrantValue> {
     let value = value?;
     Some(account_value(value))
 }

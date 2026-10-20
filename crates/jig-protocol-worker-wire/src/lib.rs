@@ -26,10 +26,12 @@ pub use v3::{
     Turn, TurnParts, Unauthorized, UnauthorizedParts, Work, WorkParts,
 };
 pub use v3::{
-    Acknowledge, AcknowledgeParts, AnsweredCall, AnsweredCallParts, Assignment, AssignmentParts, Cancel, CancelParts,
-    DeliveryAnswer, DeliveryAnswerParts, DeliveryOutcome, Grant, GrantParts, GrantTable, Granted, GrantedParts,
-    HostAnswer, HostAnswerParts, Inbound, InboundParts, Message, MessageParts, RelayAnswer, RelayText, RelayTextParts,
-    Relayed, RelayedParts, SettledAnswer, TurnBusy, TurnBusyParts, TurnKept, TurnKeptParts, Workspace, WorkspaceParts,
+    Acknowledge, AcknowledgeParts, AnsweredCall, AnsweredCallParts, ApplicationValue, ApplicationValueParts,
+    Assignment, AssignmentParts, Cancel, CancelParts, CredentialValue, CredentialValueParts, DeliveryAnswer,
+    DeliveryAnswerParts, DeliveryOutcome, Grant, GrantParts, GrantValue, Granted, GrantedParts, HostAnswer,
+    HostAnswerParts, Inbound, InboundParts, Message, MessageParts, RelayAnswer, RelayText, RelayTextParts, Relayed,
+    RelayedParts, Scheme, SettledAnswer, TurnBusy, TurnBusyParts, TurnKept, TurnKeptParts, WithdrawnValue,
+    WithdrawnValueParts, Workspace, WorkspaceParts,
 };
 pub use v3::{
     Bounds, BoundsParts, CEILINGS, Credential, CredentialParts, Hello, HelloParts, Hosting, HostingParts, ModelBound,

@@ -25,7 +25,7 @@ pub fn agent_configuration(directory: &Path) {
     let value = serde_json::json!({
         "profile":{"name":"standard","declared":{"tool_payload":512,"read_window":256},
             "policy":{"max_turns":5,"group_stop":10}},
-        "endpoints":[{"name":"fake","number":0,"dialect":1,"account":1,"provider":"codex",
+        "endpoints":[{"name":"fake","number":0,"dialect":3,"account":1,"provider":"openai",
             "address":"127.0.0.1:34443","transport":"tls","server_name":"skein.test","trust_der":directory.join("root.der"),"identity":"plain","connect":1000,"handshake":1000,
             "models":[{"name":"fake","window":1_048_576,"output":1024,"reasoning_item":64,"prices":{"input":1,"cached":1,"output":1,"unit":1000},"head":60000,"idle":30000}]}],
         "environment":[]});
@@ -39,10 +39,7 @@ pub fn configuration(directory: &Path) {
         private(&directory.join(std::str::from_utf8(&name).expect("fixture path")), bytes.expose());
     }
     private(&directory.join("worker.secret"), b"worker-secret");
-    private(
-        &directory.join("accounts/chat.json"),
-        br#"{"access_token":"token","expires_at":4102444800,"account_id":"acc"}"#,
-    );
+    private(&directory.join("accounts/chat.json"), br#"{"access_token":"token","expires_at":4102444800}"#);
     private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
     agent_configuration(directory);
     let mut value: serde_json::Value =
@@ -59,6 +56,7 @@ pub fn configuration(directory: &Path) {
     value["engine"]["hosts"]["listener"] = serde_json::json!([{"in_process":"workers"}]);
     value["application"]["server"]["listener"] = serde_json::json!({"socket":"127.0.0.1:0"});
     value["engine"]["llm"]["endpoints"][0]["address"] = serde_json::json!({"socket":"127.0.0.1:34443"});
+    value["engine"]["llm"]["endpoints"][0]["dialect"] = 3.into();
     value["engine"]["limits"]["overrides"]["core.load_slots"] = 8.into();
     value["engine"]["limits"]["overrides"]["people.sign_ins"] = 2.into();
     private(&directory.join("config.json"), &serde_json::to_vec(&value).expect("deployment JSON"));

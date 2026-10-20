@@ -48,6 +48,18 @@ fn the_largest_assignment_body_matches_a_measured_fullest_assignment() {
 }
 
 #[test]
+fn the_largest_grant_body_holds_a_four_kib_credential() {
+    // The small profile's token bound and the accounts' id bound.
+    let sizes = Sizes { grant: 7934, account_id: 256, ..SIZES_ONE_SLOT };
+    // Task8 + attempt8 + number4 + generation8 + valid8 + arm1, and the
+    // largest arm, withdrawn: id260 + bearer7938 =8235.
+    assert_eq!(largest_body(&sizes, Kind::Grant), Some(8235));
+    let granted = fixtures::granted_key(&limits(&sizes).expect("the profile's bounds"), &[b'k'; 4096]);
+    // Up to the arm 37 + scheme1 + key4100 =4138.
+    assert_eq!(granted.measure(), 4138);
+}
+
+#[test]
 fn sizes_past_a_ceiling_give_no_codec_limits() {
     for (field, sizes) in [
         ("charter", Sizes { charter: 67_108_865, ..SIZES_ONE_SLOT }),

@@ -7,7 +7,7 @@ pub const SEED: u64 = 7;
 pub const TOKEN: &[u8] = b"test-token";
 const DIGEST: &[u8] = b"6fb46f7a92742970166379ed5195e79c4493a7cc5664280c039cfd4095ba5faf";
 const REPORT: &[u8] = br#"{"form":"report","text":"Hello","fields":{}}"#;
-const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":1767229200,"account_id":"acc"}"#;
+const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":1767229200}"#;
 
 #[must_use]
 pub fn calm(seed: u64) -> Settings {
@@ -227,13 +227,18 @@ pub fn agent() -> jig_test_service::Agent {
     }
 }
 
+/// The agent calls `OpenAI`'s Responses path, which takes a bearer or a key alike.
 #[must_use]
 pub fn agent_configuration() -> smith_agent_service::Config {
+    agent_configuration_for(skein_llm::Endpoint::openai())
+}
+fn agent_configuration_for(llm: skein_llm::Endpoint) -> smith_agent_service::Config {
     let mut config = smith_agent_process_world::configuration();
     config.limits.llm.accounts = 2;
     config.channel_endpoints = endpoints();
     let (destinations, _) = config.llm_endpoints.into_parts();
-    let destination = destinations.into_boxed().into_vec().pop().expect("one provider destination");
+    let mut destination = destinations.into_boxed().into_vec().pop().expect("one provider destination");
+    destination.llm = llm;
     config.llm_endpoints = smith_protocol_llm::Endpoints::new(
         Box::new([smith_protocol_llm::ConfiguredEndpoint {
             name: smith_domain::llm::Endpoint(0),
@@ -247,6 +252,60 @@ pub fn agent_configuration() -> smith_agent_service::Config {
     )
     .expect("provider account");
     config
+}
+
+/// The provider at the dialect's path, admitting the handed-in credential:
+/// a grant's token, and in Anthropic's dialect its scheme, reach it as given.
+/// Bounds as Smith's process world gives its configured peer.
+#[must_use]
+pub fn provider(
+    scripts: Box<[skein_fake_llm_domain::api::Script]>,
+    credential: skein_llm::Credential,
+    latency: Duration,
+    transport: skein_fake_peers::Transport,
+    dialect: skein_fake_llm_protocol::documents::Provider,
+) -> skein_fake_peers::llm::Peer {
+    use skein_fake_llm_protocol::{documents, provider};
+    let mut config = skein_llm_world::fake::config();
+    config.latency_min = latency;
+    config.latency_max = latency;
+    config.script_bytes = config.script_bytes.max(16_384);
+    config.answer_bytes = config.answer_bytes.max(16_384);
+    config.query_bytes = config.query_bytes.max(16_384);
+    let mut protocol = skein_llm_world::fake::limits(&skein_llm_world::limits());
+    protocol.documents.openai.request = 32_768;
+    protocol.documents.openai.strings = 16_384;
+    protocol.documents.openai.answer = protocol.documents.openai.answer.max(16_384);
+    protocol.http.body = protocol.http.body.max(32_768);
+    protocol.sse.event = protocol.sse.event.max(16_384);
+    protocol.documents.openai.tokens = 4096;
+    protocol.documents.openai.output_items = 256;
+    protocol.documents.anthropic.output_items = 256;
+    skein_fake_peers::llm::Peer::new(
+        (
+            smith_agent_process_world::fake::loopback(),
+            if transport == skein_fake_peers::Transport::Tls { 34_443 } else { 443 },
+        )
+            .into(),
+        transport,
+        smith_agent_process_world::fake::limits(),
+        provider::Config {
+            echo: skein_llm::openai::Echo::NONE,
+            usage_fields: documents::UsageFields::ALL,
+            provider: dialect,
+            path: match dialect {
+                documents::Provider::OpenAi => skein_llm::Endpoint::openai().target,
+                documents::Provider::Anthropic => skein_llm::Endpoint::anthropic().target,
+            },
+            headers: Box::default(),
+            without_credential: false,
+        },
+        credential,
+        protocol,
+        skein_fake_llm_domain::Domain::try_scripted(&config, 17, scripts).expect("bounded provider scripts"),
+        config,
+    )
+    .expect("configured provider")
 }
 
 pub(crate) fn peer_bounds() -> (skein_channel::Schema, skein_channel::Limits) {

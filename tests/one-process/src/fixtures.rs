@@ -70,14 +70,12 @@ pub(crate) fn provider() -> skein_fake_peers::llm::Peer {
     // Keep the worker alive beyond its first committed turn for the mid-run cuts.
     script.leading_turns = 1;
     script.result = br#"{"form":"report","text":"World answer","fields":{}}"#.as_slice().into();
-    smith_agent_process_world::fake::configured(
+    channel::provider(
         Box::new([skein_fake_llm_domain::api::Script { cue: Box::default(), turns: channel::provider_turns(&script) }]),
-        skein_llm::Credential {
-            value: channel::TOKEN.into(),
-            account_id: b"acc".as_slice().into(),
-            scheme: skein_llm::Scheme::Bearer,
-        },
+        skein_llm::Credential::bearer(channel::TOKEN.into()),
         skein_lib::Duration::ZERO,
+        skein_fake_peers::Transport::Plaintext,
+        skein_fake_llm_protocol::documents::Provider::OpenAi,
     )
 }
 pub(crate) fn client_settings() -> jig_client_shell_native::Settings {

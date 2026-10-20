@@ -91,7 +91,7 @@ fn absolute_paths(value: &mut serde_json::Value, directory: &Path) {
 const FILES: &[(&str, &[u8])] = &[
     ("charters/chat.txt", b"Reply to the person."),
     ("secrets/worker-a.digest", b"6fb46f7a92742970166379ed5195e79c4493a7cc5664280c039cfd4095ba5faf"),
-    ("accounts/chat.json", br#"{"access_token":"test-token","expires_at":1767229200,"account_id":"acc"}"#),
+    ("accounts/chat.json", br#"{"access_token":"test-token","expires_at":1767229200}"#),
     ("app.secret", b"application-token"),
 ];
 pub struct Tier {

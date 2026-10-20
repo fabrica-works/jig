@@ -100,8 +100,16 @@ enum DeliveryOutcome { delivered, nothing, stale, refused, failed }
 record DeliveryAnswer { outcome: DeliveryOutcome evidence: bytes 1048576 }
 enum SettledAnswer { host: HostAnswer, delivery: DeliveryAnswer }
 record AnsweredCall { name: bytes 64 tool: text 64 answer: SettledAnswer }
-enum GrantTable { accounts, application }
-record Grant { table: GrantTable account: u32 generation: u64 valid: duration value: secret 8192 account_id: secret 256 }
+# A grant's value (protocol/channel.md, 8): an LLM account's credential with
+# its scheme, or the application's secret; its arm names whose table it is in.
+enum Scheme { bearer, key }
+record CredentialValue { scheme: Scheme bytes: secret 8192 }
+# Withdrawn: a handed-in record's account id and bearer, for jig's live test
+# only, until no record is handed in (protocol/llm.md, 5.4).
+record WithdrawnValue { id: secret 256 bearer: secret 8192 }
+record ApplicationValue { secret: secret 8192 }
+enum GrantValue { credential: CredentialValue, withdrawn: WithdrawnValue, application: ApplicationValue }
+record Grant { number: u32 generation: u64 valid: duration value: GrantValue }
 record Assignment {
     task: u64 attempt: u64
     identity: fixed 16

@@ -1,8 +1,7 @@
 //! One worker root and its channels, with values below the domain (service.md, 6).
 use crate::{Agent, Files, worker_route};
 use alloc::boxed::Box;
-use jig_domain_host as hub;
-use jig_protocol_accounts::table::{Table, Value};
+use jig_protocol_accounts::table::{Scheme, Table, Value};
 use jig_protocol_config::{self as config, Path, Problems, What};
 use jig_protocol_worker_link as link;
 use jig_test_worker as root;
@@ -68,8 +67,10 @@ impl Worker {
         if secret.len() > usize::try_from(config.limits.link.secret).expect("secret bound") {
             return Err(problem(index, b"secret", What::Bound));
         }
-        if config.limits.token > agent.limits.bodies.withdrawn_value_bearer
-            || jig_protocol_worker_wire::CEILINGS.grant_account_id > agent.limits.bodies.withdrawn_value_id
+        let bodies = &agent.limits.bodies;
+        if config.limits.token > bodies.credential_value_bytes
+            || config.limits.token > bodies.withdrawn_value_bearer
+            || jig_protocol_worker_wire::CEILINGS.withdrawn_value_id > bodies.withdrawn_value_id
         {
             return Err(problem(index, b"limits", What::Bound));
         }
@@ -141,14 +142,12 @@ impl Worker {
     }
     #[cfg(test)]
     pub(super) fn granted(&mut self, account: u32, generation: u64, value: Value, expires: Time) {
-        self.link_out.push(link::Request::Value {
-            table: hub::GrantTable::Accounts,
-            account,
-            generation,
-            expires,
-            value: value.token,
-            account_id: value.account_id,
-        });
+        let value = match value.scheme {
+            Scheme::Bearer => link::GrantValue::Credential { scheme: link::Scheme::Bearer, token: value.token },
+            Scheme::Key => link::GrantValue::Credential { scheme: link::Scheme::Key, token: value.token },
+            Scheme::Withdrawn { id } => link::GrantValue::Withdrawn { id, bearer: value.token },
+        };
+        self.link_out.push(link::Request::Value { account, generation, expires, value });
         self.drain_link(self.env.now);
     }
     pub fn stop(&mut self) {
@@ -275,14 +274,24 @@ impl Worker {
                     drop(parts);
                     self.events.push(root::Event::Link(down));
                 }
-                link::Request::Value { table, account, generation, expires, value, account_id } => {
-                    let table = match table {
-                        hub::GrantTable::Accounts => &mut self.values,
-                        hub::GrantTable::Application => &mut self.application,
+                link::Request::Value { account, generation, expires, value } => {
+                    let (table, value) = match value {
+                        link::GrantValue::Credential { scheme: link::Scheme::Bearer, token } => {
+                            (&mut self.values, Value { token, scheme: Scheme::Bearer })
+                        }
+                        link::GrantValue::Credential { scheme: link::Scheme::Key, token } => {
+                            (&mut self.values, Value { token, scheme: Scheme::Key })
+                        }
+                        link::GrantValue::Withdrawn { id, bearer } => {
+                            (&mut self.values, Value { token: bearer, scheme: Scheme::Withdrawn { id } })
+                        }
+                        // An application's secret is kept as a bearer value:
+                        // nothing presents it yet.
+                        link::GrantValue::Application { secret } => {
+                            (&mut self.application, Value { token: secret, scheme: Scheme::Bearer })
+                        }
                     };
-                    table
-                        .granted(account, generation, Value { token: value, account_id }, expires)
-                        .expect("wire values fit tables");
+                    table.granted(account, generation, value, expires).expect("wire values fit tables");
                 }
                 link::Request::Dial => {
                     if self.stopping {
@@ -604,9 +613,13 @@ fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Option<host::Va
 }
 fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
     let value = table.value(grant.account, grant.generation, now)?;
-    Some(smith_protocol_channel::GrantValue::Withdrawn {
-        account_id: value.account_id.expose().into(),
-        bearer: value.token.expose().into(),
+    let token = value.token.expose().into();
+    Some(match &value.scheme {
+        Scheme::Bearer => smith_protocol_channel::GrantValue::Bearer(token),
+        Scheme::Key => smith_protocol_channel::GrantValue::Key(token),
+        Scheme::Withdrawn { id } => {
+            smith_protocol_channel::GrantValue::Withdrawn { account_id: id.expose().into(), bearer: token }
+        }
     })
 }
 fn start_values(table: &Table, grants: &[smith::Grant], now: Time) -> Option<host::Values> {

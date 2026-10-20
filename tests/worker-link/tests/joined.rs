@@ -1,7 +1,7 @@
 #[path = "../src/joined.rs"]
 pub mod joined;
 mod joined_story {
-    use super::joined::{Joined, values};
+    use super::joined::{Joined, application, received, sent, values, withdrawn};
     use jig_domain_host as host;
     use jig_protocol_engine_workers as engine;
     use jig_protocol_worker_link::{Credential, Request};
@@ -31,20 +31,10 @@ mod joined_story {
     fn records(world: &Joined) -> Vec<Vec<u16>> {
         world.frames().iter().map(|frames| frames.iter().copied().filter(|kind| *kind >= 256).collect()).collect()
     }
-    fn value(request: &Request, table: host::GrantTable) {
-        let Request::Value { table: owner, account, generation, expires, value, account_id } = request else {
-            panic!("a layer value")
-        };
-        assert_eq!(
-            (*owner, *account, *generation, *expires),
-            (table, 1, 3, Time::ZERO.saturating_add(Duration::from_secs(60)))
-        );
-        let (token, id) = match table {
-            host::GrantTable::Accounts => (fixtures::TOKEN_ONE, fixtures::ACCOUNT_ONE),
-            host::GrantTable::Application => (fixtures::TOKEN_TWO, b"".as_slice()),
-        };
-        assert_eq!(value.expose(), token);
-        assert_eq!(account_id.expose(), id);
+    fn value(request: &Request, expected: &engine::GrantValue) {
+        let Request::Value { account, generation, expires, value } = request else { panic!("a layer value") };
+        assert_eq!((*account, *generation, *expires), (1, 3, Time::ZERO.saturating_add(Duration::from_secs(60))));
+        assert_eq!(received(value), sent(expected));
     }
     #[test]
     fn a_worker_is_admitted_and_its_hello_reaches_the_engine_root() {
@@ -60,8 +50,8 @@ mod joined_story {
         assign(&mut world);
         assert_eq!(world.worker_order, ["value", "value", "down"]);
         assert_eq!(world.values.len(), 2);
-        value(&world.values[0], host::GrantTable::Accounts);
-        value(&world.values[1], host::GrantTable::Application);
+        value(&world.values[0], &withdrawn());
+        value(&world.values[1], &application());
         let host::LinkDown::Assign { assignment } = downs(&world)[0] else { panic!("assignment") };
         assert_eq!(assignment.assignment.grants, fixtures::assignment().assignment.grants);
         world.finish();

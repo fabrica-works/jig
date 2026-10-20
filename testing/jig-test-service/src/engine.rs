@@ -100,6 +100,18 @@ impl Engine {
         self.values.put_application(number, generation, value);
     }
 
+    /// A test puts an account's grant here before announcing it, as the
+    /// accounts component would: a key, until a key source comes (JP7).
+    pub fn put_account(
+        &mut self,
+        account: u32,
+        generation: u64,
+        value: jig_protocol_accounts::table::Value,
+        expires: Time,
+    ) {
+        self.values.accounts.granted(account, generation, value, expires).expect("a grant within the table's bounds");
+    }
+
     pub(crate) fn room(&self) -> bool {
         (match &self.drain {
             Some(drain) => drain.busy.room() >= self.max_out,

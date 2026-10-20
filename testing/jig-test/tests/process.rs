@@ -3,22 +3,19 @@ mod support;
 use jig_client_protocol_world::native::Script;
 
 /// The provider, answering one chat to a run lent the handed-in file's
-/// token and account.
+/// token as a bearer.
 fn peer() -> skein_fake_peers::llm::Peer {
     let mut script = jig_channel_world::fixtures::one_chat(b"Hello");
     script.result = br#"{"form":"report","text":"Process answer","fields":{}}"#.as_slice().into();
-    smith_agent_process_world::fake::configured_transport(
+    jig_channel_world::fixtures::provider(
         Box::new([skein_fake_llm_domain::api::Script {
             cue: Box::default(),
             turns: jig_channel_world::fixtures::provider_turns(&script),
         }]),
-        skein_llm::Credential {
-            value: b"token".as_slice().into(),
-            account_id: b"acc".as_slice().into(),
-            scheme: skein_llm::Scheme::Bearer,
-        },
+        skein_llm::Credential::bearer(b"token".as_slice().into()),
         skein_lib::Duration::ZERO,
         skein_fake_peers::Transport::Tls,
+        skein_fake_llm_protocol::documents::Provider::OpenAi,
     )
 }
 
@@ -33,7 +30,7 @@ fn a_killed_jig_test_restarts_and_the_work_is_found() {
 /// llm.md 5.1 and store.md 9: the first start keeps the handed-in record in
 /// the secrets' store. The next names the account a sign-in source whose
 /// issuer nobody serves, and the handed-in file is gone: only the record
-/// the store kept can lend the token and account the provider expects.
+/// the store kept can lend the token the provider expects.
 #[test]
 fn sign_in_state_survives_a_restart_through_the_store() {
     let directory = support::scratch();

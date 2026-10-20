@@ -8,7 +8,7 @@ use jig_domain_core as core;
 use jig_protocol_accounts::{
     handed_in, installation,
     records::{self, Records},
-    table::{Table, Value},
+    table::Table,
     translate::{self, Up},
 };
 use jig_protocol_store as store;
@@ -493,15 +493,8 @@ impl Owner {
             };
             let event = match self.records.up(event, env.now) {
                 Up::Granted { event, account, generation, value, expires } => {
-                    self.lent.push(Lent { account, generation, digest: sha256::digest(value.expose()) });
-                    self.table
-                        .granted(
-                            account,
-                            generation,
-                            Value { token: value, account_id: Secret::new(skein_lib::bytes::copy_of(b"")) },
-                            expires,
-                        )
-                        .expect("configured value fits");
+                    self.lent.push(Lent { account, generation, digest: sha256::digest(value.token.expose()) });
+                    self.table.granted(account, generation, value, expires).expect("configured value fits");
                     event
                 }
                 Up::Child(event) => event,

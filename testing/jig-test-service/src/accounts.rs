@@ -349,17 +349,17 @@ impl Accounts {
             let event = self.above.pop().expect("account events");
             let event = match self.records.up(event, now) {
                 translate::Up::Granted { event, account, generation, value, expires } => {
+                    // An account with a provider account id is jig's live test's
+                    // (D2): its bearer goes out beside the id until JP13.
+                    let id = self.ids.get(account).expect("configured account id");
+                    let value = if id.expose().is_empty() {
+                        value
+                    } else {
+                        table::Value { token: value.token, scheme: table::Scheme::Withdrawn { id: id.clone() } }
+                    };
                     values
                         .accounts
-                        .granted(
-                            account,
-                            generation,
-                            table::Value {
-                                token: value,
-                                account_id: self.ids.get(account).expect("configured account id").clone(),
-                            },
-                            expires,
-                        )
+                        .granted(account, generation, value, expires)
                         .expect("startup checks token and account id bounds");
                     event
                 }

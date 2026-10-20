@@ -1,5 +1,5 @@
 use jig_domain_host as host;
-use jig_protocol_worker_link::{Event, Request};
+use jig_protocol_worker_link::{Event, GrantValue, Request};
 use jig_protocol_worker_wire as wire;
 use jig_worker_link_world::{World, fixtures};
 use skein_lib::{Duration, Reader, Token};
@@ -53,13 +53,10 @@ fn down(world: &World) -> Vec<&host::LinkDown> {
         })
         .collect()
 }
-fn value(request: &Request, table: host::GrantTable, expires: skein_lib::Time) {
-    let Request::Value { table: owner, account, generation, expires: until, value, account_id } = request else {
-        panic!("value: {request:?}")
-    };
-    assert_eq!((*owner, *account, *generation, *until), (table, 1, 3, expires));
-    assert_eq!(value.expose(), fixtures::TOKEN_ONE);
-    assert_eq!(account_id.expose(), fixtures::ACCOUNT_ONE);
+fn value(request: &Request, expires: skein_lib::Time) -> &GrantValue {
+    let Request::Value { account, generation, expires: until, value } = request else { panic!("value: {request:?}") };
+    assert_eq!((*account, *generation, *until), (1, 3, expires));
+    value
 }
 #[test]
 fn each_up_record_reaches_the_engine_in_order() {
@@ -109,8 +106,10 @@ fn grant_values_reach_the_layer_before_the_assignment() {
     world.play(fixtures::assignment_frame(fixtures::window()));
     assert_eq!(world.order(), ["value", "value", "down"]);
     let expires = world.now().saturating_add(Duration::from_secs(60));
-    value(&world.values()[0], host::GrantTable::Accounts, expires);
-    value(&world.values()[1], host::GrantTable::Application, expires);
+    let GrantValue::Withdrawn { id, bearer } = value(&world.values()[0], expires) else { panic!("withdrawn") };
+    assert_eq!((id.expose(), bearer.expose()), (fixtures::ACCOUNT_ONE, fixtures::TOKEN_ONE));
+    let GrantValue::Application { secret } = value(&world.values()[1], expires) else { panic!("application") };
+    assert_eq!(secret.expose(), fixtures::TOKEN_ONE);
     assert_eq!(assignment(&world).assignment.grants.len(), 2);
 }
 #[test]
