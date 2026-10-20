@@ -15,8 +15,8 @@ mod records;
 mod restore;
 mod signing;
 pub use boundary::{
-    ADDRESS, Answer, End, Ended, Event, Fact, Failure, FromComponent, Grant, GrantTable, Pending, Place, Request, Signing,
-    State, ToComponent, Turned, Unread,
+    ADDRESS, Answer, End, Ended, Event, Fact, Failure, FromComponent, Grant, GrantTable, Pending, Place, Request,
+    Signing, State, ToComponent, Turned, Unread,
 };
 pub use checks::{Bound, Refusal, SignIn, room_for_sign_in};
 pub use domain::{Account, Domain, fire, max_out, step};
