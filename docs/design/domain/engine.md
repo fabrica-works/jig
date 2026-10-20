@@ -555,9 +555,10 @@ recorded bindings and current coverage.
 The current program seam accepts positive login and holder facts in fleet's
 pure predicates. No program source is eligible in the live check without those
 facts. If program rows exist, unknown retained-login facts also hold direct runs
-off workers; engine hosts never retain program logins. T12 supplies the host half and its exchange. Until configuration's
-providers-only conversion, legacy model account fields seed deployment-held
-accounts only; neither admission nor the per-run charter routes by them.
+off workers; engine hosts never retain program logins. T12 supplies the host
+half and its exchange. Until configuration's providers-only conversion, legacy
+model account fields seed deployment-held accounts only; neither admission nor
+the per-run charter routes by them.
 
 ### 7.2 Transcripts
 
