@@ -315,6 +315,7 @@ impl Store {
             | Event::Turns { .. }
             | Event::Unread { .. }
             | Event::Kept { .. }
+            | Event::Carried { .. }
             | Event::Stale { .. }
             | Event::Erased { .. }
             | Event::Secret { .. }

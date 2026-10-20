@@ -253,6 +253,7 @@ pub fn up(routes: &mut Routes, event: Event, into: &mut Queue<Up>) {
         Event::OpenRefused { .. } => stop(routes, into),
         Event::Opened { .. }
         | Event::Kept { .. }
+        | Event::Carried { .. }
         | Event::Stale { .. }
         | Event::Erased { .. }
         | Event::Secret { .. }

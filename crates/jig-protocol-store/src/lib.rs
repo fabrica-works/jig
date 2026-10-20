@@ -237,8 +237,8 @@ pub mod tasks_v5;
 pub mod core_v4;
 pub mod keys;
 pub use boundary::{
-    Arrived, Below, Cursor, Event, Family, Get, Io, Load, OpenRefusal, Request, Restore, Root, Row, SecretOwner,
-    SecretRow, Secrets, TranscriptRead, Write,
+    Arrived, Below, CARRIED, Cursor, Event, Family, Get, Io, Load, OpenRefusal, Request, Restore, Root, Row,
+    SecretOwner, SecretRow, Secrets, TranscriptRead, Write,
 };
 
 #[cfg(test)]

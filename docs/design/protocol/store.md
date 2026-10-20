@@ -641,7 +641,14 @@ Removing a missing file is not a failure.
   - each key, under the party and the key of the request that carried
     it (`client.md`, section 5), which the key's source names;
   - an application's own records, under its tag: its connectors'
-    credentials, which it decodes itself.
+    credentials, which it decodes itself, by numbers below 2^63;
+  - each value an application's request carried (`client.md`, section
+    5), under the application's tag, by a number jig draws itself from
+    2^63 up, never one the request names: the next number is a row of
+    its own beside the values (key `[2, 1]`), written in the commit that
+    keeps the value, so a number is never drawn twice, an erased one
+    included, and a number already holding a value is never written
+    over: the carry is refused and nothing is kept.
 
   A program source's login is not here: it is the program's own, on
   each host (`llm.md`, 5.5).
@@ -661,12 +668,15 @@ Removing a missing file is not a failure.
   durable; the driver lends the record's token only then. A crash
   between leaves at worst a record its driver never lent, which the
   next start lends from.
-- **A key kept before the core sees it.** The clients' component takes
-  a key out of the request carrying it as it decodes it, and keeps it
-  here before the core gets the request, which names it by its party
-  and key (`client.md`, section 5). A request the core refuses, or a
-  key sent again under a key already answered, leaves a key no source
-  names, which the component erases.
+- **A carried value kept before the core sees it.** The clients'
+  component takes the value out of the request carrying it as it
+  decodes it, and keeps it here before the core gets the request, which
+  names it by its number and digest only (`client.md`, section 5); a key
+  is kept by its party and key (`llm.md`). Where the core leaves the
+  request unused (refused, a key sent again under a key answered or in
+  flight, or the engine stopping) it says so, naming the number, and
+  the component erases that value, if its own decode kept it; replacing
+  or erasing a kept value goes through the core's decisions alone.
 - **A presented credential names its sign-in:** a credential is the
   sign-in's number and its random bytes, opaque to the transport that
   carries it. The component gets the digest by number, and the clients'

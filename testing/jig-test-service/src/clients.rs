@@ -651,6 +651,7 @@ impl Clients {
             }
             Event::SecretsLoaded { .. }
             | Event::Stale { .. }
+            | Event::Carried { .. }
             | Event::Opened { .. }
             | Event::OpenRefused { .. }
             | Event::Committed { .. }

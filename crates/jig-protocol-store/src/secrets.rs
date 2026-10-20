@@ -1,5 +1,5 @@
 //! Private values kept before their owners use them (store.md, section 9).
-use crate::{Below, Event, Limits, Phase, SecretOwner, SecretRow, Secrets, Store, directory, keys, open};
+use crate::{Below, CARRIED, Event, Limits, Phase, SecretOwner, SecretRow, Secrets, Store, directory, keys, open};
 use alloc::boxed::Box;
 use skein_lib::{Env, List, Map, Queue, Secret, Token, sha256};
 
@@ -13,6 +13,13 @@ enum Pending {
         key: Box<[u8]>,
         holds: Option<[u8; 32]>,
     },
+    /// A carried value on its way under `number`, the counter moved past it.
+    Carry {
+        owner: Token,
+        key: Box<[u8]>,
+        holds: [u8; 32],
+        number: u64,
+    },
     Sweep,
 }
 #[derive(Debug)]
@@ -23,6 +30,8 @@ pub(crate) struct State {
     swept: bool,
     after: Option<Box<[u8]>>,
     waiting: bool,
+    /// The next carried number, once read from its row.
+    carried: Option<u64>,
 }
 impl State {
     pub fn new(capacity: u32) -> State {
@@ -33,6 +42,7 @@ impl State {
             swept: false,
             after: None,
             waiting: false,
+            carried: None,
         }
     }
 }
@@ -151,6 +161,7 @@ pub(crate) fn committed(store: &mut Store, owner: Token, above: &mut Queue<Event
     match pending {
         Pending::Write { owner, holds: Some(_), .. } => above.push(Event::Kept { owner }),
         Pending::Write { owner, holds: None, .. } => above.push(Event::Erased { owner }),
+        Pending::Carry { owner, number, .. } => above.push(Event::Carried { owner, number }),
         Pending::Sweep => store.secret_state.waiting = false,
     }
 }
@@ -184,7 +195,8 @@ fn held(store: &mut Store, env: &Env<Limits>, key: &[u8], below: &mut Below) -> 
     for (_, pending) in store.secret_state.pending.iter().rev() {
         match pending {
             Pending::Write { key: written, holds, .. } if **written == *key => return Ok(*holds),
-            Pending::Write { .. } | Pending::Sweep => {}
+            Pending::Carry { key: written, holds, .. } if **written == *key => return Ok(Some(*holds)),
+            Pending::Write { .. } | Pending::Carry { .. } | Pending::Sweep => {}
         }
     }
     match durable(store, env, Box::from(key), below)? {
@@ -225,6 +237,7 @@ pub(crate) fn secrets(
                 above.push(Event::Stale { owner });
             }
         }
+        Secrets::Carry { value } => carry(store, env, owner, value, above, below),
         Secrets::Erase { owner: kind, number } => {
             let Some(key) = key(kind, number, store.limits.secrets.key) else {
                 store.phase = Phase::Stopped;
@@ -304,6 +317,82 @@ fn keep(
     let holds = Some(sha256::digest(value.expose()));
     let ops = Box::new([skein_kv::Op::Put { key: key.clone(), value: Box::from(value.expose()) }]);
     submit(store, env, ops, Pending::Write { owner, key, holds }, above, below);
+}
+/// The row holding the next carried number, beside the application's
+/// values (store.md 9).
+fn counter_key(limit: u32) -> Option<Box<[u8]>> {
+    let [tag, _] = prefix(SecretOwner::Application);
+    let mut key = skein_kv::KeyWriter::new(limit);
+    key.tag(tag).tag(1);
+    key.finish()
+}
+/// The next carried number: the counter row's, read once, else the range's
+/// first; `Err` when the store answered otherwise or the row is not one.
+fn next_carried(store: &mut Store, env: &Env<Limits>, below: &mut Below) -> Result<u64, ()> {
+    if let Some(next) = store.secret_state.carried {
+        return Ok(next);
+    }
+    let key = counter_key(store.limits.secrets.key).ok_or(())?;
+    let next = match durable(store, env, key, below)? {
+        None => CARRIED,
+        Some(row) => {
+            let bytes: Result<[u8; 8], _> = (*row).try_into();
+            let Ok(bytes) = bytes else {
+                return Err(());
+            };
+            let next = u64::from_be_bytes(bytes);
+            if next < CARRIED {
+                return Err(());
+            }
+            next
+        }
+    };
+    store.secret_state.carried = Some(next);
+    Ok(next)
+}
+/// Keep a carried value under the next number, never one already holding
+/// a value, and move the counter in the same commit.
+fn carry(
+    store: &mut Store,
+    env: &Env<Limits>,
+    owner: Token,
+    value: Secret,
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    if too_large(store, &value) {
+        store.phase = Phase::Stopped;
+        return;
+    }
+    let Ok(number) = next_carried(store, env, below) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    let Some(after) = number.checked_add(1) else {
+        above.push(Event::Stale { owner });
+        return;
+    };
+    let (Some(key), Some(counter)) =
+        (key(SecretOwner::Application, number, store.limits.secrets.key), counter_key(store.limits.secrets.key))
+    else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    match held(store, env, &key, below) {
+        Ok(None) => {}
+        Ok(Some(_)) => return above.push(Event::Stale { owner }),
+        Err(()) => {
+            store.phase = Phase::Stopped;
+            return;
+        }
+    }
+    store.secret_state.carried = Some(after);
+    let holds = sha256::digest(value.expose());
+    let ops = Box::new([
+        skein_kv::Op::Put { key: counter, value: Box::from(after.to_be_bytes()) },
+        skein_kv::Op::Put { key: key.clone(), value: Box::from(value.expose()) },
+    ]);
+    submit(store, env, ops, Pending::Carry { owner, key, holds, number }, above, below);
 }
 pub(crate) fn start_sweep(store: &mut Store) {
     if !store.secret_state.swept {

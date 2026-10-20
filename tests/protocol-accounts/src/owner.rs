@@ -426,6 +426,7 @@ impl Owner {
                 | store::Event::Turns { .. }
                 | store::Event::Unread { .. }
                 | store::Event::Erased { .. }
+                | store::Event::Carried { .. }
                 | store::Event::Secret { .. }
                 | store::Event::SecretsLoaded { .. }
                 | store::Event::Corrupt { .. } => unreachable!("a replace is answered kept or stale"),

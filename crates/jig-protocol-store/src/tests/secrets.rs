@@ -1,6 +1,6 @@
 //! Secrets' durability, paging and restart sweep (store.md, section 9).
 use super::fixtures;
-use crate::{Event, Phase, Request, Restore, SecretOwner, Secrets, Store};
+use crate::{CARRIED, Event, Phase, Request, Restore, SecretOwner, Secrets, Store};
 use alloc::boxed::Box;
 use skein_lib::{Secret, Token, Wall};
 const OWNER: Token = Token::new(9);
@@ -206,4 +206,45 @@ fn a_sources_records_page_apart_from_digests_and_outlive_the_sweep() {
     restore_people(&mut store);
     assert_eq!(get(&mut store, SecretOwner::SignIn, 4), None);
     assert_eq!(get(&mut store, SecretOwner::Source, 4), Some(record(1)));
+}
+fn carry(store: &mut Store, value: u8) -> Box<[Event]> {
+    ask(store, Secrets::Carry { value: record(value) })
+}
+#[test]
+fn a_carried_value_is_numbered_by_jig_and_kept_with_its_counter_in_one_commit() {
+    let mut store = fixtures::opened();
+    for (value, number) in [(1, CARRIED), (2, CARRIED + 1)] {
+        let events = carry(&mut store, value);
+        let [Event::Carried { owner: OWNER, number: carried }] = &*events else {
+            panic!("carried once committed: {events:?}");
+        };
+        assert_eq!(*carried, number);
+        assert_eq!(get(&mut store, SecretOwner::Application, number), Some(record(value)));
+    }
+    assert_eq!(store.stores.secrets.last(), 2, "one commit each, the counter in it");
+    let events = ask(&mut store, Secrets::Load { owner: SecretOwner::Application, after: None });
+    let [Event::SecretsLoaded { rows, next: None, .. }] = &*events else {
+        panic!("one page: {events:?}");
+    };
+    let [first, second] = &**rows else {
+        panic!("the two values alone, the counter row no value: {rows:?}");
+    };
+    assert_eq!((first.number, second.number), (CARRIED, CARRIED + 1));
+}
+#[test]
+fn a_carry_whose_next_number_holds_a_value_is_stale_and_writes_nothing() {
+    let mut store = fixtures::opened();
+    ask(&mut store, Secrets::Keep { owner: SecretOwner::Application, number: CARRIED, value: record(7) });
+    let [Event::Stale { owner: OWNER }] = &*carry(&mut store, 1) else {
+        panic!("never overwritten");
+    };
+    assert_eq!(store.stores.secrets.last(), 1, "nothing written");
+    assert_eq!(get(&mut store, SecretOwner::Application, CARRIED), Some(record(7)));
+}
+#[test]
+fn a_carry_past_its_value_bound_stops_before_its_number_is_drawn() {
+    let mut store = fixtures::opened();
+    store.limits.secrets.value = 47;
+    assert!(carry(&mut store, 1).is_empty());
+    assert_eq!(store.phase, Phase::Stopped);
 }

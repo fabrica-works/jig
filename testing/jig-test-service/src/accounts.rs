@@ -408,7 +408,7 @@ impl Accounts {
                         self.down(request);
                     }
                 }
-                store::Event::Erased { .. } | store::Event::Secret { .. } => {
+                store::Event::Erased { .. } | store::Event::Secret { .. } | store::Event::Carried { .. } => {
                     unreachable!("the accounts only load and replace their records")
                 }
                 store::Event::Opened { .. }

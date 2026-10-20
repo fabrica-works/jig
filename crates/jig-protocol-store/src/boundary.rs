@@ -108,6 +108,11 @@ pub enum SecretOwner {
     Source,
 }
 
+/// The first number of the application's range that jig numbers itself,
+/// for the values clients' requests carry (store.md 9); the application
+/// numbers its own values below it.
+pub const CARRIED: u64 = 1 << 63;
+
 /// A request to the secrets' store (store.md, section 9).
 #[derive(Debug)]
 pub enum Secrets {
@@ -124,6 +129,13 @@ pub enum Secrets {
         number: u64,
         value: Secret,
         replaces: Option<[u8; 32]>,
+    },
+    /// Keep a value a client's request carried, under the next number of
+    /// the application's carried range, from [`CARRIED`] up (store.md 9):
+    /// `Carried` once durable, the next number moved in the same commit;
+    /// `Stale`, nothing written, when that number already holds a value.
+    Carry {
+        value: Secret,
     },
     Erase {
         owner: SecretOwner,
@@ -248,7 +260,13 @@ pub enum Event {
     Kept {
         owner: Token,
     },
-    /// A replace that named another value than the one held.
+    /// A carried value kept, durable, under the application's `number`.
+    Carried {
+        owner: Token,
+        number: u64,
+    },
+    /// A replace that named another value than the one held, or a carry
+    /// whose next number holds one.
     Stale {
         owner: Token,
     },

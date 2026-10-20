@@ -173,9 +173,10 @@ impl Store {
     pub(super) fn secrets(&mut self, owner: Token, request: protocol::Secrets) -> Option<protocol::Event> {
         let immediate = match &request {
             protocol::Secrets::Get { .. } | protocol::Secrets::Load { .. } => true,
-            protocol::Secrets::Keep { .. } | protocol::Secrets::Replace { .. } | protocol::Secrets::Erase { .. } => {
-                false
-            }
+            protocol::Secrets::Keep { .. }
+            | protocol::Secrets::Replace { .. }
+            | protocol::Secrets::Erase { .. }
+            | protocol::Secrets::Carry { .. } => false,
         };
         protocol::down(
             &mut self.component,
@@ -477,6 +478,7 @@ pub(super) fn answer(engine: &mut crate::Engine) {
             event @ (protocol::Event::Kept { owner }
             | protocol::Event::Stale { owner }
             | protocol::Event::Erased { owner }
+            | protocol::Event::Carried { owner, .. }
             | protocol::Event::Secret { owner, .. }
             | protocol::Event::SecretsLoaded { owner, .. }) => {
                 if crate::accounts::owns(owner) {
