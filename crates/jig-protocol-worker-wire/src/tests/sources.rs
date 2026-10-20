@@ -7,9 +7,13 @@ use crate::{
 use skein_lib::{List, Reader, Writer};
 
 #[test]
-fn source_bodies_and_slot_independent_caps_are_measured() {
+fn source_caps_are_measured_without_run_slots() {
     let sizes = Sizes { slots: 0, ..SIZES_ONE_SLOT };
     assert_eq!(sizes::engine_cap(&sizes), Some(sizes::Cap { bytes: 260, frames: 5 }));
+}
+#[test]
+fn source_record_bodies_are_measured() {
+    let sizes = Sizes { slots: 0, ..SIZES_ONE_SLOT };
     for (kind, bytes) in [
         (wire::Kind::Sources, 76),
         (wire::Kind::Check, 36),
@@ -60,7 +64,7 @@ fn source_record_fields_refuse_one_byte_past_each_bound() {
     }
 }
 #[test]
-fn whole_source_lists_round_trip_at_the_bound_and_refuse_one_more() {
+fn whole_source_lists_enforce_bounds_through_round_trip() {
     let limits = sizes::limits(&SIZES_ONE_SLOT).expect("tiny bounds");
     for count in [0, 2, 3] {
         let mut names = List::with_capacity(count);

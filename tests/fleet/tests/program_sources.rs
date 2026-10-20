@@ -133,7 +133,7 @@ fn only_absence_lifts_the_conservative_personal_login_restriction() {
     }
 }
 #[test]
-fn an_unconfigured_program_is_absent_and_an_unawaited_sign_out_faults() {
+fn an_unconfigured_program_counts_as_absent() {
     let mut world = World::new(&[b"a"]);
     world.hello(CHANNEL);
     world.step(Event::Logins {
@@ -144,6 +144,12 @@ fn an_unconfigured_program_is_absent_and_an_unawaited_sign_out_faults() {
         }]),
     });
     assert!(world.available());
+}
+#[test]
+fn an_unawaited_sign_out_faults_the_link() {
+    let mut world = World::new(&[b"a"]);
+    world.hello(CHANNEL);
+    world.inventory(&[b"a"]);
     assert_eq!(
         world.step(Event::SignedOut { channel: CHANNEL, name: source(b"a"), result: fleet::SignOutResult::SignedOut }),
         vec![Request::Refuse { channel: CHANNEL }]
@@ -151,7 +157,7 @@ fn an_unconfigured_program_is_absent_and_an_unawaited_sign_out_faults() {
     assert!(!world.available());
 }
 #[test]
-fn lost_sign_out_ends_once_and_never_replays_or_completes_a_new_channel_call() {
+fn a_lost_sign_out_cannot_complete_a_new_channel_call() {
     let mut world = World::new(&[b"a"]);
     world.hello(CHANNEL);
     world.inventory(&[b"a"]);

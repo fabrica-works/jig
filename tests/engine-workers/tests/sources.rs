@@ -21,7 +21,7 @@ fn frame(names: &[&[u8]]) -> skein_channel::Frame {
     fixtures::frame(0x0108, &body.finish())
 }
 #[test]
-fn whole_logins_and_signed_out_are_host_wide_without_attempt_fences() {
+fn source_records_are_host_wide_without_attempt_fences() {
     let mut world = World::new(&fixtures::limits(), &fixtures::workers(), 1);
     let (connection, channel) = world.reporting(fixtures::WORKER_A, fixtures::SECRET_A);
     world.play(connection, frame(&[b"alice"]));
@@ -52,7 +52,7 @@ fn whole_logins_and_signed_out_are_host_wide_without_attempt_fences() {
     assert!(world.root().iter().any(|request| matches!(request, Request::Up { up: host::LinkUp::SignedOut { name, result: host::SignOutResult::SignedOut }, .. } if *name == alice)));
 }
 #[test]
-fn malformed_or_oversized_login_rows_are_refused_and_empty_inventory_is_valid() {
+fn malformed_or_oversized_login_rows_are_refused() {
     for names in [&[b"Alice".as_slice()][..], &[b"a".as_slice(), b"b", b"c"]] {
         let mut world = World::new(&fixtures::limits(), &fixtures::workers(), 1);
         let (connection, _) = world.reporting(fixtures::WORKER_A, fixtures::SECRET_A);
@@ -60,6 +60,9 @@ fn malformed_or_oversized_login_rows_are_refused_and_empty_inventory_is_valid() 
         world.run();
         assert_eq!(world.refusal(connection), Some((3, Box::new([]) as Box<[u8]>)));
     }
+}
+#[test]
+fn an_empty_inventory_is_valid() {
     let mut world = World::new(&fixtures::limits(), &fixtures::workers(), 1);
     let (connection, _) = world.reporting(fixtures::WORKER_A, fixtures::SECRET_A);
     world.play(connection, frame(&[]));

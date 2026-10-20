@@ -27,31 +27,42 @@ fn auth_status_reaches_the_engine_through_the_worker_channel() {
         );
     }
 }
-#[test]
-fn logout_success_and_bounded_failure_reach_the_engine() {
-    for logout in [Logout::Succeeds, Logout::Fails] {
-        let succeeds = logout == Logout::Succeeds;
-        let result = program_sources::run(Some(b"claude.ai"), &Story { logout, ..Story::default() }, true, false);
-        if succeeds {
-            assert_eq!(result.ended, Some(SignOutAnswer::Answered(SignOutResult::SignedOut)));
-        } else {
-            assert_eq!(
-                result.ended,
-                Some(SignOutAnswer::Answered(SignOutResult::Failed {
-                    reason: jig_domain_fleet::SourceFailure::Exited,
-                    detail: b"refused\n".as_slice().into()
-                }))
-            );
-        }
-        assert_eq!(result.observations.iter().filter(|row| row.arguments == ["auth", "logout"]).count(), 1);
-    }
+fn logout_result(logout: Logout) -> program_sources::Run {
+    program_sources::run(Some(b"claude.ai"), &Story { logout, ..Story::default() }, true, false)
 }
 #[test]
-fn a_lost_real_logout_reply_ends_unconfirmed_and_redial_only_checks() {
-    let result = program_sources::run(Some(b"claude.ai"), &Story::default(), true, true);
-    assert_eq!(result.ended, Some(SignOutAnswer::Unconfirmed));
-    assert_eq!(result.states.last(), Some(&LoginState::NotSignedIn));
+fn logout_success_reaches_the_engine() {
+    let result = logout_result(Logout::Succeeds);
+    assert_eq!(result.ended, Some(SignOutAnswer::Answered(SignOutResult::SignedOut)));
     assert_eq!(result.observations.iter().filter(|row| row.arguments == ["auth", "logout"]).count(), 1);
+}
+#[test]
+fn bounded_logout_failure_reaches_the_engine() {
+    let result = logout_result(Logout::Fails);
+    assert_eq!(
+        result.ended,
+        Some(SignOutAnswer::Answered(SignOutResult::Failed {
+            reason: jig_domain_fleet::SourceFailure::Exited,
+            detail: b"refused\n".as_slice().into(),
+        }))
+    );
+    assert_eq!(result.observations.iter().filter(|row| row.arguments == ["auth", "logout"]).count(), 1);
+}
+fn lost_logout() -> program_sources::Run {
+    program_sources::run(Some(b"claude.ai"), &Story::default(), true, true)
+}
+#[test]
+fn a_lost_real_logout_reply_ends_unconfirmed() {
+    assert_eq!(lost_logout().ended, Some(SignOutAnswer::Unconfirmed));
+}
+#[test]
+fn redial_after_a_lost_logout_reply_only_checks() {
+    let result = lost_logout();
+    assert_eq!(result.states.last(), Some(&LoginState::NotSignedIn));
+    assert_eq!(
+        result.observations.iter().map(|row| row.arguments.clone()).collect::<Vec<_>>(),
+        [["auth", "status"], ["auth", "logout"], ["auth", "status"], ["auth", "status"]]
+    );
 }
 
 #[test]

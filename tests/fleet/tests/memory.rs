@@ -456,7 +456,7 @@ fn engine_slots_stay_within_the_fleets_worst_case() {
 }
 
 #[test]
-fn full_source_inventories_replacements_and_pending_sign_outs_fit_the_bound() {
+fn source_lifecycle_at_capacity_fits_the_memory_bound() {
     use jig_domain_fleet::{Login, LoginState, SourceName};
     let limits = LIMITS;
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };

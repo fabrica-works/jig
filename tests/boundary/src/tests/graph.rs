@@ -533,18 +533,26 @@ fn a_protocol_crate_linking_smith_is_reported_unless_charter_or_transcript() {
 }
 
 #[test]
-fn test_worker_and_service_link_only_their_smith_protocols_even_when_empty() {
+fn test_processes_link_only_their_smith_protocols_even_when_empty() {
     let failures = test_worker_smith_breaches(&manifests());
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[test]
+fn the_test_service_may_link_the_program_protocol() {
     let service = parse_manifest(
         PathBuf::from("fixture/service/Cargo.toml"),
         "[package]\nname = \"jig-test-service\"\n[dependencies]\nsmith-protocol-program.workspace = true\n",
     );
+    assert!(test_worker_smith_breaches(&[service]).is_empty());
+}
+
+#[test]
+fn the_test_worker_must_not_link_the_program_protocol() {
     let worker = parse_manifest(
         PathBuf::from("fixture/worker/Cargo.toml"),
         "[package]\nname = \"jig-test-worker\"\n[dependencies]\nsmith-protocol-program.workspace = true\n",
     );
-    assert!(test_worker_smith_breaches(&[service]).is_empty());
     assert_eq!(test_worker_smith_breaches(&[worker]), ["fixture/worker/Cargo.toml: smith-protocol-program"]);
 }
 

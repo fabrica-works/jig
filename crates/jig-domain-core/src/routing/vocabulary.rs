@@ -133,7 +133,6 @@ pub enum Write {
 }
 
 /// Core output that must follow the decision's commit.
-#[rustfmt::skip]
 #[derive(Debug)]
 pub enum Held {
     /// Every earlier commit is durable when the journal releases this terminal.

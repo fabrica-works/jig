@@ -448,7 +448,7 @@ fn fill_refusals(host: &mut Measured, owner: Token, inbox: u32) {
 }
 
 #[test]
-fn full_source_failures_and_replacement_stay_within_the_memory_bound() {
+fn source_replacement_at_capacity_stays_within_the_memory_bound() {
     use jig_domain_host::{LoginState, SourceFailure, SourceName, sources};
     let limits = Limits { slots: 0, ..LIMITS };
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };

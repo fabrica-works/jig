@@ -5,6 +5,9 @@ use jig_domain_host::{
 };
 use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 
+// Two sources exercise replacement at capacity and rejection one past it.
+const SOURCE_CAPACITY: u32 = 2;
+
 struct World {
     host: host::Domain,
     env: Env<host::Limits>,
@@ -13,13 +16,32 @@ struct World {
 impl World {
     fn new() -> Self {
         let mut limits = jig_host_world::Settings::calm(1).host;
-        limits.program_sources = 2;
+        limits.program_sources = SOURCE_CAPACITY;
         limits.slots = 0;
         Self {
             host: host::Domain::new(&limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             out: Queue::with_capacity(host::max_out(&limits)),
         }
+    }
+    fn checking(names: &[&[u8]]) -> (Self, Token) {
+        let mut world = Self::new();
+        let owner = command(&world.sources(names), names[0], Operation::Check);
+        (world, owner)
+    }
+    fn usable() -> Self {
+        let (mut world, owner) = Self::checking(&[b"a"]);
+        world.checked(owner, host::LoginState::Usable);
+        world
+    }
+    fn signing_out() -> (Self, Token) {
+        let mut world = Self::usable();
+        let owner = command(
+            &world.step(host::Event::Down(host::LinkDown::SignOut { name: name_of(b"a") })),
+            b"a",
+            Operation::SignOut,
+        );
+        (world, owner)
     }
     fn step(&mut self, event: host::Event) -> Vec<host::Request> {
         host::step(&mut self.host, &self.env, event, &mut self.out);
@@ -57,26 +79,36 @@ fn snapshot(request: &host::Request, names: &[&[u8]]) {
     );
 }
 #[test]
-fn replacement_installs_added_names_and_preserves_kept_sign_outs_while_busy() {
+fn duplicate_sources_fault_the_link() {
     let mut world = World::new();
-    let old = command(&world.sources(&[b"a", b"b"]), b"a", Operation::Check);
-    assert!(world.step(host::Event::Down(host::LinkDown::SignOut { name: name_of(b"b") })).is_empty());
-    assert!(world.sources(&[b"b", b"c"]).is_empty());
+    assert_eq!(world.sources(&[b"a", b"a"]), [host::Request::SourceFault]);
+}
+#[test]
+fn sources_one_past_capacity_fault_the_link() {
+    let mut world = World::new();
+    assert_eq!(world.sources(&[b"a", b"b", b"c"]), [host::Request::SourceFault]);
+}
+#[test]
+fn replacement_installs_added_names_while_a_check_is_busy() {
+    let (mut world, old) = World::checking(&[b"a", b"b"]);
+    world.sources(&[b"b", b"c"]);
     assert!(world.step(host::Event::Down(host::LinkDown::Check { name: name_of(b"c") })).is_empty());
-    assert!(world.step(host::Event::Down(host::LinkDown::SignOut { name: name_of(b"c") })).is_empty());
+    let b = command(&world.checked(old, host::LoginState::Usable), b"b", Operation::Check);
+    let c = command(&world.checked(b, host::LoginState::NotSignedIn), b"c", Operation::Check);
+    snapshot(&world.checked(c, host::LoginState::NotSignedIn)[0], &[b"b", b"c"]);
+}
+#[test]
+fn replacement_preserves_kept_sign_outs_while_a_check_is_busy() {
+    let (mut world, old) = World::checking(&[b"a", b"b"]);
+    world.step(host::Event::Down(host::LinkDown::SignOut { name: name_of(b"b") }));
+    world.sources(&[b"b", b"c"]);
     let b = command(&world.checked(old, host::LoginState::Usable), b"b", Operation::SignOut);
     let answer =
         world.step(host::Event::SourceAnswered { owner: b, answer: Answer::SignedOut(host::SignOutResult::SignedOut) });
-    assert!(matches!(
+    assert_eq!(
         answer[0],
-        host::Request::Up(host::LinkUp::SignedOut { result: host::SignOutResult::SignedOut, .. })
-    ));
-    let c = command(&answer[1..], b"c", Operation::SignOut);
-    let answer =
-        world.step(host::Event::SourceAnswered { owner: c, answer: Answer::SignedOut(host::SignOutResult::SignedOut) });
-    let b = command(&answer[1..], b"b", Operation::Check);
-    let c = command(&world.checked(b, host::LoginState::NotSignedIn), b"c", Operation::Check);
-    snapshot(&world.checked(c, host::LoginState::NotSignedIn)[0], &[b"b", b"c"]);
+        host::Request::Up(host::LinkUp::SignedOut { name: name_of(b"b"), result: host::SignOutResult::SignedOut })
+    );
 }
 #[test]
 fn replacement_answers_unknown_only_for_a_removed_queued_sign_out() {
@@ -92,38 +124,56 @@ fn replacement_answers_unknown_only_for_a_removed_queued_sign_out() {
     );
 }
 #[test]
-fn overlapping_checks_coalesce_and_an_unchanged_explicit_check_answers() {
-    let mut world = World::new();
-    let a = command(&world.sources(&[b"a"]), b"a", Operation::Check);
+fn overlapping_explicit_checks_coalesce_into_one_fresh_check() {
+    let (mut world, a) = World::checking(&[b"a"]);
     for _ in 0..2 {
         assert!(world.step(host::Event::Down(host::LinkDown::Check { name: name_of(b"a") })).is_empty());
     }
     let fresh = command(&world.checked(a, host::LoginState::NotSignedIn), b"a", Operation::Check);
-    snapshot(&world.checked(fresh, host::LoginState::NotSignedIn)[0], &[b"a"]);
+    let answer = world.checked(fresh, host::LoginState::NotSignedIn);
+    assert_eq!(answer.len(), 1);
+    snapshot(&answer[0], &[b"a"]);
+    assert!(world.host.sources_settled());
+}
+#[test]
+fn unchanged_periodic_checks_publish_no_inventory() {
+    let mut world = World::usable();
     world.env.now = Time::ZERO.saturating_add(Duration::from_secs(60));
     host::resume(&mut world.host, &world.env, &mut world.out);
     let periodic = world.out.pop().expect("interval check");
     let periodic = command(&[periodic], b"a", Operation::Check);
-    assert!(world.checked(periodic, host::LoginState::NotSignedIn).is_empty());
-    world.env.now = Time::ZERO.saturating_add(Duration::from_secs(119));
+    assert!(world.checked(periodic, host::LoginState::Usable).is_empty());
+}
+#[test]
+fn a_fresh_explicit_check_answers_even_when_unchanged() {
+    let mut world = World::usable();
+    world.env.now = Time::ZERO.saturating_add(Duration::from_secs(59));
     let explicit =
         command(&world.step(host::Event::Down(host::LinkDown::Check { name: name_of(b"a") })), b"a", Operation::Check);
-    world.env.now = Time::ZERO.saturating_add(Duration::from_secs(120));
+    world.env.now = Time::ZERO.saturating_add(Duration::from_secs(60));
     host::resume(&mut world.host, &world.env, &mut world.out);
     assert!(world.out.is_empty(), "the active check also covers the expired interval");
-    let answered = world.checked(explicit, host::LoginState::NotSignedIn);
-    assert_eq!(answered.len(), 1);
-    snapshot(&answered[0], &[b"a"]);
+    let answer = world.checked(explicit, host::LoginState::Usable);
+    assert_eq!(answer.len(), 1);
+    snapshot(&answer[0], &[b"a"]);
     assert!(world.host.sources_settled());
 }
 #[test]
-fn empty_sources_still_publish_an_inventory_and_unknown_commands_end() {
+fn empty_sources_still_publish_an_inventory() {
     let mut world = World::new();
     snapshot(&world.sources(&[])[0], &[]);
+}
+#[test]
+fn an_unknown_source_check_faults_the_link() {
+    let mut world = World::new();
     assert_eq!(
         world.step(host::Event::Down(host::LinkDown::Check { name: name_of(b"unknown") })),
         vec![host::Request::SourceFault]
     );
+}
+#[test]
+fn an_unknown_source_sign_out_answers_unknown() {
+    let mut world = World::new();
     let answer = world.step(host::Event::Down(host::LinkDown::SignOut { name: name_of(b"unknown") }));
     assert_eq!(
         answer,
@@ -163,15 +213,8 @@ fn a_lost_sign_out_is_settled_without_replaying_its_reply_on_redial() {
     );
 }
 #[test]
-fn shutdown_waits_for_the_command_and_answers_it_once() {
-    let mut world = World::new();
-    let a = command(&world.sources(&[b"a"]), b"a", Operation::Check);
-    world.checked(a, host::LoginState::Usable);
-    let sign_out = command(
-        &world.step(host::Event::Down(host::LinkDown::SignOut { name: name_of(b"a") })),
-        b"a",
-        Operation::SignOut,
-    );
+fn shutdown_preserves_the_active_sign_outs_real_result() {
+    let (mut world, sign_out) = World::signing_out();
     world.step(host::Event::CancelAll { reason: host::Reason::Shutdown });
     assert!(!world.host.sources_settled());
     let answer = world.step(host::Event::SourceAnswered {
@@ -185,6 +228,13 @@ fn shutdown_waits_for_the_command_and_answers_it_once() {
             result: host::SignOutResult::SignedOut
         })]
     );
+    assert!(world.host.sources_settled());
+    assert_eq!(world.host.next_deadline(), None);
+}
+#[test]
+fn sign_out_after_shutdown_answers_closed_without_starting_work() {
+    let mut world = World::usable();
+    world.step(host::Event::CancelAll { reason: host::Reason::Shutdown });
     for _ in 0..2 {
         assert_eq!(
             world.step(host::Event::Down(host::LinkDown::SignOut { name: name_of(b"a") })),
