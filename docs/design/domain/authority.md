@@ -108,7 +108,8 @@ Authority
   its main model and its sub-agents' (tasks.md, section 3), and so the
   LLM providers whose accounts may pay for its runs (accounts.md, 4.3);
   every configured model, unless the deployment's rules, the project's
-  policy or a role names fewer (section 6). A procedure's are empty.
+  policy or a role names fewer (section 6). A procedure runs no model;
+  its models are those its delegates may name.
 - **Grants:** each is a connector, a kind of effect or read that
   connector defines, and a pattern of resource names (section 4):
   "restart the services under `staging`", "create environments in the
@@ -424,9 +425,12 @@ task's executor kind and charter, each agent task's LLM choice names
 models its own authority allows and efforts its models declare
 (tasks.md, section 3), and the batch's tasks, depth, budgets and
 deadlines are within what its creator has left. Beyond any of these, the
-answer is propose; beyond the project's ceiling, refuse. An account a
-task's LLM choice names that does not serve its payer is refused, naming
-the LLM provider's rule where it is a plan's (accounts.md, 4.2).
+answer is propose; beyond the project's ceiling, refuse. For now, an LLM
+choice naming a model beyond its task's authority is refused, naming
+the model, rather than answered propose: a proposal that widens a
+task's models is later work. An account a task's LLM choice names that
+does not serve its payer is refused, naming the LLM provider's rule
+where it is a plan's (accounts.md, 4.2).
 Allowed, the answer gives the creator's numbers after the reservations,
 and what the budget given `AsAllowed`, if any, resolved to (section 7).
 
