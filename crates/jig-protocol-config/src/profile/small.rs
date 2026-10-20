@@ -131,6 +131,7 @@ pub(super) const BRIEF: brief::Limits =
 pub(super) const ACCOUNTS: accounts::Limits = accounts::Limits {
     accounts: 4,
     holder_accounts: 4,
+    program_names: 12,
     sources: 3,
     sign_ins: 2,
     credentials: 3,

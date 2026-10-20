@@ -31,6 +31,7 @@ fn a_secret_file_readable_by_others_refuses_the_start() {
     let bytes = format!(
         r#"{{"workers":[{{
         "engine":{{"socket":"127.0.0.1:7200"}},"name":"worker-a","secret":"{}","slots":1,
+        "programs":{{"check_interval_ms":60000}},
         "graces":{{"grace_ms":10000,"agent_stop_ms":5000,"delivery_ms":1000,"save_ms":1000}},
         "agent":{{"program":"jig-test","configuration":"agent.json","arguments":["agent"]}},
         "limits":{{"profile":"small"}},"memory_bytes":1152921504606846976
@@ -126,4 +127,50 @@ fn a_bundle_above_sixteen_mebibytes_is_refused() {
     let error = super::bundle::read(&directory).expect_err("oversized bundle refused");
     fs::remove_dir_all(directory).expect("scratch cleanup");
     assert!(error.contains("bundle exceeds its limits"), "{error}");
+}
+
+fn agent_document(directory: &std::path::Path, program: bool) -> PathBuf {
+    fs::write(directory.join("root.der"), skein_tls_world::pki::ROOT).expect("public test root");
+    let mut value = serde_json::json!({
+        "profile":{"name":"standard","declared":{"tool_payload":512,"read_window":256},
+            "policy":{"max_turns":5,"group_stop":10}},
+        "endpoints":[{"name":"fake","number":0,"dialect":3,"account":1,"provider":"openai",
+            "address":"127.0.0.1:34443","transport":"tls","server_name":"skein.test","trust_der":directory.join("root.der"),"identity":"plain","connect":1000,"handshake":1000,
+            "models":[{"name":"fake","window":1_048_576,"output":1024,"reasoning_item":64,"prices":{"input":1,"cached":1,"output":1,"unit":1000},"head":60000,"idle":30000}]}],
+        "environment":[{"name":"JIG_SOURCE_CHECK","value":"configured"}]
+    });
+    if program {
+        value["programs"] = serde_json::json!({"claude_code":{
+            "path":directory.join("private-claude"),"directory":directory.join("private-programs")
+        }});
+    }
+    let path = directory.join("agent.json");
+    fs::write(&path, serde_json::to_vec(&value).expect("agent fixture JSON")).expect("agent configuration");
+    path
+}
+#[test]
+fn a_worker_reads_program_resources_from_the_agent_configuration() {
+    use std::os::unix::ffi::OsStrExt;
+    let directory = scratch("program-agent");
+    let parsed = super::agent(&agent_document(&directory, true)).expect("configured agent");
+    let sources = parsed.sources.expect("configured Claude Code");
+    assert_eq!(sources.executable.as_ref(), directory.join("private-claude").as_os_str().as_bytes());
+    assert_eq!(sources.directory.as_ref(), directory.join("private-programs").as_os_str().as_bytes());
+    assert_eq!(sources.environment.as_ref(), &[Box::<[u8]>::from(b"JIG_SOURCE_CHECK=configured".as_slice())]);
+    assert!(
+        jig_test_service::program_sources::Resources::from_paths(
+            sources.directory,
+            sources.executable,
+            sources.environment
+        )
+        .is_some()
+    );
+    fs::remove_dir_all(directory).expect("scratch cleanup");
+}
+#[test]
+fn an_agent_without_a_program_supplies_no_program_resources() {
+    let directory = scratch("no-program-agent");
+    let parsed = super::agent(&agent_document(&directory, false)).expect("configured agent");
+    assert!(parsed.sources.is_none());
+    fs::remove_dir_all(directory).expect("scratch cleanup");
 }

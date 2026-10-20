@@ -13,6 +13,7 @@ mod domain;
 mod keys;
 mod limits;
 mod ordering;
+pub mod programs;
 mod providers;
 mod records;
 mod restore;

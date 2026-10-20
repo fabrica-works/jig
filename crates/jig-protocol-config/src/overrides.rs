@@ -308,6 +308,7 @@ fn set_accounts(limits: &mut jig_domain_accounts::Limits, name: &[u8], value: u6
     let jig_domain_accounts::Limits {
         accounts,
         holder_accounts,
+        program_names,
         sources,
         sign_ins,
         credentials,
@@ -320,6 +321,7 @@ fn set_accounts(limits: &mut jig_domain_accounts::Limits, name: &[u8], value: u6
     match name {
         b"accounts" => *accounts = count(value)?,
         b"holder_accounts" => *holder_accounts = count(value)?,
+        b"program_names" => *program_names = count(value)?,
         b"sources" => *sources = count(value)?,
         b"sign_ins" => *sign_ins = count(value)?,
         b"credentials" => *credentials = count(value)?,

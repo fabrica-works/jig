@@ -14,6 +14,8 @@ pub struct Worker {
     pub graces: Graces,
     pub stop_bound: Duration,
     pub agent: Agent,
+    /// Positive interval between local source-login observations.
+    pub check_interval: Duration,
     pub limits: Limits,
     pub memory: u64,
 }
@@ -79,6 +81,20 @@ pub fn worker(document: &Document, at: u32, directories: &Directories) -> Result
     if let Some(at) = object.required(document, b"graces", &path, &mut problems) {
         graces = parse_graces(document, at, &path.member(b"graces"), &mut problems);
     }
+    let mut check_interval = None;
+    if let Some(at) = object.required(document, b"programs", &path, &mut problems) {
+        let path = path.member(b"programs");
+        if let Some(mut programs) = check::object(document, at, &path, &mut problems) {
+            check_interval = check::duration(&mut programs, document, b"check_interval_ms", &path, &mut problems);
+            if check_interval == Some(Duration::ZERO) {
+                problems.push(path.member(b"check_interval_ms"), What::Bound);
+            }
+            programs.finish(document, &path, &mut problems);
+        }
+    }
+    if let Some(interval) = check_interval {
+        limits.hub.source_interval = interval;
+    }
     let mut agent = None;
     if let Some(at) = object.required(document, b"agent", &path, &mut problems) {
         agent = parse_agent(document, at, &path.member(b"agent"), directories, &mut problems);
@@ -97,6 +113,7 @@ pub fn worker(document: &Document, at: u32, directories: &Directories) -> Result
         graces: graces.expect("required member checked"),
         stop_bound: bound.expect("duration sum checked"),
         agent: agent.expect("required member checked"),
+        check_interval: check_interval.expect("required member checked"),
         limits,
         memory: memory.expect("required member checked"),
     })

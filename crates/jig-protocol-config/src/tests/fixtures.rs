@@ -111,6 +111,7 @@ pub fn refuses(from: &[u8], to: &[u8], path: Path, what: crate::What) {
 pub const WORKER_SMALL: &[u8] = br#"{
 "engine": {"in_process": "workers"},
 "name": "worker-a", "secret": "secrets/worker-a.secret", "slots": 2,
+"programs":{"check_interval_ms":60000},
 "graces": {"grace_ms": 30000, "agent_stop_ms": 10000, "delivery_ms": 20000, "save_ms": 5000},
 "agent": {"program": "jig-test", "arguments": ["agent"], "configuration": "agent.json"},
 "limits": {"profile": "small"}, "memory_bytes": 1073741824

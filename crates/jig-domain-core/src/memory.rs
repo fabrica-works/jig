@@ -133,6 +133,7 @@ fn context_carrier(limits: &Limits) -> Option<u64> {
 #[expect(clippy::too_many_lines, reason = "one checked sum names each retained and in-flight owner")]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.people.operations > limits.tasks.tasks
+        || limits.accounts.program_names > limits.fleet.program_sources
         || limits.templates == 0
         || limits.resume_bytes == 0
         || limits.run_bytes == 0

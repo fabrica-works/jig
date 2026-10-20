@@ -216,7 +216,7 @@ fn a_value_is_in_no_committed_row() {
                         }
                     }
                 }
-                Record::Accounts(accounts::Stored::Source { name, .. }) => {
+                Record::Accounts(accounts::Stored::Source { name, .. } | accounts::Stored::Issued { name, .. }) => {
                     for window in name.windows(VALUE.len()) {
                         assert_ne!(window, VALUE);
                     }

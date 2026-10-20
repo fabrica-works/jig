@@ -20,6 +20,11 @@ pub struct Resources {
     environment: Box<[Box<[u8]>]>,
 }
 impl Resources {
+    /// Startup's already parsed agent paths and explicit environment.
+    #[must_use]
+    pub fn from_paths(directory: Box<[u8]>, claude: Box<[u8]>, environment: Box<[Box<[u8]>]>) -> Option<Self> {
+        Self::new(Programs { directory, claude }, environment)
+    }
     #[must_use]
     pub fn new(programs: Programs, environment: Box<[Box<[u8]>]>) -> Option<Self> {
         if programs.directory.len() > PATH_BYTES

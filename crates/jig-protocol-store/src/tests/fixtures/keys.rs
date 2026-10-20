@@ -91,10 +91,11 @@ pub fn key(rng: &mut Rng) -> core::Key {
 }
 pub fn accounts_key(rng: &mut Rng) -> jig_domain_accounts::Key {
     use jig_domain_accounts::Key;
-    match rng.below(3) {
+    match rng.below(4) {
         0 => Key::Next,
         1 => Key::Account { number: narrow(rng) },
-        _ => Key::Source { account: narrow(rng), number: narrow(rng) },
+        2 => Key::Source { account: narrow(rng), number: narrow(rng) },
+        _ => Key::Issued { number: narrow(rng) },
     }
 }
 

@@ -213,6 +213,7 @@ fn records_that_break_the_rules_are_counted_not_restored() {
         source(0, 6, 1, Kind::SignIn),
         named(7, 1, b"Upper"),
         named(8, 1, b"runner"),
+        Stored::Issued { number: 8, holder: ALICE, name: b"runner".as_slice().into() },
         named(10, 2, b"runner"),
         account(11, 2, BOB, b"bob"),
     ]);

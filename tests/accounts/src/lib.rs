@@ -8,6 +8,7 @@ pub const ANALYST: u32 = 7;
 pub const LIMITS: Limits = Limits {
     accounts: 3,
     holder_accounts: 2,
+    program_names: 12,
     sources: 3,
     sign_ins: 1,
     credentials: 2,

@@ -134,6 +134,7 @@ pub const CORE_LIMITS: core::Limits = core::Limits {
     accounts: jig_domain_accounts::Limits {
         accounts: 1,
         holder_accounts: 1,
+        program_names: 12,
         sources: 3,
         sign_ins: 1,
         credentials: 2,

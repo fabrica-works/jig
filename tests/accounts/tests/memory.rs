@@ -71,6 +71,20 @@ fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
                 Kind::Key => Some(Held::Limited { reset: Some(Wall::from_nanos(60_000_000_000)) }),
                 Kind::SignIn | Kind::Program | Kind::None => None,
             };
+            if kind(place) == Kind::Program {
+                step(
+                    &mut domain,
+                    &env,
+                    Event::Restore {
+                        record: Stored::Issued {
+                            number: number(account, Some(place)),
+                            holder: Holder::Party(u64::from(account)),
+                            name: name.clone(),
+                        },
+                    },
+                    &mut out,
+                );
+            }
             let record = Stored::Source {
                 account: number(account, None),
                 number: number(account, Some(place)),

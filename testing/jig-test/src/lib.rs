@@ -88,8 +88,19 @@ fn read_files(document: &[u8], bounds: &[config::File], user: u32) -> Result<Fil
     }
     Ok(Files { entries })
 }
-fn agent(worker: &config::Worker) -> Result<service::Agent, String> {
-    let configuration = smith_agent_shell::config::read(path(&worker.agent.configuration))?;
+#[derive(Debug)]
+struct AgentStart {
+    agent: service::Agent,
+    sources: Option<SourceSettings>,
+}
+#[derive(Debug)]
+struct SourceSettings {
+    directory: Box<[u8]>,
+    executable: Box<[u8]>,
+    environment: Box<[Box<[u8]>]>,
+}
+fn agent(configuration: &Path) -> Result<AgentStart, String> {
+    let configuration = smith_agent_shell::config::read(configuration)?;
     let limits = &configuration.service.limits;
     let host_limits = smith_local_service::profile::host_limits(&configuration.profile, limits)
         .map_err(|why| format!("agent host: {why:?}"))?;
@@ -115,7 +126,15 @@ fn agent(worker: &config::Worker) -> Result<service::Agent, String> {
         }
     }
     let policy = configuration.profile.policy;
-    Ok(service::Agent {
+    let sources = configuration.programs.get(&smith_agent_shell::config::ProgramName::ClaudeCode).map(|program| {
+        let environment = configuration.service.environment.command_entries();
+        SourceSettings {
+            directory: program.directory.as_os_str().as_bytes().into(),
+            executable: program.path.as_os_str().as_bytes().into(),
+            environment,
+        }
+    });
+    let agent = service::Agent {
         endpoints: configuration.service.channel_endpoints,
         limits: protocol,
         host_limits,
@@ -130,7 +149,8 @@ fn agent(worker: &config::Worker) -> Result<service::Agent, String> {
             inbox: policy.inbox,
             unacknowledged: policy.unacknowledged,
         },
-    })
+    };
+    Ok(AgentStart { agent, sources })
 }
 fn account_transport(
     configured: &config::Transport,
@@ -268,7 +288,7 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> R
     }
     let user = skein_shell::effective_user();
     let files = read_files(bytes, &bounds, user)?;
-    let agent = specs.first().map(agent).transpose()?;
+    let agent = specs.first().map(|worker| agent(path(&worker.agent.configuration))).transpose()?;
     if specs
         .iter()
         .any(|worker| worker.agent.configuration != specs.first().expect("nonempty workers").agent.configuration)
@@ -323,9 +343,18 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> R
     let drawn = skein_shell::crypto_seed().map_err(|errno| format!("installation id: errno {errno}"))?;
     installation.copy_from_slice(drawn.expose().get(..16).expect("32-byte seed"));
     let seeds = Seeds { deployment, installation, seed, crypto };
-    let mut service =
-        service::startup(bytes, &files, agent.as_ref(), &seeds, runtime, Some(service::WorkerRuntime { roots }))
-            .map_err(|why| format!("startup: {why:?}"))?;
+    let mut service = service::startup(
+        bytes,
+        &files,
+        agent.as_ref().map(|configured| &configured.agent),
+        &seeds,
+        runtime,
+        Some(service::WorkerRuntime { roots }),
+    )
+    .map_err(|why| format!("startup: {why:?}"))?;
+    if let Some(configured) = &agent {
+        configure_sources(&mut service, configured, workers.len())?;
+    }
     if let Some(directory) = service.bundle_directory() {
         let bundle = bundle::read(path(directory))?;
         service.serve(bundle).map_err(|why| format!("serve bundle: {why:?}"))?;
@@ -337,6 +366,19 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> R
         service.adopt_store(root, user).map_err(|_| "store refused its deployment root")?;
     }
     Ok(service)
+}
+fn configure_sources(service: &mut service::Service, configured: &AgentStart, workers: u32) -> Result<(), String> {
+    let Some(sources) = &configured.sources else { return Ok(()) };
+    for index in 0..workers {
+        let resources = service::program_sources::Resources::from_paths(
+            sources.directory.clone(),
+            sources.executable.clone(),
+            sources.environment.clone(),
+        )
+        .ok_or("agent.programs exceeds host-operation path/environment bounds")?;
+        service.configure_program_sources(index, resources).map_err(|_| "program sources refused before startup")?;
+    }
+    Ok(())
 }
 fn serve(path: &Path, d2: Option<&Path>) -> Result<Exit, String> {
     let bytes = read_configuration(path)?;

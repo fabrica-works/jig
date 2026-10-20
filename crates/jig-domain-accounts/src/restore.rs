@@ -5,10 +5,14 @@
 use crate::domain::{Account, Domain, Hold, Source, settle};
 use crate::records::{program_name, within};
 use crate::{DISPLAY, Fact, Held, Kind, Limits, SUBJECT, Stored};
-use skein_lib::{Duration, Env, List, Map, Wall};
+use skein_lib::{Duration, Env, List, Map, Queue, Wall};
 
 pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored) {
     let taken = match record {
+        Stored::Issued { number, holder, name } => {
+            domain.past(number);
+            crate::programs::restore(domain, number, holder, name)
+        }
         Stored::Next { number } => {
             domain.next = domain.next.max(number);
             domain.kept = number;
@@ -47,7 +51,8 @@ pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored) {
 }
 
 /// The start drops each account left with no source: none of its records says how it is used.
-pub(crate) fn finish(domain: &mut Domain, env: &Env<Limits>) {
+pub(crate) fn finish(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<crate::Request>) {
+    crate::programs::finish_restore(domain, out);
     let mut empty = List::with_capacity(env.limits.accounts);
     for (number, account) in &domain.accounts {
         if account.sources.is_empty() {
@@ -64,6 +69,7 @@ pub(crate) fn finish(domain: &mut Domain, env: &Env<Limits>) {
 /// provider holds (accounts.md, 3.1 and 3.2).
 fn account(domain: &mut Domain, env: &Env<Limits>, number: u32, mut entry: Account) -> bool {
     if !free(domain, number)
+        || domain.issued.contains_key(&number)
         || !within(&entry.subject, SUBJECT)
         || !within(&entry.display, DISPLAY)
         || !crate::records::valid_uses(entry.uses.as_deref())

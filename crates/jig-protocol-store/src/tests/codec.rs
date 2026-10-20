@@ -68,6 +68,7 @@ fn accounts_records() -> Box<[jig_domain_accounts::Stored]> {
         held,
     };
     Box::new([
+        Stored::Issued { number: u32::MAX, holder: Holder::Party(u64::MAX), name: Box::new([b'p'; 32]) },
         Stored::Next { number: 0 },
         Stored::Next { number: u32::MAX },
         Stored::Account {

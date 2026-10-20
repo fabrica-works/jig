@@ -157,6 +157,7 @@ pub(super) fn limits() -> Limits {
         accounts: accounts::Limits {
             accounts: 1,
             holder_accounts: 1,
+            program_names: 12,
             sources: 3,
             sign_ins: 1,
             credentials: 2,

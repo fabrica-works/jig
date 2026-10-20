@@ -208,3 +208,24 @@ fn program_source_resources_have_positive_bounded_admission() {
         jig_domain_host::worst_case(&jig_domain_host::Limits { source_timeout: Duration::ZERO, ..limits }).is_none()
     );
 }
+
+#[test]
+fn a_worker_configures_its_local_login_check_interval() {
+    let bytes = fixtures::with(fixtures::WORKER_SMALL, b"\"check_interval_ms\":60000", b"\"check_interval_ms\":1250");
+    let parsed = worker(&bytes).expect("positive source interval");
+    assert_eq!(parsed.check_interval, Duration::from_millis(1_250));
+    assert_eq!(parsed.limits.hub.source_interval, Duration::from_millis(1_250));
+}
+#[test]
+fn a_zero_login_check_interval_names_the_invalid_field() {
+    refuses(
+        b"\"check_interval_ms\":60000",
+        b"\"check_interval_ms\":0",
+        fixtures::path(&[b"programs", b"check_interval_ms"]),
+        What::Bound,
+    );
+}
+#[test]
+fn a_missing_login_check_interval_names_the_missing_field() {
+    refuses(b"\"check_interval_ms\":60000", b"", fixtures::path(&[b"programs", b"check_interval_ms"]), What::Missing);
+}

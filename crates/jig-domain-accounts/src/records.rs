@@ -51,6 +51,8 @@ pub enum Held {
 pub enum Stored {
     /// The number the counter gives next; no number below it is given again.
     Next { number: u32 },
+    /// A lifetime reservation, retained after removal; also names unresolved host cleanup.
+    Issued { number: u32, holder: Holder, name: Box<[u8]> },
     /// An empty subject is none: no signed-in source gave one.
     Account {
         number: u32,
@@ -72,6 +74,7 @@ pub enum Key {
     Next,
     Account { number: u32 },
     Source { account: u32, number: u32 },
+    Issued { number: u32 },
 }
 
 impl Stored {
@@ -79,6 +82,7 @@ impl Stored {
     pub const fn key(&self) -> Key {
         match self {
             Stored::Next { .. } => Key::Next,
+            Stored::Issued { number, .. } => Key::Issued { number: *number },
             Stored::Account { number, .. } => Key::Account { number: *number },
             Stored::Source { account, number, .. } => Key::Source { account: *account, number: *number },
         }

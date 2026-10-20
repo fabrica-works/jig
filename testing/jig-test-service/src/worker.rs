@@ -78,6 +78,7 @@ impl Worker {
         }
         let mut limits = config.limits.hub;
         limits.slots = config.slots;
+        limits.source_interval = config.check_interval;
         let root_limits = root::Limits {
             hub: limits,
             agent: agent.host_limits,

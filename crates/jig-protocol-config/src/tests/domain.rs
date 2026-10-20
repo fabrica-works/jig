@@ -297,7 +297,9 @@ fn memory_below_the_components_sum_is_refused() {
     //     + 1 * 4096 model-name bytes) = 4520.
     // Delta = 64 + 24 + 32 + 16 + 4520 = 4656; 18_677_344_295 + 4656
     // = 18_677_348_951. Other document scratch paths remain below deployment.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_348_951 });
+    // y1b's 12 lifetime-name reservations add 1,920 bytes: 1,536 for the bounded
+    // Map<u32, Issued> (3 tree nodes x 512), plus the owned names (12 x 32 = 384).
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_350_871 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

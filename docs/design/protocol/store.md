@@ -156,7 +156,7 @@ The first byte of every key names its owner:
 | Tag | Owner | Then |
 |---|---|---|
 | 0 | the component's own rows | its family: the format row (5.3), transcripts' places (8.1) |
-| 1 | jig | the child's tag, in the order of the core's key: the core's own, then each child's; then the family's key; and one row of the component's, the installation's identifier, after the accounts child's rows (4.4) |
+| 1 | jig | the child's tag, in the order of the core's key: the core's own, then each child's; then the family's key; and one row of the component's, the installation's identifier, at its reserved key (4.4) |
 | 2 | the application | its own key bytes, which it encodes by the same rule, so that bytes sort as its keys do |
 
 - **The application's bytes stay under its tag.** The component prefixes
@@ -190,7 +190,7 @@ child puts live first.
 | Owner | Family | Key | Loaded |
 |---|---|---|---|
 | component | the format row | none: one row | at open |
-| component | the installation's identifier, in the accounts' family after the child's rows (01 04 03): drawn by the shell at each start (`configuration.md`, section 8) and kept by the store's first commit, beside the format row (5.3), so that each later start's draw is ignored | none: one row | at open, handed up as the store opens, never by the restart's ranges (7.2) |
+| component | the installation's identifier, at its reserved key in the accounts' family (01 04 03): drawn by the shell at each start (`configuration.md`, section 8) and kept by the store's first commit, beside the format row (5.3), so that each later start's draw is ignored | none: one row | at open, handed up as the store opens, never by the restart's ranges (7.2) |
 | component | transcripts' places: each task's committed length and its current window's start; each attempt's first turn | task; task, attempt | at open, the run proofs' tasks' lengths (8.4); the rest when read |
 | core | the deployment: its id, its numbers, the last commit | none: one row | at start |
 | core | goals' projections (feed, plan rows, pending milestones), run proofs, calls committed since a live task's last turn, live agent tasks' conversations (their first attempt, their current window's start) | a goal's, then its own; task; task, attempt, completion, position; task | at start |
@@ -199,7 +199,7 @@ child puts live first.
 | tasks | ended tasks, past periods, decided proposals, history, milestones, activity | task, then a position or revision; funder, period; proposal | on demand |
 | people | parties, sign-ins (no secret), roles, projects' policies (their overrides of templates among them), read positions over results and over live conversations, answered keys within the retention | as the people child keys them; a live conversation's position by party, then task | at start |
 | people | ended conversations' read positions (7.4) | task, then party | at start, by the census, every row (7.2); otherwise on demand |
-| accounts | the next number the accounts child gives, below which it gives none again; LLM accounts: each one's holder, LLM provider, subject and display name, and its uses; their sources, each at its place in its holder's order, with its kind, its name for a program's, and its hold: limited, with its reset as a wall time where it has one, or refused. The rest of a source's state is heard again at each start, and none is kept per host (`../domain/accounts.md`, 3.5) | none: one row; account; account, source | at start |
+| accounts | issued program names, including retired ones, with their source number and original holder (key tag 4, after the installation's reserved tag); the next number the accounts child gives, below which it gives none again; LLM accounts: each one's holder, LLM provider, subject and display name, and its uses; their sources, each at its place in its holder's order, with its kind, its name for a program's, and its hold: limited, with its reset as a wall time where it has one, or refused. The rest of a source's state is heard again at each start, and none is kept per host (`../domain/accounts.md`, 3.5) | source for an issued name; none: one row; account; account, source | at start, issued names before live account/source records |
 | notes | entries, and an index line per entry per scope | name; scope, name | when a scope is in use; entries on demand |
 | tasks | the results' index, the inbox's census's (7.2): a row per result of a task a party requested, at its position among that party's results, past the tasks child's live families | party, position | at start, by the census, past each party's read position over results |
 | tasks, people | indexes for parties' reads (7.4): each party's inbox by time; ended tasks by requester party and by project; ended delegates; a subtree's delegates | the index's own, newest first where it reads so: an ended index's by party or project, then label, ended at reversed and task | on demand |

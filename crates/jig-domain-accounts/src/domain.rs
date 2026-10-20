@@ -145,6 +145,7 @@ enum Choice {
 pub struct Domain {
     pub(crate) accounts: Map<u32, Account>,
     pub(crate) sources: Map<u32, Source>,
+    pub(crate) issued: Map<u32, crate::programs::Issued>,
     /// The number the counter gives next: accounts and sources alike, never twice.
     pub(crate) next: u32,
     /// The counter's number the store keeps; the start saves the counter when it has moved.
@@ -177,6 +178,7 @@ impl Domain {
         Domain {
             accounts: Map::with_capacity(limits.accounts),
             sources: Map::with_capacity(sources),
+            issued: Map::with_capacity(limits.program_names),
             next: 0,
             kept: 0,
             providers,
@@ -453,6 +455,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             domain.phase = Phase::Closed;
             domain.accounts = Map::with_capacity(env.limits.accounts);
             domain.sources = Map::with_capacity(domain.sources.capacity());
+            domain.issued = Map::with_capacity(env.limits.program_names);
             domain.signing = Map::with_capacity(env.limits.sign_ins);
             domain.signing_out = Map::with_capacity(domain.sources.capacity());
             out.push(Request::Closed);
@@ -522,7 +525,7 @@ fn want(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         return;
     }
     domain.phase = Phase::Wanted;
-    crate::restore::finish(domain, env);
+    crate::restore::finish(domain, env, out);
     crate::ordering::normalize(domain, env, out);
     none_accounts(domain, env, out);
     domain.counted(out);

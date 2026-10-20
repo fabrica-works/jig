@@ -30,7 +30,7 @@ fn each_restart_range_holds_the_keys_it_admits_and_no_others() {
 }
 #[test]
 fn the_restart_reads_its_ranges_in_the_cores_order() {
-    let expected = [&[1, 0, 0][..], &[1, 4, 0], &[1, 2, 0], &[1, 1, 0], &[1, 0, 1]];
+    let expected = [&[1, 0, 0][..], &[1, 4, 4], &[1, 2, 0], &[1, 1, 0], &[1, 0, 1]];
     for (range, start) in RestoreRange::LIVE.into_iter().zip(expected) {
         let actual = intervals::restore(&range);
         assert_eq!(actual.first().expect("one live interval").start.as_ref(), start);
@@ -264,6 +264,7 @@ fn the_accounts_restore_range_stops_before_the_installations_row() {
     let installation = keys::installation(fixtures::KEY_LIMIT).expect("within the key limit");
     assert!(!fixtures::within(&ranges, &installation), "tag 3 is no domain record");
     for key in [
+        jig_domain_accounts::Key::Issued { number: u32::MAX },
         jig_domain_accounts::Key::Next,
         jig_domain_accounts::Key::Account { number: u32::MAX },
         jig_domain_accounts::Key::Source { account: u32::MAX, number: u32::MAX },

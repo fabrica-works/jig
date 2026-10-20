@@ -257,6 +257,17 @@ fn unknown_program_login_facts_also_hold_a_direct_run_off_workers() {
             },
         },
     );
+    account(
+        &mut core,
+        &limits,
+        accounts::Event::Restore {
+            record: accounts::Stored::Issued {
+                number: 3,
+                holder: accounts::Holder::Party(2),
+                name: b"personal".as_slice().into(),
+            },
+        },
+    );
     account(&mut core, &limits, accounts::Event::Want);
     granted(&mut core, &limits, 1);
     assert_eq!(core.run_choice(TASK), Err(RunWait::Host));

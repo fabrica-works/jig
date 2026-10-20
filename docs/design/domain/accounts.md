@@ -213,7 +213,12 @@ Account
   they never take a program's source.
 - **A program source's name** is 1 to 32 characters of `a-z`, `0-9` and
   `-`, given by its holder as they declare it, unique in the deployment,
-  never changed and never reused once removed. It, not the account's
+  never changed and never reused once removed. A durable reservation keeps
+  its source number, name and original holder after removal. Both shipped
+  profiles admit 12 lifetime names. Restoring an existing live source reserves
+  its name before admitting changes; a conflicting reservation is refused.
+  Exhaustion refuses a declaration before
+  reserving its numbers or writing any row. It, not the account's
   number, names the configuration directory, so that a directory a
   person signed in on a host keeps meaning that source, and a
   developer's own fixed directory serves each fresh deployment a live
@@ -326,7 +331,8 @@ says (`../protocol/llm.md`, section 5) and what runs' agents notice
 ### 3.6 Bounds
 
 Accounts in the deployment, accounts per holder, sources per account,
-sign-ins at once and program sources per worker are limits
+sign-ins at once, lifetime program source names (retired names included),
+and program sources per worker are limits
 (`../protocol/configuration.md`, section 6), within which the accounts'
 records, skein's driver, the hub's grants, a worker's hello and the
 secrets' store are sized. A request that would pass one is refused,

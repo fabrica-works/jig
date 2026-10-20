@@ -228,6 +228,7 @@ const SMALL: &[(&[u8], u64)] = &[
     (b"accounts.facts", 32),
     (b"accounts.holder_accounts", 4),
     (b"accounts.sources", 3),
+    (b"accounts.program_names", 12),
     (b"accounts.sign_ins", 2),
     (b"accounts.sign_in_deadline_ms", 300_000),
     (b"views.runs", 4),

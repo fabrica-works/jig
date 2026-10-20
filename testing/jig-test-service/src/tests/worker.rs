@@ -360,3 +360,26 @@ fn a_roots_step_count_moves_with_an_input_and_not_with_an_idle_iterate() {
     iterate(&mut service, Time::ZERO, Wall::EPOCH);
     assert_eq!(service.root_steps(), after);
 }
+
+#[test]
+fn a_program_check_rearms_at_the_configured_interval() {
+    use jig_domain_host::{LinkDown, SourceName};
+    use skein_lib::Duration;
+    let document =
+        fixtures::with(fixtures::WORKER_DOCUMENT, b"\"check_interval_ms\":60000", b"\"check_interval_ms\":1250");
+    let mut service = crate::startup(
+        &document,
+        &fixtures::worker_files(),
+        Some(&fixtures::agent()),
+        &fixtures::seeds(),
+        None,
+        Some(fixtures::worker_runtime()),
+    )
+    .expect("worker service");
+    let layer = worker(&mut service);
+    layer.step(root::Event::Link(LinkDown::Sources {
+        sources: Box::new([SourceName::new(b"personal").expect("source name")]),
+    }));
+    layer.iterate(Time::ZERO, Wall::EPOCH);
+    assert_eq!(layer.root.next_deadline(), Some(Time::ZERO.saturating_add(Duration::from_millis(1_250))));
+}
