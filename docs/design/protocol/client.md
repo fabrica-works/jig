@@ -370,12 +370,14 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
     it, keeps it in the secrets' store before the core sees the request
     (`store.md`, section 9), and hands the core the request with the
     value named by a number jig draws for it, never one the request
-    names (a key's value, by its party and key, instead), and the
-    value's digest. The request's own digest covers its record, the
-    value left out, and its value, each after its length, in place of
-    the record's bytes as they came, so that a key sent again with
-    another value is told apart. Those digests are the only trace of the
-    bytes the core keeps, and no value can be read from them.
+    names, and the value's digest. An LLM key's value is then adopted
+    into its source's secret row in one commit, which erases the
+    carried row (`store.md`, section 9). The request's own digest covers
+    its record, the value left out, and its value, each after its
+    length, in place of the record's bytes as they came, so that a key
+    sent again with another value is told apart. Those digests are the
+    only trace of the bytes the core keeps, and no value can be read
+    from them.
   - *The client's side* sends it once: an answer of busy or not ready, a
     link down, or a party signed out or not yet confirmed ends it as
     *unsent*, the engine having made nothing; an exchange that ends with

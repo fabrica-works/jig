@@ -112,7 +112,7 @@ the application's part with the application's codecs.
 | **read** a party's read: its scope, position, direction, rows and bytes (`../domain/engine.md`, 5.3) | the page, each row with its joins, and its cursor; or busy, or gone |
 | **get** a record by key: jig's or the application's | the record, or none |
 | **transcript**: a task's current window, from the turn the core names as its start; a turn by its task, attempt and number; a page of a task's turns from either end | the turns, with their fields and bytes, and a cursor; or unread |
-| **secrets**: keep, erase, get, by owner and number, or a key by the request that carried it (section 9) | kept, erased, the value or none |
+| **secrets**: keep, replace, erase, get and load, by owner and number; carry a value under a drawn number; adopt a carried value into its source's row (section 9) | kept, stale, erased, the value or none, a page, or the carried number and digest |
 
 - **Turns are records of the core's** (`../domain/engine.md`, 5.4): the
   core saves each accepted turn, keyed by its task, attempt and number,
@@ -638,17 +638,17 @@ Removing a missing file is not a failure.
     the client id the provider issued, the scopes granted and the ID
     token, as skein's accounts driver hands it to keep (skein's
     `oauth.md`, 6.4; `llm.md`, 5.1);
-  - each key, under the party and the key of the request that carried
-    it (`client.md`, section 5), which the key's source names;
+  - each LLM key, by its source's number, adopted from the value its
+    request carried (`client.md`, section 5);
   - an application's own records, under its tag: its connectors'
     credentials, which it decodes itself, by numbers below 2^63;
-  - each value an application's request carried (`client.md`, section
-    5), under the application's tag, by a number jig draws itself from
-    2^63 up, never one the request names: the next number is a row of
-    its own beside the values (key `[2, 1]`), written in the commit that
-    keeps the value, so a number is never drawn twice, an erased one
-    included, and a number already holding a value is never written
-    over: the carry is refused and nothing is kept.
+  - each value a request carried (`client.md`, section 5), an LLM key
+    or an application's value, under the application's tag, by a number
+    jig draws itself from 2^63 up, never one the request names: the next
+    number is a row of its own beside the values (key `[2, 1]`), written
+    in the commit that keeps the value, so a number is never drawn
+    twice, an erased one included, and a number already holding a value
+    is never written over: the carry is refused and nothing is kept.
 
   A program source's login is not here: it is the program's own, on
   each host (`llm.md`, 5.5).
@@ -671,12 +671,22 @@ Removing a missing file is not a failure.
 - **A carried value kept before the core sees it.** The clients'
   component takes the value out of the request carrying it as it
   decodes it, and keeps it here before the core gets the request, which
-  names it by its number and digest only (`client.md`, section 5); a key
-  is kept by its party and key (`llm.md`). Where the core leaves the
-  request unused (refused, a key sent again under a key answered or in
-  flight, or the engine stopping) it says so, naming the number, and
-  the component erases that value, if its own decode kept it; replacing
-  or erasing a kept value goes through the core's decisions alone.
+  names it by its number and digest only (`client.md`, section 5).
+  Where the core leaves the request unused (refused, a key sent again
+  under a key answered or in flight, or the engine stopping) it says
+  so, naming the number, and the component erases that value, if its
+  own decode kept it; replacing or erasing a kept value goes through
+  the core's decisions alone.
+- **An LLM key adopted before granted.** The accounts component checks
+  the carried value against its byte bound, then asks the store to
+  adopt it into the source's row, naming the digest it replaces, or
+  none for a new source. Adoption writes the source's row and erases
+  the carried row in one secrets commit; a missing carried value or a
+  changed destination digest answers stale and changes neither row. The
+  component grants the key only once adoption is durable, a replaced
+  key as its next generation (`llm.md`, 5.1). A later erase of the
+  carried number is a no-op. A source's record or LLM key occupies one
+  secret row under a fixed-size store key.
 - **A presented credential names its sign-in:** a credential is the
   sign-in's number and its random bytes, opaque to the transport that
   carries it. The component gets the digest by number, and the clients'
@@ -687,15 +697,20 @@ Removing a missing file is not a failure.
   revoked. A crash between that commit and the erase leaves a value
   nobody names, which the restart sweeps: once people's families are
   restored, the component erases each of jig's digests whose sign-in or
-  service it did not hand up. Sources' records and keys are not swept
-  yet: the accounts' family keeps no row for a configured account's
-  signed-in source before it is first limited or refused, though its
-  record is kept here, so the sources handed up do not name every
-  source that holds one. They join the sweep with the requests that end
-  a source, the first to ask for their erase.
+  service it did not hand up. For sources, the accounts child names
+  each party source to restore before wanting it, then says the list
+  is complete. The accounts component re-adds signed-in sources and
+  loads keys by number; it then pages the source records once and
+  erases each neither configured nor named, including orphaned keys.
+  Configured sources are spared even without an accounts-family row.
+  Every application row is spared: a carried value an application used
+  may still live at its drawn number. A value orphaned by a crash
+  before the core says used or unused remains there, including an LLM
+  key not yet adopted; collecting those values is later work.
 - **A failure stops the engine,** as the store's does (section 6): what a
   failed commit of the secrets' store was keeping is never handed out.
-- **Read at start,** whole: small, with its own limits and worst case.
+- **Read at start,** within its own limits and worst case: named sources
+  by number, the sources' sweep in bounded pages.
 
 ## 10. Opening and restart
 
@@ -867,7 +882,7 @@ section 2).
      with its place in its holder's order, kind, name for a program's,
      and its hold, limited with its reset or refused; restored at start,
      a record breaking the child's rules counted and left in the store;
-     a source's record or key named by its number or its request, and
+     a source's record or key named by the source's number, and
      erased when the source goes (4.4, section 9;
      `../domain/accounts.md`, 3.5). The installation's identifier is the
      component's (4.4, 5.3).

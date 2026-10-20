@@ -431,11 +431,12 @@ among their own (`../client/domain/contract.md`, 7.1).
 
 - **A value is never committed.** A key, and later a moved record, is
   taken out by the clients' protocol layer as it decodes the request,
-  kept in the secrets' store first, and the request names it by its
-  party and key, as a minted credential's digest is kept before it is
-  used (`../protocol/store.md`, section 9). Requests and their answers
-  are committed and kept (engine.md, 5.4); a value is not. A client
-  sends a request carrying a value once, and never keeps nor resends it
+  kept in the secrets' store first, and handed to the core by a drawn
+  number and its digest. An LLM key is then adopted into its source's
+  secret row before it is granted (`../protocol/store.md`, section 9).
+  Requests and their answers are committed and kept (engine.md, 5.4);
+  a value is not. A client sends a request carrying a value once, and
+  never keeps nor resends it
   (`../protocol/client.md`, sections 5 and 10).
 - **The sign-in's redirect is on the engine's machine.** The engine
   binds a loopback listener on an ephemeral port for each sign-in, or
