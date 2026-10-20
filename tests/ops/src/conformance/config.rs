@@ -165,6 +165,7 @@ pub fn authority(spend: u64, person: bool) -> authority::Authority {
     }
     authority::Authority {
         tools: authority::Tools(1023),
+        models: authority::Models::ALL,
         grants: grants.into_boxed_slice(),
         delegation: authority::Delegation {
             kinds: Box::new([

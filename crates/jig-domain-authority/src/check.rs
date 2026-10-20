@@ -8,7 +8,7 @@ use crate::limits::{authority_within, name_within, pattern_within, within};
 use crate::order::{differences, fit_lacks};
 use crate::{
     Action, Answer, Authority, BatchAsk, Budget, Call, CallAsk, Checked, Delegate, Delegation, Domain, Effect,
-    EffectAccess, EffectAsk, Finding, Given, Grant, Guard, Holder, Judge, Last, Limits, NoteScope, PersonAsk,
+    EffectAccess, EffectAsk, Finding, Given, Grant, Guard, Holder, Judge, Last, Limits, Models, NoteScope, PersonAsk,
     PersonRequest, Policy, ProposalKind, RequestKind, Requirement, Role, RunAsk, Scopes, Source, Tools, Verdict,
     Writer, at_most, carve, charge, grant_at_most, grant_covers, left, max_out, pattern_at_most, pattern_covers,
 };
@@ -849,6 +849,7 @@ fn needs_funding(request: &PersonRequest) -> bool {
 fn empty() -> Authority {
     Authority {
         tools: Tools(0),
+        models: Models::NONE,
         grants: Box::new([]),
         delegation: Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
         budget: Budget { spend: 0, deadline: Some(Wall::EPOCH) },
@@ -917,6 +918,7 @@ fn batch_needs(tasks: &[Delegate]) -> Option<Authority> {
     for task in tasks {
         let child = &task.authority;
         authority.tools.0 |= child.tools.0;
+        authority.models.0 |= child.models.0;
         authority.notes.0 |= child.notes.0;
         authority.delegation.tasks = authority.delegation.tasks.checked_add(child.delegation.tasks.checked_add(1)?)?;
         authority.delegation.depth = authority.delegation.depth.max(child.delegation.depth.checked_add(1)?);

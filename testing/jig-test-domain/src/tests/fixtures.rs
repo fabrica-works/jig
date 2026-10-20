@@ -62,6 +62,7 @@ pub fn answer() -> host::LinkUp {
 pub fn authority() -> authority::Authority {
     authority::Authority {
         tools: authority::Tools(1023),
+        models: authority::Models::ALL,
         grants: Box::new([]),
         delegation: authority::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
         budget: authority::Budget { spend: 100, deadline: None },

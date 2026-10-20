@@ -6,8 +6,8 @@ use alloc::boxed::Box;
 use skein_lib::{List, Wall, bytes::copy_of};
 
 use crate::{
-    Authority, Budget, Delegation, Executor, Grant, Implication, Implies, Last, Name, Pattern, ResourceScope, Scopes,
-    Tools, at_most, grant_at_most, grant_covers, pattern_at_most, pattern_covers,
+    Authority, Budget, Delegation, Executor, Grant, Implication, Implies, Last, Models, Name, Pattern, ResourceScope,
+    Scopes, Tools, at_most, grant_at_most, grant_covers, pattern_at_most, pattern_covers,
 };
 
 const LETTERS: [&[u8]; 3] = [b"a", b"b", b"c"];
@@ -168,6 +168,7 @@ fn implications() -> Implies {
 fn empty() -> Authority {
     Authority {
         tools: Tools(0),
+        models: Models::ALL,
         grants: Box::new([]),
         delegation: Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
         budget: Budget { spend: 0, deadline: Some(Wall::EPOCH) },

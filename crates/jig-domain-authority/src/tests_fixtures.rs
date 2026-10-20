@@ -1,7 +1,8 @@
 //! Shared admitted policy values for the authority unit tests.
 use crate::{
-    Authority, Budget, Delegation, Domain, Event, Grant, Guard, Implication, Implies, Judge, Last, Limits, Numbers,
-    POLICY_MAX_OUT, Pattern, Policy, PolicyFact, Proposals, Requests, Requirement, Role, Rules, Scopes, Tools, step,
+    Authority, Budget, Delegation, Domain, Event, Grant, Guard, Implication, Implies, Judge, Last, Limits, Models,
+    Numbers, POLICY_MAX_OUT, Pattern, Policy, PolicyFact, Proposals, Requests, Requirement, Role, Rules, Scopes, Tools,
+    step,
 };
 use alloc::boxed::Box;
 use skein_lib::{Duration, Queue, bytes::copy_of};
@@ -32,6 +33,7 @@ pub(crate) fn pattern() -> Pattern {
 pub(crate) fn authority() -> Authority {
     Authority {
         tools: Tools(u64::MAX),
+        models: Models::ALL,
         grants: Box::new([Grant { connector: 1, kind: 3, pattern: pattern() }]),
         delegation: Delegation {
             kinds: Box::new([crate::Executor::Charter(1), crate::Executor::Procedure(2), crate::Executor::Role(3)]),

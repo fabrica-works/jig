@@ -16,6 +16,9 @@ pub fn deadline_after(decision: Wall, span: Duration) -> Wall {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Authority {
     pub tools: Tools,
+    /// The configured models its runs may use, and so their LLM providers. The order
+    /// (`at_most`, `fits`) does not compare them yet.
+    pub models: Models,
     /// Resource grants, bounded by `Limits::grants` at admission.
     pub grants: Box<[Grant]>,
     /// Executor, lifetime task-count and depth ceiling.
@@ -33,6 +36,35 @@ pub struct Authority {
 /// names. (domain/authority.md, sections 3–5).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Tools(/** Up to 64 configured family bits; inclusion is a bit-set subset test. */ pub u64);
+
+/// Up to 64 configured models, one bit each in configuration's order. The rules, a policy or
+/// a role that names fewer narrows them (domain/authority.md, sections 3
+/// and 6).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Models(/** One bit per configured model, the first model the lowest bit. */ pub u64);
+
+impl Models {
+    /// No model: a procedure's.
+    pub const NONE: Models = Models(0);
+
+    /// Every configured model: what names no narrowing.
+    pub const ALL: Models = Models(u64::MAX);
+
+    /// The models both name, in configuration's order.
+    #[must_use]
+    pub const fn and(self, other: Models) -> Models {
+        Models(self.0 & other.0)
+    }
+
+    /// The models a task run by this executor may use: none for a procedure.
+    #[must_use]
+    pub const fn run_by(self, executor: Executor) -> Models {
+        match executor {
+            Executor::Procedure(_) => Models::NONE,
+            Executor::Charter(_) | Executor::Role(_) => self,
+        }
+    }
+}
 
 /// Note scopes relative to the task: goal, project and deployment.
 /// Connector resource patterns are carried in `Authority::note_resources`.

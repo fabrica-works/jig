@@ -3,7 +3,7 @@
 use skein_lib::{List, Map, Queue};
 
 use crate::limits::{authority_within, requirements_within, within};
-use crate::{Limits, Policy, Requirement, Role, Rules, at_most, max_out, worst_case};
+use crate::{Limits, Models, Policy, Requirement, Role, Rules, at_most, max_out, worst_case};
 
 /// Bounded live project-policy table and immutable deployment rules; contains no task ledger,
 /// connector state or authentication. (domain/authority.md, sections 2 and 6).
@@ -151,6 +151,16 @@ impl Domain {
             }
         }
         None
+    }
+
+    /// The models a party in role `number` of live `project` may use: the configured models the
+    /// rules' ceiling names, narrowed by the policy's ceiling and the role's, in configuration's
+    /// order; `None` when the project or the role is absent. Scans as `role` does.
+    #[must_use]
+    pub fn models(&self, project: u32, number: u32) -> Option<Models> {
+        let policy = self.policy(project)?;
+        let role = self.role(project, number)?;
+        Some(self.rules.ceiling.models.and(policy.ceiling.models).and(role.authority.models))
     }
 }
 

@@ -216,6 +216,7 @@ fn value(
     }
     Some(authority::Authority {
         tools: authority::Tools(tools?),
+        models: authority::Models::ALL,
         grants: grants?,
         delegation: delegation?,
         budget: budget?,

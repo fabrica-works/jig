@@ -69,5 +69,6 @@ pub use order::{
 };
 pub use rules::{Guard, Judge, Policy, ProposalKind, Proposals, RequestKind, Requests, Requirement, Role, Rules};
 pub use value::{
-    Authority, Budget, Delegation, Executor, Grant, Last, Name, Pattern, ResourceScope, Scopes, Tools, deadline_after,
+    Authority, Budget, Delegation, Executor, Grant, Last, Models, Name, Pattern, ResourceScope, Scopes, Tools,
+    deadline_after,
 };

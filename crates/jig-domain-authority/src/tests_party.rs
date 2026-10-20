@@ -1,7 +1,9 @@
 //! Whether a party's roots have an escalation holder, and how much their next task may take.
+use alloc::boxed::Box;
+
 use crate::{
-    Numbers, PersonAsk, PersonRequest, Proposals, as_allowed,
-    tests_fixtures::{domain_with_role_spend, domain_with_roles, numbers},
+    Domain, Event, Executor, Models, Numbers, PersonAsk, PersonRequest, PolicyFact, Proposals, as_allowed,
+    tests_fixtures::{self as fixtures, LIMITS, apply, authority, domain_with_role_spend, domain_with_roles, numbers},
 };
 
 const SPENDS: [u64; 3] = [20, 60, 110];
@@ -37,6 +39,72 @@ fn an_unknown_project_or_role_holds_nothing() {
     let domain = domain_with_roles(Proposals(16), Some(HOLDER));
     for (project, role) in [(UNKNOWN, MEMBER), (PROJECT, UNKNOWN)] {
         assert!(!domain.escalations_held(project, role), "project {project}, role {role}");
+    }
+}
+
+/// Three configured models, the deployment's rules naming them all.
+const CONFIGURED: Models = Models(0b111);
+
+/// A domain whose rules, policy ceiling and member role name these models.
+fn domain_naming(rules: Models, policy: Models, role: Models) -> Domain {
+    let mut deployment = authority();
+    deployment.models = rules;
+    let mut ceiling = authority();
+    ceiling.models = policy;
+    let mut member = fixtures::role(authority());
+    member.number = MEMBER;
+    member.authority.models = role;
+    let mut project = fixtures::policy(ceiling);
+    project.roles = Box::new([member]);
+    let mut domain = Domain::new(fixtures::rules(deployment), LIMITS).unwrap();
+    assert_eq!(
+        apply(&mut domain, Event::Policy { project: PROJECT, policy: project }),
+        PolicyFact::Added { project: PROJECT }
+    );
+    domain
+}
+
+#[test]
+fn a_party_may_use_every_configured_model_when_nothing_narrows_them() {
+    let domain = domain_naming(CONFIGURED, Models::ALL, Models::ALL);
+    assert_eq!(domain.models(PROJECT, MEMBER), Some(CONFIGURED));
+}
+
+#[test]
+fn a_policy_naming_fewer_models_narrows_a_partys() {
+    let domain = domain_naming(CONFIGURED, Models(0b101), Models::ALL);
+    assert_eq!(domain.models(PROJECT, MEMBER), Some(Models(0b101)));
+}
+
+#[test]
+fn rules_and_policy_narrow_to_their_intersection_in_configurations_order() {
+    for (rules, policy) in [(Models(0b011), Models(0b110)), (Models(0b110), Models(0b011))] {
+        let domain = domain_naming(rules, policy, Models::ALL);
+        assert_eq!(domain.models(PROJECT, MEMBER), Some(Models(0b010)), "rules {rules:?}, policy {policy:?}");
+    }
+}
+
+#[test]
+fn a_role_naming_fewer_models_narrows_its_partys() {
+    let domain = domain_naming(CONFIGURED, Models(0b011), Models(0b110));
+    assert_eq!(domain.models(PROJECT, MEMBER), Some(Models(0b010)));
+}
+
+#[test]
+fn a_procedures_models_are_empty() {
+    let domain = domain_naming(CONFIGURED, Models::ALL, Models::ALL);
+    let models = domain.models(PROJECT, MEMBER).unwrap();
+    assert_eq!(models.run_by(Executor::Procedure(2)), Models::NONE);
+    for executor in [Executor::Charter(1), Executor::Role(3)] {
+        assert_eq!(models.run_by(executor), CONFIGURED, "{executor:?}");
+    }
+}
+
+#[test]
+fn an_unknown_project_or_role_has_no_models() {
+    let domain = domain_naming(CONFIGURED, Models::ALL, Models::ALL);
+    for (project, role) in UNKNOWN_ROLES {
+        assert_eq!(domain.models(project, role), None, "project {project}, role {role}");
     }
 }
 

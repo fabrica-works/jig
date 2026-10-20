@@ -83,6 +83,7 @@ mod tests {
             symbolic: Box::new([]),
             authority: a::Authority {
                 tools: a::Tools(0),
+                models: a::Models::NONE,
                 grants: Box::new([]),
                 delegation: a::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
                 budget: a::Budget { spend, deadline: None },
