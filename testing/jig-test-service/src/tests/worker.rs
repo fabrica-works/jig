@@ -79,22 +79,23 @@ fn a_turn_is_encoded_against_the_worker_s_endpoints() {
 }
 #[test]
 fn a_grant_s_value_reaches_smith_s_host_half_in_its_envelope() {
+    use jig_domain_host::{Form, Scheme as GrantScheme};
     use jig_protocol_accounts::table::{Scheme, Value};
     use skein_lib::Secret;
     let largest_token = Box::new([b't'; 7934]);
     let short = Secret::new(b"account".as_slice().into());
     let largest_id = Secret::new(Box::new([b'i'; 256]));
-    for (label, scheme, token) in [
-        ("bearer", Scheme::Bearer, b"access".as_slice()),
-        ("key", Scheme::Key, b"access".as_slice()),
-        ("withdrawn", Scheme::Withdrawn { id: short }, b"access".as_slice()),
-        ("full key", Scheme::Key, largest_token.as_slice()),
-        ("full withdrawn", Scheme::Withdrawn { id: largest_id }, largest_token.as_slice()),
+    for (label, scheme, form, token) in [
+        ("bearer", Scheme::Bearer, Form::Credential(GrantScheme::Bearer), b"access".as_slice()),
+        ("key", Scheme::Key, Form::Credential(GrantScheme::Key), b"access".as_slice()),
+        ("withdrawn", Scheme::Withdrawn { id: short }, Form::Withdrawn, b"access".as_slice()),
+        ("full key", Scheme::Key, Form::Credential(GrantScheme::Key), largest_token.as_slice()),
+        ("full withdrawn", Scheme::Withdrawn { id: largest_id }, Form::Withdrawn, largest_token.as_slice()),
     ] {
         let mut service = fixtures::worker_service();
         let value = Value { token: Secret::new(token.into()), scheme: scheme.clone() };
         worker(&mut service).granted(1, 1, value, Time::from_nanos(30_000_000_000));
-        let body = start_on_pipes(&mut service);
+        let body = start_on_pipes(&mut service, form);
         let agent = fixtures::agent();
         let start =
             smith_channel::Start::decode(&agent.limits.bodies, &mut skein_lib::Reader::new(&body)).expect(label);
@@ -168,7 +169,7 @@ fn a_worker_without_its_own_runtime_is_refused_at_its_root_path() {
     }
 }
 
-fn start_on_pipes(service: &mut Service) -> Box<[u8]> {
+fn start_on_pipes(service: &mut Service, form: jig_domain_host::Form) -> Box<[u8]> {
     use skein_lib::stream;
     let agent = fixtures::agent();
     let schema = smith_protocol_channel::schema_for_start(&agent.limits.bodies, agent.limits.start_bytes)
@@ -191,7 +192,11 @@ fn start_on_pipes(service: &mut Service) -> Box<[u8]> {
         Box::default(),
     )
     .expect("agent peer");
-    assign(service);
+    let jig_domain_host::LinkDown::Assign { mut assignment } = fixtures::worker_assignment() else {
+        panic!("assignment fixture")
+    };
+    assignment.assignment.grants[0].form = form;
+    worker(service).step(root::Event::Link(jig_domain_host::LinkDown::Assign { assignment }));
     let (owner, _) = spawn(service);
     worker(service).up(
         Time::ZERO,

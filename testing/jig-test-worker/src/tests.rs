@@ -6,6 +6,25 @@ use jig_domain_host as host;
 use smith_host_domain as smith;
 
 #[test]
+fn a_grants_form_maps_one_to_one_into_smiths() {
+    for (form, expected) in [
+        (host::Form::Credential(host::Scheme::Bearer), Some(smith::Form::Credential(smith::Scheme::Bearer))),
+        (host::Form::Credential(host::Scheme::Key), Some(smith::Form::Credential(smith::Scheme::Key))),
+        (host::Form::Withdrawn, Some(smith::Form::Withdrawn)),
+        (host::Form::Application, None),
+    ] {
+        let grant = host::Grant { form, account: 7, generation: 4, valid: skein_lib::Duration::from_secs(30) };
+        let actual = crate::translate::grant(grant);
+        match expected {
+            Some(form) => {
+                assert_eq!(actual, Some(smith::Grant { account: 7, generation: 4, valid: grant.valid, form }));
+            }
+            None => assert_eq!(actual, None),
+        }
+    }
+}
+
+#[test]
 fn a_start_waits_for_its_charter_to_come_back_decoded() {
     let mut worker = Worker::new(fixtures::limits());
     worker.assign();

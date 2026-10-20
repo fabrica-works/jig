@@ -4,18 +4,13 @@ use smith_host_domain as smith;
 
 #[must_use]
 pub const fn grant(value: host::Grant) -> Option<smith::Grant> {
-    match value.form.table() {
-        host::GrantTable::Accounts => Some(smith::Grant {
-            account: value.account,
-            generation: value.generation,
-            valid: value.valid,
-            // interim: removed by g2-grant-form (the domain's grant names its form).
-            // A placeholder: jig-test-service sets each grant's form from the
-            // table's value as it sends the grant (worker.rs, `account`).
-            form: smith::Form::Credential(smith::Scheme::Bearer),
-        }),
-        host::GrantTable::Application => None,
-    }
+    let form = match value.form {
+        host::Form::Credential(host::Scheme::Bearer) => smith::Form::Credential(smith::Scheme::Bearer),
+        host::Form::Credential(host::Scheme::Key) => smith::Form::Credential(smith::Scheme::Key),
+        host::Form::Withdrawn => smith::Form::Withdrawn,
+        host::Form::Application => return None,
+    };
+    Some(smith::Grant { account: value.account, generation: value.generation, valid: value.valid, form })
 }
 
 #[must_use]
