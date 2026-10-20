@@ -98,7 +98,7 @@ fn an_account_sign_out_is_confirmed_when_the_issuer_revoked_and_the_record_is_er
     assert!(owner.account_record_erased() && owner.account_removed());
     assert_eq!(
         owner.account_answers().last(),
-        Some(&accounts::Answer::SignedOut { confirmed: true }),
+        Some(&accounts::Answer::SignedOut { confirmed: true, failed_hosts: Box::new([]) }),
         "issuer statuses: {:?}",
         world::issuer_saw(&outcome)
             .iter()
@@ -125,7 +125,7 @@ fn an_account_sign_out_the_issuer_did_not_confirm_is_answered_unconfirmed() {
     let outcome = world::run(4, Story::AccountSignOut { confirmed: false });
     let owner = world::owner(&outcome);
     assert!(owner.account_record_erased() && owner.account_removed());
-    assert!(matches!(owner.account_answers().last(), Some(accounts::Answer::SignedOut { confirmed: false })));
+    assert!(matches!(owner.account_answers().last(), Some(accounts::Answer::SignedOut { confirmed: false, .. })));
     assert!(
         world::issuer_saw(&outcome)
             .iter()

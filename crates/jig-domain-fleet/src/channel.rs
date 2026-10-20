@@ -1,8 +1,7 @@
 //! The hosts with slots (domain/engine.md, section 8): workers are known by
-//! their channel, from the hello they say first until the channel is lost.
-//! The engine host uses reserved local token zero and never dials or loses contact.
-//! A worker that comes back dials a new channel, and is known again by what
-//! its hello lists: the fleet needs no other name for it.
+//! their channel for delivery and by the configured worker position each channel
+//! authenticated as for program logins and their answers. A returning worker
+//! gets a fresh channel; stale channel results never update its replacement.
 //!
 //! A hello is the worker's entrance. It is turned away, its channel to be
 //! closed, if the fleet has no room for another worker or its declared stop
@@ -43,6 +42,7 @@ use crate::limits::Limits;
 #[derive(Debug)]
 pub(crate) struct Channel {
     pub(crate) sources: crate::sources::Sources,
+    pub(crate) worker: Option<u32>,
     /// Model eligibility in configured charter order, independent of free slots.
     pub(crate) eligible: Box<[bool]>,
     pub(crate) declarations: Box<[bool]>,
@@ -102,7 +102,14 @@ pub(crate) fn cache(channel: &mut Channel, limits: &Limits, workstream: u64) {
 }
 
 /// Hello, on a new channel: the worker is in contact, or turned away.
-pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hello: Hello, out: &mut Queue<Request>) {
+pub(crate) fn hello(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    channel: Token,
+    worker: u32,
+    hello: Hello,
+    out: &mut Queue<Request>,
+) {
     let limits = &env.limits;
     let engine = channel == Token::new(0);
     let reserved = match domain.engine_hello {
@@ -159,6 +166,7 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
     let Hello { slots, workstreams, hosting, stop_bound: _, bounds } = hello;
     let mut worker = Channel {
         declarations: crate::needs::declarations(&domain.needs, &bounds.models),
+        worker: Some(worker),
         sources: crate::sources::Sources::new(domain.program_sources.clone(), limits.program_sources, true),
         eligible: crate::needs::eligibility(&domain.needs, &bounds.models),
         kind: HostKind::Worker,

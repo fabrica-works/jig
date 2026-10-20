@@ -23,11 +23,25 @@ pub(crate) fn parse(
 ) -> Option<Hosts> {
     let mut object = check::object(document, at, path, problems)?;
     let mut workers = List::<WorkerName>::with_capacity(limits.link.names);
-    if let Some(items) = check::list(&mut object, document, b"workers", limits.link.names, path, problems) {
+    if let Some(items) = check::list(
+        &mut object,
+        document,
+        b"workers",
+        limits.link.names.min(limits.core.fleet.configured_workers),
+        path,
+        problems,
+    ) {
         for (index, at) in items.iter().enumerate() {
             let path =
                 path.member(b"workers").child(Segment::Index(u32::try_from(index).expect("list bounded by u32")));
-            if let Some(worker) = worker(document, *at, &path, limits.link.name, directories, problems) {
+            if let Some(worker) = worker(
+                document,
+                *at,
+                &path,
+                limits.link.name.min(limits.core.fleet.worker_name_bytes),
+                directories,
+                problems,
+            ) {
                 for previous in &workers {
                     if previous.name == worker.name {
                         problems.push(path.member(b"name"), What::Unique);

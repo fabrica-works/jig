@@ -269,6 +269,12 @@ pub(crate) fn sign_out(
     source: u32,
     out: &mut Queue<Request>,
 ) {
+    if domain.issued.contains_key(&source) {
+        if let Err(refusal) = crate::programs::sign_out(domain, env, request, holder, source, out) {
+            out.push(Request::Answer { request, answer: Answer::Refused { refusal } });
+        }
+        return;
+    }
     let account = match removable(domain, holder, source) {
         Ok(account) => account,
         Err(refusal) => {
@@ -276,6 +282,7 @@ pub(crate) fn sign_out(
             return;
         }
     };
+
     crate::changes::detach(domain, env, account, source, out);
     assert!(domain.signing_out.insert(source, crate::changes::Leaving::Source(request)) == Ok(None), "room checked");
     out.push(Request::Signing(Signing::SignOut { source }));
@@ -288,8 +295,12 @@ fn removable(domain: &Domain, holder: Holder, source: u32) -> Result<u32, Refusa
         }
     }
     let entry = domain.sources.get(&source).expect("checked source");
-    if entry.kind != Kind::SignIn {
-        return Err(Refusal::Kind { kind: entry.kind });
+    match entry.kind {
+        Kind::SignIn | Kind::Program => {}
+        Kind::Key | Kind::None => return Err(Refusal::Kind { kind: entry.kind }),
+    }
+    if domain.signing_out.contains_key(&source) {
+        return Err(Refusal::Limit { bound: Bound::Sources });
     }
     if domain.signing_out.len() >= domain.signing_out.capacity() {
         return Err(Refusal::Limit { bound: Bound::Sources });
@@ -302,9 +313,14 @@ pub(crate) fn signed_out(domain: &mut Domain, source: u32, confirmed: bool, out:
     if let Some(leaving) = domain.signing_out.remove(&source) {
         match leaving {
             crate::changes::Leaving::Source(request) => {
-                out.push(Request::Answer { request, answer: Answer::SignedOut { confirmed } });
+                out.push(Request::Answer {
+                    request,
+                    answer: Answer::SignedOut { confirmed, failed_hosts: Box::new([]) },
+                });
             }
-            crate::changes::Leaving::Account(account) => crate::changes::signed_out(domain, account, confirmed, out),
+            crate::changes::Leaving::Account(account) => {
+                crate::changes::signed_out(domain, account, confirmed, Box::new([]), out);
+            }
         }
     }
 }

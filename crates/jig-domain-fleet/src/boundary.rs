@@ -178,6 +178,17 @@ pub struct Call {
 /// parent -> fleet
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    /// Desired absence for issued names; names remain in Sources for reconnect checks.
+    CleanupPrograms {
+        names: Box<[crate::SourceName]>,
+    },
+    CheckProgram {
+        name: crate::SourceName,
+    },
+    SignOutProgram {
+        source: u32,
+        name: crate::SourceName,
+    },
     Sources {
         sources: Box<[crate::SourceName]>,
     },
@@ -298,6 +309,7 @@ pub enum Event {
     /// holds workspaces for, and the runs it hosts or holds answers of.
     Hello {
         channel: Token,
+        worker: u32,
         hello: Hello,
     },
     /// From the protocol: the channel of a worker closed.
@@ -352,6 +364,15 @@ pub enum Event {
 /// fleet -> parent
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    ProgramTargets {
+        source: u32,
+        workers: Box<[u32]>,
+    },
+    ProgramSignedOut {
+        source: u32,
+        worker: u32,
+        result: crate::ProgramResult,
+    },
     Sources {
         channel: Token,
         sources: Box<[crate::SourceName]>,

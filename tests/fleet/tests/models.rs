@@ -42,7 +42,7 @@ impl Fleet {
     }
 
     fn hello(&mut self, channel: Token, names: &[&[u8]]) -> Vec<Request> {
-        self.send(Event::Hello { channel, hello: hello(model_bounds(names)) })
+        self.send(Event::Hello { worker: 0, channel, hello: hello(model_bounds(names)) })
     }
 
     fn start(&mut self, charter: u32) {
@@ -99,7 +99,7 @@ fn a_declared_models_smaller_window_or_output_refuses_hello() {
         bounds.models[0].window = window;
         bounds.models[0].output = output;
         assert_eq!(
-            fleet.send(Event::Hello { channel: FIRST, hello: hello(bounds) }),
+            fleet.send(Event::Hello { worker: 0, channel: FIRST, hello: hello(bounds) }),
             vec![Request::Refuse { channel: FIRST }]
         );
         assert_eq!(fleet.domain.hello_refusals().get(0).expect("refused hello").why, HelloRefusal::Agent { why });
@@ -113,7 +113,7 @@ fn every_charter_model_is_required_before_slot_preferences_apply() {
         let mut unsuitable = hello(model_bounds(&[missing]));
         unsuitable.slots = fleet.env.limits.slots;
         unsuitable.workstreams = Box::new([WORKSTREAM]);
-        fleet.send(Event::Hello { channel: FIRST, hello: unsuitable });
+        fleet.send(Event::Hello { worker: 0, channel: FIRST, hello: unsuitable });
         fleet.hello(SUITABLE, &[b"main", b"alternative"]);
         fleet.start(MODEL_CHARTER);
         assert_eq!(fleet.domain.free_kind(Kinds::Both, WORKSTREAM, MODEL_CHARTER), Some(HostKind::Worker));

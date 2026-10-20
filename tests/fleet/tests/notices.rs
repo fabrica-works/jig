@@ -29,6 +29,7 @@ fn step(domain: &mut Domain, event: Event) -> Vec<Request> {
 
 fn hello(channel: Token) -> Event {
     Event::Hello {
+        worker: 0,
         channel,
         hello: Hello {
             bounds: jig_fleet_world::fixtures::bounds(),

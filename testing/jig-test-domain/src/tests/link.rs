@@ -7,7 +7,8 @@ use skein_lib::{Duration, JournalRoom, Queue, Token};
 
 #[test]
 fn a_worker_s_hello_reaches_the_fleet_with_its_bounds() {
-    let core::Event::Fleet(fleet::Event::Hello { channel, hello }) = link::hello(fixtures::CHANNEL, fixtures::hello())
+    let core::Event::Fleet(fleet::Event::Hello { worker: _, channel, hello }) =
+        link::hello(fixtures::CHANNEL, 0, fixtures::hello())
     else {
         panic!("a hello reaches the fleet");
     };

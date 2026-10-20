@@ -36,7 +36,7 @@ impl Installation {
 pub fn encode(row: &domain::Stored) -> Result<Box<[u8]>, wire::Problem> {
     let limits = &wire::CEILINGS;
     let value = match row {
-        domain::Stored::Issued { number, holder, name } => {
+        domain::Stored::Issued { number, holder, name, signed_out } => {
             let holder = match holder {
                 domain::Holder::Deployment => wire::Holder::Deployment,
                 domain::Holder::Party(party) => {
@@ -45,7 +45,7 @@ pub fn encode(row: &domain::Stored) -> Result<Box<[u8]>, wire::Problem> {
             };
             wire::Value::Issued(wire::Issued::new(
                 limits,
-                wire::IssuedParts { number: *number, holder, name: name.clone() },
+                wire::IssuedParts { number: *number, holder, name: name.clone(), signed_out: *signed_out },
             )?)
         }
         domain::Stored::Next { number } => {
@@ -108,12 +108,12 @@ pub fn decode(bytes: &[u8]) -> Result<domain::Stored, wire::Problem> {
     let wire::RowParts { value } = wire::Row::decode(&wire::CEILINGS, &mut Reader::new(bytes))?.into_parts();
     Ok(match value {
         wire::Value::Issued(issued) => {
-            let wire::IssuedParts { number, holder, name } = issued.into_parts();
+            let wire::IssuedParts { number, holder, name, signed_out } = issued.into_parts();
             let holder = match holder {
                 wire::Holder::Deployment => domain::Holder::Deployment,
                 wire::Holder::Party(party) => domain::Holder::Party(party.into_parts().party),
             };
-            domain::Stored::Issued { number, holder, name }
+            domain::Stored::Issued { number, holder, name, signed_out }
         }
         wire::Value::Next(next) => {
             let wire::NextParts { number } = next.into_parts();

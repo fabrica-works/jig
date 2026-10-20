@@ -312,13 +312,17 @@ impl Component {
                 if kind == 0x0100
                     && let Ok(record) = wire::Hello::decode(&self.codec, &mut Reader::new(body))
                 {
+                    let Some(worker) = state.worker else {
+                        self.refuse(now, connection, state, 3, Box::new([]), out);
+                        return;
+                    };
                     let hello = crate::translate::hello(record);
                     state.phase = Phase::Open;
                     state.heard = true;
                     state.deadline = None;
                     state.ping = Some(now.saturating_add(self.limits.ping));
                     state.silence = Some(now.saturating_add(self.limits.silence));
-                    out.push(Request::Hello { channel: state.channel, hello });
+                    out.push(Request::Hello { channel: state.channel, worker, hello });
                     state.down(ChannelRequest::Read, connection, out);
                     return;
                 }

@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use skein_lib::{Deadlines, Duration, Id, Map, Queue, Set, Slab, Token};
 
 use crate::attempt::{Attempt, Run};
@@ -10,6 +11,10 @@ use crate::turn::Pending;
 /// to every step read-only.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
+    /// Configured workers, including those not in contact.
+    pub configured_workers: u32,
+    /// Bytes in each configured worker name.
+    pub worker_name_bytes: u32,
     /// Program source names retained per connected worker, independently of run slots.
     pub program_sources: u32,
     /// Maximum diagnostic detail retained for each login or sign-out failure.
@@ -73,6 +78,8 @@ pub(crate) fn tracked(limits: &Limits) -> Option<u32> {
 /// rest is its sender's to count.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    let configured = skein_lib::List::<Box<[u8]>>::worst_case(limits.configured_workers)?
+        .checked_add(u64::from(limits.configured_workers).checked_mul(u64::from(limits.worker_name_bytes))?)?;
     let count = limits.workers.checked_add(u32::from(limits.engine_slots > 0))?;
     count.checked_add(limits.history)?;
     let channels = Slab::<Channel>::worst_case(count)?.checked_add(Map::<Token, Id<Channel>>::worst_case(count)?)?;
@@ -111,6 +118,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(skein_lib::List::<crate::HelloRefusalRecord>::worst_case(limits.history)?)?;
     let sources = crate::sources::worst_case(limits)?;
     sources
+        .checked_add(configured)?
         .checked_add(channels)?
         .checked_add(workers)?
         .checked_add(engine)?

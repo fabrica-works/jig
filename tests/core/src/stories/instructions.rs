@@ -37,6 +37,7 @@ pub fn task_document(w: &mut World, task: u64, request: u64) -> documents::Task 
 pub fn sign_in(w: &mut World) {
     w.grant_account(1);
     w.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Hello {
+        worker: 0,
         channel: Token::new(7),
         hello: jig_domain_fleet::Hello {
             bounds: crate::fixtures::bounds(),

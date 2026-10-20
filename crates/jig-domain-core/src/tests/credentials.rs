@@ -9,6 +9,7 @@ fn a_run_waits_while_a_credential_it_needs_is_unusable() {
         &mut core.fleet,
         &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
         fleet::Event::Hello {
+            worker: 0,
             channel: Token::new(1),
             hello: fleet::Hello {
                 bounds: fixtures::bounds(),

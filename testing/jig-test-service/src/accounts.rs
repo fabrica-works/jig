@@ -267,6 +267,9 @@ impl Accounts {
             | domain::Request::Save { .. }
             | domain::Request::Erase { .. }
             | domain::Request::Answer { .. }
+            | domain::Request::Programs { .. }
+            | domain::Request::CheckProgram { .. }
+            | domain::Request::SignOutProgram { .. }
             | domain::Request::Closed => (),
         }
     }
@@ -357,6 +360,9 @@ impl Accounts {
             | domain::Request::Save { .. }
             | domain::Request::Erase { .. }
             | domain::Request::Answer { .. }
+            | domain::Request::Programs { .. }
+            | domain::Request::CheckProgram { .. }
+            | domain::Request::SignOutProgram { .. }
             | domain::Request::Closed => (),
         }
     }

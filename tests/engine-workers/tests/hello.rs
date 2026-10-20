@@ -18,6 +18,13 @@ mod hello {
         *channel
     }
     #[test]
+    fn hello_retains_the_authenticated_configured_position() {
+        let mut world = world();
+        world.connect(fixtures::reporting_worker(fixtures::WORKER_B, fixtures::SECRET_B));
+        world.run();
+        assert!(matches!(world.root().first(), Some(Request::Hello { worker: 1, .. })));
+    }
+    #[test]
     fn the_root_hears_a_channel_only_with_its_hello() {
         let mut world = world();
         let connection = world.connect(fixtures::worker(WORKER_A, SECRET_A, PAYLOAD));

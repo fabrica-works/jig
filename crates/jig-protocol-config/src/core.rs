@@ -66,6 +66,13 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
         }
     }
     domain::Config {
+        worker_names: {
+            let mut names = List::with_capacity(engine.limits.link.names);
+            for worker in &engine.hosts.workers {
+                names.push(worker.name.clone()).expect("checked worker count");
+            }
+            names.into_boxed()
+        },
         deployment,
         seed: engine.deployment.seed.unwrap_or(seed),
         workers_in_process,

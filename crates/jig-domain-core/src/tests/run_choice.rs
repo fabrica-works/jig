@@ -40,6 +40,7 @@ fn host(core: &mut Core, limits: &Limits, channel: Token, names: &[&[u8]]) {
         &mut core.fleet,
         &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
         fleet::Event::Hello {
+            worker: 0,
             channel,
             hello: fleet::Hello {
                 bounds,
@@ -265,6 +266,7 @@ fn unknown_program_login_facts_also_hold_a_direct_run_off_workers() {
                 number: 3,
                 holder: accounts::Holder::Party(2),
                 name: b"personal".as_slice().into(),
+                signed_out: false,
             },
         },
     );

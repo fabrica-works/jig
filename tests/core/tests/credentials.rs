@@ -37,6 +37,7 @@ fn hello(world: &mut World) {
         })
         .collect();
     world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+        worker: 0,
         channel: Token::new(7),
         hello: fleet::Hello {
             bounds: jig_core_world::fixtures::bounds(),

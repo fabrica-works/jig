@@ -231,3 +231,43 @@ fn a_value_is_in_no_committed_row() {
     assert_eq!(saved, 1);
     assert!(core.keys.is_empty() && core.key_input.is_none());
 }
+
+#[test]
+fn program_sign_out_routes_the_offline_member_result() {
+    let (mut core, env) = signing_core();
+    let mut providers = core.settings.llm_providers.clone();
+    providers.providers[0].offers.programs = Box::new([b"claude_code".as_slice().into()]);
+    core.accounts = accounts::Domain::new(&env.limits.accounts, providers);
+    assert!(core.fleet.configure_workers(&env.limits.fleet, Box::new([b"offline".as_slice().into()])));
+    for record in [
+        accounts::Stored::Issued { number: 21, holder: PARTY, name: b"personal".as_slice().into(), signed_out: false },
+        accounts::Stored::Account {
+            number: 20,
+            provider: 3,
+            holder: PARTY,
+            place: 0,
+            uses: None,
+            subject: Box::new([]),
+            display: Box::new([]),
+        },
+        accounts::Stored::Source {
+            account: 20,
+            number: 21,
+            place: 0,
+            kind: accounts::Kind::Program,
+            name: b"personal".as_slice().into(),
+            held: None,
+        },
+    ] {
+        drop(step(&mut core, &env, Event::Account(accounts::Event::Restore { record })));
+    }
+    drop(step(&mut core, &env, Event::Account(accounts::Event::Want)));
+    assert_eq!(
+        stepped(
+            &mut core,
+            &env,
+            ask(77, people::Ask::AccountSignOut { holder: people::AccountHolder::Own, source: 21 })
+        ),
+        (None, Some(people::Outcome::AccountSignedOut { confirmed: false }))
+    );
+}

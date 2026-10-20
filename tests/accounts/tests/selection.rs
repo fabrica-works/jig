@@ -128,7 +128,12 @@ fn two_sources(kind: Kind, held: Option<Held>) -> World {
     }
     let mut rows = vec![account(OWN, PROVIDER, Holder::Party(ALICE), b""), earlier, source(OWN, SECOND, 1, Kind::Key)];
     if kind == Kind::Program {
-        rows.push(Stored::Issued { number: FIRST, holder: Holder::Party(ALICE), name: b"runner".as_slice().into() });
+        rows.push(Stored::Issued {
+            number: FIRST,
+            holder: Holder::Party(ALICE),
+            name: b"runner".as_slice().into(),
+            signed_out: false,
+        });
     }
     let mut world = fixture(rows);
     grant(&mut world, SECOND);

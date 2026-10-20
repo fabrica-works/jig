@@ -24,7 +24,10 @@ fn respond(world: &mut World, rng: &mut Rng, requests: Vec<Request>, trace: &mut
                 Some(FromComponent::Expiring { account, generation })
             }
             Request::Component(ToComponent::Close) => Some(FromComponent::Closed),
-            Request::Component(ToComponent::Release { .. })
+            Request::Programs { .. }
+            | Request::CheckProgram { .. }
+            | Request::SignOutProgram { .. }
+            | Request::Component(ToComponent::Release { .. })
             | Request::Signing(_)
             | Request::Answer { .. }
             | Request::Granted { .. }
@@ -143,6 +146,9 @@ fn changes(seed: u64) -> Vec<Request> {
                     | Signing::Restore { .. }
                     | Signing::Restored,
                 )
+                | Request::Programs { .. }
+                | Request::CheckProgram { .. }
+                | Request::SignOutProgram { .. }
                 | Request::Component(_)
                 | Request::Granted { .. }
                 | Request::Save { .. }

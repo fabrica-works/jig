@@ -25,7 +25,12 @@ fn mixed(program: bool) -> Vec<Stored> {
         source(ACCOUNT, KEY, 1, Kind::Key),
     ];
     if program {
-        records.push(Stored::Issued { number: PROGRAM, holder: HOLDER, name: b"helper".as_slice().into() });
+        records.push(Stored::Issued {
+            number: PROGRAM,
+            holder: HOLDER,
+            name: b"helper".as_slice().into(),
+            signed_out: false,
+        });
         records.push(Stored::Source {
             account: ACCOUNT,
             number: PROGRAM,

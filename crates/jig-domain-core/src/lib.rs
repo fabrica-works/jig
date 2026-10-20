@@ -111,6 +111,8 @@ use skein_lib::{List, Map, Queue, Token, Wall};
 /// (`engine.md`, 6; `configuration.md`, 3).
 #[derive(Debug)]
 pub struct Config {
+    /// Configured worker names in authenticated protocol position order.
+    pub worker_names: Box<[Box<[u8]>]>,
     /// Identity committed with the first decision.
     pub deployment: [u8; 16],
     /// Deterministic task scheduling seed.
@@ -637,7 +639,11 @@ impl Core {
             ),
             authority: config.authority,
             people: people::Domain::new(&limits.people, config.owners, config.settings.deployment_provider),
-            fleet: fleet::Domain::new(&limits.fleet, fleet_needs),
+            fleet: {
+                let mut fleet = fleet::Domain::new(&limits.fleet, fleet_needs);
+                assert!(fleet.configure_workers(&limits.fleet, config.worker_names), "checked worker names");
+                fleet
+            },
             accounts: accounts::Domain::new(&limits.accounts, config.settings.llm_providers.clone()),
             brief: brief::GatherDomain::new(&limits.brief),
             notes: notes::Domain::new(&limits.notes),

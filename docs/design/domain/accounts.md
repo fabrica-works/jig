@@ -238,7 +238,18 @@ Account
 - **Signing out or removing a program's source** has each worker run the
   program's own sign-out in the source's configuration directory (smith's
   `protocol/hosts.md`, section 2); the answer names any host that did
-  not.
+  not. The answer covers the configured workers, named by their configured
+  names: one already offline is not signed out (not in contact), and a channel
+  lost during the operation is lost. A worker removed from configuration is
+  not reportable and cannot reconnect or run work; its operator clears its
+  machine's logins.
+  The issued-name record keeps desired sign-out, independently of observed
+  login state. A reconnect or engine restart checks all issued names, including
+  retired names; a retained login requiring cleanup is signed out before that
+  worker becomes ready for its holder's runs. Cleanup has its own result and
+  never changes or retries the original answer. A failed cleanup keeps the host
+  restriction until absence is established; a holder's explicit check of a
+  live declaration permits a fresh sign-in.
 - **Concurrency is the host's slots:** a run on a program is a smith
   run, and counts as one run, as any other does.
 

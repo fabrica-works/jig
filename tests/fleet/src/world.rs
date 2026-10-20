@@ -19,6 +19,8 @@ const MAX_WIRE: usize = 20_000;
 
 /// The fleet's limits in the calm world.
 pub const LIMITS: Limits = Limits {
+    configured_workers: 64,
+    worker_name_bytes: 32,
     program_sources: 12,
     source_detail_bytes: 4096,
     needs_bytes: 4096,
@@ -878,6 +880,7 @@ impl World {
                     .map(|(run, attempt, phase)| Hosted { run: Token::new(run), attempt: Token::new(attempt), phase })
                     .collect();
                 Event::Hello {
+                    worker: 0,
                     channel: token,
                     hello: Hello {
                         bounds: crate::fixtures::bounds(),
@@ -944,7 +947,11 @@ impl World {
                 assert!(sources.is_empty(), "legacy worker fixture has no program sources");
                 self.stage.push(Event::Logins { channel, logins: Box::new([]) });
             }
-            Request::Check { .. } | Request::SignOut { .. } | Request::SignedOut { .. } => {
+            Request::ProgramTargets { .. }
+            | Request::ProgramSignedOut { .. }
+            | Request::Check { .. }
+            | Request::SignOut { .. }
+            | Request::SignedOut { .. } => {
                 unreachable!("source world owns source commands")
             }
             Request::Turned { .. } | Request::AcknowledgeTurn { .. } | Request::TurnBusy { .. } => {
@@ -1308,10 +1315,13 @@ impl World {
 fn describe(event: &Event) -> String {
     match event {
         Event::Start { run, attempt, .. } => format!("Start {} {}", run.raw(), attempt.raw()),
-        Event::Hello { channel, hello } => {
+        Event::Hello { worker: _, channel, hello } => {
             format!("Hello {} slots {} hosting {:?}", channel.raw(), hello.slots, hello.hosting)
         }
-        Event::Sources { .. }
+        Event::CleanupPrograms { .. }
+        | Event::CheckProgram { .. }
+        | Event::SignOutProgram { .. }
+        | Event::Sources { .. }
         | Event::Logins { .. }
         | Event::Check { .. }
         | Event::SignOut { .. }

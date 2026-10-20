@@ -10,6 +10,8 @@ use crate::{
 };
 
 const LIMITS: Limits = Limits {
+    configured_workers: 64,
+    worker_name_bytes: 32,
     program_sources: 12,
     source_detail_bytes: 4096,
     needs_bytes: 4096,
@@ -149,7 +151,7 @@ impl Harness {
             workstreams: keys.into_boxed(),
             hosting: Box::from(hosting),
         };
-        self.step(Event::Hello { channel, hello })
+        self.step(Event::Hello { worker: 0, channel, hello })
     }
 
     fn start(&mut self, run: Token, attempt: Token, workstream: u64) -> Box<[Request]> {
@@ -435,6 +437,7 @@ fn retained_host_and_hello_history_is_bounded_and_independent_of_diagnostics() {
     h.env.wall = Wall::from_nanos(9);
     assert_eq!(
         &*h.step(Event::Hello {
+            worker: 0,
             channel: C3,
             hello: Hello {
                 bounds: fixtures::bounds(),
@@ -1277,7 +1280,7 @@ fn declared_stop_bounds_must_be_strictly_below_the_engine_grace() {
             workstreams: Box::default(),
             hosting: Box::default(),
         };
-        let out = h.step(Event::Hello { channel: C1, hello });
+        let out = h.step(Event::Hello { worker: 0, channel: C1, hello });
         if accepted {
             assert!(out.is_empty());
             assert_eq!(h.domain.workers(), 1);

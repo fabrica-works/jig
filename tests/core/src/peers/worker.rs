@@ -6,6 +6,7 @@ impl Peers {
         match up {
             workers::Up::Hello { channel, slots, stop_bound, hosting } => {
                 root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+                    worker: 0,
                     channel: Token::new(channel),
                     hello: fleet::Hello {
                         bounds: crate::fixtures::bounds(),

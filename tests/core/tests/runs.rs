@@ -83,6 +83,7 @@ fn settled_delivery_evidence_survives_restart_and_resume_until_a_turn_carries_it
     world.end(tasks::End::Parked, 1);
     world.restart(103, false);
     world.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Hello {
+        worker: 0,
         channel: Token::new(7),
         hello: jig_domain_fleet::Hello {
             bounds: jig_core_world::fixtures::bounds(),

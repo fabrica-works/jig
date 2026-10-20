@@ -391,6 +391,7 @@ fn check_engine_hello(domain: &mut fleet::Domain, limits: &fleet::Limits, agent_
         domain,
         &Env { now: skein_lib::Time::ZERO, wall: skein_lib::Wall::EPOCH, limits: *limits },
         fleet::Event::Hello {
+            worker: 0,
             channel: Token::new(0),
             hello: fleet::Hello {
                 slots,

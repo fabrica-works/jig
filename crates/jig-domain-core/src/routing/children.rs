@@ -103,7 +103,13 @@ pub(super) fn tag_brief(
 }
 
 #[expect(clippy::too_many_lines, reason = "one exhaustive host vocabulary routes its bounded child decision")]
-pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fleet::Request>, room: u32) -> Requests {
+pub(super) fn tag_fleet(
+    core: &mut Core,
+    env: &Env<Limits>,
+    work: &mut Queue<Event>,
+    mut child: Queue<fleet::Request>,
+    room: u32,
+) -> Requests {
     let marked = room.checked_mul(4).expect("bounded fleet routes");
     let task_room = tasks::max_out(&env.limits.tasks).checked_mul(8).expect("bounded task routes");
     let party_room = people::max_out(&env.limits.people).checked_mul(4).expect("bounded party routes");
@@ -117,6 +123,20 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
     for _ in 0..marked {
         let Some(next) = pending.pop() else { break };
         let request = match next {
+            fleet::Request::ProgramTargets { source, workers } => {
+                work.push(Event::Account(accounts::Event::ProgramTargets { source, hosts: workers }));
+                continue;
+            }
+            fleet::Request::ProgramSignedOut { source, worker, result } => {
+                let result = match result {
+                    fleet::ProgramResult::SignedOut => accounts::ProgramResult::SignedOut,
+                    fleet::ProgramResult::NotInContact => accounts::ProgramResult::NotInContact,
+                    fleet::ProgramResult::Lost => accounts::ProgramResult::Lost,
+                    fleet::ProgramResult::Failed => accounts::ProgramResult::Failed,
+                };
+                work.push(Event::Account(accounts::Event::ProgramSignedOut { source, host: worker, result }));
+                continue;
+            }
             fleet::Request::Sources { channel, sources } => Request::Held(Box::new(Held::Sources { channel, sources })),
             fleet::Request::Check { channel, name } => Request::Held(Box::new(Held::CheckSource { channel, name })),
             fleet::Request::SignOut { channel, name } => Request::Held(Box::new(Held::SignOutSource { channel, name })),
@@ -448,9 +468,34 @@ pub(super) fn tag_account(
     let mut out = Queue::with_capacity(room.checked_add(1).expect("account decision"));
     for _ in 0..child.len() {
         match child.pop().expect("account output count") {
+            accounts::Request::Programs { names } => {
+                let mut sources = skein_lib::List::with_capacity(env.limits.accounts.program_names);
+                let mut cleanup = skein_lib::List::with_capacity(env.limits.accounts.program_names);
+                for row in names {
+                    let Some(name) = fleet::SourceName::new(&row.name) else { continue };
+                    sources.push(name).expect("one per reservation");
+                    if row.cleanup {
+                        cleanup.push(name).expect("subset of issued names");
+                    }
+                }
+                append_fleet(core, env, work, fleet::Event::CleanupPrograms { names: cleanup.into_boxed() }, &mut out);
+                append_fleet(core, env, work, fleet::Event::Sources { sources: sources.into_boxed() }, &mut out);
+            }
+            accounts::Request::CheckProgram { name } => {
+                let name = fleet::SourceName::new(&name).expect("validated durable source name");
+                append_fleet(core, env, work, fleet::Event::CheckProgram { name }, &mut out);
+            }
+            accounts::Request::SignOutProgram { source, name } => {
+                let name = fleet::SourceName::new(&name).expect("validated durable source name");
+                append_fleet(core, env, work, fleet::Event::SignOutProgram { source, name }, &mut out);
+            }
             accounts::Request::Granted { grant } => {
-                let Requests::Out(mut routed) =
-                    route_fleet(core, env, fleet::Event::Grant { grant: crate::sibling_routes::fleet_grant(grant) });
+                let Requests::Out(mut routed) = route_fleet(
+                    core,
+                    env,
+                    work,
+                    fleet::Event::Grant { grant: crate::sibling_routes::fleet_grant(grant) },
+                );
                 for _ in 0..routed.len() {
                     match routed.pop().expect("grant output count") {
                         Request::Decided => {}
@@ -505,7 +550,9 @@ fn account_party(core: &Core, event: &accounts::Event) -> Option<u64> {
             }
             None
         }
-        accounts::Event::SignedIn { .. }
+        accounts::Event::ProgramTargets { .. }
+        | accounts::Event::ProgramSignedOut { .. }
+        | accounts::Event::SignedIn { .. }
         | accounts::Event::SignOut { .. }
         | accounts::Event::Change { .. }
         | accounts::Event::Restore { .. }
@@ -553,7 +600,12 @@ pub(super) fn route_brief(core: &mut Core, env: &Env<Limits>, event: brief::Gath
     tag_brief(core, env, out, brief::gather_max_out(&env.limits.brief))
 }
 
-pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::Event) -> Requests {
+pub(super) fn route_fleet(
+    core: &mut Core,
+    env: &Env<Limits>,
+    work: &mut Queue<Event>,
+    mut event: fleet::Event,
+) -> Requests {
     if let fleet::Event::Start { run, attempt, placement: Some(placement), .. } = &event
         && !core.fleet.placement_available(*placement)
     {
@@ -593,7 +645,10 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::
         }
     }
     let touched = match &event {
-        fleet::Event::Sources { .. }
+        fleet::Event::CleanupPrograms { .. }
+        | fleet::Event::CheckProgram { .. }
+        | fleet::Event::SignOutProgram { .. }
+        | fleet::Event::Sources { .. }
         | fleet::Event::Logins { .. }
         | fleet::Event::Check { .. }
         | fleet::Event::SignOut { .. }
@@ -629,7 +684,7 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::
     if shape || draining != draining_hosts(core) {
         core.touch_accounts(None);
     }
-    tag_fleet(core, env, out, fleet::max_out(&env.limits.fleet))
+    tag_fleet(core, env, work, out, fleet::max_out(&env.limits.fleet))
 }
 
 pub(super) fn route_projection_settled(core: &mut Core, env: &Env<Limits>, goal: u64, connector: u16) -> Requests {
@@ -675,6 +730,9 @@ fn claim_source(
 fn host_shape(event: &fleet::Event) -> bool {
     match event {
         fleet::Event::Sources { .. }
+        | fleet::Event::CleanupPrograms { .. }
+        | fleet::Event::CheckProgram { .. }
+        | fleet::Event::SignOutProgram { .. }
         | fleet::Event::Logins { .. }
         | fleet::Event::Check { .. }
         | fleet::Event::SignOut { .. }
@@ -711,4 +769,22 @@ fn draining_hosts(core: &Core) -> u32 {
         }
     }
     draining
+}
+
+fn append_fleet(
+    core: &mut Core,
+    env: &Env<Limits>,
+    work: &mut Queue<Event>,
+    event: fleet::Event,
+    out: &mut Queue<Request>,
+) {
+    let Requests::Out(mut routed) = route_fleet(core, env, work, event);
+    for _ in 0..routed.len() {
+        match routed.pop().expect("fleet output count") {
+            Request::Decided => {}
+            request @ (Request::Write(_) | Request::Ask { .. } | Request::Held(_) | Request::Now(_)) => {
+                out.push(request);
+            }
+        }
+    }
 }

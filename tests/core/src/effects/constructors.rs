@@ -63,6 +63,7 @@ impl World {
     pub(super) fn hello_engine(&mut self) {
         if self.limits.core.fleet.engine_slots > 0 {
             self.events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+                worker: 0,
                 channel: Token::new(0),
                 hello: fleet::Hello {
                     bounds: crate::fixtures::bounds(),
@@ -196,6 +197,7 @@ impl World {
                 valid: Duration::from_secs(60),
             }))),
             root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+                worker: 0,
                 channel: Token::new(7),
                 hello: fleet::Hello {
                     bounds: crate::fixtures::bounds(),

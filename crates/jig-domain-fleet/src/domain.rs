@@ -27,7 +27,8 @@ pub const fn max_out(limits: &Limits) -> u32 {
     let other = if tracked > adopting { tracked } else { adopting };
     let runs = if listed > other { listed } else { other };
     let sources = limits.program_sources.saturating_add(1);
-    let sources = if sources > limits.workers { sources } else { limits.workers };
+    let workers = limits.configured_workers.saturating_add(1);
+    let sources = if sources > workers { sources } else { workers };
     if runs > sources { runs } else { sources }
 }
 
@@ -42,6 +43,8 @@ pub(crate) enum EngineHello {
 #[derive(Debug)]
 pub struct Domain {
     pub(crate) program_sources: Box<[crate::SourceName]>,
+    pub(crate) cleanup_programs: Box<[crate::SourceName]>,
+    pub(crate) worker_names: Box<[Box<[u8]>]>,
     /// The workers in contact, and their channels' names.
     pub(crate) channels: Slab<Channel>,
     pub(crate) needs: crate::Needs,
@@ -77,6 +80,28 @@ pub struct Domain {
 }
 
 impl Domain {
+    /// Supply the fixed configured membership before admitting channels.
+    /// Returns false for names outside the startup bounds or a late replacement.
+    pub fn configure_workers(&mut self, limits: &Limits, names: Box<[Box<[u8]>]>) -> bool {
+        if self.workers() != 0
+            || !self.worker_names.is_empty()
+            || names.len() > usize::try_from(limits.configured_workers).unwrap_or(0)
+        {
+            return false;
+        }
+        for name in &names {
+            if name.len() > usize::try_from(limits.worker_name_bytes).unwrap_or(0) {
+                return false;
+            }
+        }
+        self.worker_names = names;
+        true
+    }
+    #[must_use]
+    pub fn worker_name(&self, worker: u32) -> Option<&[u8]> {
+        Some(self.worker_names.get(usize::try_from(worker).ok()?)?)
+    }
+
     #[must_use]
     pub fn program_logins(&self, channel: Token) -> Option<&[crate::Login]> {
         Some(self.channels.get(*self.tokens.get(&channel)?)?.sources.logins())
@@ -105,6 +130,7 @@ impl Domain {
         let mut tokens = Map::with_capacity(channels_count);
         if limits.engine_slots > 0 {
             let engine = Channel {
+                worker: None,
                 declarations: Box::new([]),
                 sources: crate::sources::Sources::new(Box::new([]), 0, false),
                 eligible: crate::needs::eligibility(&needs, &[]),
@@ -121,6 +147,8 @@ impl Domain {
         }
         Domain {
             program_sources: Box::new([]),
+            worker_names: Box::new([]),
+            cleanup_programs: Box::new([]),
             needs,
             engine_hello: EngineHello::Expected,
             channels,
@@ -208,6 +236,12 @@ impl Domain {
     #[must_use]
     pub fn placement_available(&self, placement: crate::PlacementConstraint) -> bool {
         channel::constrained(self, placement, crate::Kinds::Both).is_some()
+    }
+    /// Last sign-out results on this current channel, independent of login checks.
+    #[must_use]
+    pub fn program_sign_outs(&self, channel: Token) -> Option<&Map<crate::SourceName, crate::SignOutResult>> {
+        let id = *self.tokens.get(&channel)?;
+        Some(&self.channels.get(id)?.sources.results)
     }
     /// Copy bounded connected and retained lost host facts without changing placement.
     #[must_use]
@@ -345,7 +379,7 @@ impl Domain {
     /// start of the domain's stage, before its input events.
     #[must_use]
     pub fn is_ready(&self) -> bool {
-        self.placing || self.turning
+        self.placing || self.turning || crate::programs::ready(self)
     }
 
     /// The oldest fact not yet drained. The parent drains them at its own
@@ -372,6 +406,12 @@ impl Domain {
 /// Handles one event, emitting at most [`max_out`] requests.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::CleanupPrograms { names } => {
+            domain.cleanup_programs = names;
+            domain.placing = true;
+        }
+        Event::CheckProgram { name } => crate::programs::check(domain, name, out),
+        Event::SignOutProgram { source, name } => crate::programs::sign_out(domain, source, name, out),
         Event::Sources { sources } => crate::sources::replace(domain, env, sources, out),
         Event::Check { channel, name } => crate::sources::check(domain, channel, name, out),
         Event::SignOut { to, channel, name } => crate::sources::sign_out(domain, to, channel, name, out),
@@ -435,7 +475,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             out,
         ),
         Event::Loaded => attempt::loaded(domain, env),
-        Event::Hello { channel, hello } => channel::hello(domain, env, channel, hello, out),
+        Event::Hello { channel, worker, hello } => channel::hello(domain, env, channel, worker, hello, out),
         Event::Lost { channel } => channel::lost(domain, env, channel, out),
         Event::Answer { channel, run, attempt, answer, payload } => {
             attempt::answer(domain, channel, run, attempt, answer, payload, out);
@@ -465,7 +505,9 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 /// Releases one held turn or places a waiting attempt, emitting at most
 /// [`max_out`] requests; with none, waits until something changes.
 pub fn resume(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
-    if domain.turning {
+    if crate::programs::ready(domain) {
+        crate::programs::resume(domain, out);
+    } else if domain.turning {
         turn::resume(domain, out);
     } else if domain.placing {
         attempt::resume(domain, env, out);

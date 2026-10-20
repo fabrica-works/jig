@@ -219,7 +219,10 @@ fn removing_an_account_answers_when_each_sign_out_has() {
     assert!(world.domain.account(10).is_none());
     assert_eq!(
         world.step(Event::SignedOut { source: 11, confirmed: false }),
-        vec![Request::Answer { request: REQUEST, answer: Answer::Removed { confirmed: false } }]
+        vec![Request::Answer {
+            request: REQUEST,
+            answer: Answer::Removed { confirmed: false, failed_hosts: Box::new([]) }
+        }]
     );
     assert!(world.step(Event::SignedOut { source: 11, confirmed: true }).is_empty());
 }

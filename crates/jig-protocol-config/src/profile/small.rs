@@ -95,6 +95,8 @@ pub(super) const PEOPLE: people::Limits = people::Limits {
     facts: 32,
 };
 pub(super) const FLEET: fleet::Limits = fleet::Limits {
+    configured_workers: 8,
+    worker_name_bytes: 32,
     workers: 2,
     program_sources: 12,
     source_detail_bytes: 4096,
@@ -132,6 +134,7 @@ pub(super) const ACCOUNTS: accounts::Limits = accounts::Limits {
     accounts: 4,
     holder_accounts: 4,
     program_names: 12,
+    program_hosts: 9,
     sources: 3,
     sign_ins: 2,
     credentials: 3,

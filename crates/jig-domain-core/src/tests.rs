@@ -106,6 +106,8 @@ pub(super) fn limits() -> Limits {
         facts: 2,
     };
     let fleet = fleet::Limits {
+        configured_workers: 64,
+        worker_name_bytes: 32,
         program_sources: 12,
         source_detail_bytes: 4096,
         needs_bytes: 4096,
@@ -158,6 +160,7 @@ pub(super) fn limits() -> Limits {
             accounts: 1,
             holder_accounts: 1,
             program_names: 12,
+            program_hosts: 65,
             sources: 3,
             sign_ins: 1,
             credentials: 2,
@@ -270,6 +273,7 @@ fn config(seed: u64) -> Config {
     authority::step(&mut domain, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Added { project: 1 }), "policy admitted");
     Config {
+        worker_names: Box::new([]),
         deployment: [31; 16],
         seed,
         workers_in_process: false,
@@ -1621,6 +1625,7 @@ fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_cloc
         &mut core.fleet,
         &env,
         fleet::Event::Hello {
+            worker: 0,
             channel: Token::new(10),
             hello: fleet::Hello {
                 bounds: fixtures::bounds(),
@@ -1651,6 +1656,7 @@ fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_cloc
         &mut core.fleet,
         &env,
         fleet::Event::Hello {
+            worker: 0,
             channel: Token::new(11),
             hello: fleet::Hello {
                 bounds: fixtures::bounds(),

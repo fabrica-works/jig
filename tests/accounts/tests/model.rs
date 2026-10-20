@@ -142,7 +142,15 @@ fn a_sources_state_is_its_own() {
     let mut world = fresh();
     world.restore(vec![account(1, 1, Holder::Deployment, b"team"), source(1, 2, 0, Kind::SignIn)]);
     world.restore(vec![source(1, 3, 1, Kind::Key)]);
-    let wants = world.step(Event::Want).into_iter().filter(|request| matches!(request, Request::Component(_)));
+    let wants = world.step(Event::Want).into_iter().filter(|request| {
+        matches!(
+            request,
+            Request::Programs { .. }
+                | Request::CheckProgram { .. }
+                | Request::SignOutProgram { .. }
+                | Request::Component(_)
+        )
+    });
     assert_eq!(wants.collect::<Vec<_>>(), vec![want(2), want(3)], "the component serves signed-in and LLM-key sources");
     world.step(granted(2));
     world.facts();
@@ -213,7 +221,7 @@ fn records_that_break_the_rules_are_counted_not_restored() {
         source(0, 6, 1, Kind::SignIn),
         named(7, 1, b"Upper"),
         named(8, 1, b"runner"),
-        Stored::Issued { number: 8, holder: ALICE, name: b"runner".as_slice().into() },
+        Stored::Issued { number: 8, holder: ALICE, name: b"runner".as_slice().into(), signed_out: false },
         named(10, 2, b"runner"),
         account(11, 2, BOB, b"bob"),
     ]);
@@ -231,7 +239,10 @@ fn commit(store: &mut BTreeMap<Key, Stored>, requests: Vec<Request>) {
         match request {
             Request::Save { record } => drop(store.insert(record.key(), record)),
             Request::Erase { key } => drop(store.remove(&key)),
-            Request::Component(_)
+            Request::Programs { .. }
+            | Request::CheckProgram { .. }
+            | Request::SignOutProgram { .. }
+            | Request::Component(_)
             | Request::Signing(_)
             | Request::Answer { .. }
             | Request::Granted { .. }

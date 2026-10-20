@@ -13,6 +13,8 @@ use skein_world::domain::heap::{self, Meter};
 static HEAP: heap::Counting = heap::Counting;
 
 const LIMITS: Limits = Limits {
+    configured_workers: 64,
+    worker_name_bytes: 32,
     program_sources: 12,
     source_detail_bytes: 4096,
     needs_bytes: 0,
@@ -114,6 +116,7 @@ impl Measured {
         let limits = self.env.limits;
         let workstreams = (0..limits.workstreams).map(|nth| channel.raw() * 100 + u64::from(nth)).collect();
         self.step(Event::Hello {
+            worker: 0,
             channel,
             hello: Hello {
                 bounds: jig_fleet_world::fixtures::bounds(),
@@ -477,6 +480,7 @@ fn source_lifecycle_at_capacity_fits_the_memory_bound() {
     for worker in 1..=limits.workers {
         let channel = Token::new(u64::from(worker));
         measured_step(Event::Hello {
+            worker: 0,
             channel,
             hello: Hello {
                 slots: limits.slots,
@@ -501,6 +505,16 @@ fn source_lifecycle_at_capacity_fits_the_memory_bound() {
                 .collect(),
         });
         for &name in &names {
+            measured_step(Event::SignOut { to: ReplyTo::new(channel), channel, name });
+            measured_step(Event::SignedOut {
+                channel,
+                name,
+                result: jig_domain_fleet::SignOutResult::Failed {
+                    reason: jig_domain_fleet::SourceFailure::Exited,
+                    detail: vec![b'x'; usize::try_from(limits.source_detail_bytes).expect("detail bound")]
+                        .into_boxed_slice(),
+                },
+            });
             measured_step(Event::SignOut { to: ReplyTo::new(channel), channel, name });
         }
     }

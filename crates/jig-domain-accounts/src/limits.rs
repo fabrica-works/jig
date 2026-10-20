@@ -13,6 +13,8 @@ pub struct Limits {
     pub sources: u32,
     /// Lifetime program names, retired names included (accounts.md, 3.4).
     pub program_names: u32,
+    /// Hosts a program sign-out can await; at most `PROGRAM_HOSTS`.
+    pub program_hosts: u32,
     /// Sign-ins and LLM-key keeps under way at once; the driver admits as many redirect listeners.
     pub sign_ins: u32,
     pub credentials: u32,
@@ -34,6 +36,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || crate::domain::out_bound(limits).is_none()
         || limits.holder_accounts == 0
         || limits.holder_accounts > limits.accounts
+        || limits.program_hosts == 0
+        || limits.program_hosts > crate::programs::PROGRAM_HOSTS
         || limits.program_names == 0
         || limits.sources == 0
         || limits.sign_ins == 0
@@ -61,6 +65,16 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Map::<u32, Source>::worst_case(sources)?)?
         .checked_add(programs)?
         .checked_add(Map::<u32, crate::programs::Issued>::worst_case(limits.program_names)?)?
+        .checked_add(Map::<u32, crate::programs::Pending>::worst_case(limits.program_names)?)?
+        .checked_add(
+            List::<crate::programs::Host>::worst_case(limits.program_hosts)?
+                .checked_mul(u64::from(limits.program_names))?,
+        )?
+        .checked_add(List::<crate::ProgramHost>::worst_case(limits.program_hosts)?)?
+        .checked_add(
+            Map::<u32, crate::ProgramResult>::worst_case(limits.program_hosts)?
+                .checked_mul(u64::from(limits.accounts))?,
+        )?
         .checked_add(u64::from(limits.program_names).checked_mul(u64::from(NAME))?)?
         .checked_add(Map::<u32, Granted>::worst_case(limits.credentials)?)?
         .checked_add(Deadlines::<u32>::worst_case(limits.credentials)?)?

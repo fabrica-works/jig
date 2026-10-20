@@ -220,6 +220,8 @@ fn set_people(limits: &mut jig_domain_people::Limits, name: &[u8], value: u64) -
 
 fn set_fleet(limits: &mut jig_domain_fleet::Limits, name: &[u8], value: u64) -> Result<(), What> {
     let jig_domain_fleet::Limits {
+        configured_workers,
+        worker_name_bytes,
         program_sources,
         source_detail_bytes,
         workers,
@@ -238,6 +240,8 @@ fn set_fleet(limits: &mut jig_domain_fleet::Limits, name: &[u8], value: u64) -> 
         history,
     } = limits;
     match name {
+        b"configured_workers" => *configured_workers = count(value)?,
+        b"worker_name_bytes" => *worker_name_bytes = count(value)?,
         b"program_sources" => *program_sources = count(value)?,
         b"source_detail_bytes" => *source_detail_bytes = count(value)?,
         b"workers" => *workers = count(value)?,
@@ -306,6 +310,7 @@ fn set_brief(limits: &mut jig_domain_brief::Limits, name: &[u8], value: u64) -> 
 
 fn set_accounts(limits: &mut jig_domain_accounts::Limits, name: &[u8], value: u64) -> Result<(), What> {
     let jig_domain_accounts::Limits {
+        program_hosts,
         accounts,
         holder_accounts,
         program_names,
@@ -319,6 +324,7 @@ fn set_accounts(limits: &mut jig_domain_accounts::Limits, name: &[u8], value: u6
         facts,
     } = limits;
     match name {
+        b"program_hosts" => *program_hosts = count(value)?,
         b"accounts" => *accounts = count(value)?,
         b"holder_accounts" => *holder_accounts = count(value)?,
         b"program_names" => *program_names = count(value)?,

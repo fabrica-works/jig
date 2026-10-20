@@ -81,3 +81,12 @@ pub enum SignOutResult {
     SignedOut,
     Failed { reason: SourceFailure, detail: Box<[u8]> },
 }
+
+/// Terminal status for one configured member, independent of its current channel.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ProgramResult {
+    SignedOut,
+    NotInContact,
+    Lost,
+    Failed,
+}

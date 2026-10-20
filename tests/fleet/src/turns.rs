@@ -215,7 +215,11 @@ impl World {
                         &mut self.out,
                     );
                 }
-                Request::Check { .. } | Request::SignOut { .. } | Request::SignedOut { .. } => {
+                Request::ProgramTargets { .. }
+                | Request::ProgramSignedOut { .. }
+                | Request::Check { .. }
+                | Request::SignOut { .. }
+                | Request::SignedOut { .. } => {
                     unreachable!("source world owns commands")
                 }
                 Request::Turned { turn, body, .. } => {
@@ -305,7 +309,7 @@ impl World {
             hosting: Box::from([Hosted { run: RUN, attempt: ATTEMPT, phase: Phase::Active }]),
         };
         self.see(Seen::Hello { bound: self.settings.stop_bound, grace: self.env.limits.grace });
-        self.step(Event::Hello { channel, hello });
+        self.step(Event::Hello { worker: 0, channel, hello });
         for held in self.worker.values_mut() {
             held.send_at = Some(self.tick);
         }

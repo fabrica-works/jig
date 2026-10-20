@@ -662,7 +662,12 @@ impl Owner {
                     }
                 }
                 child::Request::Answer { answer, .. } => self.answers.push(answer),
-                child::Request::Granted { grant: _ } | child::Request::Save { .. } | child::Request::Erase { .. } => (),
+                child::Request::Programs { .. }
+                | child::Request::CheckProgram { .. }
+                | child::Request::SignOutProgram { .. }
+                | child::Request::Granted { grant: _ }
+                | child::Request::Save { .. }
+                | child::Request::Erase { .. } => (),
                 child::Request::Closed => {
                     self.closed = true;
                     self.trace.push(Trace::Closed);

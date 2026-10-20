@@ -80,6 +80,7 @@ fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
                             number: number(account, Some(place)),
                             holder: Holder::Party(u64::from(account)),
                             name: name.clone(),
+                            signed_out: false,
                         },
                     },
                     &mut out,
@@ -288,4 +289,92 @@ fn pending_llm_key_keeps_and_account_removals_stay_within_the_worst_case() {
     for number in 0..LIMITS.accounts {
         run.step(&mut domain, Event::SignedOut { source: number * 2 + 1, confirmed: true }, "removal confirmed");
     }
+}
+
+#[test]
+fn full_program_operations_stay_below_the_accounts_bound() {
+    let mut offered = provider(1, false, false);
+    offered.offers.programs = Box::new([b"claude_code".as_slice().into()]);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS };
+    let bound = worst_case(&LIMITS).expect("world limits");
+    let out = Queue::with_capacity(max_out(&LIMITS));
+    let providers = providers(vec![offered]);
+    let meter = Meter::new();
+    let mut domain = Domain::new(&LIMITS, providers);
+    let mut run = Run { meter, env, bound, out, request: 0 };
+    for account in 0..LIMITS.accounts {
+        let holder = Holder::Party(u64::from(account));
+        let _last = run.step(
+            &mut domain,
+            Event::Restore {
+                record: Stored::Account {
+                    number: number(account, None),
+                    provider: 1,
+                    holder,
+                    place: 0,
+                    uses: None,
+                    subject: Box::new([]),
+                    display: Box::new([]),
+                },
+            },
+            "program account",
+        );
+        for place in 0..LIMITS.sources {
+            let source = number(account, Some(place));
+            let name: Box<[u8]> = format!("{source:032}").into_bytes().into_boxed_slice();
+            let _last = run.step(
+                &mut domain,
+                Event::Restore {
+                    record: Stored::Issued { number: source, holder, name: name.clone(), signed_out: false },
+                },
+                "issued name",
+            );
+            let _last = run.step(
+                &mut domain,
+                Event::Restore {
+                    record: Stored::Source {
+                        account: number(account, None),
+                        number: source,
+                        place,
+                        kind: Kind::Program,
+                        name,
+                        held: None,
+                    },
+                },
+                "program source",
+            );
+        }
+    }
+    for number in 100..103 {
+        let _last = run.step(
+            &mut domain,
+            Event::Restore {
+                record: Stored::Issued {
+                    number,
+                    holder: Holder::Deployment,
+                    name: format!("{number:032}").into_bytes().into_boxed_slice(),
+                    signed_out: true,
+                },
+            },
+            "retired name",
+        );
+    }
+    let _last = run.step(&mut domain, Event::Want, "issued snapshot");
+    for account in 0..LIMITS.accounts {
+        for place in 0..LIMITS.sources {
+            let source = number(account, Some(place));
+            let request = run.token();
+            let _last = run.step(
+                &mut domain,
+                Event::SignOut { request, holder: Holder::Party(u64::from(account)), source },
+                "pending program",
+            );
+            let _last = run.step(
+                &mut domain,
+                Event::ProgramTargets { source, hosts: (0..LIMITS.program_hosts).collect() },
+                "full target set",
+            );
+        }
+    }
+    let _last = run.step(&mut domain, Event::Close, "close pending programs");
 }

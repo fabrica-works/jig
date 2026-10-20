@@ -9,6 +9,7 @@ use skein_lib::{Env, List, Map, Queue};
 pub(crate) struct Issued {
     pub(crate) holder: Holder,
     pub(crate) name: Box<[u8]>,
+    pub(crate) signed_out: bool,
 }
 
 /// A declaration refuses before allocating either a number or a name.
@@ -94,17 +95,18 @@ pub fn declare(
     let place = entry.sources.len();
     assert!(entry.sources.insert(place, number) == Ok(None), "admitted source at the last place");
     entry.plan = true;
-    let issued = Issued { holder, name: name.clone() };
+    let issued = Issued { holder, name: name.clone(), signed_out: false };
     assert!(domain.issued.insert(number, issued).is_ok(), "admitted lifetime name");
-    out.push(Request::Save { record: Stored::Issued { number, holder, name: name.clone() } });
+    out.push(Request::Save { record: Stored::Issued { number, holder, name: name.clone(), signed_out: false } });
     let source = Source::new(account, Kind::Program, name, &env.limits);
     assert!(domain.sources.insert(number, source) == Ok(None), "admitted source");
     out.push(Request::Save { record: crate::domain::stored(domain, env, number) });
     domain.counted(out);
+    publish(domain, out);
     Ok(number)
 }
 
-pub(crate) fn restore(domain: &mut Domain, number: u32, holder: Holder, name: Box<[u8]>) -> bool {
+pub(crate) fn restore(domain: &mut Domain, number: u32, holder: Holder, name: Box<[u8]>, signed_out: bool) -> bool {
     if number == u32::MAX || domain.accounts.contains_key(&number) || !crate::records::program_name(&name) {
         return false;
     }
@@ -113,7 +115,7 @@ pub(crate) fn restore(domain: &mut Domain, number: u32, holder: Holder, name: Bo
             return false;
         }
     }
-    domain.issued.insert(number, Issued { holder, name }).is_ok()
+    domain.issued.insert(number, Issued { holder, name, signed_out }).is_ok()
 }
 
 pub(crate) fn finish_restore(domain: &mut Domain, out: &mut Queue<Request>) {
@@ -130,8 +132,8 @@ pub(crate) fn finish_restore(domain: &mut Domain, out: &mut Queue<Request>) {
         let Some(account) = domain.accounts.get(&source.account) else { continue };
         let holder = account.holder;
         let name = source.name.clone();
-        if restore(domain, number, holder, name.clone()) {
-            out.push(Request::Save { record: Stored::Issued { number, holder, name } });
+        if restore(domain, number, holder, name.clone(), false) {
+            out.push(Request::Save { record: Stored::Issued { number, holder, name, signed_out: false } });
         }
     }
     let mut rejected = List::with_capacity(domain.sources.capacity());
@@ -182,4 +184,174 @@ pub(crate) fn finish_restore(domain: &mut Domain, out: &mut Queue<Request>) {
         }
         account.plan = plan;
     }
+}
+
+/// The schema ceiling; configured membership sets the admitted runtime bound.
+pub const PROGRAM_HOSTS: u32 = 128;
+#[derive(Debug)]
+pub(crate) struct Pending {
+    hosts: Option<List<Host>>,
+}
+#[derive(Debug)]
+pub(crate) struct Host {
+    worker: u32,
+    result: Option<crate::ProgramResult>,
+}
+#[must_use]
+pub fn name(domain: &Domain, source: u32, holder: Holder) -> Option<&[u8]> {
+    let issued = domain.issued.get(&source)?;
+    if issued.holder != holder {
+        return None;
+    }
+    Some(&issued.name)
+}
+pub(crate) fn publish(domain: &Domain, out: &mut Queue<Request>) {
+    if domain.issued.is_empty() {
+        return;
+    }
+    let mut names = List::with_capacity(domain.issued.capacity());
+    for (number, issued) in &domain.issued {
+        names
+            .push(crate::Program {
+                name: issued.name.clone(),
+                cleanup: issued.signed_out || !domain.sources.contains_key(number),
+            })
+            .expect("one desired state per reservation");
+    }
+    out.push(Request::Programs { names: names.into_boxed() });
+}
+/// An explicit holder check permits a fresh login on a live declaration.
+/// # Errors
+/// A foreign, retired or unknown source, or a closing child.
+pub fn check(domain: &mut Domain, holder: Holder, source: u32, out: &mut Queue<Request>) -> Result<(), Refusal> {
+    crate::changes::source(domain, holder, source)?;
+    if domain.signing_out.contains_key(&source) {
+        return Err(Refusal::Limit { bound: crate::Bound::Sources });
+    }
+    let issued = domain.issued.get_mut(&source).ok_or(Refusal::Unknown)?;
+    issued.signed_out = false;
+    let name = issued.name.clone();
+    out.push(Request::Save {
+        record: Stored::Issued { number: source, holder, name: name.clone(), signed_out: false },
+    });
+    publish(domain, out);
+    out.push(Request::CheckProgram { name });
+    Ok(())
+}
+pub(crate) fn begin(domain: &mut Domain, source: u32, leaving: crate::changes::Leaving, out: &mut Queue<Request>) {
+    let Some(issued) = domain.issued.get_mut(&source) else { return };
+    issued.signed_out = true;
+    let name = issued.name.clone();
+    out.push(Request::Save {
+        record: Stored::Issued { number: source, holder: issued.holder, name: name.clone(), signed_out: true },
+    });
+    assert!(domain.signing_out.insert(source, leaving) == Ok(None), "admitted sign-out");
+    assert!(domain.programs.insert(source, Pending { hosts: None }).is_ok(), "admitted program operation");
+    publish(domain, out);
+    out.push(Request::SignOutProgram { source, name });
+}
+pub(crate) fn targets(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    source: u32,
+    hosts: Box<[u32]>,
+    out: &mut Queue<Request>,
+) {
+    let Some(pending) = domain.programs.get_mut(&source) else { return };
+    if pending.hosts.is_some() {
+        return;
+    }
+    let mut rows = List::<Host>::with_capacity(env.limits.program_hosts);
+    for worker in hosts {
+        let mut duplicate = false;
+        for row in &rows {
+            duplicate |= row.worker == worker;
+        }
+        if !duplicate {
+            rows.push(Host { worker, result: None }).expect("configured target count checked at startup");
+        }
+    }
+    let empty = rows.is_empty();
+    pending.hosts = Some(rows);
+    if empty {
+        finish(domain, source, out);
+    }
+}
+pub(crate) fn signed_out(
+    domain: &mut Domain,
+    source: u32,
+    host: u32,
+    result: crate::ProgramResult,
+    out: &mut Queue<Request>,
+) {
+    let Some(pending) = domain.programs.get_mut(&source) else { return };
+    let Some(rows) = &mut pending.hosts else { return };
+    let mut finished = true;
+    for index in 0..rows.len() {
+        let Some(row) = rows.get_mut(index) else { continue };
+        if row.worker == host && row.result.is_none() {
+            row.result = Some(result);
+        }
+        finished &= row.result.is_some();
+    }
+    if finished {
+        finish(domain, source, out);
+    }
+}
+fn finish(domain: &mut Domain, source: u32, out: &mut Queue<Request>) {
+    let Some(pending) = domain.programs.remove(&source) else { return };
+    let Some(leaving) = domain.signing_out.remove(&source) else { return };
+    let Some(rows) = pending.hosts else { return };
+    let mut failed = List::with_capacity(rows.capacity());
+    for row in rows.into_boxed() {
+        if let Some(result) = row.result
+            && result != crate::ProgramResult::SignedOut
+        {
+            failed.push(crate::ProgramHost { worker: row.worker, result }).expect("one per configured worker");
+        }
+    }
+    let failed_hosts = failed.into_boxed();
+    let confirmed = failed_hosts.is_empty();
+    match leaving {
+        crate::changes::Leaving::Source(request) => {
+            out.push(Request::Answer { request, answer: crate::Answer::SignedOut { confirmed, failed_hosts } });
+        }
+        crate::changes::Leaving::Account(account) => {
+            crate::changes::signed_out(domain, account, confirmed, failed_hosts, out);
+        }
+    }
+}
+/// # Errors
+/// A foreign/unknown source, a closing child, or a concurrent operation.
+pub fn sign_out(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    request: skein_lib::Token,
+    holder: Holder,
+    source: u32,
+    out: &mut Queue<Request>,
+) -> Result<(), Refusal> {
+    crate::changes::source(domain, holder, source)?;
+    if name(domain, source, holder).is_none() {
+        return Err(Refusal::Unknown);
+    }
+    if domain.signing_out.contains_key(&source)
+        || domain.signing_out.len() == domain.signing_out.capacity()
+        || domain.programs.len() >= env.limits.program_names
+    {
+        return Err(Refusal::Limit { bound: crate::Bound::Sources });
+    }
+    begin(domain, source, crate::changes::Leaving::Source(request), out);
+    Ok(())
+}
+
+/// Original holder evidence remains available after the live source is removed.
+#[must_use]
+pub fn owner(domain: &Domain, name: &[u8]) -> Option<Holder> {
+    for (_, issued) in &domain.issued {
+        if issued.name.as_ref() == name {
+            return Some(issued.holder);
+        }
+    }
+    None
 }

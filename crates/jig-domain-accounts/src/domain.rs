@@ -146,6 +146,7 @@ pub struct Domain {
     pub(crate) accounts: Map<u32, Account>,
     pub(crate) sources: Map<u32, Source>,
     pub(crate) issued: Map<u32, crate::programs::Issued>,
+    pub(crate) programs: Map<u32, crate::programs::Pending>,
     /// The number the counter gives next: accounts and sources alike, never twice.
     pub(crate) next: u32,
     /// The counter's number the store keeps; the start saves the counter when it has moved.
@@ -179,6 +180,7 @@ impl Domain {
             accounts: Map::with_capacity(limits.accounts),
             sources: Map::with_capacity(sources),
             issued: Map::with_capacity(limits.program_names),
+            programs: Map::with_capacity(limits.program_names),
             next: 0,
             kept: 0,
             providers,
@@ -446,6 +448,10 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
         }
         Event::Want => want(domain, env, out),
+        Event::ProgramTargets { source, hosts } => crate::programs::targets(domain, env, source, hosts, out),
+        Event::ProgramSignedOut { source, host, result } => {
+            crate::programs::signed_out(domain, source, host, result, out);
+        }
         Event::Credential { number, generation, valid } => credential(domain, env, number, generation, valid, out),
         Event::Close => close(domain, env, out),
         Event::Component(FromComponent::Closed) => {
@@ -456,6 +462,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             domain.accounts = Map::with_capacity(env.limits.accounts);
             domain.sources = Map::with_capacity(domain.sources.capacity());
             domain.issued = Map::with_capacity(env.limits.program_names);
+            domain.programs = Map::with_capacity(env.limits.program_names);
             domain.signing = Map::with_capacity(env.limits.sign_ins);
             domain.signing_out = Map::with_capacity(domain.sources.capacity());
             out.push(Request::Closed);
@@ -540,6 +547,7 @@ fn want(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         }
     }
     out.push(Request::Signing(Signing::Restored));
+    crate::programs::publish(domain, out);
     for (number, source) in &domain.sources {
         if source.kind == Kind::SignIn || source.kind == Kind::Key {
             out.push(Request::Component(ToComponent::Want { account: *number }));
@@ -697,6 +705,7 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     }
     crate::signing::close(domain, out);
     crate::keys::close(domain, out);
+    domain.programs = Map::with_capacity(env.limits.program_names);
     for (_, leaving) in &domain.signing_out {
         match leaving {
             crate::changes::Leaving::Source(request) => crate::changes::refuse(*request, crate::Refusal::Closing, out),

@@ -9,9 +9,9 @@ use skein_lib::{Duration, Env, List, Map, Queue, Wall};
 
 pub(crate) fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored) {
     let taken = match record {
-        Stored::Issued { number, holder, name } => {
+        Stored::Issued { number, holder, name, signed_out } => {
             domain.past(number);
-            crate::programs::restore(domain, number, holder, name)
+            crate::programs::restore(domain, number, holder, name, signed_out)
         }
         Stored::Next { number } => {
             domain.next = domain.next.max(number);

@@ -454,7 +454,7 @@ pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
         core.touch_deployment();
         core.touch_run_waits();
     }
-    tag_fleet(core, env, child, fleet::max_out(&env.limits.fleet))
+    tag_fleet(core, env, &mut Queue::with_capacity(0), child, fleet::max_out(&env.limits.fleet))
 }
 
 #[expect(clippy::too_many_lines, reason = "exhaustive event dispatch delegates each concern")]
@@ -530,7 +530,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
         Event::Holdings { request, connector, holdings } => {
             route_holdings(core, env, work, request, connector, holdings)
         }
-        Event::Fleet(event) => route_fleet(core, env, event),
+        Event::Fleet(event) => route_fleet(core, env, work, event),
         Event::TurnPayload { run, attempt, turn, body, read, cumulative, refused } => {
             route_turn_payload(core, work, run, attempt, turn, body, read, refused, cumulative)
         }
@@ -639,7 +639,7 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
                 core.touch_run_waits();
                 core.touch_accounts(None);
             }
-            tag_fleet(core, env, out, fleet::max_out(&env.limits.fleet))
+            tag_fleet(core, env, &mut Queue::with_capacity(0), out, fleet::max_out(&env.limits.fleet))
         }
         Timer::Brief => {
             let mut out = Queue::with_capacity(brief::gather_max_out(&env.limits.brief));

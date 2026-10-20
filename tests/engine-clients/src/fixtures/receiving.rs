@@ -53,6 +53,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
         requirements: Box::new([]),
     };
     core::Config {
+        worker_names: Box::new([]),
         deployment: [31; 16],
         seed: 31,
         workers_in_process: false,

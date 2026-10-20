@@ -15,6 +15,6 @@ enum Kind { sign_in, key, program, none }
 record Limited { reset: option u64 }
 enum Held { limited: Limited, refused }
 record Source { account: u32 number: u32 place: u32 kind: Kind name: bytes 32 held: option Held }
-record Issued { number: u32 holder: Holder name: bytes 32 }
+record Issued { number: u32 holder: Holder name: bytes 32 signed_out: bool }
 enum Value { next: Next, account: Account, source: Source, issued: Issued }
 versioned record Row { value: Value }

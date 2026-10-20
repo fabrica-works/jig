@@ -1,17 +1,19 @@
 //! Holder-owned account changes (accounts.md, section 5).
 use crate::{Answer, Bound, Change, Domain, Holder, Key, Kind, Limits, Refusal, Request, Signing};
-use skein_lib::{Env, List, Queue, Token};
+use alloc::boxed::Box;
+use skein_lib::{Env, List, Map, Queue, Token};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum Leaving {
     Source(Token),
     Account(u32),
 }
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Debug)]
 pub(crate) struct Removing {
     pub(crate) request: Token,
     pub(crate) left: u32,
     pub(crate) confirmed: bool,
+    pub(crate) failed_hosts: Map<u32, crate::ProgramResult>,
 }
 
 pub(crate) fn account(domain: &Domain, holder: Holder, number: u32) -> Result<(), Refusal> {
@@ -61,7 +63,7 @@ pub(crate) fn change(
         }
         Change::Resume { source } => resume(domain, env, holder, source, out),
         Change::Remove { account } => {
-            remove(domain, request, holder, account, out);
+            remove(domain, env, request, holder, account, out);
             return;
         }
         Change::MoveAccount { account: number, place } => move_account(domain, holder, number, place, out),
@@ -156,9 +158,14 @@ fn removable(domain: &Domain, holder: Holder, number: u32) -> Result<u32, Refusa
     let mut leaving: u32 = 0;
     for (_, source) in &entry.sources {
         match domain.sources.get(source).expect("a kept source").kind {
-            Kind::SignIn => leaving = leaving.saturating_add(1),
+            Kind::SignIn | Kind::Program => {
+                if domain.signing_out.contains_key(source) {
+                    return Err(Refusal::Limit { bound: Bound::Sources });
+                }
+                leaving = leaving.saturating_add(1);
+            }
             Kind::Key => {}
-            Kind::Program | Kind::None => {
+            Kind::None => {
                 return Err(Refusal::Kind { kind: domain.sources.get(source).expect("a kept source").kind });
             }
         }
@@ -168,7 +175,14 @@ fn removable(domain: &Domain, holder: Holder, number: u32) -> Result<u32, Refusa
     }
     Ok(leaving)
 }
-fn remove(domain: &mut Domain, request: Token, holder: Holder, number: u32, out: &mut Queue<Request>) {
+fn remove(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    request: Token,
+    holder: Holder,
+    number: u32,
+    out: &mut Queue<Request>,
+) {
     let left = match removable(domain, holder, number) {
         Ok(left) => left,
         Err(refusal) => {
@@ -193,16 +207,28 @@ fn remove(domain: &mut Domain, request: Token, holder: Holder, number: u32, out:
                 out.push(Request::Signing(Signing::SignOut { source: *source }));
             }
             Kind::Key => out.push(Request::Signing(Signing::Forget { source: *source })),
-            Kind::Program | Kind::None => unreachable!("removal checked each source's kind"),
+            Kind::Program => crate::programs::begin(domain, *source, Leaving::Account(number), out),
+            Kind::None => {} // Refused by removable before any mutation.
         }
     }
     let order = crate::ordering::accounts(domain, holder);
     crate::ordering::save_accounts(domain, &order, out);
     if left == 0 {
-        out.push(Request::Answer { request, answer: Answer::Removed { confirmed: true } });
+        out.push(Request::Answer { request, answer: Answer::Removed { confirmed: true, failed_hosts: Box::new([]) } });
     } else {
         assert!(
-            domain.removing.insert(number, Removing { request, left, confirmed: true }) == Ok(None),
+            domain
+                .removing
+                .insert(
+                    number,
+                    Removing {
+                        request,
+                        left,
+                        confirmed: true,
+                        failed_hosts: Map::with_capacity(env.limits.program_hosts)
+                    }
+                )
+                .is_ok(),
             "removal room checked"
         );
     }
@@ -210,15 +236,35 @@ fn remove(domain: &mut Domain, request: Token, holder: Holder, number: u32, out:
     domain.counted(out);
 }
 
-pub(crate) fn signed_out(domain: &mut Domain, account: u32, confirmed: bool, out: &mut Queue<Request>) {
+pub(crate) fn signed_out(
+    domain: &mut Domain,
+    account: u32,
+    confirmed: bool,
+    failed_hosts: Box<[crate::ProgramHost]>,
+    out: &mut Queue<Request>,
+) {
     let entry = domain.removing.get_mut(&account).expect("an account removal names its pending request");
     entry.confirmed &= confirmed;
+    for host in failed_hosts {
+        entry.failed_hosts.insert(host.worker, host.result).expect("configured membership bounds the union");
+    }
     entry.left = entry.left.checked_sub(1).expect("one answer per signed-in source");
     if entry.left == 0 {
         let removing = domain.removing.remove(&account).expect("a completed removal");
         out.push(Request::Answer {
             request: removing.request,
-            answer: Answer::Removed { confirmed: removing.confirmed },
+            answer: Answer::Removed {
+                confirmed: removing.confirmed,
+                failed_hosts: {
+                    let mut hosts = List::with_capacity(removing.failed_hosts.capacity());
+                    for (worker, result) in &removing.failed_hosts {
+                        hosts
+                            .push(crate::ProgramHost { worker: *worker, result: *result })
+                            .expect("bounded failed hosts");
+                    }
+                    hosts.into_boxed()
+                },
+            },
         });
     }
 }

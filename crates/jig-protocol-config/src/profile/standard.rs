@@ -67,6 +67,7 @@ pub(super) const PEOPLE: people::Limits = people::Limits {
     ..small::PEOPLE
 };
 pub(super) const FLEET: fleet::Limits = fleet::Limits {
+    configured_workers: 64,
     workers: 8,
     program_sources: 12,
     source_detail_bytes: 4096,
@@ -94,7 +95,7 @@ pub(super) const AUTHORITY: authority::Limits = authority::Limits {
 };
 pub(super) const BRIEF: brief::Limits = brief::Limits { briefs: 32, ..small::BRIEF };
 pub(super) const ACCOUNTS: accounts::Limits =
-    accounts::Limits { accounts: 16, sign_ins: 4, credentials: 15, facts: 128, ..small::ACCOUNTS };
+    accounts::Limits { program_hosts: 65, accounts: 16, sign_ins: 4, credentials: 15, facts: 128, ..small::ACCOUNTS };
 pub(super) const VIEWS: views::Limits = views::Limits { runs: 32, watchers: 16, facts: 256, ..small::VIEWS };
 pub(super) const NOTES: notes::Limits =
     notes::Limits { scopes: 16, entries_per_scope: 64, body_bytes: 8_192, lines: 8, recalled: 8, ..small::NOTES };

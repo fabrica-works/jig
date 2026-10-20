@@ -36,7 +36,10 @@ fn hello(bounds: Bounds) -> Hello {
 }
 fn rejected(needs: Needs, bounds: Bounds) -> HelloRefusal {
     let mut h = Harness::with_needs(LIMITS, needs);
-    assert_eq!(&*h.step(Event::Hello { channel: C1, hello: hello(bounds) }), &[Request::Refuse { channel: C1 }]);
+    assert_eq!(
+        &*h.step(Event::Hello { worker: 0, channel: C1, hello: hello(bounds) }),
+        &[Request::Refuse { channel: C1 }]
+    );
     refusal(&h)
 }
 #[test]
@@ -51,7 +54,7 @@ fn a_worker_lacking_a_charters_model_is_admitted() {
     let mut bounds = bounds_window(8192);
     bounds.models = Box::new([]);
     let mut h = Harness::with_needs(LIMITS, needs_window(8192));
-    assert!(h.step(Event::Hello { channel: C1, hello: hello(bounds) }).is_empty());
+    assert!(h.step(Event::Hello { worker: 0, channel: C1, hello: hello(bounds) }).is_empty());
     assert_eq!(h.domain.workers(), 1);
 }
 #[test]
@@ -73,13 +76,13 @@ fn a_charter_for_the_engine_only_needs_nothing_of_workers() {
     let mut h = Harness::with_needs(LIMITS, needs);
     let mut bounds = bounds_window(0);
     bounds.models = Box::new([]);
-    assert!(h.step(Event::Hello { channel: C1, hello: hello(bounds) }).is_empty());
+    assert!(h.step(Event::Hello { worker: 0, channel: C1, hello: hello(bounds) }).is_empty());
     assert_eq!(h.domain.workers(), 1);
 }
 #[test]
 fn a_worker_holding_every_charter_is_admitted() {
     let mut h = Harness::with_needs(LIMITS, needs_window(8192));
-    assert!(h.step(Event::Hello { channel: C1, hello: hello(bounds_window(8192)) }).is_empty());
+    assert!(h.step(Event::Hello { worker: 0, channel: C1, hello: hello(bounds_window(8192)) }).is_empty());
     assert_eq!(h.domain.workers(), 1);
 }
 #[test]
@@ -88,7 +91,7 @@ fn the_engines_first_hello_is_checked_against_its_charters() {
     needs.charters[0].kinds = Kinds::Engine;
     let mut h = Harness::with_needs(LIMITS, needs);
     assert_eq!(
-        &*h.step(Event::Hello { channel: Token::new(0), hello: hello(bounds_window(4096)) }),
+        &*h.step(Event::Hello { worker: 0, channel: Token::new(0), hello: hello(bounds_window(4096)) }),
         &[Request::Refuse { channel: Token::new(0) }]
     );
     assert_eq!(refusal(&h), HelloRefusal::Agent { why: AgentShortfall::Window { charter: 1, model: 0 } });
@@ -96,9 +99,9 @@ fn the_engines_first_hello_is_checked_against_its_charters() {
 #[test]
 fn a_second_hello_on_the_engine_channel_is_refused() {
     let mut h = Harness::new(LIMITS);
-    assert!(h.step(Event::Hello { channel: Token::new(0), hello: hello(bounds_window(8192)) }).is_empty());
+    assert!(h.step(Event::Hello { worker: 0, channel: Token::new(0), hello: hello(bounds_window(8192)) }).is_empty());
     assert_eq!(
-        &*h.step(Event::Hello { channel: Token::new(0), hello: hello(bounds_window(8192)) }),
+        &*h.step(Event::Hello { worker: 0, channel: Token::new(0), hello: hello(bounds_window(8192)) }),
         &[Request::Refuse { channel: Token::new(0) }]
     );
     assert_eq!(refusal(&h), HelloRefusal::ReservedChannel);

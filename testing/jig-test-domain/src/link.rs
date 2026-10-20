@@ -20,14 +20,14 @@ pub(super) enum Ending {
 /// The three inputs of a worker channel, in arrival order.
 #[derive(Debug)]
 pub enum Event {
-    Hello(host::Hello),
+    Hello { worker: u32, hello: host::Hello },
     Up(host::LinkUp),
     Lost,
 }
 
 /// Translate a worker's complete admission report.
 #[must_use]
-pub fn hello(channel: Token, hello: host::Hello) -> core::Event {
+pub fn hello(channel: Token, worker: u32, hello: host::Hello) -> core::Event {
     let mut models = List::with_capacity(u32::try_from(hello.bounds.models.len()).expect("bounded models"));
     for model in hello.bounds.models {
         models
@@ -42,6 +42,7 @@ pub fn hello(channel: Token, hello: host::Hello) -> core::Event {
     }
     core::Event::Fleet(fleet::Event::Hello {
         channel,
+        worker,
         hello: fleet::Hello {
             slots: hello.slots,
             stop_bound: hello.stop_bound,
@@ -189,10 +190,10 @@ fn refusals(values: Box<[host::Refused]>) -> Box<[u64]> {
 
 pub(super) fn receive(domain: &mut Domain, channel: Token, link: Event, work: &mut Queue<Work>) {
     let event = match link {
-        Event::Hello(value) => {
+        Event::Hello { worker, hello: value } => {
             // The port is routing state; the fleet owns admission and its refusal.
             let _inserted = domain.links.insert(channel);
-            hello(channel, value)
+            hello(channel, worker, value)
         }
         Event::Up(value) => up(domain, channel, value),
         Event::Lost => {

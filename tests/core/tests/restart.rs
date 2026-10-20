@@ -14,6 +14,7 @@ use skein_lib::{Duration, Token};
 
 fn hello(world: &mut World, hosting: Box<[fleet::Hosted]>) {
     world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+        worker: 0,
         channel: Token::new(7),
         hello: fleet::Hello {
             bounds: jig_core_world::fixtures::bounds(),

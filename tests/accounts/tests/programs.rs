@@ -32,7 +32,7 @@ fn declare(
     (result, requests)
 }
 fn issued(number: u32, name: &[u8]) -> Stored {
-    Stored::Issued { number, holder: HOLDER, name: name.into() }
+    Stored::Issued { number, holder: HOLDER, name: name.into(), signed_out: false }
 }
 #[test]
 fn a_declaration_saves_its_reservation_atomically() {
@@ -55,6 +55,12 @@ fn a_declaration_saves_its_reservation_atomically() {
                     }
                 },
                 Request::Save { record: Stored::Next { number: 2 } },
+                Request::Programs {
+                    names: Box::new([jig_domain_accounts::Program {
+                        name: b"personal".as_slice().into(),
+                        cleanup: false
+                    }])
+                },
             ]
         )
     );
@@ -165,4 +171,137 @@ fn restoring_a_program_reserves_its_existing_directory_name() {
         declare(&mut world, OTHER, PROVIDER, None, b"personal"),
         (Err(programs::DeclarationRefusal::Issued), vec![])
     );
+}
+
+fn sign_out(world: &mut World, holder: Holder) -> Vec<Request> {
+    world.step(Event::SignOut { request: skein_lib::Token::new(91), holder, source: 1 })
+}
+fn targets(world: &mut World, workers: &[u32]) -> Vec<Request> {
+    world.step(Event::ProgramTargets { source: 1, hosts: workers.into() })
+}
+fn ended(world: &mut World, worker: u32, result: jig_domain_accounts::ProgramResult) -> Vec<Request> {
+    world.step(Event::ProgramSignedOut { source: 1, host: worker, result })
+}
+#[test]
+fn signing_out_a_program_retains_its_declaration() {
+    let mut world = fresh();
+    assert_eq!(declare(&mut world, HOLDER, PROVIDER, None, b"personal").0, Ok(1));
+    sign_out(&mut world, HOLDER);
+    assert_eq!(
+        targets(&mut world, &[]),
+        vec![Request::Answer {
+            request: skein_lib::Token::new(91),
+            answer: jig_domain_accounts::Answer::SignedOut { confirmed: true, failed_hosts: Box::new([]) },
+        }]
+    );
+    assert!(matches!(world.domain.account(0), Some(account) if account.sources().len() == 1));
+}
+#[test]
+fn a_foreign_program_sign_out_emits_no_host_command() {
+    let mut world = fresh();
+    assert_eq!(declare(&mut world, HOLDER, PROVIDER, None, b"personal").0, Ok(1));
+    assert_eq!(
+        sign_out(&mut world, OTHER),
+        vec![Request::Answer {
+            request: skein_lib::Token::new(91),
+            answer: jig_domain_accounts::Answer::Refused { refusal: Refusal::Unknown }
+        }]
+    );
+}
+#[test]
+fn a_program_answer_names_every_unconfirmed_configured_position() {
+    use jig_domain_accounts::{ProgramHost, ProgramResult};
+    let mut world = fresh();
+    assert_eq!(declare(&mut world, HOLDER, PROVIDER, None, b"personal").0, Ok(1));
+    sign_out(&mut world, HOLDER);
+    assert!(targets(&mut world, &[0, 1, 2]).is_empty());
+    assert!(ended(&mut world, 1, ProgramResult::SignedOut).is_empty());
+    assert!(ended(&mut world, 0, ProgramResult::NotInContact).is_empty());
+    assert_eq!(
+        ended(&mut world, 2, ProgramResult::Lost),
+        vec![Request::Answer {
+            request: skein_lib::Token::new(91),
+            answer: jig_domain_accounts::Answer::SignedOut {
+                confirmed: false,
+                failed_hosts: Box::new([
+                    ProgramHost { worker: 0, result: ProgramResult::NotInContact },
+                    ProgramHost { worker: 2, result: ProgramResult::Lost },
+                ]),
+            },
+        }]
+    );
+}
+#[test]
+fn a_late_program_terminal_cannot_answer_twice() {
+    let mut world = fresh();
+    assert_eq!(declare(&mut world, HOLDER, PROVIDER, None, b"personal").0, Ok(1));
+    sign_out(&mut world, HOLDER);
+    targets(&mut world, &[0]);
+    ended(&mut world, 0, jig_domain_accounts::ProgramResult::Lost);
+    assert!(ended(&mut world, 0, jig_domain_accounts::ProgramResult::SignedOut).is_empty());
+}
+#[test]
+fn restart_preserves_desired_program_absence() {
+    let mut world = fresh();
+    let (_, declared) = declare(&mut world, HOLDER, PROVIDER, None, b"personal");
+    let mut records: Vec<_> = declared
+        .into_iter()
+        .filter_map(|request| match request {
+            Request::Save { record } => Some(record),
+            Request::Programs { .. }
+            | Request::CheckProgram { .. }
+            | Request::SignOutProgram { .. }
+            | Request::Component(_)
+            | Request::Signing(_)
+            | Request::Answer { .. }
+            | Request::Granted { .. }
+            | Request::Erase { .. }
+            | Request::Closed => None,
+        })
+        .collect();
+    for request in sign_out(&mut world, HOLDER) {
+        if let Request::Save { record } = request {
+            records.retain(|old| old.key() != record.key());
+            records.push(record);
+        }
+    }
+    records.sort_by_key(|row| match row {
+        Stored::Issued { .. } => 0,
+        Stored::Account { .. } => 1,
+        Stored::Source { .. } => 2,
+        Stored::Next { .. } => 3,
+    });
+    let mut again = World::with(configured(), &records);
+    assert!(again.step(Event::Want).iter().any(|request| matches!(request,
+        Request::Programs { names } if names.len() == 1 && names[0].cleanup)));
+}
+#[test]
+fn an_explicit_holder_check_permits_signing_in_again() {
+    let mut world = fresh();
+    assert_eq!(declare(&mut world, HOLDER, PROVIDER, None, b"personal").0, Ok(1));
+    sign_out(&mut world, HOLDER);
+    targets(&mut world, &[]);
+    let mut out = Queue::with_capacity(jig_domain_accounts::max_out(&LIMITS));
+    assert_eq!(programs::check(&mut world.domain, HOLDER, 1, &mut out), Ok(()));
+    let mut requests = Vec::new();
+    while let Some(request) = out.pop() {
+        requests.push(request);
+    }
+    assert!(
+        requests
+            .iter()
+            .any(|request| matches!(request, Request::Save { record: Stored::Issued { signed_out: false, .. } }))
+    );
+}
+#[test]
+fn removing_a_program_account_retains_cleanup_evidence() {
+    let mut world = fresh();
+    assert_eq!(declare(&mut world, HOLDER, PROVIDER, None, b"personal").0, Ok(1));
+    let requests = world.step(Event::Change {
+        request: skein_lib::Token::new(92),
+        holder: HOLDER,
+        change: jig_domain_accounts::Change::Remove { account: 0 },
+    });
+    assert!(world.domain.account(0).is_none());
+    assert!(requests.iter().any(|request| matches!(request, Request::Programs { names } if names[0].cleanup)));
 }

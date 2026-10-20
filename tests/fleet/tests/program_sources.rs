@@ -28,6 +28,7 @@ impl World {
     }
     fn hello(&mut self, channel: Token) -> Vec<Request> {
         self.step(Event::Hello {
+            worker: 0,
             channel,
             hello: fleet::Hello {
                 slots: 2,
@@ -186,4 +187,89 @@ fn a_lost_sign_out_cannot_complete_a_new_channel_call() {
         panic!("sign-out completion")
     };
     assert_eq!(to.into_token(), Token::new(2));
+}
+
+fn configured() -> World {
+    let mut world = World::new(&[b"a"]);
+    assert!(
+        world
+            .domain
+            .configure_workers(&world.env.limits, Box::new([b"alpha".as_slice().into(), b"beta".as_slice().into()]))
+    );
+    world
+}
+#[test]
+fn already_offline_members_are_not_confirmed_signed_out() {
+    let mut world = configured();
+    assert_eq!(
+        world.step(Event::SignOutProgram { source: 7, name: source(b"a") }),
+        vec![
+            Request::ProgramTargets { source: 7, workers: Box::new([0, 1]) },
+            Request::ProgramSignedOut { source: 7, worker: 0, result: fleet::ProgramResult::NotInContact },
+            Request::ProgramSignedOut { source: 7, worker: 1, result: fleet::ProgramResult::NotInContact },
+        ]
+    );
+}
+#[test]
+fn loss_ends_the_configured_members_operation_once() {
+    let mut world = configured();
+    world.hello(CHANNEL);
+    world.inventory(&[b"a"]);
+    world.step(Event::SignOutProgram { source: 7, name: source(b"a") });
+    assert_eq!(
+        world.step(Event::Lost { channel: CHANNEL }),
+        vec![Request::ProgramSignedOut { source: 7, worker: 0, result: fleet::ProgramResult::Lost },]
+    );
+    assert!(world.step(Event::Lost { channel: CHANNEL }).is_empty());
+}
+#[test]
+fn reconnect_cleanup_is_separate_from_the_original_answer() {
+    let mut world = configured();
+    world.step(Event::CleanupPrograms { names: Box::new([source(b"a")]) });
+    world.hello(CHANNEL);
+    assert_eq!(
+        world.step(Event::Logins {
+            channel: CHANNEL,
+            logins: Box::new([fleet::Login { name: source(b"a"), state: fleet::LoginState::Usable },])
+        }),
+        vec![Request::SignOut { channel: CHANNEL, name: source(b"a") }]
+    );
+    let answer =
+        world.step(Event::SignedOut { channel: CHANNEL, name: source(b"a"), result: fleet::SignOutResult::SignedOut });
+    assert!(answer.is_empty());
+    assert!(!world.available());
+    world.inventory(&[b"a"]);
+    assert!(world.available());
+}
+#[test]
+fn a_failed_cleanup_is_not_retried_by_periodic_inventory() {
+    let mut world = configured();
+    world.step(Event::CleanupPrograms { names: Box::new([source(b"a")]) });
+    world.hello(CHANNEL);
+    let rows = Box::new([fleet::Login { name: source(b"a"), state: fleet::LoginState::Usable }]);
+    world.step(Event::Logins { channel: CHANNEL, logins: rows.clone() });
+    world.step(Event::SignedOut {
+        channel: CHANNEL,
+        name: source(b"a"),
+        result: fleet::SignOutResult::Failed {
+            reason: fleet::SourceFailure::Exited,
+            detail: b"failed".as_slice().into(),
+        },
+    });
+    assert!(world.step(Event::Logins { channel: CHANNEL, logins: rows }).is_empty());
+}
+#[test]
+fn a_check_waits_until_its_source_list_has_been_sent() {
+    let mut world = configured();
+    world.hello(CHANNEL);
+    world.step(Event::Sources { sources: Box::new([source(b"a"), source(b"b")]) });
+    assert!(world.step(Event::CheckProgram { name: source(b"b") }).is_empty());
+    world.inventory(&[b"a"]);
+    fleet::resume(&mut world.domain, &world.env, &mut world.out);
+    let mut requests = Vec::new();
+    while let Some(request) = world.out.pop() {
+        requests.push(request);
+    }
+    assert!(requests.iter().any(|request| matches!(request,
+        Request::Check { channel: CHANNEL, name } if *name == source(b"b"))));
 }

@@ -146,6 +146,7 @@ fn a_charter_for_workers_only_waits_while_only_engine_slots_are_free() {
             &mut domain,
             limits,
             Event::Hello {
+                worker: 0,
                 channel: Token::new(5),
                 hello: Hello {
                     bounds: jig_fleet_world::fixtures::bounds(),
@@ -185,6 +186,7 @@ fn a_worker_holding_the_workstream_is_preferred_over_a_free_engine_slot() {
             &mut domain,
             limits,
             Event::Hello {
+                worker: 0,
                 channel: Token::new(11),
                 hello: Hello {
                     bounds: jig_fleet_world::fixtures::bounds(),
@@ -276,6 +278,7 @@ fn a_worker_refused_for_its_agent_hosts_nothing() {
             &mut domain,
             limits,
             Event::Hello {
+                worker: 0,
                 channel: Token::new(5),
                 hello: Hello {
                     bounds,

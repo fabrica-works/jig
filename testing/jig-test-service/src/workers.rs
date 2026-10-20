@@ -236,8 +236,8 @@ impl Workers {
                         });
                     }
                 }
-                kit::Request::Hello { channel, hello } => {
-                    events.push(root::Event::Link { channel, link: root::link::Event::Hello(hello) });
+                kit::Request::Hello { channel, worker, hello } => {
+                    events.push(root::Event::Link { channel, link: root::link::Event::Hello { worker, hello } });
                 }
                 kit::Request::Up { channel, up, parts } => {
                     drop(parts);

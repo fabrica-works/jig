@@ -52,7 +52,7 @@ pub enum Stored {
     /// The number the counter gives next; no number below it is given again.
     Next { number: u32 },
     /// A lifetime reservation, retained after removal; also names unresolved host cleanup.
-    Issued { number: u32, holder: Holder, name: Box<[u8]> },
+    Issued { number: u32, holder: Holder, name: Box<[u8]>, signed_out: bool },
     /// An empty subject is none: no signed-in source gave one.
     Account {
         number: u32,

@@ -74,6 +74,15 @@ pub enum Event {
         record: Stored,
     },
     Want,
+    ProgramTargets {
+        source: u32,
+        hosts: Box<[u32]>,
+    },
+    ProgramSignedOut {
+        source: u32,
+        host: u32,
+        result: ProgramResult,
+    },
     Component(FromComponent),
     Unauthorized {
         account: u32,
@@ -237,16 +246,18 @@ pub enum Answer {
     Done,
     Removed {
         confirmed: bool,
+        failed_hosts: Box<[ProgramHost]>,
     },
     /// The sign-in started under this source's number; its end is a fact (`Ended`).
     Started {
         source: u32,
         address: Box<[u8]>,
     },
-    /// The source is signed out and removed; unconfirmed, its holder disconnects the
-    /// application in the provider's settings (providers.md, 2.3).
+    /// A signed-in source is removed; a program keeps its declaration. Unconfirmed, its holder disconnects the
+    /// application in the provider's settings (providers.md, 2.3); failed program hosts are named.
     SignedOut {
         confirmed: bool,
+        failed_hosts: Box<[ProgramHost]>,
     },
     Refused {
         refusal: Refusal,
@@ -297,6 +308,17 @@ pub enum End {
 /// changes, and the counter whenever it moves.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
+    /// All issued names, including retired cleanup names, to check after every reconnect.
+    Programs {
+        names: Box<[Program]>,
+    },
+    CheckProgram {
+        name: Box<[u8]>,
+    },
+    SignOutProgram {
+        source: u32,
+        name: Box<[u8]>,
+    },
     Component(ToComponent),
     Signing(Signing),
     /// Answer a party's request.
@@ -383,4 +405,24 @@ mod tests {
         }
         assert_eq!(size_of::<Form>(), 1);
     }
+}
+
+/// One configured worker's terminal sign-out result; no login bytes.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum ProgramResult {
+    SignedOut,
+    NotInContact,
+    Lost,
+    Failed,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct ProgramHost {
+    pub worker: u32,
+    pub result: ProgramResult,
+}
+/// Desired cleanup is durable; observations remain per-channel and volatile.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Program {
+    pub name: Box<[u8]>,
+    pub cleanup: bool,
 }

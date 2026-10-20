@@ -94,6 +94,8 @@ fn profile() -> root::Limits {
         facts: 2,
     };
     let fleet = fleet::Limits {
+        configured_workers: 64,
+        worker_name_bytes: 32,
         program_sources: 12,
         source_detail_bytes: 4096,
         needs_bytes: 4096,
@@ -163,6 +165,7 @@ fn profile() -> root::Limits {
                 accounts: 1,
                 holder_accounts: 1,
                 program_names: 12,
+                program_hosts: 65,
                 sources: 3,
                 sign_ins: 1,
                 credentials: 2,
@@ -310,6 +313,7 @@ pub fn config(seed: u64) -> root::Config {
         first,
         second,
         core: core::Config {
+            worker_names: Box::new([]),
             deployment: [31; 16],
             seed,
             workers_in_process: false,
@@ -484,6 +488,7 @@ impl World {
             },
         ))));
         events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+            worker: 0,
             channel: Token::new(7),
             hello: fleet::Hello {
                 bounds: crate::fixtures::bounds(),

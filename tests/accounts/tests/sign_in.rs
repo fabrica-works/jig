@@ -60,7 +60,10 @@ fn commit(store: &mut BTreeMap<Key, Stored>, requests: &[Request]) {
         match request {
             Request::Save { record } => drop(store.insert(record.key(), record.clone())),
             Request::Erase { key } => drop(store.remove(key)),
-            Request::Component(_)
+            Request::Programs { .. }
+            | Request::CheckProgram { .. }
+            | Request::SignOutProgram { .. }
+            | Request::Component(_)
             | Request::Signing(_)
             | Request::Answer { .. }
             | Request::Granted { .. }
@@ -238,7 +241,7 @@ fn a_sign_out_removes_the_source_and_answers_once_revoked() {
     assert_eq!((places(&world, 5), world.domain.source(6)), (vec![(0, 7)], None));
     assert_eq!(
         world.step(Event::SignedOut { source: 6, confirmed: false }),
-        vec![answer(2, Answer::SignedOut { confirmed: false })],
+        vec![answer(2, Answer::SignedOut { confirmed: false, failed_hosts: Box::new([]) })],
         "unconfirmed, its holder disconnects the application at the provider"
     );
     assert_eq!(
@@ -253,7 +256,7 @@ fn a_sign_out_removes_the_source_and_answers_once_revoked() {
     assert!(world.domain.account(10).is_none());
     assert_eq!(
         world.step(Event::SignedOut { source: 11, confirmed: true }),
-        vec![answer(3, Answer::SignedOut { confirmed: true })]
+        vec![answer(3, Answer::SignedOut { confirmed: true, failed_hosts: Box::new([]) })]
     );
     assert_eq!(world.step(Event::SignedOut { source: 11, confirmed: true }), vec![], "answered once");
 }

@@ -101,6 +101,7 @@ pub fn child_limits() -> child::Limits {
         accounts: 2,
         holder_accounts: 2,
         program_names: 12,
+        program_hosts: 65,
         sources: 3,
         sign_ins: 1,
         credentials: 0,

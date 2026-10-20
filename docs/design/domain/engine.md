@@ -829,6 +829,15 @@ The fleet child domain knows the hosts and the runs they host:
   limits, for the deployment's document, and start empty after a
   restart.
 
+Workers are known by their delivery channel and by the configured worker
+position that channel authenticated as. Program login answers and deployment
+facts name the configured worker, whose name is supplied at startup, never
+from a worker message. A sign-out targets every configured worker; one not in
+contact is unconfirmed at once. An old channel's result cannot change a new
+channel's inventory or complete a later operation. Cleanup of issued names
+after reconnect is a separate operation, and its login restrictions remain
+until the host establishes absence.
+
 ## 9. Briefs
 
 The brief child domain builds every run's brief from sections, each

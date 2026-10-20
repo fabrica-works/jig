@@ -297,9 +297,21 @@ fn memory_below_the_components_sum_is_refused() {
     //     + 1 * 4096 model-name bytes) = 4520.
     // Delta = 64 + 24 + 32 + 16 + 4520 = 4656; 18_677_344_295 + 4656
     // = 18_677_348_951. Other document scratch paths remain below deployment.
-    // y1b's 12 lifetime-name reservations add 1,920 bytes: 1,536 for the bounded
-    // Map<u32, Issued> (3 tree nodes x 512), plus the owned names (12 x 32 = 384).
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_350_871 });
+    // y1b adds 114,476 bytes over main's 18_677_348_951:
+    // Issued: 3 nodes * 600 + 12 names * 32 = 2,184.
+    // Pending operations: 3 nodes * 512 + 12 sources * 9 hosts * 8,
+    // plus 9 terminal rows * 8 = 2,472.
+    // Removal unions: 4 accounts * 352 + 11 B-tree slots * 32 inline growth = 1,760.
+    // Fleet: 2 channel slots * 72 + 2 workers * 3 pending nodes * 176 growth,
+    // + 2 * 3 check nodes * 480 + 2 * 3 result nodes * 744
+    // + 2 * 12 result details * 4,096 = 106,848.
+    // One extra scratch list + cleanup names: 2 * 12 * 33 = 792;
+    // target snapshot: (8 configured workers + 1 engine) * 4 = 36;
+    // configured names: 8 * (16 carrier + 32 bytes) = 384.
+    // 2,184 + 2,472 + 1,760 + 106,848 + 792 + 36 + 384 = 114,476.
+    // Resuming one worker's deferred source commands preserves the small profile's
+    // existing output/journal/KV envelopes; the engine has no program backend.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_463_427 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

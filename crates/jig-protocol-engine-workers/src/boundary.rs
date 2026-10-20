@@ -65,7 +65,7 @@ pub enum Request {
     Lower { connection: Token, lower: Lower },
     Close { connection: Token },
     Abort { connection: Token },
-    Hello { channel: Token, hello: host::Hello },
+    Hello { channel: Token, worker: u32, hello: host::Hello },
     Up { channel: Token, up: host::LinkUp, parts: Box<[Part]> },
     Lost { channel: Token },
     Closed,

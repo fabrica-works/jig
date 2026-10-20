@@ -138,6 +138,7 @@ fn deployment_complete_connector_registry_does_not_hide_original_refusal_history
             &mut core.fleet,
             &env,
             fleet::Event::Hello {
+                worker: 0,
                 channel: Token::new(channel),
                 hello: fleet::Hello {
                     bounds: fixtures::bounds(),
@@ -191,6 +192,7 @@ fn a_refused_hello_shows_its_agent_shortfall() {
         &mut core.fleet,
         &env,
         fleet::Event::Hello {
+            worker: 0,
             channel: Token::new(9),
             hello: fleet::Hello {
                 bounds,

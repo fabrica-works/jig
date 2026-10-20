@@ -49,6 +49,7 @@ fn a_delegate_waits_for_a_host_declaring_its_charters_model() {
     let mut bounds = jig_core_world::fixtures::bounds();
     bounds.models[1].name = b"specialist".as_slice().into();
     world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+        worker: 0,
         channel: Token::new(8),
         hello: fleet::Hello {
             bounds,
@@ -93,6 +94,7 @@ fn a_restart_restores_a_task_on_the_second_charter() {
 
 fn rejoin(world: &mut World) {
     world.send(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Hello {
+        worker: 0,
         channel: skein_lib::Token::new(7),
         hello: jig_domain_fleet::Hello {
             bounds: jig_core_world::fixtures::bounds(),
@@ -222,6 +224,7 @@ fn a_restart_settles_an_engine_charters_claim_at_once() {
 fn worker_with_affinity(world: &mut World, task: u64) {
     use jig_domain_fleet as fleet;
     world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+        worker: 0,
         channel: Token::new(8),
         hello: fleet::Hello {
             bounds: jig_core_world::fixtures::bounds(),

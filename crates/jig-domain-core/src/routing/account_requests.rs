@@ -19,11 +19,15 @@ pub(super) fn outcome(answer: accounts::Answer) -> people::Outcome {
         accounts::Answer::Started { source, address } => {
             return people::Outcome::AccountSignInStarted { source, address };
         }
-        accounts::Answer::SignedOut { confirmed } => return people::Outcome::AccountSignedOut { confirmed },
+        accounts::Answer::SignedOut { confirmed, failed_hosts: _ } => {
+            return people::Outcome::AccountSignedOut { confirmed };
+        }
         accounts::Answer::Refused { refusal } => refusal,
         accounts::Answer::KeyKept { source } => return people::Outcome::AccountKeyKept { source },
         accounts::Answer::Done => return people::Outcome::AccountChanged,
-        accounts::Answer::Removed { confirmed } => return people::Outcome::AccountRemoved { confirmed },
+        accounts::Answer::Removed { confirmed, failed_hosts: _ } => {
+            return people::Outcome::AccountRemoved { confirmed };
+        }
     };
     let refusal = match refusal {
         // Account sign-in ended before its visit, not wanted yet, or closing: the key may ask again.

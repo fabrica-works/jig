@@ -135,6 +135,7 @@ pub const CORE_LIMITS: core::Limits = core::Limits {
         accounts: 1,
         holder_accounts: 1,
         program_names: 12,
+        program_hosts: 65,
         sources: 3,
         sign_ins: 1,
         credentials: 2,
@@ -174,6 +175,8 @@ const fn core_authority_limits() -> jig_domain_authority::Limits {
 
 const fn core_fleet_limits() -> jig_domain_fleet::Limits {
     jig_domain_fleet::Limits {
+        configured_workers: 64,
+        worker_name_bytes: 32,
         workers: 1,
         program_sources: 12,
         source_detail_bytes: 4096,

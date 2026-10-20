@@ -2,16 +2,18 @@
 use crate::{Domain, Limits, Request};
 use crate::{Login, LoginState, SignOutResult, SourceName};
 use alloc::boxed::Box;
-use skein_lib::{Env, List, Map, Queue, ReplyTo, Token};
+use skein_lib::{Env, List, Map, Queue, ReplyTo, Set, Token};
 
 #[derive(Debug)]
 pub(crate) struct Sources {
-    sent: Box<[SourceName]>,
+    pub(crate) sent: Box<[SourceName]>,
     previous: Option<Box<[SourceName]>>,
-    desired: Option<Box<[SourceName]>>,
+    pub(crate) desired: Option<Box<[SourceName]>>,
     waiting: bool,
     logins: Box<[Login]>,
-    pending: Map<SourceName, ReplyTo>,
+    pub(crate) pending: Map<SourceName, Pending>,
+    pub(crate) checks: Set<SourceName>,
+    pub(crate) results: Map<SourceName, SignOutResult>,
     retained_removed: bool,
 }
 impl Sources {
@@ -23,6 +25,8 @@ impl Sources {
             waiting,
             logins: Box::new([]),
             pending: Map::with_capacity(capacity),
+            checks: Set::with_capacity(capacity),
+            results: Map::with_capacity(capacity),
             retained_removed: false,
         }
     }
@@ -49,13 +53,20 @@ pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     let rows = u64::from(limits.program_sources)
         .checked_mul(u64::try_from(size_of::<Login>()).ok()?.checked_add(u64::from(limits.source_detail_bytes))?)?;
     let lists = names.checked_mul(3)?; // Sent, previous and desired per worker.
-    let pending = Map::<SourceName, ReplyTo>::worst_case(limits.program_sources)?;
+    let pending = Map::<SourceName, Pending>::worst_case(limits.program_sources)?
+        .checked_add(Set::<SourceName>::worst_case(limits.program_sources)?)?
+        .checked_add(Map::<SourceName, SignOutResult>::worst_case(limits.program_sources)?)?
+        .checked_add(u64::from(limits.program_sources).checked_mul(u64::from(limits.source_detail_bytes))?)?;
     let workers = lists.checked_add(rows)?.checked_add(pending)?.checked_mul(u64::from(limits.workers))?;
-    let declaration = names; // One current list for the whole domain.
+    let declaration = names.checked_mul(2)?; // One current list for the whole domain.
     // A malformed inventory can lose one channel while its input still lives.
     let ending = List::<SourceName>::worst_case(limits.program_sources)?;
     let incoming = rows.max(names).max(u64::from(limits.source_detail_bytes)); // Inventory, declaration or terminal.
-    workers.checked_add(declaration)?.checked_add(incoming)?.checked_add(ending)
+    workers
+        .checked_add(declaration)?
+        .checked_add(incoming)?
+        .checked_add(ending.checked_mul(2)?)?
+        .checked_add(List::<u32>::worst_case(limits.configured_workers.checked_add(1)?)?)
 }
 pub(crate) fn replace(domain: &mut Domain, env: &Env<Limits>, names: Box<[SourceName]>, out: &mut Queue<Request>) {
     assert!(
@@ -86,6 +97,15 @@ fn send(sources: &mut Sources, channel: Token, out: &mut Queue<Request>) {
     }
     sources.previous = Some(core::mem::replace(&mut sources.sent, names));
     sources.waiting = true;
+    let mut removed = List::with_capacity(sources.results.capacity());
+    for (name, _) in &sources.results {
+        if !sources.sent.contains(name) {
+            removed.push(*name).expect("one per retained result");
+        }
+    }
+    for name in removed.into_boxed() {
+        drop(sources.results.remove(&name));
+    }
     out.push(Request::Sources { channel, sources: sources.sent.clone() });
 }
 fn same_names(left: &[SourceName], right: &[SourceName]) -> bool {
@@ -152,6 +172,7 @@ pub(crate) fn logins(
         sources.previous = None;
         send(sources, channel, out);
         domain.placing = true;
+        crate::programs::cleanup(domain, channel, out);
     } else if bounded
         && sources.waiting
         && let Some(previous) = &sources.previous
@@ -188,7 +209,7 @@ pub(crate) fn sign_out(domain: &mut Domain, to: ReplyTo, channel: Token, name: S
         out.push(Request::SignedOut { to, channel, name, result: None });
         return;
     }
-    host.sources.pending.insert(name, to).expect("bounded sign-outs");
+    host.sources.pending.insert(name, Pending { reply: Reply::Direct(to), sent: true }).expect("bounded sign-outs");
     out.push(Request::SignOut { channel, name });
 }
 pub(crate) fn signed_out(
@@ -214,7 +235,10 @@ pub(crate) fn signed_out(
         fault(domain, env, channel, out);
         return;
     };
-    out.push(Request::SignedOut { to, channel, name, result: Some(result) });
+    if host.sources.sent.contains(&name) {
+        host.sources.results.insert(name, result.clone()).expect("one result per declared source");
+    }
+    terminal(to.reply, channel, name, Some(result), out);
     // Even success is not a check of the login; restrictions wait for Logins.
 }
 pub(crate) fn lost(sources: &mut Sources, channel: Token, out: &mut Queue<Request>) {
@@ -224,7 +248,7 @@ pub(crate) fn lost(sources: &mut Sources, channel: Token, out: &mut Queue<Reques
     }
     for name in names.into_boxed() {
         let to = sources.pending.remove(&name).expect("pending call");
-        out.push(Request::SignedOut { to, channel, name, result: None });
+        terminal(to.reply, channel, name, None, out);
     }
 }
 
@@ -239,9 +263,41 @@ fn unique(names: &[SourceName]) -> bool {
     true
 }
 
-fn absent(state: &LoginState) -> bool {
+pub(crate) fn absent(state: &LoginState) -> bool {
     match state {
         LoginState::NotSignedIn | LoginState::Failed { reason: crate::SourceFailure::Unconfigured, .. } => true,
         LoginState::Usable | LoginState::SignedInOtherwise(_) | LoginState::Failed { .. } => false,
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum Reply {
+    Direct(ReplyTo),
+    Program { source: u32, worker: u32 },
+    Cleanup,
+}
+#[derive(Debug)]
+pub(crate) struct Pending {
+    pub(crate) reply: Reply,
+    pub(crate) sent: bool,
+}
+pub(crate) fn terminal(
+    reply: Reply,
+    channel: Token,
+    name: SourceName,
+    result: Option<SignOutResult>,
+    out: &mut Queue<Request>,
+) {
+    match reply {
+        Reply::Direct(to) => out.push(Request::SignedOut { to, channel, name, result }),
+        Reply::Program { source, worker } => {
+            let result = match result {
+                Some(SignOutResult::SignedOut) => crate::ProgramResult::SignedOut,
+                Some(SignOutResult::Failed { .. }) => crate::ProgramResult::Failed,
+                None => crate::ProgramResult::Lost,
+            };
+            out.push(Request::ProgramSignedOut { source, worker, result });
+        }
+        Reply::Cleanup => {}
     }
 }

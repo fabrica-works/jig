@@ -68,6 +68,7 @@ fn reconnect(world: &mut World, key: core::CallKey) {
     use jig_domain_fleet as fleet;
     use skein_lib::{Duration, Token};
     world.send(jig_test_domain::Event::Core(core::Event::Fleet(fleet::Event::Hello {
+        worker: 0,
         channel: Token::new(CHANNEL),
         hello: fleet::Hello {
             bounds: crate::fixtures::bounds(),
