@@ -76,3 +76,12 @@ mod account_sign_in_visitor;
 
 #[path = "support/accounts.rs"]
 mod accounts;
+
+#[path = "support/account_keys.rs"]
+mod account_keys;
+#[test]
+fn a_party_adds_replaces_and_removes_a_key() {
+    let directory = support::scratch();
+    account_keys::configuration(directory.path());
+    account_keys::run(directory.path());
+}

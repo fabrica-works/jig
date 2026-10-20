@@ -1,5 +1,6 @@
 //! Keyed request admission and version envelopes (protocol/client.md, 5 and 9).
 use super::{Box, Component, Env, Limits, Queue, ReplyTo, Request, Token, Waiting, core, people, routes, sign_in, w};
+use crate::sign_in::CarriedRequest;
 impl Component {
     pub(super) fn request(
         &mut self,
@@ -39,38 +40,9 @@ impl Component {
             return;
         }
         let request = match keyed.owner {
-            w::Owner::Jig if keyed.value.is_some() => {
-                // jig's own requests carry no value yet: the key's source is
-                // later work (llm.md), so nothing is kept.
-                self.not_a_record(env, owner);
-                return;
-            }
             w::Owner::Jig => {
-                let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
-                    Ok(value) => {
-                        if let Ok(Some(answer)) = crate::translate::operations::refused(&value, &env.limits.wire) {
-                            self.respond(env, exchange, routes::encoded(&answer));
-                            return;
-                        }
-                        let models = &self.settings.models;
-                        if let Ok(Some(answer)) = crate::translate::llm::refused(&value, models, &env.limits.wire) {
-                            self.respond(env, exchange, routes::encoded(&answer));
-                            return;
-                        }
-                        crate::translate::asks::ask(value, models, &env.limits.wire)
-                    }
-                    Err(problem) => Err(crate::translate::Untranslatable { path: problem.path }),
-                };
-                let Ok(ask) = ask else {
-                    self.not_a_record(env, owner);
-                    return;
-                };
-                Request::Core(Box::new(core::Event::People(people::Event::Ask {
-                    reply_to: ReplyTo::new(exchange),
-                    sign_in,
-                    key: keyed.key,
-                    ask,
-                })))
+                self.jig_request(env, exchange, sign_in, owner, keyed, out);
+                return;
             }
             w::Owner::Family(family) => {
                 let Ok(record) =
@@ -99,7 +71,7 @@ impl Component {
                     carried,
                 };
                 if let Some(value) = keyed.value {
-                    self.carry(env, exchange, sign_in, request, value, out);
+                    self.carry(env, exchange, sign_in, CarriedRequest::Application(request), value, out);
                     return;
                 }
                 Request::Application(request)
@@ -108,6 +80,64 @@ impl Component {
         self.pending
             .exchanges
             .insert(exchange, Waiting::Ask { sign_in, family, version: keyed.version })
+            .expect("get released slot");
+        out.push(request);
+    }
+    /// Admit jig's account key envelope before asking the store to keep a value.
+    fn jig_request(
+        &mut self,
+        env: &Env<Limits>,
+        exchange: Token,
+        sign_in: u64,
+        owner: Token,
+        keyed: w::KeyedParts,
+        out: &mut Queue<Request>,
+    ) {
+        let ask = match w::Ask::decode(&env.limits.wire, &mut skein_lib::Reader::new(&keyed.request)) {
+            Ok(value) => {
+                let valid = match account_key_digest(&value) {
+                    Some(digest) => match &keyed.value {
+                        Some(value) => digest == skein_lib::sha256::digest(value.expose()),
+                        None => false,
+                    },
+                    None => keyed.value.is_none(),
+                };
+                if !valid {
+                    self.not_a_record(env, owner);
+                    return;
+                }
+                if let Ok(Some(answer)) = crate::translate::operations::refused(&value, &env.limits.wire) {
+                    self.respond(env, exchange, routes::encoded(&answer));
+                    return;
+                }
+                let models = &self.settings.models;
+                if let Ok(Some(answer)) = crate::translate::llm::refused(&value, models, &env.limits.wire) {
+                    self.respond(env, exchange, routes::encoded(&answer));
+                    return;
+                }
+                crate::translate::asks::ask(value, models, &env.limits.wire)
+            }
+            Err(problem) => Err(crate::translate::Untranslatable { path: problem.path }),
+        };
+        let Ok(ask) = ask else {
+            self.not_a_record(env, owner);
+            return;
+        };
+        if let Some(value) = keyed.value {
+            let digest = skein_lib::sha256::digest(value.expose());
+            let request = CarriedRequest::AccountKey { key: keyed.key, ask: Box::new(ask), digest };
+            self.carry(env, exchange, sign_in, request, value, out);
+            return;
+        }
+        let request = Request::Core(Box::new(core::Event::People(people::Event::Ask {
+            reply_to: ReplyTo::new(exchange),
+            sign_in,
+            key: keyed.key,
+            ask,
+        })));
+        self.pending
+            .exchanges
+            .insert(exchange, Waiting::Ask { sign_in, family: None, version: keyed.version })
             .expect("get released slot");
         out.push(request);
     }
@@ -122,7 +152,7 @@ impl Component {
         env: &Env<Limits>,
         exchange: Token,
         sign_in: u64,
-        request: crate::ToApplication,
+        request: CarriedRequest,
         value: skein_lib::Secret,
         out: &mut Queue<Request>,
     ) {
@@ -130,12 +160,58 @@ impl Component {
             self.respond(env, exchange, routes::busy());
             return;
         }
-        let crate::ToApplication::Request { family, version, .. } = &request else {
-            unreachable!("only a request carries a value")
+        let (family, version) = match &request {
+            CarriedRequest::Application(crate::ToApplication::Request { family, version, .. }) => {
+                (Some(*family), *version)
+            }
+            CarriedRequest::AccountKey { .. } => (None, jig_client_protocol_wire::VERSION),
+            CarriedRequest::Application(crate::ToApplication::Read { .. } | crate::ToApplication::Watch { .. }) => {
+                unreachable!("only a request carries a value")
+            }
         };
-        let waiting = Waiting::Carry { sign_in, family: *family, version: *version, request: Box::new(request) };
+        let waiting = Waiting::Carry { sign_in, family, version, request: Box::new(request) };
         self.pending.carried.insert(exchange, None).expect("carried below its capacity");
         self.pending.exchanges.insert(exchange, waiting).expect("get released slot");
         out.push(Request::Secrets(crate::SecretsRequest::Carry { exchange, value }));
+    }
+}
+
+/// The account key digest is the sole secret-derived fact admitted to the core.
+fn account_key_digest(ask: &w::Ask) -> Option<[u8; 32]> {
+    let change = match ask {
+        w::Ask::AccountChange(row) => row.change(),
+        w::Ask::Message(_)
+        | w::Ask::Answer(_)
+        | w::Ask::Take(_)
+        | w::Ask::HandBack(_)
+        | w::Ask::Decide(_)
+        | w::Ask::Release(_)
+        | w::Ask::Amend(_)
+        | w::Ask::Stop(_)
+        | w::Ask::Cancel(_)
+        | w::Ask::MoveTask(_)
+        | w::Ask::Seen(_)
+        | w::Ask::EditNote(_)
+        | w::Ask::DeleteNote(_)
+        | w::Ask::ChangePolicy(_)
+        | w::Ask::SetRoles(_)
+        | w::Ask::MakeService(_)
+        | w::Ask::SetPool(_)
+        | w::Ask::Compound(_)
+        | w::Ask::Create(_)
+        | w::Ask::Propose(_)
+        | w::Ask::Withdraw(_)
+        | w::Ask::SignIn(_)
+        | w::Ask::SignOut(_) => return None,
+    };
+    match change {
+        w::AccountChange::AddKey(row) => Some(*row.digest()),
+        w::AccountChange::ReplaceKey(row) => Some(*row.digest()),
+        w::AccountChange::RemoveKey(_)
+        | w::AccountChange::Resume(_)
+        | w::AccountChange::Remove(_)
+        | w::AccountChange::MoveAccount(_)
+        | w::AccountChange::MoveSource(_)
+        | w::AccountChange::SetUses(_) => None,
     }
 }

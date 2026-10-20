@@ -141,7 +141,7 @@ fn a_value_kept_after_its_sign_in_ended_is_erased_unseen() {
     assert!(exchange.component.pending.carried.is_empty());
 }
 #[test]
-fn jigs_own_request_carries_no_value_yet() {
+fn a_value_on_an_ordinary_jig_ask_is_not_a_record() {
     let mut exchange = Exchange::new();
     let owner = exchange.send(crate::Message::Request(carrying(w::Owner::Jig, b"key")));
     exchange.authenticate();

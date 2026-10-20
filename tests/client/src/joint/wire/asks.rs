@@ -283,6 +283,37 @@ fn account_holder(value: client::AccountHolder) -> people::AccountHolder {
     }
 }
 
+fn account_change(value: &client::AccountChange) -> people::AccountChange {
+    match value {
+        client::AccountChange::AddKey { provider, join, digest } => {
+            people::AccountChange::AddKey { provider: *provider, join: *join, digest: *digest }
+        }
+        client::AccountChange::ReplaceKey { source, digest } => {
+            people::AccountChange::ReplaceKey { source: *source, digest: *digest }
+        }
+        client::AccountChange::RemoveKey { source } => people::AccountChange::RemoveKey { source: *source },
+        client::AccountChange::Resume { source } => people::AccountChange::Resume { source: *source },
+        client::AccountChange::Remove { account } => people::AccountChange::Remove { account: *account },
+        client::AccountChange::MoveAccount { account, place } => {
+            people::AccountChange::MoveAccount { account: *account, place: *place }
+        }
+        client::AccountChange::MoveSource { account, source, place } => {
+            people::AccountChange::MoveSource { account: *account, source: *source, place: *place }
+        }
+        client::AccountChange::SetUses { account, uses } => people::AccountChange::SetUses {
+            account: *account,
+            uses: uses.as_ref().map(|uses| {
+                uses.iter()
+                    .map(|use_| match use_ {
+                        client::OwnerAccountUse::Party(n) => people::Use::Party(*n),
+                        client::OwnerAccountUse::Project(n) => people::Use::Project(*n),
+                    })
+                    .collect()
+            }),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     const UTF8_TEXTS: [&[u8]; 3] = [b"~/\0", b"~\0", b"~/"];
@@ -770,36 +801,5 @@ mod tests {
         let goal = client::NoteScope::Task { project: u32::MAX, task: u64::MAX };
         assert_eq!(note_scope(&goal, u32::MAX), Ok(people::NoteScope::Goal { goal: u64::MAX }));
         assert_eq!(note_scope(&goal, 0), Err(Invalid::NoteProject));
-    }
-}
-
-fn account_change(value: &client::AccountChange) -> people::AccountChange {
-    match value {
-        client::AccountChange::AddKey { provider, join, digest } => {
-            people::AccountChange::AddKey { provider: *provider, join: *join, digest: *digest }
-        }
-        client::AccountChange::ReplaceKey { source, digest } => {
-            people::AccountChange::ReplaceKey { source: *source, digest: *digest }
-        }
-        client::AccountChange::RemoveKey { source } => people::AccountChange::RemoveKey { source: *source },
-        client::AccountChange::Resume { source } => people::AccountChange::Resume { source: *source },
-        client::AccountChange::Remove { account } => people::AccountChange::Remove { account: *account },
-        client::AccountChange::MoveAccount { account, place } => {
-            people::AccountChange::MoveAccount { account: *account, place: *place }
-        }
-        client::AccountChange::MoveSource { account, source, place } => {
-            people::AccountChange::MoveSource { account: *account, source: *source, place: *place }
-        }
-        client::AccountChange::SetUses { account, uses } => people::AccountChange::SetUses {
-            account: *account,
-            uses: uses.as_ref().map(|uses| {
-                uses.iter()
-                    .map(|use_| match use_ {
-                        client::OwnerAccountUse::Party(n) => people::Use::Party(*n),
-                        client::OwnerAccountUse::Project(n) => people::Use::Project(*n),
-                    })
-                    .collect()
-            }),
-        },
     }
 }

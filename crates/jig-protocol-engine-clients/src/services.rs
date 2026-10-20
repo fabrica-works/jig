@@ -3,7 +3,7 @@ use super::{
     Box, Component, Env, Kept, Limits, Queue, ReplyTo, Request, SecretOwner, SecretsAnswer, SecretsRequest, Token,
     Waiting, core, people, routes, sign_in,
 };
-use crate::sign_in::Answer;
+use crate::sign_in::{Answer, CarriedRequest};
 use skein_lib::{Secret, Wall};
 impl Component {
     pub(super) fn secrets(&mut self, env: &Env<Limits>, answer: SecretsAnswer, out: &mut Queue<Request>) {
@@ -123,15 +123,32 @@ impl Component {
         };
         *slot = Some(number);
         match waiting {
-            Some(Waiting::Carry { sign_in, family, version, mut request }) => {
-                if let crate::ToApplication::Request { carried: Some(carried), .. } = &mut *request {
-                    carried.number = number;
-                }
+            Some(Waiting::Carry { sign_in, family, version, request }) => {
+                let request = match *request {
+                    CarriedRequest::Application(mut request) => {
+                        match &mut request {
+                            crate::ToApplication::Request { carried: Some(carried), .. } => {
+                                carried.number = number;
+                            }
+                            crate::ToApplication::Request { carried: None, .. }
+                            | crate::ToApplication::Read { .. }
+                            | crate::ToApplication::Watch { .. } => unreachable!("only a carrying request is kept"),
+                        }
+                        Request::Application(request)
+                    }
+                    CarriedRequest::AccountKey { key, ask, digest } => Request::Core(Box::new(core::Event::Key {
+                        reply_to: ReplyTo::new(exchange),
+                        sign_in,
+                        key,
+                        ask,
+                        carried: core::Carried { number, digest },
+                    })),
+                };
                 self.pending
                     .exchanges
-                    .insert(exchange, Waiting::Ask { sign_in, family: Some(family), version })
+                    .insert(exchange, Waiting::Ask { sign_in, family, version })
                     .expect("same carry slot");
-                out.push(Request::Application(*request));
+                out.push(request);
             }
             Some(waiting) => {
                 self.pending.exchanges.insert(exchange, waiting).expect("same slot");

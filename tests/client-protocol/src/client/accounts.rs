@@ -32,6 +32,19 @@ impl Story {
             }),
         )));
     }
+    /// Account key inputs observed after the fake secrets store kept their values.
+    #[must_use]
+    pub fn account_key_inputs(&self) -> &[jig_domain_core::Carried] {
+        &self.engine.account_keys
+    }
+    #[must_use]
+    pub fn malformed_requests(&self) -> u32 {
+        self.engine.not_records
+    }
+    #[must_use]
+    pub fn erased_carried(&self) -> &[u64] {
+        &self.engine.erasures
+    }
     /// Queue complete client account sign-in inputs as one burst into the existing core world.
     pub fn hold_account_sign_in_burst(&mut self) {
         self.engine.account_sign_in_burst = Some(Vec::new());

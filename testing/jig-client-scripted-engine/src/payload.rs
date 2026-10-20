@@ -165,7 +165,14 @@ impl Payload for Ask {
                     u64::try_from(uses.len() * core::mem::size_of::<jig_client_domain::contract::OwnerAccountUse>())
                         .ok()
                 }
-                _ => Some(0),
+                jig_client_domain::contract::AccountChange::AddKey { .. }
+                | jig_client_domain::contract::AccountChange::ReplaceKey { .. }
+                | jig_client_domain::contract::AccountChange::RemoveKey { .. }
+                | jig_client_domain::contract::AccountChange::Resume { .. }
+                | jig_client_domain::contract::AccountChange::Remove { .. }
+                | jig_client_domain::contract::AccountChange::MoveAccount { .. }
+                | jig_client_domain::contract::AccountChange::MoveSource { .. }
+                | jig_client_domain::contract::AccountChange::SetUses { uses: None, .. } => Some(0),
             },
             Self::Withdraw { .. } | Self::SignIn { .. } | Self::SignOut { .. } => Some(0),
             Self::Compound { operations, .. } => operations.heap(bounds),

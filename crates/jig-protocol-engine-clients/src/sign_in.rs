@@ -21,8 +21,14 @@ pub(crate) enum Waiting {
     Ask { sign_in: u64, family: Option<u16>, version: u32 },
     // A request whose carried value the store is keeping: the core sees
     // `request` only once the value is durable (store.md 9).
-    Carry { sign_in: u64, family: u16, version: u32, request: Box<crate::ToApplication> },
+    Carry { sign_in: u64, family: Option<u16>, version: u32, request: Box<CarriedRequest> },
     Checked { sign_in: u64, body: Box<[u8]>, route: Route },
+}
+/// An admitted value's request, without the value or a speculative carried number.
+#[derive(Debug)]
+pub(crate) enum CarriedRequest {
+    Application(crate::ToApplication),
+    AccountKey { key: [u8; 16], ask: Box<jig_domain_people::Ask>, digest: [u8; 32] },
 }
 #[derive(Debug)]
 pub(crate) enum Answer {

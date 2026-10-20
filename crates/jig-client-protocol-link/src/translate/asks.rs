@@ -734,6 +734,15 @@ fn account_change(value: &c::AccountChange, limits: &w::Limits) -> Result<w::Acc
                 uses: match uses {
                     None => None,
                     Some(uses) => {
+                        if uses.len()
+                            > usize::try_from(limits.account_change_set_uses_uses_some.min(c::ACCOUNT_USES))
+                                .expect("account uses bound fits")
+                        {
+                            return Err(w::Problem {
+                                path: w::Path::AccountChangeSetUsesUses,
+                                reason: skein_codec::Reason::Bound,
+                            });
+                        }
                         let mut rows =
                             List::with_capacity(u32::try_from(uses.len()).expect("account uses bounded by the wire"));
                         for use_ in uses {

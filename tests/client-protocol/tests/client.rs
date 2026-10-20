@@ -1,3 +1,5 @@
+#[path = "client/account_keys.rs"]
+mod account_keys;
 #[path = "client/accounts.rs"]
 mod accounts;
 #[path = "client/carried.rs"]

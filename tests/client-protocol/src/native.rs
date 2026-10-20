@@ -162,6 +162,11 @@ impl NativeClient {
         });
         self.wake = Some(self.env.now);
     }
+    /// Drive an account request constructor through the real client's value envelope.
+    pub fn account_request(&mut self, event: jig_client::Event) {
+        self.callback(client::Event::Client { event });
+        self.wake = Some(self.env.now);
+    }
     /// Drain the native client after the account sign-in referee saw its answers.
     pub fn finish_account_sign_in(&mut self) {
         self.account_sign_in_controlled = false;

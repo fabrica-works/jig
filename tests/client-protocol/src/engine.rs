@@ -29,6 +29,9 @@ pub(super) struct Engine {
     /// 2^63 up as the store draws them (store.md 9).
     pub carried: BTreeMap<u64, skein_lib::Secret>,
     next_carried: u64,
+    pub account_keys: Vec<core::Carried>,
+    pub not_records: u32,
+    pub erasures: Vec<u64>,
     replies: BTreeSet<Token>,
     truth: Truth,
     observed: Vec<Observed>,
@@ -75,6 +78,9 @@ impl Engine {
             secrets: BTreeMap::new(),
             carried: BTreeMap::new(),
             next_carried: 1 << 63,
+            account_keys: Vec::new(),
+            not_records: 0,
+            erasures: Vec::new(),
             replies: BTreeSet::new(),
             truth,
             observed: Vec::new(),
@@ -111,7 +117,12 @@ impl Engine {
     }
     pub fn request(&mut self, request: Request) -> Option<skein_io::Request> {
         match request {
-            Request::Transport(message) => self.mount_event(http::Event::Component(message)),
+            Request::Transport(message) => {
+                if matches!(&message, clients::ToTransport::Reply { reply: clients::Reply::NotARecord, .. }) {
+                    self.not_records += 1;
+                }
+                self.mount_event(http::Event::Component(message));
+            }
             Request::Link { secret } => self.link = crate::fixtures::printed(&secret),
             Request::Secrets(request) => {
                 let answer = match request {
@@ -124,6 +135,7 @@ impl Engine {
                         self.secrets.remove(&owner);
                         if let SecretOwner::Carried(number) = owner {
                             self.carried.remove(&number);
+                            self.erasures.push(number);
                         }
                         SecretsAnswer::Erased { owner }
                     }
@@ -141,7 +153,18 @@ impl Engine {
                 };
                 self.event(Event::Secrets(answer));
             }
-            Request::Core(event) => self.apply(root::Event::Core(*event)),
+            Request::Core(event) => {
+                if let core::Event::Key { carried, .. } = &*event {
+                    assert_eq!(
+                        skein_lib::sha256::digest(
+                            self.carried.get(&carried.number).expect("account key kept before core input").expose()
+                        ),
+                        carried.digest
+                    );
+                    self.account_keys.push(*carried);
+                }
+                self.apply(root::Event::Core(*event));
+            }
             Request::Application(request) => {
                 match jig_test_service::family::to_root(
                     request,
@@ -214,6 +237,7 @@ impl Engine {
         self.rules.domain(&event).expect("no authentication secret in a root input");
         let to = if let root::Event::Core(
             core::Event::SignIn { reply_to, .. }
+            | core::Event::Key { reply_to, .. }
             | core::Event::People(
                 jig_domain_people::Event::Ask { reply_to, .. } | jig_domain_people::Event::SignOut { reply_to, .. },
             ),

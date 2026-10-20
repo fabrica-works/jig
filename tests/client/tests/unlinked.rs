@@ -148,7 +148,15 @@ fn a_key_constructor_sends_the_value_once_without_keeping_it() {
                     assert!(sent.replace(attempt).is_none());
                 }
                 Request::Told { told: Told::Pending { .. } } => {}
-                other => panic!("carried key must not be saved: {other:?}"),
+                other @ (Request::Exchange { .. }
+                | Request::OpenStream { .. }
+                | Request::CloseStream
+                | Request::Save { .. }
+                | Request::Erase { .. }
+                | Request::Told { .. }
+                | Request::Down { .. }
+                | Request::SignOut
+                | Request::ServiceCredential { .. }) => panic!("carried account key must not be saved: {other:?}"),
             }
         }
         let attempt = sent.expect("sent once");
