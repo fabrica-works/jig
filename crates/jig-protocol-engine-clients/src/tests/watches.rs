@@ -274,7 +274,7 @@ fn an_absent_stream_digest_is_answered_signed_out() {
 }
 
 #[test]
-fn an_accounts_document_is_not_carried_to_a_client_before_jp10() {
+fn an_accounts_document_is_watched_but_never_read() {
     use jig_domain_core::{documents as d, reads};
     use skein_lib::List;
     let document = d::Document::Accounts(Box::new(d::Accounts {
@@ -288,7 +288,20 @@ fn an_accounts_document_is_not_carried_to_a_client_before_jp10() {
     let limits = fixtures::wire();
     assert_eq!(
         watches::delivery(&document, 0, 1, &[], &limits),
-        Err(w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Tag })
+        Ok(w::DeliveryValue::OwnerAccounts(
+            w::OwnerAccounts::new(
+                &limits,
+                w::OwnerAccountsParts {
+                    accounts: Box::from([]),
+                    signing: Box::from([]),
+                    last_end: None,
+                    usable: false,
+                    settled: true,
+                    cut: false
+                }
+            )
+            .unwrap()
+        ))
     );
     assert_eq!(
         crate::translate::objects::document(&reads::Answer::Document(Box::new(document)), &[], &limits),

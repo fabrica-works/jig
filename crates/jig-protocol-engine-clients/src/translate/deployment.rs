@@ -65,13 +65,13 @@ fn hello(value: fleet::HelloRefusal, limits: &w::Limits) -> Result<w::OwnerHello
         ),
     })
 }
-fn account_place(value: accounts::Place) -> w::OwnerAccountPlace {
+pub(crate) fn account_place(value: accounts::Place) -> w::OwnerAccountPlace {
     match value {
         accounts::Place::Directory => w::OwnerAccountPlace::Directory,
         accounts::Place::File => w::OwnerAccountPlace::File,
     }
 }
-fn account_unread(value: accounts::Unread) -> w::OwnerAccountUnread {
+pub(crate) fn account_unread(value: accounts::Unread) -> w::OwnerAccountUnread {
     match value {
         accounts::Unread::Unreadable => w::OwnerAccountUnread::Unreadable,
         accounts::Unread::Refused => w::OwnerAccountUnread::Refused,
@@ -80,7 +80,7 @@ fn account_unread(value: accounts::Unread) -> w::OwnerAccountUnread {
         accounts::Unread::TooLarge => w::OwnerAccountUnread::TooLarge,
     }
 }
-fn account_state(value: d::AccountState, limits: &w::Limits) -> Result<w::OwnerAccountState, w::Problem> {
+pub(crate) fn account_state(value: d::AccountState, limits: &w::Limits) -> Result<w::OwnerAccountState, w::Problem> {
     Ok(match value {
         d::AccountState::Granted => w::OwnerAccountState::Granted,
         d::AccountState::Asking => w::OwnerAccountState::Asking,
@@ -382,7 +382,6 @@ pub fn host(value: &d::Host, limits: &w::Limits) -> Result<w::OwnerHost, w::Prob
     )
 }
 pub fn account(value: &d::Account, limits: &w::Limits) -> Result<w::OwnerAccount, w::Problem> {
-    // JP10 carries provider, display, holder and sources; client-v10 carries the existing status only.
     let mut runs = List::with_capacity(value.runs.len());
     for row in &value.runs {
         runs.push(chips::chip(row, limits)?).expect("supplied rows fit");
@@ -398,6 +397,17 @@ pub fn account(value: &d::Account, limits: &w::Limits) -> Result<w::OwnerAccount
         limits,
         w::OwnerAccountParts {
             number: value.number,
+            place: value.place,
+            uses: super::accounts::uses(value.uses.as_ref(), limits)?,
+            provider: value.provider,
+            display: owner::text(&value.display, limits)?,
+            holder: super::accounts::holder(value.holder, limits)?,
+            sources: super::accounts::source_pieces(
+                &value.sources,
+                limits,
+                limits.owner_account_sources,
+                w::Path::OwnerAccountSources,
+            )?,
             generation: value.generation,
             state: account_state(value.state, limits)?,
             spent_until: match value.spent_until {
@@ -406,7 +416,7 @@ pub fn account(value: &d::Account, limits: &w::Limits) -> Result<w::OwnerAccount
             },
             runs,
             waiting,
-            skein_bools: [value.usable, value.expiring, value.attention, value.cut],
+            skein_bools: [value.plan, value.usable, value.expiring, value.attention, value.cut],
         },
     )
 }

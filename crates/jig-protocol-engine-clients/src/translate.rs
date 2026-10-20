@@ -2,6 +2,7 @@
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v10 as w;
 use skein_lib::{List, Writer};
+pub mod accounts;
 pub mod activity;
 pub(crate) mod answers;
 pub(crate) mod asks;

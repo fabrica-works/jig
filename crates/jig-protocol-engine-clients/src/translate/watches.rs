@@ -27,6 +27,7 @@ pub(crate) fn watch(watcher: Token, sign_in: u64, value: w::Subject, rows: u32) 
             let value = value.into_parts();
             (d::Watched::Query { query: super::queries::query(value.query)? }, value.window)
         }
+        w::Subject::Accounts => (d::Watched::Accounts, rows),
         w::Subject::Deployment => (d::Watched::Deployment, rows),
         w::Subject::Run(_) => return None,
     };
@@ -117,6 +118,7 @@ pub(crate) fn delivery(
         d::Document::Inbox(value) => w::DeliveryValue::OwnerInbox(inbox::document(value, limits)?),
         d::Document::Lines(value) => w::DeliveryValue::Tasks(super::queries::lines(value, limits)?),
         d::Document::Run(value) => w::DeliveryValue::RunState(live::run(value, limits)?),
+        d::Document::Accounts(value) => w::DeliveryValue::OwnerAccounts(super::accounts::document(value, limits)?),
         d::Document::Deployment(value) => w::DeliveryValue::OwnerDeployment(deployment::document(value, limits)?),
         d::Document::Proposal(value) => w::DeliveryValue::OwnerProposal(objects::proposal(value, limits)?),
         d::Document::Escalation(_)
@@ -124,7 +126,6 @@ pub(crate) fn delivery(
         | d::Document::PersonTask(_)
         | d::Document::Result(_)
         | d::Document::Project(_)
-        | d::Document::Accounts(_)
         | d::Document::Note(_) => return Err(super::problem(skein_codec::Reason::Tag)),
     })
 }
