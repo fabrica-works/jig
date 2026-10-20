@@ -315,3 +315,12 @@ fn a_retained_due_context_is_refreshed_before_preparation() {
     assert_eq!(current.payer, tasks::Payer::Project(1));
     assert_eq!(current.numbers.budget, 100);
 }
+
+#[test]
+fn a_held_tasks_due_context_leaves_the_queue() {
+    let (mut core, limits) = ready(false);
+    core.due.push(core.tasks.run_context(TASK).unwrap());
+    send_task(&mut core, &limits, tasks::Event::Hold { task: TASK, why: tasks::Hold::Uncertain { entry: 1 } });
+    assert!(core.take_due().is_none());
+    assert!(core.due.is_empty());
+}

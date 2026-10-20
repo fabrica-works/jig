@@ -155,12 +155,18 @@ impl Core {
         charter.expect("agent task has configured charter")
     }
 
-    fn context_ready(&self, context: &tasks::RunContext) -> bool {
+    /// Whether a context's task is still due; one that left Due activates
+    /// afresh if it is due again.
+    fn still_due(&self, context: &tasks::RunContext) -> bool {
         let Some(current) = self.tasks.task(context.task) else { return false };
-        if current.phase != tasks::Phase::Active(tasks::Active::Due) {
+        current.phase == tasks::Phase::Active(tasks::Active::Due)
+    }
+
+    fn context_ready(&self, context: &tasks::RunContext) -> bool {
+        if !self.still_due(context) {
             return false;
         }
-        match current.executor {
+        match self.tasks.task(context.task).expect("a due task is live").executor {
             tasks::Executor::Agent { .. } => match self.run_admission(context, self.run_wall, Box::new([])) {
                 crate::RunAdmission::Allow(_) | crate::RunAdmission::Hold(_) => true,
                 crate::RunAdmission::Wait(_) => false,
@@ -170,11 +176,15 @@ impl Core {
         }
     }
 
-    /// Take the first due task whose executor can start, keeping the others in order.
+    /// Take the first due task whose executor can start, keeping the others in
+    /// order and dropping those whose task is no longer due.
     pub fn take_due(&mut self) -> Option<Box<tasks::RunContext>> {
         let mut taken = None;
         for _ in 0..self.due.len() {
             let context = self.due.pop().expect("due count");
+            if !self.still_due(&context) {
+                continue;
+            }
             if taken.is_none() && self.context_ready(&context) {
                 taken = self.tasks.run_context(context.task);
             } else {
