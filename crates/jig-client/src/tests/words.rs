@@ -24,14 +24,18 @@ const HOLDS: &[(H, &[u8])] = &[
     (H::Procedure, b"Procedure needs a decision"),
 ];
 fn book(languages: Box<[Language]>) -> Phrasebook {
-    let limits = PhraseLimits {
-        languages: 2,
-        phrases: words::PHRASES,
-        holes: 3,
-        segments: 256,
-        text_bytes: 8192,
-        hole_bytes: TEXT,
-    };
+    let mut segments = 0_u32;
+    for language in &languages {
+        for phrase in &language.phrases {
+            for form in &phrase.forms {
+                segments = segments
+                    .checked_add(u32::try_from(form.segments.len()).expect("bounded phrase segments"))
+                    .expect("bounded language fixtures");
+            }
+        }
+    }
+    let limits =
+        PhraseLimits { languages: 2, phrases: words::PHRASES, holes: 3, segments, text_bytes: 8192, hole_bytes: TEXT };
     Phrasebook::load(words::phrase_shapes(TEXT), languages, &limits).expect("bounded public words")
 }
 #[test]

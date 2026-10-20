@@ -17,7 +17,7 @@ pub fn delivery_values(limits: &Limits) -> List<(&'static str, DeliveryValue)> {
     let mut values = List::with_capacity(16);
     value!(values, limits, OwnerProject, OwnerProject, 111);
     value!(values, limits, Me, Me, 66);
-    value!(values, limits, Task, Task, 253, Box::new);
+    value!(values, limits, Task, Task, 255, Box::new);
     value!(values, limits, OwnerProposal, OwnerProposal, 57);
     value!(values, limits, Tree, Tree, 48);
     value!(values, limits, OwnerTree, OwnerTree, 17);

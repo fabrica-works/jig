@@ -16,7 +16,7 @@ fn an_explicit_account_preference_survives_link_storage() {
 }
 
 #[test]
-fn an_account_refusal_keeps_its_typed_reason_in_the_link() {
+fn an_account_refusal_keeps_its_reason_in_the_link() {
     let limits = fixtures::limits();
     for (wire, client) in [
         (w::AccountWhy::Unknown, c::AccountWhy::Unknown),

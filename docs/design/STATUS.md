@@ -298,9 +298,8 @@ development.md, section 3.3).
   distinguish preferences, and the core rechecks prospective funding at
   acceptance. Delegate and Amend host tools carry the same optional choice
   without widening model authority. The wire also carries the models a party
-  may choose in `me`; a
-  run is placed only on its checked free host declaring all models
-  retained for that run, with conservative program-login eligibility; and
+  may choose in `me`; a run is placed only on its checked free host declaring
+  all models retained for that run, with conservative program-login eligibility; and
   configuration names the LLM providers, the sources each offers, each
   model's efforts, each template's LLM choice and the accounts' bounds.
   Both public authority forms carry omitted/ALL/named selectors; explicit
