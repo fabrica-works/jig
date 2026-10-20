@@ -445,6 +445,7 @@ pub(super) fn encode_end(value: &tasks::End, limits: &Limits) -> Result<wire::En
             wire::EndFailedParts { value: super::value::class(*value) },
         )?),
         tasks::End::Refused => wire::End::Refused,
+        tasks::End::Recheck => wire::End::Recheck,
     })
 }
 pub(super) fn decode_end(value: wire::End, limits: &Limits) -> Result<tasks::End, wire::Problem> {
@@ -466,6 +467,7 @@ pub(super) fn decode_end(value: wire::End, limits: &Limits) -> Result<tasks::End
             tasks::End::Failed(super::value::read_class(value))
         }
         wire::End::Refused => tasks::End::Refused,
+        wire::End::Recheck => tasks::End::Recheck,
     })
 }
 

@@ -15,12 +15,25 @@ impl Core {
     /// first model; a task of an unknown charter is left to tasks, which refuses its executor.
     #[expect(clippy::result_large_err, reason = "the refusal keeps tasks' exact problem for the creator")]
     pub(crate) fn resolve_llm(&self, batch: &mut [tasks::New]) -> Result<(), tasks::Problem> {
+        let mut links = List::with_capacity(u32::try_from(batch.len()).expect("bounded batch"));
+        for new in &*batch {
+            links
+                .push(tasks::PayerLink { task: new.number, funder: new.funder })
+                .expect("one financial link per member");
+        }
         for new in batch {
             let number = new.number;
-            self.default_llm(new, number)?;
+            self.default_llm(new, number, links.as_slice())?;
             if let Some(template) = &mut new.recurring {
+                let mut template_links =
+                    List::with_capacity(u32::try_from(template.batch.len()).expect("bounded template"));
+                for member in &template.batch {
+                    template_links
+                        .push(tasks::PayerLink { task: member.number, funder: member.funder })
+                        .expect("one template link");
+                }
                 for member in &mut template.batch {
-                    self.default_llm(member, number)?;
+                    self.default_llm(member, number, template_links.as_slice())?;
                 }
             }
         }
@@ -28,7 +41,7 @@ impl Core {
     }
 
     #[expect(clippy::result_large_err, reason = "the refusal keeps tasks' exact problem for the creator")]
-    fn default_llm(&self, new: &mut tasks::New, number: u64) -> Result<(), tasks::Problem> {
+    fn default_llm(&self, new: &mut tasks::New, number: u64, links: &[tasks::PayerLink]) -> Result<(), tasks::Problem> {
         let charter = match new.executor {
             tasks::Executor::Agent { charter } => charter,
             tasks::Executor::Procedure { .. } | tasks::Executor::Person(_) => return Ok(()),
@@ -36,9 +49,41 @@ impl Core {
         if new.llm.is_some() {
             return Ok(());
         }
-        // T10 narrows the default to the charter's models whose LLM provider has an account
-        // usable now and serving the task's payer (domain/accounts.md, section 4.3).
         new.llm = self.tasks.default_llm(charter, new.authority.models);
+        if let Some(payer) = self.tasks.prospective_payer(new.funder, links)
+            && let Some(choice) = &mut new.llm
+        {
+            let coverage = self.account_coverage(payer);
+            let mut candidates = List::with_capacity(tasks::MODELS.checked_add(1).expect("main model"));
+            candidates.push(choice.main).expect("default main");
+            for model in &choice.subagents {
+                candidates.push(*model).expect("default alternatives");
+            }
+            for candidate in &candidates {
+                let model =
+                    self.settings.models.get(usize::from(candidate.model)).expect("default names a configured model");
+                let Some(provider) = self.provider(model) else { continue };
+                if let jig_domain_accounts::Selection::Chosen { .. } = self.accounts.select(
+                    crate::coverage::payer(payer),
+                    provider,
+                    None,
+                    None,
+                    coverage.as_slice(),
+                    &[],
+                    self.run_now,
+                ) {
+                    choice.main = *candidate;
+                    let mut others = List::with_capacity(tasks::MODELS);
+                    for other in &candidates {
+                        if other.model != candidate.model {
+                            others.push(*other).expect("charter alternatives");
+                        }
+                    }
+                    choice.subagents = others.into_boxed();
+                    break;
+                }
+            }
+        }
         if new.llm.is_some() {
             return Ok(());
         }

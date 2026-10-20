@@ -38,6 +38,7 @@ fn a_run_placed_on_the_engine_slots_is_settled_as_not_started_by_a_restart_befor
             &mut domain,
             limits,
             Event::Start {
+                placement: None,
                 charter: 1,
                 grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
@@ -115,6 +116,7 @@ fn a_charter_for_workers_only_waits_while_only_engine_slots_are_free() {
             &mut domain,
             limits,
             Event::Start {
+                placement: None,
                 charter: 1,
                 grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
@@ -190,6 +192,7 @@ fn a_worker_holding_the_workstream_is_preferred_over_a_free_engine_slot() {
             &mut domain,
             limits,
             Event::Start {
+                placement: None,
                 charter: 1,
                 grants: Box::new([]),
                 reply_to: ReplyTo::new(attempt),
@@ -306,6 +309,7 @@ fn waiting_worker(limits: Limits) -> Domain {
             &mut domain,
             limits,
             Event::Start {
+                placement: None,
                 charter: 1,
                 grants: Box::new([]),
                 reply_to: ReplyTo::new(Token::new(2)),

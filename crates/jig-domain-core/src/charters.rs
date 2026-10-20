@@ -16,14 +16,6 @@ pub struct Charter {
     pub spend: u64,
 }
 
-impl Charter {
-    /// The account shared by this charter's models (domain/engine.md, 7.1).
-    #[must_use]
-    pub const fn account(&self) -> u32 {
-        self.policy.model.account
-    }
-}
-
 pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
     assert!(settings.charters.len() <= usize::try_from(limits.tasks.charters).expect("charter count"), "charter count");
     assert!(settings.models.len() <= usize::try_from(tasks::MODELS).expect("model count"), "model count");
@@ -51,7 +43,6 @@ pub(crate) fn assert_configured(settings: &Settings, limits: &Limits) {
         assert!(configured(settings, &charter.policy.model).is_some(), "charter model configured");
         assert!(declares(&charter.policy.model), "a model's effort among those it declares");
         for model in &charter.policy.alternatives {
-            assert_eq!(model.account, charter.account(), "one account per charter");
             assert!(configured(settings, model).is_some(), "charter model configured");
             assert!(declares(model), "a model's effort among those it declares");
         }
@@ -165,11 +156,12 @@ impl Core {
     }
 
     fn context_ready(&self, context: &tasks::RunContext) -> bool {
-        match context.executor {
-            tasks::Executor::Agent { charter } => {
-                self.accounts.usable(self.charter(charter).expect("task charter").account())
-                    && self.credentials_ready(context.task)
-            }
+        let Some(current) = self.tasks.task(context.task) else { return false };
+        match current.executor {
+            tasks::Executor::Agent { .. } => match self.run_admission(context, self.run_wall, Box::new([])) {
+                crate::RunAdmission::Allow(_) | crate::RunAdmission::Hold(_) => true,
+                crate::RunAdmission::Wait(_) => false,
+            },
             tasks::Executor::Procedure { .. } => true,
             tasks::Executor::Person(_) => false,
         }

@@ -95,14 +95,36 @@ pub(super) fn decode_turn_proof(source: wire::TurnProof, _limits: &Limits) -> do
     let wire::TurnProofParts { turn, cumulative, read } = source.into_parts();
     domain::TurnProof { turn, cumulative, read }
 }
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches without closures")]
 pub(super) fn encode_run_proof(source: &domain::RunProof, limits: &Limits) -> Result<wire::RunProof, wire::Problem> {
-    let domain::RunProof { task, attempt, conversation, credentials, window, host, offered, turn, terminal } = source;
+    let domain::RunProof {
+        task,
+        attempt,
+        conversation,
+        accounts,
+        placement,
+        account_failure,
+        account_terminal,
+        credentials,
+        window,
+        host,
+        offered,
+        turn,
+        terminal,
+    } = source;
     wire::RunProof::new(
         &limits.core,
         wire::RunProofParts {
             task: *task,
             attempt: *attempt,
             conversation: *conversation,
+            accounts: encode_accounts(accounts, limits)?,
+            placement: match placement {
+                Some(channel) => Some(channel.raw()),
+                None => None,
+            },
+            account_failure: *account_failure,
+            account_terminal: *account_terminal,
             credentials: encode_credentials(credentials, limits)?,
             window: encode_window(*window, limits)?,
             host: super::encode_host_kind(host, limits),
@@ -118,13 +140,34 @@ pub(super) fn encode_run_proof(source: &domain::RunProof, limits: &Limits) -> Re
         },
     )
 }
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches without closures")]
 pub(super) fn decode_run_proof(source: wire::RunProof, limits: &Limits) -> Result<domain::RunProof, wire::Problem> {
-    let wire::RunProofParts { task, attempt, conversation, credentials, window, host, offered, turn, terminal } =
-        source.into_parts();
+    let wire::RunProofParts {
+        task,
+        attempt,
+        conversation,
+        accounts,
+        placement,
+        account_failure,
+        account_terminal,
+        credentials,
+        window,
+        host,
+        offered,
+        turn,
+        terminal,
+    } = source.into_parts();
     Ok(domain::RunProof {
         task,
         attempt,
         conversation,
+        accounts: decode_accounts(accounts),
+        placement: match placement {
+            Some(channel) => Some(skein_lib::Token::new(channel)),
+            None => None,
+        },
+        account_failure,
+        account_terminal,
         credentials: decode_credentials(credentials),
         window: match window {
             Some(value) => {
@@ -287,6 +330,37 @@ fn decode_credentials(values: List<wire::Credential>) -> Box<[u32]> {
     let mut result = List::with_capacity(values.len());
     for value in values.into_boxed() {
         result.push(value.into_parts().value).expect("same number of credentials");
+    }
+    result.into_boxed()
+}
+
+fn encode_accounts(
+    values: &[jig_domain_authority::AccountBinding],
+    limits: &Limits,
+) -> Result<List<wire::AccountBinding>, wire::Problem> {
+    let count = match u32::try_from(values.len()) {
+        Ok(count) => count,
+        Err(error) => return Err(too_large(error)),
+    };
+    if count > limits.core.run_proof_accounts {
+        return Err(super::problem(skein_codec::Reason::Bound));
+    }
+    let mut result = List::with_capacity(count);
+    for value in values {
+        result
+            .push(wire::AccountBinding::new(
+                &limits.core,
+                wire::AccountBindingParts { provider: value.provider, account: value.account, source: value.source },
+            )?)
+            .expect("same binding count");
+    }
+    Ok(result)
+}
+fn decode_accounts(values: List<wire::AccountBinding>) -> Box<[jig_domain_authority::AccountBinding]> {
+    let mut result = List::with_capacity(values.len());
+    for value in values.into_boxed() {
+        let wire::AccountBindingParts { provider, account, source } = value.into_parts();
+        result.push(jig_domain_authority::AccountBinding { provider, account, source }).expect("same binding count");
     }
     result.into_boxed()
 }

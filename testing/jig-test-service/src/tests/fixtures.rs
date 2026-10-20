@@ -8,6 +8,7 @@ use skein_lib::{Queue, Writer};
 const ENGINE: &[u8] = br#"{
 "limits": {"profile": "small", "overrides": {"tasks.result_bytes":32,"people.amendment_bytes":64,"core.policy_bytes":256,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1}},
 "llm": {
+"providers":[{"name":"fake-provider","number":1,"models":["small"],"sources":{"keys":true}}],
 "endpoints": [{
 "name": "fake",
 "number": 1,
@@ -393,6 +394,12 @@ pub fn assignment(config: &jig_protocol_config::Engine) -> jig_test_domain::Assi
         attempt: 3,
         charter: 1,
         run: Box::new(core::RunCharter {
+            sources: Box::new([Some(1)]),
+            accounts: Box::new([]),
+            placement: jig_domain_fleet::PlacementConstraint {
+                channel: Token::new(1),
+                kind: jig_domain_fleet::HostKind::Worker,
+            },
             policy: config.charters[0].policy.clone(),
             contract: jig_domain_tasks::Contract::Report { words: 64 },
             authority: jig_domain_tasks::Authority {
@@ -555,8 +562,7 @@ pub fn worker_service() -> Service {
         .expect("worker service")
 }
 pub fn worker_assignment() -> jig_domain_host::LinkDown {
-    let names =
-        [jig_protocol_charter::EndpointName { number: 1, name: b"fake".as_slice().into(), account: 1, dialect: 1 }];
+    let names = [jig_protocol_charter::EndpointName { number: 1, name: b"fake".as_slice().into(), dialect: 1 }];
     let mut assignment =
         crate::tools::charter(assignment(&config()), &names, &seeds().deployment).expect("charter assignment");
     assignment.assignment.identity = [3; 16];

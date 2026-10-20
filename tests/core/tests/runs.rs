@@ -589,7 +589,7 @@ fn an_account_unusable_at_the_second_check_waits_and_is_not_held() {
     assert_eq!(world.assignments.len(), assigned);
     assert!(world.store.rows.values().any(|row| matches!(row,
         root::Record::Core(core::Record::Tasks(tasks::Stored::Live(task)))
-        if matches!(task.phase, tasks::Phase::Active(tasks::Active::Preparing)))));
+        if matches!(task.phase, tasks::Phase::Active(tasks::Active::Due)))));
     account_granted(&mut world);
     assert_eq!(world.assignments.len(), assigned + 1);
 }

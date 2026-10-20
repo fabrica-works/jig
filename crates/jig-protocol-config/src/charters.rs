@@ -159,12 +159,6 @@ fn validate(charter: &Charter, path: &Path, problems: &mut Problems) {
     if policy.turns <= policy.reserve_turns || policy.time <= policy.reserve_time {
         problems.push(path.clone(), What::Reserve { charter: charter.number });
     }
-    for model in &policy.alternatives {
-        if model.account != policy.model.account {
-            problems.push(path.clone(), What::Accounts { charter: charter.number });
-            break;
-        }
-    }
     let enough = match jig_domain_core::reserve_floor(policy) {
         Some(floor) => charter.spend >= floor,
         None => false,

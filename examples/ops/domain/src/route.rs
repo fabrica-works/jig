@@ -558,6 +558,7 @@ fn core_ask(
                 child(
                     decision,
                     Released::Fleet(fleet::Event::Start {
+                        placement: Some(domain.assignments.get(&task).expect("prepared assignment").placement),
                         grants: crate::assemble::fleet_grants(
                             &domain.assignments.get(&task).expect("prepared assignment").value.assignment.grants,
                         ),
@@ -1291,6 +1292,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
         }
         core::Now::RunPrepared { task, attempt, conversation, run, messages, transcript, grants, .. } => {
             let budget = run.budget;
+            let placement = run.placement;
             let sections = domain.briefs.remove(&task).expect("completed brief parts");
             match crate::assemble::assignment(
                 domain,
@@ -1307,7 +1309,7 @@ fn core_now(domain: &mut Domain, env: &Env<Limits>, value: core::Now, work: &mut
                 Some(value) => {
                     domain
                         .assignments
-                        .insert(task, crate::domain::Assignment { attempt, value })
+                        .insert(task, crate::domain::Assignment { placement, attempt, value })
                         .expect("core-selected assignment");
                     work.push(Work::Core(core::Event::ClaimPrepared { task, attempt, budget, writes: Box::new([]) }));
                 }

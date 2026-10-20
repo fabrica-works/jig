@@ -42,6 +42,14 @@ pub fn two_charters(seed: u64) -> (root::Config, root::Limits) {
     let research = research_charter();
     config.core.settings.models = Box::new([config.core.settings.models[0].clone(), research.policy.model.clone()]);
     config.core.settings.charters = Box::new([config.core.settings.charters[0].clone(), research]);
+    config.core.settings.llm_providers.providers = Box::new([
+        config.core.settings.llm_providers.providers[0].clone(),
+        accounts::Provider {
+            number: 2,
+            models: Box::new([b"research".as_slice().into()]),
+            offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+        },
+    ]);
     let room = core::room_max(&limits.core).expect("charter room");
     let connectors = jig_test_connector::MAX_OUT * 2;
     limits.journal.writes = limits.journal.writes.max(room.writes + connectors);

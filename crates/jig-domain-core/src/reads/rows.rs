@@ -1639,7 +1639,8 @@ fn hydrate_result(
             | tasks::End::Finished { .. }
             | tasks::End::Parked
             | tasks::End::Failed(_)
-            | tasks::End::Refused => {}
+            | tasks::End::Refused
+            | tasks::End::Recheck => {}
         }
     }
     Ok(result)

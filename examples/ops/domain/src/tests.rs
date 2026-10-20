@@ -54,7 +54,6 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
         charter_endpoints: Box::new([jig_protocol_charter::EndpointName {
             number: 1,
             dialect: 1,
-            account: 1,
             name: Box::from(&b"fake"[..]),
         }]),
     };

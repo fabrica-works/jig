@@ -268,7 +268,10 @@ pub struct RunAsk {
     pub wall: Wall,
     /// One status for each model account its charter will use. One usability status per model
     /// account used by the charter, bounded by `Limits::accounts`.
-    pub accounts: Box<[bool]>,
+    pub main_provider: u32,
+    pub accounts: Box<[AccountCheck]>,
+    /// Application credentials are independent of selected LLM sources.
+    pub credentials: Box<[bool]>,
     /// Every resource its workspace will write, including saved work. Every written resource,
     /// including saved work, bounded by `Limits::writes`.
     pub writes: Box<[Write]>,
@@ -410,4 +413,37 @@ pub enum Holder {
         /// Current lifetime task capacity available to acceptance.
         tasks_left: u32,
     },
+}
+
+/// Exact secret-free evidence retained by an allowed run and its durable claim.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct AccountBinding {
+    pub provider: u32,
+    pub account: u32,
+    pub source: u32,
+}
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct AccountCheck {
+    pub binding: AccountBinding,
+    pub usable: bool,
+    pub host_eligible: bool,
+}
+/// Run-specific answer; shared checks keep their payload-free verdict.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub enum RunAnswer {
+    Allow { spend: u64, accounts: Box<[AccountBinding]> },
+    Wait,
+    Propose,
+    Refuse,
+}
+impl RunAnswer {
+    #[must_use]
+    pub const fn verdict(&self) -> Answer {
+        match self {
+            Self::Allow { .. } => Answer::Allow,
+            Self::Wait => Answer::Wait,
+            Self::Propose => Answer::Propose,
+            Self::Refuse => Answer::Refuse,
+        }
+    }
 }

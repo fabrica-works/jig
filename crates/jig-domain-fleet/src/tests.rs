@@ -141,6 +141,7 @@ impl Harness {
 
     fn start(&mut self, run: Token, attempt: Token, workstream: u64) -> Box<[Request]> {
         self.step(Event::Start {
+            placement: None,
             charter: 1,
             grants: Box::new([]),
             reply_to: to(attempt),
@@ -246,6 +247,7 @@ fn a_assignment_keeps_its_turn_and_answer_references_through_placement() {
     let assignment = Assignment { turns: payload(1), answered: payload(2) };
     assert!(
         h.step(Event::Start {
+            placement: None,
             charter: 1,
             grants: Box::new([]),
             reply_to: to(A1),

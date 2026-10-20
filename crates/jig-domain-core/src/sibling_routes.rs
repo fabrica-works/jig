@@ -168,13 +168,23 @@ impl Core {
                 worked = true;
             }
         }
-        let account = self.charter_of(task).account();
         let mut grants = List::with_capacity(env.limits.fleet.grants);
-        if let Some(grant) = self.accounts.grant(account, env.now) {
-            grants.push(fleet_grant(grant)).expect("account grant room");
-        }
         let mut holds = List::with_capacity(env.limits.fleet.grants);
-        holds.push(fleet::GrantName { table: fleet::GrantTable::Accounts, account }).expect("account name room");
+        for binding in &self.proofs.get(&task).expect("restored claim proof").accounts {
+            let Some(source) = self.accounts.source(binding.source) else { continue };
+            if source.account != binding.account {
+                continue;
+            }
+            if source.kind == accounts::Kind::None {
+                continue;
+            }
+            holds
+                .push(fleet::GrantName { table: fleet::GrantTable::Accounts, account: binding.source })
+                .expect("provider names");
+            if let Some(grant) = self.accounts.source_grant(binding.source, env.now) {
+                grants.push(fleet_grant(grant)).expect("provider grants");
+            }
+        }
         for number in &self.proofs.get(&task).expect("restored claim proof").credentials {
             holds
                 .push(fleet::GrantName { table: fleet::GrantTable::Application, account: *number })

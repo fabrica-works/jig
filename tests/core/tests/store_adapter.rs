@@ -56,6 +56,10 @@ fn turn_commit(task: u64, turn: u32, bytes: &[u8]) -> Box<[root::Write]> {
             transcript: Box::from(bytes),
         })),
         save(core::CoreRecord::RunProof(core::RunProof {
+            accounts: Box::new([]),
+            placement: None,
+            account_failure: None,
+            account_terminal: false,
             task,
             attempt: 1,
             conversation: 1,

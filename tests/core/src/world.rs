@@ -366,7 +366,13 @@ pub fn config(seed: u64) -> root::Config {
                 resume_bytes: 256,
 
                 tools: core::ToolFamilies::JIG,
-                llm_providers: accounts::Providers::none(),
+                llm_providers: accounts::Providers {
+                    providers: Box::new([accounts::Provider {
+                        number: 1,
+                        models: Box::new([b"scripted".as_slice().into()]),
+                        offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+                    }]),
+                },
             },
         },
     }

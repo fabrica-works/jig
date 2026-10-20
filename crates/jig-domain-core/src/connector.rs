@@ -580,7 +580,15 @@ impl Core {
         now: Wall,
         findings: &mut Queue<authority::Finding>,
     ) -> authority::Answer {
-        let numbers = translate::authority_numbers(context.numbers);
+        let Some(current) = self.tasks.run_context(context.task) else { return authority::Answer::Wait };
+        let numbers = translate::authority_numbers(current.numbers);
+        let Ok(choice) = self.run_choice(context.task) else { return authority::Answer::Wait };
+        let mut accounts = List::with_capacity(tasks::MODELS);
+        for binding in &choice.accounts {
+            accounts
+                .push(authority::AccountCheck { binding: *binding, usable: true, host_eligible: true })
+                .expect("checked providers");
+        }
         authority::check_run(
             &self.authority,
             &authority::RunAsk {
@@ -590,7 +598,9 @@ impl Core {
                 budget: authority::left(numbers).min(self.authority.rules().maximum_run_spend),
                 reserve: self.run_reserve(context.task),
                 wall: now,
-                accounts: self.run_accounts(context.task),
+                main_provider: choice.accounts.first().expect("choice includes main provider").provider,
+                accounts: accounts.into_boxed(),
+                credentials: self.run_credentials_check(context.task),
                 writes: Box::new([authority::Write {
                     effect: crate::resources::effect(self, context.project, effect),
                     held: authority::Writer::Task,
@@ -598,6 +608,7 @@ impl Core {
             },
             findings,
         )
+        .verdict()
     }
 
     /// Decide authority for a connector-described effect. The root gives

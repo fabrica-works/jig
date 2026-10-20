@@ -43,6 +43,7 @@ const ENGINE: &[u8] = br#"{
 ,"core.templates":2,"documents.rows":1,"documents.lines":1,"documents.chips":1,"documents.text_bytes":128
 }},
 "llm": {
+"providers":[{"name":"fake-provider","number":1,"models":["fake"],"sources":{"keys":true}}],
 "endpoints": [{
 "name": "fake",
 "number": 1,

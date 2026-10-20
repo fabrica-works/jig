@@ -38,6 +38,7 @@ fn a_delegate_waits_for_a_host_declaring_its_charters_model() {
     let (mut config, mut limits) = world::two_charters(151);
     limits.core.fleet.workers = 2;
     config.core.settings.charters[1].policy.model.name = b"specialist".as_slice().into();
+    config.core.settings.llm_providers.providers[1].models = Box::new([b"specialist".as_slice().into()]);
     let specialist = config.core.settings.charters[1].policy.model.clone();
     config.core.settings.models = Box::new([config.core.settings.models[0].clone(), specialist]);
     let mut world = World::configured(151, false, config, limits);

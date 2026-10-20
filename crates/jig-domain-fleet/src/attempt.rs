@@ -124,6 +124,7 @@ pub(crate) struct Attempt {
     pub(crate) progress: Option<crate::Observation>,
     /// The parent's conversation state references for an assignment.
     pub(crate) assignment: Assignment,
+    pub(crate) placement: Option<crate::PlacementConstraint>,
     pub(crate) grants: List<crate::grants::Kept>,
     pub(crate) state: State,
 }
@@ -276,6 +277,7 @@ pub(crate) fn start(
     workstream: u64,
     kinds: Kinds,
     charter: u32,
+    placement: Option<crate::PlacementConstraint>,
     assignment: Assignment,
     out: &mut Queue<Request>,
 ) -> bool {
@@ -295,6 +297,8 @@ pub(crate) fn start(
     replace(domain, run, out);
     let serial = next_serial(&mut domain.serial);
     insert(domain, run, attempt, false, assignment, State::Waiting { to, workstream, kinds, charter, serial });
+    let id = *domain.names.get(&(run, attempt)).expect("inserted attempt");
+    domain.attempts.get_mut(id).expect("inserted attempt").placement = placement;
     true
 }
 
@@ -708,6 +712,7 @@ pub(crate) fn loaded(domain: &mut Domain, env: &Env<Limits>) {
 /// With none, placement waits for something to change.
 pub(crate) fn resume(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     let mut chosen = None;
+    let mut recheck = None;
     for (_, &id) in &domain.waiting {
         let entry = domain.attempts.get(id).expect("a queued attempt is tracked");
         let held = match domain.runs.get(&entry.run) {
@@ -743,10 +748,29 @@ pub(crate) fn resume(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Req
                 unreachable!("only a waiting attempt is queued")
             }
         };
-        if let Some(channel) = channel::choose(domain, workstream, kinds, charter) {
+        let channel = match entry.placement {
+            Some(placement) => channel::constrained(domain, placement, kinds),
+            None => channel::choose(domain, workstream, kinds, charter),
+        };
+        if let Some(channel) = channel {
             chosen = Some((id, channel));
             break;
         }
+        if entry.placement.is_some() {
+            recheck = Some(id);
+            break;
+        }
+    }
+    if let Some(id) = recheck {
+        let entry = domain.attempts.get_mut(id).expect("queued claim");
+        let before = implied(&entry.state);
+        let State::Waiting { to, .. } = mem::replace(&mut entry.state, State::Closed) else {
+            unreachable!("queued claim")
+        };
+        out.push(Request::Refused { to, run: entry.run, attempt: entry.token, refusal: Refusal::Recheck });
+        follow(domain, id, before);
+        domain.placing = !domain.waiting.is_empty();
+        return;
     }
     match chosen {
         Some((id, channel)) => place(domain, env, id, channel, out),
@@ -1049,6 +1073,7 @@ fn insert(domain: &mut Domain, run: Token, attempt: Token, listed: bool, assignm
         kept: 0,
         lost_host: None,
         progress: None,
+        placement: None,
         grants: List::with_capacity(0),
         assignment,
         state,

@@ -9,6 +9,7 @@ use crate::channel::{self, Channel};
 use crate::facts::{Fact, Facts};
 use crate::limits::{self, Limits};
 use crate::turn::{self, Pending};
+use alloc::boxed::Box;
 
 /// The most requests a step, an alarm or a resume emits under `limits`: a
 /// request for each run a hello lists, up to twice the slots (a cancel, an
@@ -89,6 +90,7 @@ impl Domain {
         let mut tokens = Map::with_capacity(channels_count);
         if limits.engine_slots > 0 {
             let engine = Channel {
+                declarations: Box::new([]),
                 eligible: crate::needs::eligibility(&needs, &[]),
                 kind: HostKind::Engine,
                 token: Token::new(0),
@@ -164,6 +166,32 @@ impl Domain {
         Some(self.channels.get(id).expect("chosen channel is connected").kind)
     }
 
+    /// Read-only bounded placement over this run's requirements, preserving affinity.
+    #[must_use]
+    pub fn probe(
+        &self,
+        kinds: crate::Kinds,
+        workstream: u64,
+        models: &[crate::ModelNeed],
+        excluded: &[Token],
+    ) -> Option<crate::PlacementConstraint> {
+        channel::probe(self, workstream, kinds, models, excluded)
+    }
+
+    #[must_use]
+    pub fn host_capacity(&self) -> u32 {
+        self.tokens.capacity()
+    }
+    #[must_use]
+    pub fn supports(&self, placement: crate::PlacementConstraint, models: &[crate::ModelNeed]) -> bool {
+        let Some(id) = self.tokens.get(&placement.channel) else { return false };
+        let channel = self.channels.get(*id).expect("connected host");
+        channel.kind == placement.kind && crate::needs::allows_models(&self.needs, &channel.declarations, models)
+    }
+    #[must_use]
+    pub fn placement_available(&self, placement: crate::PlacementConstraint) -> bool {
+        channel::constrained(self, placement, crate::Kinds::Both).is_some()
+    }
     /// Copy bounded connected and retained lost host facts without changing placement.
     #[must_use]
     pub fn host_views(&self) -> List<crate::HostView> {
@@ -327,8 +355,10 @@ impl Domain {
 /// Handles one event, emitting at most [`max_out`] requests.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
-        Event::Start { reply_to, run, attempt, workstream, kinds, charter, assignment, grants } => {
-            if attempt::start(domain, env, reply_to, run, attempt, workstream, kinds, charter, assignment, out) {
+        Event::Start { reply_to, run, attempt, workstream, kinds, charter, placement, assignment, grants } => {
+            if attempt::start(
+                domain, env, reply_to, run, attempt, workstream, kinds, charter, placement, assignment, out,
+            ) {
                 crate::grants::keep(domain, env, run, attempt, &[], &grants, out);
             }
         }

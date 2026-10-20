@@ -164,9 +164,33 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 append_tasks(core, env, tasks::Event::Started { task: run.raw(), attempt: attempt.raw() }, &mut out);
                 continue;
             }
+            fleet::Request::Refused { to, run, attempt, refusal: fleet::Refusal::Recheck } => {
+                let _answered = to.into_token();
+                core.remember_unpriced_terminal(run, attempt, tasks::End::Recheck);
+                out.push(Request::Now(Box::new(Now::DropAssignment { task: run.raw() })));
+                append_tasks(
+                    core,
+                    env,
+                    tasks::Event::Activation {
+                        reply_to: ReplyTo::new(Token::new(u64::MAX)),
+                        task: run.raw(),
+                        attempt: attempt.raw(),
+                        cause: tasks::Cause::Unpriced,
+                        end: tasks::End::Recheck,
+                        saved: None,
+                    },
+                    &mut out,
+                );
+                continue;
+            }
             fleet::Request::NotStarted { to, run, attempt }
             | fleet::Request::Withdrawn { to, run, attempt, .. }
-            | fleet::Request::Refused { to, run, attempt, .. } => {
+            | fleet::Request::Refused {
+                to,
+                run,
+                attempt,
+                refusal: fleet::Refusal::Busy | fleet::Refusal::Workstream | fleet::Refusal::Duplicate,
+            } => {
                 let _answered = to.into_token();
                 let _: Option<u64> = core.unreported_restored.remove(&run.raw());
                 core.remember_unpriced_terminal(run, attempt, tasks::End::Refused);
@@ -222,6 +246,37 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
             fleet::Request::Assign { channel, kind, run, attempt, activation, assignment } => {
                 let proof = core.proofs.get(&run.raw()).expect("assigned run has a claim");
                 assert!(proof.attempt == attempt.raw() && proof.host == kind, "placement follows the claimed kind");
+                if let Some(selected) = proof.placement {
+                    assert_eq!(selected, channel, "assignment retains checked host");
+                }
+                if !core.claim_bindings_usable(run.raw(), attempt.raw()) {
+                    core.remember_unpriced_terminal(run, attempt, tasks::End::Recheck);
+                    append_tasks(
+                        core,
+                        env,
+                        tasks::Event::Activation {
+                            reply_to: ReplyTo::new(Token::new(u64::MAX)),
+                            task: run.raw(),
+                            attempt: attempt.raw(),
+                            cause: tasks::Cause::Unpriced,
+                            end: tasks::End::Recheck,
+                            saved: None,
+                        },
+                        &mut out,
+                    );
+                    let mut cancelled = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
+                    fleet::step(
+                        &mut core.fleet,
+                        &Env { now: env.now, wall: env.wall, limits: env.limits.fleet },
+                        fleet::Event::Cancel { run, attempt },
+                        &mut cancelled,
+                    );
+                    for _ in 0..cancelled.len() {
+                        pending.push(cancelled.pop().expect("cancelled placement outputs"));
+                    }
+                    out.push(Request::Now(Box::new(Now::DropAssignment { task: run.raw() })));
+                    continue;
+                }
                 super::view_routes::touch_number(core, &env.limits, run.raw());
                 Request::Held(Box::new(Held::Assign { channel, run, attempt, activation, assignment }))
             }
@@ -274,16 +329,25 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 let _pending = core.relaying.remove(&run.raw());
                 Request::Now(Box::new(Now::Undelivered { run, attempt, message }))
             }
-            fleet::Request::Unauthorized { account, generation, .. } => {
+            fleet::Request::Unauthorized { run, attempt, account, generation } => {
+                if !claim_source(core, run, attempt, account, false, &mut out) {
+                    continue;
+                }
                 append_account(core, env, accounts::Event::Unauthorized { account, generation }, &mut out);
                 continue;
             }
-            fleet::Request::Limited { account, reset, .. } => {
+            fleet::Request::Limited { run, attempt, account, reset } => {
+                if !claim_source(core, run, attempt, account, false, &mut out) {
+                    continue;
+                }
                 let reset = reset_at(env.now, reset);
                 append_account(core, env, accounts::Event::Limited { account, reset }, &mut out);
                 continue;
             }
-            fleet::Request::AccountRefused { account, code, reason, .. } => {
+            fleet::Request::AccountRefused { run, attempt, account, code, reason } => {
+                if !claim_source(core, run, attempt, account, false, &mut out) {
+                    continue;
+                }
                 append_account(core, env, accounts::Event::Refused { account, code, reason }, &mut out);
                 continue;
             }
@@ -315,7 +379,12 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 let _: Option<u64> = core.unreported_restored.remove(&run.raw());
                 assert!(core.current_proof(run.raw(), attempt.raw()), "current answer has reserved proof");
                 if let fleet::Answer::Failed { turned: Some(turned) } = answer {
-                    append_account(core, env, run_failed(env.now, turned), &mut out);
+                    let account = match turned {
+                        fleet::Turned::Limited { account, .. } | fleet::Turned::Refused { account } => account,
+                    };
+                    if claim_source(core, run, attempt, account, true, &mut out) {
+                        append_account(core, env, run_failed(env.now, turned), &mut out);
+                    }
                 }
                 Request::Now(Box::new(Now::AnswerPayload { run, attempt, payload }))
             }
@@ -478,6 +547,28 @@ pub(super) fn route_brief(core: &mut Core, env: &Env<Limits>, event: brief::Gath
 }
 
 pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::Event) -> Requests {
+    if let fleet::Event::Start { run, attempt, placement: Some(placement), .. } = &event
+        && !core.fleet.placement_available(*placement)
+    {
+        let mut out = Queue::with_capacity(route_room(&env.limits));
+        core.remember_unpriced_terminal(*run, *attempt, tasks::End::Recheck);
+        append_tasks(
+            core,
+            env,
+            tasks::Event::Activation {
+                reply_to: ReplyTo::new(Token::new(u64::MAX)),
+                task: run.raw(),
+                attempt: attempt.raw(),
+                cause: tasks::Cause::Unpriced,
+                end: tasks::End::Recheck,
+                saved: None,
+            },
+            &mut out,
+        );
+        out.push(Request::Now(Box::new(Now::DropAssignment { task: run.raw() })));
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
     if let fleet::Event::Start { grants, .. } = &mut event {
         for grant in &mut **grants {
             match grant.form.table() {
@@ -528,4 +619,36 @@ pub(super) fn route_projection_settled(core: &mut Core, env: &Env<Limits>, goal:
     crate::projections::settled(core, goal, connector, &mut out);
     out.push(Request::Decided);
     Requests::Out(out)
+}
+
+/// Fleet authenticates the worker; the core authenticates the recorded source binding too.
+fn claim_source(
+    core: &mut Core,
+    run: Token,
+    attempt: Token,
+    source: u32,
+    terminal: bool,
+    out: &mut Queue<Request>,
+) -> bool {
+    let Some(proof) = core.proofs.get_mut(&run.raw()) else { return false };
+    if proof.attempt != attempt.raw() {
+        return false;
+    }
+    let mut held = false;
+    for binding in &proof.accounts {
+        if binding.source == source {
+            held = true;
+        }
+    }
+    if !held {
+        return false;
+    }
+    if proof.account_failure != Some(source) || (terminal && !proof.account_terminal) {
+        proof.account_failure = Some(source);
+        if terminal {
+            proof.account_terminal = true;
+        }
+        out.push(Request::Write(Write::Save(Record::Core(CoreRecord::RunProof(proof.clone())))));
+    }
+    true
 }

@@ -362,6 +362,7 @@ pub fn second_party(world: &mut crate::effects::World, subject: &[u8], role: jig
 pub fn long_resource_world(seed: u64) -> (crate::effects::World, u64, jig_test_connector::Path) {
     let (mut configuration, mut limits) = crate::effects::fixture(seed, false);
     limits.core.documents.lines = 2;
+    limits.core.fleet.slots = 2;
     limits.connector.path_segments = limits.core.tasks.hold_segments;
     let mut path = skein_lib::List::with_capacity(limits.core.tasks.hold_segments);
     for segment in jig_test_connector_world::path(1, 1).segments() {
@@ -372,6 +373,7 @@ pub fn long_resource_world(seed: u64) -> (crate::effects::World, u64, jig_test_c
     }
     let path = jig_test_connector::Path::new(path, 128).expect("bounded resource");
     configuration.first.resources[0].path = path.clone();
+    crate::peers::journal(&mut limits);
     let mut world = crate::effects::World::configured(seed, false, configuration, limits);
     world.delegate_on_path(CREDENTIAL_RESOURCE, path.clone());
     let core::CallPart::Delegated(numbers) = &world.answers.last().expect("delegation answer").2 else {

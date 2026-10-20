@@ -205,7 +205,7 @@ impl Domain {
                 sources: places,
                 place: domain.accounts.len(),
                 uses: None,
-                plan: true,
+                plan: false,
             };
             let fresh = match domain.accounts.insert(entry.number, account) {
                 Ok(old) => old.is_none(),

@@ -67,6 +67,8 @@ mod revisions;
 mod roles;
 mod routing;
 mod run;
+mod run_choice;
+pub use run_choice::{RunAllowance, RunChoice, RunWait};
 mod sibling_routes;
 pub use numbers::{Counters, Deployment, Family, fresh};
 pub use routing::{
@@ -238,6 +240,8 @@ pub type Delegating = (CallKey, Box<[tasks::Stub]>, Option<people::Given>);
 #[derive(Debug)]
 #[expect(clippy::partial_pub_fields, reason = "the keyed escalation route remains private to the core")]
 pub struct Core {
+    pub(crate) run_now: skein_lib::Time,
+    pub(crate) run_wall: Wall,
     /// Last reported store map bytes (protocol/store.md, 11.2).
     pub fill: u64,
     pub(crate) workers_in_process: bool,
@@ -383,17 +387,17 @@ fn assert_connector_registry(connectors: &[u16]) {
 
 /// The accounts the charters name, each the deployment's until accounts are chosen by their
 /// uses (accounts.md, 3.1), with the provider serving its charter's model where one does.
-#[expect(clippy::manual_map, reason = "the strict subset uses exhaustive matches without closures")]
 fn configured_accounts(settings: &Settings, limits: &Limits) -> Box<[accounts::Configured]> {
     let mut configured = List::<accounts::Configured>::with_capacity(limits.accounts.accounts);
-    'charters: for charter in &settings.charters {
-        let number = charter.account();
+    'models: for model in &settings.models {
+        let number = model.account;
         for kept in &configured {
             if kept.number == number {
-                continue 'charters;
+                continue 'models;
             }
         }
-        let provider = match settings.llm_providers.serving(&charter.policy.model.name) {
+        let provider = match settings.llm_providers.serving(&model.name) {
+            Some(provider) if provider.offers.none() => continue,
             Some(provider) => Some(provider.number),
             None => None,
         };
@@ -630,6 +634,8 @@ impl Core {
             note_routes: Map::with_capacity(2),
             pending_note_briefs: Map::with_capacity(limits.brief.briefs),
             next_note_owner: 1,
+            run_now: skein_lib::Time::ZERO,
+            run_wall: Wall::EPOCH,
             contexts: Map::with_capacity(limits.tasks.tasks),
             workspace_pending: Map::with_capacity(limits.tasks.tasks),
             workspace_credentials: Map::with_capacity(limits.tasks.tasks),
@@ -744,6 +750,44 @@ impl Core {
             Some(turn) => turn.turn,
             None => 0,
         };
+        if proof.accounts.is_empty() || proof.accounts.len() > usize::try_from(tasks::MODELS).expect("model bound") {
+            return false;
+        }
+        let Some(channel) = proof.placement else { return false };
+        if (proof.host == fleet::HostKind::Engine) != (channel == Token::new(0)) {
+            return false;
+        }
+        if proof.account_terminal && proof.account_failure.is_none() {
+            return false;
+        }
+        if let Some(source) = proof.account_failure {
+            let mut recorded = false;
+            for binding in &proof.accounts {
+                if binding.source == source {
+                    recorded = true;
+                }
+            }
+            if !recorded {
+                return false;
+            }
+        }
+        for (at, binding) in proof.accounts.iter().enumerate() {
+            for earlier in proof.accounts.iter().take(at) {
+                if earlier.provider == binding.provider {
+                    return false;
+                }
+            }
+            if let Some(source) = self.accounts.source(binding.source)
+                && source.account != binding.account
+            {
+                return false;
+            }
+            if let Some(account) = self.accounts.account(binding.account)
+                && account.provider() != Some(binding.provider)
+            {
+                return false;
+            }
+        }
         if proof.credentials.len()
             > usize::try_from(self.accounts.credential_limit()).expect("u32 credential limit fits usize")
             || proof.attempt != expected.attempt

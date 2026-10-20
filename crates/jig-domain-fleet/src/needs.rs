@@ -144,3 +144,94 @@ pub(crate) fn allows(needs: &Needs, eligible: &[bool], charter: u32) -> bool {
     }
     true
 }
+
+/// Declared models in the configured needs' order, without retaining peer-owned names.
+pub(crate) fn declarations(needs: &Needs, models: &[crate::ModelBound]) -> Box<[bool]> {
+    let mut count = 0_u32;
+    for charter in &needs.charters {
+        count = count.checked_add(u32::try_from(charter.models.len()).expect("model count")).expect("model count");
+    }
+    let mut result = List::with_capacity(count);
+    for charter in &needs.charters {
+        for need in &charter.models {
+            let mut declared = false;
+            for model in models {
+                if model.name == need.name && model.window >= need.window && model.output >= need.output {
+                    declared = true;
+                }
+            }
+            result.push(declared).expect("one bit per model need");
+        }
+    }
+    result.into_boxed()
+}
+
+pub(crate) fn allows_models(needs: &Needs, declarations: &[bool], models: &[ModelNeed]) -> bool {
+    for model in models {
+        let mut at = 0_usize;
+        let mut found = false;
+        for charter in &needs.charters {
+            for configured in &charter.models {
+                if configured.name == model.name
+                    && configured.window >= model.window
+                    && configured.output >= model.output
+                    && declarations.get(at) == Some(&true)
+                {
+                    found = true;
+                }
+                at = at.checked_add(1).expect("bounded configured model index");
+            }
+        }
+        if !found {
+            return false;
+        }
+    }
+    true
+}
+
+/// Positive login facts supplied by a host's future program half. Unknown facts never
+/// make a program usable. A retained personal login restricts every paying account.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct ProgramLogin {
+    pub source: u32,
+    pub holder: u64,
+    pub retained: bool,
+    pub usable: bool,
+}
+
+#[must_use]
+pub fn host_rule(known: bool, logins: &[ProgramLogin], paying_holders: &[Option<u64>]) -> bool {
+    if !known {
+        return false;
+    }
+    for login in logins {
+        if login.retained {
+            for holder in paying_holders {
+                if *holder != Some(login.holder) {
+                    return false;
+                }
+            }
+        }
+    }
+    true
+}
+
+/// A program is usable only with positive facts for that source on a worker.
+#[must_use]
+pub fn program_usable(
+    kind: HostKind,
+    known: bool,
+    source: u32,
+    logins: &[ProgramLogin],
+    paying_holders: &[Option<u64>],
+) -> bool {
+    if kind != HostKind::Worker || !host_rule(known, logins, paying_holders) {
+        return false;
+    }
+    for login in logins {
+        if login.source == source && login.usable {
+            return true;
+        }
+    }
+    false
+}

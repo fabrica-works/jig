@@ -197,6 +197,7 @@ fn an_engine_claim_is_settled_at_once_instead_of_waiting_for_a_worker() {
         let mut record = record;
         if let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = &mut record {
             proof.host = fleet::HostKind::Engine;
+            proof.placement = Some(Token::new(0));
             seeded.push(record);
         }
     }
@@ -637,6 +638,9 @@ fn a_restart_sends_an_adopted_chat_its_current_grant() {
 fn a_generation_renewed_while_the_assignment_is_held_reaches_the_attempt_after_it() {
     const SECOND_ANALYST: u32 = 2;
     let (mut config, limits) = jig_core_world::effects::fixture(163, false);
+    for model in &mut config.core.settings.models {
+        model.account = SECOND_ANALYST;
+    }
     for charter in &mut config.core.settings.charters {
         charter.policy.model.account = SECOND_ANALYST;
         for model in &mut charter.policy.alternatives {
@@ -665,7 +669,7 @@ fn a_generation_renewed_before_a_waiting_chat_is_placed_reaches_its_host() {
     world.say(99);
     grant_account(&mut world, 1, 2);
     hello(&mut world, Box::new([]));
-    assert_eq!(world.assigned.as_ref().expect("resumed assignment").grants[0].generation, 1);
+    assert_eq!(world.assigned.as_ref().expect("resumed assignment").grants[0].generation, 2);
     assert_eq!(received(&world).generation, 2);
     assert!(world.grant_follows_assignment());
 }

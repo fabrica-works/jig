@@ -11,7 +11,8 @@ fn count(len: usize) -> Option<u32> {
     u32::try_from(len).ok()
 }
 
-fn model(model: boundary::Model) -> run::charter::Llm {
+fn model(llm: boundary::Llm) -> run::charter::Llm {
+    let model = llm.model;
     run::charter::Llm {
         prices: run::Prices {
             input: model.prices.input,
@@ -21,7 +22,7 @@ fn model(model: boundary::Model) -> run::charter::Llm {
             unit: model.prices.unit,
         },
         dialect: model.dialect,
-        account: Some(model.account),
+        account: llm.grant,
         endpoint: run::charter::Endpoint(model.endpoint),
         model: model.name,
         effort: model.effort,

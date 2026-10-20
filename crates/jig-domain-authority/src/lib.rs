@@ -53,8 +53,9 @@ mod value;
 
 pub use allowed::as_allowed;
 pub use boundary::{
-    Action, Answer, BatchAsk, Call, CallAsk, Checked, Delegate, Effect, EffectAccess, EffectAsk, EffectResource,
-    Finding, Given, Holder, NoteScope, PersonAsk, PersonRequest, RunAsk, Source, Verdict, Write, Writer,
+    AccountBinding, AccountCheck, Action, Answer, BatchAsk, Call, CallAsk, Checked, Delegate, Effect, EffectAccess,
+    EffectAsk, EffectResource, Finding, Given, Holder, NoteScope, PersonAsk, PersonRequest, RunAnswer, RunAsk, Source,
+    Verdict, Write, Writer,
 };
 pub use check::{
     check_batch, check_call, check_effect, check_projection, check_request, check_request_with_standing, check_run,

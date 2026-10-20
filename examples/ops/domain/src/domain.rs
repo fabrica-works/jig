@@ -15,6 +15,7 @@ use skein_lib::{Decision, Env, Journal, Map, Queue, Token};
 /// Prepared output parts retained under the core's assignment continuation.
 #[derive(Debug)]
 pub(crate) struct Assignment {
+    pub(crate) placement: jig_domain_fleet::PlacementConstraint,
     pub(crate) attempt: u64,
     pub(crate) value: host::Assignment,
 }

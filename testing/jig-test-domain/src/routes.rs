@@ -220,6 +220,7 @@ fn route_ask(
                 hold(
                     decision,
                     Delivery::Fleet(fleet::Event::Start {
+                        placement: Some(domain.assignments.get(&task).expect("prepared assignment").run.placement),
                         grants: grants::fleet(&domain.assignments.get(&task).expect("prepared assignment").grants),
                         reply_to: ReplyTo::new(Token::new(task)),
                         run: Token::new(task),

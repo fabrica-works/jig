@@ -552,6 +552,8 @@ pub enum End {
     /// Pre-execution refusal pause using the transient delay policy, without spending a failure
     /// try.
     Refused,
+    /// Its source or checked placement requires a fresh check; release the run without a try or timer.
+    Recheck,
 }
 
 /// Root-authorized follow-ups from one verdict, admitted with its result.
@@ -1565,6 +1567,8 @@ pub enum Event {
     },
     /// Notification pausing only a `Preparing` task; does not consume a failure try and has no
     /// reply.
+    /// Preparation became stale or waits for an account/host; return to due without a retry timer.
+    PreparationWaiting { task: u64 },
     PreparationFailed {
         /// `Preparing` task to pause without consuming an activation failure try; absent or other-
         /// phase tasks are ignored.
@@ -1812,6 +1816,7 @@ pub enum Cause {
 /// (domain/engine.md, sections 7.1 and 9).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RunContext {
+    pub llm: Option<crate::LlmChoice>,
     /// Current financial payer; preparations must recheck it before admission.
     pub payer: crate::Payer,
     pub task: u64,

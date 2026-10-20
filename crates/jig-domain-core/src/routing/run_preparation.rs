@@ -36,6 +36,10 @@ pub(super) fn brief_assembled(core: &mut Core, work: &mut Queue<Event>, task: u6
     Requests::Out(out)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one fenced preparation builds the exact allowance, grants and claim together"
+)]
 pub(super) fn workspace_prepared(
     core: &mut Core,
     env: &Env<Limits>,
@@ -51,7 +55,7 @@ pub(super) fn workspace_prepared(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
-    let Some(context) = core.contexts.remove(&task) else {
+    let Some(context) = core.contexts.get(&task).cloned() else {
         out.push(Request::Now(Box::new(Now::RunPreparationFailed { task })));
         out.push(Request::Decided);
         return Requests::Out(out);
@@ -71,27 +75,44 @@ pub(super) fn workspace_prepared(
         return Requests::Out(out);
     }
     drop(core.workspace_credentials.insert(task, credentials).expect("live task credential room"));
-    let why = match core.run_admission(&context, env.wall, writes) {
-        crate::RunAdmission::Allow => None,
-        crate::RunAdmission::Account => return wait_for_account(core, context),
-        crate::RunAdmission::Hold(why) => Some(why),
-    };
-    if let Some(why) = why {
-        work.push(Event::Tasks(tasks::Event::Hold { task, why }));
-        out.push(Request::Now(Box::new(Now::RunPreparationFailed { task })));
-        out.push(Request::Decided);
-        return Requests::Out(out);
+    let Some(current) = core.tasks.run_context(task) else { return wait_for_account(core, work, context) };
+    if current != context {
+        drop(core.workspace_credentials.remove(&task));
+        return wait_for_account(core, work, current);
     }
-    let Some(grant) = core.accounts.grant(core.charter_of(task).account(), env.now) else {
-        return wait_for_account(core, context);
+    let allowance = match core.run_admission(&current, env.wall, writes) {
+        crate::RunAdmission::Allow(allowance) => allowance,
+        crate::RunAdmission::Wait(_) => return wait_for_account(core, work, current),
+        crate::RunAdmission::Hold(why) => {
+            work.push(Event::Tasks(tasks::Event::Hold { task, why }));
+            out.push(Request::Now(Box::new(Now::RunPreparationFailed { task })));
+            out.push(Request::Decided);
+            return Requests::Out(out);
+        }
     };
     let mut grants = List::with_capacity(env.limits.fleet.grants);
-    grants.push(grant).expect("account grant room");
+    for binding in &allowance.choice.accounts {
+        let fact = core.accounts.source(binding.source).expect("selected source");
+        if fact.kind != jig_domain_accounts::Kind::None {
+            let Some(grant) = core.accounts.source_grant(binding.source, env.now) else {
+                return wait_for_account(core, work, current);
+            };
+            grants.push(grant).expect("provider grant room");
+        }
+    }
     for number in core.run_credentials(task) {
         let Some(grant) = core.accounts.credential_grant(*number, env.now) else {
-            return wait_for_account(core, context);
+            return wait_for_account(core, work, context);
         };
-        grants.push(grant).expect("credential grant room");
+        let mut present = false;
+        for kept in &grants {
+            if kept.form.table() == grant.form.table() && kept.account == grant.account {
+                present = true;
+            }
+        }
+        if !present {
+            grants.push(grant).expect("credential grant room");
+        }
     }
     if !core.proofs.contains_key(&task) && core.proofs.len() == core.proofs.capacity() {
         work.push(Event::Tasks(tasks::Event::PreparationFailed { task }));
@@ -105,6 +126,9 @@ pub(super) fn workspace_prepared(
     let conversation = if resume && transcript.last.is_some() { transcript.from } else { attempt };
     let messages = start_messages(context.inbox, env.limits.tasks.run_inbox);
     let mut proof = start_proof(core, task, attempt, conversation, &messages);
+    proof.host = allowance.choice.placement.kind;
+    proof.placement = Some(allowance.choice.placement.channel);
+    proof.accounts.clone_from(&allowance.choice.accounts);
     proof.window = if resume { transcript.window } else { None };
     proof.credentials = core.workspace_credentials.remove(&task).expect("prepared credentials");
     let previous = core.proofs.insert(task, proof).expect("claim proof reserved before child mutation");
@@ -113,13 +137,38 @@ pub(super) fn workspace_prepared(
     }
     let turns = if resume { core.resumed_turns(transcript) } else { Box::new([]) };
     let answered = answered_calls(core, task, attempt, env.limits.call_records);
-    let policy = core.run_policy(task, resume);
+    let mut sources = List::with_capacity(tasks::MODELS.checked_add(1).expect("main source"));
+    let mut models = List::with_capacity(tasks::MODELS.checked_add(1).expect("main model"));
+    models.push(&allowance.choice.policy.model).expect("main model");
+    for model in &allowance.choice.policy.alternatives {
+        models.push(model).expect("retained alternatives");
+    }
+    for model in &models {
+        let provider = core.provider(model).expect("selected model provider");
+        let mut grant = None;
+        for binding in &allowance.choice.accounts {
+            if binding.provider == provider
+                && core.accounts.source(binding.source).expect("selected source").kind
+                    != jig_domain_accounts::Kind::None
+            {
+                grant = Some(binding.source);
+            }
+        }
+        sources.push(grant).expect("one grant per retained model");
+    }
+    let mut policy = allowance.choice.policy;
+    if let Some(instructions) = &core.tasks.task(task).expect("live task").instructions {
+        policy.instructions.clone_from(instructions);
+    }
+    policy.resume = resume;
     let run = RunCharter {
+        sources: sources.into_boxed(),
+        accounts: allowance.choice.accounts,
+        placement: allowance.choice.placement,
         policy,
         contract: context.contract,
         authority: context.authority,
-        budget: authority::left(crate::translate::authority_numbers(context.numbers))
-            .min(core.authority.rules().maximum_run_spend),
+        budget: allowance.spend,
     };
     assert!(core.claiming.insert(task, attempt) == Ok(None), "one pending claim per task");
     out.push(Request::Now(Box::new(Now::RunPrepared {
@@ -176,26 +225,18 @@ fn start_messages(inbox: Box<[tasks::Word]>, most: u32) -> Box<[tasks::Word]> {
     messages.into_boxed()
 }
 
-fn start_proof(core: &Core, task: u64, attempt: u64, conversation: u64, messages: &[tasks::Word]) -> RunProof {
+fn start_proof(_core: &Core, task: u64, attempt: u64, conversation: u64, messages: &[tasks::Word]) -> RunProof {
     let mut offered = None;
     for word in messages {
         offered = Some(word.number);
     }
-    let charter = core.charter_of(task);
-    let kinds = charter.hosts;
-    let host = match core.fleet.free_kind(kinds, task, charter.number) {
-        Some(host) => host,
-        None => match kinds {
-            jig_domain_fleet::Kinds::Engine => jig_domain_fleet::HostKind::Engine,
-            jig_domain_fleet::Kinds::Workers | jig_domain_fleet::Kinds::Both => jig_domain_fleet::HostKind::Worker,
-        },
-    };
-    RunProof::claimed(task, attempt, conversation, offered, host)
+    RunProof::claimed(task, attempt, conversation, offered, jig_domain_fleet::HostKind::Worker)
 }
 
-fn wait_for_account(core: &mut Core, context: Box<tasks::RunContext>) -> Requests {
+fn wait_for_account(core: &mut Core, work: &mut Queue<Event>, context: Box<tasks::RunContext>) -> Requests {
     let task = context.task;
-    remember_due(core, context);
+    drop(core.contexts.remove(&task));
+    work.push(Event::Tasks(tasks::Event::PreparationWaiting { task }));
     let mut out = Queue::with_capacity(2);
     out.push(Request::Now(Box::new(Now::RunPreparationFailed { task })));
     out.push(Request::Decided);
@@ -430,8 +471,8 @@ pub(super) fn route_activate(
                 }
             }
             tasks::Executor::Agent { .. } => match core.run_admission(&context, env.wall, Box::new([])) {
-                crate::RunAdmission::Allow => out.push(Request::Now(Box::new(Now::PrepareAgent { context }))),
-                crate::RunAdmission::Account => remember_due(core, context),
+                crate::RunAdmission::Allow(_) => out.push(Request::Now(Box::new(Now::PrepareAgent { context }))),
+                crate::RunAdmission::Wait(_) => remember_due(core, context),
                 crate::RunAdmission::Hold(why) => {
                     work.push(Event::Tasks(tasks::Event::Hold { task: number, why }));
                 }
@@ -463,8 +504,10 @@ pub(super) fn route_claim_refused(core: &mut Core, work: &mut Queue<Event>, task
     Requests::Out(out)
 }
 
+#[expect(clippy::manual_map, reason = "the strict subset uses explicit matches without closures")]
 pub(super) fn route_claim_prepared(
     core: &mut Core,
+    env: &Env<Limits>,
     work: &mut Queue<Event>,
     task: u64,
     attempt: u64,
@@ -472,6 +515,30 @@ pub(super) fn route_claim_prepared(
     writes: Box<[tasks::Name]>,
 ) -> Requests {
     if core.claiming.get(&task) == Some(&attempt) {
+        if let Some(context) = core.contexts.remove(&task) {
+            let valid = match core.tasks.run_context(task) {
+                Some(current) if current == context => match core.run_admission(&current, env.wall, Box::new([])) {
+                    crate::RunAdmission::Allow(allowance) => {
+                        let proof = core.proofs.get(&task).expect("pending proof");
+                        allowance.spend == budget
+                            && allowance.choice.accounts == proof.accounts
+                            && Some(allowance.choice.placement.channel) == proof.placement
+                    }
+                    crate::RunAdmission::Wait(_) | crate::RunAdmission::Hold(_) => false,
+                },
+                Some(_) | None => false,
+            };
+            if !valid {
+                let _: Option<u64> = core.claiming.remove(&task);
+                core.restore_replaced_proof(task);
+                work.push(Event::Tasks(tasks::Event::PreparationWaiting { task }));
+                let mut out = Queue::with_capacity(2);
+                out.push(Request::Now(Box::new(Now::DropAssignment { task })));
+                out.push(Request::Decided);
+                return Requests::Out(out);
+            }
+        }
+
         let earlier_transcript = match core.proofs.get(&task) {
             Some(proof) => proof.conversation != attempt,
             None => false,
@@ -482,7 +549,13 @@ pub(super) fn route_claim_prepared(
         };
         let resumed = earlier_transcript && turned;
         work.push(Event::Tasks(tasks::Event::Claim {
-            account: None,
+            account: match core.proofs.get(&task) {
+                Some(proof) => match proof.accounts.first() {
+                    Some(binding) => Some(binding.account),
+                    None => None,
+                },
+                None => None,
+            },
             reply_to: ReplyTo::new(Token::new(task)),
             task,
             attempt,

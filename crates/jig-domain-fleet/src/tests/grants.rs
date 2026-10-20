@@ -8,6 +8,7 @@ impl Harness {
     fn start_granted(&mut self, run: Token, attempt: Token, workstream: u64, grant: Grant) {
         assert!(
             self.step(Event::Start {
+                placement: None,
                 charter: 1,
                 reply_to: to(attempt),
                 run,

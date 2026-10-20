@@ -32,6 +32,13 @@ pub fn terminal() -> core::TerminalRecord {
 }
 pub fn run() -> core::RunProof {
     core::RunProof {
+        accounts: Box::new([
+            jig_domain_authority::AccountBinding { provider: 2, account: 5, source: 7 },
+            jig_domain_authority::AccountBinding { provider: 3, account: 11, source: 13 },
+        ]),
+        placement: Some(skein_lib::Token::new(17)),
+        account_failure: Some(7),
+        account_terminal: true,
         task: 11,
         attempt: 15,
         conversation: 9,

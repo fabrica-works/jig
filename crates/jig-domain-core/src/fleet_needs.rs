@@ -36,6 +36,6 @@ pub(crate) fn configured(config: &Config, limits: &Limits) -> Needs {
         unacknowledged: config.hub_turns,
     }
 }
-fn model(value: &crate::Model) -> ModelNeed {
+pub(crate) fn model(value: &crate::Model) -> ModelNeed {
     ModelNeed { name: value.name.clone(), window: value.window, output: value.output }
 }

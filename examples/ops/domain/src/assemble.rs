@@ -58,9 +58,10 @@ pub(crate) fn assignment(
     grants: Box<[accounts::Grant]>,
 ) -> Option<host::Assignment> {
     let policy = run.policy;
+    let sources = run.sources;
     let mut models = List::with_capacity(u32::try_from(policy.alternatives.len()).ok()?);
-    for value in policy.alternatives {
-        models.push(model(value)).ok()?;
+    for (index, value) in policy.alternatives.into_iter().enumerate() {
+        models.push(charter::Llm { model: model(value), grant: *sources.get(index.checked_add(1)?)? }).ok()?;
     }
     let value = charter::charter(
         charter::Charter {
@@ -77,7 +78,7 @@ pub(crate) fn assignment(
                 time: policy.time,
                 reserve: charter::Reserve { turns: policy.reserve_turns, time: policy.reserve_time },
             },
-            model: model(policy.model),
+            model: charter::Llm { model: model(policy.model), grant: *sources.first()? },
             models: models.into_boxed(),
             waiting: policy.waiting,
             resumes: policy.resume,
@@ -141,7 +142,6 @@ fn model(value: core::Model) -> charter::Model {
             unit: value.price_unit,
         },
         dialect: value.dialect,
-        account: value.account,
         endpoint: value.endpoint,
         name: value.name,
         window: value.window,

@@ -608,6 +608,11 @@ pub struct RunProof {
     pub conversation: u64,
     /// Application credential numbers lent with this claim.
     pub credentials: Box<[u32]>,
+    pub accounts: Box<[jig_domain_authority::AccountBinding]>,
+    pub placement: Option<skein_lib::Token>,
+    pub account_failure: Option<u32>,
+    /// An authenticated account-ending terminal, even if an explicit zero reset already lifted.
+    pub account_terminal: bool,
     /// The current window's first turn: the last committed turn of this
     /// conversation that opened a window, by attempt and turn.
     pub window: Option<(u64, u32)>,
@@ -675,6 +680,10 @@ impl RunProof {
             attempt,
             conversation,
             credentials: Box::new([]),
+            accounts: Box::new([]),
+            placement: None,
+            account_failure: None,
+            account_terminal: false,
             window: None,
             host,
             offered,

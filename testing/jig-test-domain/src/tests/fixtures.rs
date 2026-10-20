@@ -128,7 +128,13 @@ pub fn domain() -> Domain {
                     }]),
                     resume_bytes: 256,
                     tools: core::ToolFamilies::JIG,
-                    llm_providers: jig_domain_accounts::Providers::none(),
+                    llm_providers: jig_domain_accounts::Providers {
+                        providers: Box::new([jig_domain_accounts::Provider {
+                            number: 1,
+                            models: Box::new([b"small".as_slice().into()]),
+                            offers: jig_domain_accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+                        }]),
+                    },
                 },
             },
         },
@@ -137,6 +143,12 @@ pub fn domain() -> Domain {
 }
 pub fn run() -> Box<core::RunCharter> {
     Box::new(core::RunCharter {
+        sources: Box::new([Some(1)]),
+        accounts: Box::new([]),
+        placement: jig_domain_fleet::PlacementConstraint {
+            channel: Token::new(1),
+            kind: jig_domain_fleet::HostKind::Worker,
+        },
         budget: 37,
         contract: tasks::Contract::Report { words: 128 },
         authority: tasks::Authority {

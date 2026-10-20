@@ -314,28 +314,29 @@ pub(super) fn deployment(
         let mut account_cut = sources.len() < account.sources().len();
         for row in &rows {
             let row = core.tasks.task(row.number).expect("live view task");
-            let agent = match row.executor {
-                tasks::Executor::Agent { charter } => {
-                    core.charter(charter).expect("task charter").account() == value.account
+            let mut running = false;
+            if let Some(proof) = core.proofs.get(&row.number)
+                && proof.terminal.is_none()
+            {
+                for binding in &proof.accounts {
+                    if binding.account == value.account {
+                        running = true;
+                    }
                 }
-                tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => false,
-            };
-            if !agent {
-                continue;
             }
-            let running = match core.proofs.get(&row.number) {
-                Some(proof) => proof.terminal.is_none(),
-                None => false,
+            let needs = match row.executor {
+                tasks::Executor::Agent { .. }
+                    if (row.phase == tasks::Phase::Active(tasks::Active::Due)
+                        || row.phase == tasks::Phase::Active(tasks::Active::Preparing)) =>
+                {
+                    if let Err(crate::RunWait::Account { account: Some(number), .. }) = core.run_choice(row.number) {
+                        number == value.account
+                    } else {
+                        false
+                    }
+                }
+                tasks::Executor::Agent { .. } | tasks::Executor::Person(_) | tasks::Executor::Procedure { .. } => false,
             };
-            let needs = !value.usable
-                && match row.phase {
-                    tasks::Phase::Active(tasks::Active::Due | tasks::Active::Preparing) => true,
-                    tasks::Phase::Waiting
-                    | tasks::Phase::Active(_)
-                    | tasks::Phase::Closing(_)
-                    | tasks::Phase::Held { .. }
-                    | tasks::Phase::Ended(_) => false,
-                };
             if running {
                 if runs.room() > 0 {
                     runs.push(super::small::chip_with_core(core, limits, row)?).expect("bounded account runs");

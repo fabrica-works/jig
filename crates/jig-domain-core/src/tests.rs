@@ -325,7 +325,13 @@ fn config(seed: u64) -> Config {
             resume_bytes: 256,
 
             tools: ToolFamilies::JIG,
-            llm_providers: accounts::Providers::none(),
+            llm_providers: accounts::Providers {
+                providers: Box::new([accounts::Provider {
+                    number: 1,
+                    models: Box::new([b"scripted".as_slice().into()]),
+                    offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+                }]),
+            },
         },
     }
 }
@@ -506,6 +512,10 @@ fn documents_run_has_only_the_live_proofs_committed_progress() {
         .insert(
             1,
             RunProof {
+                accounts: Box::new([]),
+                placement: None,
+                account_failure: None,
+                account_terminal: false,
                 task: 1,
                 attempt: 7,
                 conversation: 1,
@@ -1657,7 +1667,7 @@ fn documents_deployment_keeps_lost_worker_attempts_and_translates_the_grace_cloc
 fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
     let (mut core, mut limits) = make_tree();
     limits.people.projects = 2;
-    restore_document_party(&mut core, &limits, &[0]);
+    restore_document_party(&mut core, &limits, &[0, 1]);
     let env = Env { now: Time::from_nanos(100), wall: Wall::from_nanos(1000), limits: limits.accounts };
     let mut out = Queue::with_capacity(accounts::max_out(&limits.accounts));
     accounts::step(&mut core.accounts, &env, accounts::Event::Want, &mut out);
@@ -1709,6 +1719,10 @@ fn watch_core() -> (Core, Limits) {
         .insert(
             1,
             RunProof {
+                accounts: Box::new([]),
+                placement: None,
+                account_failure: None,
+                account_terminal: false,
                 task: 1,
                 attempt: 7,
                 conversation: 1,
@@ -3029,3 +3043,5 @@ mod templates;
 mod forget;
 
 mod coverage;
+
+mod run_choice;

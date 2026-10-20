@@ -40,6 +40,7 @@ fn hosted() -> Domain {
     let mut domain = Domain::new(&LIMITS, jig_fleet_world::fixtures::needs());
     assert!(step(&mut domain, hello(WORKER)).is_empty());
     let start = Event::Start {
+        placement: None,
         charter: 1,
         grants: Box::new([]),
         reply_to: ReplyTo::new(ATTEMPT),

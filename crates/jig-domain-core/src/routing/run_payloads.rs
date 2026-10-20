@@ -51,7 +51,27 @@ pub(super) fn route_answer_payload(
             }
         }
     };
+    let proof = core.proofs.get(&run.raw()).expect("current proof");
+    let account_wait = proof.account_terminal
+        || match proof.account_failure {
+            Some(source) => match core.accounts.source(source) {
+                Some(fact) => !fact.usable,
+                None => true,
+            },
+            None => false,
+        };
     let proof = core.proofs.get_mut(&run.raw()).expect("terminal proof pre-reserved");
+    let end = match end {
+        tasks::End::Failed(tasks::Class::Transient | tasks::Class::Permanent | tasks::Class::Run) if account_wait => {
+            tasks::End::Recheck
+        }
+        tasks::End::Finished { .. }
+        | tasks::End::FinishedWithFollowups { .. }
+        | tasks::End::Parked
+        | tasks::End::Failed(_)
+        | tasks::End::Refused
+        | tasks::End::Recheck => end,
+    };
     proof.terminal =
         Some(crate::TerminalRecord { task: run.raw(), attempt: attempt.raw(), cumulative, end: end.clone() });
     work.push(Event::Tasks(tasks::Event::Activation {

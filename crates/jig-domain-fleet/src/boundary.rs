@@ -187,6 +187,7 @@ pub enum Event {
         workstream: u64,
         kinds: Kinds,
         charter: u32,
+        placement: Option<PlacementConstraint>,
         assignment: Assignment,
         grants: Box<[Grant]>,
     },
@@ -612,6 +613,8 @@ pub enum Withdrawal {
 /// Why a start or an adoption was refused at the entrance.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
+    /// The checked host lost room; the parent must obtain a fresh run allowance.
+    Recheck,
     /// The fleet tracks as many of the parent's attempts as it may.
     Busy,
     /// The workstream task number is zero.
@@ -680,4 +683,11 @@ mod tests {
         }
         assert_eq!(size_of::<Form>(), 1);
     }
+}
+
+/// A checked channel identity. A queued or busy attempt cannot move to another host.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct PlacementConstraint {
+    pub channel: Token,
+    pub kind: HostKind,
 }

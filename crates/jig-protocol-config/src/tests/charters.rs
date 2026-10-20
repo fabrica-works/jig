@@ -31,7 +31,7 @@ fn a_charter_naming_an_unknown_model_is_refused() {
 }
 
 #[test]
-fn a_charter_whose_models_name_two_accounts_is_refused() {
+fn a_charter_whose_models_name_two_accounts_is_read() {
     let alternative = br#""models": [{"name":"other", "endpoint":"second", "window":8192,
         "output":1024, "prices":{"input":1,"cached":1,"output":1,"unit":1000}},"#;
     let endpoint = br#""endpoints": [{"name":"second", "number":2, "dialect":0,"account":2,
@@ -45,8 +45,8 @@ fn a_charter_whose_models_name_two_accounts_is_refused() {
         br#""accounts": [{"number":2,"source":{"handed_in":{"file":"accounts/other.json"}}},"#,
     );
     let document = fixtures::with(&document, br#""alternatives": []"#, br#""alternatives": ["other"]"#);
-    let problems = fixtures::engine(&document).expect_err("two accounts");
-    assert_eq!(problems.problems.get(0).expect("one problem").what, What::Accounts { charter: 1 });
+    let engine = fixtures::engine(&document).expect("runtime accounts are selected per provider");
+    assert_eq!(engine.charters[0].policy.alternatives.len(), 1);
 }
 
 #[test]

@@ -12,7 +12,6 @@ use smith_domain_run as run;
 pub struct EndpointName {
     pub number: u32,
     pub dialect: u32,
-    pub account: u32,
     pub name: Box<[u8]>,
 }
 
@@ -22,7 +21,7 @@ fn count(length: usize) -> Option<u32> {
 
 fn endpoint(value: &run::charter::Llm, names: &[EndpointName]) -> Option<Box<[u8]>> {
     for name in names {
-        if name.number == value.endpoint.0 && name.dialect == value.dialect && Some(name.account) == value.account {
+        if name.number == value.endpoint.0 && name.dialect == value.dialect {
             return Some(name.name.clone());
         }
     }

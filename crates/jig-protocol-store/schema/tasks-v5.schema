@@ -349,7 +349,7 @@ enum ResultFollowups { delegates: ResultFollowupsDelegates, proposal: boxed Resu
 record EndFinished { result: TaskResult cancel_delegates: bool }
 record EndFinishedWithFollowups { result: TaskResult followups: ResultFollowups }
 record EndFailed { value: Class }
-enum End { finished: EndFinished, finished_with_followups: boxed EndFinishedWithFollowups, parked, failed: EndFailed, refused }
+enum End { finished: EndFinished, finished_with_followups: boxed EndFinishedWithFollowups, parked, failed: EndFailed, refused, recheck }
 versioned record EndRecord { value: End }
 versioned record PhaseRecord { value: Phase }
 versioned record ChangeRecord { value: Change }

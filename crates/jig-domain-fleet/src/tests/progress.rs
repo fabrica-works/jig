@@ -92,6 +92,7 @@ fn progress_names_are_whole_bounded_and_dropped_reports_do_not_replace_the_last_
         | Activity::Ending => panic!("whole tool observation"),
     }
     h.step(Event::Start {
+        placement: None,
         charter: 1,
         grants: Box::new([]),
         reply_to: to(A2),

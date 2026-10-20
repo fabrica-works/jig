@@ -123,6 +123,7 @@ impl Measured {
         let (run, attempt) = (self.name(), self.name());
         let workstream = run.raw();
         let asked = self.step(Event::Start {
+            placement: None,
             charter: 1,
             grants: Box::new([]),
             reply_to: ReplyTo::new(attempt),
@@ -245,6 +246,7 @@ fn a_fleet_full_to_its_limits_stays_within_its_worst_case() {
     let (run, attempt) = (fleet.name(), fleet.name());
     let workstream = run.raw();
     let refused = fleet.step(Event::Start {
+        placement: None,
         charter: 1,
         grants: Box::new([]),
         reply_to: ReplyTo::new(attempt),

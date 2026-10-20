@@ -61,7 +61,7 @@ mod grants;
 mod history;
 mod limits;
 mod needs;
-pub use needs::{AgentShortfall, CharterNeeds, ModelNeed, Needs};
+pub use needs::{AgentShortfall, CharterNeeds, ModelNeed, Needs, ProgramLogin, host_rule, program_usable};
 mod progress;
 #[cfg(test)]
 mod tests;
@@ -69,7 +69,8 @@ mod turn;
 
 pub use boundary::{
     Answer, Assignment, AttemptState, AttemptView, Call, Event, Form, Grant, GrantName, GrantTable, Hello, HostKind,
-    HostView, Hosted, Kinds, Message, Phase, Placement, Refusal, Request, Scheme, Turned, Undelivered, Withdrawal,
+    HostView, Hosted, Kinds, Message, Phase, Placement, PlacementConstraint, Refusal, Request, Scheme, Turned,
+    Undelivered, Withdrawal,
 };
 pub use domain::{Domain, fire, max_out, resume, step};
 pub use facts::Fact;

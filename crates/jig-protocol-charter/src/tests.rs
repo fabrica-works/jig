@@ -7,12 +7,10 @@ use crate::{
     encode,
 };
 
-#[test]
-fn core_charter_encodes_with_the_same_sections_tools_contract_and_model() {
+fn source() -> Charter {
     let model = Model {
         prices: Prices { input: 2, cached: 1, cache_write: Some(4), output: 3, unit: 1000 },
         dialect: 4,
-        account: 5,
         endpoint: 7,
         name: Box::from(&b"small"[..]),
         window: 4096,
@@ -44,14 +42,20 @@ fn core_charter_encodes_with_the_same_sections_tools_contract_and_model() {
             time: Duration::from_secs(60),
             reserve: Reserve { turns: 1, time: Duration::from_secs(10) },
         },
-        model,
+        model: crate::Llm { model, grant: Some(5) },
         models: Box::new([]),
         waiting: Duration::ZERO,
         resumes: true,
     };
+    source
+}
+
+#[test]
+fn core_charter_encodes_with_the_same_sections_tools_contract_and_model() {
+    let source = source();
     let sections = Box::new([Section { title: Box::from(&b"Task"[..]), text: Box::from(&b"Do it"[..]) }]);
     let charter = charter(source, sections, false).expect("bounded charter");
-    let names = [EndpointName { number: 7, dialect: 4, account: 5, name: Box::from(&b"primary"[..]) }];
+    let names = [EndpointName { number: 7, dialect: 4, name: Box::from(&b"primary"[..]) }];
     let bytes = encode(charter, &names, &wire::CEILINGS).expect("bounded encoding");
     let decoded = wire::Charter::decode(&wire::CEILINGS, &mut Reader::new(&bytes)).expect("Smith codec accepts it");
     assert_eq!(decoded.instructions(), b"help");
@@ -232,4 +236,34 @@ fn two_conversations_of_a_task_have_two_identities() {
         crate::run_identity(&deployment, 7, 4),
         [0x92, 0xf3, 0x7d, 0x0f, 0x30, 0xe6, 0xf6, 0x6f, 0x8f, 0xee, 0x8a, 0x01, 0x68, 0x18, 0x8f, 0x3a]
     );
+}
+
+#[test]
+fn selected_source_grants_are_independent_of_endpoint_resolution() {
+    let names = [EndpointName { number: 7, dialect: 4, name: b"primary".as_slice().into() }];
+    for main in [Some(5), Some(19), None] {
+        let mut source = source();
+        source.model.grant = main;
+        let mut other = source.model.clone();
+        other.grant = Some(23);
+        source.models = Box::new([source.model.clone(), other]);
+        let translated = charter(source, Box::new([]), true).expect("runtime model bindings");
+        let bytes = encode(translated, &names, &wire::CEILINGS).expect("grants do not resolve endpoints");
+        let decoded = wire::Charter::decode(&wire::CEILINGS, &mut Reader::new(&bytes)).expect("charter");
+        assert_eq!(*decoded.main().account(), main);
+        assert_eq!(*decoded.models().get(0).unwrap().account(), main);
+        assert_eq!(*decoded.models().get(1).unwrap().account(), Some(23));
+    }
+}
+
+#[test]
+fn endpoint_resolution_still_refuses_wrong_dialects_and_unknown_numbers() {
+    let names = [EndpointName { number: 7, dialect: 4, name: b"primary".as_slice().into() }];
+    for (number, dialect) in [(8, 4), (7, 3)] {
+        let mut source = source();
+        source.model.model.endpoint = number;
+        source.model.model.dialect = dialect;
+        let translated = charter(source, Box::new([]), true).expect("bounded charter");
+        assert!(encode(translated, &names, &wire::CEILINGS).is_none());
+    }
 }

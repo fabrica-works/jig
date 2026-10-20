@@ -485,21 +485,25 @@ fn projection_grant(
 /// writer holds. Returns the strictest answer and findings; reserve `max_out(domain.limits())` free
 /// slots. No claim, run start, allocation or ledger mutation.
 #[must_use]
-pub fn check_run(domain: &Domain, ask: &RunAsk, why: &mut Queue<Finding>) -> Answer {
+pub fn check_run(domain: &Domain, ask: &RunAsk, why: &mut Queue<Finding>) -> crate::RunAnswer {
     room(domain, why);
     if !authority_within(&ask.authority, domain.limits())
         || !within(ask.accounts.len(), domain.limits().accounts)
+        || !within(ask.credentials.len(), domain.limits().accounts)
         || !within(ask.writes.len(), domain.limits().writes)
     {
-        return refuse(why, Finding::Oversized);
+        why.push(Finding::Oversized);
+        return crate::RunAnswer::Refuse;
     }
     for write in &ask.writes {
         if !effect_within(&write.effect, domain.limits()) {
-            return refuse(why, Finding::Oversized);
+            why.push(Finding::Oversized);
+            return crate::RunAnswer::Refuse;
         }
     }
     let Some(policy) = domain.policy(ask.project) else {
-        return refuse(why, Finding::UnknownProject);
+        why.push(Finding::UnknownProject);
+        return crate::RunAnswer::Refuse;
     };
     let mut answer = Answer::Allow;
     if ask.numbers.spent.checked_add(ask.numbers.spent_below).is_none() {
@@ -529,7 +533,26 @@ pub fn check_run(domain: &Domain, ask: &RunAsk, why: &mut Queue<Finding>) -> Ans
             find(&mut answer, why, Answer::Refuse, Finding::Deadline);
         }
     }
-    for usable in &ask.accounts {
+    let mut main = false;
+    for (at, check) in ask.accounts.iter().enumerate() {
+        let binding = check.binding;
+        for earlier in ask.accounts.iter().take(at) {
+            if earlier.binding.provider == binding.provider {
+                why.push(Finding::Account);
+                return crate::RunAnswer::Refuse;
+            }
+        }
+        if binding.provider == ask.main_provider {
+            main = true;
+        }
+        if !check.usable || !check.host_eligible {
+            find(&mut answer, why, Answer::Wait, Finding::Account);
+        }
+    }
+    if !main {
+        find(&mut answer, why, Answer::Wait, Finding::Account);
+    }
+    for usable in &ask.credentials {
         if !usable {
             find(&mut answer, why, Answer::Wait, Finding::Account);
         }
@@ -542,7 +565,18 @@ pub fn check_run(domain: &Domain, ask: &RunAsk, why: &mut Queue<Finding>) -> Ans
             Writer::Pending | Writer::Other => find(&mut answer, why, Answer::Wait, Finding::Writer),
         }
     }
-    answer
+    match answer {
+        Answer::Allow => {
+            let mut accounts = List::with_capacity(domain.limits().accounts);
+            for check in &ask.accounts {
+                accounts.push(check.binding).expect("checked account bound");
+            }
+            crate::RunAnswer::Allow { spend: ask.budget, accounts: accounts.into_boxed() }
+        }
+        Answer::Wait => crate::RunAnswer::Wait,
+        Answer::Propose => crate::RunAnswer::Propose,
+        Answer::Refuse => crate::RunAnswer::Refuse,
+    }
 }
 
 /// Root's pure tool-call check over one configured family bit, read grant, message standing or note

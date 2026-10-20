@@ -44,6 +44,7 @@ use crate::limits::Limits;
 pub(crate) struct Channel {
     /// Model eligibility in configured charter order, independent of free slots.
     pub(crate) eligible: Box<[bool]>,
+    pub(crate) declarations: Box<[bool]>,
     /// Which kind of host owns these slots.
     pub(crate) kind: HostKind,
     /// The protocol's name for its channel.
@@ -125,6 +126,7 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
             // Drop the construction bits before allocating their replacement.
             host.eligible = Box::new([]);
             host.eligible = crate::needs::eligibility(&domain.needs, &hello.bounds.models);
+            host.declarations = crate::needs::declarations(&domain.needs, &hello.bounds.models);
             domain.placing = true;
         }
         return;
@@ -155,6 +157,7 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
     }
     let Hello { slots, workstreams, hosting, stop_bound: _, bounds } = hello;
     let mut worker = Channel {
+        declarations: crate::needs::declarations(&domain.needs, &bounds.models),
         eligible: crate::needs::eligibility(&domain.needs, &bounds.models),
         kind: HostKind::Worker,
         token: channel,
@@ -265,5 +268,50 @@ pub(crate) fn choose(domain: &Domain, workstream: u64, kinds: Kinds, charter: u3
         };
     }
     let (id, _) = best?;
+    Some(id)
+}
+
+/// Candidate hosts in affinity/free-room order, checking only retained run models.
+pub(crate) fn probe(
+    domain: &Domain,
+    workstream: u64,
+    kinds: Kinds,
+    models: &[crate::ModelNeed],
+    excluded: &[Token],
+) -> Option<crate::PlacementConstraint> {
+    let mut best: Option<(&Channel, u32)> = None;
+    for (_, &id) in &domain.tokens {
+        let channel = domain.channels.get(id).expect("connected host");
+        let free = channel.slots.saturating_sub(channel.hosts.len());
+        if free == 0
+            || channel.draining
+            || !kinds.allows(channel.kind)
+            || excluded.contains(&channel.token)
+            || !crate::needs::allows_models(&domain.needs, &channel.declarations, models)
+        {
+            continue;
+        }
+        if channel.kind == HostKind::Worker && holds(channel, workstream).is_some() {
+            return Some(crate::PlacementConstraint { channel: channel.token, kind: channel.kind });
+        }
+        match best {
+            Some((_, most)) if most >= free => {}
+            Some(_) | None => best = Some((channel, free)),
+        }
+    }
+    let (channel, _) = best?;
+    Some(crate::PlacementConstraint { channel: channel.token, kind: channel.kind })
+}
+
+pub(crate) fn constrained(domain: &Domain, placement: crate::PlacementConstraint, kinds: Kinds) -> Option<Id<Channel>> {
+    let id = *domain.tokens.get(&placement.channel)?;
+    let channel = domain.channels.get(id)?;
+    if channel.kind != placement.kind
+        || !kinds.allows(channel.kind)
+        || channel.draining
+        || channel.slots <= channel.hosts.len()
+    {
+        return None;
+    }
     Some(id)
 }

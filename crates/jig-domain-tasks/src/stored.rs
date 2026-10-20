@@ -1009,7 +1009,8 @@ pub(crate) fn restored(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<R
             | crate::Escalation::Rejected { .. } => {}
         }
         match phase {
-            Phase::Active(Active::Due | Active::Preparing) => {
+            Phase::Active(Active::Due) => activate(domain, number, out),
+            Phase::Active(Active::Preparing) => {
                 task_mut(domain, number).expect("restored name exists").record.phase = Phase::Active(Active::Due);
                 publish(domain, env, number, out);
                 activate(domain, number, out);

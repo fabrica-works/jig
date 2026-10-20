@@ -99,7 +99,7 @@ pub fn terminal_bytes(end: &End) -> Option<u64> {
             };
             result.checked_add(followups)
         }
-        End::Parked | End::Failed(_) | End::Refused => Some(0),
+        End::Parked | End::Failed(_) | End::Refused | End::Recheck => Some(0),
     }
 }
 

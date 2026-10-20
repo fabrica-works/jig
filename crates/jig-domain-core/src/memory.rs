@@ -141,8 +141,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         || limits.tasks.inbox_messages < limits.people.inbox_entries
         || limits.people.inbox_tasks < limits.tasks.tasks.checked_mul(2)?
         || limits.people.inbox_recipients < crate::inbox::waiting_capacity(limits)?
-        || limits.fleet.grants < limits.accounts.credentials.checked_add(1)?
-        || limits.authority.accounts < limits.accounts.credentials.checked_add(1)?
+        || limits.fleet.grants < limits.accounts.credentials.checked_add(limits.accounts.accounts.min(tasks::MODELS))?
+        || limits.authority.accounts < limits.accounts.credentials.max(limits.accounts.accounts.min(tasks::MODELS))
         || limits.notes.scopes < 3_u32.checked_add(limits.authority.grants)?
     {
         return None;
@@ -293,6 +293,21 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(bytes(limits.fleet.grants, sizeof(size_of::<fleet::GrantName>())?)?)?;
     total = total.checked_add(bytes(limits.tasks.tasks.checked_mul(2)?, grants)?)?;
 
+    total = total.checked_add(bytes(
+        limits.tasks.tasks.checked_mul(4)?,
+        bytes(
+            tasks::MODELS,
+            sizeof(size_of::<authority::AccountBinding>())?.checked_add(sizeof(size_of::<Option<u32>>())?)?,
+        )?,
+    )?)?;
+    total = total.checked_add(bytes(limits.tasks.tasks, u64::from(limits.run_bytes))?)?;
+    total = total
+        .checked_add(List::<u32>::worst_case(limits.accounts.accounts)?)?
+        .checked_add(List::<skein_lib::Token>::worst_case(limits.fleet.workers.checked_add(1)?)?)?
+        .checked_add(bytes(
+            tasks::MODELS.checked_mul(4)?,
+            sizeof(size_of::<fleet::ModelNeed>())?.checked_add(u64::from(crate::MODEL_NAME_BYTES))?,
+        )?)?;
     // One run check's transient people/account coverage proofs; selection itself allocates nothing.
     total = total.checked_add(List::<accounts::Coverage>::worst_case(limits.accounts.accounts)?)?;
     let task = &limits.tasks;

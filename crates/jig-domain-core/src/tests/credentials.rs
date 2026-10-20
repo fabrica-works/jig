@@ -4,6 +4,22 @@ use super::*;
 fn a_run_waits_while_a_credential_it_needs_is_unusable() {
     let (mut core, limits) = core();
     make_task(&mut core, &limits, 1);
+    let mut placed = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet },
+        fleet::Event::Hello {
+            channel: Token::new(1),
+            hello: fleet::Hello {
+                bounds: fixtures::bounds(),
+                stop_bound: Duration::ZERO,
+                slots: 1,
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+            },
+        },
+        &mut placed,
+    );
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.accounts };
     let mut out = Queue::with_capacity(accounts::max_out(&limits.accounts));
     accounts::step(&mut core.accounts, &env, accounts::Event::Want, &mut out);
@@ -22,7 +38,7 @@ fn a_run_waits_while_a_credential_it_needs_is_unusable() {
     while out.pop().is_some() {}
     assert_eq!(core.workspace_credentials.insert(1, Box::new([7])), Ok(None));
     let context = charters::context(1, 1);
-    assert_eq!(core.run_admission(&context, Wall::EPOCH, Box::new([])), RunAdmission::Account);
+    assert_eq!(core.run_admission(&context, Wall::EPOCH, Box::new([])), RunAdmission::Wait(RunWait::Credential));
     core.due.push(context);
     assert!(!core.due_ready());
     accounts::step(
@@ -32,5 +48,5 @@ fn a_run_waits_while_a_credential_it_needs_is_unusable() {
         &mut out,
     );
     let context = core.take_due().expect("credential frees the waiting task");
-    assert_eq!(core.run_admission(&context, Wall::EPOCH, Box::new([])), RunAdmission::Allow);
+    assert!(matches!(core.run_admission(&context, Wall::EPOCH, Box::new([])), RunAdmission::Allow(_)));
 }

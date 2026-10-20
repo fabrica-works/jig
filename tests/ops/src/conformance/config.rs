@@ -98,7 +98,6 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
         charter_endpoints: Box::new([jig_protocol_charter::EndpointName {
             number: 1,
             dialect: 1,
-            account: 1,
             name: Box::from(&b"fake"[..]),
         }]),
     };

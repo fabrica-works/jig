@@ -541,11 +541,17 @@ fn run_cells_hold_for_readiness_propose_grants_and_refuse_hard_caps() {
         budget: 20,
         reserve: 0,
         wall: Wall::from_nanos(10),
-        accounts: Box::new([true]),
+        main_provider: 1,
+        credentials: Box::new([]),
+        accounts: Box::new([crate::AccountCheck {
+            binding: crate::AccountBinding { provider: 1, account: 2, source: 3 },
+            usable: true,
+            host_eligible: true,
+        }]),
         writes: Box::new([Write { effect: effect(), held: Writer::Task }]),
     };
     let mut why = findings(&domain);
-    assert_eq!(check_run(&domain, &base, &mut why), Answer::Allow);
+    assert_eq!(check_run(&domain, &base, &mut why).verdict(), Answer::Allow);
     for cause in 0_u8..6 {
         let mut ask = base.clone();
         let expected_finding = match cause {
@@ -562,7 +568,7 @@ fn run_cells_hold_for_readiness_propose_grants_and_refuse_hard_caps() {
                 Finding::Deadline
             }
             3 => {
-                ask.accounts[0] = false;
+                ask.accounts[0].usable = false;
                 Finding::Account
             }
             4 => {
@@ -579,7 +585,7 @@ fn run_cells_hold_for_readiness_propose_grants_and_refuse_hard_caps() {
             }
         };
         let mut why = findings(&domain);
-        assert_eq!(check_run(&domain, &ask, &mut why), Answer::Wait, "cause {cause}");
+        assert_eq!(check_run(&domain, &ask, &mut why).verdict(), Answer::Wait, "cause {cause}");
         assert!(saw(&why, expected_finding), "readiness refusal states its reason");
     }
     let mut ask = base.clone();
@@ -587,35 +593,39 @@ fn run_cells_hold_for_readiness_propose_grants_and_refuse_hard_caps() {
     ask.authority.budget.deadline = Some(ask.wall);
     let mut why = findings(&domain);
     assert_eq!(
-        check_run(&domain, &ask, &mut why),
+        check_run(&domain, &ask, &mut why).verdict(),
         Answer::Allow,
         "ancestor holds and equality at a deadline are valid"
     );
     let mut ask = base.clone();
     ask.authority.grants = Box::new([]);
-    ask.accounts[0] = false;
+    ask.accounts[0].usable = false;
     let mut why = findings(&domain);
-    assert_eq!(check_run(&domain, &ask, &mut why), Answer::Propose, "a grant deficit wins over readiness wait");
+    assert_eq!(
+        check_run(&domain, &ask, &mut why).verdict(),
+        Answer::Propose,
+        "a grant deficit wins over readiness wait"
+    );
     let mut ask = base.clone();
     ask.budget = 81;
-    ask.accounts[0] = false;
+    ask.accounts[0].usable = false;
     let mut why = findings(&domain);
-    assert_eq!(check_run(&domain, &ask, &mut why), Answer::Refuse);
+    assert_eq!(check_run(&domain, &ask, &mut why).verdict(), Answer::Refuse);
     assert!(saw(&why, Finding::RunCap), "run cap wins over readiness wait");
     let mut ask = base.clone();
     ask.numbers.spent = u64::MAX;
     ask.numbers.spent_below = 1;
     let mut why = findings(&domain);
-    assert_eq!(check_run(&domain, &ask, &mut why), Answer::Refuse);
+    assert_eq!(check_run(&domain, &ask, &mut why).verdict(), Answer::Refuse);
     assert!(saw(&why, Finding::Arithmetic), "invalid accounting never becomes a readiness-only wait");
     let mut ask = base.clone();
-    ask.accounts = Box::new([true, true, true]);
+    ask.accounts = Box::new([base.accounts[0]; 3]);
     let mut why = findings(&domain);
-    assert_eq!(check_run(&domain, &ask, &mut why), Answer::Refuse);
+    assert_eq!(check_run(&domain, &ask, &mut why).verdict(), Answer::Refuse);
     let mut ask = base;
     ask.project = 99;
     let mut why = findings(&domain);
-    assert_eq!(check_run(&domain, &ask, &mut why), Answer::Refuse);
+    assert_eq!(check_run(&domain, &ask, &mut why).verdict(), Answer::Refuse);
 }
 
 #[test]
@@ -633,11 +643,17 @@ fn run_checks_the_resources_it_writes_after_policy_narrows() {
         budget: 20,
         reserve: 0,
         wall: Wall::EPOCH,
-        accounts: Box::new([true]),
+        main_provider: 1,
+        credentials: Box::new([]),
+        accounts: Box::new([crate::AccountCheck {
+            binding: crate::AccountBinding { provider: 1, account: 2, source: 3 },
+            usable: true,
+            host_eligible: true,
+        }]),
         writes: Box::new([Write { effect: effect(), held: Writer::Task }]),
     };
     let mut why = findings(&domain);
-    assert_eq!(check_run(&domain, &ask, &mut why), Answer::Allow);
+    assert_eq!(check_run(&domain, &ask, &mut why).verdict(), Answer::Allow);
     let mut ceiling = authority();
     ceiling.grants = Box::new([Grant { connector: 1, kind: 3, pattern: pattern() }]);
     assert_eq!(
@@ -645,11 +661,15 @@ fn run_checks_the_resources_it_writes_after_policy_narrows() {
         PolicyFact::Changed { project: 1 }
     );
     let mut why = findings(&domain);
-    assert_eq!(check_run(&domain, &ask, &mut why), Answer::Allow, "an unused old grant does not block the run");
+    assert_eq!(
+        check_run(&domain, &ask, &mut why).verdict(),
+        Answer::Allow,
+        "an unused old grant does not block the run"
+    );
     let mut denied = ask;
     denied.writes[0].effect.access = EffectAccess::Context;
     let mut why = findings(&domain);
-    assert_eq!(check_run(&domain, &denied, &mut why), Answer::Refuse);
+    assert_eq!(check_run(&domain, &denied, &mut why).verdict(), Answer::Refuse);
     assert!(saw(&why, Finding::ResourceAccess));
 }
 
@@ -1242,4 +1262,87 @@ fn projection_policy_rejects_oversized_and_above_ceiling_grants_without_replacem
         PolicyFact::Refused { project: 1, reason: PolicyRefusal::Oversized }
     );
     assert!(domain.policy(1).unwrap().projections.is_empty());
+}
+
+fn selected_run() -> RunAsk {
+    RunAsk {
+        project: 1,
+        authority: authority(),
+        numbers: numbers(100),
+        budget: 20,
+        reserve: 10,
+        wall: Wall::EPOCH,
+        main_provider: 7,
+        accounts: Box::new([
+            crate::AccountCheck {
+                binding: crate::AccountBinding { provider: 7, account: 11, source: 13 },
+                usable: true,
+                host_eligible: true,
+            },
+            crate::AccountCheck {
+                binding: crate::AccountBinding { provider: 17, account: 19, source: 23 },
+                usable: true,
+                host_eligible: true,
+            },
+        ]),
+        credentials: Box::new([true, true]),
+        writes: Box::new([]),
+    }
+}
+
+#[test]
+fn run_allowance_retains_exact_bindings_and_checked_spend() {
+    let domain = domain();
+    let mut why = findings(&domain);
+    assert_eq!(
+        check_run(&domain, &selected_run(), &mut why),
+        crate::RunAnswer::Allow {
+            spend: 20,
+            accounts: Box::new([
+                crate::AccountBinding { provider: 7, account: 11, source: 13 },
+                crate::AccountBinding { provider: 17, account: 19, source: 23 },
+            ]),
+        }
+    );
+}
+
+#[test]
+fn run_evidence_waits_for_main_host_source_and_credentials() {
+    let domain = domain();
+    let mut asks = Vec::new();
+    let mut missing = selected_run();
+    missing.main_provider = 29;
+    asks.push(missing);
+    let mut unusable = selected_run();
+    unusable.accounts[0].usable = false;
+    asks.push(unusable);
+    let mut host = selected_run();
+    host.accounts[0].host_eligible = false;
+    asks.push(host);
+    let mut credential = selected_run();
+    credential.credentials[0] = false;
+    asks.push(credential);
+    for ask in asks {
+        let mut why = findings(&domain);
+        assert_eq!(check_run(&domain, &ask, &mut why), crate::RunAnswer::Wait);
+    }
+}
+
+#[test]
+fn malformed_or_over_bound_run_evidence_is_refused() {
+    let domain = domain();
+    let mut asks = Vec::new();
+    let mut duplicate = selected_run();
+    duplicate.accounts[1] = duplicate.accounts[0];
+    asks.push(duplicate);
+    let mut accounts = selected_run();
+    accounts.accounts = vec![accounts.accounts[0]; 3].into();
+    asks.push(accounts);
+    let mut credentials = selected_run();
+    credentials.credentials = Box::new([true; 3]);
+    asks.push(credentials);
+    for ask in asks {
+        let mut why = findings(&domain);
+        assert_eq!(check_run(&domain, &ask, &mut why), crate::RunAnswer::Refuse);
+    }
 }

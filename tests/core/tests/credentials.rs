@@ -111,12 +111,12 @@ fn an_adopted_run_is_sent_its_credential_again() {
 
 /// The core world with a provider offering a sign-in, and room for a party's account beside the
 /// configured one.
-fn signing(seed: u64) -> World {
+fn signing_configuration(seed: u64) -> (root::Config, root::Limits) {
     let (mut config, mut limits) = jig_core_world::effects::fixture(seed, false);
     config.core.settings.llm_providers = accounts::Providers {
         providers: Box::new([accounts::Provider {
             number: PROVIDER,
-            models: Box::new([]),
+            models: Box::new([b"scripted".as_slice().into()]),
             offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
         }]),
     };
@@ -124,6 +124,10 @@ fn signing(seed: u64) -> World {
     // The accounts story also opens the deployment watch, beside the project role.
     limits.core.people.projects = 2;
     jig_core_world::peers::journal(&mut limits);
+    (config, limits)
+}
+fn signing(seed: u64) -> World {
+    let (config, limits) = signing_configuration(seed);
     World::configured(seed, false, config, limits)
 }
 const PROVIDER: u32 = 3;
@@ -312,6 +316,9 @@ fn the_deployment_watch_shows_the_deployments_accounts_and_not_a_partys_own() {
 fn a_sources_form_reaches_the_fleet_as_the_component_named_it() {
     const SECOND_ANALYST: u32 = 2;
     let (mut config, limits) = jig_core_world::effects::fixture(166, false);
+    for model in &mut config.core.settings.models {
+        model.account = SECOND_ANALYST;
+    }
     for charter in &mut config.core.settings.charters {
         charter.policy.model.account = SECOND_ANALYST;
         for model in &mut charter.policy.alternatives {

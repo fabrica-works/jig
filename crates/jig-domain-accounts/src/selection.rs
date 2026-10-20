@@ -82,37 +82,87 @@ impl Domain {
         {
             return self.select_source(number, account, host, now);
         }
-        let mut after = None;
-        let mut waiting = Selection::NoAccount;
-        for _ in 0..self.accounts.len() {
-            let mut next = None;
-            for (number, account) in &self.accounts {
-                if !eligible(*number, account, provider, excluded, coverage) {
-                    continue;
-                }
-                let key = (rank(payer, account), account.holder(), account.place(), *number);
-                if after >= Some(key) {
-                    continue;
-                }
-                match next {
-                    Some((best, _)) if best <= key => {}
-                    Some(_) | None => next = Some((key, account)),
-                }
+        let mut chosen = None;
+        let mut waiting = None;
+        for (number, account) in &self.accounts {
+            if !eligible(*number, account, provider, excluded, coverage) {
+                continue;
             }
-            let Some((key, account)) = next else { break };
-            after = Some(key);
-            let selected = self.select_source(key.3, account, host, now);
-            match selected {
-                Selection::Chosen { .. } => return selected,
-                Selection::Wait { .. } => {
-                    if waiting == Selection::NoAccount {
-                        waiting = selected;
-                    }
-                }
+            let key = (rank(payer, account), account.holder(), account.place(), *number);
+            let selection = self.select_source(*number, account, host, now);
+            match selection {
+                Selection::Chosen { .. } => match chosen {
+                    Some((best, _)) if best <= key => {}
+                    Some(_) | None => chosen = Some((key, selection)),
+                },
+                Selection::Wait { .. } => match waiting {
+                    Some((best, _)) if best <= key => {}
+                    Some(_) | None => waiting = Some((key, selection)),
+                },
                 Selection::NoAccount => {}
             }
         }
-        waiting
+        match chosen {
+            Some((_, selection)) => selection,
+            None => match waiting {
+                Some((_, selection)) => selection,
+                None => Selection::NoAccount,
+            },
+        }
+    }
+
+    /// Ranked account candidates; a valid pin is the sole candidate even when held.
+    #[must_use]
+    pub fn candidates(
+        &self,
+        payer: Use,
+        provider: u32,
+        preferred: Option<u32>,
+        excluded: Option<Excluded>,
+        coverage: &[Coverage],
+    ) -> skein_lib::List<u32> {
+        let mut result = skein_lib::List::with_capacity(self.accounts.capacity());
+        if coverage.len() > usize::try_from(self.accounts.capacity()).expect("account capacity") {
+            return result;
+        }
+        for (at, proof) in coverage.iter().enumerate() {
+            for earlier in coverage.iter().take(at) {
+                if earlier.account == proof.account {
+                    return result;
+                }
+            }
+        }
+        if let Some(number) = preferred
+            && let Some(account) = self.account(number)
+            && eligible(number, account, provider, None, coverage)
+        {
+            result.push(number).expect("one preferred account");
+            return result;
+        }
+        let mut ranked = skein_lib::List::with_capacity(self.accounts.capacity());
+        for (number, account) in &self.accounts {
+            if eligible(*number, account, provider, excluded, coverage) {
+                ranked
+                    .push((rank(payer, account), account.holder(), account.place(), *number))
+                    .expect("one eligible row per account");
+            }
+        }
+        let mut after = None;
+        for _ in 0..ranked.len() {
+            let mut next = None;
+            for key in &ranked {
+                if after >= Some(*key) {
+                    continue;
+                }
+                if next.is_none() || next > Some(*key) {
+                    next = Some(*key);
+                }
+            }
+            let Some(key) = next else { break };
+            after = Some(key);
+            result.push(key.3).expect("one candidate per account");
+        }
+        result
     }
 
     fn select_source(&self, number: u32, account: &Account, host: &[HostSource], now: Time) -> Selection {

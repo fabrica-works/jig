@@ -68,7 +68,6 @@ impl Workers {
                 .push(jig_protocol_charter::EndpointName {
                     number: endpoint.number,
                     name: endpoint.name.clone(),
-                    account: endpoint.account,
                     dialect: endpoint.dialect,
                 })
                 .expect("endpoint count");

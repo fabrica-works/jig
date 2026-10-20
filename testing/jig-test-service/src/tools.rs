@@ -149,9 +149,10 @@ pub(super) fn charter(
     use jig_protocol_charter as charter;
     use skein_lib::List;
     let policy = value.run.policy;
+    let sources = value.run.sources;
     let mut models = List::with_capacity(u32::try_from(policy.alternatives.len()).ok()?);
-    for candidate in policy.alternatives {
-        models.push(model(candidate)).ok()?;
+    for (index, candidate) in policy.alternatives.into_iter().enumerate() {
+        models.push(charter::Llm { model: model(candidate), grant: *sources.get(index.checked_add(1)?)? }).ok()?;
     }
     let mut sections = List::with_capacity(u32::try_from(value.brief.len()).ok()?);
     for placed in value.brief {
@@ -182,7 +183,7 @@ pub(super) fn charter(
                 time: policy.time,
                 reserve: charter::Reserve { turns: policy.reserve_turns, time: policy.reserve_time },
             },
-            model: model(policy.model),
+            model: charter::Llm { model: model(policy.model), grant: *sources.first()? },
             models: models.into_boxed(),
             waiting: policy.waiting,
             resumes: policy.resume,
@@ -274,7 +275,6 @@ fn model(value: core::Model) -> jig_protocol_charter::Model {
             unit: value.price_unit,
         },
         dialect: value.dialect,
-        account: value.account,
         endpoint: value.endpoint,
         name: value.name,
         window: value.window,

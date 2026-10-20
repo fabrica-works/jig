@@ -10,12 +10,12 @@ use skein_lib::{List, Queue, Token, Wall};
 use crate::translate;
 
 /// The core's decision before a due agent run is prepared or claimed.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum RunAdmission {
     /// Current policy, funds, account and writes allow preparation.
-    Allow,
-    /// A transient account refresh is still needed.
-    Account,
+    Allow(Box<crate::RunAllowance>),
+    /// A current account, application credential or host wait.
+    Wait(crate::RunWait),
     /// The task child must hold the run for the named reason.
     Hold(tasks::Hold),
 }
@@ -51,30 +51,31 @@ impl Core {
         }
         true
     }
-    pub(crate) fn run_accounts(&self, task: u64) -> Box<[bool]> {
-        let credentials = self.run_credentials(task);
-        let mut usable = List::with_capacity(self.accounts.credential_limit().checked_add(1).expect("grant bound"));
-        usable.push(self.accounts.usable(self.charter_of(task).account())).expect("account room");
-        for number in credentials {
-            usable.push(self.accounts.credential_usable(*number)).expect("credential room");
+    pub(crate) fn run_credentials_check(&self, task: u64) -> Box<[bool]> {
+        let mut usable = List::with_capacity(self.accounts.credential_limit());
+        for number in self.run_credentials(task) {
+            usable.push(self.accounts.credential_usable(*number)).expect("credential bound");
         }
         usable.into_boxed()
     }
-    /// Current charter policy with this task's LLM choice's models and its durable instruction
-    /// replacement (domain/engine.md, 7.1).
-    pub(crate) fn run_policy(&self, task: u64, resume: bool) -> RunPolicy {
-        let mut policy = self.chosen_policy(task);
-        if let Some(instructions) = &self.tasks.task(task).expect("prepared task is live").instructions {
-            policy.instructions.clone_from(instructions);
-        }
-        policy.resume = resume;
-        policy
-    }
-
     /// Decide a run against current policy, funds, account usability and
     /// connector-translated workspace writes.
     #[must_use]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one run answer preserves deadline, budget, writer and readiness precedence"
+    )]
     pub fn run_admission(&self, task: &tasks::RunContext, wall: Wall, writes: Box<[authority::Write]>) -> RunAdmission {
+        let Some(task) = self.tasks.run_context(task.task) else { return RunAdmission::Wait(crate::RunWait::Host) };
+        let choice = self.run_choice(task.task);
+        let mut accounts = List::with_capacity(jig_domain_tasks::MODELS);
+        if let Ok(choice) = &choice {
+            for binding in &choice.accounts {
+                accounts
+                    .push(authority::AccountCheck { binding: *binding, usable: true, host_eligible: true })
+                    .expect("provider bound");
+            }
+        }
         let mut findings =
             Queue::with_capacity(authority::max_out(self.authority.limits()).expect("authority check bound"));
         let mut current = List::with_capacity(self.authority.limits().writes);
@@ -95,14 +96,23 @@ impl Core {
                 budget: authority::left(numbers).min(self.authority.rules().maximum_run_spend),
                 reserve: self.run_reserve(task.task),
                 wall,
-                accounts: self.run_accounts(task.task),
+                main_provider: match &choice {
+                    Ok(choice) => choice.accounts.first().expect("choice includes main provider").provider,
+                    Err(_) => 0,
+                },
+                accounts: accounts.into_boxed(),
+                credentials: self.run_credentials_check(task.task),
                 writes,
             },
             &mut findings,
         );
         match checked {
-            authority::Answer::Allow => RunAdmission::Allow,
-            authority::Answer::Wait | authority::Answer::Propose | authority::Answer::Refuse => {
+            authority::RunAnswer::Allow { spend, accounts } => {
+                let mut choice = choice.expect("authority requires a usable main binding");
+                choice.accounts = accounts;
+                RunAdmission::Allow(Box::new(crate::RunAllowance { choice, spend }))
+            }
+            authority::RunAnswer::Wait | authority::RunAnswer::Propose | authority::RunAnswer::Refuse => {
                 let mut account = false;
                 let mut hold = None;
                 for _ in 0..findings.len() {
@@ -156,7 +166,10 @@ impl Core {
                 }
                 match hold {
                     Some(why) => RunAdmission::Hold(why),
-                    None if account => RunAdmission::Account,
+                    None if account => RunAdmission::Wait(match choice {
+                        Err(wait) => wait,
+                        Ok(_) => crate::RunWait::Credential,
+                    }),
                     None => RunAdmission::Hold(tasks::Hold::Effects),
                 }
             }
@@ -358,6 +371,10 @@ pub struct RunPolicy {
 /// assignment cell so delivery queues carry a small fixed-size value.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RunCharter {
+    /// Selected grant for main then each retained alternative; none sources have no grant.
+    pub sources: Box<[Option<u32>]>,
+    pub accounts: Box<[authority::AccountBinding]>,
+    pub placement: jig_domain_fleet::PlacementConstraint,
     pub policy: RunPolicy,
     pub contract: tasks::Contract,
     pub authority: tasks::Authority,

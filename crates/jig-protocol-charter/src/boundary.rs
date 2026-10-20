@@ -9,7 +9,6 @@ use skein_lib::Duration;
 pub struct Model {
     pub prices: Prices,
     pub dialect: u32,
-    pub account: u32,
     pub endpoint: u32,
     pub name: Box<[u8]>,
     /// The input tokens a conversation's window may hold on this model.
@@ -157,8 +156,15 @@ pub struct Charter {
     pub conventions: Option<Conventions>,
     pub contract: Contract,
     pub budget: Budget,
-    pub model: Model,
-    pub models: Box<[Model]>,
+    pub model: Llm,
+    pub models: Box<[Llm]>,
     pub waiting: Duration,
     pub resumes: bool,
+}
+
+/// A configured model bound to the source chosen for this run, never its endpoint's account.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Llm {
+    pub model: Model,
+    pub grant: Option<u32>,
 }

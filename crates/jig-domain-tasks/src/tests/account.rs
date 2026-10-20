@@ -72,3 +72,25 @@ fn an_unclaimed_task_cannot_restore_a_kept_account() {
         panic!("an unclaimed account pin must be refused");
     };
 }
+
+#[test]
+fn an_account_wait_releases_reserve_and_charges_once_without_a_try() {
+    let mut h = preparing();
+    claim(&mut h, 1, SELECTED, 10);
+    let terminal = || Event::Activation {
+        reply_to: to(),
+        task: TASK,
+        attempt: 1,
+        cause: crate::Cause::Priced { cumulative: 3 },
+        end: crate::End::Recheck,
+        saved: None,
+    };
+    h.send(terminal());
+    h.send(terminal());
+    let row = h.domain.task(TASK).unwrap();
+    assert_eq!((row.run_reserved, row.numbers.reserved, row.numbers.spent), (0, 0, 3));
+    assert_eq!(row.tries, crate::Tries::NONE);
+    assert_eq!(row.phase, crate::Phase::Active(crate::Active::Due));
+    assert_eq!(row.kept_account, Some(SELECTED));
+    assert_eq!(h.domain.next_deadline(), None);
+}

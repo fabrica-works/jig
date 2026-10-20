@@ -408,6 +408,8 @@ pub fn room(limits: &Limits, event: &Event) -> Option<JournalRoom> {
 
 /// Route one child event and each sibling continuation within one core decision.
 pub fn step(core: &mut Core, env: &Env<Limits>, event: Event) -> Requests {
+    core.run_now = env.now;
+    core.run_wall = env.wall;
     let room = route_room(&env.limits);
     let mut work = Queue::with_capacity(room);
     let mut out = Queue::with_capacity(room.checked_add(1).expect("core output mark"));
@@ -507,7 +509,7 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
             workspace_prepared(core, env, work, task, attempt, writes, credentials)
         }
         Event::ClaimPrepared { task, attempt, budget, writes } => {
-            route_claim_prepared(core, work, task, attempt, budget, writes)
+            route_claim_prepared(core, env, work, task, attempt, budget, writes)
         }
         Event::ClaimRefused { task } => route_claim_refused(core, work, task),
         Event::ConnectorRepair { seed, executor, spec, contract, holdings } => {
@@ -605,6 +607,8 @@ fn step_one(core: &mut Core, env: &Env<Limits>, event: Event, work: &mut Queue<E
 
 /// Fire one due child timer, returning its whole bounded request batch.
 pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
+    core.run_now = env.now;
+    core.run_wall = env.wall;
     if core.stopping && crate::stopping::waits(timer) {
         return crate::stopping::empty();
     }

@@ -943,3 +943,21 @@ fn an_llm_key_answer_keeps_its_digest_without_the_value() {
     }
     assert_eq!(crate::codec::people::decode(&bytes, &limits, &names), Ok(row));
 }
+
+#[test]
+fn run_provider_bindings_round_trip_at_the_bound_and_refuse_one_more() {
+    use jig_domain_authority::AccountBinding;
+    use jig_domain_core::CoreRecord;
+    const BINDINGS: u32 = jig_domain_tasks::MODELS;
+    let limits = call_limits();
+    let mut proof = fixtures::core_rows::run();
+    let mut bindings = skein_lib::List::with_capacity(BINDINGS + 1);
+    for provider in 0..BINDINGS {
+        bindings.push(AccountBinding { provider, account: provider, source: provider + BINDINGS }).unwrap();
+    }
+    proof.accounts = bindings.as_slice().into();
+    core_round_trip(CoreRecord::RunProof(proof.clone()));
+    bindings.push(AccountBinding { provider: BINDINGS, account: 0, source: 0 }).unwrap();
+    proof.accounts = bindings.into_boxed();
+    crate::codec::core::encode(&CoreRecord::RunProof(proof), &limits).expect_err("one past the provider bound");
+}

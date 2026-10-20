@@ -38,6 +38,7 @@ impl Fleet {
 
     fn start(&mut self, charter: u32) {
         self.send(Event::Start {
+            placement: None,
             charter,
             grants: Box::new([]),
             reply_to: ReplyTo::new(ATTEMPT),
@@ -155,4 +156,73 @@ fn the_engine_hello_supplies_its_model_eligibility() {
     fleet.hello(ENGINE, &[b"main", b"alternative"]);
     assert_eq!(fleet.domain.free_kind(Kinds::Both, WORKSTREAM, MODEL_CHARTER), Some(HostKind::Engine));
     assert_eq!(fleet.settle(), vec![ENGINE]);
+}
+
+fn main_need() -> fleet::ModelNeed {
+    fleet::ModelNeed { name: b"main".as_slice().into(), window: MODEL_WINDOW, output: MODEL_OUTPUT }
+}
+
+#[test]
+fn a_probe_requires_only_the_models_retained_for_this_run() {
+    let mut fleet = Fleet::new();
+    fleet.hello(FIRST, &[b"main"]);
+    let main = [main_need()];
+    assert_eq!(
+        fleet.domain.probe(Kinds::Workers, WORKSTREAM, &main, &[]),
+        Some(fleet::PlacementConstraint { channel: FIRST, kind: HostKind::Worker })
+    );
+    let retained = [
+        main_need(),
+        fleet::ModelNeed { name: b"alternative".as_slice().into(), window: MODEL_WINDOW, output: MODEL_OUTPUT },
+    ];
+    assert_eq!(fleet.domain.probe(Kinds::Workers, WORKSTREAM, &retained, &[]), None);
+}
+
+#[test]
+fn a_pending_assignment_keeps_its_checked_host_when_room_is_lost() {
+    let mut fleet = Fleet::new();
+    fleet.hello(FIRST, &[b"main"]);
+    fleet.hello(SECOND, &[b"main", b"alternative"]);
+    let placement = fleet.domain.probe(Kinds::Workers, WORKSTREAM, &[main_need()], &[]).expect("free main-model host");
+    // A different attempt takes the last slot after the read-only probe.
+    fleet.send(Event::Start {
+        placement: Some(placement),
+        charter: MODEL_CHARTER,
+        grants: Box::new([]),
+        reply_to: ReplyTo::new(Token::new(31)),
+        run: Token::new(30),
+        attempt: Token::new(31),
+        workstream: WORKSTREAM,
+        kinds: Kinds::Workers,
+        assignment: fleet::Assignment { turns: RUN, answered: ATTEMPT },
+    });
+    fleet.settle();
+    fleet.send(Event::Start {
+        placement: Some(placement),
+        charter: MODEL_CHARTER,
+        grants: Box::new([]),
+        reply_to: ReplyTo::new(ATTEMPT),
+        run: RUN,
+        attempt: ATTEMPT,
+        workstream: WORKSTREAM,
+        kinds: Kinds::Workers,
+        assignment: fleet::Assignment { turns: RUN, answered: ATTEMPT },
+    });
+    assert!(fleet.settle().is_empty(), "the second same-kind host is not a substitute");
+    assert_eq!(fleet.domain.waiting(), 0, "the stale check is refused for a fresh allowance");
+}
+
+#[test]
+fn unknown_logins_and_other_holders_cannot_establish_host_eligibility() {
+    let login = fleet::ProgramLogin { source: 17, holder: 19, retained: true, usable: true };
+    for (known, logins, holders, allowed) in [
+        (false, &[][..], &[Some(19)][..], false),
+        (true, &[login][..], &[Some(19)][..], true),
+        (true, &[login][..], &[Some(19), None][..], false),
+        (true, &[login][..], &[Some(23)][..], false),
+    ] {
+        assert_eq!(fleet::host_rule(known, logins, holders), allowed);
+        assert_eq!(fleet::program_usable(HostKind::Worker, known, 17, logins, holders), allowed && !logins.is_empty());
+        assert!(!fleet::program_usable(HostKind::Engine, known, 17, logins, holders));
+    }
 }

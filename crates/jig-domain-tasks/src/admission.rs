@@ -240,14 +240,14 @@ pub(crate) fn activation(
                 }
             }
         }
-        End::Parked | End::Failed(_) | End::Refused => {}
+        End::Parked | End::Failed(_) | End::Refused | End::Recheck => {}
     }
     let result_admitted = match &end {
         End::FinishedWithFollowups { result, followups } => {
             !old.narrowing
                 && crate::run::invalid_followups(&old.contract, result, followups, &environment.limits).is_none()
         }
-        End::Finished { .. } | End::Parked | End::Failed(_) | End::Refused => false,
+        End::Finished { .. } | End::Parked | End::Failed(_) | End::Refused | End::Recheck => false,
     };
     post(domain, environment, number, cumulative, spent, out);
     crate::run::activation(domain, environment, to, number, attempt, end.clone(), saved, out);
@@ -260,6 +260,6 @@ pub(crate) fn activation(
             crate::proposals::propose_result(domain, environment, (**proposal).clone(), out);
         }
         (End::FinishedWithFollowups { .. }, false)
-        | (End::Finished { .. } | End::Parked | End::Failed(_) | End::Refused, _) => {}
+        | (End::Finished { .. } | End::Parked | End::Failed(_) | End::Refused | End::Recheck, _) => {}
     }
 }

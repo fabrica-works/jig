@@ -30,6 +30,7 @@ pub fn limits(domain: &domain::Limits) -> Option<Limits> {
         projection_task_words: domain.tasks.spec_bytes,
         projection_milestone_words: domain.tasks.message_bytes.max(domain.tasks.result_bytes),
         projection_goal_row_pending: domain.connectors,
+        run_proof_accounts: tasks::MODELS,
         run_proof_credentials: domain.accounts.credentials,
         turn_record_transcript: wire::CEILINGS.turn_record_transcript,
 

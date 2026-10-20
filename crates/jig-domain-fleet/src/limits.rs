@@ -77,7 +77,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let keys = Map::<u64, u64>::worst_case(limits.workstreams)?;
     // Each configured charter owns a CharterNeeds, and each host keeps one bool
     // per charter. Model payloads can only lower this maximum charter count.
-    let eligibility = limits.needs_bytes.checked_div(u64::try_from(size_of::<crate::CharterNeeds>()).ok()?)?;
+    let eligibility = limits
+        .needs_bytes
+        .checked_add(limits.needs_bytes.checked_div(u64::try_from(size_of::<crate::CharterNeeds>()).ok()?)?)?;
     let workers = u64::from(limits.workers).checked_mul(hosts.checked_add(keys)?.checked_add(eligibility)?)?;
     let engine = if limits.engine_slots > 0 {
         Set::<Id<Attempt>>::worst_case(limits.engine_slots)?

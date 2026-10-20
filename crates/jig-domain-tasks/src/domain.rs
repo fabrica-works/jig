@@ -648,11 +648,16 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 crate::End::FinishedWithFollowups { .. } => {
                     refused(reply_to, Some(task), Refusal::Contract, out);
                 }
-                crate::End::Finished { .. } | crate::End::Parked | crate::End::Failed(_) | crate::End::Refused => {
+                crate::End::Finished { .. }
+                | crate::End::Parked
+                | crate::End::Failed(_)
+                | crate::End::Refused
+                | crate::End::Recheck => {
                     crate::run::activation(domain, env, reply_to, task, attempt, end, saved, out);
                 }
             },
         },
+        Event::PreparationWaiting { task } => crate::run::preparation_waiting(domain, env, task, out),
         Event::PreparationFailed { task } => crate::run::preparation_failed(domain, env, task, out),
         Event::PreparationUnread { task } => crate::run::preparation_unread(domain, env, task, out),
         Event::Hold { task, why } => crate::run::hold(domain, env, task, why, out),
@@ -782,54 +787,65 @@ pub(crate) fn activate(domain: &mut Domain, number: u64, out: &mut Queue<Request
         }
         crate::Executor::Agent { .. } | crate::Executor::Person(_) => {}
     }
-    let task = record(domain, number).expect("activation names live task");
-    match task.executor {
-        crate::Executor::Person(_) => return,
-        crate::Executor::Agent { .. } | crate::Executor::Procedure { .. } => {}
+    if let Some(context) = domain.run_context(number) {
+        out.push(Request::Activate { context });
     }
-    let waiting = crate::proposals::waiting_for(domain, number);
-    let escalations = crate::escalation::waiting_for(domain, number);
-    let capacity = task.inbox.len().checked_add(waiting.len()).expect("bounded inbox and proposals");
-    let capacity = capacity.checked_add(escalations.len()).expect("bounded inbox and decisions");
-    let mut unordered = List::with_capacity(u32::try_from(capacity).expect("bounded inbox and proposals"));
-    for word in &task.inbox {
-        unordered.push(word.clone()).expect("inbox counted");
-    }
-    for word in waiting {
-        unordered.push(word).expect("virtual proposal counted");
-    }
-    for word in escalations {
-        unordered.push(word).expect("virtual escalation counted");
-    }
-    let mut inbox = List::with_capacity(unordered.len());
-    let mut previous = 0_u64;
-    for _ in 0..unordered.len() {
-        let mut next: Option<&crate::Word> = None;
-        for candidate in &unordered {
-            if candidate.number > previous {
-                next = match next {
-                    Some(current) if current.number < candidate.number => Some(current),
-                    Some(_) | None => Some(candidate),
-                };
-            }
+}
+
+impl Domain {
+    /// Fresh read-only preparation facts; admission must not trust an older async snapshot.
+    #[must_use]
+    pub fn run_context(&self, number: u64) -> Option<Box<crate::RunContext>> {
+        let domain = self;
+        record(domain, number)?;
+        let task = record(domain, number).expect("activation names live task");
+        match task.executor {
+            crate::Executor::Person(_) => return None,
+            crate::Executor::Agent { .. } | crate::Executor::Procedure { .. } => {}
         }
-        let next = next.expect("distinct globally numbered inbox entries");
-        previous = next.number;
-        inbox.push(next.clone()).expect("ordered inbox room");
-    }
-    let mut delegates = List::with_capacity(u32::try_from(task.delegates.len()).expect("bounded delegates"));
-    for child in &task.delegates {
-        let child_record = record(domain, *child).expect("live delegate named by requester");
-        delegates
-            .push(crate::DelegateState {
-                task: *child,
-                phase: child_record.phase.clone(),
-                revisions: child_record.revisions,
-            })
-            .expect("bounded delegate snapshot");
-    }
-    out.push(Request::Activate {
-        context: Box::new(crate::RunContext {
+        let waiting = crate::proposals::waiting_for(domain, number);
+        let escalations = crate::escalation::waiting_for(domain, number);
+        let capacity = task.inbox.len().checked_add(waiting.len()).expect("bounded inbox and proposals");
+        let capacity = capacity.checked_add(escalations.len()).expect("bounded inbox and decisions");
+        let mut unordered = List::with_capacity(u32::try_from(capacity).expect("bounded inbox and proposals"));
+        for word in &task.inbox {
+            unordered.push(word.clone()).expect("inbox counted");
+        }
+        for word in waiting {
+            unordered.push(word).expect("virtual proposal counted");
+        }
+        for word in escalations {
+            unordered.push(word).expect("virtual escalation counted");
+        }
+        let mut inbox = List::with_capacity(unordered.len());
+        let mut previous = 0_u64;
+        for _ in 0..unordered.len() {
+            let mut next: Option<&crate::Word> = None;
+            for candidate in &unordered {
+                if candidate.number > previous {
+                    next = match next {
+                        Some(current) if current.number < candidate.number => Some(current),
+                        Some(_) | None => Some(candidate),
+                    };
+                }
+            }
+            let next = next.expect("distinct globally numbered inbox entries");
+            previous = next.number;
+            inbox.push(next.clone()).expect("ordered inbox room");
+        }
+        let mut delegates = List::with_capacity(u32::try_from(task.delegates.len()).expect("bounded delegates"));
+        for child in &task.delegates {
+            let child_record = record(domain, *child).expect("live delegate named by requester");
+            delegates
+                .push(crate::DelegateState {
+                    task: *child,
+                    phase: child_record.phase.clone(),
+                    revisions: child_record.revisions,
+                })
+                .expect("bounded delegate snapshot");
+        }
+        Some(Box::new(crate::RunContext {
+            llm: task.llm.clone(),
             payer: domain.payer(number).expect("admitted financial chain has a payer"),
             task: number,
             last_message: match inbox.last() {
@@ -851,8 +867,8 @@ pub(crate) fn activate(domain: &mut Domain, number: u64, out: &mut Queue<Request
             requester: task.requester,
             authority: task.authority.clone(),
             numbers: task.numbers,
-        }),
-    });
+        }))
+    }
 }
 
 fn milestone(domain: &mut Domain, env: &Env<Limits>, number: u64, out: &mut Queue<Request>) {
