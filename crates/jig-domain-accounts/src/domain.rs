@@ -1,4 +1,4 @@
-use crate::{Event, Fact, Failure, FromComponent, Grant, GrantTable, Limits, Request, State, ToComponent};
+use crate::{Event, Fact, Failure, FromComponent, Grant, GrantTable, Limits, Request, State, ToComponent, Turned};
 use alloc::boxed::Box;
 use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time};
 
@@ -14,10 +14,17 @@ pub(crate) struct Account {
     grant: Option<Granted>,
     retry: Option<Time>,
     backoff: Duration,
-    spent: Option<Time>,
+    hold: Option<Hold>,
+    unauthorized: Option<u64>,
     usable: bool,
     expiring: bool,
-    spent_attention: bool,
+    hold_attention: bool,
+}
+/// What runs' agents noticed, over whatever the component says (domain/accounts.md, 3.5).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+enum Hold {
+    Limited { until: Option<Time> },
+    Refused,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) struct Granted {
@@ -62,10 +69,11 @@ impl Domain {
                 grant: None,
                 retry: None,
                 backoff: limits.backoff_base,
-                spent: None,
+                hold: None,
+                unauthorized: None,
                 usable: false,
                 expiring: false,
-                spent_attention: false,
+                hold_attention: false,
             };
             assert!(domain.accounts.insert(*number, entry) == Ok(None), "configured accounts fit and are distinct");
         }
@@ -199,25 +207,92 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             }
             component(domain, env, event, out);
         }
-        Event::Rejected { account, generation } => {
-            if domain.phase == Phase::Wanted && domain.accounts.contains_key(&account) {
-                out.push(Request::Component(ToComponent::Rejected { account, generation }));
+        Event::Unauthorized { account, generation } => {
+            if domain.phase == Phase::Wanted {
+                unauthorized(domain, env, account, generation, out);
             }
         }
-        Event::Exhausted { account, retry_after } => {
+        Event::Limited { account, reset } => {
+            if domain.phase == Phase::Wanted {
+                limited(domain, env, account, reset);
+            }
+        }
+        Event::Refused { account, code: _, reason: _ } => {
+            if domain.phase == Phase::Wanted {
+                refused(domain, env, account);
+            }
+        }
+        Event::RunFailed { account, turned } => {
             if domain.phase != Phase::Wanted {
                 return;
             }
-            let Some(entry) = domain.accounts.get_mut(&account) else { return };
-            let until = env.now.saturating_add(retry_after);
-            entry.spent = Some(match entry.spent {
-                Some(old) => old.max(until),
-                None => until,
-            });
-            entry.spent_attention |= retry_after >= env.limits.spent_attention;
-            changed(domain, env, account);
+            match turned {
+                Turned::Limited { reset } => limited(domain, env, account, reset),
+                Turned::Refused => refused(domain, env, account),
+            }
+        }
+        Event::Resume { account } => {
+            if domain.phase == Phase::Wanted {
+                resume(domain, env, account);
+            }
         }
     }
+}
+/// The first unauthorized of a generation asks the component to renew it; a second fails it.
+fn unauthorized(domain: &mut Domain, env: &Env<Limits>, account: u32, generation: u64, out: &mut Queue<Request>) {
+    let Some(entry) = domain.accounts.get_mut(&account) else { return };
+    if let Some(grant) = entry.grant
+        && grant.generation > generation
+    {
+        return;
+    }
+    if entry.unauthorized != Some(generation) {
+        entry.unauthorized = Some(generation);
+        out.push(Request::Component(ToComponent::Rejected { account, generation }));
+        return;
+    }
+    entry.grant = None;
+    entry.expiring = false;
+    entry.retry = None;
+    entry.state = State::NeedsSignIn;
+    changed(domain, env, account);
+}
+/// Limited until the later of its resets; a limit with none holds until resumed.
+#[expect(clippy::manual_map, reason = "the strict subset uses exhaustive matches without closures")]
+fn limited(domain: &mut Domain, env: &Env<Limits>, account: u32, reset: Option<Time>) {
+    let Some(entry) = domain.accounts.get_mut(&account) else { return };
+    let until = match entry.hold {
+        Some(Hold::Refused) => return,
+        Some(Hold::Limited { until: None }) => None,
+        Some(Hold::Limited { until: Some(old) }) => match reset {
+            Some(new) => Some(old.max(new)),
+            None => None,
+        },
+        None => reset,
+    };
+    entry.hold = Some(Hold::Limited { until });
+    entry.hold_attention |= match until {
+        Some(until) => until.saturating_since(env.now) >= env.limits.spent_attention,
+        None => true,
+    };
+    changed(domain, env, account);
+}
+fn refused(domain: &mut Domain, env: &Env<Limits>, account: u32) {
+    let Some(entry) = domain.accounts.get_mut(&account) else { return };
+    entry.hold = Some(Hold::Refused);
+    entry.hold_attention = true;
+    changed(domain, env, account);
+}
+fn resume(domain: &mut Domain, env: &Env<Limits>, account: u32) {
+    let Some(entry) = domain.accounts.get_mut(&account) else { return };
+    match entry.hold {
+        Some(Hold::Limited { .. }) => {
+            entry.hold = None;
+            entry.hold_attention = false;
+        }
+        Some(Hold::Refused) | None => return,
+    }
+    changed(domain, env, account);
 }
 fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     match domain.phase {
@@ -235,9 +310,10 @@ fn close(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
         entry.state = State::Closing;
         entry.grant = None;
         entry.retry = None;
-        entry.spent = None;
+        entry.hold = None;
+        entry.unauthorized = None;
         entry.expiring = false;
-        entry.spent_attention = false;
+        entry.hold_attention = false;
         out.push(Request::Component(ToComponent::Release { account: *number }));
     }
     for number in &numbers {
@@ -294,7 +370,7 @@ fn failed(entry: &mut Account, env: &Env<Limits>, failure: Failure) {
             entry.grant = None;
             entry.expiring = false;
             entry.retry = Some(env.now.saturating_add(env.limits.retry));
-            State::SignInAgain
+            State::NeedsSignIn
         }
         Failure::Unloaded { at, why } => {
             entry.grant = None;
@@ -323,13 +399,6 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     }
     let Some(account) = domain.alarms.expire(env.now) else { return };
     let entry = domain.accounts.get_mut(&account).expect("alarm names a configured account");
-    if match entry.spent {
-        Some(until) => until <= env.now,
-        None => false,
-    } {
-        entry.spent = None;
-        entry.spent_attention = false;
-    }
     if match entry.retry {
         Some(until) => until <= env.now,
         None => false,
@@ -342,34 +411,58 @@ pub fn fire(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
 }
 #[expect(clippy::manual_map, reason = "the strict subset uses exhaustive matches without closures")]
 fn fact(account: u32, entry: &Account) -> Fact {
-    let attention = match entry.state {
-        State::SignInAgain | State::Misconfigured | State::Unloaded { .. } => true,
-        State::Asking | State::Granted | State::Later { .. } | State::Cancelled | State::Closing => false,
+    let held = match entry.hold {
+        Some(Hold::Limited { until }) => State::Limited { until },
+        Some(Hold::Refused) => State::Refused,
+        None => entry.state,
+    };
+    let state = match entry.state {
+        State::Asking | State::Granted | State::Later { .. } => held,
+        State::Limited { .. }
+        | State::Refused
+        | State::NeedsSignIn
+        | State::Misconfigured
+        | State::Unloaded { .. }
+        | State::Cancelled
+        | State::Closing => entry.state,
+    };
+    let attention = match state {
+        State::NeedsSignIn | State::Misconfigured | State::Unloaded { .. } => true,
+        State::Asking
+        | State::Granted
+        | State::Later { .. }
+        | State::Limited { .. }
+        | State::Refused
+        | State::Cancelled
+        | State::Closing => false,
     };
     Fact {
         account,
-        state: entry.state,
+        state,
         generation: match entry.grant {
             Some(grant) => Some(grant.generation),
             None => None,
         },
         usable: entry.usable,
         expiring: entry.expiring,
-        spent_until: entry.spent,
-        attention: attention || entry.expiring || entry.spent_attention,
+        spent_until: match entry.hold {
+            Some(Hold::Limited { until }) => until,
+            Some(Hold::Refused) | None => None,
+        },
+        attention: attention || entry.expiring || entry.hold_attention,
     }
 }
 #[expect(clippy::manual_map, reason = "the strict subset uses exhaustive matches without closures")]
 fn changed(domain: &mut Domain, env: &Env<Limits>, account: u32) {
     let entry = domain.accounts.get_mut(&account).expect("event keeps its account");
-    if let Some(until) = entry.spent
+    if let Some(Hold::Limited { until: Some(until) }) = entry.hold
         && until <= env.now
     {
-        entry.spent = None;
-        entry.spent_attention = false;
+        entry.hold = None;
+        entry.hold_attention = false;
     }
     entry.usable = match entry.grant {
-        Some(grant) => grant.expires > env.now && entry.spent.is_none(),
+        Some(grant) => grant.expires > env.now && entry.hold.is_none(),
         None => false,
     };
     let record = fact(account, entry);
@@ -381,7 +474,11 @@ fn changed(domain: &mut Domain, env: &Env<Limits>, account: u32) {
         Some(grant) => Some(grant.expires),
         None => None,
     };
-    for at in [expiry, entry.spent].into_iter().flatten() {
+    let reset = match entry.hold {
+        Some(Hold::Limited { until }) => until,
+        Some(Hold::Refused) | None => None,
+    };
+    for at in [expiry, reset].into_iter().flatten() {
         if at > env.now {
             alarm = Some(match alarm {
                 Some(old) => old.min(at),

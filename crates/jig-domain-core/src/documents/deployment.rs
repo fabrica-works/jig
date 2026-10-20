@@ -147,8 +147,11 @@ fn account_state(state: accounts::State, clock: Option<DocumentClock>) -> Accoun
     match state {
         accounts::State::Asking => AccountState::Asking,
         accounts::State::Granted => AccountState::Granted,
-        accounts::State::Later { until } => AccountState::Later { until: wall_deadline(clock, until) },
-        accounts::State::SignInAgain => AccountState::SignInAgain,
+        accounts::State::Later { until } | accounts::State::Limited { until: Some(until) } => {
+            AccountState::Later { until: wall_deadline(clock, until) }
+        }
+        accounts::State::Limited { until: None } => AccountState::Later { until: None },
+        accounts::State::Refused | accounts::State::NeedsSignIn => AccountState::SignInAgain,
         accounts::State::Misconfigured => AccountState::Misconfigured,
         accounts::State::Unloaded { at, why } => AccountState::Unloaded { at, why },
         accounts::State::Cancelled => AccountState::Cancelled,

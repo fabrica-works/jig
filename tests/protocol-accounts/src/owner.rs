@@ -278,7 +278,7 @@ impl Host for Owner {
             self.child_event(now, wall, child::Event::Close);
         }
         if self.reject_requested.take().is_some() {
-            self.child_event(now, wall, child::Event::Rejected { account: self.account, generation: 1 });
+            self.child_event(now, wall, child::Event::Unauthorized { account: self.account, generation: 1 });
         }
         self.child_requests(&env);
         self.private_io(&env);

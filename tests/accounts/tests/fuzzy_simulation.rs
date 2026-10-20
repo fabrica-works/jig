@@ -35,11 +35,18 @@ fn run(seed: u64) -> Vec<Request> {
     respond(&mut world, &mut rng, wanted, &mut trace);
     for seconds in 1..160 {
         if rng.chance(40) {
-            let requests = world.step(Event::Rejected { account: ANALYST, generation: 4 });
+            let requests = world.step(Event::Unauthorized { account: ANALYST, generation: 4 });
             respond(&mut world, &mut rng, requests, &mut trace);
         }
         if rng.chance(30) {
-            trace.extend(world.step(Event::Exhausted { account: ANALYST, retry_after: Duration::from_secs(5) }));
+            let reset = match rng.below(4) {
+                0 => None,
+                _ => Some(world.now.saturating_add(Duration::from_secs(5))),
+            };
+            trace.extend(world.step(Event::Limited { account: ANALYST, reset }));
+        }
+        if rng.chance(20) {
+            trace.extend(world.step(Event::Resume { account: ANALYST }));
         }
         let due = world.fire_at(seconds);
         respond(&mut world, &mut rng, due, &mut trace);

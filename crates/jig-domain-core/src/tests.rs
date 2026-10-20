@@ -1664,7 +1664,7 @@ fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
     accounts::step(
         &mut core.accounts,
         &env,
-        accounts::Event::Exhausted { account: 1, retry_after: Duration::from_secs(5) },
+        accounts::Event::Limited { account: 1, reset: Some(env.now.saturating_add(Duration::from_secs(5))) },
         &mut out,
     );
     let Document::Deployment(deployment) = make_with_clock(
@@ -1681,8 +1681,9 @@ fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
     let account = deployment.accounts.get(0).unwrap();
     assert!(!account.usable);
     assert_eq!(account.number, 1);
-    assert_eq!(account.state, AccountState::Granted);
-    assert_eq!(account.spent_until, Some(Wall::from_nanos(1000 + Duration::from_secs(5).as_nanos())));
+    let reset = Some(Wall::from_nanos(1000 + Duration::from_secs(5).as_nanos()));
+    assert_eq!(account.state, AccountState::Later { until: reset });
+    assert_eq!(account.spent_until, reset);
     assert!(!account.waiting.is_empty());
 }
 

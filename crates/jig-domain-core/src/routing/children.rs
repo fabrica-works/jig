@@ -275,11 +275,12 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
                 Request::Now(Box::new(Now::Undelivered { run, attempt, message }))
             }
             fleet::Request::Rejected { account, generation, .. } => {
-                append_account(core, env, accounts::Event::Rejected { account, generation }, &mut out);
+                append_account(core, env, accounts::Event::Unauthorized { account, generation }, &mut out);
                 continue;
             }
             fleet::Request::Exhausted { account, retry_after, .. } => {
-                append_account(core, env, accounts::Event::Exhausted { account, retry_after }, &mut out);
+                let reset = Some(env.now.saturating_add(retry_after));
+                append_account(core, env, accounts::Event::Limited { account, reset }, &mut out);
                 continue;
             }
             fleet::Request::Grant { channel, run, attempt, grant } => {

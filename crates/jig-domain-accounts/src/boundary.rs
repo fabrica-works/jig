@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use skein_lib::{Duration, Time};
 
 /// The protocol layer's table that holds a grant (protocol/channel.md, section 8).
@@ -16,15 +17,30 @@ pub struct Grant {
     pub valid: Duration,
 }
 
-/// Accounts on the component's terms (protocol/llm.md, 5.2).
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+/// Accounts on the component's terms (protocol/llm.md, 5.2), and what runs' agents
+/// notice (domain/accounts.md, 3.5): a generation unauthorized; an account limited until
+/// its reset, or, with none, until its holder resumes it; an account refused, with the
+/// provider's code and reason; a run failed because its account turned limited or
+/// refused. A notice names its account by the grant's number, which, with one source
+/// per account, is the account's.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
     Want,
     Component(FromComponent),
-    Rejected { account: u32, generation: u64 },
-    Exhausted { account: u32, retry_after: Duration },
+    Unauthorized { account: u32, generation: u64 },
+    Limited { account: u32, reset: Option<Time> },
+    Refused { account: u32, code: Box<[u8]>, reason: Box<[u8]> },
+    RunFailed { account: u32, turned: Turned },
+    Resume { account: u32 },
     Credential { number: u32, generation: u64, valid: Duration },
     Close,
+}
+
+/// What a failed run says its account turned.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Turned {
+    Limited { reset: Option<Time> },
+    Refused,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -74,13 +90,17 @@ pub enum Request {
     Closed,
 }
 
-/// Secret-free account state (domain/engine.md, section 12).
+/// Secret-free account state (domain/engine.md, section 12; domain/accounts.md, 3.5):
+/// limited until a time, or, with none, until its holder resumes it; refused until its
+/// holder acts.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum State {
     Asking,
     Granted,
     Later { until: Time },
-    SignInAgain,
+    Limited { until: Option<Time> },
+    Refused,
+    NeedsSignIn,
     Misconfigured,
     Unloaded { at: Place, why: Unread },
     Cancelled,
