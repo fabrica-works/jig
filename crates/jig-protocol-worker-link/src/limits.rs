@@ -65,7 +65,16 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let channel = channel_limits(limits).ok()?;
     let bound = channel::worst_case(&schema, Role::Initiator, &channel)?;
     let state = u64::try_from(size_of::<Component>()).ok()?;
+    let sources = u64::from(limits.sizes.program_sources)
+        .checked_mul(u64::try_from(size_of::<host::Login>()).ok()?.checked_add(u64::from(limits.sizes.detail))?)?;
     bound
+        .checked_add(sources.checked_mul(2)?)?
+        .checked_add(wire::Logins::worst_case_bytes(&bodies)?.checked_add(8)?.checked_mul(2)?)?
+        .checked_add(
+            u64::from(limits.sizes.program_sources)
+                .checked_mul(u64::try_from(size_of::<host::SourceName>()).ok()?)?
+                .checked_mul(2)?,
+        )?
         .checked_add(state)?
         .checked_add(crate::relays::Relays::worst_case(limits)?)?
         .checked_add(crate::busy::Busy::worst_case(limits)?)?

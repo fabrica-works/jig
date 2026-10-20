@@ -561,6 +561,13 @@ impl Application for Testing {
                     },
                 })]
             }
+            root::Delivery::Core(core::Held::Sources { channel, sources }) => {
+                assert!(sources.is_empty(), "conformance worker source fixture");
+                vec![Input::Event(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Logins {
+                    channel,
+                    logins: Box::new([]),
+                })))]
+            }
             root::Delivery::Core(core::Held::Load(load)) => {
                 store.ask(StoreOut::Now(*load));
                 Vec::new()

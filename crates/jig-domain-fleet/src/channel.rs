@@ -42,6 +42,7 @@ use crate::limits::Limits;
 /// A worker in contact.
 #[derive(Debug)]
 pub(crate) struct Channel {
+    pub(crate) sources: crate::sources::Sources,
     /// Model eligibility in configured charter order, independent of free slots.
     pub(crate) eligible: Box<[bool]>,
     pub(crate) declarations: Box<[bool]>,
@@ -158,6 +159,7 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
     let Hello { slots, workstreams, hosting, stop_bound: _, bounds } = hello;
     let mut worker = Channel {
         declarations: crate::needs::declarations(&domain.needs, &bounds.models),
+        sources: crate::sources::Sources::new(domain.program_sources.clone(), limits.program_sources, true),
         eligible: crate::needs::eligibility(&domain.needs, &bounds.models),
         kind: HostKind::Worker,
         token: channel,
@@ -197,6 +199,7 @@ pub(crate) fn hello(domain: &mut Domain, env: &Env<Limits>, channel: Token, hell
         }
         listed = listed.saturating_add(1);
     }
+    out.push(Request::Sources { channel, sources: domain.program_sources.clone() });
     domain.facts.push(Fact::Hello { listed });
     domain.placing = true;
 }
@@ -219,7 +222,7 @@ fn refuse(
 
 /// Lost: the worker's attempts are kept for the grace, adrift. A channel
 /// the fleet does not know never said hello, or was turned away.
-pub(crate) fn lost(domain: &mut Domain, env: &Env<Limits>, channel: Token) {
+pub(crate) fn lost(domain: &mut Domain, env: &Env<Limits>, channel: Token, out: &mut Queue<Request>) {
     if channel == Token::new(0) {
         return;
     }
@@ -227,6 +230,7 @@ pub(crate) fn lost(domain: &mut Domain, env: &Env<Limits>, channel: Token) {
         return;
     };
     let entry = domain.channels.get_mut(id).expect("a named channel is in contact");
+    crate::sources::lost(&mut entry.sources, channel, out);
     let slots = entry.slots;
     let draining = entry.draining;
     let hosts = mem::replace(&mut entry.hosts, Set::with_capacity(0));
@@ -252,7 +256,8 @@ pub(crate) fn choose(domain: &Domain, workstream: u64, kinds: Kinds, charter: u3
     for (_, &id) in &domain.tokens {
         let channel = domain.channels.get(id).expect("a named channel is in contact");
         let free = channel.slots.saturating_sub(channel.hosts.len());
-        if channel.draining
+        if !channel.sources.ready()
+            || channel.draining
             || free == 0
             || !kinds.allows(channel.kind)
             || !crate::needs::allows(&domain.needs, &channel.eligible, charter)

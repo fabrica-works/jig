@@ -266,9 +266,8 @@ fn a_message_bound_below_a_delegate_result_is_refused() {
 fn memory_below_the_components_sum_is_refused() {
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""memory_bytes": 34359738368"#, br#""memory_bytes": 1"#);
     let problems = fixtures::engine(&document).unwrap_err();
-    // Runtime provider bindings, concrete placement, fresh contexts, selected charters,
-    // model declaration bits and their bounded check/queue copies add 2,249,720 bytes.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_655_455_095 });
+    // Runtime placement plus whole program-source state and routed output room.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_662_335_043 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

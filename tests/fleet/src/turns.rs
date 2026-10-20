@@ -206,6 +206,18 @@ impl World {
         while let Some(request) = self.out.pop() {
             self.report.trace.push(format!("{} {request:?}", self.tick));
             match request {
+                Request::Sources { channel, sources } => {
+                    assert!(sources.is_empty(), "legacy turn fixture has no program sources");
+                    fleet::step(
+                        &mut self.domain,
+                        &self.env,
+                        Event::Logins { channel, logins: Box::new([]) },
+                        &mut self.out,
+                    );
+                }
+                Request::Check { .. } | Request::SignOut { .. } | Request::SignedOut { .. } => {
+                    unreachable!("source world owns commands")
+                }
                 Request::Turned { turn, body, .. } => {
                     let (number, words) = self.payloads.remove(&body).expect("one body handoff");
                     assert_eq!(number, turn);

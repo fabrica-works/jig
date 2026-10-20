@@ -24,6 +24,9 @@ fn fixture_with_commits(commits: u32) -> (Domain, Env<Limits>) {
         host: host::Limits {
             slots: 1,
             accounts: 1,
+            program_sources: 12,
+            source_interval: Duration::from_secs(60),
+            source_timeout: Duration::from_secs(10),
             charter_bytes: 65536,
             transcript_bytes: 1024,
             delivery_evidence_bytes: 0,

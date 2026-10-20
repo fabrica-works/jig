@@ -185,7 +185,10 @@ fn down(record: jig_domain_host::LinkDown) -> translate::Down {
         LinkDown::Assign { .. } | LinkDown::Grant { .. } => {
             translate::down(record, &fixtures::parts(), fixtures::values(), &codec())
         }
-        LinkDown::Message { .. }
+        LinkDown::Sources { .. }
+        | LinkDown::Check { .. }
+        | LinkDown::SignOut { .. }
+        | LinkDown::Message { .. }
         | LinkDown::Relayed { .. }
         | LinkDown::TurnKept { .. }
         | LinkDown::Acknowledge { .. }

@@ -5,3 +5,5 @@ pub mod referee;
 mod relay;
 pub mod stories;
 pub mod world;
+
+pub mod program_sources;

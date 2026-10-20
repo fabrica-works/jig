@@ -104,7 +104,7 @@ fn outcome(procs: &[Proc], store: &Store, views: &Views, reset_injected: bool, k
     let worker = procs.iter().find_map(|proc| match proc {
         Proc::Worker(host) => Some(&host.wire),
         Proc::Probe(peer) => Some(&peer.wire),
-        Proc::Engine(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
+        Proc::Engine(_) | Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) => None,
     });
     let refusal = procs.iter().find_map(|proc| if let Proc::Probe(peer) = proc { peer.refused } else { None });
     let turns = turns(store);
@@ -403,7 +403,7 @@ pub(crate) fn diagnostics(procs: &[Proc]) -> String {
                     })
                     .collect::<Vec<_>>()
             )),
-            Proc::Probe(_) => None,
+            Proc::Auth(_) | Proc::Probe(_) => None,
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -415,7 +415,7 @@ pub(crate) fn worker_wire(procs: &[Proc]) -> &processes::Wire {
         .find_map(|proc| match proc {
             Proc::Worker(worker) => Some(&worker.wire),
             Proc::Probe(peer) => Some(&peer.wire),
-            Proc::Engine(_) | Proc::Agent { .. } | Proc::Peer(_) => None,
+            Proc::Engine(_) | Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) => None,
         })
         .expect("worker's wire observations")
 }
@@ -540,14 +540,15 @@ fn launch(
     if matches!(script.story, crate::stories::Story::DurableRestart) {
         // After the turn's transcript is written and its commit held; the
         // handed-in record's write and sync to the secrets' store, and the
-        // commit that keeps the accounts' counter, come first.
-        harness.cut(0, 100, skein_world::Cut::Kill);
+        // commit that keeps the accounts' counter and the sources/inventory
+        // exchange come first.
+        harness.cut(0, 102, skein_world::Cut::Kill);
     }
     if let crate::stories::Story::Restart { before } = script.story {
         harness.cut(0, before, skein_world::Cut::Kill);
     }
     if matches!(script.story, crate::stories::Story::Refusals(crate::stories::MessageRefusal::Replay)) {
-        harness.cut(0, 78, skein_world::Cut::Kill);
+        harness.cut(0, 80, skein_world::Cut::Kill);
     }
     spawn_channel_side(harness, root, script);
     if !matches!(

@@ -6,6 +6,7 @@ mod accounts;
 mod boundary;
 mod clients;
 pub mod family;
+pub mod program_sources;
 pub mod server;
 mod tools;
 mod values;
@@ -92,6 +93,20 @@ impl Service {
             shutdowns: 0,
             bytes,
             links: Queue::with_capacity(queue),
+        }
+    }
+    /// Inject private host-operation resources before the worker's loop starts.
+    pub fn configure_program_sources(
+        &mut self,
+        worker: u32,
+        resources: program_sources::Resources,
+    ) -> Result<(), program_sources::Resources> {
+        if self.started {
+            return Err(resources);
+        }
+        match self.workers.get_mut(worker) {
+            Some(worker) => worker.configure_program_sources(resources),
+            None => Err(resources),
         }
     }
     /// The optional browser bundle directory, read by the binary before the loop.

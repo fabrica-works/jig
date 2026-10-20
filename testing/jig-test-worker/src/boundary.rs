@@ -6,6 +6,7 @@ use smith_host_domain as smith;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    Source(Box<host::Event>),
     Link(host::LinkDown),
     Ready,
     Lost,
@@ -22,6 +23,13 @@ pub enum Event {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    Source {
+        owner: Token,
+        name: host::SourceName,
+        operation: host::sources::Operation,
+        deadline: skein_lib::Time,
+    },
+    SourceFault,
     Hello(host::Hello),
     Link(host::LinkUp),
     CancelRelay {

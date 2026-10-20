@@ -119,6 +119,8 @@ skein-fake-llm-protocol = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-fake-llm-domain = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-llm = { git = "https://github.com/fabrig-dev/skein.git" }
 skein-shell = { git = "https://github.com/fabrig-dev/skein.git" }
+smith-fake-claude = { git = "https://github.com/fabrig-dev/smith.git" }
+smith-protocol-program = { git = "https://github.com/fabrig-dev/smith.git" }
 smith-host-protocol = { git = "https://github.com/fabrig-dev/smith.git" }
 jig-test-service = { path = "testing/jig-test-service" }
 jig-client-test-protocol-wire = { path = "testing/jig-client-test-protocol-wire" }

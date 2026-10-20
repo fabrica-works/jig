@@ -13,6 +13,8 @@ use skein_world::domain::heap::{self, Meter};
 static HEAP: heap::Counting = heap::Counting;
 
 const LIMITS: Limits = Limits {
+    program_sources: 12,
+    source_detail_bytes: 4096,
     needs_bytes: 0,
     workers: 3,
     engine_slots: 0,
@@ -92,7 +94,12 @@ impl Measured {
         let measured = self.meter.end();
         let mut requests = Vec::with_capacity(self.out.len() as usize);
         while let Some(request) = self.out.pop() {
-            requests.push(request);
+            if let Request::Sources { channel, sources } = request {
+                assert!(sources.is_empty());
+                step(&mut self.domain, &self.env, Event::Logins { channel, logins: Box::new([]) }, &mut self.out);
+            } else {
+                requests.push(request);
+            }
         }
         self.meter.check(measured, self.bound, &self.env.limits);
         // The iteration ends: the reclaim point.
@@ -237,7 +244,8 @@ fn fill(limits: Limits) -> (Measured, Vec<(Token, Token, Token)>, Vec<ReplyTo>) 
 
 #[test]
 fn a_fleet_full_to_its_limits_stays_within_its_worst_case() {
-    let (mut fleet, placed, calls) = fill(LIMITS);
+    // This fixture fills runs; the source fixture below fills inventories.
+    let (mut fleet, placed, calls) = fill(Limits { program_sources: 0, source_detail_bytes: 0, ..LIMITS });
     // At its fullest, the fleet holds a fair share of the bound: it is not
     // padded beyond use.
     let fullest = fleet.meter.held();
@@ -444,5 +452,62 @@ fn engine_slots_stay_within_the_fleets_worst_case() {
     for _ in 0..2 {
         fleet.start();
         fleet.settle();
+    }
+}
+
+#[test]
+fn full_source_inventories_replacements_and_pending_sign_outs_fit_the_bound() {
+    use jig_domain_fleet::{Login, LoginState, SourceName};
+    let limits = LIMITS;
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let mut out = Queue::with_capacity(max_out(&limits));
+    let meter = Meter::new();
+    let mut domain = Domain::new(&limits, jig_fleet_world::fixtures::needs());
+    let mut measured_step = |event| {
+        meter.start();
+        step(&mut domain, &env, event, &mut out);
+        let measured = meter.end();
+        while out.pop().is_some() {}
+        meter.check(measured, worst_case(&limits).expect("source inventory bound"), &limits);
+    };
+    let names: Box<[_]> = (0..limits.program_sources)
+        .map(|index| SourceName::new(format!("{index:032}").as_bytes()).expect("full source name"))
+        .collect();
+    measured_step(Event::Sources { sources: names.clone() });
+    for worker in 1..=limits.workers {
+        let channel = Token::new(u64::from(worker));
+        measured_step(Event::Hello {
+            channel,
+            hello: Hello {
+                slots: limits.slots,
+                stop_bound: Duration::ZERO,
+                workstreams: Box::new([]),
+                hosting: Box::new([]),
+                bounds: jig_fleet_world::fixtures::bounds(),
+            },
+        });
+        measured_step(Event::Logins {
+            channel,
+            logins: names
+                .iter()
+                .map(|&name| Login {
+                    name,
+                    state: LoginState::Failed {
+                        reason: jig_domain_fleet::SourceFailure::Exited,
+                        detail: vec![b'x'; usize::try_from(limits.source_detail_bytes).expect("detail bound")]
+                            .into_boxed_slice(),
+                    },
+                })
+                .collect(),
+        });
+        for &name in &names {
+            measured_step(Event::SignOut { to: ReplyTo::new(channel), channel, name });
+        }
+    }
+    // One sent replacement and the latest desired list coexist on every host.
+    measured_step(Event::Sources { sources: Box::new([SourceName::new(b"replacement").expect("name")]) });
+    measured_step(Event::Sources { sources: names });
+    for worker in 1..=limits.workers {
+        measured_step(Event::Lost { channel: Token::new(u64::from(worker)) });
     }
 }

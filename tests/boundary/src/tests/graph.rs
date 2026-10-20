@@ -445,7 +445,8 @@ fn test_worker_smith_breaches(manifests: &[CrateManifest]) -> Vec<String> {
         }
         for dependency in &manifest.dependencies {
             if dependency.starts_with("smith-")
-                && !(manifest.name.as_deref() == Some("jig-test-service") && dependency == "smith-domain-run")
+                && !(manifest.name.as_deref() == Some("jig-test-service")
+                    && ["smith-domain-run", "smith-protocol-program"].contains(&dependency.as_str()))
                 && !["smith-host-domain", "smith-host-protocol", "smith-protocol-channel", "smith-channel"]
                     .contains(&dependency.as_str())
             {
@@ -532,9 +533,19 @@ fn a_protocol_crate_linking_smith_is_reported_unless_charter_or_transcript() {
 }
 
 #[test]
-fn test_worker_and_service_link_only_the_four_smith_crates_even_when_empty() {
+fn test_worker_and_service_link_only_their_smith_protocols_even_when_empty() {
     let failures = test_worker_smith_breaches(&manifests());
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+    let service = parse_manifest(
+        PathBuf::from("fixture/service/Cargo.toml"),
+        "[package]\nname = \"jig-test-service\"\n[dependencies]\nsmith-protocol-program.workspace = true\n",
+    );
+    let worker = parse_manifest(
+        PathBuf::from("fixture/worker/Cargo.toml"),
+        "[package]\nname = \"jig-test-worker\"\n[dependencies]\nsmith-protocol-program.workspace = true\n",
+    );
+    assert!(test_worker_smith_breaches(&[service]).is_empty());
+    assert_eq!(test_worker_smith_breaches(&[worker]), ["fixture/worker/Cargo.toml: smith-protocol-program"]);
 }
 
 #[test]

@@ -29,7 +29,16 @@ impl Fleet {
         let mut out = Queue::with_capacity(fleet::max_out(&self.env.limits));
         fleet::step(&mut self.domain, &self.env, event, &mut out);
         self.domain.reclaim();
-        core::iter::from_fn(|| out.pop()).collect()
+        let mut requests = Vec::new();
+        while let Some(request) = out.pop() {
+            if let Request::Sources { channel, sources } = request {
+                assert!(sources.is_empty());
+                fleet::step(&mut self.domain, &self.env, Event::Logins { channel, logins: Box::new([]) }, &mut out);
+            } else {
+                requests.push(request);
+            }
+        }
+        requests
     }
 
     fn hello(&mut self, channel: Token, names: &[&[u8]]) -> Vec<Request> {

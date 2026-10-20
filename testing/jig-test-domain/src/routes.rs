@@ -88,6 +88,10 @@ pub(super) fn route_core(
                 | core::Held::Drained
                 | core::Held::Grant { .. }
                 | core::Held::Cancel { .. }
+                | core::Held::Sources { .. }
+                | core::Held::CheckSource { .. }
+                | core::Held::SignOutSource { .. }
+                | core::Held::SourceSignedOut { .. }
                 | core::Held::Refuse { .. }
                 | core::Held::TurnBusy { .. }
                 | core::Held::StopRun { .. }

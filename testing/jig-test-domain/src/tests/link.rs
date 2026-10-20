@@ -266,3 +266,45 @@ fn an_assignment_carries_its_brief_s_sections_in_order() {
         ]
     );
 }
+
+#[test]
+fn program_source_lifecycle_routes_without_run_payloads() {
+    use jig_domain_host::{LinkDown, LinkUp, Login, LoginState, SignOutResult, SourceName};
+    let mut domain = fixtures::domain();
+    domain.links.insert(fixtures::CHANNEL).expect("one connected worker");
+    let name = SourceName::new(b"alice").expect("source name");
+    let fleet_name = fleet::SourceName::new(b"alice").expect("source name");
+    for (held, expected) in [
+        (
+            core::Held::Sources { channel: fixtures::CHANNEL, sources: Box::new([fleet_name]) },
+            LinkDown::Sources { sources: Box::new([name]) },
+        ),
+        (core::Held::CheckSource { channel: fixtures::CHANNEL, name: fleet_name }, LinkDown::Check { name }),
+        (core::Held::SignOutSource { channel: fixtures::CHANNEL, name: fleet_name }, LinkDown::SignOut { name }),
+    ] {
+        let Delivery::Link { channel, down } = link::down(&mut domain, Delivery::Core(held)) else {
+            panic!("source down record")
+        };
+        assert_eq!(channel, fixtures::CHANNEL);
+        assert_eq!(down, expected);
+    }
+    let before = domain.payloads.len();
+    let inventory = link::up(
+        &mut domain,
+        fixtures::CHANNEL,
+        LinkUp::Logins { logins: Box::new([Login { name, state: LoginState::Usable }]) },
+    );
+    let core::Event::Fleet(fleet::Event::Logins { channel, logins }) = inventory else {
+        panic!("typed fleet inventory")
+    };
+    assert_eq!(channel, fixtures::CHANNEL);
+    assert_eq!(logins.as_ref(), [fleet::Login { name: fleet_name, state: fleet::LoginState::Usable }]);
+    let result = link::up(&mut domain, fixtures::CHANNEL, LinkUp::SignedOut { name, result: SignOutResult::SignedOut });
+    let core::Event::Fleet(fleet::Event::SignedOut { channel, name: actual, result }) = result else {
+        panic!("fleet sign-out result")
+    };
+    assert_eq!(channel, fixtures::CHANNEL);
+    assert_eq!(actual, fleet_name);
+    assert_eq!(result, fleet::SignOutResult::SignedOut);
+    assert_eq!(domain.payloads.len(), before);
+}

@@ -20,12 +20,13 @@ pub const fn max_out(limits: &Limits) -> u32 {
     let cancelling = limits.run_calls.saturating_mul(2);
     let starting = limits.held.saturating_add(limits.accounts);
     let most = if starting > cancelling { starting } else { cancelling };
-    most.saturating_add(2).saturating_add(limits.turns.saturating_mul(2))
+    most.saturating_add(limits.program_sources).saturating_add(4).saturating_add(limits.turns.saturating_mul(2))
 }
 
 /// The host child domain's state.
 #[derive(Debug)]
 pub struct Domain {
+    pub(crate) sources: crate::sources::Domain,
     /// The run slots.
     pub(crate) hosted: Slab<Hosted>,
     /// The runs not yet answered, by the engine's names for them.
@@ -48,6 +49,7 @@ impl Domain {
     pub fn new(limits: &Limits) -> Domain {
         let calls = limits::calls(limits).expect("worst_case accepted the limits");
         Domain {
+            sources: crate::sources::Domain::new(limits.program_sources),
             hosted: Slab::with_capacity(limits.slots),
             names: Map::with_capacity(limits.slots),
             calls: Slab::with_capacity(calls),
@@ -58,6 +60,15 @@ impl Domain {
             shut: false,
             refusals_lost: 0,
         }
+    }
+
+    #[must_use]
+    pub fn next_deadline(&self) -> Option<skein_lib::Time> {
+        self.sources.next_deadline()
+    }
+    #[must_use]
+    pub fn sources_settled(&self) -> bool {
+        self.sources.settled()
     }
 
     /// Runs hosted: the slots taken, closed runs included until they are
@@ -219,6 +230,10 @@ impl Domain {
 /// Handles one event, emitting at most [`max_out`] requests.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::SourceAnswered { owner, answer } => {
+            crate::sources::answered(&mut domain.sources, env, owner, answer, out);
+        }
+        Event::SourceLost => crate::sources::lost(&mut domain.sources),
         Event::Called { owner, call, ask } => hosted::called(domain, env, owner, call, ask, out),
         Event::Withdrawn { owner, call } => hosted::withdrawn(domain, owner, call, out),
         Event::Turn { owner, turn } => hosted::turned(domain, env, owner, turn, out),
@@ -234,7 +249,12 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             hosted::finished(domain, env, owner, turns, spent, finish, read, out);
         }
         Event::RelayCancelled { run, attempt, call } => hosted::relay_cancelled(domain, run, attempt, &call, out),
-        Event::CancelAll { reason } => hosted::cancel_all(domain, reason),
+        Event::CancelAll { reason } => {
+            if reason == Reason::Shutdown {
+                crate::sources::close(&mut domain.sources, out);
+            }
+            hosted::cancel_all(domain, reason);
+        }
         Event::Opened { stop_bound, workstreams, bounds } => {
             crate::answers::opened(domain, env.limits.slots, stop_bound, workstreams, bounds, out);
         }
@@ -249,6 +269,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         Event::Delivered { owner, delivery } => hosted::delivered(domain, owner, delivery, out),
         Event::Saved { owner, at } => hosted::saved(domain, owner, at, out),
         Event::Down(down) => match down {
+            LinkDown::Sources { sources } => crate::sources::replace(&mut domain.sources, env, sources, out),
+            LinkDown::Check { name } => crate::sources::check(&mut domain.sources, env, name, out),
+            LinkDown::SignOut { name } => crate::sources::sign_out(&mut domain.sources, env, name, out),
             LinkDown::Message { run, attempt, name, sender, words } => {
                 hosted::inbound(domain, env, run, attempt, name, sender, words, out);
             }
@@ -268,4 +291,5 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
 /// requests: one of those a `CancelAll` named, for its reason.
 pub fn resume(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     hosted::resume(domain, env, out);
+    crate::sources::fire(&mut domain.sources, env, out);
 }

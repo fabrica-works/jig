@@ -105,6 +105,8 @@ pub(super) fn limits() -> Limits {
         facts: 2,
     };
     let fleet = fleet::Limits {
+        program_sources: 12,
+        source_detail_bytes: 4096,
         needs_bytes: 4096,
         workers: 1,
         engine_slots: 0,

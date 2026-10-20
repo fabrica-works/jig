@@ -77,7 +77,7 @@ impl Domain {
 
     #[must_use]
     pub fn next_deadline(&self) -> Option<Time> {
-        self.agent.next_deadline()
+        [self.agent.next_deadline(), self.hub.next_deadline()].into_iter().flatten().min()
     }
 
     pub fn reclaim(&mut self) {
@@ -96,7 +96,11 @@ impl Domain {
     }
 
     fn stopping_ready(&self) -> bool {
-        self.stopping && self.hub.hosted() == 0 && self.agent.agents() == 0 && self.pending.is_empty()
+        self.stopping
+            && self.hub.sources_settled()
+            && self.hub.hosted() == 0
+            && self.agent.agents() == 0
+            && self.pending.is_empty()
     }
 
     #[must_use]
@@ -107,6 +111,7 @@ impl Domain {
 
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Source(event) => hub(domain, env, *event),
         Event::Link(link) => hub(domain, env, host::Event::Down(link)),
         Event::Ready => hub(
             domain,
@@ -117,7 +122,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 bounds: env.limits.bounds.clone(),
             },
         ),
-        Event::Lost => {}
+        Event::Lost => hub(domain, env, host::Event::SourceLost),
         Event::GracePassed => {
             hub(domain, env, host::Event::CancelAll { reason: host::Reason::Contact });
             if domain.stopping {
@@ -226,6 +231,10 @@ fn down(domain: &mut Domain, env: &Env<Limits>, request: host::Request, out: &mu
     match request.to_agent() {
         Ok(request) => to_agent(domain, env, request, out),
         Err(request) => match request {
+            host::Request::Source { owner, name, operation, deadline } => {
+                out.push(Request::Source { owner, name, operation, deadline });
+            }
+            host::Request::SourceFault => out.push(Request::SourceFault),
             host::Request::Up(up) => out.push(Request::Link(up)),
             host::Request::Hello { hello } => {
                 out.push(Request::Hello(hello));

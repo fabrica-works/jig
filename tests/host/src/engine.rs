@@ -188,8 +188,11 @@ impl Engine {
     /// Takes the host's request `request`, which is for the engine.
     pub fn take(&mut self, request: Request) -> Vec<Act> {
         match request {
+            Request::Source { .. } | Request::SourceFault => unreachable!("source scheduling has its own world"),
             Request::Up(
-                LinkUp::Activity { .. }
+                LinkUp::Logins { .. }
+                | LinkUp::SignedOut { .. }
+                | LinkUp::Activity { .. }
                 | LinkUp::Unauthorized { .. }
                 | LinkUp::Limited { .. }
                 | LinkUp::AccountRefused { .. },

@@ -262,6 +262,7 @@ impl Parent {
     /// Takes the host's request `request`, which is for the parent.
     pub fn take(&mut self, request: Request) -> Vec<Out> {
         match request {
+            Request::Source { .. } | Request::SourceFault => unreachable!("source scheduling has its own world"),
             Request::Prepare { owner, workspace } => self.prepare(owner, &workspace),
             // A notice: the prepare still ends as it was going to, which the
             // world checks the host takes.
@@ -281,7 +282,9 @@ impl Parent {
             Request::Release { workspace } => self.release(workspace),
             Request::Grant { .. } => Vec::new(),
             Request::Up(
-                LinkUp::Activity { .. }
+                LinkUp::Logins { .. }
+                | LinkUp::SignedOut { .. }
+                | LinkUp::Activity { .. }
                 | LinkUp::Unauthorized { .. }
                 | LinkUp::Limited { .. }
                 | LinkUp::AccountRefused { .. }

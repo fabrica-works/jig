@@ -58,6 +58,9 @@ impl Settings {
             host: Limits {
                 accounts: 4,
                 slots: 4,
+                program_sources: 12,
+                source_interval: skein_lib::Duration::from_secs(60),
+                source_timeout: skein_lib::Duration::from_secs(10),
                 charter_bytes: 4096,
                 transcript_bytes: 1040,
                 delivery_evidence_bytes: 0,
@@ -634,8 +637,13 @@ impl World {
                 self.stats.reports += 1;
                 Taken::Other
             }
-            Event::Down(
-                LinkDown::Message { .. }
+            Event::SourceAnswered { .. }
+            | Event::SourceLost
+            | Event::Down(
+                LinkDown::Sources { .. }
+                | LinkDown::Check { .. }
+                | LinkDown::SignOut { .. }
+                | LinkDown::Message { .. }
                 | LinkDown::Grant { .. }
                 | LinkDown::Cancel { .. }
                 | LinkDown::Relayed { .. }
@@ -723,6 +731,7 @@ impl World {
     /// `run`'s attempt `attempt`: a refusal, or a prepare that admits it.
     fn assigned(&mut self, run: Token, attempt: Token, request: &Request) {
         match request {
+            Request::Source { .. } | Request::SourceFault => unreachable!("source scheduling has its own world"),
             Request::Up(LinkUp::Answer { run: answered, attempt: of, answer }) => {
                 assert_eq!((*answered, *of), (run, attempt), "an assignment is answered as itself");
                 match &answer.ending {
@@ -746,7 +755,9 @@ impl World {
                 assert!(self.admitted.insert((run, attempt), *owner).is_none(), "an attempt is admitted once");
             }
             Request::Up(
-                LinkUp::Activity { .. }
+                LinkUp::Logins { .. }
+                | LinkUp::SignedOut { .. }
+                | LinkUp::Activity { .. }
                 | LinkUp::Unauthorized { .. }
                 | LinkUp::Limited { .. }
                 | LinkUp::AccountRefused { .. }
@@ -789,8 +800,11 @@ impl World {
         self.refusals.request(&request);
         self.trace.log(self.now, format_args!("host -> {request:?}"));
         match request {
+            Request::Source { .. } | Request::SourceFault => unreachable!("source scheduling has its own world"),
             Request::Up(
-                LinkUp::Activity { .. }
+                LinkUp::Logins { .. }
+                | LinkUp::SignedOut { .. }
+                | LinkUp::Activity { .. }
                 | LinkUp::Unauthorized { .. }
                 | LinkUp::Limited { .. }
                 | LinkUp::AccountRefused { .. },

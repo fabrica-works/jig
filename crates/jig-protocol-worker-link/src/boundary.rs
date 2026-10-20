@@ -6,6 +6,7 @@ use skein_channel::{Closed, Lower, LowerEvent};
 use skein_lib::{Secret, Time, Token};
 #[derive(Debug)]
 pub enum Event {
+    SourceFault,
     Hello { hello: host::Hello },
     Up { up: host::LinkUp, parts: Box<[Part]> },
     Dialled { connection: Token },

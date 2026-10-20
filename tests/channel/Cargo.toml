@@ -8,6 +8,9 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+jig-domain-fleet.workspace = true
+smith-fake-claude.workspace = true
+smith-protocol-program.workspace = true
 jig-client-test-records = { path = "../../testing/jig-client-test-records" }
 jig-test-service.workspace = true
 jig-test-domain.workspace = true

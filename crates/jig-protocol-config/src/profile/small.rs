@@ -96,6 +96,8 @@ pub(super) const PEOPLE: people::Limits = people::Limits {
 };
 pub(super) const FLEET: fleet::Limits = fleet::Limits {
     workers: 2,
+    program_sources: 12,
+    source_detail_bytes: 4096,
     needs_bytes: 65_536,
     grants: 8,
     engine_slots: 0,
@@ -198,6 +200,9 @@ pub(super) const CORE: core::Limits = core::Limits {
 pub(super) const HUB: host::Limits = host::Limits {
     slots: 2,
     accounts: 8,
+    program_sources: 12,
+    source_interval: Duration::from_secs(60),
+    source_timeout: Duration::from_secs(10),
     charter_bytes: 65_536,
     transcript_bytes: 262_144,
     delivery_evidence_bytes: 4_096,
@@ -243,8 +248,9 @@ pub(super) const IO: skein_io::Limits = skein_io::Limits {
     close_timeout: Duration::from_secs(30),
     retry: Duration::from_millis(250),
 };
+// One extra Sources output at hello adds eight core route positions.
 pub(super) const JOURNAL: skein_lib::JournalLimits =
-    skein_lib::JournalLimits { commits: 3, writes: 18_548, held: 55_644, now: 256, release: 256 };
+    skein_lib::JournalLimits { commits: 3, writes: 18_556, held: 55_668, now: 256, release: 256 };
 pub(super) const LIMITS: Limits = Limits {
     core: CORE,
     store: STORE,
@@ -345,13 +351,13 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
 pub(super) const STORE_KV: skein_kv::Limits = skein_kv::Limits {
     key: 2079,
     value: 1_305_193,
-    ops: 37_099,
-    commit: 345_898_194,
+    ops: 37_115,
+    commit: 345_931_602,
     queued: 3,
-    queued_bytes: 1_037_694_582,
+    queued_bytes: 1_037_794_806,
     budget: 268_435_456,
-    segment: 691_796_388,
-    snapshot_after: 345_898_194,
+    segment: 691_863_204,
+    snapshot_after: 345_931_602,
     chunk: 1_307_292,
     page: skein_kv::Page { rows: 2, bytes: 1_307_272 },
     deadline: Duration::from_secs(30),

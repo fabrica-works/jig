@@ -25,6 +25,13 @@ impl World {
             }
         }
         match delivery {
+            root::Delivery::Core(core::Held::Sources { channel, sources }) => {
+                assert!(sources.is_empty(), "scripted worker source fixture");
+                self.events.push_back(root::Event::Core(core::Event::Fleet(jig_domain_fleet::Event::Logins {
+                    channel,
+                    logins: Box::new([]),
+                })));
+            }
             root::Delivery::ApplicationRead { reply, number, answer } => {
                 if let Some(reads) = &mut self.reads {
                     reads.application_replied(reply, number, answer, &self.store);
@@ -202,6 +209,9 @@ impl World {
                 | core::Held::NotesWritten { .. }
                 | core::Held::NotesDeleted { .. }
                 | core::Held::StopRun { .. }
+                | core::Held::CheckSource { .. }
+                | core::Held::SignOutSource { .. }
+                | core::Held::SourceSignedOut { .. }
                 | core::Held::Refuse { .. }
                 | core::Held::MakeEffect { .. },
             ) => {}

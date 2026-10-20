@@ -1,5 +1,6 @@
 //! The fleet's state and its entry points (programming-model.md, section 3).
 
+use alloc::boxed::Box;
 use skein_lib::{Deadlines, Env, Id, List, Map, Queue, Slab, Time, Token};
 
 use crate::attempt::{self, Attempt, Run};
@@ -21,11 +22,14 @@ use alloc::boxed::Box;
 /// per resume, within the same bound.
 #[must_use]
 pub const fn max_out(limits: &Limits) -> u32 {
-    let listed = limits.slots.saturating_mul(limits.grants.saturating_add(2));
+    let listed = limits.slots.saturating_mul(limits.grants.saturating_add(2)).saturating_add(1);
     let tracked = limits.attempts.saturating_add(limits.workers.saturating_mul(limits.slots));
     let adopting = limits.grants.saturating_add(3);
     let other = if tracked > adopting { tracked } else { adopting };
-    if listed > other { listed } else { other }
+    let runs = if listed > other { listed } else { other };
+    let sources = limits.program_sources.saturating_add(1);
+    let sources = if sources > limits.workers { sources } else { limits.workers };
+    if runs > sources { runs } else { sources }
 }
 
 /// Whether the engine's construction hello has been heard.
@@ -38,6 +42,7 @@ pub(crate) enum EngineHello {
 /// The fleet's state.
 #[derive(Debug)]
 pub struct Domain {
+    pub(crate) program_sources: Box<[crate::SourceName]>,
     /// The workers in contact, and their channels' names.
     pub(crate) channels: Slab<Channel>,
     pub(crate) needs: crate::Needs,
@@ -73,6 +78,17 @@ pub struct Domain {
 }
 
 impl Domain {
+    #[must_use]
+    pub fn program_logins(&self, channel: Token) -> Option<&[crate::Login]> {
+        Some(self.channels.get(*self.tokens.get(&channel)?)?.sources.logins())
+    }
+    #[must_use]
+    pub fn awaiting_logins(&self, channel: Token) -> bool {
+        match self.tokens.get(&channel) {
+            Some(id) => self.channels.get(*id).expect("current channel").sources.awaiting(),
+            None => true,
+        }
+    }
     /// A domain with room for `limits`.
     #[must_use]
     pub fn new(limits: &Limits, needs: crate::Needs) -> Domain {
@@ -91,6 +107,7 @@ impl Domain {
         if limits.engine_slots > 0 {
             let engine = Channel {
                 declarations: Box::new([]),
+                sources: crate::sources::Sources::new(Box::new([]), 0, false),
                 eligible: crate::needs::eligibility(&needs, &[]),
                 kind: HostKind::Engine,
                 token: Token::new(0),
@@ -104,6 +121,7 @@ impl Domain {
             tokens.insert(Token::new(0), id).expect("engine token reserved");
         }
         Domain {
+            program_sources: Box::new([]),
             needs,
             engine_hello: EngineHello::Expected,
             channels,
@@ -355,6 +373,13 @@ impl Domain {
 /// Handles one event, emitting at most [`max_out`] requests.
 pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queue<Request>) {
     match event {
+        Event::Sources { sources } => crate::sources::replace(domain, env, sources, out),
+        Event::Check { channel, name } => crate::sources::check(domain, channel, name, out),
+        Event::SignOut { to, channel, name } => crate::sources::sign_out(domain, to, channel, name, out),
+        Event::Logins { channel, logins } => crate::sources::logins(domain, env, channel, logins, out),
+        Event::SignedOut { channel, name, result } => {
+            crate::sources::signed_out(domain, env, channel, name, result, out);
+        }
         Event::Start { reply_to, run, attempt, workstream, kinds, charter, placement, assignment, grants } => {
             if attempt::start(
                 domain, env, reply_to, run, attempt, workstream, kinds, charter, placement, assignment, out,
@@ -412,7 +437,7 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
         ),
         Event::Loaded => attempt::loaded(domain, env),
         Event::Hello { channel, hello } => channel::hello(domain, env, channel, hello, out),
-        Event::Lost { channel } => channel::lost(domain, env, channel),
+        Event::Lost { channel } => channel::lost(domain, env, channel, out),
         Event::Answer { channel, run, attempt, answer, payload } => {
             attempt::answer(domain, channel, run, attempt, answer, payload, out);
         }

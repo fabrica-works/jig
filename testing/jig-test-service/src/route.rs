@@ -211,6 +211,9 @@ fn immediate(engine: &mut Engine, now: core::Now) {
 
 fn core_held(engine: &mut Engine, held: core::Held) {
     match held {
+        core::Held::Sources { .. } | core::Held::CheckSource { .. } | core::Held::SignOutSource { .. } => {
+            unreachable!("link translates host-wide source commands")
+        }
         core::Held::Drained => stop::drained(engine),
         core::Held::Load(load) => immediate(engine, *load),
         core::Held::ReadLoad { load, range } => {
@@ -230,7 +233,9 @@ fn core_held(engine: &mut Engine, held: core::Held) {
                 engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
             }
         }
-        held @ core::Held::Result { .. } => engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held))),
+        held @ (core::Held::Result { .. } | core::Held::SourceSignedOut { .. }) => {
+            engine.outputs.push(PartyOutput::Held(root::Delivery::Core(held)));
+        }
         core::Held::MakeEffect { connector: number, entry } => {
             engine.events.push(root::Event::Connector { number, event: connector::Event::Make { entry } });
         }

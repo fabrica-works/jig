@@ -298,7 +298,10 @@ fn delivery(now: Time, channel: Token, down: host::LinkDown, values: &Values) ->
     let grants = match &down {
         host::LinkDown::Assign { assignment } => values.grants(&assignment.assignment.grants, now),
         host::LinkDown::Grant { grant, .. } => values.grants(::core::slice::from_ref(grant), now),
-        host::LinkDown::Message { .. }
+        host::LinkDown::Sources { .. }
+        | host::LinkDown::Check { .. }
+        | host::LinkDown::SignOut { .. }
+        | host::LinkDown::Message { .. }
         | host::LinkDown::Relayed { .. }
         | host::LinkDown::TurnKept { .. }
         | host::LinkDown::Acknowledge { .. }

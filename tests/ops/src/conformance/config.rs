@@ -62,6 +62,9 @@ pub fn root_for(seed: u64, environment_chat: bool) -> (Config, Limits) {
         host: host::Limits {
             slots: 1,
             accounts: 1,
+            program_sources: 12,
+            source_interval: skein_lib::Duration::from_secs(60),
+            source_timeout: skein_lib::Duration::from_secs(10),
             charter_bytes: 65536,
             transcript_bytes: 32768,
             delivery_evidence_bytes: 0,

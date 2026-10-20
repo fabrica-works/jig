@@ -409,6 +409,13 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(u64::from(limits.people.words))?
         .checked_add(u64::from(limits.notes.body_bytes))?
         .checked_add(u64::from(limits.documents.text_bytes))?;
+    let source_payload = bytes(
+        limits.fleet.program_sources,
+        sizeof(size_of::<fleet::Login>())?
+            .checked_add(sizeof(size_of::<fleet::SourceName>())?.checked_mul(3)?)?
+            .checked_add(u64::from(limits.fleet.source_detail_bytes))?,
+    )?;
+    let payload = payload.max(source_payload);
     total = total.checked_add(Queue::<fleet::Request>::worst_case(fleet::max_out(&limits.fleet).checked_mul(4)?)?)?;
     total = total.checked_add(Queue::<Event>::worst_case(route.writes)?)?;
     total = total.checked_add(Queue::<Request>::worst_case(route.writes.checked_add(1)?)?)?;

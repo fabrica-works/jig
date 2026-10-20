@@ -566,10 +566,13 @@ impl World {
     fn route(&mut self, request: Request) {
         self.refusals.request(&request);
         match request {
+            Request::Source { .. } | Request::SourceFault => unreachable!("source scheduling has its own world"),
             Request::Up(
                 record @ (LinkUp::Unauthorized { .. }
                 | LinkUp::Limited { .. }
                 | LinkUp::AccountRefused { .. }
+                | LinkUp::Logins { .. }
+                | LinkUp::SignedOut { .. }
                 | LinkUp::Activity { .. }),
             ) => {
                 self.receive_report(record);

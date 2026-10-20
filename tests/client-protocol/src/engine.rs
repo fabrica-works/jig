@@ -401,6 +401,10 @@ pub fn held_event(held: core::Held) -> Option<Event> {
         | core::Held::TaskTurnKept { .. }
         | core::Held::AcknowledgeTurn { .. }
         | core::Held::Cancel { .. }
+        | core::Held::Sources { .. }
+        | core::Held::CheckSource { .. }
+        | core::Held::SignOutSource { .. }
+        | core::Held::SourceSignedOut { .. }
         | core::Held::Refuse { .. }
         | core::Held::TurnBusy { .. }
         | core::Held::StopRun { .. }

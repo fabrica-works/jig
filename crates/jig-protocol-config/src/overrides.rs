@@ -220,6 +220,8 @@ fn set_people(limits: &mut jig_domain_people::Limits, name: &[u8], value: u64) -
 
 fn set_fleet(limits: &mut jig_domain_fleet::Limits, name: &[u8], value: u64) -> Result<(), What> {
     let jig_domain_fleet::Limits {
+        program_sources,
+        source_detail_bytes,
         workers,
         needs_bytes,
         engine_slots,
@@ -236,6 +238,8 @@ fn set_fleet(limits: &mut jig_domain_fleet::Limits, name: &[u8], value: u64) -> 
         history,
     } = limits;
     match name {
+        b"program_sources" => *program_sources = count(value)?,
+        b"source_detail_bytes" => *source_detail_bytes = count(value)?,
         b"workers" => *workers = count(value)?,
         b"needs_bytes" => *needs_bytes = value,
         b"engine_slots" => *engine_slots = count(value)?,
@@ -373,6 +377,9 @@ fn set_notes(limits: &mut jig_domain_notes::Limits, name: &[u8], value: u64) -> 
 
 fn set_hub(limits: &mut jig_domain_host::Limits, name: &[u8], value: u64) -> Result<(), What> {
     let jig_domain_host::Limits {
+        program_sources,
+        source_interval: _,
+        source_timeout: _,
         slots,
         accounts,
         charter_bytes,
@@ -391,6 +398,7 @@ fn set_hub(limits: &mut jig_domain_host::Limits, name: &[u8], value: u64) -> Res
         turn_queue_bytes,
     } = limits;
     match name {
+        b"program_sources" => *program_sources = count(value)?,
         b"slots" => *slots = count(value)?,
         b"accounts" => *accounts = count(value)?,
         b"charter_bytes" => *charter_bytes = value,

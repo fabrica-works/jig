@@ -24,7 +24,7 @@ fn source_bodies_and_slot_independent_caps_are_measured() {
 fn source_record_fields_refuse_one_byte_past_each_bound() {
     let limits = sizes::limits(&SIZES_ONE_SLOT).expect("tiny bounds");
     for length in [32, 33] {
-        let name = vec![b'a'; length].into_boxed_slice();
+        let name: Box<[u8]> = Box::from([b'a'; 33].get(..length).expect("field fixture"));
         assert_eq!(wire::Check::new(&limits, wire::CheckParts { name: name.clone() }).is_ok(), length == 32);
         assert_eq!(wire::SignOut::new(&limits, wire::SignOutParts { name: name.clone() }).is_ok(), length == 32);
         assert_eq!(
@@ -51,7 +51,7 @@ fn source_record_fields_refuse_one_byte_past_each_bound() {
                 &limits,
                 wire::SourceFailedParts {
                     reason: wire::SourceFailure::Exited,
-                    detail: vec![b'e'; length].into_boxed_slice(),
+                    detail: Box::from([b'e'; 17].get(..length).expect("detail fixture")),
                 }
             )
             .is_ok(),
@@ -66,7 +66,7 @@ fn whole_source_lists_round_trip_at_the_bound_and_refuse_one_more() {
         let mut names = List::with_capacity(count);
         let mut logins = List::with_capacity(count);
         for index in 0..count {
-            let name = format!("source-{index}").into_bytes().into_boxed_slice();
+            let name: Box<[u8]> = Box::from([b'a' + u8::try_from(index).expect("three sources")].as_slice());
             names
                 .push(wire::ProgramSource::new(&limits, wire::ProgramSourceParts { name: name.clone() }).expect("name"))
                 .expect("list");
@@ -88,5 +88,5 @@ fn whole_source_lists_round_trip_at_the_bound_and_refuse_one_more() {
         }
     }
     assert_eq!(wire::VERSION, 3);
-    assert!(v3::check_limits(&limits).is_ok());
+    v3::check_limits(&limits).expect("source limits");
 }

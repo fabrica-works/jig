@@ -16,7 +16,12 @@ fn step(domain: &mut Domain, event: Event) -> Vec<Request> {
     fleet::step(domain, &env, event, &mut out);
     let mut requests = Vec::new();
     while let Some(request) = out.pop() {
-        requests.push(request);
+        if let Request::Sources { channel, sources } = request {
+            assert!(sources.is_empty());
+            fleet::step(domain, &env, Event::Logins { channel, logins: Box::new([]) }, &mut out);
+        } else {
+            requests.push(request);
+        }
     }
     domain.reclaim();
     requests

@@ -5,6 +5,9 @@ use skein_lib::{Duration, Token};
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum LinkDown {
+    Sources { sources: Box<[SourceName]> },
+    Check { name: SourceName },
+    SignOut { name: SourceName },
     Assign { assignment: Assignment },
     Message { run: Token, attempt: Token, name: Token, sender: Box<[u8]>, words: Box<[u8]> },
     Relayed { run: Token, attempt: Token, call: Box<[u8]>, answer: Relayed },
@@ -16,6 +19,13 @@ pub enum LinkDown {
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum LinkUp {
+    Logins {
+        logins: Box<[Login]>,
+    },
+    SignedOut {
+        name: SourceName,
+        result: SignOutResult,
+    },
     Activity {
         run: Token,
         attempt: Token,
@@ -108,13 +118,13 @@ impl SourceName {
         if value.is_empty() || value.len() > 32 {
             return None;
         }
-        for byte in value {
+        let mut bytes = [0; 32];
+        for (index, byte) in value.iter().enumerate() {
             if !byte.is_ascii_lowercase() && !byte.is_ascii_digit() && *byte != b'-' {
                 return None;
             }
+            *bytes.get_mut(index)? = *byte;
         }
-        let mut bytes = [0; 32];
-        bytes.get_mut(..value.len())?.copy_from_slice(value);
         Some(Self { length: u8::try_from(value.len()).ok()?, bytes })
     }
     #[must_use]
@@ -134,13 +144,13 @@ impl LoginMethod {
         if value.is_empty() || value.len() > 32 {
             return None;
         }
-        for byte in value {
+        let mut bytes = [0; 32];
+        for (index, byte) in value.iter().enumerate() {
             if !(0x21..=0x7e).contains(byte) {
                 return None;
             }
+            *bytes.get_mut(index)? = *byte;
         }
-        let mut bytes = [0; 32];
-        bytes.get_mut(..value.len())?.copy_from_slice(value);
         Some(Self { length: u8::try_from(value.len()).ok()?, bytes })
     }
     #[must_use]

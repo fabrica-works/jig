@@ -327,6 +327,10 @@ impl Application for OpsApplication {
                 | core::Held::AcknowledgeTurn { .. }
                 | core::Held::Drained
                 | core::Held::Cancel { .. }
+                | core::Held::Sources { .. }
+                | core::Held::CheckSource { .. }
+                | core::Held::SignOutSource { .. }
+                | core::Held::SourceSignedOut { .. }
                 | core::Held::Refuse { .. }
                 | core::Held::TurnBusy { .. }
                 | core::Held::StopRun { .. }

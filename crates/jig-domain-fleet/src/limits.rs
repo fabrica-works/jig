@@ -10,6 +10,8 @@ use crate::turn::Pending;
 /// to every step read-only.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
+    pub program_sources: u32,
+    pub source_detail_bytes: u32,
     /// Workers in contact at once. A worker beyond them is turned away at
     /// its hello.
     pub workers: u32,
@@ -69,6 +71,10 @@ pub(crate) fn tracked(limits: &Limits) -> Option<u32> {
 /// rest is its sender's to count.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
+    let listed = limits.slots.checked_mul(limits.grants.checked_add(2)?)?.checked_add(1)?;
+    let adopting = limits.grants.checked_add(3)?;
+    let _outputs =
+        listed.max(tracked(limits)?.max(adopting)).max(limits.program_sources.checked_add(1)?).max(limits.workers);
     let count = limits.workers.checked_add(u32::from(limits.engine_slots > 0))?;
     count.checked_add(limits.history)?;
     let channels = Slab::<Channel>::worst_case(count)?.checked_add(Map::<Token, Id<Channel>>::worst_case(count)?)?;
@@ -105,7 +111,9 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     let views = skein_lib::List::<crate::HostView>::worst_case(count.checked_add(limits.history)?)?
         .checked_add(skein_lib::List::<crate::AttemptView>::worst_case(tracked)?)?
         .checked_add(skein_lib::List::<crate::HelloRefusalRecord>::worst_case(limits.history)?)?;
-    channels
+    let sources = crate::sources::worst_case(limits)?.checked_mul(u64::from(count).checked_add(1)?)?;
+    sources
+        .checked_add(channels)?
         .checked_add(workers)?
         .checked_add(engine)?
         .checked_add(attempts)?

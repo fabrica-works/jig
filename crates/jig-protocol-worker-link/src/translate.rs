@@ -56,6 +56,8 @@ pub(crate) fn hello(hello: host::Hello, limits: &wire::v3::Limits) -> Option<Fra
 
 pub(crate) fn up(up: host::LinkUp, parts: &[Part], limits: &wire::v3::Limits) -> Option<Frame> {
     match up {
+        host::LinkUp::Logins { logins } => logins_frame(logins, limits),
+        host::LinkUp::SignedOut { name, result } => signed_out_frame(name, result, limits),
         host::LinkUp::Activity { run, attempt, activity: value } => {
             let record = wire::Fact::new(
                 limits,
@@ -346,6 +348,24 @@ pub(crate) fn down(
         }
     }
     let down = match known? {
+        wire::Kind::Sources => {
+            let record = wire::Sources::decode(limits, &mut reader).ok()?.into_parts();
+            let mut names = List::with_capacity(record.sources.len());
+            for source in record.sources.into_boxed() {
+                let name = host::SourceName::new(source.name())?;
+                if names.as_slice().contains(&name) {
+                    return None;
+                }
+                names.push(name).ok()?;
+            }
+            host::LinkDown::Sources { sources: names.into_boxed() }
+        }
+        wire::Kind::Check => host::LinkDown::Check {
+            name: host::SourceName::new(wire::Check::decode(limits, &mut reader).ok()?.name())?,
+        },
+        wire::Kind::SignOut => host::LinkDown::SignOut {
+            name: host::SourceName::new(wire::SignOut::decode(limits, &mut reader).ok()?.name())?,
+        },
         wire::Kind::Assignment => {
             let record = wire::Assignment::decode(limits, &mut reader).ok()?;
             host::LinkDown::Assign { assignment: assignment(record, now, parts, next, out) }
@@ -398,10 +418,7 @@ pub(crate) fn down(
             }
         }
         // TurnBusy is decoded below the hub by the component; up kinds are invalid here.
-        wire::Kind::Sources
-        | wire::Kind::Check
-        | wire::Kind::SignOut
-        | wire::Kind::Logins
+        wire::Kind::Logins
         | wire::Kind::SignedOut
         | wire::Kind::TurnBusy
         | wire::Kind::Hello
@@ -526,4 +543,68 @@ fn assignment(
         answered: answered.into_boxed(),
         turns,
     }
+}
+
+fn login_state(state: host::LoginState, limits: &wire::v3::Limits) -> Option<wire::LoginState> {
+    Some(match state {
+        host::LoginState::Usable => wire::LoginState::Usable,
+        host::LoginState::NotSignedIn => wire::LoginState::NotSignedIn,
+        host::LoginState::SignedInOtherwise(method) => wire::LoginState::SignedInOtherwise(
+            wire::LoginOtherwise::new(limits, wire::LoginOtherwiseParts { method: Box::from(method.as_bytes()) })
+                .ok()?,
+        ),
+        host::LoginState::Failed { reason, detail } => wire::LoginState::Failed(source_failed(reason, detail, limits)?),
+    })
+}
+fn source_failed(
+    reason: host::SourceFailure,
+    detail: Box<[u8]>,
+    limits: &wire::v3::Limits,
+) -> Option<wire::SourceFailed> {
+    let reason = match reason {
+        host::SourceFailure::Missing => wire::SourceFailure::Missing,
+        host::SourceFailure::Deadline => wire::SourceFailure::Deadline,
+        host::SourceFailure::Unreadable => wire::SourceFailure::Unreadable,
+        host::SourceFailure::Exited => wire::SourceFailure::Exited,
+        host::SourceFailure::Unconfigured => wire::SourceFailure::Unconfigured,
+        host::SourceFailure::Unknown => wire::SourceFailure::Unknown,
+        host::SourceFailure::Closed => wire::SourceFailure::Closed,
+    };
+    wire::SourceFailed::new(limits, wire::SourceFailedParts { reason, detail }).ok()
+}
+
+fn logins_frame(logins: Box<[host::Login]>, limits: &wire::v3::Limits) -> Option<Frame> {
+    let mut rows = List::<wire::Login>::with_capacity(limits.logins_logins);
+    for login in logins {
+        for row in &rows {
+            if row.name() == login.name.as_bytes() {
+                return None;
+            }
+        }
+        rows.push(
+            wire::Login::new(
+                limits,
+                wire::LoginParts { name: Box::from(login.name.as_bytes()), state: login_state(login.state, limits)? },
+            )
+            .ok()?,
+        )
+        .ok()?;
+    }
+    let record = wire::Logins::new(limits, wire::LoginsParts { logins: rows }).ok()?;
+    let mut body = Writer::new(usize::try_from(record.measure()).ok()?);
+    record.encode(&mut body).ok()?;
+    frame(0x0108, body.finish())
+}
+fn signed_out_frame(name: host::SourceName, result: host::SignOutResult, limits: &wire::v3::Limits) -> Option<Frame> {
+    let result = match result {
+        host::SignOutResult::SignedOut => wire::SignOutResult::SignedOut,
+        host::SignOutResult::Failed { reason, detail } => {
+            wire::SignOutResult::Failed(source_failed(reason, detail, limits)?)
+        }
+    };
+    let record =
+        wire::SignedOut::new(limits, wire::SignedOutParts { name: Box::from(name.as_bytes()), result }).ok()?;
+    let mut body = Writer::new(usize::try_from(record.measure()).ok()?);
+    record.encode(&mut body).ok()?;
+    frame(0x0109, body.finish())
 }

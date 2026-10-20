@@ -19,6 +19,8 @@ const MAX_WIRE: usize = 20_000;
 
 /// The fleet's limits in the calm world.
 pub const LIMITS: Limits = Limits {
+    program_sources: 12,
+    source_detail_bytes: 4096,
     needs_bytes: 4096,
     workers: 4,
     engine_slots: 0,
@@ -935,8 +937,16 @@ impl World {
 
     // The fleet's requests.
 
+    #[expect(clippy::too_many_lines, reason = "one exhaustive translation of fleet requests to the scripted workers")]
     fn request(&mut self, request: Request) {
         match request {
+            Request::Sources { channel, sources } => {
+                assert!(sources.is_empty(), "legacy worker fixture has no program sources");
+                self.stage.push(Event::Logins { channel, logins: Box::new([]) });
+            }
+            Request::Check { .. } | Request::SignOut { .. } | Request::SignedOut { .. } => {
+                unreachable!("source world owns source commands")
+            }
             Request::Turned { .. } | Request::AcknowledgeTurn { .. } | Request::TurnBusy { .. } => {
                 unreachable!("this world exercises placement and relays")
             }
@@ -1301,7 +1311,12 @@ fn describe(event: &Event) -> String {
         Event::Hello { channel, hello } => {
             format!("Hello {} slots {} hosting {:?}", channel.raw(), hello.slots, hello.hosting)
         }
-        Event::Inbound { .. }
+        Event::Sources { .. }
+        | Event::Logins { .. }
+        | Event::Check { .. }
+        | Event::SignOut { .. }
+        | Event::SignedOut { .. }
+        | Event::Inbound { .. }
         | Event::Grant { .. }
         | Event::Unauthorized { .. }
         | Event::Limited { .. }

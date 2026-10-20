@@ -117,6 +117,12 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
     for _ in 0..marked {
         let Some(next) = pending.pop() else { break };
         let request = match next {
+            fleet::Request::Sources { channel, sources } => Request::Held(Box::new(Held::Sources { channel, sources })),
+            fleet::Request::Check { channel, name } => Request::Held(Box::new(Held::CheckSource { channel, name })),
+            fleet::Request::SignOut { channel, name } => Request::Held(Box::new(Held::SignOutSource { channel, name })),
+            fleet::Request::SignedOut { to, channel, name, result } => {
+                Request::Held(Box::new(Held::SourceSignedOut { to, channel, name, result }))
+            }
             fleet::Request::Acknowledge { channel, run, attempt } => {
                 Request::Held(Box::new(Held::Acknowledge { channel, run, attempt }))
             }
@@ -586,7 +592,12 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::
         }
     }
     let touched = match &event {
-        fleet::Event::Start { .. }
+        fleet::Event::Sources { .. }
+        | fleet::Event::Logins { .. }
+        | fleet::Event::Check { .. }
+        | fleet::Event::SignOut { .. }
+        | fleet::Event::SignedOut { .. }
+        | fleet::Event::Start { .. }
         | fleet::Event::Adopt { .. }
         | fleet::Event::Cancel { .. }
         | fleet::Event::Acknowledge { .. }

@@ -599,6 +599,7 @@ impl Session {
         }
     }
 
+    #[expect(clippy::too_many_lines, reason = "one exhaustive delivery translation for the joint client session")]
     fn held(&mut self, delivery: root::Delivery, now: Time, wall: Wall) -> Result<(), Invalid> {
         match delivery {
             root::Delivery::Core(core::Held::PeopleReply { to, reply }) => {
@@ -678,6 +679,10 @@ impl Session {
                 | core::Held::AcknowledgeTurn { .. }
                 | core::Held::Drained
                 | core::Held::Cancel { .. }
+                | core::Held::Sources { .. }
+                | core::Held::CheckSource { .. }
+                | core::Held::SignOutSource { .. }
+                | core::Held::SourceSignedOut { .. }
                 | core::Held::Refuse { .. }
                 | core::Held::TurnBusy { .. }
                 | core::Held::StopRun { .. }

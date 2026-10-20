@@ -11,6 +11,10 @@ use crate::turns::{Name, Pending};
 /// step read-only.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
+    /// Local program sources; their command lifecycle does not consume run slots.
+    pub program_sources: u32,
+    pub source_interval: skein_lib::Duration,
+    pub source_timeout: skein_lib::Duration,
     /// Runs hosted at once: the run slots. An assignment beyond them is
     /// refused as busy.
     pub slots: u32,
@@ -81,6 +85,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     if cancellations.checked_add(2).is_none() || limits.held.checked_add(limits.accounts)?.checked_add(2).is_none() {
         return None;
     }
+    let sources = crate::sources::worst_case(limits)?;
     let hosted = Slab::<Hosted>::worst_case(limits.slots)?;
     let names = Map::<Token, Id<Hosted>>::worst_case(limits.slots)?;
     let answers = Map::<(Token, Token), Id<Hosted>>::worst_case(limits.slots)?;
@@ -118,7 +123,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
     // One terminal arrives per step; its fixed payload is included.
     // A boxed start exists at the step peak before the parent takes it.
     let delivered = u64::try_from(size_of::<Delivery>()).ok()?;
-    hosted
+    sources
+        .checked_add(hosted)?
         .checked_add(names)?
         .checked_add(ready)?
         .checked_add(answers)?
@@ -137,6 +143,7 @@ fn cancellations_bound(limits: &Limits) -> Option<u32> {
         .run_calls
         .checked_mul(2)?
         .max(limits.held.checked_add(limits.accounts)?)
-        .checked_add(2)?
+        .checked_add(limits.program_sources)?
+        .checked_add(4)?
         .checked_add(limits.turns.checked_mul(2)?)
 }

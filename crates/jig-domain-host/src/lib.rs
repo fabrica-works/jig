@@ -6,8 +6,9 @@
 //! to the core, workspace and agent capabilities; an engine root gives it a
 //! direct link that is never lost and no workspace. The agent may be a process
 //! or an inline agent, and the host does not distinguish them.
-//! The host arms no timers; its callers bound each wait. Facts are best effort
-//! and never govern a decision.
+//! The run lifecycle arms no timers; its callers bound each wait. The source
+//! machine owns periodic checks, driven by its parent through `next_deadline`
+//! and `resume`. Facts are best effort and never govern a decision.
 
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
@@ -25,6 +26,7 @@ mod hosted;
 mod limits;
 mod link;
 mod refusals;
+pub mod sources;
 #[cfg(test)]
 mod tests;
 mod turns;

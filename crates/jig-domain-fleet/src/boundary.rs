@@ -178,6 +178,27 @@ pub struct Call {
 /// parent -> fleet
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    Sources {
+        sources: Box<[crate::SourceName]>,
+    },
+    Check {
+        channel: Token,
+        name: crate::SourceName,
+    },
+    SignOut {
+        to: ReplyTo,
+        channel: Token,
+        name: crate::SourceName,
+    },
+    Logins {
+        channel: Token,
+        logins: Box<[crate::Login]>,
+    },
+    SignedOut {
+        channel: Token,
+        name: crate::SourceName,
+        result: crate::SignOutResult,
+    },
     /// Place a run on a host declaring every model of its configured charter,
     /// with references to its ordered committed conversation state.
     Start {
@@ -331,6 +352,25 @@ pub enum Event {
 /// fleet -> parent
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    Sources {
+        channel: Token,
+        sources: Box<[crate::SourceName]>,
+    },
+    Check {
+        channel: Token,
+        name: crate::SourceName,
+    },
+    SignOut {
+        channel: Token,
+        name: crate::SourceName,
+    },
+    /// None means the host did not confirm sign-out, including channel loss.
+    SignedOut {
+        to: ReplyTo,
+        channel: Token,
+        name: crate::SourceName,
+        result: Option<crate::SignOutResult>,
+    },
     /// An owned live observation changed; this grants no reply right.
     Observed {
         run: Token,

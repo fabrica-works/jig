@@ -9,6 +9,7 @@ use smith_agent_process_world as agent_fixture;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) enum Proc {
+    Auth(Box<smith_fake_claude::Fake>),
     Engine(Box<ServiceHost>),
     Worker(Box<ServiceHost>),
     Agent { host: Box<PipeHost<smith_agent_shell::Agent>>, errors: agent_fixture::AgentErrors },
@@ -119,6 +120,7 @@ impl Proc {
         match self {
             Self::Engine(host) | Self::Worker(host) => host.as_ref(),
             Self::Agent { host, .. } => host.as_ref(),
+            Self::Auth(fake) => fake.as_ref(),
             Self::Peer(peer) => peer.as_ref(),
             Self::Probe(peer) => peer.as_ref(),
         }
@@ -127,6 +129,7 @@ impl Proc {
         match self {
             Self::Engine(host) | Self::Worker(host) => host.as_mut(),
             Self::Agent { host, .. } => host.as_mut(),
+            Self::Auth(fake) => fake.as_mut(),
             Self::Peer(peer) => peer.as_mut(),
             Self::Probe(peer) => peer.as_mut(),
         }
@@ -215,6 +218,9 @@ pub(crate) fn worker_message(root: kernel::Fd) -> Proc {
     worker_configured(root, false, true)
 }
 fn worker_configured(root: kernel::Fd, bad_charter: bool, message: bool) -> Proc {
+    worker_document(root, bad_charter, message, fixtures::WORKER_DOCUMENT)
+}
+fn worker_document(root: kernel::Fd, bad_charter: bool, message: bool, document: &[u8]) -> Proc {
     let mut roots = skein_lib::List::with_capacity(1);
     roots.push(root).expect("one worker root");
     let mut agent = fixtures::agent();
@@ -226,7 +232,6 @@ fn worker_configured(root: kernel::Fd, bad_charter: bool, message: bool) -> Proc
         agent.host_limits.message_bytes = 256;
         agent.bounds.message_bytes = 512;
     }
-    let document = fixtures::WORKER_DOCUMENT;
     let service = jig_test_service::startup(
         document,
         &fixtures::files(true),
@@ -263,6 +268,8 @@ fn agent_configured(inherited: &Inherited, mut configuration: smith_agent_servic
 /// A short send or receive extends its descriptor's retained frame prefix.
 #[derive(Default)]
 pub(crate) struct Wire {
+    sources: BTreeMap<i32, Vec<Box<[u8]>>>,
+    inventory: BTreeMap<i32, Vec<Box<[u8]>>>,
     completed: BTreeSet<skein_lib::Token>,
     streams: BTreeMap<(i32, bool), Vec<u8>>,
     pub(crate) acknowledgements: Vec<(u64, u64)>,
@@ -295,6 +302,10 @@ fn secrets(grants: &mut Vec<Box<[u8]>>, grant: &jig_protocol_worker_wire::Grant)
 }
 
 impl Wire {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one observer records worker frames and checks the independent placement fence"
+    )]
     pub(crate) fn complete(&mut self, complete: &kernel::Complete, worker: bool, now: Time) {
         if worker
             && let kernel::Op::Connect { fd, .. } = &complete.kind
@@ -306,6 +317,8 @@ impl Wire {
             && self.streams.keys().any(|(known, _)| *known == fd.raw())
         {
             self.closed = true;
+            self.sources.remove(&fd.raw());
+            self.inventory.remove(&fd.raw());
         }
         let Ok(kernel::Done::Count(count)) = complete.result else { return };
         let (fd, bytes) = match (&complete.kind, worker) {
@@ -333,7 +346,37 @@ impl Wire {
             }
             self.channel = Some(fd);
             self.frames.push((now, header.kind, stream[8..end].into()));
+            if header.kind == 0x0188 {
+                let sources = jig_protocol_worker_wire::Sources::decode(
+                    &jig_protocol_worker_wire::CEILINGS,
+                    &mut skein_lib::Reader::new(&stream[8..end]),
+                )
+                .expect("whole sources");
+                self.sources
+                    .insert(fd.raw(), sources.sources().iter().map(|source| Box::from(source.name())).collect());
+            }
+            if header.kind == 0x0108 {
+                let rows = jig_protocol_worker_wire::Logins::decode(
+                    &jig_protocol_worker_wire::CEILINGS,
+                    &mut skein_lib::Reader::new(&stream[8..end]),
+                )
+                .expect("whole inventory");
+                // Read and write completions can be delivered in either order.
+                // Retain the received evidence even if Sources' send completion
+                // has not reached the observer yet.
+                self.inventory.insert(fd.raw(), rows.logins().iter().map(|row| Box::from(row.name())).collect());
+            }
             if header.kind == 0x0180 {
+                if !worker {
+                    assert!(
+                        self.sources.get(&fd.raw()).is_some_and(|names| {
+                            self.inventory.get(&fd.raw()).is_some_and(|rows| {
+                                names.len() == rows.len() && names.iter().all(|name| rows.contains(name))
+                            })
+                        }),
+                        "assignment follows the matching first inventory, including empty Sources"
+                    );
+                }
                 let assignment = jig_protocol_worker_wire::Assignment::decode(
                     &jig_protocol_worker_wire::CEILINGS,
                     &mut skein_lib::Reader::new(&stream[8..end]),
@@ -448,4 +491,42 @@ pub(crate) fn window_provider(scripts: Box<[skein_fake_llm_domain::api::Script]>
         config,
     )
     .expect("window provider")
+}
+
+pub(crate) fn auth(spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
+    assert!(inherited.pipes.iter().all(|(number, _)| *number != 0));
+    assert!(spawn.env.iter().any(|entry| entry.as_ref() == b"CLAUDE_CONFIG_DIR=/private/programs/alice"));
+    assert!(
+        !spawn
+            .env
+            .iter()
+            .any(|entry| entry.starts_with(b"ANTHROPIC_") || entry.starts_with(b"CLAUDE_CODE_OAUTH_TOKEN="))
+    );
+    Proc::Auth(Box::new((smith_fake_claude::hosted(b"claude").make)(spawn, inherited)))
+}
+pub(crate) fn worker_programs(root: kernel::Fd) -> Proc {
+    let document = String::from_utf8(fixtures::WORKER_DOCUMENT.to_vec())
+        .expect("fixture JSON")
+        .replace(r#""hub.slots":1"#, r#""hub.detail_bytes":8,"hub.slots":1"#);
+    assert!(document.contains(r#""hub.detail_bytes":8"#), "tiny source detail fixture");
+    let mut worker = worker_document(root, false, false, document.as_bytes());
+    let Proc::Worker(host) = &mut worker else { unreachable!("worker factory") };
+    host.service
+        .configure_program_sources(
+            0,
+            jig_test_service::program_sources::Resources::new(
+                smith_protocol_program::Programs {
+                    directory: b"/private/programs".as_slice().into(),
+                    claude: b"claude".as_slice().into(),
+                },
+                Box::new([
+                    Box::from(b"HOME=/private/home".as_slice()),
+                    Box::from(b"ANTHROPIC_API_KEY=fixture-only".as_slice()),
+                    Box::from(b"CLAUDE_CODE_OAUTH_TOKEN=fixture-only".as_slice()),
+                ]),
+            )
+            .expect("private bounded source resources"),
+        )
+        .expect("before worker loop");
+    worker
 }

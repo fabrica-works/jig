@@ -10,6 +10,8 @@ use crate::{
 };
 
 const LIMITS: Limits = Limits {
+    program_sources: 12,
+    source_detail_bytes: 4096,
     needs_bytes: 4096,
     workers: 3,
     engine_slots: 0,
@@ -115,7 +117,18 @@ impl Harness {
     fn drain(&mut self) -> Box<[Request]> {
         let mut requests = List::with_capacity(self.out.len());
         for _ in 0..self.out.len() {
-            requests.push(self.out.pop().unwrap()).unwrap();
+            let request = self.out.pop().unwrap();
+            if let Request::Sources { channel, sources } = request {
+                assert!(sources.is_empty(), "source-free fixture");
+                step(
+                    &mut self.domain,
+                    &self.env,
+                    Event::Logins { channel, logins: Box::new([]) },
+                    &mut Queue::with_capacity(max_out(&self.env.limits)),
+                );
+            } else {
+                requests.push(request).unwrap();
+            }
         }
         // The iteration ends: the reclaim point.
         self.domain.reclaim();
@@ -1130,9 +1143,9 @@ fn the_worst_case_is_bounded_or_refused() {
     assert!(worst_case(&LIMITS).is_some());
     let huge = Limits { workers: u32::MAX, slots: u32::MAX, ..LIMITS };
     assert_eq!(worst_case(&huge), None);
-    assert_eq!(max_out(&LIMITS), 12);
-    assert_eq!(max_out(&Limits { slots: 1, ..LIMITS }), 9);
-    assert_eq!(max_out(&Limits { slots: 8, ..LIMITS }), 32);
+    assert_eq!(max_out(&LIMITS), 13);
+    assert_eq!(max_out(&Limits { slots: 1, ..LIMITS }), 13);
+    assert_eq!(max_out(&Limits { slots: 8, ..LIMITS }), 33);
 }
 
 fn turns() -> Harness {

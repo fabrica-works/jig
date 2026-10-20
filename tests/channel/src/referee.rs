@@ -108,7 +108,7 @@ impl skein_world::Referee<Proc> for Referee {
                 }
                 Proc::Peer(peer) if self.passed => peer.shutdown(),
                 Proc::Probe(peer) if self.passed => peer.shutdown(),
-                Proc::Worker(_) | Proc::Peer(_) | Proc::Agent { .. } | Proc::Probe(_) => {}
+                Proc::Worker(_) | Proc::Auth(_) | Proc::Peer(_) | Proc::Agent { .. } | Proc::Probe(_) => {}
             }
         }
         self.stopped = self.passed;
@@ -132,7 +132,7 @@ impl skein_world::Referee<Proc> for Referee {
             .iter()
             .find_map(|proc| match proc {
                 Proc::Engine(engine) => Some(engine),
-                Proc::Worker(_) | Proc::Agent { .. } | Proc::Peer(_) | Proc::Probe(_) => None,
+                Proc::Worker(_) | Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) | Proc::Probe(_) => None,
             })
             .expect("engine process");
         assert!(worker.acknowledgements.len() <= self.expected_answers, "one received answer acknowledgement");
@@ -161,7 +161,7 @@ impl skein_world::Referee<Proc> for Referee {
                         | crate::stories::Story::BeyondGrace
                 ) || smith_agent_process_world::fake::replied(peer)
             }
-            Proc::Engine(_) | Proc::Worker(_) | Proc::Agent { .. } | Proc::Probe(_) => false,
+            Proc::Auth(_) | Proc::Engine(_) | Proc::Worker(_) | Proc::Agent { .. } | Proc::Probe(_) => false,
         });
         let ended = if matches!(self.story, crate::stories::Story::InvalidCharter) {
             self.rules.refused_ends.len() == 1 && worker.acknowledgements.is_empty()
@@ -280,7 +280,7 @@ fn presented(worker: &crate::processes::Wire, procs: &[Proc], key: bool) -> (u64
         .iter()
         .find_map(|proc| match proc {
             Proc::Peer(peer) => Some(peer),
-            Proc::Engine(_) | Proc::Worker(_) | Proc::Agent { .. } | Proc::Probe(_) => None,
+            Proc::Auth(_) | Proc::Engine(_) | Proc::Worker(_) | Proc::Agent { .. } | Proc::Probe(_) => None,
         })
         .expect("provider");
     assert!(
@@ -619,7 +619,7 @@ impl Referee {
         if self.injected
             || !procs.iter().any(|proc| match proc {
                 Proc::Worker(host) => host.wire.frames.iter().any(|(_, kind, _)| *kind == 0x0180),
-                Proc::Engine(_) | Proc::Agent { .. } | Proc::Peer(_) | Proc::Probe(_) => false,
+                Proc::Engine(_) | Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) | Proc::Probe(_) => false,
             })
         {
             return;
@@ -635,7 +635,7 @@ impl Referee {
                     host.relay.until = Some(now.saturating_add(worker));
                     host.relay.channel = host.wire.channel;
                 }
-                Proc::Agent { .. } | Proc::Peer(_) | Proc::Probe(_) => {}
+                Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) | Proc::Probe(_) => {}
             }
         }
     }

@@ -12,6 +12,9 @@ use crate::{
 const LIMITS: Limits = Limits {
     slots: 2,
     accounts: 2,
+    program_sources: 12,
+    source_interval: skein_lib::Duration::from_secs(60),
+    source_timeout: skein_lib::Duration::from_secs(10),
     charter_bytes: 64,
     transcript_bytes: 64,
     delivery_evidence_bytes: 64,

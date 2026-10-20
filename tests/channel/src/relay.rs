@@ -95,7 +95,13 @@ impl Peer {
             schema.versions.get_mut(0).expect("one version").version = chosen;
         }
         if matches!(case, Some(Opening::Terms)) {
-            schema.versions.get_mut(0).expect("one version").kinds.get_mut(8).expect("assignment").largest = 1;
+            let kinds = &mut schema.versions.get_mut(0).expect("one version").kinds;
+            for index in 0..kinds.len() {
+                let kind = kinds.get_mut(index).expect("kind slot");
+                if kind.kind == 0x0180 {
+                    kind.largest = 1;
+                }
+            }
         }
         let credential = wire::Credential::new(
             &wire::CEILINGS,
@@ -218,6 +224,18 @@ impl Peer {
                     skein_channel::decode_control(header.kind, &self.input[8..end], &self.limits).expect("refusal");
                 let skein_channel::Control::Refuse { reason, .. } = control else { panic!("refusal kind") };
                 self.refused = Some(reason);
+            }
+            if header.kind == 0x0188 && self.refusal.is_some() {
+                use jig_protocol_worker_wire as wire;
+                let sources = wire::Sources::decode(&wire::CEILINGS, &mut skein_lib::Reader::new(&self.input[8..end]))
+                    .expect("sources fixture");
+                assert!(sources.sources().is_empty(), "recorded key-run fixture");
+                let logins =
+                    wire::Logins::new(&wire::CEILINGS, wire::LoginsParts { logins: skein_lib::List::with_capacity(0) })
+                        .expect("empty inventory");
+                let mut body = skein_lib::Writer::new(4);
+                logins.encode(&mut body).expect("empty inventory bytes");
+                self.play(0x0108, &body.finish());
             }
             if header.kind == 0x0181 && self.refusal.is_some() {
                 let message = jig_protocol_worker_wire::Inbound::decode(

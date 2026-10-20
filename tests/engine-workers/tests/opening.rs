@@ -64,7 +64,13 @@ mod opening {
     #[test]
     fn terms_below_the_largest_assignment_are_refused_as_limits() {
         let mut schema = fixtures::schema();
-        schema.versions.get_mut(0).expect("one version").kinds.get_mut(8).expect("assignment kind").largest = 1;
+        let kinds = &mut schema.versions.get_mut(0).expect("one version").kinds;
+        for index in 0..kinds.len() {
+            let kind = kinds.get_mut(index).expect("kind slot");
+            if kind.kind == 0x0180 {
+                kind.largest = 1;
+            }
+        }
         let mut world = world();
         let connection =
             world.connect(fixtures::peer(schema, jig_protocol_worker_wire::VERSION, WORKER_A, SECRET_A, PAYLOAD));

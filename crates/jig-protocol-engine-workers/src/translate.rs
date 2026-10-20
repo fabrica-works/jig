@@ -55,6 +55,7 @@ fn phase(value: wire::Phase) -> host::Phase {
 
 #[derive(Debug)]
 pub(crate) enum Up {
+    Source(host::LinkUp),
     Turn(wire::Turn),
     Call(wire::Call),
     Answer(wire::Answer),
@@ -74,6 +75,33 @@ pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v3::Limits) -> Optio
     let kind = found?;
     let reader = &mut Reader::new(body);
     match kind {
+        wire::Kind::Logins => {
+            let record = wire::Logins::decode(limits, reader).ok()?.into_parts();
+            let mut rows = List::<host::Login>::with_capacity(record.logins.len());
+            for row in record.logins.into_boxed() {
+                let row = row.into_parts();
+                let name = host::SourceName::new(&row.name)?;
+                for old in &rows {
+                    if old.name == name {
+                        return None;
+                    }
+                }
+                rows.push(host::Login { name, state: login_state(row.state)? }).ok()?;
+            }
+            Some(Up::Source(host::LinkUp::Logins { logins: rows.into_boxed() }))
+        }
+        wire::Kind::SignedOut => {
+            let record = wire::SignedOut::decode(limits, reader).ok()?.into_parts();
+            let name = host::SourceName::new(&record.name)?;
+            let result = match record.result {
+                wire::SignOutResult::SignedOut => host::SignOutResult::SignedOut,
+                wire::SignOutResult::Failed(failure) => {
+                    let failure = failure.into_parts();
+                    host::SignOutResult::Failed { reason: source_failure(failure.reason), detail: failure.detail }
+                }
+            };
+            Some(Up::Source(host::LinkUp::SignedOut { name, result }))
+        }
         wire::Kind::Turn => Some(Up::Turn(wire::Turn::decode(limits, reader).ok()?)),
         wire::Kind::Call => Some(Up::Call(wire::Call::decode(limits, reader).ok()?)),
         wire::Kind::Answer => Some(Up::Answer(wire::Answer::decode(limits, reader).ok()?)),
@@ -84,8 +112,6 @@ pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v3::Limits) -> Optio
         wire::Kind::Sources
         | wire::Kind::Check
         | wire::Kind::SignOut
-        | wire::Kind::Logins
-        | wire::Kind::SignedOut
         | wire::Kind::Hello
         | wire::Kind::Assignment
         | wire::Kind::Message
@@ -99,6 +125,7 @@ pub(crate) fn decode(kind: u16, body: &[u8], limits: &wire::v3::Limits) -> Optio
 }
 pub(crate) fn up(record: Up, parts: &mut Parts) -> host::LinkUp {
     match record {
+        Up::Source(up) => up,
         Up::Turn(record) => turn(record),
         Up::Call(record) => call(record),
         Up::Answer(record) => answer(record, parts),
@@ -343,6 +370,9 @@ pub(crate) fn call(record: wire::Call) -> host::LinkUp {
 /// These records are private to the translation; the wire crate exposes individual codecs.
 #[derive(Debug)]
 pub(crate) enum Down {
+    Sources(wire::Sources),
+    Check(wire::Check),
+    SignOut(wire::SignOut),
     Assign(wire::Assignment),
     Message(wire::Inbound),
     Relayed(wire::Relayed),
@@ -355,6 +385,9 @@ pub(crate) enum Down {
 impl Down {
     pub fn frame(self) -> skein_channel::Frame {
         let (kind, length) = match &self {
+            Self::Sources(record) => (0x0188, record.measure()),
+            Self::Check(record) => (0x0189, record.measure()),
+            Self::SignOut(record) => (0x018a, record.measure()),
             Self::Assign(record) => (0x0180, record.measure()),
             Self::Message(record) => (0x0181, record.measure()),
             Self::Relayed(record) => (0x0182, record.measure()),
@@ -367,6 +400,9 @@ impl Down {
         let mut writer = skein_channel::frame_writer(kind, length).expect("checked record fits a frame");
         let mut body = skein_lib::Writer::new(usize::try_from(length).expect("checked body length"));
         let encoded = match self {
+            Self::Sources(record) => record.encode(&mut body),
+            Self::Check(record) => record.encode(&mut body),
+            Self::SignOut(record) => record.encode(&mut body),
             Self::Assign(record) => record.encode(&mut body),
             Self::Message(record) => record.encode(&mut body),
             Self::Relayed(record) => record.encode(&mut body),
@@ -388,6 +424,27 @@ pub(crate) fn down(
     limits: &wire::v3::Limits,
 ) -> Option<Down> {
     match down {
+        host::LinkDown::Sources { sources } => {
+            if !host::sources::unique(&sources) {
+                return None;
+            }
+            let mut names = List::with_capacity(limits.sources_sources);
+            for name in sources {
+                names
+                    .push(
+                        wire::ProgramSource::new(limits, wire::ProgramSourceParts { name: Box::from(name.as_bytes()) })
+                            .ok()?,
+                    )
+                    .ok()?;
+            }
+            Some(Down::Sources(wire::Sources::new(limits, wire::SourcesParts { sources: names }).ok()?))
+        }
+        host::LinkDown::Check { name } => {
+            Some(Down::Check(wire::Check::new(limits, wire::CheckParts { name: Box::from(name.as_bytes()) }).ok()?))
+        }
+        host::LinkDown::SignOut { name } => Some(Down::SignOut(
+            wire::SignOut::new(limits, wire::SignOutParts { name: Box::from(name.as_bytes()) }).ok()?,
+        )),
         host::LinkDown::Assign { assignment } => {
             Some(Down::Assign(assignment_record(assignment, parts, values, limits)?))
         }
@@ -582,4 +639,29 @@ pub(crate) fn turn_busy(run: Token, attempt: Token, turn: u32, limits: &wire::v3
         wire::TurnBusy::new(limits, wire::TurnBusyParts { task: run.raw(), attempt: attempt.raw(), number: turn })
             .expect("fixed turn busy fields fit"),
     )
+}
+
+fn source_failure(reason: wire::SourceFailure) -> host::SourceFailure {
+    match reason {
+        wire::SourceFailure::Missing => host::SourceFailure::Missing,
+        wire::SourceFailure::Deadline => host::SourceFailure::Deadline,
+        wire::SourceFailure::Unreadable => host::SourceFailure::Unreadable,
+        wire::SourceFailure::Exited => host::SourceFailure::Exited,
+        wire::SourceFailure::Unconfigured => host::SourceFailure::Unconfigured,
+        wire::SourceFailure::Unknown => host::SourceFailure::Unknown,
+        wire::SourceFailure::Closed => host::SourceFailure::Closed,
+    }
+}
+fn login_state(state: wire::LoginState) -> Option<host::LoginState> {
+    Some(match state {
+        wire::LoginState::Usable => host::LoginState::Usable,
+        wire::LoginState::NotSignedIn => host::LoginState::NotSignedIn,
+        wire::LoginState::SignedInOtherwise(method) => {
+            host::LoginState::SignedInOtherwise(host::LoginMethod::new(method.method())?)
+        }
+        wire::LoginState::Failed(failure) => {
+            let failure = failure.into_parts();
+            host::LoginState::Failed { reason: source_failure(failure.reason), detail: failure.detail }
+        }
+    })
 }

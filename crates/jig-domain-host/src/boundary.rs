@@ -10,6 +10,11 @@ use skein_lib::{Duration, Token};
 /// parent -> host
 #[derive(PartialEq, Eq, Debug)]
 pub enum Event {
+    SourceAnswered {
+        owner: Token,
+        answer: crate::sources::Answer,
+    },
+    SourceLost,
     /// One completed conversation turn from the agent.
     Turn {
         owner: Token,
@@ -138,6 +143,13 @@ pub enum Event {
 /// host -> parent
 #[derive(PartialEq, Eq, Debug)]
 pub enum Request {
+    Source {
+        owner: Token,
+        name: crate::SourceName,
+        operation: crate::sources::Operation,
+        deadline: skein_lib::Time,
+    },
+    SourceFault,
     Up(crate::LinkUp),
     Hello {
         hello: crate::Hello,
@@ -371,7 +383,9 @@ impl Request {
             Request::Grant { agent, grant } => Ok(ToAgent::Grant { agent, grant }),
             Request::AcknowledgeAgentTurn { agent, turn } => Ok(ToAgent::Acknowledge { agent, turn }),
             Request::Stop { agent } => Ok(ToAgent::Cancel { agent }),
-            other @ (Request::Up(..)
+            other @ (Request::Source { .. }
+            | Request::SourceFault
+            | Request::Up(..)
             | Request::Deliver { .. }
             | Request::CancelRelay { .. }
             | Request::Hello { .. }

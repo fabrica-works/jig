@@ -22,6 +22,8 @@ pub struct Worker {
     pub(super) root_steps: u64,
     env: Env<root::Limits>,
     agent: Agent,
+    sources: crate::program_sources::Component,
+    source_events: Queue<jig_domain_host::Event>,
     link: link::Component,
     link_out: Queue<link::Request>,
     out: Queue<root::Request>,
@@ -107,6 +109,8 @@ impl Worker {
                 bounds: agent.bounds.clone(),
                 host_limits: agent.host_limits,
             },
+            sources: crate::program_sources::Component::new(limits.detail_bytes),
+            source_events: Queue::with_capacity(2),
             link,
             link_out: Queue::with_capacity(link::MAX_OUT_DOWN),
             out: Queue::with_capacity(room),
@@ -150,6 +154,12 @@ impl Worker {
         self.link_out.push(link::Request::Value { account, generation, expires, value });
         self.drain_link(self.env.now);
     }
+    pub(super) fn configure_program_sources(
+        &mut self,
+        resources: crate::program_sources::Resources,
+    ) -> Result<(), crate::program_sources::Resources> {
+        self.sources.configure(resources)
+    }
     pub fn stop(&mut self) {
         if !self.stopping {
             self.stopping = true;
@@ -170,6 +180,9 @@ impl Worker {
             let _request = self.out.pop();
         }
         self.link_down(self.env.now, link::Event::Abort);
+        if let Some(at) = self.sources.next_deadline() {
+            self.sources.fire(at, &mut self.source_events, &mut self.io);
+        }
         for (entity, _) in &self.entities {
             self.io.push(io::Request::Abort { entity: *entity });
         }
@@ -177,7 +190,8 @@ impl Worker {
     pub(super) fn accepts(&self, event: &io::Event) -> bool {
         match crate::workers::owner(event) {
             Some(owner) => {
-                owner == Token::new(self.prefix)
+                self.sources.owns(owner)
+                    || owner == Token::new(self.prefix)
                     || self.owners.get(&owner).is_some()
                     || self.entities.get(&owner).is_some()
             }
@@ -194,6 +208,10 @@ impl Worker {
     }
     pub(super) fn up(&mut self, now: Time, mut event: io::Event) {
         let owner = crate::workers::owner(&event).expect("routed owner");
+        if self.sources.owns(owner) {
+            self.sources.from_io(event, &mut self.source_events, &mut self.io);
+            return;
+        }
         if owner == Token::new(self.prefix) {
             match event {
                 io::Event::Connecting { socket, .. } => {
@@ -332,6 +350,22 @@ impl Worker {
         for _ in 0..self.out.capacity() {
             let Some(request) = self.out.pop() else { break };
             match request {
+                root::Request::Source { owner, name, operation, deadline } => {
+                    let io_owner = Token::new(self.prefix.checked_add(self.next).expect("source owner range"));
+                    self.next = self.next.checked_add(1).expect("source owner sequence");
+                    assert!(self.next < (1_u64 << 48_u32), "worker owner range");
+                    self.sources.start(
+                        owner,
+                        io_owner,
+                        name,
+                        operation,
+                        self.directory.expect("worker root"),
+                        deadline,
+                        &mut self.source_events,
+                        &mut self.io,
+                    );
+                }
+                root::Request::SourceFault => self.link_down(self.env.now, link::Event::SourceFault),
                 root::Request::Hello(hello) => self.link_down(self.env.now, link::Event::Hello { hello }),
                 root::Request::Link(up) => self.link_down(self.env.now, link::Event::Up { up, parts: Box::default() }),
                 root::Request::CancelRelay { run, attempt, call } => {
@@ -458,6 +492,13 @@ impl Worker {
         if !self.started {
             self.started = true;
         }
+        self.sources.fire(now, &mut self.source_events, &mut self.io);
+        for _ in 0..self.source_events.len() {
+            let event = self.source_events.pop().expect("source terminal");
+            if self.aborted.is_none() {
+                self.events.push(root::Event::Source(Box::new(event)));
+            }
+        }
         self.link.fire(now, &mut self.link_out);
         self.drain_link(now);
         let mut agents = List::with_capacity(self.processes.len());
@@ -542,6 +583,7 @@ impl Worker {
             return None;
         }
         let mut next = [
+            self.sources.next_deadline(),
             self.root.next_deadline(),
             self.link.next_deadline(),
             self.values.next_expiry(),
@@ -565,6 +607,7 @@ impl Worker {
             || !self.io.is_empty()
             || !self.events.is_empty()
             || !self.process_events.is_empty()
+            || !self.source_events.is_empty()
             || !self.submitted.is_empty()
             || (self.aborted.is_none() && self.root.work_pending())
             || match self.next_deadline() {
@@ -573,7 +616,7 @@ impl Worker {
             }
     }
     pub(super) fn closed(&self) -> bool {
-        self.closed && self.processes.is_empty() && self.io.is_empty()
+        self.closed && self.sources.settled() && self.processes.is_empty() && self.io.is_empty()
     }
     pub(super) fn is_empty(&self) -> bool {
         self.closed() && self.directory.is_none() && self.submitted.is_empty()
@@ -667,6 +710,9 @@ pub(super) fn worst_case(worker: &config::Worker, agent: &Agent, root_bytes: usi
         command = command.checked_add(u64::try_from(argument.len()).ok()?)?;
     }
     domain
+        .checked_add(crate::program_sources::worst_case(hub.detail_bytes)?)?
+        .checked_add(Queue::<jig_domain_host::Event>::worst_case(2)?)?
+        .checked_add(u64::from(hub.detail_bytes).checked_mul(2)?)?
         .checked_add(
             host::process_worst_case(&agent.limits, agent.host_limits.detail_bytes)?
                 .checked_mul(u64::from(worker.slots))?,

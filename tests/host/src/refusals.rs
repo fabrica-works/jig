@@ -43,6 +43,8 @@ impl Referee {
             | Event::Faulted { .. }
             | Event::Gone { .. }
             | Event::Delivered { .. }
+            | Event::SourceAnswered { .. }
+            | Event::SourceLost
             | Event::Saved { .. } => {}
         }
     }
@@ -51,6 +53,7 @@ impl Referee {
     }
     pub(crate) fn request(&mut self, request: &Request) {
         match request {
+            Request::Source { .. } | Request::SourceFault => unreachable!("source scheduling has its own world"),
             Request::Message { agent, name, .. } => {
                 if let Some(key) = self.agents.get(agent) {
                     self.pending.entry(*key).or_default().remove(name);

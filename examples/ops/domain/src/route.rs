@@ -365,6 +365,10 @@ fn core_held(
         | core::Held::CarriedUnused { .. }
         | core::Held::Result { .. }
         | core::Held::Drained
+        | core::Held::Sources { .. }
+        | core::Held::CheckSource { .. }
+        | core::Held::SignOutSource { .. }
+        | core::Held::SourceSignedOut { .. }
         | core::Held::Refuse { .. }
         | core::Held::TurnBusy { .. }
         | core::Held::NotesLoad { .. }
@@ -1436,6 +1440,11 @@ pub(crate) fn host_out(
         match request.to_agent() {
             Ok(request) => held(decision, Output::Agent(request)),
             Err(request) => match request {
+                host::Request::Source { .. }
+                | host::Request::SourceFault
+                | host::Request::Up(host::LinkUp::Logins { .. } | host::LinkUp::SignedOut { .. }) => {
+                    unreachable!("engine hub has no program sources")
+                }
                 host::Request::Up(host::LinkUp::Call { run, attempt, call, tool, writes, input, deadline }) => {
                     domain
                         .host_calls

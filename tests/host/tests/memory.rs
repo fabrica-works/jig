@@ -16,6 +16,9 @@ static HEAP: heap::Counting = heap::Counting;
 const LIMITS: Limits = Limits {
     accounts: 4,
     slots: 2,
+    program_sources: 12,
+    source_interval: skein_lib::Duration::from_secs(60),
+    source_timeout: skein_lib::Duration::from_secs(10),
     charter_bytes: 1024,
     transcript_bytes: 528,
     delivery_evidence_bytes: 0,
@@ -97,8 +100,11 @@ impl Measured {
         let mut cancelled = Vec::new();
         while let Some(request) = self.out.pop() {
             asked.push(match request {
+                Request::Source { .. } | Request::SourceFault => unreachable!("source scheduling has its own world"),
                 Request::Up(
-                    LinkUp::Activity { .. }
+                    LinkUp::Logins { .. }
+                    | LinkUp::SignedOut { .. }
+                    | LinkUp::Activity { .. }
                     | LinkUp::Unauthorized { .. }
                     | LinkUp::Limited { .. }
                     | LinkUp::AccountRefused { .. },
@@ -439,4 +445,63 @@ fn fill_refusals(host: &mut Measured, owner: Token, inbox: u32) {
             .is_empty()
         );
     }
+}
+
+#[test]
+fn full_source_failures_and_replacement_stay_within_the_memory_bound() {
+    use jig_domain_host::{LoginState, SourceFailure, SourceName, sources};
+    let limits = Limits { slots: 0, ..LIMITS };
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
+    let mut out = Queue::with_capacity(max_out(&limits));
+    let meter = Meter::new();
+    let mut domain = Domain::new(&limits);
+    let names: Box<[_]> = (0..limits.program_sources)
+        .map(|index| SourceName::new(format!("{index:032}").as_bytes()).expect("full source name"))
+        .collect();
+    meter.start();
+    step(&mut domain, &env, Event::Down(LinkDown::Sources { sources: names.clone() }), &mut out);
+    let measured = meter.end();
+    let Some(Request::Source { mut owner, .. }) = out.pop() else { panic!("first check") };
+    meter.check(measured, worst_case(&limits).expect("source bound"), &limits);
+    for index in 0..limits.program_sources {
+        let event = Event::SourceAnswered {
+            owner,
+            answer: sources::Answer::Checked(LoginState::Failed {
+                reason: SourceFailure::Exited,
+                detail: bytes(u64::from(limits.detail_bytes)),
+            }),
+        };
+        meter.start();
+        step(&mut domain, &env, event, &mut out);
+        // Keep the full inventory at the measured step peak, then hand it out.
+        let measured = meter.end();
+        while let Some(request) = out.pop() {
+            match request {
+                Request::Source { owner: next, .. } => owner = next,
+                Request::Up(LinkUp::Logins { logins }) => assert_eq!(logins.len(), names.len()),
+                other @ (Request::SourceFault
+                | Request::Up(_)
+                | Request::Hello { .. }
+                | Request::Message { .. }
+                | Request::Reply { .. }
+                | Request::Start { .. }
+                | Request::AcknowledgeAgentTurn { .. }
+                | Request::Deliver { .. }
+                | Request::CancelRelay { .. }
+                | Request::Prepare { .. }
+                | Request::Abort { .. }
+                | Request::Stop { .. }
+                | Request::Grant { .. }
+                | Request::Save { .. }
+                | Request::Release { .. }) => panic!("unexpected source output: {other:?}"),
+            }
+        }
+        meter.check(measured, worst_case(&limits).expect("source bound"), &limits);
+        assert_eq!(domain.sources_settled(), index + 1 == limits.program_sources);
+    }
+    meter.start();
+    step(&mut domain, &env, Event::Down(LinkDown::Sources { sources: names }), &mut out);
+    let measured = meter.end();
+    assert!(matches!(out.pop(), Some(Request::Source { .. })));
+    meter.check(measured, worst_case(&limits).expect("replacement bound"), &limits);
 }
