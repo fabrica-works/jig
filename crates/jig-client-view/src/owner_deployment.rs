@@ -687,16 +687,16 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 pub fn limits(l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
     let nodes = max_nodes(l)?;
     let phrase = words.jig_capacity()?;
-    let text_per_node = phrase
-        .max(crate::literal_segment::max_bytes(l.text)?)
-        .max(64)
-        .checked_mul(2)?
-        .max(jig_client::contract::ACCOUNT_MANAGE_USAGE.checked_add(phrase)?);
+    let text = phrase.max(crate::literal_segment::max_bytes(l.text)?).max(64).checked_mul(2)?;
+    // skein-ui still shares the external-target bound with text-run capacity.
+    let text_per_node = text.max(jig_client::contract::ACCOUNT_MANAGE_USAGE.checked_add(phrase)?);
     Some(skein_ui::Limits {
         nodes,
         depth: l.rows.checked_add(32)?,
         text_per_node,
-        text_bytes: nodes.checked_mul(text_per_node)?,
+        text_bytes: nodes
+            .checked_mul(text)?
+            .checked_add(l.rows.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?,
         drawing_bytes: 0,
         styles_per_node: 2,
         patches: 0,

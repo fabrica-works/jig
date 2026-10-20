@@ -30,7 +30,7 @@ fn the_worlds_original_storage_counts_construct_a_finite_view() {
     assert_eq!(limits.tree.slots, 256);
     assert_eq!(limits.tree.patches, 5120);
     assert!(limits.tree.text_per_node >= native.text_per_node);
-    assert_eq!(limits.tree.text_bytes, 1024 * limits.tree.text_per_node);
+    assert!(limits.tree.text_bytes < 1024 * limits.tree.text_per_node);
     assert!(crate::worst_case(&limits, &domain, jig, first).is_some());
     let view =
         crate::View::new(&limits, &domain, jig, first, jig_client_test_domain::first::Address { project: 3, item: 5 });
@@ -94,7 +94,7 @@ fn bounded_world_storage_survives_complete_composition_text_overflow() {
     let limits = Limits::for_world(&domain, jig, first, 1024, 256).unwrap();
     assert_eq!(limits.tree.nodes, 1024);
     assert_eq!(limits.tree.slots, 256);
-    assert_eq!(limits.tree.text_bytes, 1024 * limits.tree.text_per_node);
+    assert!(limits.tree.text_bytes < 1024 * limits.tree.text_per_node);
     assert!(crate::worst_case(&limits, &domain, jig, first).is_some());
 }
 
@@ -120,7 +120,7 @@ fn bounded_world_storage_survives_the_jig_envelopes_text_overflow() {
     assert!(jig_client_view::limits::of_words(&domain.jig, jig).is_none());
     let limits = Limits::for_world(&domain, jig, first, 1024, 256).unwrap();
     assert_eq!(limits.tree.nodes, 1024);
-    assert_eq!(limits.tree.text_bytes, 1024 * limits.tree.text_per_node);
+    assert!(limits.tree.text_bytes < 1024 * limits.tree.text_per_node);
 }
 
 #[test]
@@ -139,7 +139,7 @@ fn bounded_storage_keeps_every_attribute_of_a_finite_complete_envelope() {
     expected.tree.bindings = 32;
     expected.tree.slots = 4;
     expected.tree.patches = 160;
-    expected.tree.text_bytes = 32 * expected.tree.text_per_node;
+    expected.tree.text_bytes = (full.tree.text_bytes / full.tree.nodes) * 32;
     assert_eq!(Limits::for_world(&domain, &jig, &first, 32, 4), Some(expected));
     assert!(Limits::for_world(&domain, &jig, &first, full.tree.nodes + 1, 0).is_none());
 }

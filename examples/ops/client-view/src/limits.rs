@@ -58,13 +58,16 @@ impl Limits {
             .checked_add(8)?;
         let mut tree =
             jig_client_view::limits::compose(&domain.jig, jig, &arrangement(), application_nodes, slot_nodes, 8)?;
-        tree.text_per_node = tree
-            .text_per_node
+        let jig_text = jig_client_view::limits::node_text(domain.jig.text, jig.jig_capacity()?)?;
+        let text = jig_text
             .max(observability.capacity()?.max(infrastructure.capacity()?).checked_mul(2)?.checked_add(32)?)
             .max(jig_client_view::literal_segment::max_bytes(
                 domain.observability.text.max(domain.infrastructure.text),
             )?);
-        tree.text_bytes = tree.nodes.checked_mul(tree.text_per_node)?;
+        // Preserve jig's separately priced whole addresses; ordinary connector
+        // text only enlarges the shared display envelope by its difference.
+        tree.text_bytes = tree.text_bytes.checked_add(tree.nodes.checked_mul(text.checked_sub(jig_text)?)?)?;
+        tree.text_per_node = tree.text_per_node.max(text);
         tree.drawing_bytes = drawing::BYTES;
         let limits = Self { tree };
         worst_case(&limits, domain, jig, observability, infrastructure)?;

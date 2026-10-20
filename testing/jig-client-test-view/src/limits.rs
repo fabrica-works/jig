@@ -54,17 +54,19 @@ impl Limits {
         if u64::from(nodes) > full_nodes {
             return None;
         }
-        tree.text_per_node = tree
-            .text_per_node
+        let text = jig_client_view::limits::node_text(domain.jig.text, jig.jig_capacity()?)?
             .max(first.capacity()?.checked_mul(2)?.checked_add(20)?)
             .max(owner.text_per_node)
             .max(jig_client_view::literal_segment::max_bytes(domain.first.text)?);
+        tree.text_per_node = tree.text_per_node.max(text);
         tree.nodes = nodes;
         tree.depth = tree.depth.checked_add(owner.depth.checked_add(4)?.max(8))?;
         tree.bindings = nodes;
         tree.slots = slots;
         tree.patches = nodes.checked_mul(5)?;
-        tree.text_bytes = nodes.checked_mul(tree.text_per_node)?;
+        tree.text_bytes = nodes
+            .checked_mul(text)?
+            .checked_add(domain.jig.rows.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?;
         tree.drawing_bytes = drawing::BYTES;
         let limits = Self { tree, text: domain.first.text };
         worst_case(&limits, domain, jig, first)?;
@@ -98,12 +100,14 @@ impl Limits {
             slot_nodes,
             owner.depth.checked_add(4)?.max(8),
         )?;
-        tree.text_per_node = tree
-            .text_per_node
+        let jig_text = jig_client_view::limits::node_text(domain.jig.text, jig.jig_capacity()?)?;
+        let text = jig_text
             .max(first.capacity()?.checked_mul(2)?.checked_add(20)?)
             .max(owner.text_per_node)
             .max(jig_client_view::literal_segment::max_bytes(domain.first.text)?);
-        tree.text_bytes = tree.nodes.checked_mul(tree.text_per_node)?;
+        // Keep jig's whole-address reserve separate from ordinary node text.
+        tree.text_bytes = tree.text_bytes.checked_add(tree.nodes.checked_mul(text.checked_sub(jig_text)?)?)?;
+        tree.text_per_node = tree.text_per_node.max(text);
         tree.drawing_bytes = drawing::BYTES;
         let limits = Self { tree, text: domain.first.text };
         worst_case(&limits, domain, jig, first)?;

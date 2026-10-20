@@ -77,6 +77,8 @@ pub fn envelope(
     // A field carries a saying as its name and the full domain value.
     // Markdown links may carry both label and external target.
     // Public manage addresses stay whole even with a smaller display-text bound.
+    // skein-ui shares this bound with every text node's run capacity, so this
+    // still over-reserves runs when the external-target floor dominates.
     let text_per_node =
         node_text(client.text, phrase)?.max(jig_client::contract::ACCOUNT_MANAGE_USAGE.checked_add(phrase)?);
     Some(Limits {

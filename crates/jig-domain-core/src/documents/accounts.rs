@@ -218,6 +218,15 @@ pub(super) fn next_account(
     next
 }
 
+/// Public configuration is independent of the holder's private account document.
+pub(super) fn provider_name(core: &Core, account: &accounts::Account, bytes: u32) -> Option<Text> {
+    let provider = core.settings.llm_providers.get(account.provider())?;
+    Some(super::small::text(&provider.name, bytes))
+}
+pub(super) fn manage_usage(core: &Core, account: &accounts::Account) -> Option<Box<[u8]>> {
+    core.settings.llm_providers.get(account.provider())?.manage_usage.clone()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -226,13 +235,4 @@ mod tests {
         let accounts = super::worst_case(&limits.documents).expect("accounts bound");
         assert!(accounts <= crate::documents::document_worst_case(&limits.documents).expect("document bound"));
     }
-}
-
-/// Public configuration is independent of the holder's private account document.
-pub(super) fn provider_name(core: &Core, account: &accounts::Account, bytes: u32) -> Option<Text> {
-    let provider = core.settings.llm_providers.get(account.provider())?;
-    Some(super::small::text(&provider.name, bytes))
-}
-pub(super) fn manage_usage(core: &Core, account: &accounts::Account) -> Option<Box<[u8]>> {
-    core.settings.llm_providers.get(account.provider())?.manage_usage.clone()
 }
