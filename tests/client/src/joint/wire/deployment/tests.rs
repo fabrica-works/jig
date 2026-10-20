@@ -644,6 +644,7 @@ fn me_deployment_role_is_independent_of_project_rows() {
                     role: people::Role::Owner,
                     pool: None,
                     creating: None,
+                    models: jig_domain_authority::Models::NONE,
                     templates: List::with_capacity(0),
                 }],
             ),

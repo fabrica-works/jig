@@ -435,6 +435,7 @@ fn documents_frame_carries_roles_retention_and_configured_charters() {
                     }
                 },
             }),
+            models: authority::Models::ALL,
             templates: List::with_capacity(0),
         }]
     );

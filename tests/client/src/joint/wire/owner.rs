@@ -794,6 +794,7 @@ pub(super) mod tests {
                     name: None,
                     pool: None,
                     creating: None,
+                    models: jig_domain_authority::Models::NONE,
                     templates: List::with_capacity(0),
                 })
                 .expect("the complete supplied fixture is admitted");

@@ -45,6 +45,7 @@ impl Core {
         tasks_left: u32,
     ) -> jig_domain_authority::Authority {
         let mut given = self.authority.role(project, role.number()).expect("configured role policy").authority.clone();
+        given.models = self.authority.models(project, role.number()).expect("configured role policy");
         let (_, pool) = self.person_pool(project, person);
         given.delegation.tasks = given.delegation.tasks.min(tasks_left).saturating_sub(1);
         given.delegation.depth = given.delegation.depth.saturating_sub(1);

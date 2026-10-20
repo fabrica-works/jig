@@ -19,6 +19,7 @@ pub fn frame_two_projects() -> d::Frame {
                 name: None,
                 pool: None,
                 creating: None,
+                models: jig_domain_authority::Models::NONE,
                 templates: List::with_capacity(0),
             })
             .unwrap();

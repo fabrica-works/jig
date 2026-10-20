@@ -266,6 +266,7 @@ pub(crate) fn create_start(
             authority::Executor::Procedure(code)
         }
     };
+    given.models = given.models.run_by(executor);
     let period_cap = policy.period_spend.min(core.authority.rules().period_spend);
     if budget > period_cap {
         return Err(people::Refusal::Authority {

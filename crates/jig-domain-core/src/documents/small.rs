@@ -123,6 +123,10 @@ pub(super) fn frame(core: &Core, limits: &Limits, party: u64) -> Result<Frame, M
                         unreachable!("creating is bounded or refused")
                     }
                 },
+                models: match core.authority.models(role.project, role.role.number()) {
+                    Some(models) => models,
+                    None => jig_domain_authority::Models::NONE,
+                },
             })
             .expect("bounded project list");
     }
