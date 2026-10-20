@@ -314,6 +314,7 @@ fn config(seed: u64) -> Config {
             resume_bytes: 256,
 
             tools: ToolFamilies::JIG,
+            llm_providers: accounts::Providers::none(),
         },
     }
 }

@@ -127,6 +127,7 @@ pub fn domain() -> Domain {
                     }]),
                     resume_bytes: 256,
                     tools: core::ToolFamilies::JIG,
+                    llm_providers: jig_domain_accounts::Providers::none(),
                 },
             },
         },

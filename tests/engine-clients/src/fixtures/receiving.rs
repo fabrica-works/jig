@@ -37,6 +37,7 @@ fn configuration(limits: &core::Limits) -> core::Config {
             deployment_provider: 2,
             resume_bytes: 256,
             tools: core::ToolFamilies::JIG,
+            llm_providers: jig_domain_accounts::Providers::none(),
             charters: Box::new([core::Charter {
                 number: 1,
                 hosts: jig_domain_fleet::Kinds::Workers,

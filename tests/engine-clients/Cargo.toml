@@ -13,6 +13,7 @@ jig-protocol-engine-clients.workspace = true
 jig-protocol-engine-clients-http.workspace = true
 jig-client-protocol-wire.workspace = true
 jig-domain-core.workspace = true
+jig-domain-accounts.workspace = true
 jig-domain-authority.workspace = true
 jig-domain-fleet.workspace = true
 jig-protocol-config.workspace = true

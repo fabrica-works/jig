@@ -796,6 +796,7 @@ dependencies = [
  "jig-client-protocol-wire",
  "jig-client-test-records",
  "jig-core-world",
+ "jig-domain-accounts",
  "jig-domain-authority",
  "jig-domain-core",
  "jig-domain-fleet",

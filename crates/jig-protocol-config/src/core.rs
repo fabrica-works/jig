@@ -1,5 +1,6 @@
 //! Core startup values from the checked engine part (configuration.md, 3 and 8).
 use crate::{Address, Engine, ProviderKind};
+use jig_domain_accounts as accounts;
 use jig_domain_authority as authority;
 use jig_domain_core as domain;
 use skein_io::Addr;
@@ -59,6 +60,7 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
             charters: engine.charters.clone(),
             resume_bytes: limits.resume_bytes,
             tools: domain::ToolFamilies::JIG,
+            llm_providers: accounts::Providers::default(),
         },
         projects,
         permission_roles,

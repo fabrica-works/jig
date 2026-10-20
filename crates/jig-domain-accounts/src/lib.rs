@@ -7,8 +7,10 @@ extern crate alloc;
 mod boundary;
 mod domain;
 mod limits;
+mod providers;
 pub use boundary::{
     Event, Fact, Failure, FromComponent, Grant, GrantTable, Place, Request, State, ToComponent, Unread,
 };
 pub use domain::{Domain, fire, max_out, step};
 pub use limits::{Limits, worst_case};
+pub use providers::{Offers, Provider, Providers};

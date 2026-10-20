@@ -142,6 +142,8 @@ pub struct Settings {
     pub resume_bytes: u32,
     /// Jig's one-bit authority family for each engine tool.
     pub tools: ToolFamilies,
+    /// Configured LLM providers, for the accounts child (accounts.md, 3.1).
+    pub llm_providers: accounts::Providers,
 }
 
 /// Jig's authority bits for the engine's tool families.
