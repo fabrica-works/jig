@@ -23,18 +23,18 @@ pub fn historical(
             limits,
             w::OwnerHistoricalValueTaskParts {
                 document: task::document(document, models, limits)?,
-                result: current::result(result, limits)?,
+                result: current::result(models, result, limits)?,
             },
         )?),
         reads::Past::Proposal(value) => w::OwnerHistoricalValue::Proposal(w::OwnerHistoricalValueProposal::new(
             limits,
-            w::OwnerHistoricalValueProposalParts { value: historical::proposal_history(value, limits)? },
+            w::OwnerHistoricalValueProposalParts { value: historical::proposal_history(models, value, limits)? },
         )?),
         reads::Past::PersonProposal { proposal, decision } => {
             w::OwnerHistoricalValue::PersonProposal(w::OwnerHistoricalValuePersonProposal::new(
                 limits,
                 w::OwnerHistoricalValuePersonProposalParts {
-                    proposal: historical::person_proposal(proposal, limits)?,
+                    proposal: historical::person_proposal(models, proposal, limits)?,
                     decision: match *decision {
                         Some(item) => Some(historical::proposal_decision(item, limits)?),
                         None => None,
@@ -59,13 +59,13 @@ pub fn historical(
             w::OwnerHistoricalValue::Question(w::OwnerHistoricalValueQuestion::new(
                 limits,
                 w::OwnerHistoricalValueQuestionParts {
-                    question: current::question(question, limits)?,
+                    question: current::question(models, question, limits)?,
                     answer: match answer {
                         Some(item) => Some(question_answer::answer(item, limits)?),
                         None => None,
                     },
                     ending: match ending {
-                        Some(item) => Some(result(item, limits)?),
+                        Some(item) => Some(result(models, item, limits)?),
                         None => None,
                     },
                 },
@@ -75,8 +75,8 @@ pub fn historical(
             w::OwnerHistoricalValue::PersonTask(w::OwnerHistoricalValuePersonTask::new(
                 limits,
                 w::OwnerHistoricalValuePersonTaskParts {
-                    document: person_task(document, limits)?,
-                    result: current::result(result, limits)?,
+                    document: person_task(models, document, limits)?,
+                    result: current::result(models, result, limits)?,
                 },
             )?)
         }
@@ -109,12 +109,12 @@ pub fn document(
         reads::Answer::Document(value) => match value.as_ref() {
             d::Document::Frame(value) => w::ReadValue::Me(owner::frame(value, models, limits)?),
             d::Document::Task(value) => w::ReadValue::Task(task::document(value, models, limits)?),
-            d::Document::Proposal(value) => w::ReadValue::OwnerProposal(proposal(value, limits)?),
+            d::Document::Proposal(value) => w::ReadValue::OwnerProposal(proposal(models, value, limits)?),
             d::Document::Escalation(value) => w::ReadValue::OwnerEscalation(escalation(value, models, limits)?),
-            d::Document::Question(value) => w::ReadValue::Question(question(value, limits)?),
-            d::Document::PersonTask(value) => w::ReadValue::OwnerPersonTask(person_task(value, limits)?),
-            d::Document::Result(value) => w::ReadValue::Result(result(value, limits)?),
-            d::Document::Project(value) => w::ReadValue::OwnerProject(project(value, limits)?),
+            d::Document::Question(value) => w::ReadValue::Question(question(models, value, limits)?),
+            d::Document::PersonTask(value) => w::ReadValue::OwnerPersonTask(person_task(models, value, limits)?),
+            d::Document::Result(value) => w::ReadValue::Result(result(models, value, limits)?),
+            d::Document::Project(value) => w::ReadValue::OwnerProject(project(models, value, limits)?),
             d::Document::Deployment(value) => w::ReadValue::OwnerDeployment(deployment::document(value, limits)?),
             d::Document::Chips(_)
             | d::Document::Run(_)

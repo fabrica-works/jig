@@ -14,7 +14,7 @@ const REJECTED: u32 = 43;
 fn preparing() -> Harness {
     let mut h = Harness::new();
     let mut new = task(TASK, &[]);
-    new.authority.models = Models(1);
+    new.authority.models = Models::Named(1);
     new.llm = Some(LlmChoice {
         account: Some(PREFERENCE),
         main: ModelEffort { model: 0, effort: None },

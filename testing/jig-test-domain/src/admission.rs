@@ -120,6 +120,7 @@ mod tests {
         let mut domain = fixtures::domain();
         fixtures::fill_journal(&mut domain, &env);
         let event = Event::Core(core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(7)),
             sign_in: 1,
             key: [1; 16],

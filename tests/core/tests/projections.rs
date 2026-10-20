@@ -30,6 +30,7 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
     assert_eq!(record.numbers.spent, 0);
     for number in 40..48 {
         world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(9100 + u64::from(number))),
             sign_in: world.sign_in.expect("signed in party"),
             key: [number; 16],
@@ -52,6 +53,7 @@ fn projections_use_project_grants_require_verdicts_and_observe_a_policy_narrowin
         .expect("durable goal");
     assert_eq!(saved.numbers.spent, 0, "the priced projection charges no task budget");
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9001)),
         sign_in: world.sign_in.expect("signed in party"),
         key: [32; 16],
@@ -191,6 +193,7 @@ fn a_delegate_of_a_delegate_ending_feeds_the_whole_plan_once_and_closing_waits_f
         0,
     );
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9200)),
         sign_in: world.sign_in.expect("signed in party"),
         key: [33; 16],
@@ -411,6 +414,7 @@ fn an_untracked_goals_projection_is_forgotten_once_its_write_settles() {
 
 fn tracked_goal(world: &mut World) -> u64 {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9000)),
         sign_in: world.sign_in.expect("signed in party"),
         key: [31; 16],

@@ -34,7 +34,7 @@ fn project(record: &w::Me, at: usize) -> w::MeProject {
 #[test]
 fn me_lists_only_the_models_the_party_s_authority_allows_by_name() {
     let mut frame = fixtures::frame_two_projects();
-    frame.projects.get_mut(0).unwrap().models = jig_domain_authority::Models(0b10);
+    frame.projects.get_mut(0).unwrap().models = jig_domain_authority::Models::Named(0b10);
     frame.projects.get_mut(1).unwrap().models = jig_domain_authority::Models::ALL;
     let record = translate::owner::frame(&frame, &fixtures::models(), &w::CEILINGS).unwrap();
     let some = project(&record, 0);
@@ -173,4 +173,37 @@ fn a_model_the_core_refuses_is_named_by_configuration() {
         translate::answers::answer(&past, &fixtures::models(), &l),
         Err(w::Problem { path: w::Path::RefusalLlmModel, reason: skein_codec::Reason::Bound })
     );
+}
+
+fn selector_ask(names: &[&[u8]]) -> w::Ask {
+    let limits = w::CEILINGS;
+    let (w::Ask::ChangePolicy(ask), _) = fixtures::authority_ask() else { panic!("role edit") };
+    let mut ask = ask.into_parts();
+    let w::PolicyEdit::Role(role) = ask.edit else { panic!("role") };
+    let mut role = role.into_parts();
+    let mut value = role.value.into_parts();
+    let mut authority = value.authority.into_parts();
+    let mut rows = skein_lib::List::with_capacity(u32::try_from(names.len()).unwrap());
+    for name in names {
+        rows.push(Box::from(*name)).unwrap();
+    }
+    authority.models =
+        Some(w::ModelSet::Names(w::ModelSetNames::new(&limits, w::ModelSetNamesParts { names: rows }).unwrap()));
+    value.authority = w::OwnerAuthority::new(&limits, authority).unwrap();
+    role.value = w::PolicyEditRole::new(&limits, value).unwrap();
+    ask.edit = w::PolicyEdit::Role(w::PolicyEditRoleValue::new(&limits, role).unwrap());
+    w::Ask::ChangePolicy(w::ChangePolicy::new(&limits, ask).unwrap())
+}
+#[test]
+fn original_selector_names_are_canonical_and_unknowns_reach_retained_key_lookup() {
+    let models = fixtures::models();
+    let a = translate::asks::named(selector_ask(&[b"quick", b"careful"]), &models, &w::CEILINGS).unwrap();
+    let b = translate::asks::named(selector_ask(&[b"careful", b"quick"]), &models, &w::CEILINGS).unwrap();
+    assert_eq!(a.ask, b.ask);
+    assert_eq!(a.models, b.models);
+    let unknown = translate::asks::named(selector_ask(&[b"removed"]), &models, &w::CEILINGS).unwrap();
+    assert_eq!(unknown.models.as_ref(), &[Box::<[u8]>::from(b"removed".as_slice())]);
+    for names in [&[b"quick".as_slice(), b"quick".as_slice()][..], &[b"".as_slice()][..]] {
+        assert!(translate::asks::named(selector_ask(names), &models, &w::CEILINGS).is_err());
+    }
 }

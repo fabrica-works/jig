@@ -53,3 +53,5 @@ mod compound;
 mod create;
 
 mod accounts;
+
+mod authority_models;

@@ -242,8 +242,7 @@ fn models(
     problems: &mut Problems,
 ) -> Option<authority::Models> {
     let Some(at) = object.member(document, b"models") else {
-        let count = u32::try_from(configured.len()).unwrap_or(u32::MAX);
-        return Some(authority::Models(u64::MAX.checked_shr(u64::BITS.saturating_sub(count)).unwrap_or(0)));
+        return Some(authority::Models::ALL);
     };
     let path = path.member(b"models");
     let items = match read::list(document, at, crate::llm::MODELS) {
@@ -253,7 +252,7 @@ fn models(
             return None;
         }
     };
-    let mut models = authority::Models::NONE;
+    let mut models = 0_u64;
     let mut named = true;
     for (index, at) in items.iter().enumerate() {
         let path = check::index(&path, index);
@@ -273,7 +272,7 @@ fn models(
             }
         }
         match bit {
-            Some(bit) if models.0 & bit == 0 => models.0 |= bit,
+            Some(bit) if models & bit == 0 => models |= bit,
             Some(_) => {
                 problems.push(path, What::Unique);
                 named = false;
@@ -284,7 +283,7 @@ fn models(
             }
         }
     }
-    if named { Some(models) } else { None }
+    if named { Some(authority::Models::Named(models)) } else { None }
 }
 fn budget(document: &Document, at: Option<u32>, path: &Path, problems: &mut Problems) -> Option<authority::Budget> {
     let mut object = check::object(document, at?, path, problems)?;

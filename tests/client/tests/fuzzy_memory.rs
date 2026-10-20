@@ -26,6 +26,7 @@ fn full_authority() -> jig_client_domain::contract::OwnerAuthorityDocument {
     let resource = OwnerResourceScope { connector: u16::MAX, pattern };
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants: jig_client_world::test::list([grant.clone(), grant]),
             delegation: OwnerDelegation {

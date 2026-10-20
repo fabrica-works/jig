@@ -245,6 +245,16 @@ has left (`../../domain/authority.md`, 8.1 and 8.4).
   answer kept: it is admitted on the party's sign-in and role, and ends
   when its client leaves (section 7).
 
+Authority payloads carry an optional model selector: ALL or an explicit
+list of at most 64 unique, nonempty UTF-8 names, each at most 4,096 bytes.
+The client may receive fewer bytes per name under its whole text bound;
+an identity beyond that bound is refused whole. An empty list is explicit denial. Omission follows the Create, Amend and
+role defaults in `../../domain/authority.md`, 3. Both public authority
+forms carry this selector. Authority documents also carry `cut`; only a
+whole document can supply a replacement. Names are copied literally in
+both directions, and current availability is checked after retained-key
+lookup (`../../protocol/store.md`, 5.1).
+
 ### 3.3 An application's requests
 
 A request about an application's own object (silence this alert, extend

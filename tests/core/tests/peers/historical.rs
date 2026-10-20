@@ -46,6 +46,7 @@ fn a_second_authenticated_decider_reads_the_first_task_proposal_choice_and_clock
     tasks.dedup();
     assert_eq!(tasks.len(), 2, "only the proposing chat and its accepted goal");
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(81_001)),
         sign_in: owner_sign_in,
         key: [82; 16],

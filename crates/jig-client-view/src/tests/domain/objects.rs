@@ -67,6 +67,7 @@ pub(super) fn phase_details(phase: Phase) -> ChipPhase {
 pub(super) fn owner_authority() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: 0,
             grants: List::with_capacity(0),
             delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 1, depth: 1 },
@@ -80,6 +81,7 @@ pub(super) fn owner_authority() -> OwnerAuthorityDocument {
 }
 pub(super) fn authority() -> Authority {
     Authority {
+        models: None,
         budget: 10,
         grants: List::with_capacity(0),
         task_kinds: List::with_capacity(0),

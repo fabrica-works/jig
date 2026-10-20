@@ -63,7 +63,7 @@ pub const LIMITS: Limits = Limits {
 pub fn authority() -> Authority {
     Authority {
         tools: Tools(0),
-        models: Models(0),
+        models: Models::Named(0),
         grants: Box::new([]),
         delegation: Delegation { kinds: Box::new([]), tasks: 16, depth: 4 },
         budget: Budget { spend: 100, deadline: None },

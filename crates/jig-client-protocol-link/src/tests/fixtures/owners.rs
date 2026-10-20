@@ -41,6 +41,7 @@ pub fn owner_project() -> c::OwnerProject {
             templates: List::with_capacity(0),
             ceiling: c::OwnerAuthorityDocument {
                 authority: c::OwnerAuthority {
+                    models: Some(c::AuthorityModels::All),
                     tools: 7,
                     grants: List::with_capacity(0),
                     delegation: c::OwnerDelegation { kinds: List::with_capacity(0), tasks: 7, depth: 7 },

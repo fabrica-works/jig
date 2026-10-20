@@ -271,7 +271,7 @@ fn a_task_record_past_its_inbox_count_is_refused() {
         fixtures::task_word(17),
     ]);
     assert_eq!(
-        tasks::encode(&live_record(record), &tasks_limits()),
+        tasks::encode(&live_record(record), &tasks_limits(), &fixtures::model_names(&[b"first", b"second", b"third"])),
         Err(bound_problem(wire::Path::TaskInterestsInbox))
     );
 }
@@ -288,8 +288,12 @@ fn a_task_record_inbox_decoded_above_its_count_is_refused() {
         fixtures::task_word(13),
         fixtures::task_word(17),
     ]);
-    let bytes = tasks::encode(&live_record(record), &wider).expect("within wider count");
-    assert_eq!(tasks::decode(&bytes, &limits), Err(bound_problem(wire::Path::TaskInterestsInbox)));
+    let bytes = tasks::encode(&live_record(record), &wider, &fixtures::model_names(&[b"first", b"second", b"third"]))
+        .expect("within wider count");
+    assert_eq!(
+        tasks::decode(&bytes, &limits, &fixtures::model_names(&[b"first", b"second", b"third"])),
+        Err(bound_problem(wire::Path::TaskInterestsInbox))
+    );
 }
 #[test]
 fn record_count_limits_past_the_schema_ceilings_are_refused() {
@@ -323,7 +327,10 @@ fn an_activity_words_line_past_its_own_word_bound_is_refused() {
         kind: domain::MessageKind::Words,
         words: skein_lib::bytes::zeroed(17),
     });
-    assert_eq!(tasks::encode(&row, &tasks_limits()), Err(bound_problem(wire::Path::ActivityWordsWords)));
+    assert_eq!(
+        tasks::encode(&row, &tasks_limits(), &fixtures::model_names(&[b"first", b"second", b"third"])),
+        Err(bound_problem(wire::Path::ActivityWordsWords))
+    );
 }
 fn a_person_wait_without_a_stall_notice_reads_back() {
     let mut record = fixtures::task_record();

@@ -163,6 +163,7 @@ impl Peers {
                     },
                 };
                 root::Event::Core(core::Event::People(people::Event::Ask {
+                    models: Box::new([]),
                     reply_to: ReplyTo::new(Token::new(to)),
                     sign_in,
                     key,

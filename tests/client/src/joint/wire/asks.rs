@@ -203,7 +203,7 @@ fn grant(value: &client::OwnerGrant) -> people::Grant {
 fn authority(value: &client::OwnerAuthority) -> people::Authority {
     people::Authority {
         tools: value.tools,
-        models: 0,
+        models: None,
         grants: value.grants.iter().map(grant).collect(),
         delegation: people::Delegation {
             kinds: value
@@ -672,6 +672,7 @@ mod tests {
         let role = client::PolicyEditRole {
             number: u32::MAX,
             authority: client::OwnerAuthority {
+                models: None,
                 tools: u64::MAX,
                 grants: grants.clone(),
                 delegation: client::OwnerDelegation { kinds, tasks: u32::MAX, depth: u32::MAX },

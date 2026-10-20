@@ -184,6 +184,7 @@ mod tests {
     }
     fn answer(party: u64) -> root::Record {
         root::Record::Core(core::Record::People(jig_domain_people::Stored::Answer {
+            models: Box::new([]),
             key: jig_domain_people::RequestKey { person: party, key: [9; 16] },
             ask: Box::new(jig_domain_people::Ask::Say {
                 project: 1,

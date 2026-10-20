@@ -89,6 +89,7 @@ fn owner_authority(spend: u64) -> w::OwnerAuthority {
     w::OwnerAuthority::new(
         &limits,
         w::OwnerAuthorityParts {
+            models: None,
             tools: 0,
             grants: Box::new([]),
             spend,
@@ -152,12 +153,13 @@ fn keyed(key: [u8; 16], ask: &w::Ask) -> Box<[u8]> {
 fn route_real_core(peer: &mut Peer, world: &mut jig_core_world::effects::World) -> Vec<[u8; 16]> {
     let mut keys = Vec::new();
     while let Some(event) = peer.take_core() {
-        let core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask }) = event else {
+        let core::Event::People(people::Event::Ask { models, reply_to, sign_in, key, ask }) = event else {
             panic!("authenticated ask")
         };
         let token = reply_to.into_token();
         keys.push(key);
         world.send(jig_test_domain::Event::Core(core::Event::People(people::Event::Ask {
+            models,
             reply_to: skein_lib::ReplyTo::new(token),
             sign_in,
             key,

@@ -32,7 +32,13 @@ fn ask(core: &mut Core, env: &Env<Limits>, ask: people::Ask) -> Requests {
     step(
         core,
         env,
-        Event::People(people::Event::Ask { reply_to: ReplyTo::new(Token::new(7202)), sign_in: 10, key: [72; 16], ask }),
+        Event::People(people::Event::Ask {
+            models: Box::new([]),
+            reply_to: ReplyTo::new(Token::new(7202)),
+            sign_in: 10,
+            key: [72; 16],
+            ask,
+        }),
     )
 }
 

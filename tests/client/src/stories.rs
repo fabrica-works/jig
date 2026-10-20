@@ -101,6 +101,7 @@ pub fn inbox() -> RootAddress {
 fn owner_authority() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: 0,
             grants: list([]),
             delegation: OwnerDelegation { kinds: list([]), tasks: 1, depth: 1 },
@@ -114,6 +115,7 @@ fn owner_authority() -> OwnerAuthorityDocument {
 }
 fn authority() -> Authority {
     Authority {
+        models: None,
         budget: 1,
         grants: list([]),
         task_kinds: list([]),
@@ -133,6 +135,7 @@ fn batch_task(number: u64, spec: SpecificationDocument, executor: OwnerExecutor,
         contract: TaskContractDocument::Report { words: 32 },
         authority: OwnerAuthorityDocument {
             authority: OwnerAuthority {
+                models: None,
                 tools: 0,
                 grants: list([]),
                 delegation: OwnerDelegation { kinds: list([]), tasks: 1, depth: 1 },

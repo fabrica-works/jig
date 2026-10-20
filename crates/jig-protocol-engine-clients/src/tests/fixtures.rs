@@ -550,6 +550,7 @@ pub fn authority_ask() -> (w::Ask, people::Ask) {
     let authority = w::OwnerAuthority::new(
         &limits,
         w::OwnerAuthorityParts {
+            models: None,
             tools: u64::MAX,
             grants,
             delegation: w::OwnerDelegation::new(&limits, w::OwnerDelegationParts { kinds, tasks: 9, depth: 10 })
@@ -607,7 +608,7 @@ fn expected_authority() -> people::Ask {
             decides: 14,
             authority: p::Authority {
                 tools: u64::MAX,
-                models: 0,
+                models: None,
                 grants: Box::new([p::Grant {
                     connector: 5,
                     kind: 6,

@@ -99,6 +99,7 @@ pub fn world_with_policy(
         .expect("signed-in party");
     if let Some(role) = role {
         world.send(jig_test_domain::Event::Core(core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(6000)),
             sign_in: world.sign_in.expect("sign in"),
             key: [0; 16],

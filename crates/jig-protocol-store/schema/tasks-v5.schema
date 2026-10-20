@@ -31,7 +31,7 @@ record Choices { choices: list 64 Verdict }
 record ChangeContract { connector: u16 kind: u16 words: u32 }
 enum Contract { approval: Approval, report: Report, verdict: Choices, change: ChangeContract }
 record Tools { bits: u64 }
-record Models { bits: u64 }
+record Models { bits: u64 all: bool }
 record ModelEffort { model: u8 effort: option u8 }
 record LlmChoice { main: ModelEffort subagents: list 64 ModelEffort account: option u32 }
 record Scopes { bits: u8 }
@@ -311,7 +311,8 @@ record TaskRecord { history: TaskHistory run: TaskRun definition: TaskDefinition
 record EndedByParty { party: u64 label: u32 ended_at: u64 task: u64 }
 record EndedByProject { project: u32 label: u32 ended_at: u64 task: u64 }
 enum Value { ledger: FundingRecord, closed_ledger: FundingRecord, writer: WriterSlot, pool: PoolSlots, history: boxed History, milestone: Milestone, person_proposal: PersonProposal, decided_proposal: PersonProposal, activity: ActivityLine, live: TaskRecord, ended: TaskRecord, stub: Stub, update: Update, result: ResultRow, ended_delegate: Edge, delegate: Edge, ended_by_party: EndedByParty, ended_by_project: EndedByProject }
-versioned record Row { value: Value }
+record ModelName { value: text 4096 }
+versioned record Row { value: Value models: list 64 ModelName }
 record CapacityActionBatch { first: option u64 members: u32 }
 record CapacityActionProposal { number: u64 }
 record CapacityActionPersonProposal { number: u64 }

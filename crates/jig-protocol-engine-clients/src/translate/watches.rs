@@ -120,7 +120,7 @@ pub(crate) fn delivery(
         d::Document::Run(value) => w::DeliveryValue::RunState(live::run(value, limits)?),
         d::Document::Accounts(value) => w::DeliveryValue::OwnerAccounts(super::accounts::document(value, limits)?),
         d::Document::Deployment(value) => w::DeliveryValue::OwnerDeployment(deployment::document(value, limits)?),
-        d::Document::Proposal(value) => w::DeliveryValue::OwnerProposal(objects::proposal(value, limits)?),
+        d::Document::Proposal(value) => w::DeliveryValue::OwnerProposal(objects::proposal(models, value, limits)?),
         d::Document::Escalation(_)
         | d::Document::Question(_)
         | d::Document::PersonTask(_)

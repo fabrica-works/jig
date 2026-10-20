@@ -112,6 +112,7 @@ fn covers(facts: &OwnerAuthority, draft: &OwnerAuthority, order: &[super::OwnerK
     let mut fits = draft.spend <= facts.spend
         && draft.delegation.depth <= facts.delegation.depth
         && draft.delegation.tasks <= facts.delegation.tasks
+        && models_cover(facts.models.as_ref(), draft.models.as_ref())
         && draft.tools & !facts.tools == 0
         && draft.notes & !facts.notes == 0
         && deadline(draft.deadline, facts.deadline);
@@ -173,5 +174,26 @@ fn pattern_at_most(draft: &OwnerPattern, given: &OwnerPattern) -> bool {
                 OwnerPatternEnd::Exact(segment) | OwnerPatternEnd::Open(segment) => segment.starts_with(last),
             }
         }
+    }
+}
+
+fn models_cover(facts: Option<&super::AuthorityModels>, draft: Option<&super::AuthorityModels>) -> bool {
+    match draft {
+        None => true,
+        Some(super::AuthorityModels::All) => match facts {
+            Some(super::AuthorityModels::All) => true,
+            Some(super::AuthorityModels::Named(_)) | None => false,
+        },
+        Some(super::AuthorityModels::Named(names)) => match facts {
+            Some(super::AuthorityModels::All) => true,
+            Some(super::AuthorityModels::Named(given)) => {
+                let mut fits = true;
+                for name in names {
+                    fits &= given.as_slice().contains(name);
+                }
+                fits
+            }
+            None => names.is_empty(),
+        },
     }
 }

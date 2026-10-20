@@ -108,6 +108,7 @@ const HOLDER_REQUEST_BASE: u64 = 8200;
 /// Submit an owner or member request with the fixture's request-token range.
 pub fn ask_as(world: &mut crate::effects::World, sign_in: u64, key: u8, ask: jig_domain_people::Ask) {
     world.send(jig_test_domain::Event::Core(jig_domain_core::Event::People(jig_domain_people::Event::Ask {
+        models: Box::new([]),
         reply_to: skein_lib::ReplyTo::new(skein_lib::Token::new(HOLDER_REQUEST_BASE + u64::from(key))),
         sign_in,
         key: [key; 16],
@@ -253,7 +254,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         contract: people::Contract::Report { words: 16 },
         authority: people::Authority {
             tools: 0,
-            models: 0,
+            models: None,
             grants: Box::new([]),
             delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
             spend,

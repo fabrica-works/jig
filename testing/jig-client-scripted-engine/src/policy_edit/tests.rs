@@ -10,6 +10,7 @@ fn pattern() -> OwnerPattern {
 }
 fn authority() -> OwnerAuthority {
     OwnerAuthority {
+        models: None,
         tools: u64::MAX,
         grants: List::with_capacity(0),
         delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: u32::MAX, depth: u32::MAX },

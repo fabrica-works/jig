@@ -4,13 +4,49 @@ use alloc::boxed::Box;
 use jig_client_protocol_wire::v10 as w;
 use jig_domain_people as p;
 use skein_lib::{List, Reader, Wall};
-#[expect(clippy::too_many_lines, reason = "one total match names every wire ask")]
+#[derive(Debug)]
+pub(crate) struct NamedAsk {
+    pub ask: p::Ask,
+    pub models: Box<[Box<[u8]>]>,
+}
+
+pub(crate) fn named(record: w::Ask, models: &[crate::Model], limits: &w::Limits) -> Result<NamedAsk, Untranslatable> {
+    let mut names = List::with_capacity(p::MODELS);
+    let mut ask = decode(record, models, limits, &mut names)?;
+    let original = names.into_boxed();
+    let mut canonical = original.clone();
+    canonical.sort_unstable();
+    let mut moved = [0_u64; 64];
+    for (at, name) in original.iter().enumerate() {
+        for (to, other) in canonical.iter().enumerate() {
+            if name == other {
+                *moved.get_mut(at).expect("bounded names") =
+                    1_u64.checked_shl(u32::try_from(to).expect("bounded model index")).unwrap_or(0);
+                break;
+            }
+        }
+    }
+    p::remap_models(&mut ask, &moved);
+    Ok(NamedAsk { ask, models: canonical })
+}
+
+#[cfg(test)]
 pub(crate) fn ask(record: w::Ask, models: &[crate::Model], limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
+    Ok(named(record, models, limits)?.ask)
+}
+
+#[expect(clippy::too_many_lines, reason = "one total match names every wire ask")]
+fn decode(
+    record: w::Ask,
+    models: &[crate::Model],
+    limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
+) -> Result<p::Ask, Untranslatable> {
     Ok(match record {
-        w::Ask::Propose(value) => super::operations::propose(value, models, limits)?,
+        w::Ask::Propose(value) => super::operations::propose(value, models, limits, names)?,
         w::Ask::Withdraw(value) => p::Ask::Withdraw { project: value.project(), proposal: value.proposal() },
-        w::Ask::Create(value) => super::operations::create(value, models, limits)?,
-        w::Ask::Compound(value) => super::operations::compound(value, models, limits)?,
+        w::Ask::Create(value) => super::operations::create(value, models, limits, names)?,
+        w::Ask::Compound(value) => super::operations::compound(value, models, limits, names)?,
         w::Ask::Message(value) => {
             let v = value.into_parts();
             p::Ask::Say { project: v.project, task: v.task, words: v.words }
@@ -45,7 +81,7 @@ pub(crate) fn ask(record: w::Ask, models: &[crate::Model], limits: &w::Limits) -
                     Some(value) => revision(value),
                     None => 0,
                 },
-                amendment: amendment(v.change, v.reason, models, limits)?,
+                amendment: amendment(v.change, v.reason, models, limits, names)?,
             }
         }
         w::Ask::Stop(value) => {
@@ -108,7 +144,7 @@ pub(crate) fn ask(record: w::Ask, models: &[crate::Model], limits: &w::Limits) -
         }
         w::Ask::ChangePolicy(value) => {
             let v = value.into_parts();
-            p::Ask::ChangePolicy { project: v.project, change: policy(v.edit, limits)? }
+            p::Ask::ChangePolicy { project: v.project, change: policy(v.edit, limits, names)? }
         }
         w::Ask::SetRoles(value) => {
             let v = value.into_parts();
@@ -278,10 +314,11 @@ pub(super) fn amendment(
     reason: Box<[u8]>,
     models: &[crate::Model],
     limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
 ) -> Result<p::Amendment, Untranslatable> {
     let v = value.into_parts();
     let authority = match v.authority {
-        Some(value) => Some(authority(value, limits)?),
+        Some(value) => Some(authority(value, limits, names)?),
         None => None,
     };
     Ok(p::Amendment {
@@ -363,7 +400,11 @@ pub(super) fn grants(
     Ok(values.into_boxed())
 }
 #[expect(clippy::manual_map, reason = "step code matches optional fields")]
-pub(super) fn authority(value: w::OwnerAuthority, limits: &w::Limits) -> Result<p::Authority, Untranslatable> {
+pub(super) fn authority(
+    value: w::OwnerAuthority,
+    limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
+) -> Result<p::Authority, Untranslatable> {
     let v = value.into_parts();
     let delegation = v.delegation.into_parts();
     let mut kinds = List::with_capacity(delegation.kinds.capacity());
@@ -394,9 +435,7 @@ pub(super) fn authority(value: w::OwnerAuthority, limits: &w::Limits) -> Result<
     }
     Ok(p::Authority {
         tools: v.tools,
-        // The client wire names no models until JP10: the core fills a role's or a task's from
-        // the models it already keeps.
-        models: 0,
+        models: super::llm::requested(v.models, names)?,
         grants: grants(&v.grants, limits.owner_authority_grants, w::Path::OwnerAuthorityGrants, limits)?,
         delegation: p::Delegation { kinds: kinds.into_boxed(), tasks: delegation.tasks, depth: delegation.depth },
         spend: v.spend,
@@ -426,7 +465,11 @@ fn requirement(value: w::PolicyRequirement) -> p::Requirement {
         must_be_guarded: v.must_be_guarded,
     }
 }
-fn policy(value: w::PolicyEdit, limits: &w::Limits) -> Result<p::PolicyChange, Untranslatable> {
+fn policy(
+    value: w::PolicyEdit,
+    limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
+) -> Result<p::PolicyChange, Untranslatable> {
     Ok(match value {
         w::PolicyEdit::Templates(v) => super::operations::templates(v),
         w::PolicyEdit::ProjectSpend(v) => p::PolicyChange::ProjectSpend { period_spend: v.period_spend() },
@@ -434,7 +477,7 @@ fn policy(value: w::PolicyEdit, limits: &w::Limits) -> Result<p::PolicyChange, U
             let v = v.into_parts().value.into_parts();
             p::PolicyChange::Role(p::PolicyRole {
                 number: v.number,
-                authority: authority(v.authority, limits)?,
+                authority: authority(v.authority, limits, names)?,
                 period_spend: v.period_spend,
                 requests: v.requests,
                 decides: v.decides,

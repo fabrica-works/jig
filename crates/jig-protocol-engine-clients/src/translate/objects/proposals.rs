@@ -4,7 +4,11 @@ use alloc::boxed::Box;
 use jig_domain_core::documents as d;
 use jig_domain_tasks as t;
 use skein_lib::{List, Writer};
-pub fn amendment(value: &d::AmendmentState, limits: &w::Limits) -> Result<w::OwnerAmendmentState, w::Problem> {
+pub fn amendment(
+    models: &[crate::Model],
+    value: &d::AmendmentState,
+    limits: &w::Limits,
+) -> Result<w::OwnerAmendmentState, w::Problem> {
     let mut dependencies = List::with_capacity(value.dependencies.len());
     for row in &value.dependencies {
         dependencies.push(*row).expect("supplied rows fit");
@@ -23,7 +27,7 @@ pub fn amendment(value: &d::AmendmentState, limits: &w::Limits) -> Result<w::Own
                 None => None,
             },
             spec: owner::specification(&value.spec, limits)?,
-            authority: owner::authority(&value.authority, limits)?,
+            authority: owner::authority(models, &value.authority, limits)?,
             wake: owner::wake(value.wake, limits)?,
             dependencies,
             cut: value.cut,
@@ -54,7 +58,11 @@ pub fn holder(value: t::ProposalHolder, limits: &w::Limits) -> Result<w::OwnerHi
         ),
     })
 }
-pub fn proposed(value: &d::ProposedTask, limits: &w::Limits) -> Result<w::ProposedTask, w::Problem> {
+pub fn proposed(
+    models: &[crate::Model],
+    value: &d::ProposedTask,
+    limits: &w::Limits,
+) -> Result<w::ProposedTask, w::Problem> {
     let mut dependencies = List::with_capacity(value.dependencies.len());
     for row in &value.dependencies {
         dependencies.push(*row).expect("supplied rows fit");
@@ -78,7 +86,7 @@ pub fn proposed(value: &d::ProposedTask, limits: &w::Limits) -> Result<w::Propos
             spec: owner::specification(&value.spec, limits)?,
             executor: owner::executor(value.executor, limits)?,
             contract: owner::contract(&value.contract, limits)?,
-            authority: owner::authority(&value.authority, limits)?,
+            authority: owner::authority(models, &value.authority, limits)?,
             budget: value.budget,
             funder: owner::funder(value.funder, limits)?,
             dependencies,
@@ -89,12 +97,16 @@ pub fn proposed(value: &d::ProposedTask, limits: &w::Limits) -> Result<w::Propos
         },
     )
 }
-pub fn action(value: &d::ProposalAction, limits: &w::Limits) -> Result<w::OwnerProposalAction, w::Problem> {
+pub fn action(
+    models: &[crate::Model],
+    value: &d::ProposalAction,
+    limits: &w::Limits,
+) -> Result<w::OwnerProposalAction, w::Problem> {
     Ok(match value {
         d::ProposalAction::Batch(value) => {
             let mut rows = List::with_capacity(value.len());
             for row in value {
-                rows.push(proposed(row, limits)?).expect("supplied rows fit");
+                rows.push(proposed(models, row, limits)?).expect("supplied rows fit");
             }
             let rows = proposed_task_pieces(
                 &rows,
@@ -111,7 +123,7 @@ pub fn action(value: &d::ProposalAction, limits: &w::Limits) -> Result<w::OwnerP
                 limits,
                 w::OwnerProposalActionEffectParts {
                     part: owner::part(part, limits)?,
-                    authority: owner::authority(authority, limits)?,
+                    authority: owner::authority(models, authority, limits)?,
                     attempt: *attempt,
                     completion: *completion,
                     position: *position,
@@ -124,7 +136,7 @@ pub fn action(value: &d::ProposalAction, limits: &w::Limits) -> Result<w::OwnerP
                 limits,
                 w::OwnerProposalActionProcedureEffectParts {
                     part: owner::part(part, limits)?,
-                    authority: owner::authority(authority, limits)?,
+                    authority: owner::authority(models, authority, limits)?,
                     step: *step,
                     purpose: *purpose,
                 },
@@ -145,8 +157,8 @@ pub fn action(value: &d::ProposalAction, limits: &w::Limits) -> Result<w::OwnerP
                         )?),
                         None => None,
                     },
-                    before: amendment(before, limits)?,
-                    after: amendment(after, limits)?,
+                    before: amendment(models, before, limits)?,
+                    after: amendment(models, after, limits)?,
                     reason: owner::text(reason, limits)?,
                     release: *release,
                 },
@@ -157,8 +169,8 @@ pub fn action(value: &d::ProposalAction, limits: &w::Limits) -> Result<w::OwnerP
                 limits,
                 w::OwnerProposalActionWidenParts {
                     task: task::link(target, limits)?,
-                    before: owner::authority(before, limits)?,
-                    after: owner::authority(after, limits)?,
+                    before: owner::authority(models, before, limits)?,
+                    after: owner::authority(models, after, limits)?,
                 },
             )?)
         }
@@ -176,7 +188,11 @@ pub fn action(value: &d::ProposalAction, limits: &w::Limits) -> Result<w::OwnerP
         }
     })
 }
-pub fn proposal(value: &d::Proposal, limits: &w::Limits) -> Result<w::OwnerProposal, w::Problem> {
+pub fn proposal(
+    models: &[crate::Model],
+    value: &d::Proposal,
+    limits: &w::Limits,
+) -> Result<w::OwnerProposal, w::Problem> {
     if let d::Proposer::Party(_) = value.proposer
         && let d::ProposalAction::Amend { .. } = value.action
     {
@@ -203,7 +219,7 @@ pub fn proposal(value: &d::Proposal, limits: &w::Limits) -> Result<w::OwnerPropo
             key: task::proposal(&d::ProposalRef { proposer: value.proposer, number: value.number }, limits)?,
             project: value.project,
             reason: owner::text(&value.reason, limits)?,
-            action: action(&value.action, limits)?,
+            action: action(models, &value.action, limits)?,
             as_holder: value.as_holder,
             waiting: w::OwnerProposalWaiting::new(
                 limits,
@@ -213,7 +229,7 @@ pub fn proposal(value: &d::Proposal, limits: &w::Limits) -> Result<w::OwnerPropo
                 },
             )?,
             funding,
-            acts: task::offered(&value.acts, limits, limits.owner_proposal_acts, w::Path::OwnerProposalActs)?,
+            acts: task::offered(models, &value.acts, limits, limits.owner_proposal_acts, w::Path::OwnerProposalActs)?,
         },
     )
 }

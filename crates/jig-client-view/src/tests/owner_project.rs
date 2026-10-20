@@ -42,6 +42,7 @@ fn part() -> OwnerPart {
 fn authority(cut: bool) -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants: list(4, [OwnerGrant { connector: u16::MAX, kind: u16::MAX, pattern: pattern() }]),
             delegation: OwnerDelegation {

@@ -35,6 +35,7 @@ pub(super) fn timer_core(answers: bool) -> (Core, Env<Limits>) {
     if answers {
         for id in [1, 2] {
             rows.push(people::Stored::Answer {
+                models: Box::new([]),
                 key: people::RequestKey { person: 1, key: [id; 16] },
                 ask: Box::new(people::Ask::Stop { project: 1, task: 1 }),
                 outcome: people::Outcome::Stopped { task: 1 },
@@ -96,6 +97,7 @@ fn people_timer_expires_signins_durably_and_later_replies_wait_for_that_commit()
         &mut core,
         &env,
         Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(50)),
             sign_in: 10,
             key: [5; 16],

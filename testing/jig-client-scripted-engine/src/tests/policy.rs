@@ -30,6 +30,7 @@ fn each_closed_policy_edit_is_one_durable_keyed_request_and_replays_without_spli
         PolicyEdit::Role(PolicyEditRole {
             number: u32::MAX,
             authority: OwnerAuthority {
+                models: None,
                 tools: u64::MAX,
                 grants: list(vec![]),
                 delegation: OwnerDelegation { kinds: list(vec![]), tasks: u32::MAX, depth: u32::MAX },

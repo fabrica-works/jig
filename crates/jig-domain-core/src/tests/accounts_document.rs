@@ -125,6 +125,7 @@ fn ask(core: &mut Core, env: &Env<Limits>, by: u64, key: u8, holder: people::Acc
         core,
         env,
         Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(u64::from(key))),
             sign_in,
             key: [key; 16],

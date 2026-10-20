@@ -24,7 +24,7 @@ fn raise_pool_ceiling(world: &mut World, seed: u64) {
                 number: role.number,
                 authority: people::Authority {
                     tools: authority.tools.0,
-                    models: authority.models.0,
+                    models: None,
                     grants: authority
                         .grants
                         .iter()

@@ -8,9 +8,73 @@ use jig_domain_people as p;
 use jig_domain_tasks as t;
 use skein_lib::{List, Reader, bytes};
 
+/// A complete permission selector by names, preserving literal ALL even with 64 models.
+pub fn authority(value: Models, models: &[Model], limits: &w::Limits) -> Result<Option<w::ModelSet>, w::Problem> {
+    if value.is_all() {
+        return Ok(Some(w::ModelSet::All));
+    }
+    let mut names = List::with_capacity(p::MODELS);
+    for (at, model) in models.iter().enumerate() {
+        if value.bits() & (1_u64.checked_shl(u32::try_from(at).expect("bounded model index")).unwrap_or(0)) != 0 {
+            names.push(bytes::copy_of(&model.name)).expect("configured models");
+        }
+    }
+    let mut names = names.into_boxed();
+    names.sort_unstable();
+    let mut rows = List::with_capacity(u32::try_from(names.len()).expect("model bound"));
+    for name in names {
+        rows.push(name).expect("same model count");
+    }
+    Ok(Some(w::ModelSet::Names(w::ModelSetNames::new(limits, w::ModelSetNamesParts { names: rows })?)))
+}
+
+/// Collect only names the ask uses; admission of unknown names follows people's replay lookup.
+pub(super) fn requested(
+    value: Option<w::ModelSet>,
+    names: &mut List<Box<[u8]>>,
+) -> Result<Option<p::Models>, super::Untranslatable> {
+    let bad = super::Untranslatable { path: w::Path::ModelSetNamesNames };
+    Ok(match value {
+        None => None,
+        Some(w::ModelSet::All) => Some(p::Models::All),
+        Some(w::ModelSet::Names(value)) => {
+            let mut mask = 0_u64;
+            for name in value.into_parts().names.into_boxed() {
+                if name.is_empty() {
+                    return Err(bad);
+                }
+                let mut bit = None;
+                for (at, previous) in names.iter().enumerate() {
+                    if *previous == name {
+                        bit = Some(at);
+                        break;
+                    }
+                }
+                let at = match bit {
+                    Some(at) => at,
+                    None => {
+                        let at = usize::try_from(names.len()).expect("model count");
+                        if names.push(name).is_err() {
+                            return Err(bad);
+                        }
+                        at
+                    }
+                };
+                let bit = 1_u64.checked_shl(u32::try_from(at).expect("bounded model index")).unwrap_or(0);
+                if mask & bit != 0 {
+                    return Err(bad);
+                }
+                mask |= bit;
+            }
+            Some(p::Models::Named(mask))
+        }
+    })
+}
+
 /// Whether the configured models fit the core's indices and the wire's bounds.
 pub(crate) fn fits(models: &[Model], limits: &w::Limits) -> bool {
-    if models.len() > usize::try_from(t::MODELS).expect("u32 fits usize")
+    if models.len() > usize::try_from(limits.model_set_names_names).expect("u32 fits usize")
+        || models.len() > usize::try_from(t::MODELS).expect("u32 fits usize")
         || models.len() > usize::try_from(limits.me_project_models).expect("u32 fits usize")
     {
         return false;
@@ -20,6 +84,7 @@ pub(crate) fn fits(models: &[Model], limits: &w::Limits) -> bool {
         if model.name.is_empty()
             || !skein_codec::text_is_valid(&model.name)
             || name > usize::try_from(jig_domain_core::MODEL_NAME_BYTES).expect("u32 fits usize")
+            || name > usize::try_from(limits.model_set_names_names_item).expect("u32 fits usize")
             || name > usize::try_from(limits.me_model_name).expect("u32 fits usize")
             || name > usize::try_from(limits.model_effort_model).expect("u32 fits usize")
             || name > usize::try_from(limits.refusal_llm_model).expect("u32 fits usize")
@@ -51,7 +116,7 @@ pub(crate) fn fits(models: &[Model], limits: &w::Limits) -> bool {
 pub fn models(allowed: Models, models: &[Model], limits: &w::Limits) -> Result<List<w::MeModel>, w::Problem> {
     let mut rows = List::with_capacity(u32::try_from(models.len()).expect("checked models"));
     for (at, model) in models.iter().enumerate() {
-        if allowed.0 & (1_u64 << at) == 0 {
+        if allowed.bits() & (1_u64.checked_shl(u32::try_from(at).expect("bounded model index")).unwrap_or(0)) == 0 {
             continue;
         }
         let mut efforts = List::with_capacity(u32::try_from(model.efforts.len()).expect("checked efforts"));

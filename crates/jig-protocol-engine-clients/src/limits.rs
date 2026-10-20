@@ -54,6 +54,10 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
                 .checked_mul(body.checked_mul(128)?.checked_add(80)?)?,
         )?
         .checked_add(Queue::<Request>::worst_case(MAX_OUT_DOWN)?)?
+        // Original names, canonicalization scratch and each routed output context.
+        .checked_add(
+            jig_domain_people::model_names_worst_case()?.checked_mul(u64::from(MAX_OUT_DOWN).checked_add(2)?)?,
+        )?
         .checked_add(skein_lib::List::<crate::Served>::worst_case(limits.families)?)?
         .checked_add(skein_lib::List::<u16>::worst_case(limits.providers)?)?
         // The configured models, which `Component::new` holds to the core's bounds.

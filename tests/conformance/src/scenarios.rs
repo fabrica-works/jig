@@ -32,6 +32,7 @@ const PARTY_REPLY_BASE: u64 = 6000;
 
 fn ask(world: &mut World, key: u8, ask: people::Ask) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(PARTY_REPLY_BASE + u64::from(key))),
         sign_in: world.peers.peers.parties[0].sign_in.expect("scripted sign-in"),
         key: [key; 16],

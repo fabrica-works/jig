@@ -178,6 +178,7 @@ fn family_document_with_second(root: &mut Domain, proposal_count: u64, second: O
 fn owner_authority() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: 0,
             grants: List::with_capacity(0),
             delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 1, depth: 1 },
@@ -191,6 +192,7 @@ fn owner_authority() -> OwnerAuthorityDocument {
 }
 fn authority() -> Authority {
     Authority {
+        models: None,
         budget: 1,
         grants: list([]),
         task_kinds: list([]),

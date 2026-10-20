@@ -18,6 +18,7 @@ fn ask(world: &mut World, request: u8, ask: people::Ask) {
 
 fn ask_as(world: &mut World, sign_in: u64, request: u8, ask: people::Ask) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(6000 + u64::from(request))),
         sign_in,
         key: [request; 16],
@@ -1205,7 +1206,7 @@ fn a_widening_amendment_with_release_is_proposed_and_released_on_acceptance(worl
     let mut change = amendment(b"widened task");
     let mut widened_authority = people::Authority {
         tools: 1023,
-        models: 0,
+        models: None,
         grants: Box::new([people::Grant {
             connector: 1,
             kind: 5,
@@ -1346,7 +1347,7 @@ fn a_goal_with_a_deadline_is_held_past_it() {
                 number: 0,
                 authority: people::Authority {
                     tools: 1023,
-                    models: 0,
+                    models: None,
                     grants: Box::new([people::Grant {
                         connector: 1,
                         kind: 5,

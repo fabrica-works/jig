@@ -439,7 +439,7 @@ impl World {
             })
             .unwrap_or(0);
         self.context = Some(RequestKey { person, key });
-        self.send(Event::Ask { reply_to, sign_in, key, ask });
+        self.send(Event::Ask { models: Box::new([]), reply_to, sign_in, key, ask });
         self.context = None;
         call
     }
@@ -493,7 +493,7 @@ impl World {
                 Request::Save { record } => changes.push(Change::Save(record)),
                 Request::Erase { key } => changes.push(Change::Erase(key)),
                 Request::Reply { to, reply } => replies.push((to.into_token().raw(), reply)),
-                Request::Route { request, person, project, role, ask } => {
+                Request::Route { request, person, project, role, ask, models: _ } => {
                     assert!(
                         project == 1
                             || matches!(

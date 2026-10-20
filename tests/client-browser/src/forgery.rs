@@ -22,6 +22,7 @@ fn task() -> c::NewTask {
         },
         contract: c::NewContract::Report { words: RESULT_WORDS },
         authority: c::OwnerAuthority {
+            models: None,
             tools: 0,
             grants: List::with_capacity(0),
             delegation: c::OwnerDelegation { kinds: List::with_capacity(0), tasks: 0, depth: 0 },

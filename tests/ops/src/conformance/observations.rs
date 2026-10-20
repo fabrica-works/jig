@@ -125,7 +125,8 @@ pub fn inbound(
     store: &Store,
     event: &mut root::Event,
 ) -> Vec<r::Observed> {
-    if let root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask })) = event {
+    if let root::Event::Core(core::Event::People(people::Event::Ask { models: _, reply_to, sign_in, key, ask })) = event
+    {
         let person = store.rows.values().find_map(|row| match row {
             root::Record::Core(core::Record::People(people::Stored::SignIn { number, person, .. }))
                 if number == sign_in =>

@@ -55,6 +55,7 @@ fn fixture() -> OwnerAmendmentState {
         },
         authority: OwnerAuthorityDocument {
             authority: OwnerAuthority {
+                models: None,
                 tools: u64::MAX,
                 grants,
                 delegation: OwnerDelegation { kinds, tasks: u32::MAX, depth: u32::MAX },
@@ -237,6 +238,13 @@ fn owner_amendment_full_rows_and_text_reach_the_declared_worst_case_without_omis
             })
             .unwrap();
     }
+    let mut names = List::with_capacity(AUTHORITY_MODELS);
+    for at in 0..AUTHORITY_MODELS {
+        names
+            .push(vec![b'0' + u8::try_from(at).unwrap(); usize::try_from(bounds.text).unwrap()].into_boxed_slice())
+            .unwrap();
+    }
+    value.authority.authority.models = Some(AuthorityModels::Named(names));
     let maximum = worst_case(&bounds).unwrap();
     assert_eq!(bytes(&value, &bounds), Some(maximum));
     assert!(fits(&value, &Bounds { document_bytes: maximum, ..bounds }));

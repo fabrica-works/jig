@@ -199,6 +199,7 @@ fn narrowed_policy_case(seed: u64) {
     world.call(1, 9201);
     let proposal = world.propose(2);
     world.send(root::Event::Core(core::Event::People(jig_domain_people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9400)),
         sign_in: world.sign_in.expect("person"),
         key: [43; 16],

@@ -63,6 +63,7 @@ impl Measured {
         let words = vec![1; usize::try_from(self.env.limits.words).expect("test values are admitted and fit")]
             .into_boxed_slice();
         self.event(Event::Ask {
+            models: Box::new([]),
             reply_to,
             sign_in: 1,
             key: [key; 16],
@@ -302,6 +303,7 @@ fn retained_account_sign_in_answers_hold_their_longest_addresses_within_the_wors
         let reply_to = test.to();
         let request = test
             .event(Event::Ask {
+                models: Box::new([]),
                 reply_to,
                 sign_in: 1,
                 key: [key; 16],
@@ -318,6 +320,7 @@ fn retained_account_sign_in_answers_hold_their_longest_addresses_within_the_wors
     let reply_to = test.to();
     assert!(
         test.event(Event::Ask {
+            models: Box::new([]),
             reply_to,
             sign_in: 1,
             key: [0; 16],

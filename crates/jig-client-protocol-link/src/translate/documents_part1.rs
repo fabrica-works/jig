@@ -237,6 +237,7 @@ pub(crate) fn owner_authority_fields(
         None => None,
     };
     Ok(c::OwnerAuthority {
+        models: crate::translate::model_sets::decode(value.models().as_ref())?,
         tools: value.tools(),
         grants: owner_grant_piece(value.grants(), limits, limits.client.authority)?,
         delegation: owner_delegation_fields(value.delegation(), limits)?,
@@ -251,7 +252,7 @@ pub(crate) fn owner_authority_document_fields(
     value: &w::OwnerAuthorityDocument,
     limits: &Limits,
 ) -> Result<c::OwnerAuthorityDocument, w::Problem> {
-    Ok(c::OwnerAuthorityDocument::complete(owner_authority_fields(value.authority(), limits)?))
+    Ok(c::OwnerAuthorityDocument { authority: owner_authority_fields(value.authority(), limits)?, cut: value.cut() })
 }
 
 pub(crate) fn hold_reason_fields(value: &w::HoldReason, limits: &Limits) -> Result<c::HoldReason, w::Problem> {

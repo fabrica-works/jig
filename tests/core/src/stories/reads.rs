@@ -50,7 +50,7 @@ pub fn conversation_member(forgettable: bool) -> people::Member {
         contract: people::Contract::Report { words: 128 },
         authority: people::Authority {
             tools: DELEGATE,
-            models: 0,
+            models: None,
             grants: Box::new([]),
             delegation: people::Delegation {
                 kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),
@@ -135,6 +135,7 @@ pub fn request(world: &mut World, number: u8, ask: people::Ask) {
 #[must_use]
 pub fn request_event(world: &World, number: u8, ask: people::Ask) -> root::Event {
     root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(30_000 + u64::from(number))),
         sign_in: world.sign_in.expect("signed in"),
         key: [number; 16],

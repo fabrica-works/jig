@@ -162,6 +162,7 @@ impl World {
                     return;
                 }
                 self.events.push_back(root::Event::Core(core::Event::People(people::Event::Ask {
+                    models: Box::new([]),
                     reply_to: ReplyTo::new(Token::new(102)),
                     sign_in,
                     key: [5; 16],

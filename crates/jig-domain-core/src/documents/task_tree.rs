@@ -42,6 +42,7 @@ pub struct NoteScope {
 /// An authority carrier in bounded document form.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AuthorityLine {
+    pub models: tasks::Models,
     pub tools: tasks::Tools,
     pub grants: List<GrantLine>,
     pub executors: List<tasks::AuthorityExecutor>,
@@ -366,6 +367,7 @@ pub(super) fn authority(limits: &Limits, value: &tasks::Authority) -> Result<Aut
             .expect("bounded note scopes");
     }
     Ok(AuthorityLine {
+        models: value.models,
         tools: value.tools,
         grants,
         executors,

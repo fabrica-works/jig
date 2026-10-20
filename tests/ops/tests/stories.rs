@@ -123,6 +123,7 @@ fn result_world() -> jig_conformance::Harness<jig_ops_world::conformance::Ops> {
     let mut world = jig_conformance::Harness::<Ops>::new(Config::new(176, Story::Alert), 176);
     world.drain().expect("cold root");
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(177)),
         sign_in: world.peers.sign_in.expect("signed in"),
         key: [177; 16],

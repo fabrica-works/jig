@@ -10,6 +10,7 @@ fn source() -> OwnerProject {
         policy: OwnerProjectPolicy {
             templates: skein_lib::List::with_capacity(0),
             ceiling: OwnerAuthorityDocument::complete(OwnerAuthority {
+                models: None,
                 tools: u64::MAX,
                 grants: List::with_capacity(0),
                 delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: u32::MAX, depth: u32::MAX },

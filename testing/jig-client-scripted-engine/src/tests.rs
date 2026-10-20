@@ -63,6 +63,7 @@ fn frame(number: u64) -> Me {
 pub(crate) fn owner_authority() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: 0,
             grants: List::with_capacity(0),
             delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 10, depth: 10 },
@@ -76,6 +77,7 @@ pub(crate) fn owner_authority() -> OwnerAuthorityDocument {
 }
 fn authority() -> Authority {
     Authority {
+        models: None,
         budget: 100,
         grants: list(vec![]),
         task_kinds: list(vec![]),
@@ -2285,4 +2287,21 @@ fn span_acceptance_uses_the_supplied_decision_wall() {
         let answers = engine.poll(at(seconds * 1_000_000_000 + 10_000_000));
         assert_eq!(final_answer(&answers[0]), &expected, "{seconds}");
     }
+}
+
+#[test]
+fn named_authority_models_price_their_full_allocated_list_and_bytes() {
+    let mut value = owner_authority();
+    let bounds = Bounds { document_bytes: u64::MAX, ..Bounds::default() };
+    let before = crate::owner_authority::document_bytes(&value, &bounds).unwrap();
+    let mut names = List::with_capacity(64);
+    names.push(Box::from([b'x'; 4096].as_slice())).unwrap();
+    let allocated = List::<Box<[u8]>>::worst_case(64).unwrap() + 4096;
+    value.authority.models = Some(AuthorityModels::Named(names));
+    assert_eq!(crate::owner_authority::document_bytes(&value, &bounds), Some(before + allocated));
+    assert!(crate::owner_authority::worst_case(&bounds).unwrap() >= before + allocated);
+    let mut over = List::with_capacity(65);
+    over.push(Box::from(b"model".as_slice())).unwrap();
+    value.authority.models = Some(AuthorityModels::Named(over));
+    assert_eq!(crate::owner_authority::document_bytes(&value, &bounds), None);
 }

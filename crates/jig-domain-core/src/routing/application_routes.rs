@@ -44,7 +44,13 @@ pub(super) fn start(
         core,
         env,
         work,
-        people::Event::Ask { reply_to, sign_in, key, ask: people::Ask::Application { scope, connector, digest } },
+        people::Event::Ask {
+            models: Box::new([]),
+            reply_to,
+            sign_in,
+            key,
+            ask: people::Ask::Application { scope, connector, digest },
+        },
     );
     // Still here only when people did not admit it: refused, answered
     // from a retained answer, or joined to the flight of its key.

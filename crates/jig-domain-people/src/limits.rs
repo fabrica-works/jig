@@ -158,7 +158,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Queue::<Fact>::worst_case(limits.facts)?)
 }
 
-fn ask_bytes(limits: &Limits) -> Option<u64> {
+pub(crate) fn ask_bytes(limits: &Limits) -> Option<u64> {
     let compound = List::<crate::Operation>::worst_case(limits.operations)?.checked_add(
         u64::from(limits.operations).checked_mul(
             u64::from(limits.amendment_bytes)
@@ -166,15 +166,12 @@ fn ask_bytes(limits: &Limits) -> Option<u64> {
                 .max(u64::from(limits.words)),
         )?,
     )?;
-    Some(
-        (u64::from(limits.batch)
-            .checked_mul(
-                u64::try_from(size_of::<crate::Member>()).ok()?.checked_add(u64::from(limits.amendment_bytes))?,
-            )?
-            .checked_add(u64::from(limits.words))?)
-        .max(compound)
-        .max(u64::from(limits.words))
-        .max(u64::from(limits.amendment_bytes))
-        .max(u64::from(limits.holdings).checked_mul(u64::try_from(size_of::<Holding>()).ok()?)?),
-    )
+    (u64::from(limits.batch)
+        .checked_mul(u64::try_from(size_of::<crate::Member>()).ok()?.checked_add(u64::from(limits.amendment_bytes))?)?
+        .checked_add(u64::from(limits.words))?)
+    .max(compound)
+    .max(u64::from(limits.words))
+    .max(u64::from(limits.amendment_bytes))
+    .max(u64::from(limits.holdings).checked_mul(u64::try_from(size_of::<Holding>()).ok()?)?)
+    .checked_add(crate::model_names_worst_case()?)
 }

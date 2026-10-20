@@ -27,7 +27,11 @@ pub fn pattern(value: &t::Pattern, limits: &w::Limits) -> Result<w::OwnerPattern
         },
     )
 }
-pub fn authority(value: &t::Authority, limits: &w::Limits) -> Result<w::OwnerAuthority, w::Problem> {
+pub fn authority(
+    models: &[crate::Model],
+    value: &t::Authority,
+    limits: &w::Limits,
+) -> Result<w::OwnerAuthority, w::Problem> {
     let mut grants = List::with_capacity(super::super::count(value.grants.len())?);
     for row in &value.grants {
         grants
@@ -61,6 +65,11 @@ pub fn authority(value: &t::Authority, limits: &w::Limits) -> Result<w::OwnerAut
     w::OwnerAuthority::new(
         limits,
         w::OwnerAuthorityParts {
+            models: super::super::llm::authority(
+                jig_domain_authority::Models::from_parts(value.models.bits(), value.models.is_all()),
+                models,
+                limits,
+            )?,
             tools: value.tools.0,
             grants,
             delegation: w::OwnerDelegation::new(
@@ -157,7 +166,11 @@ pub fn contract(value: &t::Contract, limits: &w::Limits) -> Result<w::TaskContra
         }
     })
 }
-pub fn goal(value: &t::New, limits: &w::Limits) -> Result<w::OwnerPersonProposalGoal, w::Problem> {
+pub fn goal(
+    models: &[crate::Model],
+    value: &t::New,
+    limits: &w::Limits,
+) -> Result<w::OwnerPersonProposalGoal, w::Problem> {
     if value.recurring.is_some() {
         return Err(w::Problem { path: w::Path::OwnerPersonProposalGoal, reason: skein_codec::Reason::Tag });
     }
@@ -202,7 +215,7 @@ pub fn goal(value: &t::New, limits: &w::Limits) -> Result<w::OwnerPersonProposal
             executor: owner::executor(value.executor, limits)?,
             spec: spec(&value.spec, limits)?,
             contract: contract(&value.contract, limits)?,
-            authority: authority(&value.authority, limits)?,
+            authority: authority(models, &value.authority, limits)?,
             numbers: owner::numbers(value.numbers, limits)?,
             funder: owner::funder(value.funder, limits)?,
             dependencies,

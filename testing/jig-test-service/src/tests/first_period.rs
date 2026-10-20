@@ -115,6 +115,7 @@ fn a_first_start_opens_each_seeded_projects_period() {
             "{label}"
         );
         f::engine(&mut service).parties_in().push(core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(u64::from(project) + 20)),
             sign_in,
             key: u128::from(project).to_be_bytes(),

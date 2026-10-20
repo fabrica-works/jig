@@ -202,7 +202,14 @@ pub(super) fn tag_people(
             people::Request::RolesRefused { .. } | people::Request::RestoreRefused { .. } => {
                 Request::Now(Box::new(Now::RestoreRefused))
             }
-            people::Request::Route { request, person, project, role, ask } => {
+            people::Request::Route { request, person, project, role, mut ask, models } => {
+                if !crate::model_names::resolve(&mut ask, &models, &core.settings.models) {
+                    work.push(Event::People(people::Event::Decided {
+                        request,
+                        outcome: people::Outcome::Refused(people::Refusal::Unknown),
+                    }));
+                    continue;
+                }
                 if let Err(why) = crate::acts::request(core, &env.limits, person, project, role, &ask, env.wall) {
                     work.push(Event::People(people::Event::Decided {
                         request,

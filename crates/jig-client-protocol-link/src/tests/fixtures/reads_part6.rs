@@ -57,6 +57,7 @@ pub fn read_value_owner_authority_document() -> c::OwnerAuthorityDocument {
 
 pub fn read_value_owner_authority() -> c::OwnerAuthority {
     c::OwnerAuthority {
+        models: Some(c::AuthorityModels::All),
         tools: 7,
         grants: List::with_capacity(0),
         delegation: read_value_owner_delegation(),

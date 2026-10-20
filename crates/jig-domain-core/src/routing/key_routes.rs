@@ -36,8 +36,12 @@ pub(super) fn start(
     }
     assert!(core.key_input.is_none(), "one LLM key admission at a time");
     core.key_input = Some(carried);
-    let routed =
-        super::people_routes::route_people(core, env, work, people::Event::Ask { reply_to, sign_in, key, ask });
+    let routed = super::people_routes::route_people(
+        core,
+        env,
+        work,
+        people::Event::Ask { models: Box::new([]), reply_to, sign_in, key, ask },
+    );
     let unused = super::application_routes::number(core.key_input.take());
     super::application_routes::first(unused, routed)
 }

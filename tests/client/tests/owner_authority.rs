@@ -27,6 +27,7 @@ fn pattern(open: bool) -> OwnerPattern {
 }
 fn authority() -> OwnerAuthority {
     OwnerAuthority {
+        models: None,
         tools: u64::MAX,
         grants: list((0..3).map(|n| OwnerGrant { connector: u16::MAX, kind: n, pattern: pattern(n % 2 == 0) })),
         delegation: OwnerDelegation {
@@ -162,6 +163,7 @@ fn saturated_owner_authority_renderer_and_words_fit_composed_heap_envelopes() {
     );
     let empty = OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             grants: List::with_capacity(0),
             delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 0, depth: 0 },
             note_resources: List::with_capacity(0),

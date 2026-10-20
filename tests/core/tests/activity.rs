@@ -40,6 +40,7 @@ fn a_chat_s_activity_holds_the_person_s_words_its_turns_and_its_delegate_s_resul
     let parent = world.assignments[0];
     world.turn(1, 2, None, b"the first committed turn");
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(5001)),
         sign_in: world.sign_in.expect("signed-in person"),
         key: [51; 16],

@@ -223,7 +223,7 @@ fn a_project_document_carries_its_policy_s_template_overrides() {
         deadline: None,
         priority: None,
     }]);
-    let record = translate::objects::project(&project, &w::CEILINGS).unwrap();
+    let record = translate::objects::project(&fixtures::models(), &project, &w::CEILINGS).unwrap();
     let entry = record.policy().templates().get(0).unwrap();
     assert_eq!(entry.template(), TEMPLATE);
     assert_eq!(

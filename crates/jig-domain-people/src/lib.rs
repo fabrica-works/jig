@@ -60,6 +60,10 @@ pub use scope::ApplicationScope;
 mod templates;
 pub use templates::{TemplateBudget, TemplateDeadline, TemplateExecutor, TemplateOverride};
 mod amendment;
+mod models;
+pub use models::{
+    MODEL_NAME_BYTES, Models, model_names_worst_case, remap_models, valid_model_context, valid_model_names,
+};
 mod batch;
 pub use batch::{
     Action, Budget, Contract, Deadline, Dependency, FieldRule, Flags, Given, Member, Retention, TaskExecutor, Verdict,

@@ -43,7 +43,7 @@ fn an_unknown_project_or_role_holds_nothing() {
 }
 
 /// Three configured models, the deployment's rules naming them all.
-const CONFIGURED: Models = Models(0b111);
+const CONFIGURED: Models = Models::Named(0b111);
 
 /// A domain whose rules, policy ceiling and member role name these models.
 fn domain_naming(rules: Models, policy: Models, role: Models) -> Domain {
@@ -72,22 +72,23 @@ fn a_party_may_use_every_configured_model_when_nothing_narrows_them() {
 
 #[test]
 fn a_policy_naming_fewer_models_narrows_a_partys() {
-    let domain = domain_naming(CONFIGURED, Models(0b101), Models::ALL);
-    assert_eq!(domain.models(PROJECT, MEMBER), Some(Models(0b101)));
+    let domain = domain_naming(CONFIGURED, Models::Named(0b101), Models::ALL);
+    assert_eq!(domain.models(PROJECT, MEMBER), Some(Models::Named(0b101)));
 }
 
 #[test]
 fn rules_and_policy_narrow_to_their_intersection_in_configurations_order() {
-    for (rules, policy) in [(Models(0b011), Models(0b110)), (Models(0b110), Models(0b011))] {
+    for (rules, policy) in [(Models::Named(0b011), Models::Named(0b110)), (Models::Named(0b110), Models::Named(0b011))]
+    {
         let domain = domain_naming(rules, policy, Models::ALL);
-        assert_eq!(domain.models(PROJECT, MEMBER), Some(Models(0b010)), "rules {rules:?}, policy {policy:?}");
+        assert_eq!(domain.models(PROJECT, MEMBER), Some(Models::Named(0b010)), "rules {rules:?}, policy {policy:?}");
     }
 }
 
 #[test]
 fn a_role_naming_fewer_models_narrows_its_partys() {
-    let domain = domain_naming(CONFIGURED, Models(0b011), Models(0b110));
-    assert_eq!(domain.models(PROJECT, MEMBER), Some(Models(0b010)));
+    let domain = domain_naming(CONFIGURED, Models::Named(0b011), Models::Named(0b110));
+    assert_eq!(domain.models(PROJECT, MEMBER), Some(Models::Named(0b010)));
 }
 
 #[test]

@@ -41,6 +41,7 @@ fn chip() -> Chip {
 pub(super) fn owner_authority() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: 0,
             grants: List::with_capacity(0),
             delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: 3, depth: 2 },
@@ -54,6 +55,7 @@ pub(super) fn owner_authority() -> OwnerAuthorityDocument {
 }
 pub(super) fn authority() -> Authority {
     Authority {
+        models: None,
         budget: 10,
         grants: list([]),
         task_kinds: list([Executor::Party { party: 1 }]),

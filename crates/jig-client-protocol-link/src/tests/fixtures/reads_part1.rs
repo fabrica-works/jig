@@ -10,6 +10,7 @@ pub fn read_wire_authority() -> w::Authority {
     w::Authority::new(
         &lim,
         w::AuthorityParts {
+            models: None,
             budget: 7,
             grants: Box::from([]),
             task_kinds: List::with_capacity(0),

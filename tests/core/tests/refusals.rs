@@ -11,6 +11,7 @@ fn ask(world: &mut World, request: u8, ask: people::Ask) {
 
 fn ask_as(world: &mut World, sign_in: u64, request: u8, ask: people::Ask) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(8000 + u64::from(request))),
         sign_in,
         key: [request; 16],
@@ -188,7 +189,7 @@ fn a_proposal_pending_when_the_policy_narrows_still_waits() {
         decides: 16,
         authority: people::Authority {
             tools: 1023,
-            models: 0,
+            models: None,
             grants: Box::new([]),
             delegation: people::Delegation {
                 kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),

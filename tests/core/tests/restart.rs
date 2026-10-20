@@ -253,6 +253,7 @@ fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
     let revision = row.revisions.hold;
     let sign_in = world.sign_in.expect("restored sign-in");
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(7001)),
         sign_in,
         key: [80; 16],
@@ -269,6 +270,7 @@ fn an_uncertain_effect_released_without_making_it_again_tells_its_executor() {
     world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
     let answers = world.people_answers.len();
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(7002)),
         sign_in,
         key: [81; 16],

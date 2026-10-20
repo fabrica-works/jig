@@ -106,6 +106,7 @@ fn rejoin(world: &mut World) {
 
 fn set_goal(world: &mut World, charter: u32) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(9000)),
         sign_in: world.sign_in.expect("signed in party"),
         key: [31; 16],

@@ -4,7 +4,11 @@ use super::super::{chips, owner, task, w};
 use alloc::boxed::Box;
 use jig_domain_core::documents as d;
 use skein_lib::{List, Writer, bytes};
-pub fn result(value: &d::ResultDoc, limits: &w::Limits) -> Result<w::ResultDocument, w::Problem> {
+pub fn result(
+    models: &[crate::Model],
+    value: &d::ResultDoc,
+    limits: &w::Limits,
+) -> Result<w::ResultDocument, w::Problem> {
     let mut facts = List::with_capacity(4);
     facts
         .push(w::Fact::Ending(w::EndingRow::new(
@@ -39,7 +43,7 @@ pub fn result(value: &d::ResultDoc, limits: &w::Limits) -> Result<w::ResultDocum
                 None => None,
             },
             details: Some(details(value, limits)?),
-            acts: task::offered(&value.acts, limits, limits.result_document_acts, w::Path::ResultDocumentActs)?,
+            acts: task::offered(models, &value.acts, limits, limits.result_document_acts, w::Path::ResultDocumentActs)?,
         },
     )
 }
@@ -91,7 +95,11 @@ pub fn result_value(value: &d::ResultValue, limits: &w::Limits) -> Result<w::Res
         w::ResultValueParts { rows: chips::fact_pieces(&facts, limits.result_value_rows, w::Path::ResultValueRows)? },
     )
 }
-pub fn person_task(value: &d::PersonTask, limits: &w::Limits) -> Result<w::OwnerPersonTask, w::Problem> {
+pub fn person_task(
+    models: &[crate::Model],
+    value: &d::PersonTask,
+    limits: &w::Limits,
+) -> Result<w::OwnerPersonTask, w::Problem> {
     let mut results = List::with_capacity(value.results.len());
     for row in &value.results {
         results
@@ -100,7 +108,7 @@ pub fn person_task(value: &d::PersonTask, limits: &w::Limits) -> Result<w::Owner
                 w::OwnerShownResultParts {
                     task: task::link(&row.task, limits)?,
                     result: match &row.result {
-                        Some(item) => Some(result(item, limits)?),
+                        Some(item) => Some(result(models, item, limits)?),
                         None => None,
                     },
                 },
@@ -131,11 +139,17 @@ pub fn person_task(value: &d::PersonTask, limits: &w::Limits) -> Result<w::Owner
             contract: owner::contract(&value.contract, limits)?,
             results,
             cut: value.cut,
-            acts: task::offered(&value.acts, limits, limits.owner_person_task_acts, w::Path::OwnerPersonTaskActs)?,
+            acts: task::offered(
+                models,
+                &value.acts,
+                limits,
+                limits.owner_person_task_acts,
+                w::Path::OwnerPersonTaskActs,
+            )?,
         },
     )
 }
-pub fn question(value: &d::Question, limits: &w::Limits) -> Result<w::Question, w::Problem> {
+pub fn question(models: &[crate::Model], value: &d::Question, limits: &w::Limits) -> Result<w::Question, w::Problem> {
     w::Question::new(
         limits,
         w::QuestionParts {
@@ -144,7 +158,7 @@ pub fn question(value: &d::Question, limits: &w::Limits) -> Result<w::Question, 
             message: value.message,
             words: bytes::copy_of(&value.words),
             since: value.at.as_nanos(),
-            acts: task::offered(&value.acts, limits, limits.question_acts, w::Path::QuestionActs)?,
+            acts: task::offered(models, &value.acts, limits, limits.question_acts, w::Path::QuestionActs)?,
             ending: None,
         },
     )
@@ -158,7 +172,13 @@ pub fn escalation(
         limits,
         w::OwnerEscalationParts {
             task: task::document(&value.task, models, limits)?,
-            acts: task::offered(&value.acts, limits, limits.owner_escalation_acts, w::Path::OwnerEscalationActs)?,
+            acts: task::offered(
+                models,
+                &value.acts,
+                limits,
+                limits.owner_escalation_acts,
+                w::Path::OwnerEscalationActs,
+            )?,
         },
     )
 }

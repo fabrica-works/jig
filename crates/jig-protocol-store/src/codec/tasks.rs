@@ -2,6 +2,7 @@
 pub mod activity;
 pub mod carried;
 pub mod index;
+mod models;
 pub mod phase;
 mod pieces;
 pub mod proposals;
@@ -34,6 +35,8 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
         .ok()?,
     )?;
     let limits = wire::Limits {
+        row_models: jig_domain_tasks::MODELS,
+        model_name_value: jig_domain_core::MODEL_NAME_BYTES,
         person_proposal_reason: domain.message_bytes,
         grace_reason: domain.result_bytes,
         task_problem_blocked_by_some: domain.delegates,
@@ -107,7 +110,7 @@ pub fn limits(domain: &domain::Limits) -> Option<wire::Limits> {
 }
 
 /// Encode one tasks row within the configured bounds.
-pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, wire::Problem> {
+pub fn encode(row: &domain::Stored, limits: &wire::Limits, names: &[Box<[u8]>]) -> Result<Box<[u8]>, wire::Problem> {
     let value = match row {
         domain::Stored::Ledger(row) => wire::Value::Ledger(value::funding(row, limits)?),
         domain::Stored::ClosedLedger(row) => wire::Value::ClosedLedger(value::funding(row, limits)?),
@@ -149,16 +152,16 @@ pub fn encode(row: &domain::Stored, limits: &wire::Limits) -> Result<Box<[u8]>, 
         domain::Stored::Ended(row) => wire::Value::Ended(record::task_record(row, limits)?),
         domain::Stored::Stub(row) => wire::Value::Stub(state::stub(row, limits)?),
     };
-    let row = wire::Row::new(limits, wire::RowParts { value })?;
+    let row = wire::Row::new(limits, wire::RowParts { value, models: models::encode(names, limits)? })?;
     let mut writer = Writer::new(usize::try_from(row.measure()).expect("encoded row fits usize"));
     row.encode(&mut writer).expect("measured room");
     Ok(writer.finish())
 }
 
 /// Decode one tasks row, refusing another version or trailing bytes.
-pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wire::Problem> {
-    let wire::RowParts { value } = wire::Row::decode(limits, &mut Reader::new(bytes))?.into_parts();
-    Ok(match value {
+pub fn decode(bytes: &[u8], limits: &wire::Limits, names: &[Box<[u8]>]) -> Result<domain::Stored, wire::Problem> {
+    let wire::RowParts { value, models: kept } = wire::Row::decode(limits, &mut Reader::new(bytes))?.into_parts();
+    let mut row = match value {
         wire::Value::Update(row) => domain::Stored::Update(index::read_update(row, limits)?),
         wire::Value::Result(row) => domain::Stored::Result(index::read_result_row(row, limits)?),
         wire::Value::EndedDelegate(row) => domain::Stored::EndedDelegate(index::read_edge(row, limits)?),
@@ -199,5 +202,7 @@ pub fn decode(bytes: &[u8], limits: &wire::Limits) -> Result<domain::Stored, wir
             let wire::PoolSlotsParts { number, pool, slots } = value.into_parts();
             domain::Stored::Pool(domain::PoolSlots { number, pool: value::read_name(pool, limits)?, slots })
         }
-    })
+    };
+    models::remap(&mut row, &models::moves(&kept, names));
+    Ok(row)
 }

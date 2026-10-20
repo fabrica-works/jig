@@ -3,7 +3,11 @@
 use super::{objects, owner, w};
 use jig_domain_core::documents as d;
 use jig_domain_tasks as t;
-pub fn line(value: &d::HistoryLine, limits: &w::Limits) -> Result<w::OwnerHistoryLine, w::Problem> {
+pub fn line(
+    models: &[crate::Model],
+    value: &d::HistoryLine,
+    limits: &w::Limits,
+) -> Result<w::OwnerHistoryLine, w::Problem> {
     let change = match value.change {
         t::Change::Cancelled => w::OwnerHistoryChange::Cancelled,
         t::Change::Released => w::OwnerHistoryChange::Released,
@@ -24,15 +28,15 @@ pub fn line(value: &d::HistoryLine, limits: &w::Limits) -> Result<w::OwnerHistor
             change,
             reason: owner::text(&value.reason, limits)?,
             proposal: match &value.proposal {
-                Some(item) => Some(objects::historical::proposal_history(item, limits)?),
+                Some(item) => Some(objects::historical::proposal_history(models, item, limits)?),
                 None => None,
             },
             amendment: match &value.amendment {
                 Some((before, after)) => Some(w::OwnerHistoryAmendment::new(
                     limits,
                     w::OwnerHistoryAmendmentParts {
-                        before: objects::proposals::amendment(before, limits)?,
-                        after: objects::proposals::amendment(after, limits)?,
+                        before: objects::proposals::amendment(models, before, limits)?,
+                        after: objects::proposals::amendment(models, after, limits)?,
                     },
                 )?),
                 None => None,

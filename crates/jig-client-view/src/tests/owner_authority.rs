@@ -41,6 +41,7 @@ fn fixture() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         cut: true,
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants,
             delegation: OwnerDelegation { kinds, tasks: u32::MAX, depth: u32::MAX },
@@ -52,7 +53,7 @@ fn fixture() -> OwnerAuthorityDocument {
     }
 }
 fn phrase_limits() -> PhraseLimits {
-    PhraseLimits { languages: 2, phrases: 19, holes: 1, segments: 100, text_bytes: 4096, hole_bytes: 0 }
+    PhraseLimits { languages: 2, phrases: 23, holes: 1, segments: 100, text_bytes: 4096, hole_bytes: 0 }
 }
 fn english() -> OwnerAuthorityWords {
     OwnerAuthorityWords::load(Box::new([words::english()]), &phrase_limits(), 0, 0).expect("checked English")
@@ -91,7 +92,7 @@ fn exact_authority_fragment_keeps_opaque_boundaries_full_codes_and_explicit_cut(
     let value = fixture();
     let words = english();
     let tree = render(&value, &words, 3);
-    assert_eq!(tree.len(), 26, "one region and every independent fact/segment/end leaf");
+    assert_eq!(tree.len(), 27, "one region and every independent fact/segment/end leaf");
     for text in [
         &b"a/b"[..],
         &b"\\xFF\\x00\\x80"[..],
@@ -113,7 +114,7 @@ fn exact_authority_fragment_keeps_opaque_boundaries_full_codes_and_explicit_cut(
     complete.cut = false;
     let tree = render(&complete, &words, 3);
     assert!(!has(&tree, b"More are held than shown"));
-    assert_eq!(tree.len(), 25);
+    assert_eq!(tree.len(), 26);
     let envelope = view::worst_case(3, 3, 5, &words).expect("configured envelope");
     assert!(tree.len() <= envelope.nodes);
     assert_eq!(view::worst_case(u32::MAX, u32::MAX, u32::MAX, &words), None);
@@ -210,4 +211,33 @@ fn a_long_authority_shows_rows_of_grants_and_one_partial_mark() {
     );
     assert_eq!(value.authority.grants.len(), 3);
     assert_eq!(value.authority.grants.get(SHOWN).unwrap().connector, GRANT_CONNECTORS[2]);
+}
+
+#[test]
+fn model_selectors_render_literal_names_all_empty_and_default_with_exact_budgets() {
+    let words = OwnerAuthorityWords::load(Box::new([words::english()]), &phrase_limits(), 0, 0).unwrap();
+    let mut value = fixture();
+    value.cut = false;
+    let mut names = List::with_capacity(2);
+    names.push(copy_of(b"arbitrary model")).unwrap();
+    names.push(copy_of(&[b'x'; 4096])).unwrap();
+    for (models, label) in [
+        (None, b"Keep default models".as_slice()),
+        (Some(jig_client::contract::AuthorityModels::All), b"All models"),
+        (Some(jig_client::contract::AuthorityModels::Named(List::with_capacity(0))), b"No models"),
+        (Some(jig_client::contract::AuthorityModels::Named(names)), b"Allowed models"),
+    ] {
+        value.authority.models = models;
+        let tree = render(&value, &words, 3);
+        assert!(has(&tree, label));
+        if let Some(jig_client::contract::AuthorityModels::Named(names)) = &value.authority.models {
+            for name in names {
+                assert!(has(&tree, name));
+            }
+        }
+    }
+    let required = view::document_required(&value, &words, 1).unwrap();
+    let tree = render(&value, &words, 1);
+    assert!(tree.len() <= required.nodes);
+    assert!(has(&tree, b"More are held than shown"));
 }

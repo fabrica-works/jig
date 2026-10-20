@@ -6,7 +6,7 @@ use skein_ui::phrases::Hole;
 use skein_ui::{Builder, Role, Run};
 
 use jig_client::contract::{
-    OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerPattern, OwnerPatternEnd,
+    AuthorityModels, OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerPattern, OwnerPatternEnd,
 };
 
 /// Storage needed for one standalone authority region.
@@ -46,6 +46,19 @@ impl AuthorityFragment {
         Some(())
     }
 }
+fn model_phrase(value: Option<&AuthorityModels>) -> AuthorityPhrase {
+    match value {
+        None => AuthorityPhrase::ModelsDefault,
+        Some(AuthorityModels::All) => AuthorityPhrase::ModelsAll,
+        Some(AuthorityModels::Named(names)) => {
+            if names.is_empty() {
+                AuthorityPhrase::ModelsEmpty
+            } else {
+                AuthorityPhrase::ModelsNamed
+            }
+        }
+    }
+}
 /// Checked fragment capacities; phrase capacities cover every loaded language.
 #[must_use]
 pub fn required_words(value: &OwnerAuthority, words: &Words, rows: u32) -> Option<AuthorityFragment> {
@@ -64,6 +77,12 @@ pub fn required_words(value: &OwnerAuthority, words: &Words, rows: u32) -> Optio
     }
     if value.deadline.is_some() {
         result.phrase(words, AuthorityPhrase::Deadline)?;
+    }
+    result.phrase(words, model_phrase(value.models.as_ref()))?;
+    if let Some(AuthorityModels::Named(names)) = &value.models {
+        for name in names.iter().take(usize::try_from(rows).expect("rows fit")) {
+            result.leaf(u32::try_from(name.len()).ok()?)?;
+        }
     }
     for grant in value.grants.iter().take(usize::try_from(rows).expect("rows fit")) {
         result.phrase(words, AuthorityPhrase::Connector)?;
@@ -88,7 +107,11 @@ pub fn required_words(value: &OwnerAuthority, words: &Words, rows: u32) -> Optio
     Some(result)
 }
 fn partial(value: &OwnerAuthority, rows: u32) -> bool {
-    value.grants.len() > rows || value.delegation.kinds.len() > rows || value.note_resources.len() > rows
+    let models = match &value.models {
+        Some(AuthorityModels::Named(names)) => names.len() > rows,
+        Some(AuthorityModels::All) | None => false,
+    };
+    models || value.grants.len() > rows || value.delegation.kinds.len() > rows || value.note_resources.len() > rows
 }
 /// Include the owner's cut fact without inferring completeness from other facts.
 #[must_use]
@@ -108,10 +131,12 @@ pub fn worst_case_words(rows: u32, segments: u32, text: u32, words: &Words) -> O
     }
     let patterns = rows.checked_mul(2)?;
     let raw = segments.checked_add(1)?.checked_mul(patterns)?;
-    let sayings = rows.checked_mul(8)?.checked_add(10)?;
+    let sayings = rows.checked_mul(8)?.checked_add(11)?;
+    let model_rows = rows.min(jig_client::contract::AUTHORITY_MODELS);
+    let model_bytes = model_rows.checked_mul(text.min(jig_client::contract::AUTHORITY_MODEL_BYTES))?;
     let nodes = document_nodes(rows, segments)?;
     let text = crate::literal_segment::max_bytes(text)?;
-    let text_bytes = raw.checked_mul(text)?.checked_add(sayings.checked_mul(phrase)?)?;
+    let text_bytes = raw.checked_mul(text)?.checked_add(sayings.checked_mul(phrase)?)?.checked_add(model_bytes)?;
     Some(AuthorityFragment { nodes, text_bytes, text_per_node: text.max(phrase), depth: 2 })
 }
 fn text(b: &mut Builder, words: &Words, phrase: AuthorityPhrase, holes: &[Hole]) {
@@ -158,6 +183,12 @@ fn body(b: &mut Builder, value: &OwnerAuthority, words: &Words, text_limit: u32,
     if let Some(deadline) = value.deadline {
         text(b, words, AuthorityPhrase::Deadline, &[Hole::Wall(words.adjusted_wall(deadline))]);
     }
+    text(b, words, model_phrase(value.models.as_ref()), &[]);
+    if let Some(AuthorityModels::Named(names)) = &value.models {
+        for name in names.iter().take(usize::try_from(rows).expect("rows fit")) {
+            b.text(Run::Plain, name);
+        }
+    }
     text(b, words, AuthorityPhrase::Grants, &[]);
     for grant in value.grants.iter().take(usize::try_from(rows).expect("rows fit")) {
         number(b, words, AuthorityPhrase::Connector, u64::from(grant.connector));
@@ -201,7 +232,9 @@ pub fn document_words(b: &mut Builder, value: &OwnerAuthorityDocument, words: &W
 #[must_use]
 pub fn document_nodes(rows: u32, segments: u32) -> Option<u32> {
     let raw = segments.checked_add(1)?.checked_mul(rows.checked_mul(2)?)?;
-    raw.checked_add(rows.checked_mul(8)?.checked_add(10)?)?.checked_add(1)
+    raw.checked_add(rows.checked_mul(8)?.checked_add(11)?)?
+        .checked_add(rows.min(jig_client::contract::AUTHORITY_MODELS))?
+        .checked_add(1)
 }
 /// Standalone capacity API shares the original checked book.
 #[must_use]

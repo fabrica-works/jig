@@ -107,6 +107,7 @@ pub fn phases() -> [(d::PhaseLine, w::Phase); 6] {
 }
 pub fn authority() -> d::AuthorityLine {
     d::AuthorityLine {
+        models: t::Models::ALL,
         tools: t::Tools(7),
         grants: List::with_capacity(0),
         executors: List::with_capacity(0),

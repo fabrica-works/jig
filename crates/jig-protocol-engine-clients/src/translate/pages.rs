@@ -5,7 +5,12 @@ use jig_domain_core::reads;
 mod documents;
 mod rows;
 
-pub fn page(read: &reads::Read, page: &reads::Page, limits: &w::Limits) -> Result<w::ReadValue, w::Problem> {
+pub fn page(
+    models: &[crate::Model],
+    read: &reads::Read,
+    page: &reads::Page,
+    limits: &w::Limits,
+) -> Result<w::ReadValue, w::Problem> {
     let invalid = w::Problem { path: w::Path::ReadValueTag, reason: skein_codec::Reason::Tag };
     check_edges(read, page)?;
     let before = match &page.before {
@@ -18,11 +23,15 @@ pub fn page(read: &reads::Read, page: &reads::Page, limits: &w::Limits) -> Resul
     };
     Ok(match read {
         reads::Read::Activity { task, .. } => documents::activity(*task, page, before, after, limits)?,
-        reads::Read::History { task, subtree, .. } => documents::history(*task, *subtree, page, before, after, limits)?,
+        reads::Read::History { task, subtree, .. } => {
+            documents::history(models, *task, *subtree, page, before, after, limits)?
+        }
         reads::Read::Inbox { .. } => documents::inbox(page, before, after, limits)?,
         reads::Read::EndedDelegates { .. } => documents::ended(page, before, after, limits)?,
         reads::Read::Spend { project, .. } => documents::spend(*project, page, before, after, limits)?,
-        reads::Read::Notes { .. } | reads::Read::ScopedNotes { .. } => documents::notes(page, before, after, limits)?,
+        reads::Read::Notes { .. } | reads::Read::ScopedNotes { .. } => {
+            documents::notes(models, page, before, after, limits)?
+        }
         reads::Read::Tasks { .. }
         | reads::Read::Application { .. }
         | reads::Read::Frame

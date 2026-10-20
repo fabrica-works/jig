@@ -126,6 +126,7 @@ pub(crate) fn authority_fields(value: &w::Authority, limits: &Limits) -> Result<
         list2.push(*item).expect("reserved supplied list");
     }
     Ok(c::Authority {
+        models: crate::translate::model_sets::decode(value.models().as_ref())?,
         budget: value.budget(),
         grants: grant_piece(value.grants(), limits, limits.client.authority)?,
         task_kinds: list0,

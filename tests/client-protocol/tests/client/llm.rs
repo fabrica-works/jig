@@ -65,3 +65,42 @@ fn me_names_the_models_a_create_chooses_from_and_the_task_shows_the_choice() {
     assert!(story.run_until(|s| chosen(s).is_some(), PROOF_WAIT));
     assert_eq!(chosen(&story).map(|task| task.llm.clone()), Some(Some(choice)));
 }
+
+#[test]
+fn a_client_role_model_edit_changes_the_models_in_me() {
+    use jig_client::{Key, Readable, Readout};
+    let mut story = Story::live_batch(fixtures::SEED, true);
+    story.watch(ME, Watchable::Jig(contract::Subject::Me));
+    assert!(story.run_until(|s| me_models(s).is_some_and(|rows| rows.len() == 1), PROOF_WAIT));
+    let project = jig_client::Handle { asker: Asker::JIG, number: 29 };
+    story.read(project, Readable::Jig(contract::Read::Project { project: PROJECT_NUMBER }));
+    assert!(story.run_until(|s| !s.pages(project).is_empty(), PROOF_WAIT));
+    let pages = story.pages(project);
+    let [Readout::Jig(contract::ReadResult::Value(contract::ReadValue::OwnerProject(page)))] = pages.as_slice() else {
+        panic!("project page")
+    };
+    let role = page.policy.roles.get(0).unwrap();
+    let mut authority = role.authority.whole().unwrap();
+    authority.models = Some(contract::AuthorityModels::Named(List::with_capacity(0)));
+    let key = Key { asker: Asker::JIG, number: 601 };
+    story.send(
+        key,
+        Ask::Jig(Box::new(contract::Ask::ChangePolicy {
+            project: PROJECT_NUMBER,
+            edit: contract::PolicyEdit::Role(contract::PolicyEditRole {
+                number: role.number,
+                authority,
+                period_spend: role.period_spend,
+                requests: role.requests,
+                decides: role.decides,
+            }),
+        })),
+    );
+    assert!(story.run_until(|s| !s.answered(key).is_empty() && me_models(s) == Some(vec![]), PROOF_WAIT));
+    assert!(matches!(
+        story.answered(key).as_slice(),
+        [Outcome::Answered(Answered::Jig(contract::Answer::Done(contract::Outcome::Owner(
+            contract::OwnerOutcome::PolicyChanged { .. }
+        ))))]
+    ));
+}

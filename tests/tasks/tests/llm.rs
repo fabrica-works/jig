@@ -18,7 +18,7 @@ fn choice(main: ModelEffort, subagents: &[ModelEffort]) -> LlmChoice {
 }
 
 fn allowing(models: u64) -> Authority {
-    Authority { models: Models(models), ..authority() }
+    Authority { models: Models::Named(models), ..authority() }
 }
 
 fn chosen(number: u64, models: u64, llm: LlmChoice) -> jig_domain_tasks::New {
@@ -134,7 +134,7 @@ fn an_amendment_s_choice_and_a_narrowed_authority_are_checked_against_each_other
     refused(&amend(&mut world, 1, None, Some(choice(effort(2, Some(0)), &[]))), 2, LlmFault::Authority);
     refused(&amend(&mut world, 1, Some(allowing(0b001)), None), 1, LlmFault::Authority);
     assert_eq!(world.record(1).llm, Some(kept));
-    assert_eq!(world.record(1).authority.models, Models(0b011));
+    assert_eq!(world.record(1).authority.models, Models::Named(0b011));
 
     let mut procedure = task(2, &[]);
     procedure.executor = Executor::Procedure { connector: 1, code: 1 };
@@ -146,11 +146,11 @@ fn an_amendment_s_choice_and_a_narrowed_authority_are_checked_against_each_other
 fn a_charter_s_default_is_its_first_models_within_authority_with_their_first_efforts() {
     let domain = domain(&LIMITS, 74);
     assert_eq!(
-        domain.default_llm(1, Models(0b111)),
+        domain.default_llm(1, Models::Named(0b111)),
         Some(choice(effort(0, Some(0)), &[effort(1, None), effort(2, Some(0))]))
     );
-    assert_eq!(domain.default_llm(1, Models(0b1110)), Some(choice(effort(1, None), &[effort(2, Some(0))])));
-    assert_eq!(domain.default_llm(2, Models(0b1000)), Some(choice(effort(3, None), &[])));
-    assert_eq!(domain.default_llm(2, Models(0b0111)), None, "the authority allows none of the charter's");
-    assert_eq!(domain.default_llm(9, Models(u64::MAX)), None, "the charter is not configured");
+    assert_eq!(domain.default_llm(1, Models::Named(0b1110)), Some(choice(effort(1, None), &[effort(2, Some(0))])));
+    assert_eq!(domain.default_llm(2, Models::Named(0b1000)), Some(choice(effort(3, None), &[])));
+    assert_eq!(domain.default_llm(2, Models::Named(0b0111)), None, "the authority allows none of the charter's");
+    assert_eq!(domain.default_llm(9, Models::ALL), None, "the charter is not configured");
 }

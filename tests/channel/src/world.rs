@@ -272,6 +272,7 @@ pub(crate) fn party_event(up: parties::Up, store: &Store) -> core::Event {
         },
         parties::Up::Request { to, sign_in, project, key, ask: parties::Ask::Chat { words } } => {
             core::Event::People(people::Event::Ask {
+                models: Box::new([]),
                 reply_to: ReplyTo::new(Token::new(to)),
                 sign_in,
                 key,
@@ -285,6 +286,7 @@ pub(crate) fn party_event(up: parties::Up, store: &Store) -> core::Event {
             key,
             ask: parties::Ask::Say { task: parties::Task::Number(task), words, release },
         } => core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(to)),
             sign_in,
             key,

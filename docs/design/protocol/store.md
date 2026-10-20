@@ -233,17 +233,31 @@ secrets' store (section 9).
   So a family's limits, made from the domain's (5.4), are never past
   its ceilings for a count the domain does not have, and a record's
   worst case is the sum, not a count times its largest item.
-- **A role's models are kept by name** (`../domain/authority.md`,
-  section 3): their bits follow configuration's order, which a later
-  start may change. So the people family (version 5) keeps, in a
-  project's policy row, the names of the models configured when it was
-  written, and each role's bits against them; a restore maps each name
-  to its bit in today's order, and a name no longer configured drops
-  out of the role, without an error. A role naming every model (no
-  narrowing, every bit set) keeps naming every model, today's included;
-  a model configured later joins no other role a policy row already
-  holds. The row holds no ceiling: each start restores the policy under
-  configuration's.
+- **Authority models retain their selector** (`../domain/authority.md`,
+  section 3). Literal ALL is distinct from a named set, including an
+  explicit empty set and a set of all 64 configured models. The people
+  family (version 5) keeps one bounded name context per policy row or retained
+  ask. Tagged authority masks reference that context, including nested Create members, Amend, compound operations,
+  proposals and ChangePolicy roles. A retained ask's names are unique and sorted by their
+  bytes (effective snapshot contexts follow configuration order), at most 64, each at most 4,096 UTF-8 bytes; these retained names
+  are priced separately from an authority's other bounded payload.
+  Omission is distinct too: Create defaults to the creator's models,
+  Amend keeps the target's, an edited role keeps its models and a new
+  role takes the project's ceiling. Explicit selectors replace models
+  under that ceiling; literal ALL never stands for a frozen named set.
+- **Retained request identity survives removal.** A retained ask keeps
+  its original canonical selector, never remapped for equality. An exact
+  retry returns its retained answer before current model-availability
+  admission; another selector on that key is KeyConflict. A new key
+  naming an unknown model is refused. Restoring effective policy maps
+  names to today's configuration, dropping removed names without an
+  error; only literal ALL gains a newly configured model. Answers and
+  pending proposals retain their identity and outcome. A policy row
+  holds no ceiling: each start restores it under configuration's.
+  The tasks family's version 5 rows retain a bounded configuration-name
+  context too: live/ended authorities, pending or decided proposals,
+  recurring members and amendment history remap effective masks on load.
+  These are effective snapshots; the original keyed ask remains people's.
 - **Golden bytes** per family and version; a fuzz target per family's
   decoder; bounds at their limit and one past it.
 

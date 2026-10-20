@@ -102,6 +102,7 @@ fn parties_run_ahead_of_held_completions_but_every_answer_waits() {
     world.store.fault(Fault::Hold { commits: 1 });
     for request in [70, 71] {
         world.send(root::Event::Core(core::Event::People(jig_domain_people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(u64::from(request))),
             sign_in: world.sign_in.expect("signed in"),
             key: [request; 16],

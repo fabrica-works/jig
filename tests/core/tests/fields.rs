@@ -13,6 +13,7 @@ fn a_chats_flags_and_last_activity_survive_a_cold_restart() {
     let mut world = World::new(171, false);
     world.set_clock(Time::from_nanos(9_000_000_000), Wall::from_nanos(9_000_000_000));
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(8001)),
         sign_in: world.sign_in.expect("signed in"),
         key: [1; 16],
@@ -68,7 +69,7 @@ fn member_decides(world: &mut World, owner: u64, key: u8, decides: authority::Pr
         number: people::Role::Member.number(),
         authority: people::Authority {
             tools: 1023,
-            models: 0,
+            models: None,
             grants: Box::new([]),
             delegation: people::Delegation {
                 kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),

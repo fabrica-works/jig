@@ -143,7 +143,7 @@ fn fits(domain: &Domain, charter: &[u8], allowed: Models, chosen: ModelEffort) -
 
 fn allows(models: Models, model: u8) -> bool {
     match 1_u64.checked_shl(u32::from(model)) {
-        Some(bit) => models.0 & bit != 0,
+        Some(bit) => models.bits() & bit != 0,
         None => false,
     }
 }

@@ -374,6 +374,7 @@ fn a_person_signs_out_and_a_later_request_is_answered_signed_out() {
         now,
         super::clock(now),
         jig_test_domain::Event::Core(jig_domain_core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to,
             sign_in,
             key,

@@ -3,8 +3,8 @@
 use crate::{Bounds, payload::Payload};
 use core::mem::size_of;
 use jig_client_domain::contract::{
-    OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant, OwnerPattern,
-    OwnerPatternEnd, OwnerResourceScope,
+    AuthorityModels, OwnerAuthority, OwnerAuthorityDocument, OwnerAuthorityExecutor, OwnerDelegation, OwnerGrant,
+    OwnerPattern, OwnerPatternEnd, OwnerResourceScope,
 };
 use skein_lib::List;
 
@@ -40,9 +40,32 @@ impl Payload for OwnerDelegation {
         crate::payload::authority(&self.kinds, bounds)
     }
 }
+impl Payload for AuthorityModels {
+    fn heap(&self, bounds: &Bounds) -> Option<u64> {
+        match self {
+            Self::All => Some(0),
+            Self::Named(names) => {
+                if names.capacity() > jig_client_domain::contract::AUTHORITY_MODELS {
+                    return None;
+                }
+                let mut bytes = List::<Box<[u8]>>::worst_case(names.capacity())?;
+                for name in names {
+                    let len = u64::try_from(name.len()).ok()?;
+                    if len > u64::from(bounds.text.min(jig_client_domain::contract::AUTHORITY_MODEL_BYTES)) {
+                        return None;
+                    }
+                    bytes = bytes.checked_add(len)?;
+                }
+                Some(bytes)
+            }
+        }
+    }
+}
 impl Payload for OwnerAuthority {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
-        crate::payload::authority(&self.grants, bounds)?
+        self.models
+            .heap(bounds)?
+            .checked_add(crate::payload::authority(&self.grants, bounds)?)?
             .checked_add(self.delegation.heap(bounds)?)?
             .checked_add(crate::payload::authority(&self.note_resources, bounds)?)
     }
@@ -85,5 +108,10 @@ pub fn worst_case(bounds: &Bounds) -> Option<u64> {
         .checked_add(List::<OwnerResourceScope>::worst_case(bounds.authority)?)?
         .checked_add(List::<OwnerAuthorityExecutor>::worst_case(bounds.authority)?)?
         .checked_add(nested)?
+        .checked_add(List::<Box<[u8]>>::worst_case(jig_client_domain::contract::AUTHORITY_MODELS)?)?
+        .checked_add(
+            u64::from(jig_client_domain::contract::AUTHORITY_MODELS)
+                .checked_mul(u64::from(bounds.text.min(jig_client_domain::contract::AUTHORITY_MODEL_BYTES)))?,
+        )?
         .checked_add(u64::try_from(size_of::<OwnerAuthorityDocument>()).ok()?)
 }

@@ -9,6 +9,7 @@ use skein_lib::{ReplyTo, Token};
 
 fn ask(world: &mut World, key: u8, ask: people::Ask) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(8000 + u64::from(key))),
         sign_in: world.sign_in.expect("signed in owner"),
         key: [key; 16],
@@ -94,7 +95,7 @@ fn changed_role() -> people::PolicyRole {
         number: 0,
         authority: people::Authority {
             tools: 1023,
-            models: 0,
+            models: None,
             grants: Box::new([]),
             delegation: people::Delegation {
                 kinds: Box::new([people::Executor::Charter(1), people::Executor::Procedure(1)]),

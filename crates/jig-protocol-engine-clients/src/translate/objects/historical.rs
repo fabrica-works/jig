@@ -7,6 +7,7 @@ use jig_domain_people as p;
 use jig_domain_tasks as t;
 use skein_lib::{List, bytes};
 pub fn retained_amendment(
+    models: &[crate::Model],
     value: &d::AmendmentChange,
     limits: &w::Limits,
 ) -> Result<w::OwnerRetainedAmendment, w::Problem> {
@@ -43,7 +44,7 @@ pub fn retained_amendment(
                 None => None,
             },
             authority: match &value.authority {
-                Some(item) => Some(owner::authority(item, limits)?),
+                Some(item) => Some(owner::authority(models, item, limits)?),
                 None => None,
             },
             wake: match value.wake {
@@ -56,12 +57,16 @@ pub fn retained_amendment(
         },
     )
 }
-pub fn retained_action(value: &d::RetainedAction, limits: &w::Limits) -> Result<w::OwnerRetainedAction, w::Problem> {
+pub fn retained_action(
+    models: &[crate::Model],
+    value: &d::RetainedAction,
+    limits: &w::Limits,
+) -> Result<w::OwnerRetainedAction, w::Problem> {
     Ok(match value {
         d::RetainedAction::Batch(rows) => {
             let mut copied = List::with_capacity(rows.len());
             for row in rows {
-                copied.push(super::proposals::proposed(row, limits)?).expect("supplied rows fit");
+                copied.push(super::proposals::proposed(models, row, limits)?).expect("supplied rows fit");
             }
             let copied = super::proposals::proposed_task_pieces(
                 &copied,
@@ -78,7 +83,7 @@ pub fn retained_action(value: &d::RetainedAction, limits: &w::Limits) -> Result<
                 limits,
                 w::OwnerRetainedActionEffectParts {
                     part: owner::part(part, limits)?,
-                    authority: owner::authority(authority, limits)?,
+                    authority: owner::authority(models, authority, limits)?,
                     attempt: *attempt,
                     completion: *completion,
                     position: *position,
@@ -91,7 +96,7 @@ pub fn retained_action(value: &d::RetainedAction, limits: &w::Limits) -> Result<
                 limits,
                 w::OwnerRetainedActionProcedureEffectParts {
                     part: owner::part(part, limits)?,
-                    authority: owner::authority(authority, limits)?,
+                    authority: owner::authority(models, authority, limits)?,
                     step: *step,
                     purpose: *purpose,
                 },
@@ -100,13 +105,16 @@ pub fn retained_action(value: &d::RetainedAction, limits: &w::Limits) -> Result<
         d::RetainedAction::Amend { task, change } => {
             w::OwnerRetainedAction::Amend(Box::new(w::OwnerRetainedActionAmend::new(
                 limits,
-                w::OwnerRetainedActionAmendParts { task: *task, change: retained_amendment(change, limits)? },
+                w::OwnerRetainedActionAmendParts { task: *task, change: retained_amendment(models, change, limits)? },
             )?))
         }
         d::RetainedAction::Widen { task, authority } => {
             w::OwnerRetainedAction::Widen(w::OwnerRetainedActionWiden::new(
                 limits,
-                w::OwnerRetainedActionWidenParts { task: *task, authority: owner::authority(authority, limits)? },
+                w::OwnerRetainedActionWidenParts {
+                    task: *task,
+                    authority: owner::authority(models, authority, limits)?,
+                },
             )?)
         }
         d::RetainedAction::Release { task } => w::OwnerRetainedAction::Release(w::OwnerRetainedActionRelease::new(
@@ -115,11 +123,15 @@ pub fn retained_action(value: &d::RetainedAction, limits: &w::Limits) -> Result<
         )?),
     })
 }
-pub fn proposal_history(value: &d::ProposalHistory, limits: &w::Limits) -> Result<w::OwnerProposalHistory, w::Problem> {
+pub fn proposal_history(
+    models: &[crate::Model],
+    value: &d::ProposalHistory,
+    limits: &w::Limits,
+) -> Result<w::OwnerProposalHistory, w::Problem> {
     w::OwnerProposalHistory::new(
         limits,
         w::OwnerProposalHistoryParts {
-            action: retained_action(&value.action, limits)?,
+            action: retained_action(models, &value.action, limits)?,
             number: value.number,
             proposer: value.proposer,
             as_holder: value.as_holder,
@@ -261,7 +273,11 @@ pub fn proposal_decision(
         },
     )
 }
-pub fn person_proposal(value: &t::PersonProposal, limits: &w::Limits) -> Result<w::OwnerPersonProposal, w::Problem> {
+pub fn person_proposal(
+    models: &[crate::Model],
+    value: &t::PersonProposal,
+    limits: &w::Limits,
+) -> Result<w::OwnerPersonProposal, w::Problem> {
     let [goal] = value.batch() else { return Err(super::super::problem(skein_codec::Reason::Malformed)) };
     w::OwnerPersonProposal::new(
         limits,
@@ -269,7 +285,7 @@ pub fn person_proposal(value: &t::PersonProposal, limits: &w::Limits) -> Result<
             number: value.number,
             proposer: value.proposer,
             project: value.project,
-            goal: super::goal::goal(goal, limits)?,
+            goal: super::goal::goal(models, goal, limits)?,
             state: match &value.state {
                 t::PersonProposalState::Withdrawn { .. } => {
                     return Err(super::super::problem(skein_codec::Reason::Malformed));

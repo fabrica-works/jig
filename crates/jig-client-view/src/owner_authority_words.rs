@@ -1,5 +1,5 @@
 //! Checked authority words and selected language (client/domain/view.md, 7).
-//! Phrase IDs 3000..3018 are reserved for the owner authority vocabulary.
+//! Phrase IDs 3000..3022 are reserved for the owner authority vocabulary.
 use crate::Owner;
 use alloc::boxed::Box;
 use skein_lib::{List, Wall, bytes::copy_of};
@@ -30,9 +30,13 @@ pub enum AuthorityPhrase {
     Cut,
     Deadline,
     OmittedSegments,
+    ModelsDefault,
+    ModelsAll,
+    ModelsNamed,
+    ModelsEmpty,
 }
 /// All phrases, in their stable owner vocabulary order.
-pub const ALL: [AuthorityPhrase; 19] = [
+pub const ALL: [AuthorityPhrase; 23] = [
     AuthorityPhrase::Tools,
     AuthorityPhrase::Tasks,
     AuthorityPhrase::Depth,
@@ -52,6 +56,10 @@ pub const ALL: [AuthorityPhrase; 19] = [
     AuthorityPhrase::Cut,
     AuthorityPhrase::Deadline,
     AuthorityPhrase::OmittedSegments,
+    AuthorityPhrase::ModelsDefault,
+    AuthorityPhrase::ModelsAll,
+    AuthorityPhrase::ModelsNamed,
+    AuthorityPhrase::ModelsEmpty,
 ];
 impl AuthorityPhrase {
     /// Stable phrase identity, available when composing owner language data.
@@ -77,6 +85,10 @@ impl AuthorityPhrase {
             Self::Cut => 3016,
             Self::Deadline => 3017,
             Self::OmittedSegments => 3018,
+            Self::ModelsDefault => 3019,
+            Self::ModelsAll => 3020,
+            Self::ModelsNamed => 3021,
+            Self::ModelsEmpty => 3022,
         };
         PhraseId { owner: Owner::Jig.opaque(), number }
     }
@@ -100,14 +112,18 @@ impl AuthorityPhrase {
             | Self::Exact
             | Self::Open
             | Self::Cut
-            | Self::OmittedSegments => None,
+            | Self::OmittedSegments
+            | Self::ModelsDefault
+            | Self::ModelsAll
+            | Self::ModelsNamed
+            | Self::ModelsEmpty => None,
         }
     }
 }
 /// Phrase contracts independent of language word order.
 #[must_use]
 pub fn shapes() -> Box<[PhraseShape]> {
-    let mut shapes = List::with_capacity(19);
+    let mut shapes = List::with_capacity(23);
     for phrase in ALL {
         let holes: Box<[HoleShape]> = match phrase.hole() {
             Some(kind) => Box::new([HoleShape { kind, bytes: 0 }]),
@@ -120,7 +136,7 @@ pub fn shapes() -> Box<[PhraseShape]> {
 /// Explicit English language data; callers select a checked loaded language.
 #[must_use]
 pub fn english() -> Language {
-    let mut phrases = List::with_capacity(19);
+    let mut phrases = List::with_capacity(23);
     for phrase in ALL {
         let words: &[u8] = match phrase {
             AuthorityPhrase::Tools => b"Tool bits: ",
@@ -142,6 +158,10 @@ pub fn english() -> Language {
             AuthorityPhrase::Cut => b"More are held than shown",
             AuthorityPhrase::Deadline => b"Deadline: ",
             AuthorityPhrase::OmittedSegments => "…".as_bytes(),
+            AuthorityPhrase::ModelsDefault => b"Keep default models",
+            AuthorityPhrase::ModelsAll => b"All models",
+            AuthorityPhrase::ModelsNamed => b"Allowed models",
+            AuthorityPhrase::ModelsEmpty => b"No models",
         };
         let segments: Box<[Segment]> = match phrase.hole() {
             Some(kind) => Box::new([Segment::Text(copy_of(words)), Segment::Hole { index: 0, kind }]),

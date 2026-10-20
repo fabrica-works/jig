@@ -135,6 +135,7 @@ fn authority_full() -> OwnerAuthorityDocument {
         last: OwnerPatternEnd::Open(vec![128, 255, 0].into_boxed_slice()),
     };
     OwnerAuthorityDocument::complete(OwnerAuthority {
+        models: None,
         tools: u64::MAX,
         grants: list(vec![OwnerGrant { connector: u16::MAX, kind: u16::MAX, pattern: pattern.clone() }; 2]),
         delegation: OwnerDelegation {

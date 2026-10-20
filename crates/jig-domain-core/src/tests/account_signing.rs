@@ -44,7 +44,7 @@ fn signed_in(core: &mut Core, env: &Env<Limits>) {
 }
 fn ask(key: u8, ask: people::Ask) -> Event {
     let reply_to = ReplyTo::new(Token::new(u64::from(key)));
-    Event::People(people::Event::Ask { reply_to, sign_in: SIGN_IN, key: [key; 16], ask })
+    Event::People(people::Event::Ask { models: Box::new([]), reply_to, sign_in: SIGN_IN, key: [key; 16], ask })
 }
 /// The one ask, if any, the core makes of the accounts' component for one event, and the party's
 /// outcome, if one is answered.

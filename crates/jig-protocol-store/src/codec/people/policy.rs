@@ -138,7 +138,14 @@ pub(super) fn encode_authority(
         limits,
         wire::AuthorityParts {
             tools: *tools,
-            models: *models,
+            models: match models {
+                Some(domain::Models::All) => Some(wire::ModelSet::All),
+                Some(domain::Models::Named(bits)) => Some(wire::ModelSet::Named(wire::ModelSetNamed::new(
+                    limits,
+                    wire::ModelSetNamedParts { bits: *bits },
+                )?)),
+                None => None,
+            },
             grants: encode_grant_piece(grants, limits, shared_sum(limits), limits.authority_grants)?,
             delegation: encode_delegation(delegation, limits)?,
             spend: *spend,
@@ -165,7 +172,11 @@ pub(super) fn decode_authority(
         value.into_parts();
     Ok(domain::Authority {
         tools,
-        models,
+        models: match models {
+            Some(wire::ModelSet::All) => Some(domain::Models::All),
+            Some(wire::ModelSet::Named(value)) => Some(domain::Models::Named(value.bits())),
+            None => None,
+        },
         grants: decode_grant_piece(grants, limits, shared_sum(limits))?,
         delegation: decode_delegation(delegation, limits)?,
         spend,

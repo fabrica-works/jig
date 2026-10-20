@@ -332,6 +332,7 @@ fn a_procedure_only_goal_form_confirms_and_sends_the_supplied_executor_once() {
                         },
                         contract: jig_client_domain::contract::NewContract::Report { words: 32 },
                         authority: jig_client_domain::contract::OwnerAuthority {
+                            models: None,
                             tools: 0,
                             grants: jig_client_world::test::list([]),
                             delegation: jig_client_domain::contract::OwnerDelegation {

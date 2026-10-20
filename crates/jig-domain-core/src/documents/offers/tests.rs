@@ -29,6 +29,7 @@ fn bounded(limits: &DocumentLimits, order_rows: u32) -> Admission {
         roles.push(u32::MAX).unwrap();
     }
     let authority = AuthorityLine {
+        models: tasks::Models::ALL,
         tools: tasks::Tools(u64::MAX),
         grants: grants.clone(),
         executors,

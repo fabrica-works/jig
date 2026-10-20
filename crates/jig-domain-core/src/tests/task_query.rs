@@ -177,6 +177,7 @@ fn generated_event(core: &Core, draw: u64, iteration: u64) -> Event {
     let reply_to = ReplyTo::new(Token::new(REPLY));
     match draw {
         0 => Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to,
             sign_in: SIGN_IN,
             key: [u8::try_from(iteration).unwrap(); 16],

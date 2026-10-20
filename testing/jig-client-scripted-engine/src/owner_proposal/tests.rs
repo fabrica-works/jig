@@ -8,6 +8,7 @@ fn doc(bytes: &[u8]) -> DocumentText {
 fn authority() -> OwnerAuthorityDocument {
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants: List::with_capacity(3),
             delegation: OwnerDelegation { kinds: List::with_capacity(3), tasks: u32::MAX, depth: u32::MAX },

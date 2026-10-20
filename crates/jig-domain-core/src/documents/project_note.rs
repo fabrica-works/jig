@@ -198,6 +198,7 @@ fn authority_line(limits: &Limits, value: &authority::Authority) -> Result<Autho
             .expect("bounded note scopes");
     }
     Ok(AuthorityLine {
+        models: tasks::Models::from_parts(value.models.bits(), value.models.is_all()),
         tools: tasks::Tools(value.tools.0),
         grants,
         executors,

@@ -355,7 +355,7 @@ impl Observer {
             self.observe(now, observed);
         }
         match event {
-            root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask })) => {
+            root::Event::Core(core::Event::People(people::Event::Ask { models: _, reply_to, sign_in, key, ask })) => {
                 let person = store.rows.values().find_map(|row| match row {
                     root::Record::Core(core::Record::People(people::Stored::SignIn { number, person, .. }))
                         if number == sign_in =>

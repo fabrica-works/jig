@@ -156,8 +156,8 @@ fn a_connector_numbered_as_the_cores_own_is_refused() {
 #[test]
 fn a_ceiling_without_models_takes_every_configured_model() {
     let engine = engine();
-    assert_eq!(engine.rules.ceiling.models, jig_domain_authority::Models(0b1));
-    assert_eq!(engine.projects[0].policy.ceiling.models, jig_domain_authority::Models(0b1));
+    assert_eq!(engine.rules.ceiling.models, jig_domain_authority::Models::ALL);
+    assert_eq!(engine.projects[0].policy.ceiling.models, jig_domain_authority::Models::ALL);
 }
 #[test]
 fn a_ceilings_models_name_the_configured_models_it_keeps() {
@@ -167,7 +167,7 @@ fn a_ceilings_models_name_the_configured_models_it_keeps() {
         ceiling,
         br#""ceiling": {"tools": 1023, "models": ["small"],"#,
     ));
-    assert_eq!(named.unwrap().rules.ceiling.models, jig_domain_authority::Models(0b1));
+    assert_eq!(named.unwrap().rules.ceiling.models, jig_domain_authority::Models::Named(0b1));
     let none = fixtures::engine(&fixtures::with(
         fixtures::ENGINE_SMALL,
         ceiling,
@@ -215,8 +215,8 @@ fn role_models_path(index: usize) -> crate::Path {
 }
 #[test]
 fn a_roles_models_name_the_configured_models_it_keeps() {
-    assert_eq!(role(&engine()), jig_domain_authority::Models(0b1), "absent names every configured model");
-    assert_eq!(role(&role_models(br#"["small"]"#).unwrap()), jig_domain_authority::Models(0b1));
+    assert_eq!(role(&engine()), jig_domain_authority::Models::ALL, "absent names every configured model");
+    assert_eq!(role(&role_models(br#"["small"]"#).unwrap()), jig_domain_authority::Models::Named(0b1));
     assert_eq!(role(&role_models(b"[]").unwrap()), jig_domain_authority::Models::NONE);
 }
 fn a_role_naming_an_unknown_model_is_refused() {

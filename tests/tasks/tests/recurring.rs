@@ -64,10 +64,10 @@ fn an_occurrence_keeps_its_members_llm_choice() {
         subagents: Box::new([ModelEffort { model: 2, effort: Some(0) }]),
     };
     let mut master = recurring(9, RecurringOverlap::Skip);
-    master.authority.models = Models(0b101);
+    master.authority.models = Models::Named(0b101);
     let template = master.recurring.as_mut().expect("template");
     let member = template.batch.first_mut().expect("member");
-    member.authority.models = Models(0b101);
+    member.authority.models = Models::Named(0b101);
     member.llm = Some(llm.clone());
     assert_eq!(world.make(Party::Deployment { project: 1 }, vec![master]), Reply::Made(vec![9]));
     world.open_period(1, 100_000);

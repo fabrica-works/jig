@@ -952,7 +952,7 @@ fn batch_needs(tasks: &[Delegate]) -> Option<Authority> {
     for task in tasks {
         let child = &task.authority;
         authority.tools.0 |= child.tools.0;
-        authority.models.0 |= child.models.0;
+        authority.models = authority.models.or(child.models);
         authority.notes.0 |= child.notes.0;
         authority.delegation.tasks = authority.delegation.tasks.checked_add(child.delegation.tasks.checked_add(1)?)?;
         authority.delegation.depth = authority.delegation.depth.max(child.delegation.depth.checked_add(1)?);

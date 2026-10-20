@@ -56,7 +56,10 @@ fn authority_to_authority(value: people::Authority) -> Option<authority::Authori
     }
     Some(authority::Authority {
         tools: authority::Tools(value.tools),
-        models: authority::Models(value.models),
+        models: match value.models {
+            Some(models) => authority::Models::from_parts(models.bits(), models.is_all()),
+            None => authority::Models::NONE,
+        },
         grants: grants.into_boxed(),
         delegation: authority::Delegation {
             kinds: kinds.into_boxed(),
@@ -100,7 +103,7 @@ pub fn authority_to_people(value: &authority::Authority) -> Option<people::Autho
     }
     Some(people::Authority {
         tools: value.tools.0,
-        models: value.models.0,
+        models: Some(people::Models::from_parts(value.models.bits(), value.models.is_all())),
         grants: grants.into_boxed(),
         delegation: people::Delegation {
             kinds: kinds.into_boxed(),
@@ -190,16 +193,21 @@ pub(crate) fn apply(
             if edit.number <= 3 && !role_exists(policy, edit.number) {
                 return None;
             }
-            let mut value = authority_to_authority(edit.authority)?;
-            // A party's edit names no models until the client wire carries them (JP10): an edited
-            // role keeps its own, and a new one takes every model the project's ceiling names.
-            value.models = policy.ceiling.models;
+            let mut inherited = policy.ceiling.models;
+            for role in &policy.roles {
+                if role.number == edit.number {
+                    inherited = role.authority.models;
+                }
+            }
+            let mut given = edit.authority;
+            if given.models.is_none() {
+                given.models = Some(people::Models::from_parts(inherited.bits(), inherited.is_all()));
+            }
+            let value = authority_to_authority(given)?;
             let mut found = false;
             for role in &mut policy.roles {
                 if role.number == edit.number {
-                    let models = role.authority.models;
                     role.authority = value.clone();
-                    role.authority.models = models;
                     role.period_spend = edit.period_spend;
                     role.requests = authority::Requests(edit.requests);
                     role.decides = authority::Proposals(edit.decides);
@@ -328,6 +336,22 @@ impl Core {
         let Some(mut policy) = self.authority.policy(project).cloned() else {
             return Err(people::Refusal::Unknown);
         };
+        match &change {
+            people::PolicyChange::Role(role) => {
+                if let Some(models) = role.authority.models {
+                    let models = authority::Models::from_parts(models.bits(), models.is_all());
+                    if !models.at_most(policy.ceiling.models) || !models.at_most(self.authority.rules().ceiling.models)
+                    {
+                        return Err(people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape });
+                    }
+                }
+            }
+            people::PolicyChange::Templates { .. }
+            | people::PolicyChange::Projections { .. }
+            | people::PolicyChange::ProjectSpend { .. }
+            | people::PolicyChange::Requirements { .. }
+            | people::PolicyChange::Permissions { .. } => {}
+        }
         let mut permissions = match self.permission_roles.get(&project) {
             Some(mappings) => mappings.clone(),
             None => Box::new([]),

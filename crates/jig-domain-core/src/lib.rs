@@ -46,6 +46,7 @@ mod llm;
 mod memory;
 
 pub use memory::{policy_owned_bytes, worst_case};
+mod model_names;
 mod numbers;
 mod person_task;
 mod policy;

@@ -86,8 +86,12 @@ pub(super) fn flags(value: jig_domain_tasks::Flags, limits: &w::Limits) -> Resul
         },
     )
 }
-pub fn creating(value: &acts::Creating, limits: &w::Limits) -> Result<w::CreatingBounds, w::Problem> {
-    let within = match task::bounds(&value.within, limits)? {
+pub fn creating(
+    models: &[crate::Model],
+    value: &acts::Creating,
+    limits: &w::Limits,
+) -> Result<w::CreatingBounds, w::Problem> {
+    let within = match task::bounds(models, &value.within, limits)? {
         w::Bounds::Create(value) => value,
         w::Bounds::Amend(_) => unreachable!("creating has creating bounds"),
     };

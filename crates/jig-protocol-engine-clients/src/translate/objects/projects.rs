@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use jig_domain_core::documents as d;
 use jig_domain_tasks as t;
 use skein_lib::{List, Writer};
-pub fn project(value: &d::Project, limits: &w::Limits) -> Result<w::OwnerProject, w::Problem> {
+pub fn project(models: &[crate::Model], value: &d::Project, limits: &w::Limits) -> Result<w::OwnerProject, w::Problem> {
     let mut resources = List::with_capacity(value.resources.len());
     for row in &value.resources {
         resources
@@ -67,17 +67,17 @@ pub fn project(value: &d::Project, limits: &w::Limits) -> Result<w::OwnerProject
     let spend = owner_project_spend_pieces(&spend, limits.owner_project_spend, w::Path::OwnerProjectSpend)?;
     let mut recurring = List::with_capacity(value.recurring.len());
     for row in &value.recurring {
-        recurring.push(recurrence(row, limits)?).expect("supplied rows fit");
+        recurring.push(recurrence(models, row, limits)?).expect("supplied rows fit");
     }
     let recurring = recurring_pieces(&recurring, limits.owner_project_recurring, w::Path::OwnerProjectRecurring)?;
 
     w::OwnerProject::new(
         limits,
         w::OwnerProjectParts {
-            acts: task::offered(&value.acts, limits, limits.owner_project_acts, w::Path::OwnerProjectActs)?,
+            acts: task::offered(models, &value.acts, limits, limits.owner_project_acts, w::Path::OwnerProjectActs)?,
             number: value.number,
             resources,
-            policy: policy(&value.policy, limits)?,
+            policy: policy(models, &value.policy, limits)?,
             members,
             current_period: match &value.current_period {
                 Some(item) => Some(owner::ledger(item, limits)?),
@@ -93,7 +93,11 @@ pub fn project(value: &d::Project, limits: &w::Limits) -> Result<w::OwnerProject
         },
     )
 }
-pub fn policy(value: &d::Policy, limits: &w::Limits) -> Result<w::OwnerProjectPolicy, w::Problem> {
+pub fn policy(
+    models: &[crate::Model],
+    value: &d::Policy,
+    limits: &w::Limits,
+) -> Result<w::OwnerProjectPolicy, w::Problem> {
     let mut projections = List::with_capacity(value.projections.len());
     for row in &value.projections {
         projections.push(owner::grant(row, limits)?).expect("supplied rows fit");
@@ -110,7 +114,7 @@ pub fn policy(value: &d::Policy, limits: &w::Limits) -> Result<w::OwnerProjectPo
                 limits,
                 w::OwnerProjectPolicyRoleParts {
                     number: row.number,
-                    authority: owner::authority(&row.authority, limits)?,
+                    authority: owner::authority(models, &row.authority, limits)?,
                     period_spend: row.period_spend,
                     requests: row.requests.0,
                     decides: row.decides.0,
@@ -176,7 +180,7 @@ pub fn policy(value: &d::Policy, limits: &w::Limits) -> Result<w::OwnerProjectPo
         limits,
         w::OwnerProjectPolicyParts {
             templates: super::super::me::overrides(&value.templates, limits)?,
-            ceiling: owner::authority(&value.ceiling, limits)?,
+            ceiling: owner::authority(models, &value.ceiling, limits)?,
             period_spend: value.period_spend,
             escalation_role: value.escalation_role,
             projections,
@@ -188,10 +192,14 @@ pub fn policy(value: &d::Policy, limits: &w::Limits) -> Result<w::OwnerProjectPo
         },
     )
 }
-pub fn recurrence(value: &d::Recurring, limits: &w::Limits) -> Result<w::Recurring, w::Problem> {
+pub fn recurrence(
+    models: &[crate::Model],
+    value: &d::Recurring,
+    limits: &w::Limits,
+) -> Result<w::Recurring, w::Problem> {
     let mut batch = List::with_capacity(value.batch.len());
     for row in &value.batch {
-        batch.push(super::proposals::proposed(row, limits)?).expect("supplied rows fit");
+        batch.push(super::proposals::proposed(models, row, limits)?).expect("supplied rows fit");
     }
     let batch = super::proposals::proposed_task_pieces(&batch, limits.recurring_batch, w::Path::RecurringBatch)?;
     let mut last_batch = List::with_capacity(value.last_batch.len());

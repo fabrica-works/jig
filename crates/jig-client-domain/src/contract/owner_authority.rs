@@ -44,9 +44,19 @@ pub struct OwnerResourceScope {
     pub connector: u16,
     pub pattern: OwnerPattern,
 }
-/// Whole admitted authority payload, retaining raw tools and note scope bits.
+pub const AUTHORITY_MODELS: u32 = 64;
+pub const AUTHORITY_MODEL_BYTES: u32 = 4_096;
+
+/// An explicit model selector; a named set may be empty.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum AuthorityModels {
+    All,
+    Named(List<Box<[u8]>>),
+}
+/// Whole authority, with omission retaining the existing/default models.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerAuthority {
+    pub models: Option<AuthorityModels>,
     pub tools: u64,
     pub grants: List<OwnerGrant>,
     pub delegation: OwnerDelegation,

@@ -38,12 +38,38 @@ pub struct Tools(/** Up to 64 configured family bits; tasks assigns no family me
 /// Configured-model bit set carried with a task, in configuration's order: bit `i` is the `i`th
 /// configured model (domain/tasks.md, section 3; domain/authority.md, section 3).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Models(/** Up to 64 configured model bits. */ pub u64);
+pub enum Models {
+    /// Every model, including models configured later.
+    All,
+    /// A frozen configured-model mask, including all 64 bits or none.
+    Named(u64),
+}
 
 impl Models {
-    /// No model: a goal judge's authority, and the placeholder a sender fills where the core sets
-    /// the models from the creator (domain/authority.md, section 3).
-    pub const NONE: Models = Models(0);
+    pub const NONE: Self = Self::Named(0);
+    pub const ALL: Self = Self::All;
+
+    #[must_use]
+    pub const fn bits(self) -> u64 {
+        match self {
+            Self::All => u64::MAX,
+            Self::Named(bits) => bits,
+        }
+    }
+
+    #[must_use]
+    pub const fn is_all(self) -> bool {
+        match self {
+            Self::All => true,
+            Self::Named(_) => false,
+        }
+    }
+
+    /// Preserve the selector tag across a vocabulary boundary.
+    #[must_use]
+    pub const fn from_parts(bits: u64, all: bool) -> Self {
+        if all { Self::All } else { Self::Named(bits) }
+    }
 }
 
 /// Task-relative note-scope bits carried as semantic data; the authority child checks scope

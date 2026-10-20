@@ -44,6 +44,7 @@ fn client_world() -> (World, u64) {
 
 fn chat(world: &mut World, sign_in: u64) {
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(45_101)),
         sign_in,
         key: [45; 16],
@@ -92,6 +93,7 @@ fn a_client_watch_coalesces_until_its_delivery_is_taken() {
     assert_eq!(world.client_peer.as_ref().expect("client peer").delivered.len(), 1);
     world.client_peer.as_mut().expect("client peer").delivered.clear();
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(45_104)),
         sign_in,
         key: [46; 16],
@@ -159,6 +161,7 @@ fn a_watched_task_query_is_delivered_again_when_its_task_ends() {
     world.client_peer.as_mut().expect("configured fixture").delivered.clear();
     let before = world.store.applied;
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(CANCEL_REPLY)),
         sign_in,
         key: [47; 16],

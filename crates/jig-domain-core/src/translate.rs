@@ -71,7 +71,7 @@ pub(crate) fn authority_value(value: &tasks::Authority) -> authority::Authority 
     }
     authority::Authority {
         tools: authority::Tools(value.tools.0),
-        models: authority::Models(value.models.0),
+        models: authority::Models::from_parts(value.models.bits(), value.models.is_all()),
         grants: grants.into_boxed(),
         delegation: authority::Delegation {
             kinds: kinds.into_boxed(),
@@ -129,7 +129,7 @@ pub fn task_authority(value: &authority::Authority) -> tasks::Authority {
     }
     tasks::Authority {
         tools: tasks::Tools(value.tools.0),
-        models: tasks::Models(value.models.0),
+        models: tasks::Models::from_parts(value.models.bits(), value.models.is_all()),
         grants: grants.into_boxed(),
         delegation: tasks::Delegation {
             kinds: kinds.into_boxed(),

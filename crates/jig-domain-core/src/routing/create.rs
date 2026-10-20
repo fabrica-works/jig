@@ -326,7 +326,7 @@ fn executor(core: &Core, executor: people::TaskExecutor) -> Result<tasks::Execut
 /// so that its agent delegates may: as with tools, only the goal judge empties a procedure's.
 fn given_models(core: &Core, project: u32, role: people::Role) -> tasks::Models {
     match core.authority.models(project, role.number()) {
-        Some(models) => tasks::Models(models.0),
+        Some(models) => tasks::Models::from_parts(models.bits(), models.is_all()),
         None => tasks::Models::NONE,
     }
 }

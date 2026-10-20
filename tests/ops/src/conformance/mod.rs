@@ -734,6 +734,7 @@ impl Application for Ops {
                     && peers.asked_accept.insert((row.number, proposal.number))
                 {
                     events.push(Input::Event(root::Event::Core(core::Event::People(people::Event::Ask {
+                        models: Box::new([]),
                         reply_to: ReplyTo::new(Token::new(200)),
                         sign_in,
                         key: {
@@ -970,6 +971,7 @@ fn alert_documents(seed: u64, cut: jig_conformance::Cut, documents: bool) -> jig
         }]),
     })));
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(101)),
         sign_in: world.peers.sign_in.expect("on-call session"),
         key: [2; 16],

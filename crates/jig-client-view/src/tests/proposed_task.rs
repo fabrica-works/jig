@@ -55,6 +55,7 @@ pub(super) fn full_template(number: u64) -> ProposedTask {
     };
     task.authority = OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants: list([grant.clone(), grant]),
             delegation: OwnerDelegation {

@@ -16,6 +16,7 @@ fn supplied() -> OwnerAuthorityDocument {
     note_resources.push(OwnerResourceScope { connector: u16::MAX, pattern }).unwrap();
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants,
             delegation: OwnerDelegation { kinds, tasks: u32::MAX, depth: u32::MAX },

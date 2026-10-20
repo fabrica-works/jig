@@ -212,6 +212,7 @@ pub fn authority(value: &documents::AuthorityLine, limits: &Limits) -> Result<cl
     let limits = &Limits { rows: crate::test::AUTHORITY_ENTRIES, ..*limits };
     Ok(client::OwnerAuthorityDocument {
         authority: client::OwnerAuthority {
+            models: None,
             tools: value.tools.0,
             grants: list(&value.grants, limits, |value| {
                 Ok(client::OwnerGrant {
@@ -391,6 +392,7 @@ pub(super) mod tests {
             instructions: None,
             spec: value_source(),
             authority: documents::AuthorityLine {
+                models: tasks::Models::ALL,
                 tools: tasks::Tools(u64::MAX),
                 grants: List::with_capacity(3),
                 executors: List::with_capacity(2),
@@ -630,6 +632,7 @@ pub(super) mod tests {
             .expect("the complete supplied fixture is admitted");
         for deadline in [None, Some(skein_lib::Wall::EPOCH)] {
             let source = documents::AuthorityLine {
+                models: tasks::Models::ALL,
                 tools: tasks::Tools(u64::MAX),
                 grants: grants.clone(),
                 executors: executors.clone(),
@@ -853,4 +856,15 @@ pub(super) mod tests {
         assert_eq!(translated.updates, client::Count { value: 0, limited: false });
         assert_eq!(translated.party.kind, client::PartyKind::Person);
     }
+}
+
+pub(super) fn models(value: tasks::Models) -> Option<client::AuthorityModels> {
+    if value.is_all() {
+        return Some(client::AuthorityModels::All);
+    }
+    let mut names = List::with_capacity(1);
+    if value.bits() & 1 != 0 {
+        names.push(jig_core_world::world::scripted_model().name).expect("one configured model");
+    }
+    Some(client::AuthorityModels::Named(names))
 }

@@ -243,9 +243,11 @@ pub fn wire_owner_authority_document() -> w::OwnerAuthorityDocument {
     w::OwnerAuthorityDocument::new(
         &lim,
         w::OwnerAuthorityDocumentParts {
+            cut: false,
             authority: w::OwnerAuthority::new(
                 &lim,
                 w::OwnerAuthorityParts {
+                    models: Some(w::ModelSet::All),
                     tools: 7,
                     grants: Box::from([]),
                     delegation: w::OwnerDelegation::new(

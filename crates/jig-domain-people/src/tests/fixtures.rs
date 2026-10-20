@@ -30,7 +30,7 @@ pub(super) fn member(words: &[u8]) -> Member {
         contract: Contract::Report { words: 8 },
         authority: Authority {
             tools: NO_TOOLS,
-            models: 0,
+            models: None,
             grants: Box::new([]),
             delegation: Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
             spend: 1,

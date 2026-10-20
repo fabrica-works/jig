@@ -41,26 +41,62 @@ pub struct Tools(/** Up to 64 configured family bits; inclusion is a bit-set sub
 /// a role that names fewer narrows them (domain/authority.md, sections 3
 /// and 6).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Models(/** One bit per configured model, the first model the lowest bit. */ pub u64);
+pub enum Models {
+    /// Every model, including models configured later.
+    All,
+    /// A frozen configured-model mask, including all 64 bits or none.
+    Named(u64),
+}
 
 impl Models {
-    /// No model: a procedure's.
-    pub const NONE: Models = Models(0);
+    pub const NONE: Self = Self::Named(0);
+    pub const ALL: Self = Self::All;
 
-    /// Every configured model: what names no narrowing.
-    pub const ALL: Models = Models(u64::MAX);
-
-    /// The models both name, in configuration's order.
     #[must_use]
-    pub const fn and(self, other: Models) -> Models {
-        Models(self.0 & other.0)
+    pub const fn bits(self) -> u64 {
+        match self {
+            Self::All => u64::MAX,
+            Self::Named(bits) => bits,
+        }
     }
 
-    /// The models a task run by this executor may use: none for a procedure.
     #[must_use]
-    pub const fn run_by(self, executor: Executor) -> Models {
+    pub const fn is_all(self) -> bool {
+        match self {
+            Self::All => true,
+            Self::Named(_) => false,
+        }
+    }
+
+    /// Preserve the selector tag across a vocabulary boundary.
+    #[must_use]
+    pub const fn from_parts(bits: u64, all: bool) -> Self {
+        if all { Self::All } else { Self::Named(bits) }
+    }
+
+    #[must_use]
+    pub const fn and(self, other: Self) -> Self {
+        if self.is_all() && other.is_all() { Self::All } else { Self::Named(self.bits() & other.bits()) }
+    }
+
+    #[must_use]
+    pub const fn or(self, other: Self) -> Self {
+        if self.is_all() || other.is_all() { Self::All } else { Self::Named(self.bits() | other.bits()) }
+    }
+
+    #[must_use]
+    pub const fn at_most(self, other: Self) -> bool {
+        match (self, other) {
+            (Self::All | Self::Named(_), Self::All) => true,
+            (Self::All, Self::Named(_)) => false,
+            (Self::Named(a), Self::Named(b)) => a & !b == 0,
+        }
+    }
+
+    #[must_use]
+    pub const fn run_by(self, executor: Executor) -> Self {
         match executor {
-            Executor::Procedure(_) => Models::NONE,
+            Executor::Procedure(_) => Self::NONE,
             Executor::Charter(_) | Executor::Role(_) => self,
         }
     }

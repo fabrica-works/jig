@@ -782,3 +782,9 @@ build its own from the reference UI's page (view.md, 18.2).
   missing (one the party may not see, or none). Each section of jig's
   there says it in its own region, where at a place of jig's the page
   says it (view.md, 18.2; section 8).
+
+Authority and policy review fragments preserve omitted, ALL, empty and
+named model selectors as supplied (`contract.md`, 3.2). Named rows obey
+the fragment's row bound and show a cut marker when incomplete. Their
+names, labels and nodes are priced in the fragment envelope. A supplied
+cut authority cannot become a whole replacement through `whole()`.

@@ -153,7 +153,7 @@ pub fn run() -> Box<core::RunCharter> {
         contract: tasks::Contract::Report { words: 128 },
         authority: tasks::Authority {
             tools: tasks::Tools(1023),
-            models: tasks::Models(1),
+            models: tasks::Models::Named(1),
             grants: Box::new([]),
             delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
             budget: tasks::Budget { spend: 100, deadline: None },

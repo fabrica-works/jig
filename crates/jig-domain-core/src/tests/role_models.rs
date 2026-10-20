@@ -1,11 +1,10 @@
-//! A party's role edit names no models until the client wire carries them: the core keeps an
-//! edited role's own and gives a new role every model the project's ceiling names
+//! Omitted role edits keep the old selector; explicit edits replace it under the ceiling
 //! (domain/authority.md, section 6).
 use super::*;
 
 const ROLE: u32 = 4;
-const CEILING: authority::Models = authority::Models(0b111);
-const KEPT: authority::Models = authority::Models(0b010);
+const CEILING: authority::Models = authority::Models::Named(0b111);
+const KEPT: authority::Models = authority::Models::Named(0b010);
 
 fn project_policy() -> authority::Policy {
     let mut ceiling = authority_value(1000, Box::new([]));
@@ -30,7 +29,7 @@ fn project_policy() -> authority::Policy {
 
 fn edited(number: u32) -> authority::Policy {
     let mut value = authority_to_people(&authority_value(400, Box::new([]))).unwrap();
-    value.models = 0;
+    value.models = None;
     let change = people::PolicyChange::Role(people::PolicyRole {
         number,
         authority: value,
@@ -57,4 +56,59 @@ fn a_new_role_takes_every_model_the_ceiling_names() {
     let policy = edited(ROLE + 1);
     assert_eq!(policy.roles[1].number, ROLE + 1);
     assert_eq!(policy.roles[1].authority.models, CEILING);
+}
+
+#[test]
+fn explicit_role_selectors_narrow_empty_and_widen_under_the_ceiling() {
+    for (models, expected) in [
+        (people::Models::NONE, authority::Models::NONE),
+        (people::Models::Named(1), authority::Models::Named(1)),
+        (people::Models::Named(7), CEILING),
+    ] {
+        let mut policy = project_policy();
+        let mut value = authority_to_people(&policy.roles[0].authority).unwrap();
+        value.models = Some(models);
+        let change = people::PolicyChange::Role(people::PolicyRole {
+            number: ROLE,
+            authority: value,
+            period_spend: 400,
+            requests: 0,
+            decides: 0,
+        });
+        policy::apply(
+            &mut policy,
+            &mut Box::<[people::PermissionRole]>::default(),
+            &mut Box::<[people::TemplateOverride]>::default(),
+            change,
+            1,
+            2,
+        )
+        .unwrap();
+        assert_eq!(policy.roles[0].authority.models, expected);
+    }
+}
+#[test]
+fn an_explicit_role_past_the_ceiling_refuses_the_entire_edit() {
+    for models in [people::Models::Named(8), people::Models::ALL] {
+        let (mut core, _) = make_tree();
+        let mut policy = core.authority.policy(1).unwrap().clone();
+        policy.ceiling.models = CEILING;
+        let mut out = Queue::with_capacity(4);
+        for role in &mut policy.roles {
+            role.authority.models = role.authority.models.and(CEILING);
+        }
+        authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy: policy.clone() }, &mut out);
+        assert_eq!(core.authority.policy(1), Some(&policy));
+        let mut value = authority_to_people(&policy.ceiling).unwrap();
+        value.models = Some(models);
+        let change = people::PolicyChange::Role(people::PolicyRole {
+            number: ROLE,
+            authority: value,
+            period_spend: 1,
+            requests: 0,
+            decides: 0,
+        });
+        assert!(core.change_policy(&limits(), 1, 1, change).is_err());
+        assert_eq!(core.authority.policy(1), Some(&policy));
+    }
 }

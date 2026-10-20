@@ -97,7 +97,11 @@ pub fn recipient(value: &acts::Recipient, limits: &w::Limits) -> Result<w::Recip
         )?),
     })
 }
-pub(super) fn bounds(value: &acts::Bounds, limits: &w::Limits) -> Result<w::Bounds, w::Problem> {
+pub(super) fn bounds(
+    models: &[crate::Model],
+    value: &acts::Bounds,
+    limits: &w::Limits,
+) -> Result<w::Bounds, w::Problem> {
     Ok(match value {
         acts::Bounds::Create {
             authority,
@@ -120,7 +124,7 @@ pub(super) fn bounds(value: &acts::Bounds, limits: &w::Limits) -> Result<w::Boun
             w::Bounds::Create(w::BoundsCreate::new(
                 limits,
                 w::BoundsCreateParts {
-                    authority: owner::authority(authority, limits)?,
+                    authority: owner::authority(models, authority, limits)?,
                     pool_left: *pool_left,
                     charters: charters.clone(),
                     procedures: rows,
@@ -166,14 +170,14 @@ pub(super) fn bounds(value: &acts::Bounds, limits: &w::Limits) -> Result<w::Boun
                     budget_left: *budget_left,
                     grants,
                     implications: pairs,
-                    authority: owner::authority(authority, limits)?,
-                    ceiling: owner::authority(ceiling, limits)?,
+                    authority: owner::authority(models, authority, limits)?,
+                    ceiling: owner::authority(models, ceiling, limits)?,
                 },
             )?)
         }
     })
 }
-fn admission(value: &acts::Admission, limits: &w::Limits) -> Result<w::Admission, w::Problem> {
+fn admission(models: &[crate::Model], value: &acts::Admission, limits: &w::Limits) -> Result<w::Admission, w::Problem> {
     Ok(match value {
         acts::Admission::Allowed => w::Admission::Allowed,
         acts::Admission::Proposed { to } => w::Admission::Proposed(w::AdmissionProposed::new(
@@ -197,12 +201,13 @@ fn admission(value: &acts::Admission, limits: &w::Limits) -> Result<w::Admission
             };
             w::Admission::Bounded(Box::new(w::AdmissionBounded::new(
                 limits,
-                w::AdmissionBoundedParts { within: bounds(within, limits)?, beyond },
+                w::AdmissionBoundedParts { within: bounds(models, within, limits)?, beyond },
             )?))
         }
     })
 }
 pub fn offered(
+    models: &[crate::Model],
     value: &List<acts::Offered>,
     limits: &w::Limits,
     bound: u32,
@@ -221,7 +226,7 @@ pub fn offered(
                     None => None,
                 },
                 act: act(item.act, limits)?,
-                admission: admission(&item.admission, limits)?,
+                admission: admission(models, &item.admission, limits)?,
             },
         )?)
         .expect("supplied offered acts");
@@ -365,7 +370,7 @@ pub fn document(value: &d::Task, models: &[crate::Model], limits: &w::Limits) ->
             cut: value.cut,
             resources,
             budget: owner::budget(&value.budget, limits)?,
-            authority: owner::authority(&value.authority, limits)?,
+            authority: owner::authority(models, &value.authority, limits)?,
             hold: match &value.hold {
                 Some(item) => Some(w::TaskHold::Owner(w::TaskHoldOwner::new(
                     limits,
@@ -376,7 +381,7 @@ pub fn document(value: &d::Task, models: &[crate::Model], limits: &w::Limits) ->
             proposals,
             activity: value.activity,
             changed: value.changed.as_nanos(),
-            acts: offered(&value.acts, limits, limits.task_acts, w::Path::TaskActs)?,
+            acts: offered(models, &value.acts, limits, limits.task_acts, w::Path::TaskActs)?,
             result: match &value.result {
                 Some(item) => Some(w::TaskResult::Ending(w::TaskResultEnding::new(
                     limits,

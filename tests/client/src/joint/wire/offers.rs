@@ -252,6 +252,7 @@ mod tests {
         use jig_domain_core::documents;
         use jig_domain_tasks as tasks;
         let authority = documents::AuthorityLine {
+            models: tasks::Models::ALL,
             tools: tasks::Tools(u64::MAX),
             grants: List::with_capacity(3),
             executors: List::with_capacity(3),

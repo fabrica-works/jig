@@ -94,6 +94,7 @@ fn policy_role_projection_permission_and_empty_replacement_reviews_keep_every_su
     let tree = shown(&PolicyEdit::Role(PolicyEditRole {
         number: u32::MAX,
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants: List::with_capacity(0),
             delegation: OwnerDelegation { kinds: List::with_capacity(0), tasks: u32::MAX, depth: u32::MAX },

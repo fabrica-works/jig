@@ -39,6 +39,7 @@ fn pattern(value: &tasks::Pattern, limits: &Limits) -> Result<client::OwnerPatte
 }
 fn authority(value: &tasks::Authority, limits: &Limits) -> Result<client::OwnerAuthority, owner::Invalid> {
     Ok(client::OwnerAuthority {
+        models: owner::models(value.models),
         tools: value.tools.0,
         grants: list(&value.grants, limits, |value| {
             Ok(client::OwnerGrant {

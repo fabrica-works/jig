@@ -13,6 +13,7 @@ fn template(number: u64, words: &[u8]) -> ProposedTask {
         contract: TaskContractDocument::Report { words: 32 },
         authority: OwnerAuthorityDocument {
             authority: OwnerAuthority {
+                models: None,
                 tools: 0,
                 grants: list(vec![]),
                 delegation: OwnerDelegation { kinds: list(vec![]), tasks: 2, depth: 1 },

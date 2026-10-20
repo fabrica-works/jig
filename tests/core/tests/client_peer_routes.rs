@@ -79,6 +79,7 @@ fn signed_in(world: &mut World, token: Token) -> (u64, u64) {
 
 fn mark_seen(token: Token, sign_in: u64, key: [u8; 16]) -> root::Event {
     root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(token),
         sign_in,
         key,
@@ -228,6 +229,7 @@ fn keyed_client_work_replays_after_explicit_registration_reset_and_cold_restart(
     let creation = jig_core_world::fixtures::chat(&world, 1, b"one chat".as_slice().into());
     let chat = || {
         root::Event::Core(core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(CLIENT),
             sign_in: session,
             key: [16; 16],
@@ -307,6 +309,7 @@ fn default_capture_and_independent_worker_delivery_keep_their_original_paths() {
         holdings: Box::new([people::Holding { person, role: people::Role::Owner }]),
     })));
     world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(OTHER_CLIENT),
         sign_in: session,
         key: [17; 16],

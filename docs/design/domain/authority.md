@@ -110,6 +110,16 @@ Authority
   every configured model, unless the deployment's rules, the project's
   policy or a role names fewer (section 6). A procedure runs no model;
   its models are those its delegates may name.
+  A permission selector is omitted, literal ALL, or a named set of at
+  most 64 unique configured names (each 4,096 UTF-8 bytes at most).
+  A named empty set grants no model; a named set containing all 64
+  remains frozen, distinct from ALL. Create omission inherits the
+  creator's models; Amend omission keeps the task's. A role edit's
+  omission keeps its models, or takes the project ceiling for a new role.
+  Explicit role edits replace models under both ceilings and refuse
+  atomically if they exceed either. Retained identity and effective
+  restore mapping follow `../protocol/store.md`, 5.1.
+
 - **Grants:** each is a connector, a kind of effect or read that
   connector defines, and a pattern of resource names (section 4):
   "restart the services under `staging`", "create environments in the

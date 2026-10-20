@@ -115,7 +115,7 @@ impl Component {
                     self.respond(env, exchange, routes::encoded(&answer));
                     return;
                 }
-                crate::translate::asks::ask(value, models, &env.limits.wire)
+                crate::translate::asks::named(value, models, &env.limits.wire)
             }
             Err(problem) => Err(crate::translate::Untranslatable { path: problem.path }),
         };
@@ -125,7 +125,7 @@ impl Component {
         };
         if let Some(value) = keyed.value {
             let digest = skein_lib::sha256::digest(value.expose());
-            let request = CarriedRequest::AccountKey { key: keyed.key, ask: Box::new(ask), digest };
+            let request = CarriedRequest::AccountKey { key: keyed.key, ask: Box::new(ask.ask), digest };
             self.carry(env, exchange, sign_in, request, value, out);
             return;
         }
@@ -133,7 +133,8 @@ impl Component {
             reply_to: ReplyTo::new(exchange),
             sign_in,
             key: keyed.key,
-            ask,
+            ask: ask.ask,
+            models: ask.models,
         })));
         self.pending
             .exchanges

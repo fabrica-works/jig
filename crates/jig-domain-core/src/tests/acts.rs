@@ -311,6 +311,7 @@ fn an_observers_core_role_refusals_match_their_offers() {
                 &mut core,
                 &Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
                 Event::People(people::Event::Ask {
+                    models: Box::new([]),
                     reply_to: ReplyTo::new(Token::new(77)),
                     sign_in: 9,
                     key,
@@ -578,7 +579,13 @@ fn ask_now(core: &mut Core, limits: &Limits, key: u8, ask: people::Ask) -> peopl
     let Requests::Out(out) = step(
         core,
         &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
-        Event::People(people::Event::Ask { reply_to: ReplyTo::new(Token::new(101)), sign_in: 9, key: [key; 16], ask }),
+        Event::People(people::Event::Ask {
+            models: Box::new([]),
+            reply_to: ReplyTo::new(Token::new(101)),
+            sign_in: 9,
+            key: [key; 16],
+            ask,
+        }),
     );
     for row in &out {
         if let Request::Held(held) = row
@@ -804,6 +811,7 @@ fn keyed_proposal(core: &mut Core, limits: &Limits, key: u8, proposer: Proposer)
         core,
         &Env { now: Time::ZERO, wall: Wall::EPOCH, limits: *limits },
         Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(101)),
             sign_in: 9,
             key: [key; 16],

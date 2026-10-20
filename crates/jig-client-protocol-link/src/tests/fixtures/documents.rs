@@ -104,6 +104,7 @@ pub fn task() -> c::Task {
         },
         authority: c::OwnerAuthorityDocument {
             authority: c::OwnerAuthority {
+                models: Some(c::AuthorityModels::All),
                 tools: 7,
                 grants: List::with_capacity(0),
                 delegation: c::OwnerDelegation { kinds: List::with_capacity(0), tasks: 7, depth: 7 },
@@ -420,6 +421,7 @@ pub fn task_with_authority_grants(count: u32) -> (w::Task, c::Task) {
     parts.authority = w::OwnerAuthorityDocument::new(
         &w::CEILINGS,
         w::OwnerAuthorityDocumentParts {
+            cut: false,
             authority: translate::asks::wire_owner_authority(&expected.authority.authority, &w::CEILINGS).unwrap(),
         },
     )

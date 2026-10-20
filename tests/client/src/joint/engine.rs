@@ -364,6 +364,7 @@ mod tests {
             now,
             wall,
             root::Event::Core(core::Event::People(people::Event::Ask {
+                models: Box::new([]),
                 reply_to: token,
                 sign_in: session,
                 key: [92; 16],

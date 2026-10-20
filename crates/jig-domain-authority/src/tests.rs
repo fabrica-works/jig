@@ -287,9 +287,12 @@ fn naive_authority(a: &Authority, b: &Authority, patterns: &[Pattern], sets: &[[
             return false;
         }
     }
+    if a.models.is_all() && !b.models.is_all() {
+        return false;
+    }
     for bit in 0_u32..64 {
         let mask = 1_u64 << bit;
-        if a.models.0 & mask != 0 && b.models.0 & mask == 0 {
+        if a.models.bits() & mask != 0 && b.models.bits() & mask == 0 {
             return false;
         }
     }
@@ -363,7 +366,7 @@ fn authorities(patterns: &[Pattern]) -> Box<[Authority]> {
         let mut authority = empty();
         authority.tools = Tools((1_u64 << level).checked_sub(1).unwrap());
         authority.notes = Scopes(u8::try_from(authority.tools.0).unwrap());
-        authority.models = Models(u64::from(index.checked_rem(7).unwrap()));
+        authority.models = Models::Named(u64::from(index.checked_rem(7).unwrap()));
         authority.delegation.tasks = level;
         authority.delegation.depth = level;
         authority.budget.spend = u64::from(level);
@@ -452,9 +455,9 @@ fn each_component_can_independently_prevent_the_order() {
     child.notes = Scopes::DEPLOYMENT;
     assert!(!at_most(&child, &ceiling, &table), "notes need their scope");
     let mut named = ceiling.clone();
-    named.models = Models(0b01);
+    named.models = Models::Named(0b01);
     child = named.clone();
-    child.models = Models(0b10);
+    child.models = Models::Named(0b10);
     assert!(!at_most(&child, &named, &table), "models need membership");
     child.models = Models::NONE;
     assert!(at_most(&child, &named, &table), "no models fit under any");
@@ -525,4 +528,15 @@ fn span_addition_saturates_at_the_last_wall() {
             "{decision} + {span}"
         );
     }
+}
+
+#[test]
+fn literal_all_stays_distinct_from_a_frozen_full_mask() {
+    let named = Models::Named(u64::MAX);
+    assert_ne!(Models::ALL, named);
+    assert!(named.at_most(Models::ALL));
+    assert!(!Models::ALL.at_most(named));
+    assert_eq!(Models::ALL.and(named), named);
+    assert_eq!(named.or(Models::ALL), Models::ALL);
+    assert_eq!(Models::NONE.and(Models::ALL), Models::NONE);
 }

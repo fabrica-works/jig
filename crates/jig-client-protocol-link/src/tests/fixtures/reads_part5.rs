@@ -31,6 +31,7 @@ pub fn read_value_proposal_action() -> c::ProposalAction {
 
 pub fn read_value_authority() -> c::Authority {
     c::Authority {
+        models: None,
         budget: 7,
         grants: List::with_capacity(0),
         task_kinds: List::with_capacity(0),

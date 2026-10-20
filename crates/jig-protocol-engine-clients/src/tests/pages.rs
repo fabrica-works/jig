@@ -4,7 +4,7 @@ use jig_client_protocol_wire::v10 as w;
 use jig_domain_core::reads;
 
 fn activity(read: &reads::Page, limits: &w::Limits) -> Result<w::ReadValue, w::Problem> {
-    pages::page(&reads::Read::Activity { task: 7, before: None }, read, limits)
+    pages::page(&fixtures::models(), &reads::Read::Activity { task: 7, before: None }, read, limits)
 }
 #[test]
 fn an_activity_page_carries_each_turn_s_bytes() {
@@ -41,7 +41,12 @@ fn a_history_page_keeps_its_cut_flag() {
         let mut expected = literal.clone().into_parts();
         expected.cut = cut;
         assert_eq!(
-            pages::page(&reads::Read::History { task: 7, subtree: false, from: None }, &source, &limits),
+            pages::page(
+                &fixtures::models(),
+                &reads::Read::History { task: 7, subtree: false, from: None },
+                &source,
+                &limits
+            ),
             Ok(w::ReadValue::History(w::HistoryPage::new(&limits, expected).expect(label))),
             "{label}"
         );
@@ -58,7 +63,11 @@ fn an_inbox_page_keeps_its_two_groups_apart() {
         ("updates", reads::Group::Updates, &updates, records[1].clone()),
     ] {
         let read = reads::Read::Inbox { group, filter: reads::Filter { project: None, goal: None }, from: None };
-        assert_eq!(pages::page(&read, source, &limits), Ok(w::ReadValue::OwnerInbox(record)), "{label}");
+        assert_eq!(
+            pages::page(&fixtures::models(), &read, source, &limits),
+            Ok(w::ReadValue::OwnerInbox(record)),
+            "{label}"
+        );
     }
 }
 #[test]
@@ -67,7 +76,7 @@ fn a_notes_page_becomes_its_record() {
     let source = fixtures::notes_page();
     let read = reads::Read::Notes { project: 13, from: None };
     assert_eq!(
-        pages::page(&read, &source, &limits),
+        pages::page(&fixtures::models(), &read, &source, &limits),
         Ok(w::ReadValue::Notes(jig_client_test_records::scoped_notes_page()))
     );
 }

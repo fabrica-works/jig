@@ -31,6 +31,7 @@ pub(crate) struct SignIn {
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub(crate) struct Answered {
     ask: Ask,
+    models: Box<[Box<[u8]>]>,
     outcome: Outcome,
     at: Wall,
     due: Time,
@@ -41,6 +42,7 @@ pub(crate) struct Pending {
     part: Option<Ask>,
     key: RequestKey,
     ask: Ask,
+    models: Box<[Box<[u8]>]>,
     replies: List<ReplyTo>,
 }
 
@@ -476,7 +478,9 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 Err(outcome) => out.push(Request::RolesRefused { project, outcome }),
             }
         }
-        Event::Ask { reply_to, sign_in, key, ask } => admit_ask(domain, env, reply_to, sign_in, key, ask, out),
+        Event::Ask { reply_to, sign_in, key, ask, models } => {
+            admit_ask(domain, env, reply_to, sign_in, key, ask, models, out);
+        }
         Event::Decided { request, outcome } => decided(domain, env, Id::<Pending>::from_token(request), outcome, out),
     }
 }
@@ -1366,6 +1370,7 @@ fn role(domain: &Domain, person: u64, project: u32) -> Option<Role> {
     None
 }
 
+#[expect(clippy::too_many_arguments, reason = "one keyed request includes its canonical original model context")]
 fn admit_ask(
     domain: &mut Domain,
     env: &Env<Limits>,
@@ -1373,6 +1378,7 @@ fn admit_ask(
     sign_in: u64,
     bytes: [u8; 16],
     ask: Ask,
+    models: Box<[Box<[u8]>]>,
     out: &mut Queue<Request>,
 ) {
     if !domain.ready() {
@@ -1385,7 +1391,7 @@ fn admit_ask(
         return signed_out(to, out);
     }
     let key = RequestKey { person: session.person, key: bytes };
-    if !valid_ask(&env.limits, &ask) {
+    if !valid_ask(&env.limits, &ask) || !crate::valid_model_context(&ask, &models) {
         return refused(to, invalid_ask(&env.limits, &ask), out);
     }
     if let Some(answer) = domain.answers.get(&key)
@@ -1397,7 +1403,7 @@ fn admit_ask(
         out.push(Request::Erase { key: Key::Answer(key) });
     }
     if let Some(answer) = domain.answers.get(&key) {
-        if answer.ask != ask {
+        if answer.ask != ask || answer.models != models {
             return refused(to, Refusal::KeyConflict, out);
         }
         return out.push(Request::Reply { to, reply: Reply::Outcome(answer.outcome.clone()) });
@@ -1405,7 +1411,7 @@ fn admit_ask(
 
     if let Some(id) = domain.flights.get(&key).copied() {
         let flight = domain.pending.get_mut(id).expect("key index names live pending request");
-        if flight.ask != ask {
+        if flight.ask != ask || flight.models != models {
             return refused(to, Refusal::KeyConflict, out);
         }
         if flight.replies.len() >= env.limits.waiters {
@@ -1434,7 +1440,7 @@ fn admit_ask(
     let refusal = admission(domain, key.person, project, role, &ask);
     if let Some(refusal) = refusal {
         let outcome = Outcome::Refused(refusal);
-        save_answer(domain, env, key, ask, outcome.clone(), out);
+        save_answer(domain, env, key, ask, models, outcome.clone(), out);
         return out.push(Request::Reply { to, reply: outcome_reply(outcome) });
     }
     if domain.pending.is_full() {
@@ -1443,11 +1449,11 @@ fn admit_ask(
     }
     let mut replies = List::with_capacity(env.limits.waiters);
     replies.push(to).expect("bounded list room checked");
-    let flight = Pending { key, ask: ask.clone(), replies, part: None };
+    let flight = Pending { key, ask: ask.clone(), models: models.clone(), replies, part: None };
     let id = domain.pending.insert(flight).expect("pending request admitted");
     let indexed = domain.flights.insert(key, id);
     assert!(indexed == Ok(None), "one key per flight within pending capacity");
-    out.push(Request::Route { request: id.token(), person: key.person, project, role, ask: Box::new(ask) });
+    out.push(Request::Route { request: id.token(), person: key.person, project, role, ask: Box::new(ask), models });
     fact(domain, Fact::Routed { person: key.person });
 }
 
@@ -1475,14 +1481,21 @@ fn save_answer(
     env: &Env<Limits>,
     key: RequestKey,
     ask: Ask,
+    models: Box<[Box<[u8]>]>,
     outcome: Outcome,
     out: &mut Queue<Request>,
 ) {
     out.push(Request::Save {
-        record: Stored::Answer { key, ask: Box::new(ask.clone()), outcome: outcome.clone(), at: env.wall },
+        record: Stored::Answer {
+            key,
+            ask: Box::new(ask.clone()),
+            models: models.clone(),
+            outcome: outcome.clone(),
+            at: env.wall,
+        },
     });
     let due = deadline(env, answer_expiry(env.wall, &env.limits));
-    let saved = domain.answers.insert(key, Answered { ask, outcome, at: env.wall, due });
+    let saved = domain.answers.insert(key, Answered { ask, models, outcome, at: env.wall, due });
     assert!(saved.is_ok(), "answer room reserved at request entrance");
     let armed = domain.answer_alarms.arm(key, due);
     assert!(armed.is_ok(), "one expiry per retained completed key");
@@ -1507,6 +1520,7 @@ pub(super) fn answer_decided(
     let flight = domain.pending.get_mut(id).expect("root returns each routed request exactly once");
     let key = flight.key;
     let ask = flight.ask.clone();
+    let models = flight.models.clone();
     let replies = core::mem::replace(&mut flight.replies, List::with_capacity(0));
     domain.pending.retire(id);
     let removed = domain.flights.remove(&key);
@@ -1546,7 +1560,7 @@ pub(super) fn answer_decided(
         | Outcome::AccountChanged
         | Outcome::AccountRemoved { .. }
         | Outcome::AccountSignedOut { .. }
-        | Outcome::Refused(_) => save_answer(domain, env, key, ask, outcome.clone(), out),
+        | Outcome::Refused(_) => save_answer(domain, env, key, ask, models, outcome.clone(), out),
     }
     for to in replies.into_boxed() {
         out.push(Request::Reply { to, reply: outcome_reply(outcome.clone()) });
@@ -1589,8 +1603,9 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
             valid_roles(domain, &env.limits, *project, holdings).is_ok() && !domain.roles.contains_key(project)
         }
         Stored::Policy { .. } | Stored::EndedRead { .. } => false,
-        Stored::Answer { key, ask, outcome, at } => {
+        Stored::Answer { key, ask, models, outcome, at } => {
             valid_ask(&env.limits, ask)
+                && crate::valid_model_context(ask, models)
                 && valid_answer_shape(ask, outcome.clone())
                 && !domain.answers.contains_key(key)
                 && (answer_expiry(*at, &env.limits) <= env.wall || domain.answers.len() < env.limits.requests)
@@ -1627,12 +1642,12 @@ fn restore(domain: &mut Domain, env: &Env<Limits>, record: Stored, out: &mut Que
         Stored::Policy { .. } | Stored::EndedRead { .. } => {
             unreachable!("root does not restore on-demand records into people")
         }
-        Stored::Answer { key, ask, outcome, at } => {
+        Stored::Answer { key, ask, models, outcome, at } => {
             if answer_expiry(at, &env.limits) <= env.wall {
                 out.push(Request::Erase { key: Key::Answer(key) });
             } else {
                 let due = deadline(env, answer_expiry(at, &env.limits));
-                let saved = domain.answers.insert(key, Answered { ask: *ask, outcome, at, due });
+                let saved = domain.answers.insert(key, Answered { ask: *ask, models, outcome, at, due });
                 assert!(saved.is_ok(), "restored answer admitted");
                 let armed = domain.answer_alarms.arm(key, due);
                 assert!(armed.is_ok(), "one expiry per restored answer");
@@ -1864,7 +1879,7 @@ pub fn application_part(domain: &mut Domain, env: &Env<Limits>, request: Token, 
     let flight = domain.pending.get_mut(id).expect("admitted application flight");
     assert!(flight.part.is_none(), "one core part at a time");
     flight.part = Some(ask.clone());
-    Ok(Request::Route { request, person, project: application_project, role, ask: Box::new(ask) })
+    Ok(Request::Route { request, person, project: application_project, role, ask: Box::new(ask), models: Box::new([]) })
 }
 
 fn admission(domain: &Domain, person: u64, _project: u32, role: Option<Role>, ask: &Ask) -> Option<Refusal> {

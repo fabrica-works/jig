@@ -310,6 +310,7 @@ pub(crate) fn wire_owner_authority(
     w::OwnerAuthority::new(
         limits,
         w::OwnerAuthorityParts {
+            models: super::model_sets::encode(value.models.as_ref(), limits)?,
             tools: value.tools,
             grants: wire_owner_grant_piece(&list0, limits)?,
             delegation: wire_owner_delegation(&value.delegation, limits)?,

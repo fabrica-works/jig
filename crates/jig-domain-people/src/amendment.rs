@@ -98,7 +98,8 @@ pub struct Authority {
     pub tools: u64,
     /// One bit per configured model, in the configuration's order; the people domain keeps no
     /// model names.
-    pub models: u64,
+    /// Omission retains the contextual default; named masks reference the enclosing ask's names.
+    pub models: Option<crate::Models>,
     pub grants: Box<[Grant]>,
     pub delegation: Delegation,
     pub spend: u64,

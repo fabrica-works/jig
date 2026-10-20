@@ -48,6 +48,7 @@ fn full_owner_authority() -> OwnerAuthorityDocument {
     let scope = OwnerResourceScope { connector: 2, pattern };
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants: list([grant.clone(), grant]),
             delegation: OwnerDelegation {
@@ -65,6 +66,7 @@ fn full_owner_authority() -> OwnerAuthorityDocument {
 }
 fn authority() -> Authority {
     Authority {
+        models: None,
         budget: u64::MAX,
         grants: list([
             Grant { connector: 2, kind: 1, pattern: full_pattern() },
@@ -782,14 +784,28 @@ fn full_cursor() -> Cursor {
 fn each_page_bound_keeps_its_value_at_the_client_limits() {
     // Two account rows each add two 12-node sources and 48 identity/use nodes.
     const DEPLOYMENT_NODES: u32 = 2873;
-    assert_eq!(crate::inbox_nodes(&CLIENT, 0), Some(339_043));
-    assert_eq!(crate::conversations_nodes(&CLIENT, 0), Some(85_580));
-    assert_eq!(crate::conversation_nodes(&CLIENT, 0), Some(1_015_392));
-    assert_eq!(crate::task_nodes(&CLIENT, 0), Some(1_172_239));
-    assert_eq!(crate::project_nodes(&CLIENT, 0), Some(508_689));
-    assert_eq!(crate::deployment_nodes(&CLIENT, 0), Some(DEPLOYMENT_NODES));
-    assert_eq!(crate::not_the_work_nodes(&CLIENT, 0), Some(25));
-    assert_eq!(crate::page_nodes(&CLIENT, 0), Some(1_172_239));
+    assert_eq!(
+        [
+            crate::inbox_nodes(&CLIENT, 0),
+            crate::conversations_nodes(&CLIENT, 0),
+            crate::conversation_nodes(&CLIENT, 0),
+            crate::task_nodes(&CLIENT, 0),
+            crate::project_nodes(&CLIENT, 0),
+            crate::deployment_nodes(&CLIENT, 0),
+            crate::not_the_work_nodes(&CLIENT, 0),
+            crate::page_nodes(&CLIENT, 0)
+        ],
+        [
+            Some(339_259),
+            Some(85_634),
+            Some(1_016_040),
+            Some(1_172_995),
+            Some(509_013),
+            Some(DEPLOYMENT_NODES),
+            Some(25),
+            Some(1_172_995)
+        ]
+    );
 }
 
 #[test]
@@ -805,20 +821,20 @@ fn an_arranged_task_page_counts_the_sum_of_its_sections() {
     let counts = sections.map(|s| crate::task_section_nodes(&CLIENT, s).unwrap());
     assert_eq!(
         (crate::task_header_nodes(&CLIENT).unwrap(), counts),
-        (42_545, [183_577, 1_129_694, 312_525, 13_826, 68, 94])
+        (42_572, [183_691, 1_130_423, 312_714, 13_832, 71, 94])
     );
     let arrangement = crate::page::Arrangement { task: list(sections), project: list([]) };
     assert_eq!(
         crate::arranged_nodes(&CLIENT, 0, &arrangement),
-        Some(42_545 + 183_577 + 1_129_694 + 312_525 + 13_826 + 68 + 94)
+        Some(42_572 + 183_691 + 1_130_423 + 312_714 + 13_832 + 71 + 94)
     );
 }
 #[test]
 fn no_arrangement_keeps_each_page_bound() {
     each_page_bound_keeps_its_value_at_the_client_limits();
     let arrangement = crate::page::Arrangement::none();
-    assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_172_239));
-    assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_172_248));
+    assert_eq!(crate::arranged_nodes(&CLIENT, 0, &arrangement), Some(1_172_995));
+    assert_eq!(crate::arranged_nodes(&CLIENT, 9, &arrangement), Some(1_173_004));
 }
 
 fn most_owed_cards() -> Fixture {

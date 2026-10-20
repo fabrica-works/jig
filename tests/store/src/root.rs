@@ -301,7 +301,7 @@ pub fn live_task(number: u64) -> core::Record {
         contract: tasks::Contract::Report { words: 32 },
         authority: tasks::Authority {
             tools: tasks::Tools(0),
-            models: tasks::Models(1),
+            models: tasks::Models::Named(1),
             grants: Box::new([]),
             delegation: tasks::Delegation { kinds: Box::new([]), tasks: 2, depth: 2 },
             budget: tasks::Budget { spend: 1, deadline: None },

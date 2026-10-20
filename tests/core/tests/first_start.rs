@@ -148,13 +148,62 @@ fn frame_models(world: &mut World, sign_in: u64) -> authority::Models {
 #[test]
 fn a_roles_models_follow_their_names_across_restarts() {
     let named = || Box::new([world::scripted_model(), model(b"research"), model(b"review")]);
-    let mut world = World::first_start(with_models(11_004, named(), authority::Models(0b101)), world::limits());
+    let mut world = World::first_start(with_models(11_004, named(), authority::Models::Named(0b101)), world::limits());
     world.client_peer = Some(ClientPeer::default());
     let (_, signed) = sign_in(&mut world, 7);
-    assert_eq!(frame_models(&mut world, signed), authority::Models(0b101), "scripted and review, seeded");
+    assert_eq!(frame_models(&mut world, signed), authority::Models::Named(0b101), "scripted and review, seeded");
     world.restart_with(with_models(11_005, named(), authority::Models::ALL));
-    assert_eq!(frame_models(&mut world, signed), authority::Models(0b101), "the saved role, not configuration's");
+    assert_eq!(
+        frame_models(&mut world, signed),
+        authority::Models::Named(0b101),
+        "the saved role, not configuration's"
+    );
     let today = Box::new([model(b"research"), world::scripted_model()]);
     world.restart_with(with_models(11_006, today, authority::Models::ALL));
-    assert_eq!(frame_models(&mut world, signed), authority::Models(0b10), "scripted moves; review drops out");
+    assert_eq!(frame_models(&mut world, signed), authority::Models::Named(0b10), "scripted moves; review drops out");
+}
+
+fn named_edit(world: &mut World, sign_in: u64, key: u8, name: &[u8]) -> people::Reply {
+    let mut member = jig_core_world::fixtures::people_member(b"work", 1);
+    member.authority.models = Some(people::Models::Named(1));
+    world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+        reply_to: ReplyTo::new(Token::new(11_010)),
+        sign_in,
+        key: [key; 16],
+        ask: people::Ask::ChangePolicy {
+            project: 1,
+            change: people::PolicyChange::Role(people::PolicyRole {
+                number: 0,
+                authority: member.authority,
+                period_spend: 1,
+                requests: authority::Requests::ALL.0,
+                decides: authority::Proposals::ALL.0,
+            }),
+        },
+        models: Box::new([name.into()]),
+    })));
+    let (_, root::Delivery::Core(core::Held::PeopleReply { reply, .. })) =
+        world.client_peer.as_mut().unwrap().delivered.pop().unwrap()
+    else {
+        panic!("keyed answer")
+    };
+    reply
+}
+#[test]
+fn an_original_key_replays_before_model_admission_after_removal() {
+    let mut world = World::first_start(
+        with_models(11_011, Box::new([world::scripted_model(), model(b"removed")]), authority::Models::ALL),
+        world::limits(),
+    );
+    world.client_peer = Some(ClientPeer::default());
+    let (_, sign_in) = sign_in(&mut world, 7);
+    let original = named_edit(&mut world, sign_in, 80, b"removed");
+    assert_eq!(original, people::Reply::Outcome(people::Outcome::PolicyChanged { project: 1 }));
+    world.restart_with(with_models(11_012, Box::new([world::scripted_model(), model(b"new")]), authority::Models::ALL));
+    assert_eq!(named_edit(&mut world, sign_in, 80, b"removed"), original);
+    assert_eq!(named_edit(&mut world, sign_in, 80, b"new"), people::Reply::Refused(people::Refusal::KeyConflict));
+    assert_eq!(
+        named_edit(&mut world, sign_in, 81, b"removed"),
+        people::Reply::Outcome(people::Outcome::Refused(people::Refusal::Unknown))
+    );
 }

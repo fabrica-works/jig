@@ -140,7 +140,13 @@ fn keyed(
             }
             let ask = wire::asks::ask(value).map_err(Invalid::Ask)?;
             let reply_to = driver.transport.reply_to(Reply::Keyed { client, attempt, key, owner: KeyedOwner::Jig });
-            root::Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask }))
+            root::Event::Core(core::Event::People(people::Event::Ask {
+                models: Box::new([]),
+                reply_to,
+                sign_in,
+                key,
+                ask,
+            }))
         }
         Ask::Family { scope, record } => {
             let (project, value) =

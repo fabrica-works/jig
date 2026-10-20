@@ -324,6 +324,7 @@ impl Driven {
     }
     pub fn chat(&mut self, number: u64, words: &[u8]) {
         self.party(core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(number)),
             sign_in: self.sign_in.raw(),
             key: u128::from(number).to_be_bytes(),
@@ -405,7 +406,7 @@ pub fn assignment(config: &jig_protocol_config::Engine) -> jig_test_domain::Assi
             contract: jig_domain_tasks::Contract::Report { words: 64 },
             authority: jig_domain_tasks::Authority {
                 tools: jig_domain_tasks::Tools(1023),
-                models: jig_domain_tasks::Models(1),
+                models: jig_domain_tasks::Models::Named(1),
                 grants: Box::default(),
                 delegation: jig_domain_tasks::Delegation { kinds: Box::default(), tasks: 0, depth: 0 },
                 budget: jig_domain_tasks::Budget { spend: 20, deadline: None },
@@ -682,7 +683,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         contract: people::Contract::Report { words: 16 },
         authority: people::Authority {
             tools: 0,
-            models: 0,
+            models: None,
             grants: Box::new([]),
             delegation: people::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
             spend,

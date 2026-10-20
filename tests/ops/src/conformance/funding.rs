@@ -57,6 +57,7 @@ pub(super) fn poll(peers: &mut Peers, store: &Store) -> Vec<Input<root::Event, r
         })
         .collect();
     vec![Input::Event(root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(90020)),
         sign_in,
         key: [78; 16],
@@ -66,7 +67,7 @@ pub(super) fn poll(peers: &mut Peers, store: &Store) -> Vec<Input<root::Event, r
                 number: 0,
                 authority: people::Authority {
                     tools: value.tools.0,
-                    models: value.models.0,
+                    models: None,
                     grants,
                     delegation: people::Delegation {
                         kinds,

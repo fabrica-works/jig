@@ -32,6 +32,7 @@ fn segmented_names_and_exact_open_patterns_keep_raw_bindings_and_separate_litera
         OwnerPattern { segments: exact.segments.clone(), last: OwnerPatternEnd::Open(path.get(1).unwrap().clone()) };
     assert_ne!(exact, open);
     let authority = Authority {
+        models: None,
         budget: 0,
         grants: list([
             Grant { connector: u16::MAX, kind: 1, pattern: exact },

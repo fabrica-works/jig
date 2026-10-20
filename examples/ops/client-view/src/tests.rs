@@ -402,6 +402,7 @@ fn list<T>(rows: impl IntoIterator<Item = T>) -> List<T> {
 }
 fn authority() -> Authority {
     Authority {
+        models: None,
         budget: 1,
         grants: list([]),
         task_kinds: list([]),
@@ -468,6 +469,7 @@ fn task() -> Task {
         },
         authority: OwnerAuthorityDocument {
             authority: OwnerAuthority {
+                models: None,
                 tools: 0,
                 grants: list([]),
                 delegation: OwnerDelegation { kinds: list([]), tasks: 1, depth: 1 },

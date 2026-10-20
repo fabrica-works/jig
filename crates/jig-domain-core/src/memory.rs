@@ -398,6 +398,7 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(context)?
         .checked_add(u64::from(task.message_bytes.max(task.result_bytes)).checked_mul(field_size.checked_add(1)?)?)?
         .checked_add(limits.policy_bytes)?
+        .checked_add(people::model_names_worst_case()?)?
         .checked_add(u64::from(limits.run_bytes))?
         .checked_add(u64::from(task.message_bytes))?
         .checked_add(u64::from(limits.brief.brief_bytes))?

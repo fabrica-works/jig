@@ -610,7 +610,7 @@ pub fn authority(value: &domain::Authority, limits: &wire::Limits) -> Result<wir
         limits,
         wire::AuthorityParts {
             tools: wire::Tools::new(limits, wire::ToolsParts { bits: tools.0 })?,
-            models: wire::Models::new(limits, wire::ModelsParts { bits: models.0 })?,
+            models: wire::Models::new(limits, wire::ModelsParts { bits: models.bits(), all: models.is_all() })?,
             grants: translated_grants,
             delegation: wire::Delegation::new(
                 limits,
@@ -647,7 +647,7 @@ pub fn read_authority(value: wire::Authority, limits: &wire::Limits) -> Result<d
     let wire::BudgetParts { spend, deadline } = budget.into_parts();
     let value = domain::Authority {
         tools: domain::Tools(tools.into_parts().bits),
-        models: domain::Models(models.into_parts().bits),
+        models: domain::Models::from_parts(models.bits(), models.all()),
         grants: translated_grants.into_boxed(),
         delegation: domain::Delegation { kinds: executors.into_boxed(), tasks, depth },
         budget: domain::Budget { spend, deadline: read_wall(deadline) },

@@ -341,7 +341,7 @@ impl Payload for Part {
     }
 }
 fields!(Grant { connector, kind, pattern });
-fields!(Authority { budget, grants, task_kinds, depth, tasks, deadline, tools, note_scopes });
+fields!(Authority { models, budget, grants, task_kinds, depth, tasks, deadline, tools, note_scopes });
 impl Payload for NoteScope {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {

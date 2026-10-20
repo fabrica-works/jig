@@ -22,6 +22,7 @@ fn seeded_reads_wait_for_prior_commits_and_keep_receipts_across_restart_cuts() {
             world.store.fault(jig_core_world::Fault::Hold { commits: 1 });
             world.cut = Some(Cut::Submitted(number));
             world.send(root::Event::Core(core::Event::People(people::Event::Ask {
+                models: Box::new([]),
                 reply_to: ReplyTo::new(Token::new(30_001)),
                 sign_in: world.sign_in.expect("signed in"),
                 key: [1; 16],

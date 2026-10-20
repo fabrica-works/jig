@@ -25,7 +25,7 @@ fn raw_goal() -> tasks::New {
         contract: tasks::Contract::Report { words: u32::MAX },
         authority: tasks::Authority {
             tools: tasks::Tools(u64::MAX),
-            models: tasks::Models(u64::MAX),
+            models: tasks::Models::ALL,
             grants: Box::new([tasks::Grant {
                 connector: u16::MAX,
                 kind: u16::MAX,

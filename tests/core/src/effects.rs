@@ -493,6 +493,7 @@ impl World {
             people::ProposalDecision::Reject { reason: b"not now".as_slice().into() }
         };
         self.send(root::Event::Core(core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(u64::from(request) + 230)),
             sign_in: self.sign_in.expect("signed-in person"),
             key: [request; 16],
@@ -574,6 +575,7 @@ impl World {
         let words = char::from(key).encode_utf8(&mut text);
         let task = self.assigned.as_ref().expect("assigned chat").task;
         self.send(root::Event::Core(core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: ReplyTo::new(Token::new(3000 + u64::from(key))),
             sign_in: self.sign_in.expect("signed in"),
             key: [key; 16],

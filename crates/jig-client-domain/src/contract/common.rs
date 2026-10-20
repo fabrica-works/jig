@@ -218,6 +218,7 @@ pub struct Grant {
 /// Authority facts to show or ask to amend, never evaluated here.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Authority {
+    pub models: Option<super::AuthorityModels>,
     pub budget: u64,
     pub grants: List<Grant>,
     pub task_kinds: List<Executor>,

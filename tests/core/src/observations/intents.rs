@@ -22,7 +22,7 @@ impl Intents {
 
     pub fn inbound_root(&mut self, store: &crate::Store, event: &mut jig_test_domain::Event) -> Vec<r::Observed> {
         use jig_test_domain::{Event, Record};
-        if let Event::Core(core::Event::People(people::Event::Ask { reply_to, sign_in, key, ask })) = event {
+        if let Event::Core(core::Event::People(people::Event::Ask { models: _, reply_to, sign_in, key, ask })) = event {
             let person = store.rows.values().find_map(|row| match row {
                 Record::Core(core::Record::People(people::Stored::SignIn { number, person, .. }))
                     if number == sign_in =>

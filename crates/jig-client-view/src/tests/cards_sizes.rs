@@ -23,6 +23,7 @@ fn full_owner_authority() -> OwnerAuthorityDocument {
     let scope = OwnerResourceScope { connector: 2, pattern };
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants: list([grant.clone(), grant]),
             delegation: OwnerDelegation {

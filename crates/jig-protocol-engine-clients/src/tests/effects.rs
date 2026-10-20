@@ -41,7 +41,8 @@ fn a_cancel_offer_preserves_its_working_census_runs_and_proposals() {
         admission: acts::Admission::Allowed,
         effect: Some(effect),
     }]);
-    let bytes = translate::task::offered(&rows, &limits, limits.task_acts, w::Path::TaskActs).unwrap();
+    let bytes =
+        translate::task::offered(&fixtures::models(), &rows, &limits, limits.task_acts, w::Path::TaskActs).unwrap();
     let bytes = skein_codec::piece::split(&mut skein_lib::Reader::new(&bytes)).unwrap().unwrap();
     let value = w::Offered::decode(&limits, &mut skein_lib::Reader::new(&bytes)).unwrap();
     assert_eq!(value.act(), &w::ActKind::Cancel);

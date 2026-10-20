@@ -41,7 +41,14 @@ fn application_parts_use_party_admission_and_preserve_the_original_key() {
     let observer_part = Ask::SetPool { project: 1, person: 1, budget: 20 };
     assert_eq!(
         application_part(&mut test.d, &test.env, request, observer_part.clone()),
-        Ok(Request::Route { request, person: 1, project: 1, role: Some(Role::Observer), ask: Box::new(observer_part) })
+        Ok(Request::Route {
+            models: Box::new([]),
+            request,
+            person: 1,
+            project: 1,
+            role: Some(Role::Observer),
+            ask: Box::new(observer_part)
+        })
     );
     application_part_done(&mut test.d, request);
     assert_eq!(
@@ -56,7 +63,14 @@ fn application_parts_use_party_admission_and_preserve_the_original_key() {
     let part = Ask::SetRoles { project: 1, holdings: Box::new([Holding { person: 1, role: Role::Owner }]) };
     assert_eq!(
         application_part(&mut test.d, &test.env, request, part.clone()),
-        Ok(Request::Route { request, person: 1, project: 1, role: Some(Role::Owner), ask: Box::new(part) })
+        Ok(Request::Route {
+            models: Box::new([]),
+            request,
+            person: 1,
+            project: 1,
+            role: Some(Role::Owner),
+            ask: Box::new(part)
+        })
     );
     let to = test.to();
     let applied = test.send(Event::ApplyRoles { reply_to: to, request });
@@ -73,6 +87,7 @@ fn application_parts_use_party_admission_and_preserve_the_original_key() {
     assert_eq!(
         saved_answer(&completed),
         Stored::Answer {
+            models: Box::new([]),
             key: RequestKey { person: 1, key: [1; 16] },
             ask: Box::new(ask.clone()),
             outcome: outcome.clone(),
@@ -291,7 +306,7 @@ impl Test {
 
     fn request_bounded(&mut self, sign_in: u64, key: u8, ask: Ask) -> List<Request> {
         let reply_to = self.to();
-        self.send_bounded(Event::Ask { reply_to, sign_in, key: [key; 16], ask })
+        self.send_bounded(Event::Ask { models: Box::new([]), reply_to, sign_in, key: [key; 16], ask })
     }
 
     fn signin(&mut self, person: u64, sign_in: u64, identity: Identity) -> Vec<Request> {
@@ -301,7 +316,7 @@ impl Test {
 
     fn request(&mut self, sign_in: u64, key: u8, ask: Ask) -> Vec<Request> {
         let reply_to = self.to();
-        self.send(Event::Ask { reply_to, sign_in, key: [key; 16], ask })
+        self.send(Event::Ask { models: Box::new([]), reply_to, sign_in, key: [key; 16], ask })
     }
 
     fn member(&mut self) {
@@ -572,6 +587,7 @@ fn expired_completed_key_is_erased_from_a_restore_page_and_frees_its_slot() {
     let key = RequestKey { person: 1, key: [1; 16] };
     let erased = test.send(Event::Restore {
         record: Stored::Answer {
+            models: Box::new([]),
             key,
             ask: Box::new(ask(1)),
             outcome: Outcome::Created { first: 90, last: 90, given: None },
@@ -753,7 +769,7 @@ fn restored_role_success_requires_matching_ask_kind_and_project() {
         test.d = Domain::new(&LIMITS, Box::new([]), 2);
         assert_eq!(
             test.send_bounded(Event::Restore {
-                record: Stored::Answer { key, ask: Box::new(ask), outcome, at: Wall::EPOCH }
+                record: Stored::Answer { models: Box::new([]), key, ask: Box::new(ask), outcome, at: Wall::EPOCH }
             })
             .as_slice(),
             [Request::RestoreRefused { key: Key::Answer(key), refusal: Refusal::Limit { which: LimitKind::Restore } }]
@@ -775,6 +791,7 @@ fn restored_successful_role_rosters_require_positive_unique_people() {
         assert_eq!(
             test.send_bounded(Event::Restore {
                 record: Stored::Answer {
+                    models: Box::new([]),
                     key,
                     ask: Box::new(Ask::SetRoles { project: 1, holdings }),
                     outcome: Outcome::RolesSet { project: 1 },
@@ -798,6 +815,7 @@ fn restored_role_success_checks_historical_people_and_project_after_all_rows_arr
         assert!(
             test.send_bounded(Event::Restore {
                 record: Stored::Answer {
+                    models: Box::new([]),
                     key,
                     ask: Box::new(Ask::SetRoles {
                         project,
@@ -1081,6 +1099,7 @@ fn calls_before_restore_and_after_failed_restore_are_answered_not_ready() {
     assert_eq!(reply(&test.request(10, 1, ask(1))), Reply::Again(Again::NotReady));
     test.send(Event::Restore {
         record: Stored::Answer {
+            models: Box::new([]),
             key: RequestKey { person: 99, key: [1; 16] },
             ask: Box::new(ask(1)),
             outcome: Outcome::Created { first: 90, last: 90, given: None },
@@ -1245,7 +1264,7 @@ fn retry_and_signed_out_answers_cannot_restore_as_completed_keys() {
         let key = RequestKey { person: 1, key: [1; 16] };
         assert_eq!(
             test.send(Event::Restore {
-                record: Stored::Answer { key, ask: Box::new(ask(1)), outcome, at: Wall::EPOCH }
+                record: Stored::Answer { models: Box::new([]), key, ask: Box::new(ask(1)), outcome, at: Wall::EPOCH }
             }),
             [Request::RestoreRefused { key: Key::Answer(key), refusal: Refusal::Limit { which: LimitKind::Restore } }],
         );
@@ -1337,6 +1356,7 @@ fn restored_application_tokens_must_name_their_connector_and_a_positive_outcome(
         test.d = Domain::new(&LIMITS, Box::new([]), 2);
         let rows = test.send(Event::Restore {
             record: Stored::Answer {
+                models: Box::new([]),
                 key: RequestKey { person: 1, key: [1; 16] },
                 ask: Box::new(application(1)),
                 outcome,
@@ -1643,4 +1663,60 @@ fn a_stored_account_sign_in_answer_keeps_its_address() {
     assert!(test.send(Event::Restored).is_empty());
     assert!(test.d.ready());
     assert_eq!(reply(&test.request(10, 7, ask)), Reply::Outcome(outcome));
+}
+
+#[test]
+fn original_named_selectors_survive_answer_restore_and_key_conflicts() {
+    let mut test = Test::new(LIMITS);
+    test.member();
+    let mut member = fixtures::member(b"work");
+    member.authority.models = Some(Models::Named(1));
+    let ask = Ask::Create { project: 1, batch: Box::new([member]) };
+    let names: Box<[Box<[u8]>]> = Box::new([Box::from(b"removed".as_slice())]);
+    let reply_to = test.to();
+    let routed = test.send(Event::Ask { reply_to, sign_in: 10, key: [1; 16], ask: ask.clone(), models: names.clone() });
+    let request = route(&routed);
+    let outcome = Outcome::Refused(Refusal::Unknown);
+    let completed = test.send(Event::Decided { request, outcome: outcome.clone() });
+    let record = saved_answer(&completed);
+    let mut cold = Test::new(LIMITS);
+    cold.d = Domain::new(&LIMITS, Box::new([]), 2);
+    cold.send(Event::Restore { record });
+    cold.send(Event::Restore { record: Stored::Person { number: 1, identity: identity(0, 1) } });
+    cold.send(Event::Restored);
+    cold.signin(1, 10, identity(0, 1));
+    let reply_to = cold.to();
+    let replay = cold.send(Event::Ask { reply_to, sign_in: 10, key: [1; 16], ask: ask.clone(), models: names });
+    assert_eq!(reply(&replay), Reply::Outcome(outcome));
+    assert_eq!(replay.len(), 1, "only the old answer, no route or save");
+    let reply_to = cold.to();
+    let conflict = cold.send(Event::Ask {
+        reply_to,
+        sign_in: 10,
+        key: [1; 16],
+        ask,
+        models: Box::new([Box::from(b"other".as_slice())]),
+    });
+    assert_eq!(reply(&conflict), Reply::Refused(Refusal::KeyConflict));
+}
+
+#[test]
+fn original_name_context_checks_count_bytes_order_and_references() {
+    let mut member = fixtures::member(b"work");
+    member.authority.models = Some(Models::Named(1));
+    let ask = Ask::Create { project: 1, batch: Box::new([member]) };
+    assert!(valid_model_context(&ask, &[Box::from([b'x'; 4096].as_slice())]));
+    for names in [
+        Box::<[Box<[u8]>]>::from([]),
+        Box::from([Box::from(b"".as_slice())]),
+        Box::from([Box::from([b'x'; 4097].as_slice())]),
+        Box::from([Box::from(b"same".as_slice()), Box::from(b"same".as_slice())]),
+    ] {
+        assert!(!valid_model_context(&ask, &names));
+    }
+    let sixty_four: Vec<Box<[u8]>> = (0_u8..64).map(|at| Box::<[u8]>::from([at])).collect();
+    assert!(valid_model_names(&sixty_four));
+    let mut too_many = sixty_four;
+    too_many.push(Box::from([64_u8]));
+    assert!(!valid_model_names(&too_many));
 }

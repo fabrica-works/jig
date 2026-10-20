@@ -52,7 +52,13 @@ fn a_made_compound_with_a_zero_first_message_cannot_restore() {
     let outcome = Outcome::Compound { project: 1, operations: 2, first_message: 0 };
     assert_eq!(
         test.send(Event::Restore {
-            record: Stored::Answer { key: RESTORED_KEY, ask: Box::new(compound(2)), outcome, at: Wall::EPOCH }
+            record: Stored::Answer {
+                models: Box::new([]),
+                key: RESTORED_KEY,
+                ask: Box::new(compound(2)),
+                outcome,
+                at: Wall::EPOCH
+            }
         }),
         [Request::RestoreRefused {
             key: Key::Answer(RESTORED_KEY),

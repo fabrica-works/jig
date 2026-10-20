@@ -44,6 +44,7 @@ pub(super) fn activity(
 }
 
 pub(super) fn history(
+    models: &[crate::Model],
     task: u64,
     subtree: bool,
     page: &reads::Page,
@@ -56,9 +57,12 @@ pub(super) fn history(
     let mut rows = List::with_capacity(page.rows.len());
     for row in &page.rows {
         rows.push(match row {
-            reads::PageRow::History(value) if subtree || value.task == task => w::HistoryRow::Change(Box::new(
-                w::HistoryRowChange::new(limits, w::HistoryRowChangeParts { value: history::line(value, limits)? })?,
-            )),
+            reads::PageRow::History(value) if subtree || value.task == task => {
+                w::HistoryRow::Change(Box::new(w::HistoryRowChange::new(
+                    limits,
+                    w::HistoryRowChangeParts { value: history::line(models, value, limits)? },
+                )?))
+            }
             reads::PageRow::Milestone(value) if subtree || value.task == task => {
                 w::HistoryRow::Milestone(w::HistoryRowMilestone::new(
                     limits,
@@ -224,6 +228,7 @@ pub(super) fn spend(
 }
 
 pub(super) fn notes(
+    models: &[crate::Model],
     page: &reads::Page,
     before: Option<w::Cursor>,
     after: Option<w::Cursor>,
@@ -243,7 +248,7 @@ pub(super) fn notes(
             | reads::PageRow::Line(_)
             | reads::PageRow::Spend(_) => return Err(invalid),
         };
-        rows.push(rows::note(value, limits)?).expect("selected rows fit");
+        rows.push(rows::note(models, value, limits)?).expect("selected rows fit");
     }
     Ok(w::ReadValue::Notes(w::NotePage::new(
         limits,

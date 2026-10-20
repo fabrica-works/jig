@@ -59,8 +59,11 @@ pub fn read_wire_results_wake() -> w::ResultsWake {
 
 pub fn read_wire_owner_authority_document() -> w::OwnerAuthorityDocument {
     let lim = w::CEILINGS;
-    w::OwnerAuthorityDocument::new(&lim, w::OwnerAuthorityDocumentParts { authority: read_wire_owner_authority() })
-        .unwrap()
+    w::OwnerAuthorityDocument::new(
+        &lim,
+        w::OwnerAuthorityDocumentParts { cut: false, authority: read_wire_owner_authority() },
+    )
+    .unwrap()
 }
 
 pub fn read_wire_owner_authority() -> w::OwnerAuthority {
@@ -68,6 +71,7 @@ pub fn read_wire_owner_authority() -> w::OwnerAuthority {
     w::OwnerAuthority::new(
         &lim,
         w::OwnerAuthorityParts {
+            models: Some(w::ModelSet::All),
             tools: 7,
             grants: Box::from([]),
             delegation: read_wire_owner_delegation(),

@@ -23,6 +23,7 @@ fn sign_in(token: u64) -> root::Event {
 
 fn ask(world: &World, sign_in: u64, token: u64) -> root::Event {
     root::Event::Core(core::Event::People(people::Event::Ask {
+        models: Box::new([]),
         reply_to: ReplyTo::new(Token::new(token)),
         sign_in,
         key: KEY,

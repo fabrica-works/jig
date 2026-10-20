@@ -108,6 +108,7 @@ fn entries<T: Clone>(values: &List<T>) -> List<T> {
 #[cfg(test)]
 pub(super) fn empty_authority() -> jig_domain_core::documents::AuthorityLine {
     jig_domain_core::documents::AuthorityLine {
+        models: t::Models::ALL,
         tools: t::Tools(0),
         grants: List::with_capacity(0),
         executors: List::with_capacity(0),

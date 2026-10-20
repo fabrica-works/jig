@@ -105,7 +105,10 @@ fn both_shipped_profiles_round_trip_a_policy_whose_roles_name_models() {
         value: people::PolicyValue {
             period_spend: 0,
             projections: Box::new([]),
-            roles: Box::new([role(0, u64::MAX), role(1, (1 << 63) | 0b101)]),
+            roles: Box::new([
+                role(0, Some(people::Models::ALL)),
+                role(1, Some(people::Models::Named((1 << 63) | 0b101))),
+            ]),
             requirements: Box::new([]),
             permissions: Box::new([]),
             templates: Box::new([]),

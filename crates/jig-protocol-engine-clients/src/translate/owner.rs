@@ -158,7 +158,7 @@ fn project(
             },
             templates: super::me::templates(&value.templates, models, limits)?,
             creating: match &value.creating {
-                Some(value) => Some(super::me::creating(value, limits)?),
+                Some(value) => Some(super::me::creating(models, value, limits)?),
                 None => None,
             },
             models: super::llm::models(value.models, models, limits)?,
@@ -264,7 +264,11 @@ pub fn grant(value: &d::GrantLine, limits: &w::Limits) -> Result<w::OwnerGrant, 
         },
     )
 }
-pub fn authority(value: &d::AuthorityLine, limits: &w::Limits) -> Result<w::OwnerAuthorityDocument, w::Problem> {
+pub fn authority(
+    models: &[crate::Model],
+    value: &d::AuthorityLine,
+    limits: &w::Limits,
+) -> Result<w::OwnerAuthorityDocument, w::Problem> {
     let mut grants = List::with_capacity(value.grants.len());
     for item in &value.grants {
         grants.push(grant(item, limits)?).expect("supplied grants");
@@ -298,9 +302,15 @@ pub fn authority(value: &d::AuthorityLine, limits: &w::Limits) -> Result<w::Owne
     w::OwnerAuthorityDocument::new(
         limits,
         w::OwnerAuthorityDocumentParts {
+            cut: false,
             authority: w::OwnerAuthority::new(
                 limits,
                 w::OwnerAuthorityParts {
+                    models: super::llm::authority(
+                        jig_domain_authority::Models::from_parts(value.models.bits(), value.models.is_all()),
+                        models,
+                        limits,
+                    )?,
                     tools: value.tools.0,
                     grants,
                     delegation: w::OwnerDelegation::new(

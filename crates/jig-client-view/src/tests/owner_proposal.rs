@@ -49,6 +49,7 @@ fn authority() -> OwnerAuthorityDocument {
     }
     OwnerAuthorityDocument {
         authority: OwnerAuthority {
+            models: None,
             tools: u64::MAX,
             grants,
             delegation: OwnerDelegation { kinds, tasks: u32::MAX, depth: u32::MAX },

@@ -572,6 +572,9 @@ pub enum Stored {
         key: RequestKey,
         /** Original request with words bounded by `Limits::words`, compared on every retry. */
         ask: Box<Ask>,
+        /// Canonical original names used by the request's model selectors.
+        /// Canonical original names referenced by the ask's tagged selectors (store.md, 5.1).
+        models: Box<[Box<[u8]>]>,
         /** Retained permanent outcome returned without remaking the decision. */
         outcome: Outcome,
         /** Wall time the answer was made; completed keys are retained for `Limits::request_retention`. */
@@ -681,6 +684,9 @@ pub enum Event {
         key: [u8; 16],
         /// Request with payload bounds checked before lookup, route or mutation.
         ask: Ask,
+        /// Canonical original names, independent of today's configuration.
+        /// Canonical original names referenced by the ask's tagged selectors (store.md, 5.1).
+        models: Box<[Box<[u8]>]>,
     },
     /// Complete a live `Route` exactly once, retire its flight and answer each waiter; permanent
     /// answer writes join the root's action commit.
@@ -734,6 +740,9 @@ pub enum Request {
         role: Option<Role>,
         /** Original bounded request, owned by the root for routing and atomic decision. */
         ask: Box<Ask>,
+        /// Canonical original names used by the request's model selectors.
+        /// Canonical original names referenced by the ask's tagged selectors (store.md, 5.1).
+        models: Box<[Box<[u8]>]>,
     },
     /// Terminal client output; the parent enforces durability before exposure.
     Reply {

@@ -374,7 +374,7 @@ pub(crate) fn differences(
         spend: a.budget.spend > spend,
         deadline: !deadline_fits,
         notes: a.notes.0 & !b.notes.0 != 0,
-        models: a.models.0 & !b.models.0 != 0,
+        models: !a.models.at_most(b.models),
     };
     for kind in &a.delegation.kinds {
         if !b.delegation.kinds.contains(kind) {

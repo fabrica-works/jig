@@ -119,7 +119,7 @@ pub(super) fn funding(value: &t::FundingRecord, limits: &w::Limits) -> Result<w:
         },
     )
 }
-pub(super) fn note(value: &d::Note, limits: &w::Limits) -> Result<w::Note, w::Problem> {
+pub(super) fn note(models: &[crate::Model], value: &d::Note, limits: &w::Limits) -> Result<w::Note, w::Problem> {
     let scope = match &value.scope {
         d::NoteLocation::Deployment => w::NoteScope::Deployment,
         d::NoteLocation::Project(value) => {
@@ -166,7 +166,7 @@ pub(super) fn note(value: &d::Note, limits: &w::Limits) -> Result<w::Note, w::Pr
                 Some(value) => Some(value.as_nanos()),
                 None => None,
             },
-            acts: task::offered(&value.acts, limits, limits.note_acts, w::Path::NoteActs)?,
+            acts: task::offered(models, &value.acts, limits, limits.note_acts, w::Path::NoteActs)?,
             cut: value.cut,
         },
     )

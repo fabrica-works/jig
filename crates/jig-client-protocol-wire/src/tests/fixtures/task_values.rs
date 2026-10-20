@@ -90,6 +90,7 @@ pub fn owner_authority(limits: &Limits) -> OwnerAuthority {
     OwnerAuthority::new(
         limits,
         OwnerAuthorityParts {
+            models: None,
             tools: u64::MAX,
             grants: Box::from([]),
             delegation: owner_delegation(limits),
@@ -103,7 +104,7 @@ pub fn owner_authority(limits: &Limits) -> OwnerAuthority {
 }
 
 pub fn owner_authority_document(limits: &Limits) -> OwnerAuthorityDocument {
-    OwnerAuthorityDocument::new(limits, OwnerAuthorityDocumentParts { authority: owner_authority(limits) })
+    OwnerAuthorityDocument::new(limits, OwnerAuthorityDocumentParts { cut: false, authority: owner_authority(limits) })
         .expect("bounded owner_authority_document")
 }
 

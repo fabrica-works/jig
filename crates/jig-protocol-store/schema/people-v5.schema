@@ -19,7 +19,9 @@ record ExecutorProcedure { value: u32 }
 record ExecutorRole { value: u32 }
 enum Executor { charter: ExecutorCharter, procedure: ExecutorProcedure, role: ExecutorRole }
 record Delegation { kinds: bytes 65536 tasks: u32 depth: u32 }
-record Authority { tools: u64 models: u64 grants: bytes 65536 delegation: Delegation spend: u64 deadline: option u64 notes: u8 note_resources: bytes 65536 }
+record ModelSetNamed { bits: u64 }
+enum ModelSet { all, named: ModelSetNamed }
+record Authority { tools: u64 models: option ModelSet grants: bytes 65536 delegation: Delegation spend: u64 deadline: option u64 notes: u8 note_resources: bytes 65536 }
 record Judge { connector: u16 requirement: u16 parameters: u32 }
 record GuardObserved { freshness: u64 }
 enum Guard { guarded, observed: GuardObserved }
@@ -244,6 +246,6 @@ record OutcomeAccountRemoved { confirmed: bool }
 record Given { task: u64 amount: u64 }
 record OutcomeCreated { first: u64 last: u64 given: option Given }
 enum Outcome { compound: OutcomeCompound, compound_refused: OutcomeCompoundRefused, created: OutcomeCreated, marked_seen: OutcomeMarkedSeen, applied: OutcomeApplied, again: OutcomeAgain, signed_out, note_edited: OutcomeNoteEdited, service_made: OutcomeServiceMade, adopted: OutcomeAdopted, proposed: OutcomeProposed, stopped: OutcomeStopped, cancelled: OutcomeCancelled, released: OutcomeReleased, person_taken: OutcomePersonTaken, person_handed_back: OutcomePersonHandedBack, person_answered: OutcomePersonAnswered, moved: OutcomeMoved, proposal_decided: OutcomeProposalDecided, said: OutcomeSaid, question_answered: OutcomeQuestionAnswered, amended: OutcomeAmended, roles_set: OutcomeRolesSet, policy_changed: OutcomePolicyChanged, pool_set: OutcomePoolSet, escalation_decided: OutcomeEscalationDecided, refused: OutcomeRefused, withdrawn: OutcomeWithdrawn, account_sign_in_started: OutcomeAccountSignInStarted, account_signed_out: OutcomeAccountSignedOut, account_key_kept: OutcomeAccountKeyKept, account_changed, account_removed: OutcomeAccountRemoved }
-record StoredAnswer { key: RequestKey ask: Ask outcome: Outcome at: u64 }
+record StoredAnswer { key: RequestKey ask: Ask models: list 64 ModelName outcome: Outcome at: u64 }
 enum Value { person: StoredPerson, read_results: StoredReadResults, read_conversation: StoredReadConversation, sign_in: StoredSignIn, roles: StoredRoles, policy: StoredPolicy, answer: StoredAnswer, ended_read: EndedRead }
 versioned record Row { value: Value }

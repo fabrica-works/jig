@@ -32,6 +32,7 @@ fn pattern() -> OwnerPattern {
 }
 pub(super) fn source(number: u32) -> OwnerProject {
     let authority = OwnerAuthorityDocument::complete(OwnerAuthority {
+        models: None,
         tools: u64::MAX,
         grants: list(2, [OwnerGrant { connector: u16::MAX, kind: u16::MAX, pattern: pattern() }]),
         delegation: OwnerDelegation {

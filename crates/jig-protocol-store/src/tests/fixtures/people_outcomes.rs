@@ -215,6 +215,7 @@ pub fn outcome_values() -> Box<[domain::Outcome]> {
 }
 pub fn answered(outcome: domain::Outcome) -> domain::Stored {
     domain::Stored::Answer {
+        models: Box::new([]),
         key: domain::RequestKey { person: 2, key: [7; 16] },
         ask: Box::new(domain::Ask::DecideProposal {
             project: 1,

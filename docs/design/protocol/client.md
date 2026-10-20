@@ -198,6 +198,12 @@ the shell: fetch, skein's HTTP client, a socket            skein's HTTP server, 
   from its clock and its wall when it makes the document, so a client
   shows it as it shows every other moment.
 
+Authority selectors in client v10 preserve omission, ALL and named sets
+(including empty), at most 64 names of 4,096 UTF-8 bytes each. Both public
+authority forms carry them. Authority documents carry `cut` independently
+from the whole authority payload used for edits (`../client/domain/contract.md`,
+3.2); decoding retains the flag, and `whole()` refuses a cut projection.
+
 ## 4. The connection
 
 A client keeps one connection to the engine, whatever carries it, of

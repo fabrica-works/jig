@@ -3,7 +3,7 @@
 use super::*;
 
 const TASK: u64 = 10;
-const MODELS: tasks::Models = tasks::Models(0b101);
+const MODELS: tasks::Models = tasks::Models::Named(0b101);
 
 fn core_with_task() -> Core {
     let (mut core, limits) = tree_core();

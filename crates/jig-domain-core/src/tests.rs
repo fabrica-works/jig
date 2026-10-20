@@ -10,6 +10,7 @@ fn restored_application_tokens_cannot_exceed_the_deployments_allocations() {
     let connector = core.connectors[0];
     let token = fresh(&mut core.counters, Family::Application).expect("application token");
     let mut record = people::Stored::Answer {
+        models: Box::new([]),
         key: people::RequestKey { person: 1, key: [1; 16] },
         ask: Box::new(people::Ask::Application {
             scope: jig_domain_people::ApplicationScope::Project(1),
@@ -2705,6 +2706,7 @@ fn deployment_capacity_carries_keyed_refusal_identity_time_and_bounded_omissions
             &mut core.people,
             &env,
             people::Event::Ask {
+                models: Box::new([]),
                 reply_to: ReplyTo::new(Token::new(501)),
                 sign_in: 20,
                 key: [key; 16],

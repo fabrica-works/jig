@@ -211,6 +211,7 @@ pub(super) fn recurring_task(number: u64, words: &[u8]) -> ProposedTask {
         contract: TaskContractDocument::Report { words: 32 },
         authority: OwnerAuthorityDocument {
             authority: OwnerAuthority {
+                models: None,
                 tools: 0,
                 grants: list([]),
                 delegation: OwnerDelegation { kinds: list([]), tasks: 2, depth: 1 },

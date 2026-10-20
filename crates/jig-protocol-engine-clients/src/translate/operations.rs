@@ -104,6 +104,7 @@ pub(super) fn compound(
     value: w::Compound,
     models: &[crate::Model],
     limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
 ) -> Result<p::Ask, Untranslatable> {
     let path = w::Path::CompoundOperations;
     let mut reader = skein_lib::Reader::new(value.operations());
@@ -119,7 +120,9 @@ pub(super) fn compound(
     }
     let mut operations = List::with_capacity(decoded.len());
     for operation in decoded.into_boxed() {
-        operations.push(operation_to_people(operation, value.project(), models, limits)?).expect("same capacity");
+        operations
+            .push(operation_to_people(operation, value.project(), models, limits, names)?)
+            .expect("same capacity");
     }
     Ok(p::Ask::Compound { project: value.project(), operations })
 }
@@ -128,6 +131,7 @@ fn operation_to_people(
     project: u32,
     models: &[crate::Model],
     limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
 ) -> Result<p::Operation, Untranslatable> {
     if operation_project(&value) != project {
         return Err(Untranslatable { path: w::Path::CompoundOperations });
@@ -145,7 +149,7 @@ fn operation_to_people(
                     Some(v) => v.value(),
                     None => 0,
                 },
-                amendment: Box::new(asks::amendment(v.change, v.reason, models, limits)?),
+                amendment: Box::new(asks::amendment(v.change, v.reason, models, limits, names)?),
                 release: None,
             }
         }
@@ -211,14 +215,23 @@ fn wire_piece(reader: &mut skein_lib::Reader<'_>) -> Result<Option<Box<[u8]>>, w
 }
 
 /// Batch members remain data until people admission resolves their authority.
-pub(super) fn create(value: w::Create, models: &[crate::Model], limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
-    Ok(p::Ask::Create { project: value.project(), batch: batch(value.tasks(), w::Path::CreateTasks, models, limits)? })
+pub(super) fn create(
+    value: w::Create,
+    models: &[crate::Model],
+    limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
+) -> Result<p::Ask, Untranslatable> {
+    Ok(p::Ask::Create {
+        project: value.project(),
+        batch: batch(value.tasks(), w::Path::CreateTasks, models, limits, names)?,
+    })
 }
 fn batch(
     bytes: &[u8],
     path: w::Path,
     models: &[crate::Model],
     limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
 ) -> Result<Box<[p::Member]>, Untranslatable> {
     let mut tasks = List::with_capacity(asks::count(bytes, path)?);
     let mut reader = skein_lib::Reader::new(bytes);
@@ -227,11 +240,16 @@ fn batch(
         let Ok(task) = w::NewTask::decode(limits, &mut skein_lib::Reader::new(&bytes)) else {
             return Err(Untranslatable { path });
         };
-        tasks.push(member(task, models, limits)?).expect("counted pieces");
+        tasks.push(member(task, models, limits, names)?).expect("counted pieces");
     }
     Ok(tasks.into_boxed())
 }
-fn member(value: w::NewTask, models: &[crate::Model], limits: &w::Limits) -> Result<p::Member, Untranslatable> {
+fn member(
+    value: w::NewTask,
+    models: &[crate::Model],
+    limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
+) -> Result<p::Member, Untranslatable> {
     let v = value.into_parts();
     let spec = asks::spec(v.spec);
     let mut dependencies = List::with_capacity(v.dependencies.len());
@@ -261,7 +279,7 @@ fn member(value: w::NewTask, models: &[crate::Model], limits: &w::Limits) -> Res
         parameters: spec.parameters,
         inputs: spec.inputs,
         contract: new_contract(v.contract),
-        authority: asks::authority(v.authority, limits)?,
+        authority: asks::authority(v.authority, limits, names)?,
         budget: match v.budget {
             w::NewBudget::Named => p::Budget::Named,
             w::NewBudget::AsAllowed(v) => p::Budget::AsAllowed { cap: *v.cap() },
@@ -324,18 +342,19 @@ pub(super) fn propose(
     value: w::Propose,
     models: &[crate::Model],
     limits: &w::Limits,
+    names: &mut List<Box<[u8]>>,
 ) -> Result<p::Ask, Untranslatable> {
     let v = value.into_parts();
     let action = match v.action {
         w::ProposeAction::Batch(value) => {
-            p::Action::Batch(batch(value.tasks(), w::Path::ProposeBatchTasks, models, limits)?)
+            p::Action::Batch(batch(value.tasks(), w::Path::ProposeBatchTasks, models, limits, names)?)
         }
         w::ProposeAction::Amendment(value) => {
             let value = value.into_parts();
             p::Action::Amend {
                 task: value.task,
                 revision: value.revision.value(),
-                amendment: Box::new(asks::amendment(value.change, v.reason.clone(), models, limits)?),
+                amendment: Box::new(asks::amendment(value.change, v.reason.clone(), models, limits, names)?),
             }
         }
     };

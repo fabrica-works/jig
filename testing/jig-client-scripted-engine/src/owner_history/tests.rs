@@ -55,6 +55,7 @@ fn state() -> OwnerAmendmentState {
         },
         authority: OwnerAuthorityDocument {
             authority: OwnerAuthority {
+                models: None,
                 tools: u64::MAX,
                 grants,
                 delegation: OwnerDelegation { kinds, tasks: u32::MAX, depth: u32::MAX },

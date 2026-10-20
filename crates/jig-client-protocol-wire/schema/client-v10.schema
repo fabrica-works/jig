@@ -235,7 +235,9 @@ record OwnerAuthorityExecutorRole { value: u32 }
 enum OwnerAuthorityExecutor { charter: OwnerAuthorityExecutorCharter, procedure: OwnerAuthorityExecutorProcedure, role: OwnerAuthorityExecutorRole }
 record OwnerDelegation { kinds: list 32 OwnerAuthorityExecutor tasks: u32 depth: u32 }
 record OwnerResourceScope { connector: u16 pattern: OwnerPattern }
-record OwnerAuthority { tools: u64 grants: bytes 16777216 delegation: OwnerDelegation spend: u64 deadline: option u64 notes: u8 note_resources: bytes 16777216 }
+record ModelSetNames { names: list 64 text 4096 }
+enum ModelSet { all, names: ModelSetNames }
+record OwnerAuthority { models: option ModelSet tools: u64 grants: bytes 16777216 delegation: OwnerDelegation spend: u64 deadline: option u64 notes: u8 note_resources: bytes 16777216 }
 record TrackingTracked { priority: u32 }
 enum Tracking { tracked: TrackingTracked, untracked }
 record Amendment { addressed: option AddressChange spec: option Specification wake: option OwnerWakePolicy dependencies: option list 32 u64 authority: option OwnerAuthority instructions: option text 65536 tracked: option Tracking llm: option LlmChoice }
@@ -492,7 +494,7 @@ record ResultDetails { contract: TaskContractDocument requester: OwnerRequester 
 enum ActKind { message, answer, take, hand_back, accept, reject, pass_up, release, leave_held, amend, stop, cancel, move_task, reorder, seen, edit_note, delete_note, adopt, change_policy, set_roles, make_service, set_pool, withdraw }
 record CreateProcedure { connector: u16 code: u32 }
 record OwnerKindImplication { connector: u16 kind: u16 implies: u16 }
-record OwnerAuthorityDocument { authority: OwnerAuthority }
+record OwnerAuthorityDocument { authority: OwnerAuthority cut: bool }
 record BoundsCreate { authority: OwnerAuthorityDocument pool_left: u64 charters: list 32 u32 procedures: list 32 CreateProcedure latest: option u64 budget: u64 maximum_budget: u64 maximum_deadline: option u64 }
 record BoundsAmend { budget_left: u64 grants: bytes 16777216 implications: list 32 OwnerKindImplication authority: OwnerAuthorityDocument ceiling: OwnerAuthorityDocument }
 enum Bounds { create: BoundsCreate, amend: BoundsAmend }
@@ -674,7 +676,7 @@ record RunState { task: u64 attempt: option u64 committed_turn: u32 writing: opt
 # Remaining documents and stream (protocol/client.md, 3 and 7).
 record ProposalActionBatch { tasks: bytes 16777216 own: bool }
 record ProposalActionEffect { part: Part }
-record Authority { budget: u64 grants: bytes 16777216 task_kinds: list 32 Executor depth: u32 tasks: u32 deadline: option u64 tools: list 32 u16 note_scopes: bytes 16777216 }
+record Authority { models: option ModelSet budget: u64 grants: bytes 16777216 task_kinds: list 32 Executor depth: u32 tasks: u32 deadline: option u64 tools: list 32 u16 note_scopes: bytes 16777216 }
 record ProposalActionWiden { before: Authority after: Authority }
 record ProposalActionAmend { task: u64 before: text 65536 change: Amendment }
 enum ProposalAction { batch: ProposalActionBatch, effect: ProposalActionEffect, widen: ProposalActionWiden, amend: ProposalActionAmend }

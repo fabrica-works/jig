@@ -273,7 +273,10 @@ pub(crate) fn granted(
     }
     Some(tasks::Authority {
         tools: tasks::Tools(value.tools),
-        models,
+        models: match value.models {
+            Some(value) => tasks::Models::from_parts(value.bits(), value.is_all()),
+            None => models,
+        },
         grants: grants.into_boxed(),
         delegation: tasks::Delegation {
             kinds: kinds.into_boxed(),

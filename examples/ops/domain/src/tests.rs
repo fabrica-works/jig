@@ -390,6 +390,7 @@ fn started_chat() -> (Domain, Env<Limits>, Token) {
         &mut domain,
         &env,
         Event::Core(core::Event::People(people::Event::Ask {
+            models: Box::new([]),
             reply_to: skein_lib::ReplyTo::new(Token::new(102)),
             sign_in,
             key: [2; 16],

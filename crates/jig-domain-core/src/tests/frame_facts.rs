@@ -184,6 +184,7 @@ pub(super) fn owner_creating(capacity: u32, tasks_left: u32, depth: u32) -> crat
     executors.push(tasks::AuthorityExecutor::Procedure(CREATING_PROCEDURE)).unwrap();
     crate::acts::Bounds::Create {
         authority: Box::new(AuthorityLine {
+            models: tasks::Models::ALL,
             tools: tasks::Tools(1023),
             grants: List::with_capacity(0),
             executors,
@@ -236,13 +237,13 @@ fn me_carries_a_members_creating_bounds_per_project() {
 fn me_shows_the_models_a_partys_role_may_use_in_each_project() {
     let (mut core, limits) = core();
     let mut policy = core.authority.policy(1).unwrap().clone();
-    policy.ceiling.models = authority::Models(0b011);
-    policy.roles[0].authority.models = authority::Models(0b110);
+    policy.ceiling.models = authority::Models::Named(0b011);
+    policy.roles[0].authority.models = authority::Models::Named(0b110);
     let mut out = Queue::with_capacity(authority::POLICY_MAX_OUT);
     authority::step(&mut core.authority, authority::Event::Policy { project: 1, policy }, &mut out);
     assert_eq!(out.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
     let value = frame(&core, &limits);
-    assert_eq!(value.projects.get(0).unwrap().models, authority::Models(0b010));
+    assert_eq!(value.projects.get(0).unwrap().models, authority::Models::Named(0b010));
 }
 
 #[test]

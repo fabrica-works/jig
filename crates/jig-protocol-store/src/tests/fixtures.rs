@@ -137,7 +137,7 @@ pub fn task_authority() -> jig_domain_tasks::Authority {
     };
     Authority {
         tools: Tools(u64::MAX),
-        models: Models(u64::MAX),
+        models: Models::ALL,
         grants: Box::new([
             Grant {
                 connector: 2,
@@ -375,7 +375,7 @@ pub fn people_pattern() -> people::Pattern {
 pub fn people_authority() -> people::Authority {
     people::Authority {
         tools: 9,
-        models: 0b101,
+        models: None,
         grants: Box::new([people::Grant { connector: 1, kind: 2, pattern: people_pattern() }]),
         delegation: people::Delegation {
             kinds: Box::new([people::Executor::Charter(3), people::Executor::Procedure(4), people::Executor::Role(5)]),

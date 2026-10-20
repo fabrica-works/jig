@@ -200,6 +200,7 @@ fn document(number: u64) -> contract::Task {
         },
         authority: contract::OwnerAuthorityDocument {
             authority: contract::OwnerAuthority {
+                models: None,
                 tools: 7,
                 grants: List::with_capacity(0),
                 delegation: contract::OwnerDelegation { kinds: List::with_capacity(0), tasks: 7, depth: 7 },
