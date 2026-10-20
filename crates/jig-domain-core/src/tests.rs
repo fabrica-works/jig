@@ -338,9 +338,36 @@ fn config(seed: u64) -> Config {
     }
 }
 
+fn restore_key_account(core: &mut Core, limits: &Limits, number: u32, source: u32, provider: u32) {
+    let mut out = Queue::with_capacity(accounts::max_out(&limits.accounts));
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.accounts };
+    for record in [
+        accounts::Stored::Account {
+            number,
+            provider,
+            holder: accounts::Holder::Deployment,
+            place: 0,
+            uses: None,
+            subject: Box::new([]),
+            display: Box::new([]),
+        },
+        accounts::Stored::Source {
+            account: number,
+            number: source,
+            place: 0,
+            kind: accounts::Kind::Key,
+            name: Box::new([]),
+            held: None,
+        },
+    ] {
+        accounts::step(&mut core.accounts, &env, accounts::Event::Restore { record }, &mut out);
+    }
+}
+
 pub(crate) fn core() -> (Core, Limits) {
     let limits = limits();
     let mut core = Core::new(config(41), &limits);
+    restore_key_account(&mut core, &limits, 0, 1, 1);
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.people };
     people::step(
@@ -574,6 +601,7 @@ fn tree_core() -> (Core, Limits) {
     set_role_authority(&mut config.authority, given);
     let mut core = Core::new(config, &limits);
     core.people = old.people;
+    core.accounts = old.accounts;
     send_task(&mut core, &limits, tasks::Event::Restored);
     send_task(
         &mut core,
@@ -1705,7 +1733,7 @@ fn documents_deployment_accounts_are_secret_free_and_show_unusable_state() {
     };
     let account = deployment.accounts.get(0).unwrap();
     assert!(!account.usable);
-    assert_eq!(account.number, 1);
+    assert_eq!(account.number, 0);
     let reset = Some(Wall::from_nanos(1000 + Duration::from_secs(5).as_nanos()));
     assert_eq!(account.state, AccountState::Later { until: reset });
     assert_eq!(account.spent_until, reset);

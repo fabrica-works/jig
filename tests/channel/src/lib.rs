@@ -6,4 +6,5 @@ mod relay;
 pub mod stories;
 pub mod world;
 
+mod account_setup;
 pub mod program_sources;

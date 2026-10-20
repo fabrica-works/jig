@@ -13,7 +13,7 @@ use jig_protocol_config::{Path, Problem, What};
 #[test]
 fn the_document_names_the_files_its_caller_reads() {
     let names = crate::named(&engine_document()).expect("fixture document");
-    assert_eq!(names.len(), 5);
+    assert_eq!(names.len(), 4);
     for (name, expected) in names.iter().zip(fixtures::NAMES) {
         assert_eq!(name.as_ref(), expected);
     }

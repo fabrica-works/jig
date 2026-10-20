@@ -57,7 +57,7 @@
           "name": "fake",
           "number": 1,
           "dialect": 0,
-                    "provider": "fake-provider",
+          "provider": "fake-provider",
           "address": {
             "socket": "127.0.0.1:7101"
           },
@@ -81,14 +81,14 @@
           }
         }
       ],
-      "accounts": [
+      "providers": [
         {
+          "name": "Fake",
           "number": 1,
-          "source": {
-            "handed_in": {
-              "file": "accounts/chat.json"
-            }
-          }
+          "models": [
+            "fake"
+          ],
+          "sources": {}
         }
       ]
     },

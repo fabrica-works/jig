@@ -100,7 +100,13 @@ impl World {
     #[must_use]
     pub fn configured(seed: u64, requirement: bool, configuration: root::Config, limits: root::Limits) -> World {
         let world = Self::configured_unassigned(seed, requirement, configuration, limits);
-        assert!(world.assigned.is_some(), "the task hub and fleet assigned the caller: {:?}", world.trace);
+        assert!(
+            world.assigned.is_some(),
+            "the task hub and fleet assigned the caller: {:?}; source {:?}; replies {:?}",
+            world.trace,
+            world.domain.accounts().source(1),
+            world.people_answers
+        );
         world
     }
 
@@ -130,6 +136,20 @@ impl World {
         limits: root::Limits,
         initial: people::Ask,
     ) -> World {
+        let rows = crate::fixtures::account_rows(&configuration.core.settings.llm_providers);
+        Self::configured_with_rows(seed, requirement, configuration, limits, initial, rows)
+    }
+
+    /// Explicit lower-world rows; a story using real key/sign-in requests supplies none.
+    #[must_use]
+    pub fn configured_with_rows(
+        seed: u64,
+        requirement: bool,
+        configuration: root::Config,
+        limits: root::Limits,
+        initial: people::Ask,
+        rows: Box<[root::Record]>,
+    ) -> World {
         // This domain only journals roles before the exact effect configuration
         // is installed and restored below; its bootstrap needs no effect grants.
         let mut bootstrap = crate::world::config(seed);
@@ -155,6 +175,7 @@ impl World {
         world.observer = crate::observations::Observer::new(&configuration);
         world.bootstrap_owners = configuration.core.owners.to_vec();
         world.observer.durable(world.wall, &world.store);
+        world.seed(rows);
         world.domain = root::Domain::new(configuration, &limits);
         world.send(root::Event::RestartBegin);
         world.hello_engine();
@@ -208,6 +229,7 @@ impl World {
         let store = Store::new(limits, &configuration.core.settings.models);
         World {
             bootstrap_owners: Vec::new(),
+            fixture_accounts: Box::new([]),
             domain: root::Domain::new(configuration, limits),
             store,
             systems: [System::new(), System::new()],
@@ -319,9 +341,15 @@ impl World {
         cut: Option<Cut>,
         clock: Option<(Time, Wall)>,
     ) -> World {
+        let rows = crate::fixtures::account_rows(&configuration.core.settings.llm_providers);
         let mut world = Self::empty(configuration, limits);
         if let Some((now, wall)) = clock {
             world.set_clock(now, wall);
+        }
+        world.fixture_accounts.clone_from(&rows);
+        let env = world.env();
+        for row in rows {
+            assert!(root::restore_record(&mut world.domain, &env, row));
         }
         let mut peers = peers;
         peers.creating = Some(world.creating.clone());

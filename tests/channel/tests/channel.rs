@@ -93,7 +93,7 @@ fn a_partition_seen_late_by_the_engine_places_no_attempt_early() {
 
 #[test]
 fn a_restarted_engine_adopts_the_worker_s_run_at_its_hello() {
-    let outcome = run(Story::Restart { before: 80 });
+    let outcome = run(Story::Restart { before: 124 });
     assert!(outcome.adopting_hellos > 0);
     assert_eq!(outcome.verdict, Verdict::Passed);
     assert_eq!(outcome.turns_committed, 1);
@@ -282,4 +282,14 @@ fn a_restart_reads_back_only_what_was_durable() {
     assert!(!outcome.recovered_commits.contains(&held), "held commit {held} was absent at recovery");
     assert_eq!(outcome.turns_committed, 1);
     assert_eq!(outcome.answers_acknowledged, 1);
+}
+
+#[test]
+fn two_providers_keep_real_source_bindings_across_engine_restart() {
+    let outcome = run(Story::Providers);
+    assert_eq!(outcome.verdict, Verdict::Passed);
+    assert!(outcome.engine_drained);
+    let expected = (Some(1), vec![(1, 1, 0), (2, 3, 2)]);
+    assert_eq!(outcome.providers_before, expected);
+    assert_eq!(outcome.providers_after, expected);
 }

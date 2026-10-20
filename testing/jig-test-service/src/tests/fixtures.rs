@@ -119,19 +119,12 @@ pub fn decimal(mut value: u64) -> Box<[u8]> {
     writer.finish()
 }
 
-pub const NAMES: [&[u8]; 5] = [
-    b"charters/chat.txt",
-    b"secrets/worker-a.digest",
-    b"secrets/worker-b.digest",
-    b"accounts/chat.json",
-    b"app.secret",
-];
+pub const NAMES: [&[u8]; 4] =
+    [b"charters/chat.txt", b"secrets/worker-a.digest", b"secrets/worker-b.digest", b"app.secret"];
 pub fn files(_document: &[u8]) -> Files {
     let mut entries = List::with_capacity(6);
-    for name in [b"accounts/live.json".as_slice()].into_iter().chain(NAMES) {
+    for name in NAMES {
         let contents = match name {
-            b"accounts/chat.json" => ACCOUNT,
-            b"accounts/live.json" => LIVE_ACCOUNT,
             b"secrets/worker-a.digest" => DIGEST_A,
             b"secrets/worker-b.digest" => DIGEST_B,
             _ => b"fixture contents",
@@ -332,12 +325,7 @@ pub fn engine(service: &mut Service) -> &mut crate::Engine {
     service.engine().expect("fixture engine")
 }
 
-pub const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":120}"#;
-/// jig's live test's record: a provider account id beside the bearer (D2,
-/// until JP13).
-pub const LIVE_ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":120,"account_id":"acc"}"#;
 pub const TOKEN: &[u8] = b"test-token";
-pub const SIGNED_SOURCE: &[u8] = br#"{"sign_in":{"client":"client","authorization":"http://127.0.0.1:7101/authorize","token":"http://127.0.0.1:7101/token","endpoint":{"socket":"127.0.0.1:7101"},"transport":"plaintext","redirect":"http://localhost:7123/callback","scope":"read"}}"#;
 pub const DIGEST_A: &[u8] = b"8766b9cb08e6040b704f1e3ee1e186efccf2635b1d2634d6525333007e6aeae1";
 pub const DIGEST_B: &[u8] = b"ff492ef788c89b555e6f738b33d2422f57dbb6656af2402155672c5f123a90af";
 
@@ -661,7 +649,7 @@ pub fn service_bytes(document: &[u8]) -> u64 {
         .expect("root bounds")
         .checked_add(crate::workers::configured_bytes(&parsed.engine).expect("configured bounds"))
         .expect("worker total")
-        .checked_add(crate::accounts::configured_bytes(&parsed.engine).expect("configured account bounds"))
+        .checked_add(crate::accounts::configured_bytes(&parsed.engine).expect("provider registration bounds"))
         .expect("service total")
 }
 

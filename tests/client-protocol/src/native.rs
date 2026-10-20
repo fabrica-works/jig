@@ -118,8 +118,9 @@ impl NativeClient {
     pub fn new(settings: Settings, root: Fd, user: u32, seed: u64, script: Script) -> Self {
         let mut shell = Shell::new(settings);
         shell.adopt(root, user, seed);
-        let limits = jig_client_world::test::limits();
-        let (root, view) = jig_client_world::test::linked(seed);
+        let mut limits = jig_client_world::test::limits();
+        limits.client.domain.text = 512;
+        let (root, view) = jig_client_world::test::linked_with(&limits, seed);
         let patches = Queue::with_capacity(Test::patch_limit(&view));
         let complete = Queue::with_capacity(shell.operations() + 10);
         Self {
@@ -165,6 +166,15 @@ impl NativeClient {
     /// Drive an account request constructor through the real client's value envelope.
     pub fn account_request(&mut self, event: jig_client::Event) {
         self.callback(client::Event::Client { event });
+        self.wake = Some(self.env.now);
+    }
+    /// Stop presentation watches while a referee drives requests directly.
+    pub fn idle_fixture_view(&mut self) {
+        self.callback(client::Event::Jig(jig_client_view::Event::Left));
+    }
+    /// Resume its ordinary UI script after fixture account setup.
+    pub fn resume_after_account_setup(&mut self) {
+        self.account_sign_in_controlled = false;
         self.wake = Some(self.env.now);
     }
     /// Drain the native client after the account sign-in referee saw its answers.
@@ -311,9 +321,11 @@ impl Host for NativeClient {
             Test::fire(&mut self.root, &self.env, &mut self.out);
             Test::take(&mut self.root, &self.env, &mut self.out);
             self.outputs();
-            Test::build(&mut self.view, &self.root, &mut self.patches);
-            changed = !self.patches.is_empty();
-            while self.patches.pop().is_some() {}
+            if !self.account_sign_in_controlled {
+                Test::build(&mut self.view, &self.root, &mut self.patches);
+                changed = !self.patches.is_empty();
+                while self.patches.pop().is_some() {}
+            }
             if self.terminal.is_none() && !self.account_sign_in_controlled {
                 self.wake = None;
                 let before = self.person.at();
@@ -368,7 +380,16 @@ impl Host for NativeClient {
         .min()
     }
     fn next_policy_deadline(&self) -> Option<Time> {
-        if self.closing { None } else { [Test::next_deadline(&self.root), self.wake].into_iter().flatten().min() }
+        if self.closing {
+            None
+        } else {
+            let root = if self.account_sign_in_controlled {
+                self.root.client().next_deadline()
+            } else {
+                Test::next_deadline(&self.root)
+            };
+            [root, self.wake].into_iter().flatten().min()
+        }
     }
     fn is_empty(&self) -> bool {
         self.closing && self.shell.is_empty() && self.terminal.as_ref().is_none_or(skein_ui_text::Terminal::closed)
@@ -383,4 +404,4 @@ impl Host for NativeClient {
 
 pub mod wire;
 mod world;
-pub use world::{Outcome, run, run_terminal};
+pub use world::{Outcome, run, run_terminal, settings};

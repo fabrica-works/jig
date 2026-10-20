@@ -305,6 +305,8 @@ dependencies = [
 name = "jig-channel-world"
 version = "0.0.0"
 dependencies = [
+ "jig-client",
+ "jig-client-protocol-world",
  "jig-client-test-records",
  "jig-domain-accounts",
  "jig-domain-core",
@@ -885,6 +887,7 @@ name = "jig-one-process-world"
 version = "0.0.0"
 dependencies = [
  "jig-channel-world",
+ "jig-client",
  "jig-client-domain",
  "jig-client-protocol-world",
  "jig-client-shell-native",
@@ -982,6 +985,7 @@ dependencies = [
  "jig-ops-world",
  "jig-protocol-charter",
  "jig-protocol-tools",
+ "jig-test-domain",
  "skein-lib",
  "smith-charter",
 ]
@@ -1311,10 +1315,14 @@ dependencies = [
  "jig-client",
  "jig-client-protocol-world",
  "jig-client-shell-native",
+ "jig-core-world",
+ "jig-domain-accounts",
+ "jig-domain-core",
  "jig-domain-host",
  "jig-protocol-accounts-world",
  "jig-protocol-config",
  "jig-protocol-store",
+ "jig-test-domain",
  "jig-test-service",
  "serde_json",
  "skein-fake-llm-domain",
@@ -1324,6 +1332,7 @@ dependencies = [
  "skein-http",
  "skein-io",
  "skein-json",
+ "skein-kv",
  "skein-lib",
  "skein-llm",
  "skein-oauth-accounts",
@@ -1390,6 +1399,7 @@ dependencies = [
  "jig-domain-people",
  "jig-domain-tasks",
  "jig-protocol-accounts",
+ "jig-protocol-accounts-world",
  "jig-protocol-charter",
  "jig-protocol-config",
  "jig-protocol-engine-clients",
@@ -1405,6 +1415,7 @@ dependencies = [
  "jig-test-worker",
  "skein-channel",
  "skein-fake-channel",
+ "skein-heap",
  "skein-http",
  "skein-io",
  "skein-json",

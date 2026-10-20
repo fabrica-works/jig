@@ -24,6 +24,14 @@ fn a_revoked_record_waits_for_erased_and_coalesces_a_sign_out() {
         let old = 1;
         let fresh = 9001;
         let candidate = accounts.env.limits.client.document;
+        let old_record = record(old, &candidate);
+        let records::Next::Store(old_keep) = accounts.records.keep(old, old_record, &candidate) else {
+            panic!("explicit old source fixture");
+        };
+        replace(&mut engine.store, old_keep);
+        assert!(accounts.records.kept(old).is_some());
+        let prior = accounts.ids.insert(old, Secret::new(Box::default())).expect("explicit old source id");
+        assert!(prior.is_none());
         let mut record = record(fresh, &candidate);
         let records::Next::Store(keep) = accounts.records.keep(fresh, record.clone(), &candidate) else {
             panic!("fresh source is kept");
@@ -207,7 +215,7 @@ fn service_restart_restores_an_llm_key_before_want_and_sweeps_only_unnamed_sourc
         b"kept-llm-key"
     );
     for (owner, number, exists) in [
-        (store::SecretOwner::Source, 1, true),
+        (store::SecretOwner::Source, 1, false),
         (store::SecretOwner::Source, 7, true),
         (store::SecretOwner::Source, 8, false),
         (store::SecretOwner::Application, carried_orphan, true),
@@ -264,5 +272,86 @@ fn aborting_does_not_submit_an_llm_key_adoption_to_the_closing_store() {
         .secrets(Token::new(123), store::Secrets::Get { owner: store::SecretOwner::Application, number: carried })
     else {
         panic!("carried value remains an orphan")
+    };
+}
+
+#[test]
+fn d2_preseed_restores_the_fake_issuers_handed_source_and_names_it_in_the_sweep() {
+    use jig_protocol_accounts_world::world;
+    let issued = world::run(31, world::Story::SignIn);
+    assert!(world::owner(&issued).last_kept().is_some());
+    let mut service = fixtures::started(&fixtures::accounts_document());
+    for _ in 0_u32..8 {
+        fixtures::turn(&mut service);
+    }
+    let engine = fixtures::engine(&mut service);
+    let limits = engine.accounts.as_ref().unwrap().env.limits;
+    let issued_record =
+        oauth::decode_record(world::owner(&issued).last_kept().unwrap(), &limits.client.document).unwrap();
+    let expected_token = issued_record.access_token.clone();
+    let fixture = crate::d2_preseed(
+        70,
+        9001,
+        1,
+        domain::Holder::Party(1),
+        Secret::new(issued_record.access_token),
+        issued_record.expires_at,
+        Some(b"D2-only-account-id".as_slice().into()),
+        &limits.client.document,
+    )
+    .unwrap();
+    let _later = engine.store.secrets(
+        Token::new(123),
+        store::Secrets::Keep { owner: store::SecretOwner::Source, number: 9001, value: fixture.value },
+    );
+    while engine.store.above.pop().is_some() {}
+    let configuration = crate::startup::parse(&fixtures::accounts_document()).unwrap().engine;
+    let mut component = Accounts::new(
+        &configuration,
+        &fixtures::files(&[]),
+        &fixtures::seeds(),
+        Some(AccountsRuntime {
+            d2: fixture.input,
+            providers: List::with_capacity(0),
+            trust_roots: 0,
+            trust_root_bytes: 0,
+        }),
+        64,
+        &configuration.limits.store.secrets,
+    )
+    .unwrap();
+    let providers = domain::Providers {
+        providers: Box::new([domain::Provider {
+            number: 1,
+            models: Box::new([]),
+            offers: domain::Offers { sign_in: false, key: true, programs: Box::new([]) },
+        }]),
+    };
+    let mut child = domain::Domain::new(&configuration.limits.core.accounts, providers);
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: configuration.limits.core.accounts };
+    let mut out = Queue::with_capacity(domain::max_out(&env.limits));
+    for record in fixture.rows {
+        domain::step(&mut child, &env, domain::Event::Restore { record }, &mut out);
+    }
+    domain::step(&mut child, &env, domain::Event::Want, &mut out);
+    while let Some(request) = out.pop() {
+        component.request(request);
+    }
+    let mut granted = false;
+    for event in &pump_accounts(&mut component, engine) {
+        if let domain::FromComponent::Granted { account: 9001, .. } = event {
+            granted = true;
+        }
+    }
+    assert!(granted);
+    let value = engine.values.accounts.value(9001, 1, Time::from_nanos(1)).unwrap();
+    assert_eq!(value.token.expose(), expected_token.as_ref());
+    let table::Scheme::Withdrawn { .. } = value.scheme else {
+        panic!("D2 withdrawn grant");
+    };
+    let Some(store::Event::Secret { value: Some(_), .. }) =
+        engine.store.secrets(Token::new(123), store::Secrets::Get { owner: store::SecretOwner::Source, number: 9001 })
+    else {
+        panic!("named D2 source survived the sweep");
     };
 }

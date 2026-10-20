@@ -350,7 +350,7 @@ fn a_limited_source_keeps_its_reset_across_a_restart() {
     })));
     let limited = jig_domain_accounts::State::Limited { until: Some(reset) };
     assert_eq!(world.domain.accounts().source(1).expect("the configured source").state, limited);
-    let row = root::Key::Core(core::Key::Accounts(jig_domain_accounts::Key::Source { account: 1, number: 1 }));
+    let row = root::Key::Core(core::Key::Accounts(jig_domain_accounts::Key::Source { account: 0, number: 1 }));
     assert!(world.store.rows.contains_key(&row), "the hold is committed with the decision that limits it");
     world.restart(121, false);
     assert!(world.domain.ready());
@@ -639,8 +639,7 @@ fn a_restart_sends_an_adopted_chat_its_current_grant() {
 #[test]
 fn a_generation_renewed_while_the_assignment_is_held_reaches_the_attempt_after_it() {
     const SECOND_ANALYST: u32 = 2;
-    let (mut config, limits) = jig_core_world::effects::fixture(163, false);
-    let mut world = World::configured_unassigned(163, false, config, limits);
+    let mut world = jig_core_world::fixtures::waiting_on_source(163, SECOND_ANALYST);
     assert!(world.assigned.is_none());
     world.renew_on_assignment(
         SECOND_ANALYST,

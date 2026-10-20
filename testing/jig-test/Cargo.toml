@@ -11,6 +11,7 @@ publish.workspace = true
 jig-test-service.workspace = true
 jig-protocol-config.workspace = true
 jig-domain-host.workspace = true
+jig-domain-accounts.workspace = true
 skein-io.workspace = true
 skein-lib.workspace = true
 skein-json.workspace = true
@@ -39,6 +40,10 @@ disallowed_types = "deny"
 disallowed_methods = "deny"
 
 [dev-dependencies]
+jig-core-world = { path = "../../tests/core" }
+jig-domain-core.workspace = true
+jig-test-domain.workspace = true
+skein-kv.workspace = true
 jig-protocol-accounts-world = { path = "../../tests/protocol-accounts" }
 jig-client = { path = "../../crates/jig-client" }
 skein-fake-oauth.workspace = true

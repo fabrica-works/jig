@@ -19,13 +19,29 @@ const USAGE: &str = "usage: jig-test serve CONFIG.json | jig-test agent AGENT.js
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Command {
-    Serve { configuration: PathBuf },
-    Agent { configuration: PathBuf },
+    Serve {
+        configuration: PathBuf,
+    },
+    /// D2: removed by JP13. Explicit fixture only, outside configuration.
+    D2 {
+        configuration: PathBuf,
+        record: PathBuf,
+    },
+    Agent {
+        configuration: PathBuf,
+    },
 }
 
 pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, String> {
     let command = args.next().ok_or(USAGE)?;
     let configuration = args.next().ok_or(USAGE)?.into();
+    if command == "serve-d2" {
+        let record = args.next().ok_or(USAGE)?.into();
+        if args.next().is_some() {
+            return Err(USAGE.into());
+        }
+        return Ok(Command::D2 { configuration, record });
+    }
     if args.next().is_some() {
         return Err(USAGE.into());
     }
@@ -40,7 +56,8 @@ pub fn configure(mut args: impl Iterator<Item = OsString>) -> Result<Command, St
 
 pub fn run(command: Command) -> Result<u8, String> {
     let exit = match command {
-        Command::Serve { configuration } => serve(&configuration)?,
+        Command::Serve { configuration } => serve(&configuration, None)?,
+        Command::D2 { configuration, record } => serve(&configuration, Some(&record))?,
         Command::Agent { configuration } => smith_agent_shell::run(&configuration, Box::new(std::io::stderr()))?,
     };
     Ok(match exit {
@@ -225,9 +242,9 @@ fn accounts(engine: &config::Engine) -> Result<service::AccountsRuntime, String>
             providers.push((provider.number, endpoint, origins)).expect("configured provider count");
         }
     }
-    Ok(service::AccountsRuntime { providers, trust_roots, trust_root_bytes })
+    Ok(service::AccountsRuntime { d2: service::D2::empty(), providers, trust_roots, trust_root_bytes })
 }
-fn prepare(bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String> {
+fn prepare(bytes: &[u8], owned: &mut Vec<Fd>, d2: Option<config::HandedIn>) -> Result<service::Service, String> {
     let document =
         config::document(bytes, &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 32 })
             .map_err(|why| format!("configuration: {why:?}"))?;
@@ -279,7 +296,22 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String
                 read::text(&document, *at, 32).map_err(|why| format!("component: {why:?}"))?.as_ref() == b"accounts";
         }
     }
-    let runtime = if accounts_enabled { engine.as_ref().map(accounts).transpose()? } else { None };
+    let mut runtime = if accounts_enabled { engine.as_ref().map(accounts).transpose()? } else { None };
+    if let Some(record) = d2 {
+        let engine = engine.as_ref().ok_or("D2 requires an engine")?;
+        let fixture = service::d2_preseed(
+            10,
+            11,
+            1,
+            jig_domain_accounts::Holder::Party(1),
+            record.token,
+            record.lapses,
+            record.account_id,
+            &engine.limits.driver.client.document,
+        )
+        .map_err(|_| "D2 fixture record does not fit")?;
+        runtime.as_mut().ok_or("D2 requires the accounts component")?.d2 = fixture.input;
+    }
     let seed = skein_shell::seed().map_err(|errno| format!("random seed: errno {errno}"))?;
     let crypto = skein_shell::crypto_seed().map_err(|errno| format!("cryptographic seed: errno {errno}"))?;
     let mut deployment = [0_u8; 16];
@@ -306,10 +338,21 @@ fn prepare(bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String
     }
     Ok(service)
 }
-fn serve(path: &Path) -> Result<Exit, String> {
+fn serve(path: &Path, d2: Option<&Path>) -> Result<Exit, String> {
     let bytes = read_configuration(path)?;
     let mut owned = Vec::new();
-    let prepared = prepare(&bytes, &mut owned);
+    let d2 = d2
+        .map(|path| {
+            let bytes = skein_shell::read_private_file(path, CONFIG_BYTES, skein_shell::effective_user())
+                .map_err(|why| format!("D2 fixture: {why:?}"))?;
+            config::handed_in(
+                bytes.expose(),
+                &config::DocumentLimits { bytes: CONFIG_BYTES, tokens: CONFIG_BYTES, depth: 16 },
+            )
+            .map_err(|why| format!("D2 fixture: {why:?}"))
+        })
+        .transpose()?;
+    let prepared = prepare(&bytes, &mut owned, d2);
     let mut service = match prepared {
         Ok(service) => service,
         Err(why) => {

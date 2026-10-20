@@ -32,6 +32,8 @@ pub struct Referee {
     rules: Rc<RefCell<rules::Referee>>,
     applied: u64,
     clients: BTreeMap<usize, usize>,
+    keys: BTreeSet<usize>,
+    ready: BTreeSet<usize>,
     agent_seen: usize,
     commits_seen: usize,
     rows: BTreeMap<root::Key, root::Record>,
@@ -66,6 +68,8 @@ impl Referee {
             rules,
             applied,
             clients: BTreeMap::new(),
+            keys: BTreeSet::new(),
+            ready: BTreeSet::new(),
             agent_seen: 0,
             commits_seen: 0,
             rows,
@@ -76,6 +80,38 @@ impl Referee {
             cold: (applied > 0).then_some(()),
             drained: None,
             restarts,
+        }
+    }
+    fn accounts(&mut self, procs: &mut [Proc]) {
+        for (index, proc) in procs.iter_mut().enumerate() {
+            if let Proc::Client(client) = proc {
+                if client.account_sign_in_ready() && self.keys.insert(index) {
+                    client.account_request(jig_client::accounts::add_key(
+                        jig_client::Key { asker: jig_client::Asker(77), number: 1 },
+                        [61; 16],
+                        jig_client::contract::AccountHolder::Deployment,
+                        1,
+                        None,
+                        skein_lib::Secret::new(jig_channel_world::fixtures::TOKEN.into()),
+                    ));
+                }
+                if !self.ready.contains(&index)
+                    && client.received.iter().any(|r| {
+                        matches!(
+                            r,
+                            Received::Answer {
+                                answer: jig_client::contract::Answer::Done(jig_client::contract::Outcome::Owner(
+                                    jig_client::contract::OwnerOutcome::AccountKeyKept { .. }
+                                )),
+                                ..
+                            }
+                        )
+                    })
+                {
+                    self.ready.insert(index);
+                    client.resume_after_account_setup();
+                }
+            }
         }
     }
     fn say(&mut self, now: Time, event: rules::Observed) {
@@ -225,6 +261,7 @@ fn received(seen: &Received, store: &Store) -> Vec<rules::Receipt> {
 }
 impl skein_world::Referee<Proc> for Referee {
     fn act(&mut self, now: Time, procs: &mut [Proc]) {
+        self.accounts(procs);
         let clients_done = procs
             .iter()
             .filter_map(|proc| match proc {
@@ -254,6 +291,8 @@ impl skein_world::Referee<Proc> for Referee {
                 self.cold = Some(());
                 *self.restarts.borrow_mut() += 1;
                 if matches!(self.scenario, Scenario::Fault { cut: skein_world::Cut::PowerLoss, .. }) {
+                    self.keys.clear();
+                    self.ready.clear();
                     self.clients.clear();
                     self.requests.clear();
                     self.parties.clear();

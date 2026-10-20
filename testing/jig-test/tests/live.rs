@@ -1,4 +1,5 @@
 //! One borrowed account, a real agent completion, and the native person's answer.
+#[expect(dead_code, reason = "shared process support; live uses only the explicit D2 entry")]
 mod support;
 use jig_client_protocol_world::native::Script;
 use jig_protocol_config as config;
@@ -18,7 +19,7 @@ fn configuration(directory: &Path, source: &Path) -> codec::Limits {
     let mut value: serde_json::Value =
         serde_json::from_slice(&fs::read(&path).expect("fixture configuration")).expect("fixture JSON");
     let engine = &mut value["engine"];
-    engine["llm"]["accounts"][0]["source"]["handed_in"]["file"] = settings["account_file"].clone();
+    engine["llm"]["providers"][0]["models"][0] = settings["model"].clone();
     let endpoint = &mut engine["llm"]["endpoints"][0];
     endpoint["provider"] = "codex".into();
     endpoint["dialect"] = 1.into();
@@ -42,6 +43,8 @@ fn configuration(directory: &Path, source: &Path) -> codec::Limits {
         .expect("engine member");
     let engine = config::engine(&document, at, &config::Directories::working()).expect("live engine configuration");
     let limits = codec::limits(&engine.limits.core).expect("live store codec limits");
+    let raw = fs::read(settings["account_file"].as_str().expect("D2 record path")).expect("D2 handed-in fixture");
+    support::d2::preseed(directory, &raw);
     let path = directory.join("agent.json");
     let mut agent: serde_json::Value =
         serde_json::from_slice(&fs::read(&path).expect("agent fixture")).expect("agent JSON");
@@ -123,7 +126,7 @@ fn a_native_client_s_chat_is_answered_by_a_real_model() {
     let clock = Clock::new();
     let started = clock.now().now;
     let result = std::panic::catch_unwind(|| {
-        support::run(
+        support::run_d2(
             directory.path(),
             Script::answered_report(WORDS.as_bytes(), support::ANSWER, Duration::from_secs(240)),
             None,

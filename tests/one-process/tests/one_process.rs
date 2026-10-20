@@ -28,14 +28,14 @@ fn the_next_start_settles_the_worker_s_claims_at_once() {
 
 #[test]
 fn a_kill_before_a_commit_loses_nothing_a_person_saw() {
-    let outcome = crash(skein_world::Cut::Kill, 80);
+    let outcome = crash(skein_world::Cut::Kill, 130);
     assert_eq!(outcome.verdict, Verdict::Passed);
     assert_eq!(outcome.restarts, 1);
     assert!(outcome.drained);
 }
 #[test]
 fn a_power_loss_mid_run_restarts_and_adopts_nothing_from_the_dead_worker() {
-    let outcome = crash(skein_world::Cut::PowerLoss, 128);
+    let outcome = crash(skein_world::Cut::PowerLoss, 145);
     assert_eq!(outcome.verdict, Verdict::Passed);
     assert_eq!(outcome.restarts, 1);
     assert_eq!(outcome.claims_settled_at_restart, 1);

@@ -324,12 +324,22 @@ fn settle(domain: &mut Domain, env: &Env<Limits>) -> Box<[Output]> {
     seen.into_boxed()
 }
 
+fn restore_chat_account(domain: &mut Domain, env: &Env<Limits>) {
+    let configuration = jig_core_world::world::config(17);
+    for row in jig_core_world::fixtures::account_rows(&configuration.core.settings.llm_providers) {
+        let jig_test_domain::Record::Core(core::Record::Accounts(record)) = row else { panic!("account fixture row") };
+        step(domain, env, Event::Core(core::Event::Account(accounts::Event::Restore { record })));
+        settle(domain, env);
+    }
+}
+
 fn started_chat() -> (Domain, Env<Limits>, Token) {
     use jig_domain_accounts as accounts;
     use jig_domain_fleet as fleet;
     use jig_domain_people as people;
     use jig_domain_tasks as tasks;
     let (mut domain, env) = fixture();
+    restore_chat_account(&mut domain, &env);
     for event in [
         core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) }),
         core::Event::People(people::Event::Restored),

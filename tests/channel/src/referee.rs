@@ -1,7 +1,7 @@
 //! Channel-wide safety and liveness (protocol/channel.md, 12).
 use crate::{
     processes::Proc,
-    world::{Store, answer_parties, answer_store, diagnostics, party_event, terminal, turns, worker_wire},
+    world::{Store, answer_parties, answer_store, diagnostics, terminal, turns, worker_wire},
 };
 use jig_domain_core as core;
 use jig_fake_parties as parties;
@@ -9,6 +9,7 @@ use skein_lib::Time;
 use std::{cell::RefCell, rc::Rc};
 #[expect(clippy::struct_excessive_bools, reason = "independent party, injection and settlement controls")]
 pub struct Referee {
+    pub(crate) accounts: crate::account_setup::Setup,
     /// Owned outside every engine process, so restart cannot drop durable rows.
     pub(crate) store: Rc<RefCell<Store>>,
     pub(crate) party: parties::Party,
@@ -31,7 +32,15 @@ pub struct Referee {
 }
 impl skein_world::Referee<Proc> for Referee {
     fn act(&mut self, now: Time, procs: &mut [Proc]) {
+        self.accounts.act(procs, self.story, self.passed);
+        if !self.passed {
+            self.accounts.party(now, procs, &mut self.party, &mut self.views.borrow_mut(), self.story);
+        }
         self.inject(now, procs);
+
+        if self.views.borrow().query_submissions.is_none() && procs.iter().any(|proc| matches!(proc, Proc::Peer(peer) if smith_agent_process_world::fake::queries(peer).next().is_some())) {
+            self.views.borrow_mut().query_submissions = procs.iter().find_map(|p| if let Proc::Engine(e) = p { Some(e.submitted) } else { None });
+        }
         for proc in procs {
             match proc {
                 Proc::Engine(host) => {
@@ -70,33 +79,6 @@ impl skein_world::Referee<Proc> for Referee {
                         });
                         self.period = true;
                     }
-                    if store.applied > 0
-                        && !self.passed
-                        && let Some(up) = self.party.tick(now)
-                    {
-                        let mut event = party_event(up, &store);
-                        if matches!(self.story, crate::stories::Story::ApplicationGeneration)
-                            && let core::Event::People(jig_domain_people::Event::Ask {
-                                ask: jig_domain_people::Ask::Create { batch, .. },
-                                ..
-                            }) = &mut event
-                        {
-                            batch[0].parameters = Box::new([jig_domain_people::Parameter::Resource {
-                                name: 1,
-                                connector: 1,
-                                resource: 1,
-                            }]);
-                        }
-                        if matches!(self.story, crate::stories::Story::Key { .. })
-                            && let core::Event::People(jig_domain_people::Event::Ask {
-                                ask: jig_domain_people::Ask::Create { .. },
-                                ..
-                            }) = &event
-                        {
-                            put_key(engine, 2, crate::fixtures::KEY, now);
-                        }
-                        engine.parties_in().push(event);
-                    }
                     if self.passed && !host.stopping {
                         host.stopping = true;
                         host.service.shutdown();
@@ -108,7 +90,12 @@ impl skein_world::Referee<Proc> for Referee {
                 }
                 Proc::Peer(peer) if self.passed => peer.shutdown(),
                 Proc::Probe(peer) if self.passed => peer.shutdown(),
-                Proc::Worker(_) | Proc::Auth(_) | Proc::Peer(_) | Proc::Agent { .. } | Proc::Probe(_) => {}
+                Proc::Worker(_)
+                | Proc::Peer(_)
+                | Proc::Auth(_)
+                | Proc::Client(_)
+                | Proc::Agent { .. }
+                | Proc::Probe(_) => {}
             }
         }
         self.stopped = self.passed;
@@ -126,13 +113,27 @@ impl skein_world::Referee<Proc> for Referee {
             .expect("engine");
         self.observe_engine(now, engine);
         let store = self.store.borrow();
+        if matches!(self.story, crate::stories::Story::Providers)
+            && self.views.borrow().engine_drained
+            && !store.recovered.is_empty()
+        {
+            let choices = crate::world::provider_choices(&store);
+            if !choices.1.is_empty() {
+                self.views.borrow_mut().providers_after = choices;
+            }
+        }
         let turns = turns(&store);
         assert!(turns.len() <= self.expected_turns as usize, "bounded committed turns for the script");
         let engine = procs
             .iter()
             .find_map(|proc| match proc {
                 Proc::Engine(engine) => Some(engine),
-                Proc::Worker(_) | Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) | Proc::Probe(_) => None,
+                Proc::Worker(_)
+                | Proc::Agent { .. }
+                | Proc::Peer(_)
+                | Proc::Auth(_)
+                | Proc::Client(_)
+                | Proc::Probe(_) => None,
             })
             .expect("engine process");
         assert!(worker.acknowledgements.len() <= self.expected_answers, "one received answer acknowledgement");
@@ -161,7 +162,12 @@ impl skein_world::Referee<Proc> for Referee {
                         | crate::stories::Story::BeyondGrace
                 ) || smith_agent_process_world::fake::replied(peer)
             }
-            Proc::Auth(_) | Proc::Engine(_) | Proc::Worker(_) | Proc::Agent { .. } | Proc::Probe(_) => false,
+            Proc::Engine(_)
+            | Proc::Worker(_)
+            | Proc::Agent { .. }
+            | Proc::Probe(_)
+            | Proc::Auth(_)
+            | Proc::Client(_) => false,
         });
         let ended = if matches!(self.story, crate::stories::Story::InvalidCharter) {
             self.rules.refused_ends.len() == 1 && worker.acknowledgements.is_empty()
@@ -175,12 +181,14 @@ impl skein_world::Referee<Proc> for Referee {
             && ended
             && replied
             && self.rules.complete()
+            && (!matches!(self.story, crate::stories::Story::Providers)
+                || !self.views.borrow().providers_after.1.is_empty())
         {
             if matches!(self.story, crate::stories::Story::ApplicationGeneration) {
                 assert!(self.injected, "generation 2 announced while the agent was running");
                 application_generation(worker);
             }
-            if matches!(self.story, crate::stories::Story::Chat) {
+            if matches!(self.story, crate::stories::Story::Chat | crate::stories::Story::Providers) {
                 assert_eq!(&*presented(worker, procs, false).1, crate::fixtures::TOKEN);
             }
             if let crate::stories::Story::Key { replaced } = self.story {
@@ -221,29 +229,6 @@ impl skein_world::Referee<Proc> for Referee {
     }
 }
 
-/// The sign-in account's grant of `key` at `generation`, put in the table and
-/// announced as its accounts component would.
-fn put_key(engine: &mut jig_test_service::Engine, generation: u64, key: &[u8], now: Time) {
-    let valid = skein_lib::Duration::from_secs(60);
-    engine.put_account(
-        1,
-        generation,
-        jig_protocol_accounts::table::Value {
-            token: skein_lib::Secret::new(key.into()),
-            scheme: jig_protocol_accounts::table::Scheme::Key,
-        },
-        now.saturating_add(valid),
-    );
-    engine.parties_in().push(core::Event::Account(jig_domain_accounts::Event::Component(
-        jig_domain_accounts::FromComponent::Granted {
-            form: jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Key),
-            account: 1,
-            generation,
-            valid,
-        },
-    )));
-}
-
 fn assignment(worker: &crate::processes::Wire) -> jig_protocol_worker_wire::Assignment {
     use jig_protocol_worker_wire::{Assignment, CEILINGS};
     worker
@@ -270,7 +255,7 @@ fn presented(worker: &crate::processes::Wire, procs: &[Proc], key: bool) -> (u64
             GrantValue::Withdrawn(_) | GrantValue::Application(_) => None,
         })
         .expect("assignment holds the account's credential");
-    assert_eq!(*value.scheme(), if key { Scheme::Key } else { Scheme::Bearer });
+    assert_eq!(*value.scheme(), Scheme::Key);
     let (route, scheme) = if key {
         (skein_llm::Provider::Anthropic, skein_llm::Scheme::Key)
     } else {
@@ -280,7 +265,12 @@ fn presented(worker: &crate::processes::Wire, procs: &[Proc], key: bool) -> (u64
         .iter()
         .find_map(|proc| match proc {
             Proc::Peer(peer) => Some(peer),
-            Proc::Auth(_) | Proc::Engine(_) | Proc::Worker(_) | Proc::Agent { .. } | Proc::Probe(_) => None,
+            Proc::Engine(_)
+            | Proc::Worker(_)
+            | Proc::Agent { .. }
+            | Proc::Probe(_)
+            | Proc::Auth(_)
+            | Proc::Client(_) => None,
         })
         .expect("provider");
     assert!(
@@ -305,7 +295,7 @@ fn key_replaced(worker: &crate::processes::Wire) {
         .expect("generation 3 granted on the live attempt's connection (0x0187)");
     assert_eq!((granted.task(), granted.attempt()), (assignment.task(), assignment.attempt()));
     assert_eq!(worker.placements.get(&(granted.task(), granted.attempt())), Some(fd));
-    assert_eq!(granted.grant().number(), 1);
+    assert_eq!(granted.grant().number(), 0);
     let GrantValue::Credential(value) = granted.grant().value() else { panic!("the account's grant is a credential") };
     assert_eq!(*value.scheme(), Scheme::Key);
     assert_eq!(value.bytes().expose(), crate::fixtures::NEXT_KEY);
@@ -525,7 +515,7 @@ impl std::fmt::Debug for Roots<'_> {
 impl Referee {
     /// Once the provider is first asked, the next generation of the grant the
     /// story replaces mid-run: the application's credential, or the key.
-    fn inject_grant(&mut self, now: Time, procs: &mut [Proc]) {
+    fn inject_grant(&mut self, _now: Time, procs: &mut [Proc]) {
         let key = matches!(self.story, crate::stories::Story::Key { replaced: true });
         if !(key || matches!(self.story, crate::stories::Story::ApplicationGeneration)) || self.injected
             || !procs.iter().any(|proc| matches!(proc, Proc::Peer(peer) if smith_agent_process_world::fake::queries(peer).next().is_some()))
@@ -533,11 +523,15 @@ impl Referee {
             return;
         }
         self.injected = true;
+        if key {
+            self.accounts.replace(procs);
+            return;
+        }
         for proc in procs.iter_mut() {
             if let Proc::Engine(host) = proc {
                 let engine = host.service.engine().expect("engine");
                 if key {
-                    put_key(engine, 3, crate::fixtures::NEXT_KEY, now);
+                    unreachable!("LLM key replacement goes through the client");
                 } else {
                     engine.put_application(1, 2, skein_lib::Secret::new(b"application-token-2".as_slice().into()));
                     engine.parties_in().push(core::Event::Account(jig_domain_accounts::Event::Credential {
@@ -570,16 +564,14 @@ impl Referee {
             && procs.iter().any(|proc| matches!(proc, Proc::Peer(peer) if smith_agent_process_world::fake::queries(peer).next().is_some())) {
             self.injected = true;
             for proc in procs.iter_mut() {
-                if let Proc::Engine(host) = proc {
-                    let input = host.service.engine().expect("engine").parties_in();
-                    input.push(core::Event::Watch { watcher: skein_lib::Token::new(70), sign_in: 1,
-                        subject: core::documents::Watched::Task { task: 1 },
-                        window: core::documents::Window { rows: 1, after: None } });
-                    input.push(core::Event::WatchRun { watcher: skein_lib::Token::new(71), sign_in: 1,
-                        task: 1, turn: None, offset: 0 });
+                if let Proc::Client(client) = proc {
+                    for (number, subject) in [(70, jig_client::contract::Subject::Task { task: 1 }), (71, jig_client::contract::Subject::Run { task: 1, turn: None, offset: 0 })] {
+                        client.account_request(jig_client::Event::Watch { handle: jig_client::Handle { asker: jig_client::Asker(78), number }, subject: jig_client::Watchable::Jig(subject) });
+                    }
                 }
             }
         }
+
         if matches!(self.story, crate::stories::Story::Shutdown) && !self.injected
             && procs.iter().any(|proc| matches!(proc, Proc::Peer(peer) if smith_agent_process_world::fake::queries(peer).next().is_some())) {
             self.injected = true;
@@ -614,12 +606,18 @@ impl Referee {
             | crate::stories::Story::InvalidCharter
             | crate::stories::Story::Restart { .. }
             | crate::stories::Story::HeldCommit
-            | crate::stories::Story::DurableRestart => return,
+            | crate::stories::Story::DurableRestart
+            | crate::stories::Story::Providers => return,
         };
         if self.injected
             || !procs.iter().any(|proc| match proc {
                 Proc::Worker(host) => host.wire.frames.iter().any(|(_, kind, _)| *kind == 0x0180),
-                Proc::Engine(_) | Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) | Proc::Probe(_) => false,
+                Proc::Engine(_)
+                | Proc::Agent { .. }
+                | Proc::Peer(_)
+                | Proc::Auth(_)
+                | Proc::Client(_)
+                | Proc::Probe(_) => false,
             })
         {
             return;
@@ -635,7 +633,7 @@ impl Referee {
                     host.relay.until = Some(now.saturating_add(worker));
                     host.relay.channel = host.wire.channel;
                 }
-                Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) | Proc::Probe(_) => {}
+                Proc::Agent { .. } | Proc::Peer(_) | Proc::Auth(_) | Proc::Client(_) | Proc::Probe(_) => {}
             }
         }
     }
@@ -886,13 +884,14 @@ impl Referee {
 
 impl Referee {
     fn drain_engine(&mut self, procs: &mut [Proc]) {
-        if !matches!(self.story, crate::stories::Story::Drain) {
+        if !matches!(self.story, crate::stories::Story::Drain | crate::stories::Story::Providers) {
             return;
         }
         for proc in procs {
             if let Proc::Engine(host) = proc {
                 if !self.injected && crate::world::pending_turn(&self.store.borrow()) {
                     self.injected = true;
+                    self.views.borrow_mut().providers_before = crate::world::provider_choices(&self.store.borrow());
                     host.service.shutdown();
                 }
                 if self.injected && !self.views.borrow().engine_drained && host.service.is_empty() {
@@ -902,7 +901,11 @@ impl Referee {
                     views.commits_waiting_at_drain = self.store.borrow().pending.len();
                     assert_eq!(views.commits_waiting_at_drain, 0);
                     host.service = jig_test_service::startup(
-                        &crate::fixtures::engine_document(),
+                        &if matches!(self.story, crate::stories::Story::Providers) {
+                            crate::fixtures::providers_document()
+                        } else {
+                            crate::fixtures::engine_document()
+                        },
                         &crate::fixtures::files(false),
                         None,
                         &crate::fixtures::seeds(),

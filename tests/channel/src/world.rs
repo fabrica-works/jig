@@ -9,7 +9,7 @@ use jig_domain_people as people;
 use jig_fake_parties as parties;
 use jig_test_domain as root;
 use jig_test_service::PartyOutput;
-use skein_lib::{Duration, ReplyTo, Token};
+use skein_lib::Duration;
 use skein_world::domain::Verdict;
 use std::{cell::RefCell, rc::Rc};
 
@@ -68,6 +68,9 @@ pub struct Outcome {
     pub durable_at_restart: u64,
     pub held_at_restart: Option<u64>,
     pub recovered_commits: Vec<u64>,
+    pub query_submissions: Option<u32>,
+    pub providers_before: (Option<u32>, Vec<(u32, u32, u32)>),
+    pub providers_after: (Option<u32>, Vec<(u32, u32, u32)>),
 }
 
 /// Run one person's chat through the actual agent and all channel layers.
@@ -81,10 +84,22 @@ pub fn run(mut settings: Settings, script: Script) -> Outcome {
     let referee = make_referee(&script, store.clone(), views.clone());
     let mut machine = skein_fake_machine::Machine::new();
     let _store_root = machine.lay(&[]);
+    let client_root = machine.lay(&[]);
     let root = (!matches!(script.story, crate::stories::Story::Opening(_))).then(|| machine.lay(&[]));
     let mut harness = skein_world::World::new(settings.seed, settings.config, referee, skein_world::Memory::Unchecked)
         .with_machine(Machine(machine));
     launch(&mut harness, root, &script);
+    harness.spawn_root(skein_sim::Handle::new(client_root.raw()), |root| {
+        let mut client = jig_client_protocol_world::native::NativeClient::new(
+            jig_client_protocol_world::native::settings(),
+            root,
+            1000,
+            settings.seed,
+            jig_client_protocol_world::native::Script::account_sign_in(),
+        );
+        client.hold_for_account_sign_in();
+        Proc::Client(Box::new(client))
+    });
     let scenario = script.story;
     drop(script);
     let mut reset_injected = false;
@@ -104,7 +119,7 @@ fn outcome(procs: &[Proc], store: &Store, views: &Views, reset_injected: bool, k
     let worker = procs.iter().find_map(|proc| match proc {
         Proc::Worker(host) => Some(&host.wire),
         Proc::Probe(peer) => Some(&peer.wire),
-        Proc::Engine(_) | Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) => None,
+        Proc::Engine(_) | Proc::Agent { .. } | Proc::Peer(_) | Proc::Auth(_) | Proc::Client(_) => None,
     });
     let refusal = procs.iter().find_map(|proc| if let Proc::Probe(peer) = proc { peer.refused } else { None });
     let turns = turns(store);
@@ -123,6 +138,9 @@ fn outcome(procs: &[Proc], store: &Store, views: &Views, reset_injected: bool, k
     Outcome {
         durable_at_restart: views.durable_at_restart,
         held_at_restart: views.held_at_restart,
+        query_submissions: views.query_submissions,
+        providers_before: views.providers_before.clone(),
+        providers_after: views.providers_after.clone(),
         recovered_commits: store.recovered.iter().copied().collect(),
         engine_drained: views.engine_drained,
         commits_waiting_at_drain: views.commits_waiting_at_drain,
@@ -192,9 +210,12 @@ pub(crate) fn answer_store(
 ) {
     host.holding = hold;
     host.corrupt_transcript = matches!(scenario, crate::stories::Story::InvalidTranscript);
-    for commit in
-        store.observe(&mut host.files.events, &host.codec, fixtures::store_names(), &host.store_limits.root.connector)
-    {
+    let names = if matches!(scenario, crate::stories::Story::Providers) {
+        fixtures::providers_store_names()
+    } else {
+        fixtures::store_names()
+    };
+    for commit in store.observe(&mut host.files.events, &host.codec, names, &host.store_limits.root.connector) {
         for write in &commit.writes {
             if let root::Write::Save(row) = write {
                 match row {
@@ -257,55 +278,6 @@ fn answer_refusals(
             assert!(retained, "refused message {} is retained in the durable terminal inbox", refused.name());
             rules.message_refused(terminal.task, terminal.attempt, refused.name());
         }
-    }
-}
-
-pub(crate) fn party_event(up: parties::Up, store: &Store) -> core::Event {
-    match up {
-        parties::Up::SignIn { to, provider, subject } => core::Event::SignIn {
-            reply_to: ReplyTo::new(Token::new(to)),
-            identity: people::Identity {
-                key: people::IdentityKey { provider, subject },
-                login: b"person".as_slice().into(),
-                name: b"Person".as_slice().into(),
-            },
-        },
-        parties::Up::Request { to, sign_in, project, key, ask: parties::Ask::Chat { words } } => {
-            core::Event::People(people::Event::Ask {
-                models: Box::new([]),
-                reply_to: ReplyTo::new(Token::new(to)),
-                sign_in,
-                key,
-                ask: fixtures::chat(store, project, &words),
-            })
-        }
-        parties::Up::Request {
-            to,
-            sign_in,
-            project,
-            key,
-            ask: parties::Ask::Say { task: parties::Task::Number(task), words, release },
-        } => core::Event::People(people::Event::Ask {
-            models: Box::new([]),
-            reply_to: ReplyTo::new(Token::new(to)),
-            sign_in,
-            key,
-            ask: party_words(project, task, words, release),
-        }),
-        parties::Up::Request { ask, .. } => panic!("channel script requested {ask:?}"),
-    }
-}
-fn party_words(project: u32, task: u64, words: Box<[u8]>, release: Option<u64>) -> people::Ask {
-    match release {
-        Some(revision) => {
-            let mut operations = skein_lib::List::with_capacity(2);
-            operations.push(people::Operation::Message { task, words }).expect("two word and release operations");
-            operations
-                .push(people::Operation::Release { task, revision, again: None })
-                .expect("two word and release operations");
-            people::Ask::Compound { project, operations }
-        }
-        None => people::Ask::Say { project, task, words },
     }
 }
 
@@ -405,7 +377,7 @@ pub(crate) fn diagnostics(procs: &[Proc]) -> String {
                     })
                     .collect::<Vec<_>>()
             )),
-            Proc::Auth(_) | Proc::Probe(_) => None,
+            Proc::Probe(_) | Proc::Auth(_) | Proc::Client(_) => None,
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -417,7 +389,7 @@ pub(crate) fn worker_wire(procs: &[Proc]) -> &processes::Wire {
         .find_map(|proc| match proc {
             Proc::Worker(worker) => Some(&worker.wire),
             Proc::Probe(peer) => Some(&peer.wire),
-            Proc::Engine(_) | Proc::Agent { .. } | Proc::Auth(_) | Proc::Peer(_) => None,
+            Proc::Engine(_) | Proc::Agent { .. } | Proc::Peer(_) | Proc::Auth(_) | Proc::Client(_) => None,
         })
         .expect("worker's wire observations")
 }
@@ -432,6 +404,9 @@ pub(crate) struct Views {
     pub(crate) commits_waiting_at_drain: usize,
     pub(crate) durable_at_restart: u64,
     pub(crate) held_at_restart: Option<u64>,
+    pub(crate) query_submissions: Option<u32>,
+    pub(crate) providers_before: (Option<u32>, Vec<(u32, u32, u32)>),
+    pub(crate) providers_after: (Option<u32>, Vec<(u32, u32, u32)>),
 }
 
 fn transcript_count(bytes: &[u8]) -> u32 {
@@ -448,6 +423,7 @@ fn transcript_count(bytes: &[u8]) -> u32 {
 fn make_referee(script: &Script, store: Rc<RefCell<Store>>, views: Rc<RefCell<Views>>) -> crate::referee::Referee {
     crate::referee::Referee {
         store,
+        accounts: crate::account_setup::Setup::default(),
         party: parties::Party::new(1, parties::Role::Owner, 100, fixtures::party_script(script)),
         period: false,
         passed: false,
@@ -463,6 +439,7 @@ fn make_referee(script: &Script, store: Rc<RefCell<Store>>, views: Rc<RefCell<Vi
             crate::stories::Story::Drain
             | crate::stories::Story::ApplicationGeneration
             | crate::stories::Story::Key { .. }
+            | crate::stories::Story::Providers
             | crate::stories::Story::Chat
             | crate::stories::Story::Stalled
             | crate::stories::Story::Quiet
@@ -503,6 +480,8 @@ fn launch(
         program: b"agent-program".as_slice().into(),
         make: if matches!(script.story, crate::stories::Story::BeyondGrace) {
             processes::agent_slow
+        } else if matches!(script.story, crate::stories::Story::Providers) {
+            processes::agent_providers
         } else if matches!(script.story, crate::stories::Story::Key { .. }) {
             processes::agent_anthropic
         } else {
@@ -511,14 +490,16 @@ fn launch(
         instances: 2,
         operations: smith_agent_process_world::limits().routes.checked_add(2).expect("agent operations"),
     });
-    let engine_factory = if matches!(
+    let engine_factory = if matches!(script.story, crate::stories::Story::Providers) {
+        processes::engine_providers
+    } else if matches!(
         script.story,
         crate::stories::Story::Refusals(
             crate::stories::MessageRefusal::TooLarge | crate::stories::MessageRefusal::Replay
         )
     ) {
         processes::engine_message
-    } else if matches!(script.story, crate::stories::Story::Drain) {
+    } else if matches!(script.story, crate::stories::Story::Drain | crate::stories::Story::Providers) {
         processes::engine_drain
     } else if matches!(script.story, crate::stories::Story::Call) {
         processes::engine_calls
@@ -531,27 +512,24 @@ fn launch(
     };
     let mut roots =
         vec![skein_world::StartupRoot { name: b"state".as_slice().into(), path: b"state".as_slice().into() }];
-    if matches!(script.story, crate::stories::Story::Drain) {
+    if matches!(script.story, crate::stories::Story::Drain | crate::stories::Story::Providers) {
         roots.push(skein_world::StartupRoot {
             name: b"restart-state".as_slice().into(),
             path: b"state".as_slice().into(),
         });
     }
     harness.spawn_restartable(roots, engine_factory);
-
+    // The real key request is kept before these channel-story cuts.
+    if matches!(script.story, crate::stories::Story::Refusals(crate::stories::MessageRefusal::Replay)) {
+        harness.cut(0, 156, skein_world::Cut::Kill);
+    }
     if matches!(script.story, crate::stories::Story::DurableRestart) {
-        // After the turn's transcript is written and its commit held; the
-        // handed-in record's write and sync to the secrets' store, and the
-        // commit that keeps the accounts' counter and the sources/inventory
-        // exchange come first.
-        harness.cut(0, 102, skein_world::Cut::Kill);
+        harness.cut(0, 143, skein_world::Cut::Kill);
     }
     if let crate::stories::Story::Restart { before } = script.story {
         harness.cut(0, before, skein_world::Cut::Kill);
     }
-    if matches!(script.story, crate::stories::Story::Refusals(crate::stories::MessageRefusal::Replay)) {
-        harness.cut(0, 80, skein_world::Cut::Kill);
-    }
+
     spawn_channel_side(harness, root, script);
     if !matches!(
         script.story,
@@ -629,7 +607,9 @@ fn spawn_channel_side(
     } else if let crate::stories::Story::Opening(case) = script.story {
         harness.spawn(|| Proc::Probe(Box::new(crate::relay::Peer::opening(case))));
     } else {
-        let factory = if matches!(
+        let factory = if matches!(script.story, crate::stories::Story::Providers) {
+            processes::worker_providers
+        } else if matches!(
             script.story,
             crate::stories::Story::Refusals(
                 crate::stories::MessageRefusal::TooLarge | crate::stories::MessageRefusal::Replay
@@ -711,4 +691,29 @@ fn recorded(worker: Option<&processes::Wire>) -> Option<Recorded> {
         }
     })?;
     Some(Recorded { turn, answer })
+}
+
+pub(crate) fn provider_choices(store: &Store) -> (Option<u32>, Vec<(u32, u32, u32)>) {
+    let main = store.rows.values().find_map(|row| {
+        if let root::Record::Core(core::Record::Tasks(
+            jig_domain_tasks::Stored::Live(task) | jig_domain_tasks::Stored::Ended(task),
+        )) = row
+        {
+            task.kept_account
+        } else {
+            None
+        }
+    });
+    let bindings = store
+        .rows
+        .values()
+        .find_map(|row| {
+            if let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) = row {
+                Some(proof.accounts.iter().map(|a| (a.provider, a.account, a.source)).collect())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
+    (main, bindings)
 }

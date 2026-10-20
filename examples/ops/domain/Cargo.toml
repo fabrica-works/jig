@@ -27,6 +27,7 @@ jig-ops-domain-infrastructure.workspace = true
 smith-charter.workspace = true
 
 [dev-dependencies]
+jig-test-domain.workspace = true
 jig-core-world = { path = "../../../tests/core" }
 jig-ops-world = { path = "../../../tests/ops" }
 

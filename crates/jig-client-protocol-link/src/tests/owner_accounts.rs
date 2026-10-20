@@ -80,7 +80,6 @@ fn ends() -> Box<[c::OwnerAccountEnd]> {
     Box::new([
         c::OwnerAccountEnd::Made { account: 7, declined: false },
         c::OwnerAccountEnd::Renewed { account: 7, declined: true },
-        c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::Configured },
         c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::NotLimited },
         c::OwnerAccountEnd::Refused { refusal: c::OwnerAccountRefusal::Uses },
         c::OwnerAccountEnd::Refused {

@@ -1,4 +1,5 @@
 //! Binary, native person and independent provider on Skein's real ring.
+pub mod d2;
 use jig_client_protocol_world::native::{NativeClient, Script};
 use skein_io::kernel::{Complete, Done, Fd, Op, Signal, Submit};
 use skein_lib::{Duration, Queue, Time, Token, Wall};
@@ -32,14 +33,13 @@ pub fn agent_configuration(directory: &Path) {
     private(&directory.join("agent.json"), &serde_json::to_vec(&value).expect("agent JSON"));
 }
 pub fn configuration(directory: &Path) {
-    for name in ["accounts", "secrets", "charters", "state", "agent-root"] {
+    for name in ["secrets", "charters", "state", "agent-root"] {
         fs::create_dir(directory.join(name)).expect("deployment directory");
     }
     for (name, bytes) in jig_channel_world::fixtures::files(false).entries.into_boxed() {
         private(&directory.join(std::str::from_utf8(&name).expect("fixture path")), bytes.expose());
     }
     private(&directory.join("worker.secret"), b"worker-secret");
-    private(&directory.join("accounts/chat.json"), br#"{"access_token":"token","expires_at":4102444800}"#);
     private(&directory.join("root.der"), skein_tls_world::pki::ROOT);
     agent_configuration(directory);
     let mut value: serde_json::Value =
@@ -74,6 +74,19 @@ pub fn start(directory: &Path) -> Binary {
     )
     .expect("jig-test starts")
 }
+fn start_d2(directory: &Path) -> Binary {
+    Binary::start(
+        Command {
+            program: env!("CARGO_BIN_EXE_jig-test").into(),
+            arguments: vec!["serve-d2".into(), "config.json".into(), "d2.json".into()],
+            directory: directory.into(),
+            environment: std::env::vars_os().filter(|(name, _)| name == "PATH").collect(),
+        },
+        Mode::Pipes,
+        65536,
+    )
+    .expect("explicit D2 fixture starts")
+}
 pub fn printed_link(bytes: &[u8]) -> Option<&[u8]> {
     let end = bytes.iter().position(|byte| *byte == b'\n')?;
     Some(&bytes[..end])
@@ -103,6 +116,7 @@ pub(super) struct Person {
     pub(super) root: Option<Fd>,
     pub(super) script: Option<Script>,
     pub(super) account_sign_in: bool,
+    pub(super) llm_key: Option<bool>,
     pub(super) input: Option<Fd>,
     pub(super) output: Option<Fd>,
     pub(super) reading: bool,
@@ -165,11 +179,40 @@ impl Host for Person {
                 7,
                 self.script.take().expect("person script"),
             );
-            if self.account_sign_in {
+            if self.account_sign_in || self.llm_key.is_some() {
                 client.hold_for_account_sign_in();
             }
             client.sign_in(link).expect("printed sign-in link");
             self.client = Some(client);
+        }
+        if let Some(sent) = &mut self.llm_key
+            && let Some(client) = &mut self.client
+        {
+            if !*sent && client.account_sign_in_ready() {
+                client.account_request(jig_client::accounts::add_key(
+                    jig_client::Key { asker: jig_client::Asker(77), number: 1 },
+                    [61; 16],
+                    jig_client::contract::AccountHolder::Deployment,
+                    1,
+                    None,
+                    skein_lib::Secret::new(b"token".as_slice().into()),
+                ));
+                *sent = true;
+            }
+            if client.received.iter().any(|r| {
+                matches!(
+                    r,
+                    jig_client_protocol_world::native::Received::Answer {
+                        answer: jig_client::contract::Answer::Done(jig_client::contract::Outcome::Owner(
+                            jig_client::contract::OwnerOutcome::AccountKeyKept { .. }
+                        )),
+                        ..
+                    }
+                )
+            }) {
+                client.resume_after_account_setup();
+                self.llm_key = None;
+            }
         }
         if !self.reading
             && let Some(fd) = self.output
@@ -287,7 +330,8 @@ impl Referee<Process> for Judge {
         let Process::Binary(binary) = &procs[0] else { panic!("binary") };
         assert!(
             binary.exit_status().is_none() || self.ended,
-            "jig-test failed: {}",
+            "jig-test failed {:?}: {}",
+            binary.exit_status(),
             String::from_utf8_lossy(binary.stderr())
         );
     }
@@ -302,9 +346,15 @@ impl Referee<Process> for Judge {
     }
 }
 pub fn run(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm::Peer>) -> (u32, u32) {
+    run_mode(directory, script, peer, false)
+}
+pub fn run_d2(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm::Peer>) -> (u32, u32) {
+    run_mode(directory, script, peer, true)
+}
+fn run_mode(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm::Peer>, d2: bool) -> (u32, u32) {
     let seconds = if std::env::var("NEXTEST_PROFILE").as_deref() == Ok("live") { 280 } else { 60 };
     let clock = Clock::new();
-    let mut binary = start(directory);
+    let mut binary = if d2 { start_d2(directory) } else { start(directory) };
     let streams = binary.take_streams().expect("binary pipes");
     let fds = streams.descriptors();
     let Streams::Pipes { input, output } = streams else { panic!("pipes mode") };
@@ -321,6 +371,7 @@ pub fn run(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm:
             root: Some(root),
             script: Some(script),
             account_sign_in: false,
+            llm_key: (!d2).then_some(false),
             input: Some(input),
             output: Some(output),
             reading: false,

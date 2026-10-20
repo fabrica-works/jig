@@ -47,7 +47,7 @@ fn a_value_past_the_token_bound_is_refused() {
     assert!(table.value(ACCOUNT_CHAT, 1, Time::ZERO).is_none());
 }
 #[test]
-fn the_tables_take_account_numbers_beyond_the_configured_accounts() {
+fn the_tables_take_sparse_source_numbers_within_the_count_bound() {
     let mut table = table();
     grant(&mut table, 20_000, 1, TOKEN_FIRST, 1000);
     grant(&mut table, 40_000, 1, TOKEN_FIRST, 1000);

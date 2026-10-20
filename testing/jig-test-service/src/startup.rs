@@ -413,13 +413,7 @@ pub(super) fn engine_startup(
         Some(_) | None => Some(0),
     }
     .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
-    let configured = crate::workers::configured_bytes(&parsed.engine)
-        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
-    let account_configuration = crate::accounts::configured_bytes(&parsed.engine)
-        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
-    let configured = configured
-        .checked_add(account_configuration)
-        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
+    let configured = configuration_bytes(&parsed.engine, runtime.as_ref())?;
     let bytes = limits::worst_case(&parsed.limits)
         .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?
         .checked_add(trust)
@@ -724,4 +718,21 @@ pub fn startup(
 pub(super) fn fixture_connectors(document: &[u8]) -> (config::Engine, [connector::Config; 2]) {
     let parsed = parse(document).expect("fixture configuration");
     (parsed.engine, [parsed.first, parsed.second])
+}
+
+fn configuration_bytes(engine: &config::Engine, runtime: Option<&crate::AccountsRuntime>) -> Result<u64, Problems> {
+    let d2 = match runtime {
+        Some(runtime) => runtime.d2.worst_case(&engine.limits.driver.client.document),
+        None => Some(0),
+    }
+    .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
+    let workers = crate::workers::configured_bytes(engine)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
+    let accounts = crate::accounts::configured_bytes(engine)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?;
+    workers
+        .checked_add(accounts)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))?
+        .checked_add(d2)
+        .ok_or(problem(Path::root().member(b"engine").member(b"memory_bytes"), What::Bound))
 }

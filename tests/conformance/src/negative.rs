@@ -39,7 +39,7 @@ pub enum Fault {
 type EngineOutput = Output<root::Write, Delivery>;
 
 pub(crate) fn input(
-    domain: &mut root::Domain,
+    domain: &mut super::Engine,
     config: &Config,
     clock: Clock,
     mut input: Input<root::Event, root::Record>,
@@ -123,7 +123,7 @@ pub(crate) fn input(
 }
 
 pub(crate) fn released(
-    domain: &mut root::Domain,
+    domain: &mut super::Engine,
     config: &Config,
     clock: Clock,
     outputs: Vec<EngineOutput>,

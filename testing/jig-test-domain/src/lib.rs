@@ -687,7 +687,7 @@ fn decide(domain: &mut Domain, env: &Env<Limits>, first: Work) {
                     }
                     core::RestartStep::LoadInbox => {
                         // The accounts' records came with the core's ranges:
-                        // want each configured account once they are restored.
+                        // want each real source once its account rows are restored.
                         work.push(Work::Core(core::Event::Account(jig_domain_accounts::Event::Want)));
                         hold(&mut decision, Delivery::Restart(step));
                     }

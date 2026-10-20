@@ -22,6 +22,7 @@ impl World {
         let (configuration, mut limits) = super::config::root(187);
         limits.core.fleet.turns = 1;
         limits.host.turns = 2;
+        let rows = jig_core_world::fixtures::account_rows(&configuration.core.settings.llm_providers);
         let mut world = Self {
             domain: root::Domain::new(configuration, &limits),
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
@@ -29,6 +30,12 @@ impl World {
             saved: Vec::new(),
             kept: Vec::new(),
         };
+        for row in rows {
+            let jig_test_domain::Record::Core(core::Record::Accounts(record)) = row else {
+                panic!("account fixture row")
+            };
+            world.send(root::Event::Core(core::Event::Account(accounts::Event::Restore { record })));
+        }
         for event in [
             core::Event::People(people::Event::Roles { project: 1, holdings: Box::new([]) }),
             core::Event::People(people::Event::Restored),

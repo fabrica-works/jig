@@ -488,8 +488,9 @@ deployment, is above the deployment's minimum for a run and holds its
 reserve and one more of its main model's most costly completions, and
 on a program backend one more again (section 7); the accounts its check
 chooses each have a source usable on a host with room (accounts.md,
-4.3), and the application's credentials its workspace needs are usable
-(engine.md, 12.1); a host the charter allows has room, declares its
+4.3), from runtime accounts and their restored source rows, never an
+endpoint account; and the application's credentials its workspace needs
+are usable (engine.md, 12.1); a host the charter allows has room, declares its
 task's models, and may take its payer's runs (engine.md, section 8);
 and every resource its workspace writes, saved state
 included, is covered by a grant of the task and held by the task or by

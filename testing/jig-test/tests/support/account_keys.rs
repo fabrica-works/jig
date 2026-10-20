@@ -133,7 +133,7 @@ impl Referee<Process> for Judge {
                         panic!("account key kept: {answer:?}")
                     };
                     let source = *source;
-                    assert_ne!(source, 0);
+
                     client(procs).account_request(accounts::replace_key(
                         REPLACE,
                         [42; 16],
@@ -214,6 +214,7 @@ pub fn run(directory: &Path) {
             root: Some(root),
             script: Some(Script::account_sign_in()),
             account_sign_in: true,
+            llm_key: None,
             input: Some(input),
             output: Some(output),
             reading: false,

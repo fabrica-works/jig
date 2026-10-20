@@ -37,7 +37,6 @@ pub(crate) fn owner_account_key_failure(value: &w::OwnerAccountKeyFailure) -> c:
 }
 pub(crate) fn owner_account_refusal(value: &w::OwnerAccountRefusal) -> c::OwnerAccountRefusal {
     match value {
-        w::OwnerAccountRefusal::Configured => c::OwnerAccountRefusal::Configured,
         w::OwnerAccountRefusal::NotLimited => c::OwnerAccountRefusal::NotLimited,
         w::OwnerAccountRefusal::Uses => c::OwnerAccountRefusal::Uses,
         w::OwnerAccountRefusal::NotKept(row) => {

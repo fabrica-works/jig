@@ -144,6 +144,8 @@ it is live:
   none, which leaves its LLM provider's default.
   The task keeps the choice it was given, and only an amendment changes
   it (section 7).
+  Configuration templates choose models and efforts; they never name an
+  account. Runtime requests supply the optional account preference.
 - **Its account:** the LLM account its runs use for its main model's LLM
   provider, chosen at its first run's check and kept from run to run,
   so that a conversation stays on one account's cache and replay, until

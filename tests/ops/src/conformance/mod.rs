@@ -231,11 +231,17 @@ impl Application for Ops {
             _ => panic!("declared story kinds"),
         }
     }
-    fn start(_: &Config, store: &mut Store) -> Vec<root::Event> {
+    fn start(config: &Config, store: &mut Store) -> Vec<root::Event> {
         if store.rows.is_empty() {
             let record =
                 root::Record::Core(core::Record::People(people::Stored::Roles { project: 1, holdings: Box::new([]) }));
             store.rows.insert(record.key(), record);
+            let configuration = config::root_for(config.seed, config.story == Story::Environment).0;
+            for row in jig_core_world::fixtures::account_rows(&configuration.core.settings.llm_providers) {
+                let jig_test_domain::Record::Core(row) = row else { panic!("account fixture row") };
+                let row = root::Record::Core(row);
+                store.rows.insert(row.key(), row);
+            }
         }
         vec![root::Event::Restart]
     }

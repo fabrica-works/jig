@@ -23,6 +23,8 @@ const SWEEP: Token = Token::new(PREFIX | (1_u64 << 34));
 const KEY_EXCHANGE: u64 = PREFIX | (1_u64 << 33);
 #[derive(Debug)]
 pub struct AccountsRuntime {
+    /// D2: removed by JP13. Ordinary callers supply `D2::empty()`.
+    pub d2: crate::D2,
     /// LLM account sign-in endpoints and origins, keyed by provider number.
     pub providers: List<(u32, driver::Endpoint, List<driver::Origin>)>,
     /// Bounds of all prepared trust roots, supplied by their shell owner.
@@ -30,10 +32,6 @@ pub struct AccountsRuntime {
     pub trust_root_bytes: u32,
 }
 /// The driver starts after the store supplies its durable installation identity (llm.md, 5.4).
-#[expect(
-    clippy::large_enum_variant,
-    reason = "one phase per service, and the sources it loads move once into the driver"
-)]
 enum Phase {
     Loading { crypto: CryptoRng },
     Running,
@@ -51,6 +49,7 @@ pub(super) struct Accounts {
     env: Env<driver::Limits>,
     ids: Map<u32, Secret>,
     providers: Map<u32, driver::Account>,
+    d2: crate::D2,
     required: Map<u32, Box<[u8]>>,
     erasing: Map<u32, Erasing>,
     records: records::Records,
@@ -199,12 +198,20 @@ impl Accounts {
         let crypto = CryptoRng::new(&seeds.crypto, 1).ok_or(problem(0, What::Bound))?;
         let providers = provider_templates(config, runtime.as_mut(), &limits, &crypto, &seeds.installation)?;
         let inventory = restart::Inventory::new(limits.accounts, secrets.page.rows);
+        let d2 = match runtime {
+            Some(runtime) => runtime.d2,
+            None => crate::D2::empty(),
+        };
+        if d2.sources.len() > limits.accounts {
+            return Err(problem(0, What::Bound));
+        }
         Ok(Self {
             component: None,
             phase: Phase::Loading { crypto },
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
             ids: Map::with_capacity(limits.accounts),
             providers,
+            d2,
             required: Map::with_capacity(limits.accounts),
             erasing: Map::with_capacity(limits.accounts),
             records: records::Records::new(limits.accounts),
@@ -526,6 +533,44 @@ impl Accounts {
         }
     }
     fn restore_signed_in(&mut self, source: u32, provider: u32, value: Option<Secret>) {
+        if let Some(record) = self.d2.sources.remove(&source) {
+            // D2: removed by JP13. Only an explicitly named, already durable fixture record.
+            let Some(value) = value else {
+                self.records.missing(source);
+                self.key_events.push(domain::FromComponent::Failed {
+                    account: source,
+                    failure: domain::Failure::Unloaded { at: domain::Place::File, why: domain::Unread::Unreadable },
+                });
+                return;
+            };
+            let expected =
+                oauth::encode_record(&record, &self.env.limits.client.document).expect("D2 helper checked record");
+            if expected.as_ref() != value.expose() {
+                self.records.missing(source);
+                self.key_events.push(domain::FromComponent::Failed {
+                    account: source,
+                    failure: domain::Failure::Unloaded { at: domain::Place::File, why: domain::Unread::Unreadable },
+                });
+                return;
+            }
+            let _loaded = self.records.load(source, value.expose(), &self.env.limits.client.document);
+            let id = Secret::new(record.metadata.clone().unwrap_or_default());
+            self.component.as_mut().expect("running driver").add(
+                &self.env,
+                source,
+                driver::Account::HandedIn,
+                &mut self.above,
+            );
+            self.ids.insert(source, id).expect("D2 source fits driver");
+            self.required.insert(source, Box::default()).expect("D2 source fits driver");
+            let records::Next::Driver(request) =
+                self.records.hand_in(source, record, &self.env.limits.client.document).expect("D2 helper record")
+            else {
+                unreachable!("D2 preseed is durable");
+            };
+            self.down(request);
+            return;
+        }
         let Some(template) = self.providers.get(&provider) else {
             self.key_events.push(domain::FromComponent::Failed {
                 account: source,
@@ -775,7 +820,7 @@ impl Accounts {
             }
         }
     }
-    /// The durable installation identity replaces this start's draw before any Restore or SignIn.
+    /// The durable installation identity replaces this start's draw before any restore or sign-in.
     fn opened(&mut self, kept: &[u8; 16]) {
         let Phase::Loading { crypto } = ::core::mem::replace(&mut self.phase, Phase::Running) else {
             unreachable!("loading");

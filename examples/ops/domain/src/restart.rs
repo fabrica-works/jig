@@ -25,7 +25,7 @@ pub(crate) fn route(
             core::RestartStep::LoadCore => held(decision, Output::Load { step, range: Range::Core }),
             core::RestartStep::LoadInbox => {
                 // The accounts' records came with the core's ranges: want
-                // each configured account once they are restored.
+                // each real source once its account rows are restored.
                 let requests = core::want_accounts(
                     &mut domain.core,
                     &Env { now: env.now, wall: env.wall, limits: env.limits.core },

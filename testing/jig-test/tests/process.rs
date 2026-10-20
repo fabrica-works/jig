@@ -2,8 +2,7 @@
 mod support;
 use jig_client_protocol_world::native::Script;
 
-/// The provider, answering one chat to a run lent the handed-in file's
-/// token as a bearer.
+/// The fake provider checks the credential presented by the real run.
 fn peer() -> skein_fake_peers::llm::Peer {
     let mut script = jig_channel_world::fixtures::one_chat(b"Hello");
     script.result = br#"{"form":"report","text":"Process answer","fields":{}}"#.as_slice().into();
@@ -20,32 +19,23 @@ fn peer() -> skein_fake_peers::llm::Peer {
 }
 
 #[test]
-fn a_killed_jig_test_restarts_and_the_work_is_found() {
+fn providers_only_startup_keeps_a_requested_key_across_restart() {
     let directory = support::scratch();
     support::configuration(directory.path());
     assert_eq!(support::run(directory.path(), Script::answered_chat(b"Hello", support::ANSWER), Some(peer())), (1, 1));
+    assert!(!directory.path().join("accounts/chat.json").exists());
     assert_eq!(support::run(directory.path(), Script::found_chat(support::ANSWER), None), (1, 0));
 }
 
-/// llm.md 5.1 and store.md 9: the first start keeps the handed-in record in
-/// the secrets' store. The next names the account a sign-in source whose
-/// issuer nobody serves, and the handed-in file is gone: only the record
-/// the store kept can lend the token the provider expects.
 #[test]
-fn sign_in_state_survives_a_restart_through_the_store() {
+fn the_explicit_d2_preseed_reaches_the_shipped_driver_without_a_configured_account() {
     let directory = support::scratch();
     support::configuration(directory.path());
-    assert_eq!(support::run(directory.path(), Script::answered_chat(b"Hello", support::ANSWER), Some(peer())), (1, 1));
-    let path = directory.path().join("config.json");
-    let mut value: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(&path).expect("deployment JSON")).expect("deployment JSON");
-    value["engine"]["llm"]["accounts"][0]["source"] = serde_json::json!({"sign_in":{
-        "client":"client","authorization":"http://127.0.0.1:7101/authorize","token":"http://127.0.0.1:7101/token",
-        "endpoint":{"socket":"127.0.0.1:7101"},"transport":"plaintext","redirect":"http://localhost:7123/callback",
-        "scope":"read"}});
-    std::fs::write(&path, serde_json::to_vec(&value).expect("deployment JSON")).expect("deployment JSON");
-    std::fs::remove_file(directory.path().join("accounts/chat.json")).expect("handed-in file");
-    assert_eq!(support::run(directory.path(), Script::answered_chat(b"Hello", support::ANSWER), Some(peer())), (1, 1));
+    support::d2::preseed(directory.path(), br#"{"access_token":"token","expires_at":4102444800}"#);
+    assert_eq!(
+        support::run_d2(directory.path(), Script::answered_chat(b"Hello", support::ANSWER), Some(peer())),
+        (1, 1)
+    );
 }
 
 #[path = "support/browser.rs"]

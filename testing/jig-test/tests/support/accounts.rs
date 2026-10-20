@@ -311,6 +311,7 @@ pub fn run(directory: &Path) {
             root: Some(root),
             script: Some(Script::account_sign_in()),
             account_sign_in: true,
+            llm_key: None,
             input: Some(input),
             output: Some(output),
             reading: false,

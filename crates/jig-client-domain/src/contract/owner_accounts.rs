@@ -77,7 +77,6 @@ pub enum OwnerAccountKeyFailure {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum OwnerAccountRefusal {
-    Configured,
     NotLimited,
     Uses,
     NotKept { why: OwnerAccountKeyFailure },

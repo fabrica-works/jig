@@ -241,11 +241,10 @@ fn commit(store: &mut BTreeMap<Key, Stored>, requests: Vec<Request>) {
 
 #[test]
 fn each_record_restores_to_the_same_model() {
-    let configured = [account(7, 1, Holder::Deployment, b""), source(7, 8, 0, Kind::SignIn)];
     let start = |store: &BTreeMap<Key, Stored>| {
         let mut world = World::with(
             providers(vec![provider(1, true, true), provider(2, true, false), provider(3, false, false)]),
-            &configured,
+            &[],
         );
         world.wall = Wall::from_nanos(1_000_000_000_000);
         world.restore(store.values().cloned().collect());
@@ -253,6 +252,8 @@ fn each_record_restores_to_the_same_model() {
     };
     let mut store = BTreeMap::new();
     for record in [
+        account(7, 1, Holder::Deployment, b""),
+        source(7, 8, 0, Kind::SignIn),
         account(20, 1, ALICE, b"alice"),
         source(20, 21, 0, Kind::SignIn),
         source(20, 22, 1, Kind::Key),
@@ -281,26 +282,23 @@ fn each_record_restores_to_the_same_model() {
     for event in [
         Event::Limited { account: 21, reset },
         Event::Refused { account: 22, code: Box::new([]), reason: Box::new([]) },
-        Event::Limited { account: 7, reset: None },
+        Event::Limited { account: 8, reset: None },
     ] {
         let saved = world.step(event);
         assert_eq!(saved.len(), 1, "a changed hold saves its source's record");
         commit(&mut store, saved);
     }
-    assert_eq!(
-        store.len(),
-        7,
-        "the counter, two accounts and four sources: a configured account is the configuration's, its source's record its hold"
-    );
+    assert_eq!(store.len(), 8, "the counter, three accounts and four sources are all durable rows");
     let mut again = start(&store);
     assert_eq!(again.domain.unrestored(), 0);
     assert_eq!(
         again.step(Event::Want),
         vec![
+            Request::Signing(jig_domain_accounts::Signing::Restore { source: 8, provider: 1, kind: Kind::SignIn }),
             Request::Signing(jig_domain_accounts::Signing::Restore { source: 21, provider: 1, kind: Kind::SignIn }),
             Request::Signing(jig_domain_accounts::Signing::Restore { source: 22, provider: 1, kind: Kind::Key }),
             Request::Signing(jig_domain_accounts::Signing::Restored),
-            want(7),
+            want(8),
             want(21),
             want(22)
         ],

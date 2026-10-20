@@ -176,55 +176,6 @@ fn a_keyed_retry_keeps_the_first_result() {
 }
 
 #[test]
-fn a_handed_in_record_is_kept_before_its_value_is_lent() {
-    use jig_protocol_store::{SecretOwner, Secrets};
-    let mut service = fixtures::started(&fixtures::accounts_document());
-    let get = || Secrets::Get { owner: SecretOwner::Source, number: 1 };
-    for _ in 0_u32..8 {
-        fixtures::turn(&mut service);
-        let engine = fixtures::engine(&mut service);
-        let lent = engine.values.accounts.value(1, 1, skein_lib::Time::from_nanos(1)).is_some();
-        let Some(StoreEvent::Secret { value, .. }) = engine.store.secrets(skein_lib::Token::new(99), get()) else {
-            panic!("a get is answered at once");
-        };
-        assert!(!lent || value.is_some(), "no value is lent before its record is kept");
-    }
-    let engine = fixtures::engine(&mut service);
-    let Some(StoreEvent::Secret { value: Some(kept), .. }) = engine.store.secrets(skein_lib::Token::new(99), get())
-    else {
-        panic!("the handed-in record is kept");
-    };
-    let Ok(record) = skein_oauth::decode_record(kept.expose(), &fixtures::config().limits.driver.client.document)
-    else {
-        panic!("a kept record decodes");
-    };
-    assert_eq!((record.key, &*record.access_token), (1, fixtures::TOKEN));
-    let value = engine.values.accounts.value(1, 1, skein_lib::Time::from_nanos(1)).expect("lent value");
-    assert_eq!(value.token.expose(), fixtures::TOKEN);
-    assert_eq!(value.scheme, Scheme::Bearer);
-    assert_eq!(
-        engine.domain.accounts().source_grant(1, engine.env.now).expect("announced grant").form,
-        jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Bearer)
-    );
-}
-#[test]
-fn a_handed_in_record_with_an_account_id_is_lent_withdrawn_beside_it() {
-    let document = fixtures::with(&fixtures::accounts_document(), b"accounts/chat.json", b"accounts/live.json");
-    let mut service = fixtures::started(&document);
-    for _ in 0_u32..8 {
-        fixtures::turn(&mut service);
-    }
-    let engine = fixtures::engine(&mut service);
-    let value = engine.values.accounts.value(1, 1, skein_lib::Time::from_nanos(1)).expect("lent value");
-    assert_eq!(value.token.expose(), fixtures::TOKEN);
-    assert_eq!(value.scheme, Scheme::Withdrawn { id: Secret::new(b"acc".as_slice().into()) });
-    assert_eq!(
-        engine.domain.accounts().source_grant(1, engine.env.now).expect("announced grant").form,
-        jig_domain_accounts::Form::Withdrawn
-    );
-}
-
-#[test]
 fn a_call_is_decoded_and_one_that_does_not_is_answered_an_error() {
     let config = fixtures::config();
     let mut tools = tools(&config);
@@ -423,27 +374,16 @@ fn a_result_that_does_not_decode_fails_its_attempt_as_invalid() {
     }
 }
 #[test]
-fn a_signed_in_source_without_runtime_is_refused_at_its_path() {
-    let document = fixtures::with(
-        &fixtures::accounts_document(),
-        br#"{"handed_in": {"file": "accounts/chat.json"}}"#,
-        fixtures::SIGNED_SOURCE,
-    );
+fn a_provider_registration_without_runtime_is_refused() {
+    let document = fixtures::with(&fixtures::accounts_document(), br#""keys":true"#, br#""keys":true,"sign_in":{"issuer":"https://issuer.example","client":"client","scopes":["openid"],"authorization":"https://issuer.example/authorize","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","must_grant":["openid"],"redirect_path":"callback"}"#);
     let found = crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds(), None, None)
         .err()
         .expect("runtime absent");
     assert_eq!(
-        found.problems.get(0),
-        Some(&jig_protocol_config::Problem {
-            path: jig_protocol_config::Path::root()
-                .member(b"engine")
-                .member(b"llm")
-                .member(b"accounts")
-                .child(jig_protocol_config::Segment::Index(0))
-                .member(b"source"),
-            what: jig_protocol_config::What::Refers,
-        })
+        found.problems.get(0).unwrap().path,
+        jig_protocol_config::Path::root().member(b"engine").member(b"llm").member(b"providers")
     );
+    assert_eq!(found.problems.get(0).unwrap().what, jig_protocol_config::What::Refers);
 }
 
 const IDENTITY: [u8; 16] = [227, 220, 92, 103, 122, 9, 131, 161, 162, 47, 205, 195, 6, 132, 110, 28];

@@ -136,7 +136,6 @@ pub fn account_end_records() -> Vec<w::OwnerAccountEnd> {
         ),
     ];
     let refusals = [
-        w::OwnerAccountRefusal::Configured,
         w::OwnerAccountRefusal::NotLimited,
         w::OwnerAccountRefusal::Uses,
         w::OwnerAccountRefusal::NotKept(

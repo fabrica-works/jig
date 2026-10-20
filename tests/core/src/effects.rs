@@ -35,6 +35,7 @@ pub enum Cut {
 #[expect(clippy::struct_excessive_bools, reason = "independently held peer traffic and crash cuts")]
 pub struct World {
     bootstrap_owners: Vec<people::InitialOwner>,
+    fixture_accounts: Box<[root::Record]>,
     pub domain: root::Domain,
     pub store: Store,
     pub systems: [System; 2],
@@ -284,6 +285,9 @@ impl World {
                         while let Some(write) = writes.pop() {
                             rows.push(write);
                         }
+                        rows.extend(
+                            std::mem::take(&mut self.fixture_accounts).into_vec().into_iter().map(root::Write::Save),
+                        );
                         if let Some(watches) = &mut self.watches {
                             watches.commit(number, &rows);
                         }

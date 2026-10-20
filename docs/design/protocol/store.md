@@ -743,14 +743,15 @@ Removing a missing file is not a failure.
    root's first commit, with the deployment's header.
 3. **The root starts** (`service.md`, section 3): the core's restart
    script asks for one step at a time, and the store serves each step's
-   ranges (7.2). A first start makes a second commit after the first
-   start's decision: the accounts child's want, which saves its counter,
-   moved past the configured accounts' numbers, and the accounts it
-   makes for the LLM providers whose source is none.
+   ranges (7.2). The accounts child's want saves its never-reused
+   counter when it advances, and the ordinary account/source rows it
+   makes for providers whose source is none. A first start with no
+   accounts needs no such commit. Restarts retain those same numbers.
 4. **Secrets are served** to the protocol layer's other components once
    the secrets' store is open: each signed-in source's record to make
-   skein's driver with, and each key to the accounts' table, before the
-   root's restart begins (`llm.md`, 5.1).
+   skein's driver with, and each key to the accounts' table, when the
+   accounts child names the restored sources. After all are named, the
+   component sweeps unnamed source secrets (`llm.md`, 5.1).
 
 ## 11. Growth
 

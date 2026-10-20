@@ -140,6 +140,12 @@ the application's main (its shell)
   home for that connector. A project seeded with none has none until
   then.
 
+Every configured model belongs to exactly one numbered LLM provider,
+including providers whose source is none. Omitted or empty providers
+therefore require an empty model catalogue. Endpoint backend names do
+not select accounts or infer provider membership. The public JSON refuses
+`llm.accounts` and an endpoint's `account` member at their paths.
+
 ### 3.1 Templates
 
 - **A template is the application's recipe for a shape of work:** the

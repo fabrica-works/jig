@@ -86,6 +86,7 @@ impl skein_world::Referee<Proc> for Judge {
                     Proc::Engine(_)
                     | Proc::Worker(_)
                     | Proc::Auth(_)
+                    | Proc::Client(_)
                     | Proc::Agent { .. }
                     | Proc::Peer(_)
                     | Proc::Probe(_) => {}
@@ -135,7 +136,12 @@ impl skein_world::Referee<Proc> for Judge {
                         self.phase = Phase::Asked;
                     }
                 }
-                Proc::Worker(_) | Proc::Auth(_) | Proc::Agent { .. } | Proc::Peer(_) | Proc::Probe(_) => {}
+                Proc::Worker(_)
+                | Proc::Auth(_)
+                | Proc::Client(_)
+                | Proc::Agent { .. }
+                | Proc::Peer(_)
+                | Proc::Probe(_) => {}
             }
         }
         self.record(hellos);

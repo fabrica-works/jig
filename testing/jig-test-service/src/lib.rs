@@ -2,6 +2,9 @@
 #![cfg_attr(not(test), no_std)]
 #![forbid(unsafe_code)]
 extern crate alloc;
+#[cfg(test)]
+#[global_allocator]
+static HEAP: skein_heap::Counting = skein_heap::Counting;
 mod accounts;
 mod boundary;
 mod clients;
@@ -23,7 +26,9 @@ mod stop;
 mod store;
 pub mod system;
 use alloc::boxed::Box;
+mod d2;
 pub use boundary::{End, Files, PartyOutput, Seeds, Stop};
+pub use d2::{D2, D2Preseed, d2_preseed};
 pub use engine::Engine;
 pub use limits::Limits;
 use skein_io::{

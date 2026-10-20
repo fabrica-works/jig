@@ -10,6 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) enum Proc {
     Auth(Box<dyn Host>),
+    Client(Box<jig_client_protocol_world::native::NativeClient>),
     Engine(Box<ServiceHost>),
     Worker(Box<ServiceHost>),
     Agent { host: Box<PipeHost<smith_agent_shell::Agent>>, errors: agent_fixture::AgentErrors },
@@ -25,6 +26,7 @@ pub(crate) struct ServiceHost {
     pub(crate) service: Service,
     pub(crate) wire: Wire,
     pub(crate) stopping: bool,
+    pub(crate) submitted: u32,
     worker: bool,
     pub(crate) files: Capture,
     pub(crate) codec: jig_protocol_store::codec::Limits,
@@ -43,6 +45,7 @@ impl ServiceHost {
             service,
             wire: Wire::default(),
             stopping: false,
+            submitted: 0,
             worker,
             files: Capture::default(),
             codec: jig_protocol_store::codec::limits(&fixtures::store_limits().root.core)
@@ -82,6 +85,7 @@ impl Host for ServiceHost {
                 self.service.submissions().push(submit);
             }
         }
+        self.submitted += self.service.submissions().len();
         for submit in self.service.submissions().iter() {
             if let kernel::Op::Close { fd } = submit.kind
                 && let Some(bound) = self.wire.stop_bounds.get(&fd.raw())
@@ -122,6 +126,7 @@ impl Proc {
             Self::Agent { host, .. } => host.as_ref(),
             Self::Auth(fake) => fake.as_ref(),
             Self::Peer(peer) => peer.as_ref(),
+            Self::Client(client) => client.as_ref(),
             Self::Probe(peer) => peer.as_ref(),
         }
     }
@@ -131,6 +136,7 @@ impl Proc {
             Self::Agent { host, .. } => host.as_mut(),
             Self::Auth(fake) => fake.as_mut(),
             Self::Peer(peer) => peer.as_mut(),
+            Self::Client(client) => client.as_mut(),
             Self::Probe(peer) => peer.as_mut(),
         }
     }
@@ -174,6 +180,9 @@ impl Host for Proc {
 pub(crate) fn engine(inherited: &Inherited) -> Proc {
     engine_configured(inherited, false)
 }
+pub(crate) fn engine_providers(inherited: &Inherited) -> Proc {
+    engine_document(inherited, &fixtures::providers_document())
+}
 pub(crate) fn engine_drain(inherited: &Inherited) -> Proc {
     engine_configured(inherited, false)
 }
@@ -209,21 +218,30 @@ fn engine_document(inherited: &Inherited, document: &[u8]) -> Proc {
     Proc::Engine(Box::new(host))
 }
 pub(crate) fn worker(root: kernel::Fd) -> Proc {
-    worker_configured(root, false, false)
+    worker_configured(root, false, false, false)
 }
 pub(crate) fn worker_bad_charter(root: kernel::Fd) -> Proc {
-    worker_configured(root, true, false)
+    worker_configured(root, true, false, false)
 }
 pub(crate) fn worker_message(root: kernel::Fd) -> Proc {
-    worker_configured(root, false, true)
+    worker_configured(root, false, true, false)
 }
-fn worker_configured(root: kernel::Fd, bad_charter: bool, message: bool) -> Proc {
-    worker_document(root, bad_charter, message, fixtures::WORKER_DOCUMENT)
+pub(crate) fn worker_providers(root: kernel::Fd) -> Proc {
+    worker_configured(root, false, false, true)
 }
-fn worker_document(root: kernel::Fd, bad_charter: bool, message: bool, document: &[u8]) -> Proc {
+fn worker_configured(root: kernel::Fd, bad_charter: bool, message: bool, providers: bool) -> Proc {
+    worker_document(root, bad_charter, message, providers, fixtures::WORKER_DOCUMENT)
+}
+fn worker_document(root: kernel::Fd, bad_charter: bool, message: bool, providers: bool, document: &[u8]) -> Proc {
     let mut roots = skein_lib::List::with_capacity(1);
     roots.push(root).expect("one worker root");
     let mut agent = fixtures::agent();
+    if providers {
+        let mut models = agent.bounds.models.into_vec();
+        models.push(jig_domain_host::ModelBound { name: b"other".as_slice().into(), window: 1_048_576, output: 512 });
+        agent.bounds.models = models.into_boxed_slice();
+        agent.host_limits.accounts = 3;
+    }
 
     if bad_charter {
         agent.endpoints = smith_protocol_channel::Endpoints::new(skein_lib::List::with_capacity(0));
@@ -245,6 +263,16 @@ fn worker_document(root: kernel::Fd, bad_charter: bool, message: bool, document:
 }
 pub(crate) fn agent(_spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
     agent_configured(inherited, fixtures::agent_configuration(), false)
+}
+pub(crate) fn agent_providers(_spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
+    let mut config = fixtures::agent_configuration();
+    let mut other = config.domain.models[0].clone();
+    other.model = b"other".as_slice().into();
+    config.domain.models = Box::new([config.domain.models[0].clone(), other]);
+    config.limits.llm.llms = 2;
+    config.limits.llm.accounts = 3;
+    config.limits.memory = 4 << 30;
+    agent_configured(inherited, config, false)
 }
 pub(crate) fn agent_slow(_spawn: &kernel::Spawn, inherited: &Inherited) -> Proc {
     agent_configured(inherited, fixtures::agent_configuration(), true)
@@ -272,6 +300,7 @@ pub(crate) struct Wire {
     inventory: BTreeMap<i32, Vec<Box<[u8]>>>,
     completed: BTreeSet<skein_lib::Token>,
     streams: BTreeMap<(i32, bool), Vec<u8>>,
+    clients: BTreeSet<i32>,
     pub(crate) acknowledgements: Vec<(u64, u64)>,
     pub(crate) calls_answered: u32,
     pub(crate) frames: Vec<(Time, u16, Box<[u8]>)>,
@@ -336,8 +365,16 @@ impl Wire {
         if worker && Some(fd) != self.channel {
             return;
         }
+        if self.clients.contains(&fd.raw()) {
+            return;
+        }
         let stream = self.streams.entry((fd.raw(), send)).or_default();
         stream.extend_from_slice(bytes);
+        if !worker && (stream.starts_with(b"GET ") || stream.starts_with(b"POST ") || stream.starts_with(b"HTTP/")) {
+            self.clients.insert(fd.raw());
+            self.streams.retain(|(number, _), _| *number != fd.raw());
+            return;
+        }
         while stream.len() >= 8 {
             let header = skein_channel::parse_header(&stream[..8]).expect("channel frame header");
             let end = 8 + usize::try_from(header.body_len).expect("bounded frame body");
@@ -509,7 +546,7 @@ pub(crate) fn worker_programs(root: kernel::Fd) -> Proc {
         .expect("fixture JSON")
         .replace(r#""hub.slots":1"#, r#""hub.detail_bytes":8,"hub.slots":1"#);
     assert!(document.contains(r#""hub.detail_bytes":8"#), "tiny source detail fixture");
-    let mut worker = worker_document(root, false, false, document.as_bytes());
+    let mut worker = worker_document(root, false, false, false, document.as_bytes());
     let Proc::Worker(host) = &mut worker else { unreachable!("worker factory") };
     host.service
         .configure_program_sources(

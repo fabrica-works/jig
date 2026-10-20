@@ -5,13 +5,12 @@ use skein_lib::{Duration, List, Secret};
 
 pub const SEED: u64 = 7;
 pub const TOKEN: &[u8] = b"test-token";
-/// A key the story puts in the engine's table before the attempt starts.
+/// A key the story keeps through a real request before the attempt starts.
 pub const KEY: &[u8] = b"test-key";
 /// The key's next generation, put while the attempt runs.
 pub const NEXT_KEY: &[u8] = b"test-key-2";
 const DIGEST: &[u8] = b"6fb46f7a92742970166379ed5195e79c4493a7cc5664280c039cfd4095ba5faf";
 const REPORT: &[u8] = br#"{"form":"report","text":"Hello","fields":{}}"#;
-const ACCOUNT: &[u8] = br#"{"access_token":"test-token","expires_at":1767229200}"#;
 
 #[must_use]
 pub fn calm(seed: u64) -> Settings {
@@ -34,11 +33,11 @@ const ENGINE: &[u8] = br#"{
 "tasks.result_bytes":32,"people.amendment_bytes":64,"core.policy_bytes":256,"tasks.spec_bytes":128,"tasks.message_bytes":512,"tasks.hold_bytes":64,"tasks.authority_bytes":64,"people.words":512,"core.call_answer_bytes":2048,"notes.recalled":1,
 "people.operations":2,"tasks.tasks":2,"tasks.funders":2,"tasks.project_tasks":1,"tasks.tree_tasks":1,"tasks.project_goals":1,
 "tasks.batch":1,"tasks.dependencies":1,"tasks.delegates":1,"tasks.charters":1,
-"people.people":1,"people.projects":1,"people.sign_ins":1,"people.holdings":1,
+"people.people":1,"people.projects":1,"people.sign_ins":2,"people.holdings":1,
 "people.inbox_tasks":4,"people.pending":1,"people.waiters":1,
 "fleet.attempts":1,"fleet.calls":1,"fleet.turns":8,
 "brief.briefs":1,"brief.sections":1,
-"notes.entries_per_scope":1,"views.runs":1,"views.watchers":2,"views.watchers_per_party":2,
+"notes.entries_per_scope":1,"views.runs":1,"views.watchers":4,"views.watchers_per_party":4,
 "core.load_slots":1,"core.load_bytes":8192,"core.resume_bytes":4096,"core.run_bytes":4096,"views.text_bytes":1024
 ,"core.templates":2,"documents.rows":1,"documents.lines":1,"documents.chips":1,"documents.text_bytes":128
 }},
@@ -124,7 +123,7 @@ pub fn engine_document() -> Vec<u8> {
     document.extend_from_slice(
         br#", "application":{"server":{"listener":{"socket":"127.0.0.1:7100"}},"credential":"app.secret","connectors":[
         {"prefix":["one"],"resources":[]},{"prefix":["two"],"resources":[]}]},
-        "service":{"components":["accounts","workers"]}}"#,
+        "service":{"components":["accounts","workers","clients"]}}"#,
     );
     document
 }
@@ -136,7 +135,6 @@ pub fn files(worker: bool) -> Files {
         &[
             (b"charters/chat.txt", b"Reply to the person."),
             (b"secrets/worker-a.digest", DIGEST),
-            (b"accounts/chat.json", ACCOUNT),
             (b"app.secret", b"application-token"),
         ]
     };
@@ -569,4 +567,18 @@ pub fn chat(store: &crate::world::Store, project: u32, words: &[u8]) -> jig_doma
     member.flags = people::Flags { conversation: true, listed: false, retention: people::Retention::Kept };
     member.label = jig_client_test_records::CHAT;
     people::Ask::Create { project, batch: Box::new([member]) }
+}
+
+/// Two numbered providers share an endpoint but require distinct real source grants.
+pub(crate) fn providers_document() -> Vec<u8> {
+    String::from_utf8(engine_document()).expect("bounded fixture value")
+        .replace(r#""providers":[{"name":"fake-provider","number":1,"models":["fake"],"sources":{"keys":true}}]"#,
+                 r#""providers":[{"name":"fake-provider","number":1,"models":["fake"],"sources":{"keys":true}},{"name":"other","number":2,"models":["other"],"sources":{"keys":true}}]"#)
+        .replace("\"unit\": 1000000}\n}]", "\"unit\": 1000000}\n},{\"name\":\"other\",\"endpoint\":\"fake\",\"window\":1048576,\"output\":512,\"prices\":{\"input\":1,\"cached\":1,\"output\":1,\"unit\":1000000}}]")
+        .replace(r#""alternatives": []"#, r#""alternatives": ["other"]"#).into_bytes()
+}
+
+pub(crate) fn providers_store_names() -> &'static [Box<[u8]>] {
+    static NAMES: std::sync::OnceLock<Box<[Box<[u8]>]>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| Box::new([b"fake".as_slice().into(), b"other".as_slice().into()]))
 }

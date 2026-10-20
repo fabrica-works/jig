@@ -49,6 +49,8 @@ jig-protocol-worker-wire.workspace = true
 jig-protocol-engine-workers.workspace = true
 
 [dev-dependencies]
+skein-heap.workspace = true
+jig-protocol-accounts-world = { path = "../../tests/protocol-accounts" }
 jig-client.workspace = true
 skein-world.workspace = true
 skein-fake-channel.workspace = true

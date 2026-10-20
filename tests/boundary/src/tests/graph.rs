@@ -689,6 +689,7 @@ fn client_crates_carry_the_client_prefix() {
         "jig-test",
         "jig-test-service",
         "jig-one-process-world",
+        "jig-channel-world",
         "jig-ops-world",
     ];
     assert_eq!(crate::client_names::breaches(&kit_root(), "jig", &allowed), PENDING);

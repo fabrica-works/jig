@@ -24,7 +24,7 @@ pub struct Registration {
     pub redirect_port: Option<u16>,
 }
 
-/// Joins the configured account sign-in scopes in OAuth's space-separated form.
+/// Joins the provider sign-in scopes in OAuth's space-separated form.
 #[must_use]
 pub fn scopes(values: &[Box<[u8]>]) -> Box<[u8]> {
     let mut length = values.len().saturating_sub(1);

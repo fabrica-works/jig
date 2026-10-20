@@ -202,8 +202,27 @@ impl Neighbours {
     }
 }
 
+/// Lower-domain fixture rows are restored only on the first empty-store load,
+/// then travel in its first real journal commit and every subsequent cold load.
+pub struct Engine {
+    root: root::Domain,
+    fixture: Option<Box<[root::Record]>>,
+    journal: Box<[root::Record]>,
+}
+impl std::ops::Deref for Engine {
+    type Target = root::Domain;
+    fn deref(&self) -> &Self::Target {
+        &self.root
+    }
+}
+impl std::ops::DerefMut for Engine {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.root
+    }
+}
+
 impl Application for Testing {
-    type Domain = root::Domain;
+    type Domain = Engine;
     type Store = Store;
     type Write = root::Write;
     type Config = Config;
@@ -218,8 +237,9 @@ impl Application for Testing {
         let (configuration, _) = config.root();
         Store::new(&config.limits, &configuration.core.settings.models)
     }
-    fn build(config: &Config) -> root::Domain {
+    fn build(config: &Config) -> Engine {
         let (configuration, limits) = config.root();
+        let fixture = jig_core_world::fixtures::account_rows(&configuration.core.settings.llm_providers);
         let mut domain = root::Domain::new(configuration, &limits);
         let env = env(config, Clock { now: 0 });
         domain.configure_holds(
@@ -230,7 +250,7 @@ impl Application for Testing {
                 tasks::Kind { connector: 1, kind: 2, hold: tasks::HoldKind::Pooled { taken: tasks::Taken::Waits } },
             ]),
         );
-        domain
+        Engine { root: domain, fixture: Some(fixture), journal: Box::new([]) }
     }
 
     fn systems(config: &Config, _: u64) -> [System; 2] {
@@ -374,9 +394,20 @@ impl Application for Testing {
         ]
     }
 
-    fn step(domain: &mut root::Domain, config: &Config, clock: Clock, input: Input<root::Event, root::Record>) {
+    fn step(domain: &mut Engine, config: &Config, clock: Clock, input: Input<root::Event, root::Record>) {
         let env = env(config, clock);
         let input = negative::input(domain, config, clock, input);
+        if matches!(&input, Input::Restore(root::Record::Core(core::Record::Core(core::CoreRecord::Deployment(_))))) {
+            domain.fixture = None;
+        }
+        if matches!(&input, Input::Event(root::Event::Core(core::Event::People(people::Event::Restored))))
+            && let Some(rows) = domain.fixture.take()
+        {
+            for row in &rows {
+                assert!(root::restore_record(domain, &env, row.clone()));
+            }
+            domain.journal = rows;
+        }
         match input {
             Input::Event(event) => root::step(domain, &env, event),
             Input::Committed(number) => root::step(domain, &env, root::Event::Committed { number, fill: 0 }),
@@ -385,7 +416,7 @@ impl Application for Testing {
         }
     }
 
-    fn release(domain: &mut root::Domain, config: &Config, clock: Clock) -> Vec<Output<root::Write, Delivery>> {
+    fn release(domain: &mut Engine, config: &Config, clock: Clock) -> Vec<Output<root::Write, Delivery>> {
         let mut queue = Queue::with_capacity(128);
         root::release(domain, &env(config, clock), &mut queue);
         let mut outputs = Vec::new();
@@ -396,6 +427,7 @@ impl Application for Testing {
                     while let Some(write) = writes.pop() {
                         rows.push(write);
                     }
+                    rows.extend(std::mem::take(&mut domain.journal).into_vec().into_iter().map(root::Write::Save));
                     Output::Commit { number, writes: rows.into_boxed_slice() }
                 }
                 root::Request::Restart(core::RestartStep::LoadInbox)
@@ -659,13 +691,13 @@ impl Application for Testing {
         observed
     }
 
-    fn ready(domain: &root::Domain) -> bool {
+    fn ready(domain: &Engine) -> bool {
         domain.ready()
     }
-    fn quiescent(domain: &root::Domain) -> bool {
+    fn quiescent(domain: &Engine) -> bool {
         domain.quiescent()
     }
-    fn reclaim(domain: &mut root::Domain) {
+    fn reclaim(domain: &mut Engine) {
         domain.reclaim();
     }
     fn maximum(config: &Config) -> u64 {

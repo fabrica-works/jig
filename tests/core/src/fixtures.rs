@@ -490,3 +490,71 @@ pub fn chat_for(world: &crate::effects::World, project: u32, role: u32, words: B
 }
 
 pub mod deadlines;
+
+/// Explicit durable key accounts used by the lower domain world; zero is a real account row.
+#[must_use]
+pub fn account_rows(providers: &jig_domain_accounts::Providers) -> Box<[root::Record]> {
+    use jig_domain_accounts::{Holder, Kind, Stored};
+    let mut rows = Vec::new();
+    for (index, entry) in providers.providers.iter().filter(|p| !p.offers.none()).enumerate() {
+        let index = u32::try_from(index).expect("bounded fixture value");
+        let (account, source) = if index == 0 { (0, 1) } else { (2 * index + 1, 2 * index) };
+        let provider = entry.number;
+        {
+            for row in [
+                Stored::Account {
+                    number: account,
+                    provider,
+                    holder: Holder::Deployment,
+                    place: index,
+                    uses: None,
+                    subject: Box::new([]),
+                    display: Box::new([]),
+                },
+                Stored::Source { account, number: source, place: 0, kind: Kind::Key, name: Box::new([]), held: None },
+            ] {
+                rows.push(root::Record::Core(core::Record::Accounts(row)));
+            }
+        }
+    }
+    if !rows.is_empty() {
+        rows.push(root::Record::Core(core::Record::Accounts(Stored::Next {
+            number: u32::try_from(rows.len()).expect("bounded fixture value"),
+        })));
+    }
+    rows.into_boxed_slice()
+}
+
+/// A lower-world story supplies the exact durable source it will grant later.
+#[must_use]
+pub fn waiting_on_source(seed: u64, source: u32) -> crate::effects::World {
+    let (config, limits) = crate::effects::fixture(seed, false);
+    let mut rows = account_rows(&config.core.settings.llm_providers).into_vec();
+    for row in &mut rows {
+        match row {
+            root::Record::Core(core::Record::Accounts(jig_domain_accounts::Stored::Source { number, .. })) => {
+                *number = source;
+            }
+            root::Record::Core(core::Record::Accounts(jig_domain_accounts::Stored::Next { number })) => {
+                *number = source + 1;
+            }
+            root::Record::Core(_) | root::Record::Connector { .. } => {}
+        }
+    }
+    configured_sources(seed, config, limits, rows.into_boxed_slice())
+}
+#[must_use]
+pub fn configured_sources(
+    seed: u64,
+    config: root::Config,
+    limits: root::Limits,
+    rows: Box<[root::Record]>,
+) -> crate::effects::World {
+    let initial = create_chat(
+        &Creating::new(&config.core, limits.core.tasks.tree_tasks),
+        1,
+        0,
+        b"make an effect".as_slice().into(),
+    );
+    crate::effects::World::configured_with_rows(seed, false, config, limits, initial, rows)
+}

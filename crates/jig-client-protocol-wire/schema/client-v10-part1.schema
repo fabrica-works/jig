@@ -65,7 +65,7 @@ record OwnerAccountRefusalLimit { bound: OwnerAccountBound }
 record OwnerAccountRefusalHeld { provider: u32 }
 record OwnerAccountRefusalProvider { provider: u32 }
 record OwnerAccountRefusalKind { kind: OwnerAccountKind }
-enum OwnerAccountRefusal { configured, not_limited, uses, not_kept: OwnerAccountRefusalNotKept, limit: OwnerAccountRefusalLimit, held: OwnerAccountRefusalHeld, provider: OwnerAccountRefusalProvider, subject, unknown, numbers, kind: OwnerAccountRefusalKind, closing, not_started }
+enum OwnerAccountRefusal { not_limited, uses, not_kept: OwnerAccountRefusalNotKept, limit: OwnerAccountRefusalLimit, held: OwnerAccountRefusalHeld, provider: OwnerAccountRefusalProvider, subject, unknown, numbers, kind: OwnerAccountRefusalKind, closing, not_started }
 record OwnerAccountFailureLater { after: option duration }
 record OwnerAccountFailureMissingScope { scope: u32 }
 record OwnerAccountFailureUnloaded { at: OwnerAccountPlace why: OwnerAccountUnread }

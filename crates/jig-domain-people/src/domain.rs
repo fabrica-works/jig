@@ -1352,7 +1352,7 @@ fn valid_answer_shape(ask: &Ask, outcome: Outcome) -> bool {
         Outcome::PoolSet { project, person } => expected == Expected::Pool(project, person),
         Outcome::EscalationDecided { .. } => expected == Expected::Escalation,
         Outcome::AccountSignInStarted { .. } => expected == Expected::AccountSignIn,
-        Outcome::AccountKeyKept { source } => expected == Expected::AccountKey && source != 0,
+        Outcome::AccountKeyKept { source } => expected == Expected::AccountKey && source != u32::MAX,
         Outcome::AccountChanged => expected == Expected::AccountChanged,
         Outcome::AccountRemoved { .. } => expected == Expected::AccountRemoved,
         Outcome::AccountSignedOut { .. } => expected == Expected::AccountSignOut,

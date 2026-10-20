@@ -333,7 +333,8 @@ holds, and neither of its components reads them.
   `protocol/charter.md`). The worker's routing decodes it as the agent
   starts, against the endpoints of the worker's agent configuration,
   which resolve the names it uses (`configuration.md`, section 4;
-  smith's `protocol/charter.md`, section 7).
+  smith's `protocol/charter.md`, section 7). The run's provider bindings supply its account/source numbers; configured
+  endpoints carry no account preference or default.
 - **Turns** cross as smith's turn bytes (smith's
   `protocol/transcript.md`), encoded on the worker as the agent hands
   each up, before the hub keeps it. The record carries beside them what

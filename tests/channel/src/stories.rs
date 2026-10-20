@@ -8,8 +8,9 @@ use skein_lib::Duration;
 #[derive(Clone, Copy, Debug)]
 pub enum Story {
     Chat,
+    Providers,
     ApplicationGeneration,
-    // The sign-in account's grant is a key; `replaced` puts its next generation while the attempt runs.
+    // A real key request supplies the grant; `replaced` changes it while the attempt runs.
     Key { replaced: bool },
     Stalled,
     Quiet,
@@ -45,11 +46,20 @@ fn script(story: Story) -> crate::world::Script {
     script.story = story;
     if matches!(
         story,
-        Story::Drain | Story::Progress | Story::Call | Story::Wait | Story::InvalidTranscript | Story::Refusals(_)
+        Story::Drain
+            | Story::Providers
+            | Story::Progress
+            | Story::Call
+            | Story::Wait
+            | Story::InvalidTranscript
+            | Story::Refusals(_)
     ) {
         script.leading_turns = 1;
     }
-    if matches!(story, Story::Restart { .. } | Story::ApplicationGeneration | Story::Key { replaced: true }) {
+    if matches!(
+        story,
+        Story::Restart { .. } | Story::Providers | Story::ApplicationGeneration | Story::Key { replaced: true }
+    ) {
         script.latency = Duration::from_secs(1);
     }
     if matches!(story, Story::Partition { .. } | Story::Facts | Story::Reconnect | Story::Shutdown | Story::Refusals(_))
@@ -79,15 +89,22 @@ pub fn drawn(seed: u64) -> Outcome {
         latency_max: Duration::from_millis(1),
         ..skein_sim::Faults::NONE
     };
-    let story = match draw.below(6) {
+    let mut story = match draw.below(6) {
         0 => Story::Chat,
         1 => Story::Progress,
         2 => Story::Call,
         3 => Story::HeldCommit,
         4 => Story::MidFrame,
-        5 => Story::Restart { before: 80 },
+        5 => Story::Restart { before: 124 },
         _ => panic!("bounded draw"),
     };
+    if matches!(story, Story::Restart { .. }) {
+        // Measure the same faulted startup through the real account request first.
+        let mut calibration = script(Story::Chat);
+        calibration.latency = Duration::from_secs(1);
+        let before = world::run(settings, calibration).query_submissions.expect("provider query");
+        story = Story::Restart { before };
+    }
     world::run(settings, script(story))
 }
 

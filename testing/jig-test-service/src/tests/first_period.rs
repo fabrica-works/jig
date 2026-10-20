@@ -164,7 +164,7 @@ fn later_start() -> Service {
         writes: Box::new([
             store::Write::Save(core::Record::Core(core::CoreRecord::Deployment(header))),
             store::Write::Save(core::Record::Tasks(tasks::Stored::Ledger(stored_period()))),
-            // The accounts' counter a first start keeps past the configured account and its source.
+            // The accounts' counter a first start keeps after making any none sources.
             store::Write::Save(core::Record::Accounts(jig_domain_accounts::Stored::Next { number: 2 })),
         ]),
     });

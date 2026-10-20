@@ -238,8 +238,9 @@ pub fn crash(settings: Settings, cut: skein_world::Cut, before: u32) -> Outcome 
 }
 fn client(inherited: &Inherited) -> Proc {
     let root = inherited.roots.first().expect("client root").1;
-    let client =
+    let mut client =
         NativeClient::new(fixtures::client_settings(), root, 1000, fixtures::SEED, Script::start_chat(b"Hello"));
+    client.hold_for_account_sign_in();
     Proc::Client(Box::new(SignalHost::new(client, Some(inherited.signal))))
 }
 fn peer(inherited: &Inherited) -> Proc {
@@ -289,7 +290,8 @@ fn run_phase(
     } else {
         for script in people {
             world.spawn_root(skein_sim::Handle::new(client_root.raw()), |root| {
-                let client = NativeClient::new(fixtures::client_settings(), root, 1000, settings.seed, script);
+                let mut client = NativeClient::new(fixtures::client_settings(), root, 1000, settings.seed, script);
+                client.hold_for_account_sign_in();
                 Proc::Client(Box::new(SignalHost::new(client, None)))
             });
         }

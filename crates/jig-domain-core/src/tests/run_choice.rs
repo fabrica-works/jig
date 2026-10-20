@@ -80,6 +80,10 @@ fn ready(none: bool) -> (Core, Limits) {
     config.settings.llm_providers.providers = Box::new([config.settings.llm_providers.providers[0].clone(), provider]);
     let mut core = Core::new(config, &limits);
     core.people = base.people;
+    restore_key_account(&mut core, &limits, 0, 1, 1);
+    if !none {
+        restore_key_account(&mut core, &limits, 3, 2, 2);
+    }
     make_task(&mut core, &limits, TASK);
     account(&mut core, &limits, accounts::Event::Want);
     granted(&mut core, &limits, 1);
@@ -93,7 +97,7 @@ fn optional_unavailable_provider_is_omitted_and_same_provider_shares_one_source(
     let (core, _) = ready(false);
     let choice = core.run_choice(TASK).unwrap();
     assert_eq!(choice.placement.channel, FIRST);
-    assert_eq!(choice.accounts.as_ref(), [authority::AccountBinding { provider: 1, account: 1, source: 1 }]);
+    assert_eq!(choice.accounts.as_ref(), [authority::AccountBinding { provider: 1, account: 0, source: 1 }]);
     assert_eq!(choice.policy.alternatives.iter().map(|model| model.name.as_ref()).collect::<Vec<_>>(), [b"same"]);
 }
 
@@ -112,8 +116,8 @@ fn usable_retained_provider_constrains_the_concrete_host() {
     assert_eq!(
         allowed.choice.accounts.as_ref(),
         [
-            authority::AccountBinding { provider: 1, account: 1, source: 1 },
-            authority::AccountBinding { provider: 2, account: 2, source: 2 },
+            authority::AccountBinding { provider: 1, account: 0, source: 1 },
+            authority::AccountBinding { provider: 2, account: 3, source: 2 },
         ]
     );
 }
@@ -126,7 +130,7 @@ fn a_none_provider_is_retained_without_a_credential_grant() {
     assert_eq!(
         choice.accounts.as_ref(),
         [
-            authority::AccountBinding { provider: 1, account: 1, source: 1 },
+            authority::AccountBinding { provider: 1, account: 0, source: 1 },
             authority::AccountBinding { provider: 2, account: 2, source: 3 },
         ]
     );
@@ -143,7 +147,7 @@ fn an_unknown_reset_wait_has_no_readiness_spin_after_a_long_advance() {
     assert_eq!(
         core.run_choice(TASK),
         Err(RunWait::Account {
-            account: Some(1),
+            account: Some(0),
             source: Some(1),
             why: accounts::WaitWhy::Source(accounts::State::Limited { until: None })
         })
@@ -154,7 +158,7 @@ fn an_unknown_reset_wait_has_no_readiness_spin_after_a_long_advance() {
 fn restored_bindings_refuse_duplicates_and_wrong_surviving_associations() {
     let (mut core, limits) = ready(false);
     let mut cases = Vec::new();
-    let binding = authority::AccountBinding { provider: 1, account: 1, source: 1 };
+    let binding = authority::AccountBinding { provider: 1, account: 0, source: 1 };
     cases.push((vec![binding], true));
     cases.push((vec![binding, binding], false));
     cases.push((vec![authority::AccountBinding { source: 2, ..binding }], false));
@@ -179,7 +183,7 @@ fn adoption_uses_recorded_sources_through_refresh_and_removal() {
     granted(&mut core, &limits, 2);
     let mut proof = RunProof::claimed(TASK, 7, 7, None, fleet::HostKind::Worker);
     proof.placement = Some(FIRST);
-    proof.accounts = Box::new([authority::AccountBinding { provider: 2, account: 2, source: 2 }]);
+    proof.accounts = Box::new([authority::AccountBinding { provider: 2, account: 3, source: 2 }]);
     core.proofs.insert(TASK, proof).unwrap();
     for usable in [true, false] {
         if !usable {
@@ -220,6 +224,7 @@ fn a_default_chooses_a_usable_provider_once_with_its_first_effort() {
 fn unknown_program_login_facts_also_hold_a_direct_run_off_workers() {
     let (mut core, limits) = ready(false);
     core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
+    restore_key_account(&mut core, &limits, 0, 1, 1);
     account(
         &mut core,
         &limits,
@@ -267,13 +272,13 @@ fn terminal_after_zero_reset(account_terminal: bool) -> tasks::Tries {
             attempt: 7,
             resumed: false,
             budget: 10,
-            account: Some(1),
+            account: Some(0),
             writes: Box::new([]),
         },
     );
     let mut proof = RunProof::claimed(TASK, 7, 7, None, fleet::HostKind::Worker);
     proof.placement = Some(FIRST);
-    proof.accounts = Box::new([authority::AccountBinding { provider: 1, account: 1, source: 1 }]);
+    proof.accounts = Box::new([authority::AccountBinding { provider: 1, account: 0, source: 1 }]);
     proof.account_failure = Some(1);
     proof.account_terminal = account_terminal;
     core.proofs.insert(TASK, proof).unwrap();

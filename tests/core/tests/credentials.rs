@@ -304,7 +304,7 @@ fn the_deployment_watch_shows_the_deployments_accounts_and_not_a_partys_own() {
         panic!("deployment document")
     };
     assert_eq!(deployment.accounts.len(), 1);
-    assert_eq!(deployment.accounts.get(0).expect("the configured deployment account").number, CONFIGURED_SOURCE);
+    assert_eq!(deployment.accounts.get(0).expect("the restored deployment account").number, 0);
     assert!(!deployment.accounts.iter().any(|account| account.number == own));
     assert!(deployment.accounts.iter().all(|account| account.holder == accounts::Holder::Deployment));
     take(&mut world, OWN_WATCH);
@@ -315,8 +315,7 @@ fn the_deployment_watch_shows_the_deployments_accounts_and_not_a_partys_own() {
 #[test]
 fn a_sources_form_reaches_the_fleet_as_the_component_named_it() {
     const SECOND_ANALYST: u32 = 2;
-    let (mut config, limits) = jig_core_world::effects::fixture(166, false);
-    let mut world = World::configured_unassigned(166, false, config, limits);
+    let mut world = jig_core_world::fixtures::waiting_on_source(166, SECOND_ANALYST);
     world.announce_grant(SECOND_ANALYST, 1, accounts::Form::Credential(accounts::Scheme::Key));
     assert_eq!(
         world.assigned.as_ref().expect("the fleet started the run").grants[0].form,
@@ -586,9 +585,14 @@ fn a_carried_llm_key_is_returned_unused_while_stopping() {
 }
 
 fn own_key_run(seed: u64) -> (World, u32, u32) {
-    const CONFIGURED_ACCOUNT: u32 = 99;
-    let (mut config, limits) = signing_configuration(seed);
-    let mut world = World::configured_unassigned(seed, false, config, limits);
+    let (config, limits) = signing_configuration(seed);
+    let initial = jig_core_world::fixtures::create_chat(
+        &jig_core_world::fixtures::Creating::new(&config.core, limits.core.tasks.tree_tasks),
+        1,
+        0,
+        b"make an effect".as_slice().into(),
+    );
+    let mut world = World::configured_with_rows(seed, false, config, limits, initial, Box::new([]));
     carry(&mut world, 40, llm_key(7), 1_u64 << 63, 7);
     let Some(people::Reply::Outcome(people::Outcome::AccountKeyKept { source })) = world.people_answers.last().cloned()
     else {

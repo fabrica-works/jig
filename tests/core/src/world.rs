@@ -371,7 +371,7 @@ pub fn config(seed: u64) -> root::Config {
                     providers: Box::new([accounts::Provider {
                         number: 1,
                         models: Box::new([b"scripted".as_slice().into()]),
-                        offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },
+                        offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
                     }]),
                 },
             },
@@ -464,6 +464,11 @@ impl World {
         events.push_back(root::Event::Core(core::Event::People(people::Event::Restored)));
         events.push_back(root::Event::Core(core::Event::Tasks(tasks::Event::Restored)));
         events.push_back(root::Event::Core(core::Event::Fleet(fleet::Event::Loaded)));
+        for row in crate::fixtures::account_rows(&config(seed).core.settings.llm_providers) {
+            if let root::Record::Core(core::Record::Accounts(record)) = row {
+                events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Restore { record })));
+            }
+        }
         events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Want)));
         events.push_back(root::Event::Core(core::Event::Account(accounts::Event::Component(
             accounts::FromComponent::Granted {

@@ -139,6 +139,10 @@ impl Owner {
     /// The owner over an open memory store holding `held` as its source's
     /// record, as an earlier run left it, and `installation.kept` as the
     /// installation's identifier if an earlier start kept one.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the explicit domain and protocol fixture restore the same source identities"
+    )]
     pub(crate) fn new(story: Story, held: Option<&[u8]>, installation: Installation) -> Self {
         let mut limits = fixtures::limits();
         if story == Story::AccountSignInFull {

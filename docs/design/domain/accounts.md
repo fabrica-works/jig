@@ -112,7 +112,11 @@ Account
   (engine.md, 5.4). An LLM provider whose source is *none* has one
   account, the deployment's, made at the first start that configures
   it. An application's configuration names LLM providers, never
-  accounts, and an endpoint names no account.
+  accounts, and an endpoint names no account. On restart the accounts
+  child restores those durable rows and names every signed-in or key
+  source for the component, including deployment-held sources. The source
+  sweep retains exactly those named secrets, leaving application-carried
+  values to their own owner.
 - **The domain sees names and states,** never a value: an account by
   number, a source by its account and its place, a program's also by
   its name, and a credential by its source and a generation, with how
@@ -368,6 +372,10 @@ and refuse unknown or cyclic task chains without writing anything.
   jig's accounts are not involved.
 
 ### 4.3 Choosing the account
+
+Selection uses runtime accounts and their kept source identities (3.1).
+Configuration supplies provider membership and model choices; it gives no
+account a preferred number or an endpoint default.
 
 - **With the run's check.** As the core checks that a task's run may
   start (authority.md, 8.3; engine.md, 7.1, step 1), it takes, for its

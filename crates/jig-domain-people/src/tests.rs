@@ -1766,3 +1766,29 @@ fn original_name_context_checks_count_bytes_order_and_references() {
     too_many.push(Box::from([64_u8]));
     assert!(!valid_model_names(&too_many));
 }
+
+#[test]
+fn a_kept_llm_key_answer_restores_and_replays_source_zero() {
+    let mut test = Test::new(LIMITS);
+    test.member();
+    let ask = Ask::AccountChange {
+        holder: AccountHolder::Own,
+        change: AccountChange::AddKey { provider: 3, join: None, digest: [7; 32] },
+    };
+    let request = route(&test.request(10, 7, ask.clone()));
+    let outcome = Outcome::AccountKeyKept { source: 0 };
+    let rows = test.send(Event::Decided { request, outcome: outcome.clone() });
+    assert_eq!(reply(&rows), Reply::Outcome(outcome.clone()));
+    let saved = saved_answer(&rows);
+    test.d = Domain::new(&LIMITS, Box::new([]), 2);
+    for record in [
+        Stored::Person { number: 1, identity: identity(0, 1) },
+        Stored::SignIn { number: 10, person: 1, expires: Wall::from_nanos(LIMITS.sign_in_lifetime.as_nanos()) },
+        saved,
+    ] {
+        assert!(test.send(Event::Restore { record }).is_empty());
+    }
+    assert!(test.send(Event::Restored).is_empty());
+    assert!(test.d.ready());
+    assert_eq!(reply(&test.request(10, 7, ask)), Reply::Outcome(outcome));
+}

@@ -201,8 +201,12 @@ fn from_fixture(
 /// The same fixture with the application's byte transport attached.
 #[must_use]
 pub fn linked(seed: u64) -> (domain::Domain, view::View<'static>) {
-    let limits = limits();
-    from_fixture(&limits, seed, fixture(&limits), true)
+    linked_with(&limits(), seed)
+}
+/// A native fixture with the caller's declared request and document bounds.
+#[must_use]
+pub fn linked_with(limits: &domain::Limits, seed: u64) -> (domain::Domain, view::View<'static>) {
+    from_fixture(limits, seed, fixture(limits), true)
 }
 /// Constructs the one arranged client used by the all-sections story.
 #[must_use]

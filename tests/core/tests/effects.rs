@@ -517,7 +517,21 @@ fn an_unauthorized_grant_reaches_the_accounts_child() {
     use jig_domain_fleet as fleet;
     use skein_lib::Token;
     let (config, limits) = jig_core_world::world::two_charters(151);
-    let mut world = World::configured(151, false, config, limits);
+    let mut rows = jig_core_world::fixtures::account_rows(&config.core.settings.llm_providers).into_vec();
+    for row in &mut rows {
+        match row {
+            root::Record::Core(core::Record::Accounts(jig_domain_accounts::Stored::Account {
+                number: 0,
+                holder,
+                ..
+            })) => *holder = jig_domain_accounts::Holder::Party(1),
+            root::Record::Core(core::Record::Accounts(jig_domain_accounts::Stored::Source {
+                number: 1, kind, ..
+            })) => *kind = jig_domain_accounts::Kind::SignIn,
+            root::Record::Core(_) | root::Record::Connector { .. } => {}
+        }
+    }
+    let mut world = jig_core_world::fixtures::configured_sources(151, config, limits, rows.into_boxed_slice());
     let before = assignment(&world).grants[0];
     assert_eq!(before.generation, 1);
     let current = assignment(&world);

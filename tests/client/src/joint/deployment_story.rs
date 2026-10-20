@@ -78,7 +78,7 @@ fn configured_deployment_owner_reads_capacity_account_and_connector_facts() {
             Step::Press { find: Find::named(Role::Button, b"Sign in with Test") },
             Step::See { find: Find::named(Role::Heading { level: 1 }, b"Deployment"), within },
             Step::See { find: Find::named(Role::Region, b"Tasks Capacity"), within },
-            Step::See { find: Find::text(b"Account: 1"), within },
+            Step::See { find: Find::text(b"Account: 0"), within },
             Step::See { find: Find::text(b"Account generation: 1"), within },
             Step::See { find: Find::text(b"Hosts forgotten: 0"), within },
             Step::See { find: Find::named(Role::Region, b"Configured connectors"), within },
