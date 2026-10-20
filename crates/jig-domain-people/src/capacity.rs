@@ -212,6 +212,7 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
         | Refusal::Unknown
         | Refusal::NotOffered
         | Refusal::NoEscalationHolder
+        | Refusal::Llm { .. }
         | Refusal::KeyConflict => None,
     }
 }

@@ -1,6 +1,7 @@
 //! A task's LLM choice at the root: the default it records at Create (domain/tasks.md, section 3)
 //! and the models a run of the task uses (domain/engine.md, 7.1).
 
+use jig_domain_people as people;
 use jig_domain_tasks as tasks;
 use skein_lib::List;
 
@@ -67,6 +68,21 @@ impl Core {
             None => policy.clone(),
         }
     }
+}
+
+/// A party's LLM choice as tasks keeps it, models and efforts by index in configuration's order
+/// both: tasks checks it when it makes or amends the task (domain/tasks.md, section 3).
+pub(crate) fn choice(value: Option<&people::LlmChoice>) -> Option<tasks::LlmChoice> {
+    let value = value?;
+    let mut subagents = List::with_capacity(u32::try_from(value.subagents.len()).expect("people bounds sub-agents"));
+    for subagent in &value.subagents {
+        subagents.push(model_effort(*subagent)).expect("same number of sub-agents");
+    }
+    Some(tasks::LlmChoice { main: model_effort(value.main), subagents: subagents.into_boxed() })
+}
+
+fn model_effort(value: people::ModelEffort) -> tasks::ModelEffort {
+    tasks::ModelEffort { model: value.model, effort: value.effort }
 }
 
 fn chosen(settings: &Settings, policy: &RunPolicy, choice: &tasks::LlmChoice) -> Option<RunPolicy> {

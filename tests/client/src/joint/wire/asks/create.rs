@@ -1,12 +1,16 @@
 //! The direct joint world's independent batch translation.
 use super::{authority, client as c, people as p, request_arguments, specification};
 use skein_lib::List;
-pub(super) fn ask(project: u32, values: &List<c::NewTask>) -> p::Ask {
-    p::Ask::Create { project, batch: values.iter().map(member).collect() }
+pub(super) fn ask(project: u32, values: &List<c::NewTask>) -> Result<p::Ask, super::Invalid> {
+    Ok(p::Ask::Create { project, batch: values.iter().map(member).collect::<Result<_, _>>()? })
 }
-fn member(v: &c::NewTask) -> p::Member {
+/// The joint world configures no models to name a choice by: the engine's translation owns that.
+fn member(v: &c::NewTask) -> Result<p::Member, super::Invalid> {
+    if v.llm.is_some() {
+        return Err(super::Invalid::Llm);
+    }
     let spec = specification(&v.spec);
-    p::Member {
+    Ok(p::Member {
         executor: match v.executor {
             c::OwnerExecutor::Agent { charter } => p::TaskExecutor::Agent { charter },
             c::OwnerExecutor::Procedure { connector, code } => p::TaskExecutor::Procedure { connector, code },
@@ -75,12 +79,13 @@ fn member(v: &c::NewTask) -> p::Member {
                 c::Retention::ForgottenOnceRead => p::Retention::ForgottenOnceRead,
             },
         },
-    }
+        llm: None,
+    })
 }
 
 pub(super) fn propose(project: u32, action: &c::ProposeAction, reason: &c::Text) -> Result<p::Ask, super::Invalid> {
     let action = match action {
-        c::ProposeAction::Batch { tasks } => p::Action::Batch(tasks.iter().map(member).collect()),
+        c::ProposeAction::Batch { tasks } => p::Action::Batch(tasks.iter().map(member).collect::<Result<_, _>>()?),
         c::ProposeAction::Amendment { task, revision, change } => {
             let ask = c::Ask::Amend {
                 project,

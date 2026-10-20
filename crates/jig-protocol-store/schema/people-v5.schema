@@ -81,7 +81,9 @@ enum ResultsWake { never, each, last_or_failure }
 record WakePolicy { words: WakeRule notices: WakeRule news: WakeRule results: ResultsWake questions: bool answers: bool timers: bool }
 record TrackingTracked { priority: u32 }
 enum Tracking { tracked: TrackingTracked, untracked }
-record Amendment { tracked: option Tracking addressed: option AddressChange instructions: option bytes 8192 spec: option Spec wake: option WakePolicy dependencies: option bytes 65536 authority: option Authority reason: bytes 8192 }
+record ModelEffort { model: u8 effort: option u8 }
+record LlmChoice { main: ModelEffort subagents: list 64 ModelEffort }
+record Amendment { tracked: option Tracking addressed: option AddressChange instructions: option bytes 8192 spec: option Spec wake: option WakePolicy dependencies: option bytes 65536 authority: option Authority llm: option LlmChoice reason: bytes 8192 }
 record TaskExecutorAgent { charter: u32 }
 record TaskExecutorProcedure { connector: u16 code: u32 }
 record TaskExecutorPerson { address: PersonAddress }
@@ -101,7 +103,7 @@ enum Retention { kept, forgotten_once_read }
 record Flags { conversation: bool listed: bool retention: Retention }
 record DeadlineSpan { value: duration }
 enum Deadline { named, span: DeadlineSpan }
-record Member { deadline: Deadline executor: TaskExecutor words: bytes 8192 parameters: bytes 65536 inputs: bytes 65536 contract: Contract authority: Authority budget: Budget wake: WakePolicy dependencies: bytes 65536 named: bytes 65536 tracked: option u32 label: u32 flags: Flags }
+record Member { deadline: Deadline executor: TaskExecutor words: bytes 8192 parameters: bytes 65536 inputs: bytes 65536 contract: Contract authority: Authority budget: Budget wake: WakePolicy dependencies: bytes 65536 named: bytes 65536 tracked: option u32 label: u32 flags: Flags llm: option LlmChoice }
 record OperationCancel { task: u64 reason: bytes 8192 grace: option u64 }
 record OperationMove { task: u64 reason: bytes 8192 }
 record OperationAmend { task: u64 revision: u64 amendment: Amendment release: option u64 }
@@ -191,7 +193,9 @@ record RefusalEnded { how: Ending }
 record RefusalTaken { by: u64 }
 enum Malformed { cycle, as_allowed_twice, conversation, proposed_as_allowed }
 record RefusalNotWellFormed { at: u32 why: Malformed }
-enum Refusal { not_well_formed: RefusalNotWellFormed, role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict, no_escalation_holder }
+enum LlmWhy { unconfigured, effort, charter, authority, procedure, repeated }
+record RefusalLlm { model: u8 why: LlmWhy }
+enum Refusal { not_well_formed: RefusalNotWellFormed, role: RefusalRole, authority: RefusalAuthority, limit: RefusalLimit, moved: RefusalMoved, ended: RefusalEnded, taken: RefusalTaken, not_waiting, no_further, unknown, not_offered, key_conflict, no_escalation_holder, llm: RefusalLlm }
 enum ProposalChoice { accepted, rejected, passed, withdrawn, stale }
 enum EscalationChoice { released, rejected, passed }
 record OutcomeCompound { project: u32 operations: u32 first_message: u64 }

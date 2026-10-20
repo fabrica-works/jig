@@ -40,6 +40,8 @@ pub struct Member {
     pub tracked: Option<u32>,
     pub label: u32,
     pub flags: Flags,
+    /// The agent task's LLM choice; `None` takes its charter's default (domain/tasks.md, 3).
+    pub llm: Option<crate::LlmChoice>,
 }
 /// Who carries out a member.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -125,6 +127,7 @@ pub fn member_bytes(member: &Member) -> Option<u64> {
     named.delegation.kinds = Box::new([]);
     named.note_resources = Box::new([]);
     total = total.checked_add(crate::authority_bytes(&named)?)?;
+    total = total.checked_add(crate::llm_bytes(member.llm.as_ref())?)?;
     for parameter in &member.parameters {
         match parameter {
             Parameter::Bytes { value, .. } => total = total.checked_add(u64::try_from(value.len()).ok()?)?,
@@ -156,7 +159,9 @@ pub(crate) fn valid(limits: &crate::Limits, batch: &[Member]) -> bool {
         return false;
     }
     for member in batch {
-        if member.words.len() > usize::try_from(limits.words).expect("u32 fits usize") {
+        if member.words.len() > usize::try_from(limits.words).expect("u32 fits usize")
+            || !crate::llm::valid(member.llm.as_ref())
+        {
             return false;
         }
         match member_bytes(member) {

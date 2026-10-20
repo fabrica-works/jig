@@ -50,6 +50,11 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         p::Refusal::NotOffered => w::Refusal::NotOffered,
         p::Refusal::NoEscalationHolder => w::Refusal::NoEscalationHolder,
         p::Refusal::KeyConflict => w::Refusal::KeyConflict,
+        // Only a made or amended task's refusal names a model, which the answer names by the
+        // configured models (answers.rs); an offer's admission is people's own check.
+        p::Refusal::Llm { .. } => {
+            return Err(w::Problem { path: w::Path::RefusalLlmModel, reason: skein_codec::Reason::Bound });
+        }
     })
 }
 fn role(value: p::Role, limits: &w::Limits) -> Result<w::HeldRole, w::Problem> {

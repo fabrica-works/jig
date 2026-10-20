@@ -547,6 +547,7 @@ fn party_refusal(why: people::Refusal) -> parties::Refusal {
         people::Refusal::Unknown => parties::Refusal::Unknown,
         people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => parties::Refusal::NotOffered,
         people::Refusal::KeyConflict => parties::Refusal::KeyConflict,
+        people::Refusal::Llm { model, .. } => parties::Refusal::Llm { model },
     }
 }
 

@@ -126,6 +126,7 @@ pub(crate) fn unchanged(reason: &[u8]) -> tasks::Amendment {
 #[must_use]
 pub(crate) fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
     jig_domain_people::Amendment {
+        llm: None,
         tracked: None,
         addressed: None,
         instructions: None,
@@ -144,6 +145,7 @@ pub(crate) fn creating(core: &Core, limits: &Limits, party: u64, project: u32) -
 pub(crate) fn member(words: &[u8], spend: u64) -> jig_domain_people::Member {
     use jig_domain_people as people;
     people::Member {
+        llm: None,
         deadline: jig_domain_people::Deadline::Named,
         executor: people::TaskExecutor::Agent { charter: 1 },
         words: words.into(),

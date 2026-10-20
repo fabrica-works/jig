@@ -100,7 +100,11 @@ pub(super) fn tracking(value: w::Tracking) -> p::Tracking {
 }
 
 /// Decode the pieces before anything reaches the core.
-pub(super) fn compound(value: w::Compound, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
+pub(super) fn compound(
+    value: w::Compound,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<p::Ask, Untranslatable> {
     let path = w::Path::CompoundOperations;
     let mut reader = skein_lib::Reader::new(value.operations());
     let mut decoded = List::with_capacity(asks::count(value.operations(), path)?);
@@ -115,11 +119,16 @@ pub(super) fn compound(value: w::Compound, limits: &w::Limits) -> Result<p::Ask,
     }
     let mut operations = List::with_capacity(decoded.len());
     for operation in decoded.into_boxed() {
-        operations.push(operation_to_people(operation, value.project(), limits)?).expect("same capacity");
+        operations.push(operation_to_people(operation, value.project(), models, limits)?).expect("same capacity");
     }
     Ok(p::Ask::Compound { project: value.project(), operations })
 }
-fn operation_to_people(value: w::Operation, project: u32, limits: &w::Limits) -> Result<p::Operation, Untranslatable> {
+fn operation_to_people(
+    value: w::Operation,
+    project: u32,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<p::Operation, Untranslatable> {
     if operation_project(&value) != project {
         return Err(Untranslatable { path: w::Path::CompoundOperations });
     }
@@ -136,7 +145,7 @@ fn operation_to_people(value: w::Operation, project: u32, limits: &w::Limits) ->
                     Some(v) => v.value(),
                     None => 0,
                 },
-                amendment: Box::new(asks::amendment(v.change, v.reason, limits)?),
+                amendment: Box::new(asks::amendment(v.change, v.reason, models, limits)?),
                 release: None,
             }
         }
@@ -202,10 +211,15 @@ fn wire_piece(reader: &mut skein_lib::Reader<'_>) -> Result<Option<Box<[u8]>>, w
 }
 
 /// Batch members remain data until people admission resolves their authority.
-pub(super) fn create(value: w::Create, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
-    Ok(p::Ask::Create { project: value.project(), batch: batch(value.tasks(), w::Path::CreateTasks, limits)? })
+pub(super) fn create(value: w::Create, models: &[crate::Model], limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
+    Ok(p::Ask::Create { project: value.project(), batch: batch(value.tasks(), w::Path::CreateTasks, models, limits)? })
 }
-fn batch(bytes: &[u8], path: w::Path, limits: &w::Limits) -> Result<Box<[p::Member]>, Untranslatable> {
+fn batch(
+    bytes: &[u8],
+    path: w::Path,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<Box<[p::Member]>, Untranslatable> {
     let mut tasks = List::with_capacity(asks::count(bytes, path)?);
     let mut reader = skein_lib::Reader::new(bytes);
     for _ in 0..tasks.capacity() {
@@ -213,11 +227,11 @@ fn batch(bytes: &[u8], path: w::Path, limits: &w::Limits) -> Result<Box<[p::Memb
         let Ok(task) = w::NewTask::decode(limits, &mut skein_lib::Reader::new(&bytes)) else {
             return Err(Untranslatable { path });
         };
-        tasks.push(member(task, limits)?).expect("counted pieces");
+        tasks.push(member(task, models, limits)?).expect("counted pieces");
     }
     Ok(tasks.into_boxed())
 }
-fn member(value: w::NewTask, limits: &w::Limits) -> Result<p::Member, Untranslatable> {
+fn member(value: w::NewTask, models: &[crate::Model], limits: &w::Limits) -> Result<p::Member, Untranslatable> {
     let v = value.into_parts();
     let spec = asks::spec(v.spec);
     let mut dependencies = List::with_capacity(v.dependencies.len());
@@ -276,6 +290,7 @@ fn member(value: w::NewTask, limits: &w::Limits) -> Result<p::Member, Untranslat
                 w::Retention::ForgottenOnceRead => p::Retention::ForgottenOnceRead,
             },
         },
+        llm: super::llm::people(v.llm, models, w::Path::NewTaskLlm)?,
     })
 }
 fn new_contract(value: w::NewContract) -> p::Contract {
@@ -305,16 +320,22 @@ fn new_contract(value: w::NewContract) -> p::Contract {
     }
 }
 
-pub(super) fn propose(value: w::Propose, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
+pub(super) fn propose(
+    value: w::Propose,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<p::Ask, Untranslatable> {
     let v = value.into_parts();
     let action = match v.action {
-        w::ProposeAction::Batch(value) => p::Action::Batch(batch(value.tasks(), w::Path::ProposeBatchTasks, limits)?),
+        w::ProposeAction::Batch(value) => {
+            p::Action::Batch(batch(value.tasks(), w::Path::ProposeBatchTasks, models, limits)?)
+        }
         w::ProposeAction::Amendment(value) => {
             let value = value.into_parts();
             p::Action::Amend {
                 task: value.task,
                 revision: value.revision.value(),
-                amendment: Box::new(asks::amendment(value.change, v.reason.clone(), limits)?),
+                amendment: Box::new(asks::amendment(value.change, v.reason.clone(), models, limits)?),
             }
         }
     };

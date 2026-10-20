@@ -5,12 +5,12 @@ use jig_client_protocol_wire::v10 as w;
 use jig_domain_people as p;
 use skein_lib::{List, Reader, Wall};
 #[expect(clippy::too_many_lines, reason = "one total match names every wire ask")]
-pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
+pub(crate) fn ask(record: w::Ask, models: &[crate::Model], limits: &w::Limits) -> Result<p::Ask, Untranslatable> {
     Ok(match record {
-        w::Ask::Propose(value) => super::operations::propose(value, limits)?,
+        w::Ask::Propose(value) => super::operations::propose(value, models, limits)?,
         w::Ask::Withdraw(value) => p::Ask::Withdraw { project: value.project(), proposal: value.proposal() },
-        w::Ask::Create(value) => super::operations::create(value, limits)?,
-        w::Ask::Compound(value) => super::operations::compound(value, limits)?,
+        w::Ask::Create(value) => super::operations::create(value, models, limits)?,
+        w::Ask::Compound(value) => super::operations::compound(value, models, limits)?,
         w::Ask::Message(value) => {
             let v = value.into_parts();
             p::Ask::Say { project: v.project, task: v.task, words: v.words }
@@ -45,7 +45,7 @@ pub(crate) fn ask(record: w::Ask, limits: &w::Limits) -> Result<p::Ask, Untransl
                     Some(value) => revision(value),
                     None => 0,
                 },
-                amendment: amendment(v.change, v.reason, limits)?,
+                amendment: amendment(v.change, v.reason, models, limits)?,
             }
         }
         w::Ask::Stop(value) => {
@@ -267,6 +267,7 @@ fn address(value: w::AddressChange) -> p::AddressChange {
 pub(super) fn amendment(
     value: w::Amendment,
     reason: Box<[u8]>,
+    models: &[crate::Model],
     limits: &w::Limits,
 ) -> Result<p::Amendment, Untranslatable> {
     let v = value.into_parts();
@@ -297,6 +298,7 @@ pub(super) fn amendment(
             None => None,
         },
         authority,
+        llm: super::llm::people(v.llm, models, w::Path::AmendmentLlm)?,
         reason,
     })
 }

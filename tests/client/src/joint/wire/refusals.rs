@@ -26,6 +26,7 @@ pub fn refusal(value: people::Refusal) -> client::Refusal {
         people::Refusal::Unknown => client::Refusal::Unknown,
         people::Refusal::NotOffered | people::Refusal::NoEscalationHolder => client::Refusal::NotOffered,
         people::Refusal::KeyConflict => client::Refusal::KeyConflict,
+        people::Refusal::Llm { .. } => unreachable!("the joint world sends no model choice"),
     }
 }
 

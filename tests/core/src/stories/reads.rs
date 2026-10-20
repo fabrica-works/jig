@@ -79,6 +79,7 @@ pub fn conversation_member(forgettable: bool) -> people::Member {
             listed: false,
             retention: if forgettable { people::Retention::ForgottenOnceRead } else { people::Retention::Kept },
         },
+        llm: None,
     }
 }
 

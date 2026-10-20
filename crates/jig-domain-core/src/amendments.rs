@@ -324,8 +324,7 @@ pub(crate) fn translate(
             Some(authority) => Some(granted(authority, models, limits)?),
             None => None,
         },
-        // A party's wire carries no choice until JP10: the kept choice stands.
-        llm: None,
+        llm: crate::llm::choice(value.llm.as_ref()),
         reason: value.reason,
     })
 }

@@ -154,6 +154,7 @@ pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: reason.into(),
     }
 }
@@ -273,6 +274,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         tracked: None,
         label: 0,
         flags: people::Flags::PLAIN,
+        llm: None,
     }
 }
 

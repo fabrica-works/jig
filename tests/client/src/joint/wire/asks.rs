@@ -15,10 +15,13 @@ pub enum Invalid {
     NoteRevision,
     NoteProject,
     CompoundProject,
+    /// A choice of models, which the joint world configures none of.
+    Llm,
 }
 
 /// # Errors
-/// Refuses an inapplicable closed decision, an overflowing recalled revision or a mismatched note project.
+/// Refuses an inapplicable closed decision, an overflowing recalled revision, a mismatched note project
+/// or a model choice.
 #[expect(
     clippy::too_many_lines,
     reason = "one exhaustive closed request match keeps every supported and pending wire arm explicit"
@@ -27,7 +30,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
     Ok(match value {
         client::Ask::Propose { project, action, reason } => create::propose(*project, action, reason)?,
         client::Ask::Withdraw { project, proposal } => people::Ask::Withdraw { project: *project, proposal: *proposal },
-        client::Ask::Create { project, tasks } => create::ask(*project, tasks),
+        client::Ask::Create { project, tasks } => create::ask(*project, tasks)?,
         client::Ask::Compound { project, operations } => compound::ask(*project, operations)?,
         client::Ask::Message { project, task, words } => {
             people::Ask::Say { project: *project, task: *task, words: Box::from(words.bytes()) }
@@ -104,6 +107,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
                 recalled: u32::try_from(revision.value).map_err(|_| Invalid::NoteRevision)?,
             }),
         },
+        client::Ask::Amend { change, .. } if change.llm.is_some() => return Err(Invalid::Llm),
         client::Ask::Amend { project, task, revision, change, reason } => people::Ask::Amend {
             project: *project,
             task: *task,
@@ -122,6 +126,7 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
                 wake: change.wake.map(request_arguments::wake),
                 dependencies: change.dependencies.as_ref().map(|values| values.iter().copied().collect()),
                 authority: change.authority.as_ref().map(authority),
+                llm: None,
                 reason: Box::from(reason.bytes()),
             },
             release: None,

@@ -52,7 +52,12 @@ impl Component {
                             self.respond(env, exchange, routes::encoded(&answer));
                             return;
                         }
-                        crate::translate::asks::ask(value, &env.limits.wire)
+                        let models = &self.settings.models;
+                        if let Ok(Some(answer)) = crate::translate::llm::refused(&value, models, &env.limits.wire) {
+                            self.respond(env, exchange, routes::encoded(&answer));
+                            return;
+                        }
+                        crate::translate::asks::ask(value, models, &env.limits.wire)
                     }
                     Err(problem) => Err(crate::translate::Untranslatable { path: problem.path }),
                 };

@@ -719,7 +719,7 @@ mod closing;
 pub use closing::*;
 
 pub fn translated(reply: &people::Reply, limits: &w::Limits) -> w::Final {
-    let record = crate::translate::answers::answer(reply, limits).expect("translated answer");
+    let record = crate::translate::answers::answer(reply, &models(), limits).expect("translated answer");
     final_record(record, limits)
 }
 pub fn final_record(record: w::KeyedAnswer, limits: &w::Limits) -> w::Final {

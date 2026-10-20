@@ -445,7 +445,7 @@ impl Component {
             | people::Reply::Outcome(_)
             | people::Reply::Again(_)
             | people::Reply::Refused(_) => {
-                let answer = crate::translate::answers::answer(&reply, &env.limits.wire);
+                let answer = crate::translate::answers::answer(&reply, &self.settings.models, &env.limits.wire);
                 self.answer(env, exchange, answer, out);
             }
         }

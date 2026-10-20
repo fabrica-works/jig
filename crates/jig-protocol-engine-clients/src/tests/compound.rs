@@ -24,7 +24,7 @@ fn a_compound_reaches_the_people_child_in_order() {
     expected.push(p::Operation::Message { task: TASK, words: b"words".as_slice().into() }).unwrap();
     expected.push(p::Operation::Stop { task: TASK }).unwrap();
     assert_eq!(
-        asks::ask(compound(PROJECT, PROJECT), &f::wire()),
+        asks::ask(compound(PROJECT, PROJECT), &f::models(), &f::wire()),
         Ok(p::Ask::Compound { project: PROJECT, operations: expected })
     );
 }

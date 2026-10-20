@@ -10,6 +10,7 @@ pub(super) fn encode(batch: &[domain::Member], limits: &wire::Limits) -> Result<
             .push(wire::Member::new(
                 limits,
                 wire::MemberParts {
+                    llm: super::llm::encode_llm(member.llm.as_ref(), limits)?,
                     executor: parts::encode_executor(member.executor, limits)?,
                     words: member.words.clone(),
                     parameters: encode_spec_parameters(
@@ -84,10 +85,12 @@ pub(super) fn decode(batch: List<wire::Member>, limits: &wire::Limits) -> Result
             tracked,
             label,
             flags,
+            llm,
         } = member.into_parts();
         let wire::FlagsParts { conversation, listed, retention } = flags.into_parts();
         members
             .push(domain::Member {
+                llm: super::llm::decode_llm(llm),
                 deadline: match deadline {
                     wire::Deadline::Named => domain::Deadline::Named,
                     wire::Deadline::Span(value) => domain::Deadline::Span(value.value()),

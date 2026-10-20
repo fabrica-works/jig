@@ -7,6 +7,7 @@ use skein_lib::{Duration, List, Reader, Wall, Writer};
 mod asks;
 mod batch;
 mod compound;
+mod llm;
 mod outcomes;
 mod pieces;
 pub(crate) mod policy;
@@ -90,6 +91,7 @@ pub fn limits(domain: &core::Limits) -> Option<wire::Limits> {
         // A policy row names each configured model a role's bit stands for.
         stored_policy_models: u64::BITS,
         model_name_name: core::MODEL_NAME_BYTES,
+        llm_choice_subagents: domain::MODELS,
         segment_bytes: people.amendment_bytes.max(authority.segment_bytes),
     };
     derive_shared(domain, &mut limits)?;

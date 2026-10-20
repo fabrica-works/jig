@@ -3,6 +3,7 @@
 #[must_use]
 pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
     jig_domain_people::Amendment {
+        llm: None,
         tracked: None,
         addressed: None,
         instructions: None,
@@ -32,6 +33,7 @@ pub fn member(world: &mut crate::World) -> u64 {
 pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
     use jig_domain_people as people;
     people::Member {
+        llm: None,
         deadline: jig_domain_people::Deadline::Named,
         executor: people::TaskExecutor::Agent { charter: 1 },
         words: words.into(),

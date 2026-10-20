@@ -4,17 +4,21 @@ use alloc::boxed::Box;
 use jig_client_protocol_wire::v10 as w;
 use jig_domain_people as p;
 use skein_lib::Writer;
-pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::KeyedAnswer, w::Problem> {
+pub(crate) fn answer(
+    reply: &p::Reply,
+    models: &[crate::Model],
+    limits: &w::Limits,
+) -> Result<w::KeyedAnswer, w::Problem> {
     let final_answer = match reply {
         p::Reply::Outcome(p::Outcome::Again(why)) | p::Reply::Again(why) => return Ok(again(*why)),
         p::Reply::Outcome(p::Outcome::SignedOut) | p::Reply::SignedOut => return Ok(w::KeyedAnswer::SignedOut),
         p::Reply::Outcome(p::Outcome::Refused(why)) | p::Reply::Refused(why) => w::Final::Refused(w::Refused::new(
             limits,
-            w::RefusedParts { at: None, refusal: refusals::refusal(*why, limits)? },
+            w::RefusedParts { at: None, refusal: refusal(*why, models, limits)? },
         )?),
         p::Reply::Outcome(p::Outcome::CompoundRefused { at, why }) => w::Final::Refused(w::Refused::new(
             limits,
-            w::RefusedParts { refusal: refusals::refusal(*why, limits)?, at: Some(*at) },
+            w::RefusedParts { refusal: refusal(*why, models, limits)?, at: Some(*at) },
         )?),
         p::Reply::Outcome(p::Outcome::ServiceMade { person }) => {
             let what = w::Made::Service(w::MadeService::new(
@@ -34,6 +38,13 @@ pub(crate) fn answer(reply: &p::Reply, limits: &w::Limits) -> Result<w::KeyedAns
     let mut out = Writer::new(usize::try_from(final_answer.measure()).expect("wire size fits"));
     final_answer.encode(&mut out).expect("measured final answer");
     owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits)
+}
+/// A refusal, a refused model by its configured name.
+fn refusal(value: p::Refusal, models: &[crate::Model], limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
+    if let p::Refusal::Llm { model, why } = value {
+        return super::llm::refusal(model, why, models, limits);
+    }
+    refusals::refusal(value, limits)
 }
 pub(crate) fn service(
     party: u64,

@@ -197,7 +197,7 @@ fn new_task(
         number,
         project: *project,
         executor,
-        llm: None,
+        llm: crate::llm::choice(member.llm.as_ref()),
         spec,
         contract: contract(&member.contract),
         authority: given,

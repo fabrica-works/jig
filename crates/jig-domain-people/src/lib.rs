@@ -76,6 +76,8 @@ mod domain;
 pub use domain::EndedMark;
 mod facts;
 mod limits;
+mod llm;
+pub use llm::{LlmChoice, LlmWhy, MODELS, ModelEffort, llm_bytes};
 mod policy_value;
 mod refusals;
 #[cfg(test)]

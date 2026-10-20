@@ -3,8 +3,9 @@ use super::fixtures;
 use crate::{Component, Unusable, translate};
 use alloc::boxed::Box;
 use jig_client_protocol_wire::v10 as w;
+use jig_domain_people as p;
 use jig_domain_tasks as t;
-use skein_lib::{Queue, Reader};
+use skein_lib::{Queue, Reader, Writer};
 
 fn choice() -> t::LlmChoice {
     t::LlmChoice {
@@ -87,4 +88,88 @@ fn configured_models_past_the_wire_or_named_twice_cannot_start_the_component() {
     }
     let mut out = Queue::with_capacity(8);
     assert_eq!(Component::new(fixtures::settings(), &env, &mut out).err(), None);
+}
+
+/// The create fixture's first task, choosing `choice`.
+fn create(choice: w::LlmChoice) -> w::Ask {
+    let limits = fixtures::wire();
+    let (w::Ask::Create(create), _) = fixtures::create_ask() else { panic!("create fixture") };
+    let bytes = skein_codec::piece::split(&mut Reader::new(create.tasks())).unwrap().unwrap();
+    let mut parts = w::NewTask::decode(&limits, &mut Reader::new(&bytes)).unwrap().into_parts();
+    parts.llm = Some(choice);
+    let task = w::NewTask::new(&limits, parts).unwrap();
+    let mut out = Writer::new(usize::try_from(task.measure()).unwrap());
+    task.encode(&mut out).unwrap();
+    let tasks = fixtures::pieces(&[out.finish()]);
+    w::Ask::Create(w::Create::new(&limits, w::CreateParts { project: fixtures::PROJECT, tasks }).unwrap())
+}
+/// An amendment changing only the task's choice.
+fn amend(choice: w::LlmChoice) -> Box<w::Amend> {
+    let limits = fixtures::wire();
+    let mut change = fixtures::empty_amendment(None).into_parts();
+    change.llm = Some(choice);
+    let parts = w::AmendParts {
+        project: fixtures::PROJECT,
+        task: 8,
+        revision: None,
+        change: w::Amendment::new(&limits, change).unwrap(),
+        reason: Box::new([]),
+    };
+    Box::new(w::Amend::new(&limits, parts).unwrap())
+}
+/// The place and refusal the engine answers an ask with before the core sees it.
+fn refused(ask: &w::Ask) -> (Option<u32>, w::Refusal) {
+    let limits = fixtures::wire();
+    let answer = translate::llm::refused(ask, &fixtures::models(), &limits).unwrap().unwrap();
+    let w::Final::Refused(value) = fixtures::final_record(answer, &limits) else { panic!("refusal") };
+    (*value.at(), value.refusal().clone())
+}
+fn named(model: &[u8], why: w::LlmWhy) -> w::Refusal {
+    w::Refusal::Llm(w::RefusalLlm::new(&fixtures::wire(), w::RefusalLlmParts { model: model.into(), why }).unwrap())
+}
+
+#[test]
+fn a_choice_naming_a_model_or_an_effort_configuration_lacks_is_refused_by_its_name() {
+    let l = fixtures::wire();
+    let models = fixtures::models();
+    let unknown = create(fixtures::llm_choice(&l, b"careless", None, b"quick"));
+    assert_eq!(refused(&unknown), (None, named(b"careless", w::LlmWhy::Unconfigured)));
+    let effort = w::Ask::Amend(amend(fixtures::llm_choice(&l, b"careful", Some(b"medium"), b"quick")));
+    assert_eq!(refused(&effort), (None, named(b"careful", w::LlmWhy::Effort)));
+    let message = w::MessageParts { project: fixtures::PROJECT, task: 8, words: b"words".as_slice().into() };
+    let operations = [
+        w::Operation::Message(w::Message::new(&l, message).unwrap()),
+        w::Operation::Amend(amend(fixtures::llm_choice(&l, b"careful", Some(b"high"), b"hasty"))),
+    ];
+    let compound = fixtures::compound(fixtures::PROJECT, &operations);
+    assert_eq!(refused(&compound), (Some(1), named(b"hasty", w::LlmWhy::Unconfigured)));
+    let configured = create(fixtures::careful_and_quick(&l));
+    assert!(translate::llm::refused(&configured, &models, &l).unwrap().is_none());
+}
+
+#[test]
+fn an_amended_choice_reaches_the_people_child_in_configuration_s_order() {
+    let l = fixtures::wire();
+    let ask = w::Ask::Amend(amend(fixtures::careful_and_quick(&l)));
+    let Ok(p::Ask::Amend { amendment, .. }) = translate::asks::ask(ask, &fixtures::models(), &l) else {
+        panic!("amendment")
+    };
+    let expected = p::LlmChoice {
+        main: p::ModelEffort { model: 0, effort: Some(1) },
+        subagents: Box::new([p::ModelEffort { model: 1, effort: None }]),
+    };
+    assert_eq!(amendment.llm, Some(expected));
+}
+
+#[test]
+fn a_model_the_core_refuses_is_named_by_configuration() {
+    let l = fixtures::wire();
+    let reply = p::Reply::Outcome(p::Outcome::Refused(p::Refusal::Llm { model: 1, why: p::LlmWhy::Charter }));
+    let w::Final::Refused(value) = fixtures::translated(&reply, &l) else { panic!("refusal") };
+    assert_eq!(value.refusal(), &named(b"quick", w::LlmWhy::Charter));
+    let past = p::Reply::Outcome(p::Outcome::Refused(p::Refusal::Llm { model: 2, why: p::LlmWhy::Authority }));
+    assert_eq!(
+        translate::answers::answer(&past, &fixtures::models(), &l),
+        Err(w::Problem { path: w::Path::RefusalLlmModel, reason: skein_codec::Reason::Bound })
+    );
 }

@@ -3,6 +3,7 @@
 #[must_use]
 pub(super) fn unchanged(reason: &[u8]) -> Amendment {
     Amendment {
+        llm: None,
         tracked: None,
         addressed: None,
         instructions: None,
@@ -18,6 +19,7 @@ use super::*;
 const NO_TOOLS: u64 = 0;
 pub(super) fn member(words: &[u8]) -> Member {
     Member {
+        llm: None,
         deadline: Deadline::Named,
         executor: TaskExecutor::Agent { charter: 1 },
         words: words.into(),

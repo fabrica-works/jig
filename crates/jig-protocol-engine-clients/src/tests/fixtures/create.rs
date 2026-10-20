@@ -81,7 +81,7 @@ fn member(role: bool, authority: w::OwnerAuthority, expected: p::Authority) -> (
     let task = w::NewTask::new(
         &l,
         w::NewTaskParts {
-            llm: None,
+            llm: if role { None } else { Some(careful_and_quick(&l)) },
             deadline: w::NewDeadline::Named,
             executor,
             spec,
@@ -142,7 +142,36 @@ fn expected_member(role: bool, expected: p::Authority) -> p::Member {
         tracked: Some(14),
         label: 15,
         flags: p::Flags { conversation: false, listed: true, retention: p::Retention::ForgottenOnceRead },
+        llm: if role {
+            None
+        } else {
+            Some(p::LlmChoice {
+                main: p::ModelEffort { model: 0, effort: Some(1) },
+                subagents: Box::new([p::ModelEffort { model: 1, effort: None }]),
+            })
+        },
     }
+}
+/// The fixture's careful model at its high effort, its sub-agents the quick one.
+pub fn careful_and_quick(l: &w::Limits) -> w::LlmChoice {
+    llm_choice(l, b"careful", Some(b"high"), b"quick")
+}
+/// A main model and effort, and one sub-agent model at its default effort, by name.
+#[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
+pub fn llm_choice(l: &w::Limits, main: &[u8], effort: Option<&[u8]>, subagent: &[u8]) -> w::LlmChoice {
+    let main = w::ModelEffort::new(
+        l,
+        w::ModelEffortParts {
+            model: main.into(),
+            effort: match effort {
+                Some(effort) => Some(effort.into()),
+                None => None,
+            },
+        },
+    )
+    .unwrap();
+    let subagent = w::ModelEffort::new(l, w::ModelEffortParts { model: subagent.into(), effort: None }).unwrap();
+    w::LlmChoice::new(l, w::LlmChoiceParts { main, subagents: list([subagent]) }).unwrap()
 }
 
 pub fn create_refusals() -> [(&'static str, p::Refusal, w::Refusal); 5] {

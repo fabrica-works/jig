@@ -690,6 +690,7 @@ pub fn people_member(words: &[u8], spend: u64) -> jig_domain_people::Member {
         tracked: None,
         label: 0,
         flags: people::Flags::PLAIN,
+        llm: None,
     }
 }
 

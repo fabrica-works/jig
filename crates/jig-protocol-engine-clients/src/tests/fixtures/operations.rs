@@ -73,6 +73,7 @@ pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
         wake: None,
         dependencies: None,
         authority: None,
+        llm: None,
         reason: reason.into(),
     }
 }

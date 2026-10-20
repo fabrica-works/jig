@@ -38,6 +38,10 @@ pub enum Refusal {
     NotOffered,
     /// This party's key names another ask.
     KeyConflict,
+    /// The named model, by its index in configuration's order, cannot be chosen.
+    Llm {
+        model: u8,
+    },
 }
 
 /// Authority missing from a party's request.

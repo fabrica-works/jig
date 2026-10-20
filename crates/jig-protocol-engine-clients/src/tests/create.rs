@@ -5,7 +5,7 @@ use jig_domain_people as p;
 #[test]
 fn a_create_reaches_the_people_child_with_each_task_s_fields() {
     let (wire, expected) = f::create_ask();
-    assert_eq!(asks::ask(wire, &f::wire()), Ok(expected));
+    assert_eq!(asks::ask(wire, &f::models(), &f::wire()), Ok(expected));
 }
 #[test]
 fn an_as_allowed_answer_names_what_was_given() {

@@ -218,6 +218,10 @@ pub enum NoteChange {
 /// Authenticated keyed requests admitted by the people child and routed by
 /// the root after role checks (domain/people.md, section 5.1).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "an amendment stays inline, as `Event` carries a keyed request whole, and is priced by size_of"
+)]
 pub enum Ask {
     /// Several task operations committed together under one key.
     Compound { project: u32, operations: List<crate::Operation> },

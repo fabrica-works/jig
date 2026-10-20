@@ -46,6 +46,8 @@ pub enum Refusal {
     KeyConflict,
     /// The root's requester has nobody to hold its escalations (domain/people.md, 5.1).
     NoEscalationHolder,
+    /// The task's LLM choice names this configured model, refused for `why` (domain/tasks.md, 3).
+    Llm { model: u8, why: crate::LlmWhy },
 }
 
 /// Why a batch member is not well formed.

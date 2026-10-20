@@ -474,6 +474,7 @@ pub fn people_amendment() -> people::Amendment {
 
 pub fn people_member() -> people::Member {
     people::Member {
+        llm: None,
         deadline: jig_domain_people::Deadline::Named,
         executor: people::TaskExecutor::Agent { charter: 3 },
         words: b"a task".as_slice().into(),
@@ -728,6 +729,7 @@ pub use store::{Answer, events, opened_with_transcripts, script, written};
 #[must_use]
 pub fn person_unchanged(reason: &[u8]) -> jig_domain_people::Amendment {
     jig_domain_people::Amendment {
+        llm: None,
         tracked: None,
         addressed: None,
         instructions: None,

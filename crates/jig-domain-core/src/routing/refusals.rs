@@ -44,21 +44,11 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
             },
             None => people::Refusal::Unknown,
         },
-        // A choice for a procedure's or a person's task is the task kind's lack.
-        tasks::Refusal::Executor | tasks::Refusal::Llm { why: tasks::LlmFault::Procedure, .. } => {
+        tasks::Refusal::Executor => {
             people::Refusal::Authority { proposable: None, lacking: people::Lack::TaskKind { executor: None } }
         }
-        // A model absent from configuration, the charter or the authority, or an effort the model
-        // lacks: the party's wire names no model until it carries the choice (tasks.md, 3).
-        tasks::Refusal::Llm {
-            why:
-                tasks::LlmFault::Unconfigured
-                | tasks::LlmFault::Effort
-                | tasks::LlmFault::Charter
-                | tasks::LlmFault::Authority
-                | tasks::LlmFault::Repeated,
-            ..
-        } => people::Refusal::Authority { proposable: None, lacking: people::Lack::Models },
+        // A refused model reaches the party by its index, which the client's engine names (tasks.md, 3).
+        tasks::Refusal::Llm { model, why } => people::Refusal::Llm { model, why: llm_why(why) },
         tasks::Refusal::Reference => people::Refusal::Authority { proposable: None, lacking: people::Lack::Reference },
         tasks::Refusal::Funding => people::Refusal::Authority { proposable: None, lacking: people::Lack::Funding },
         tasks::Refusal::AuthorityShape => people::Refusal::Authority { proposable: None, lacking: people::Lack::Shape },
@@ -88,6 +78,17 @@ fn task_answer(core: &Core, task: Option<u64>, why: tasks::Refusal) -> people::O
         tasks::Refusal::Holds => people::Refusal::Limit { which: people::LimitKind::Holds },
     };
     people::Outcome::Refused(refusal)
+}
+
+fn llm_why(why: tasks::LlmFault) -> people::LlmWhy {
+    match why {
+        tasks::LlmFault::Unconfigured => people::LlmWhy::Unconfigured,
+        tasks::LlmFault::Effort => people::LlmWhy::Effort,
+        tasks::LlmFault::Charter => people::LlmWhy::Charter,
+        tasks::LlmFault::Authority => people::LlmWhy::Authority,
+        tasks::LlmFault::Procedure => people::LlmWhy::Procedure,
+        tasks::LlmFault::Repeated => people::LlmWhy::Repeated,
+    }
 }
 
 fn current_task(core: &Core, task: Option<u64>) -> Option<&tasks::TaskRecord> {

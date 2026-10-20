@@ -18,6 +18,8 @@ pub struct Amendment {
     pub wake: Option<WakePolicy>,
     pub dependencies: Option<Box<[u64]>>,
     pub authority: Option<Authority>,
+    /// Replace the agent task's LLM choice from its next run (domain/tasks.md, 3).
+    pub llm: Option<crate::LlmChoice>,
     pub reason: Box<[u8]>,
 }
 
@@ -176,6 +178,7 @@ pub fn amendment_bytes(amendment: &Amendment) -> Option<u64> {
     if let Some(authority) = &amendment.authority {
         total = total.checked_add(authority_bytes(authority)?)?;
     }
+    total = total.checked_add(crate::llm_bytes(amendment.llm.as_ref())?)?;
     Some(total)
 }
 
@@ -224,6 +227,7 @@ pub fn authority_bytes(authority: &Authority) -> Option<u64> {
 
 pub(crate) fn valid(limits: &crate::Limits, amendment: &Amendment) -> bool {
     amendment.reason.len() <= usize::try_from(limits.words).expect("u32 fits usize")
+        && crate::llm::valid(amendment.llm.as_ref())
         && match amendment_bytes(amendment) {
             Some(bytes) => bytes <= u64::from(limits.amendment_bytes),
             None => false,

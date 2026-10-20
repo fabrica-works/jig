@@ -9,7 +9,7 @@ use jig_domain_people as p;
 fn a_message_record_becomes_the_cores_say() {
     let limits = f::wire();
     assert_eq!(
-        ask(f::start(&limits), &limits),
+        ask(f::start(&limits), &f::models(), &limits),
         Ok(p::Ask::Say { project: 3, task: 8, words: Box::from(b"hello".as_slice()) })
     );
 }
@@ -34,7 +34,7 @@ fn a_decision_record_keeps_its_revision() {
             .expect("decision"),
         ));
         assert_eq!(
-            ask(value, &limits),
+            ask(value, &f::models(), &limits),
             Ok(p::Ask::DecideEscalation { project: 3, task: 8, revision: u64::MAX, decision: expected })
         );
     }
@@ -60,7 +60,7 @@ fn an_amendment_record_keeps_its_release_and_reason() {
             }
             None => p::Ask::Amend { project: 3, task: 8, revision: 6, amendment, release: None },
         };
-        assert_eq!(ask(f::amendment(release, reason), &f::wire()), Ok(expected));
+        assert_eq!(ask(f::amendment(release, reason), &f::models(), &f::wire()), Ok(expected));
     }
 }
 fn invalid() -> w::Ask {
@@ -76,7 +76,10 @@ fn invalid() -> w::Ask {
 #[test]
 fn an_ask_that_does_not_translate_reaches_no_core() {
     let value = invalid();
-    assert_eq!(ask(value.clone(), &f::wire()), Err(Untranslatable { path: w::Path::DecideEscalationDecision }));
+    assert_eq!(
+        ask(value.clone(), &f::models(), &f::wire()),
+        Err(Untranslatable { path: w::Path::DecideEscalationDecision })
+    );
     let mut exchange = Exchange::new();
     for bytes in [f::encode_ask(&value), f::encode_ask(&f::malformed_piece()), Box::new([255]), {
         let bytes = f::encode_ask(&f::start(&f::wire()));
@@ -133,7 +136,7 @@ fn every_other_ask_family_keeps_its_supplied_fields() {
     let limits = f::wire();
     let cases = f::other_asks();
     for (wire, expected) in cases {
-        assert_eq!(ask(wire, &limits), Ok(expected));
+        assert_eq!(ask(wire, &f::models(), &limits), Ok(expected));
     }
 }
 
@@ -141,14 +144,14 @@ fn every_other_ask_family_keeps_its_supplied_fields() {
 fn policy_authority_keeps_every_length_prefixed_grant_and_resource() {
     let limits = f::wire();
     let (wire, expected) = f::authority_ask();
-    assert_eq!(ask(wire.clone(), &limits), Ok(expected));
+    assert_eq!(ask(wire.clone(), &f::models(), &limits), Ok(expected));
 }
 #[test]
 fn a_piece_past_its_decoded_sum_is_refused() {
     let limits = f::wire();
     let (wire, _) = f::authority_ask();
     let small = w::Limits { owner_authority_grants: 19, ..limits };
-    assert_eq!(ask(wire, &small), Err(Untranslatable { path: w::Path::OwnerAuthorityGrants }));
+    assert_eq!(ask(wire, &f::models(), &small), Err(Untranslatable { path: w::Path::OwnerAuthorityGrants }));
 }
 
 #[test]
@@ -178,7 +181,7 @@ fn a_decide_on_an_escalation_reaches_the_people_child_with_its_revision() {
     )
     .expect("escalation");
     assert_eq!(
-        ask(f::decide(w::DecideOn::Escalation(target)), &limits),
+        ask(f::decide(w::DecideOn::Escalation(target)), &f::models(), &limits),
         Ok(p::Ask::DecideEscalation { project: 3, task: 8, revision: u64::MAX, decision: p::EscalationDecision::Pass })
     );
 }
@@ -192,14 +195,14 @@ fn a_cancel_with_a_grace_reaches_the_people_child_with_its_span() {
     )
     .expect("cancel");
     assert_eq!(
-        ask(w::Ask::Cancel(cancel), &limits),
+        ask(w::Ask::Cancel(cancel), &f::models(), &limits),
         Ok(p::Ask::Cancel { project: 3, task: 8, reason: b"enough".as_slice().into(), grace: Some(GRACE) })
     );
 }
 #[test]
 fn a_priority_only_amend_names_no_revision() {
     assert_eq!(
-        ask(f::priority_amend(), &f::wire()),
+        ask(f::priority_amend(), &f::models(), &f::wire()),
         Ok(p::Ask::Amend {
             project: 3,
             task: 8,
@@ -215,7 +218,7 @@ fn a_priority_only_amend_names_no_revision() {
 #[test]
 fn a_policy_change_of_template_overrides_reaches_the_people_child() {
     assert_eq!(
-        ask(f::template_change(), &f::wire()),
+        ask(f::template_change(), &f::models(), &f::wire()),
         Ok(p::Ask::ChangePolicy {
             project: 3,
             change: p::PolicyChange::Templates {
@@ -246,7 +249,7 @@ fn a_propose_of_an_amendment_reaches_the_people_child_with_its_reason() {
             .expect("proposal"),
     );
     assert_eq!(
-        ask(value, &limits),
+        ask(value, &f::models(), &limits),
         Ok(p::Ask::Propose {
             project: 3,
             action: p::Action::Amend { task: 8, revision: 9, amendment: Box::new(f::person_unchanged(b"more work")) },

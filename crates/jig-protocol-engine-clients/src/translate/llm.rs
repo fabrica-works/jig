@@ -2,9 +2,11 @@
 //! configuration's order, the client by name (contract.md, 3.2 and 5.1; domain/tasks.md, 3).
 use super::w;
 use crate::Model;
+use alloc::boxed::Box;
 use jig_domain_authority::Models;
+use jig_domain_people as p;
 use jig_domain_tasks as t;
-use skein_lib::{List, bytes};
+use skein_lib::{List, Reader, bytes};
 
 /// Whether the configured models fit the core's indices and the wire's bounds.
 pub(crate) fn fits(models: &[Model], limits: &w::Limits) -> bool {
@@ -103,4 +105,176 @@ fn model_effort(value: t::ModelEffort, models: &[Model], limits: &w::Limits) -> 
         None => None,
     };
     w::ModelEffort::new(limits, w::ModelEffortParts { model: bytes::copy_of(&model.name), effort })
+}
+
+/// A choice naming a model or an effort configuration lacks is refused before the core sees the
+/// ask, as a project mismatch is: by the model's name, and for a compound request the place of its
+/// operation (contract.md, 3.2 and 4).
+pub(crate) fn refused(
+    record: &w::Ask,
+    models: &[Model],
+    limits: &w::Limits,
+) -> Result<Option<w::KeyedAnswer>, w::Problem> {
+    let (at, found) = match record {
+        w::Ask::Create(value) => (None, batch(value.tasks(), models, limits)?),
+        w::Ask::Propose(value) => match value.action() {
+            w::ProposeAction::Batch(value) => (None, batch(value.tasks(), models, limits)?),
+            w::ProposeAction::Amendment(value) => (None, lacking(value.change().llm().as_ref(), models)),
+        },
+        w::Ask::Amend(value) => (None, lacking(value.change().llm().as_ref(), models)),
+        w::Ask::Compound(value) => operations(value.operations(), models, limits)?,
+        w::Ask::Message(_)
+        | w::Ask::Answer(_)
+        | w::Ask::Take(_)
+        | w::Ask::HandBack(_)
+        | w::Ask::Decide(_)
+        | w::Ask::Release(_)
+        | w::Ask::Stop(_)
+        | w::Ask::Cancel(_)
+        | w::Ask::MoveTask(_)
+        | w::Ask::Seen(_)
+        | w::Ask::EditNote(_)
+        | w::Ask::DeleteNote(_)
+        | w::Ask::ChangePolicy(_)
+        | w::Ask::SetRoles(_)
+        | w::Ask::MakeService(_)
+        | w::Ask::SetPool(_)
+        | w::Ask::Withdraw(_) => return Ok(None),
+    };
+    let Some(Lacking { model, why }) = found else {
+        return Ok(None);
+    };
+    let refusal = w::Refusal::Llm(w::RefusalLlm::new(limits, w::RefusalLlmParts { model, why })?);
+    let answer = w::Final::Refused(w::Refused::new(limits, w::RefusedParts { refusal, at })?);
+    let mut out = skein_lib::Writer::new(usize::try_from(answer.measure()).expect("wire size fits"));
+    answer.encode(&mut out).expect("measured answer");
+    match super::answers::owned(w::Owner::Jig, jig_client_protocol_wire::VERSION, out.finish(), limits) {
+        Ok(value) => Ok(Some(value)),
+        Err(problem) => Err(problem),
+    }
+}
+/// A model a choice names that configuration lacks, or whose effort its model lacks.
+struct Lacking {
+    model: Box<[u8]>,
+    why: w::LlmWhy,
+}
+fn batch(bytes: &[u8], models: &[Model], limits: &w::Limits) -> Result<Option<Lacking>, w::Problem> {
+    let mut reader = Reader::new(bytes);
+    while let Some(piece) = piece(&mut reader)? {
+        let task = w::NewTask::decode(limits, &mut Reader::new(&piece))?;
+        if let Some(found) = lacking(task.llm().as_ref(), models) {
+            return Ok(Some(found));
+        }
+    }
+    Ok(None)
+}
+fn operations(
+    bytes: &[u8],
+    models: &[Model],
+    limits: &w::Limits,
+) -> Result<(Option<u32>, Option<Lacking>), w::Problem> {
+    let mut reader = Reader::new(bytes);
+    let mut at = 0_u32;
+    while let Some(piece) = piece(&mut reader)? {
+        if let w::Operation::Amend(value) = w::Operation::decode(limits, &mut Reader::new(&piece))?
+            && let Some(found) = lacking(value.change().llm().as_ref(), models)
+        {
+            return Ok((Some(at), Some(found)));
+        }
+        at = at.checked_add(1).ok_or(super::problem(skein_codec::Reason::Bound))?;
+    }
+    Ok((None, None))
+}
+fn piece(reader: &mut Reader<'_>) -> Result<Option<Box<[u8]>>, w::Problem> {
+    match skein_codec::piece::split(reader) {
+        Ok(value) => Ok(value),
+        Err(_) => Err(super::problem(skein_codec::Reason::Malformed)),
+    }
+}
+/// The first model of a choice that configuration lacks, or whose effort its model lacks.
+fn lacking(choice: Option<&w::LlmChoice>, models: &[Model]) -> Option<Lacking> {
+    let choice = choice?;
+    if let Err(why) = indices(choice.main(), models) {
+        return Some(Lacking { model: bytes::copy_of(choice.main().model()), why });
+    }
+    for item in choice.subagents() {
+        if let Err(why) = indices(item, models) {
+            return Some(Lacking { model: bytes::copy_of(item.model()), why });
+        }
+    }
+    None
+}
+
+/// A named choice by the indices configuration's order gives its models and efforts; a name
+/// configuration lacks is untranslatable, as the refusal above answers it first.
+pub(crate) fn people(
+    value: Option<w::LlmChoice>,
+    models: &[Model],
+    path: w::Path,
+) -> Result<Option<p::LlmChoice>, super::Untranslatable> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let Ok(main) = indices(value.main(), models) else {
+        return Err(super::Untranslatable { path });
+    };
+    let mut subagents = List::with_capacity(value.subagents().len());
+    for item in value.subagents() {
+        let Ok(item) = indices(item, models) else {
+            return Err(super::Untranslatable { path });
+        };
+        subagents.push(item).expect("same capacity");
+    }
+    Ok(Some(p::LlmChoice { main, subagents: subagents.into_boxed() }))
+}
+fn indices(value: &w::ModelEffort, models: &[Model]) -> Result<p::ModelEffort, w::LlmWhy> {
+    let mut found = None;
+    for (at, model) in models.iter().enumerate() {
+        if *model.name == *value.model() {
+            found = Some((at, model));
+            break;
+        }
+    }
+    let Some((at, model)) = found else {
+        return Err(w::LlmWhy::Unconfigured);
+    };
+    let effort = match value.effort() {
+        Some(name) => {
+            let mut effort = None;
+            for (index, item) in model.efforts.iter().enumerate() {
+                if **item == **name {
+                    effort = Some(u8::try_from(index).expect("checked efforts"));
+                    break;
+                }
+            }
+            if effort.is_none() {
+                return Err(w::LlmWhy::Effort);
+            }
+            effort
+        }
+        None => None,
+    };
+    Ok(p::ModelEffort { model: u8::try_from(at).expect("checked models"), effort })
+}
+
+/// A model the core refused, by its configured name; an index past configuration is a problem,
+/// as the core names only configured ones.
+pub(crate) fn refusal(
+    model: u8,
+    why: p::LlmWhy,
+    models: &[Model],
+    limits: &w::Limits,
+) -> Result<w::Refusal, w::Problem> {
+    let Some(model) = models.get(usize::from(model)) else {
+        return Err(w::Problem { path: w::Path::RefusalLlmModel, reason: skein_codec::Reason::Bound });
+    };
+    let why = match why {
+        p::LlmWhy::Unconfigured => w::LlmWhy::Unconfigured,
+        p::LlmWhy::Effort => w::LlmWhy::Effort,
+        p::LlmWhy::Charter => w::LlmWhy::Charter,
+        p::LlmWhy::Authority => w::LlmWhy::Authority,
+        p::LlmWhy::Procedure => w::LlmWhy::Procedure,
+        p::LlmWhy::Repeated => w::LlmWhy::Repeated,
+    };
+    Ok(w::Refusal::Llm(w::RefusalLlm::new(limits, w::RefusalLlmParts { model: bytes::copy_of(&model.name), why })?))
 }

@@ -594,10 +594,12 @@ pub(crate) fn encode_amendment(
     limits: &wire::Limits,
 ) -> Result<wire::Amendment, wire::Problem> {
     check_amendment(value, limits)?;
-    let domain::Amendment { tracked, addressed, instructions, spec, wake, dependencies, authority, reason } = value;
+    let domain::Amendment { tracked, addressed, instructions, spec, wake, dependencies, authority, llm, reason } =
+        value;
     wire::Amendment::new(
         limits,
         wire::AmendmentParts {
+            llm: super::llm::encode_llm(llm.as_ref(), limits)?,
             tracked: match tracked {
                 Some(domain::Tracking::Tracked { priority }) => Some(wire::Tracking::Tracked(
                     wire::TrackingTracked::new(limits, wire::TrackingTrackedParts { priority: *priority })?,
@@ -640,9 +642,10 @@ pub(crate) fn decode_amendment(
     value: wire::Amendment,
     limits: &wire::Limits,
 ) -> Result<domain::Amendment, wire::Problem> {
-    let wire::AmendmentParts { tracked, addressed, instructions, spec, wake, dependencies, authority, reason } =
+    let wire::AmendmentParts { tracked, addressed, instructions, spec, wake, dependencies, authority, llm, reason } =
         value.into_parts();
     let value = domain::Amendment {
+        llm: super::llm::decode_llm(llm),
         tracked: match tracked {
             Some(wire::Tracking::Tracked(value)) => {
                 Some(domain::Tracking::Tracked { priority: value.into_parts().priority })

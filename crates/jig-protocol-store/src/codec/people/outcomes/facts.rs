@@ -460,6 +460,10 @@ pub(super) fn encode_refusal(value: &domain::Refusal, limits: &wire::Limits) -> 
         domain::Refusal::NotOffered => wire::Refusal::NotOffered,
         domain::Refusal::KeyConflict => wire::Refusal::KeyConflict,
         domain::Refusal::NoEscalationHolder => wire::Refusal::NoEscalationHolder,
+        domain::Refusal::Llm { model, why } => wire::Refusal::Llm(wire::RefusalLlm::new(
+            limits,
+            wire::RefusalLlmParts { model: *model, why: super::super::llm::encode_why(*why) },
+        )?),
     })
 }
 pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
@@ -521,6 +525,10 @@ pub(super) fn decode_refusal(value: wire::Refusal) -> domain::Refusal {
         wire::Refusal::NotOffered => domain::Refusal::NotOffered,
         wire::Refusal::KeyConflict => domain::Refusal::KeyConflict,
         wire::Refusal::NoEscalationHolder => domain::Refusal::NoEscalationHolder,
+        wire::Refusal::Llm(value) => {
+            let wire::RefusalLlmParts { model, why } = value.into_parts();
+            domain::Refusal::Llm { model, why: super::super::llm::decode_why(why) }
+        }
     }
 }
 pub(super) fn encode_proposal_choice(value: domain::ProposalChoice, _limits: &wire::Limits) -> wire::ProposalChoice {
