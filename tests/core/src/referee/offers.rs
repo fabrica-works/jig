@@ -112,6 +112,9 @@ impl Referee {
             (offers.clone(), None)
         };
         let task = match document {
+            Document::Accounts(_) => {
+                unreachable!("Parties open no accounts watch; the accounts story uses the client peer")
+            }
             Document::Task(value) => Some(*value.clone()),
             Document::Escalation(value) => Some(*value.task.clone()),
             Document::Frame(_)
@@ -200,6 +203,9 @@ pub fn check(expected: &Admission, actual: &people::Reply) -> Result<(), &'stati
 }
 fn offers(value: &Document) -> Option<&List<Offered>> {
     Some(match value {
+        Document::Accounts(_) => {
+            unreachable!("Parties open no accounts watch; the accounts story uses the client peer")
+        }
         Document::Task(v) => &v.acts,
         Document::Proposal(v) => &v.acts,
         Document::Escalation(v) => &v.acts,

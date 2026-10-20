@@ -120,6 +120,7 @@ fn refused_subject(watcher: Token, subject: &Subject, why: WatchRefusal) -> Requ
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
+        | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -147,6 +148,7 @@ pub(super) fn open(
         | Watched::Task { .. }
         | Watched::Tree { .. }
         | Watched::Chips { .. }
+        | Watched::Accounts
         | Watched::Inbox
         | Watched::Query { .. }
         | Watched::Deployment
@@ -193,6 +195,7 @@ fn open_follow(
             | Watched::Task { .. }
             | Watched::Tree { .. }
             | Watched::Chips { .. }
+            | Watched::Accounts
             | Watched::Inbox
             | Watched::Query { .. }
             | Watched::Run { .. }
@@ -218,6 +221,7 @@ fn open_follow(
         | Subject::Task { .. }
         | Subject::Tree { .. }
         | Subject::Inbox { .. }
+        | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -284,6 +288,7 @@ fn admission(core: &Core, env: &Env<Limits>, party: u64, subject: &Subject, wind
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
+        | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -310,6 +315,7 @@ fn named_subject(subject: Watched, party: u64) -> Subject {
         Watched::Tree { task } => Subject::Tree { task },
         Watched::Chips { tasks } => Subject::Chips { tasks },
         Watched::Inbox => Subject::Inbox { party },
+        Watched::Accounts => Subject::Accounts { party },
         Watched::Query { query } => Subject::Query { query },
         Watched::Run { task } => Subject::Run { task },
         Watched::Deployment => Subject::Deployment,
@@ -331,6 +337,7 @@ fn application_subject(
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
+        | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -357,6 +364,7 @@ pub(super) fn marked(core: &mut Core, connector: u16, subjects: List<Token>) -> 
             | Subject::Tree { .. }
             | Subject::Chips { .. }
             | Subject::Inbox { .. }
+            | Subject::Accounts { .. }
             | Subject::Query { .. }
             | Subject::Run { .. }
             | Subject::Deployment
@@ -418,6 +426,7 @@ fn watch_document(
         | Subject::Task { .. }
         | Subject::Tree { .. }
         | Subject::Inbox { .. }
+        | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -530,6 +539,7 @@ fn changed_run(core: &mut Core, env: &Env<Limits>, run: Token, out: &mut Queue<R
             | Subject::Tree { .. }
             | Subject::Chips { .. }
             | Subject::Inbox { .. }
+            | Subject::Accounts { .. }
             | Subject::Query { .. }
             | Subject::Run { .. }
             | Subject::Deployment

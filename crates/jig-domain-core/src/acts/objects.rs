@@ -66,7 +66,8 @@ pub(super) fn admit(
                 Admission::Refused(people::Refusal::NotOffered)
             }
         }
-        documents::Subject::Query { .. }
+        documents::Subject::Accounts { .. }
+        | documents::Subject::Query { .. }
         | documents::Subject::Note { .. }
         | documents::Subject::Application { .. }
         | documents::Subject::Tree { .. }

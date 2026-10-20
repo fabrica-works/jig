@@ -135,7 +135,7 @@ pub struct HelloRefusalLine {
     pub why: fleet::HelloRefusal,
 }
 
-fn wall_deadline(clock: Option<DocumentClock>, at: Time) -> Option<Wall> {
+pub(super) fn wall_deadline(clock: Option<DocumentClock>, at: Time) -> Option<Wall> {
     let clock = clock?;
     if at >= clock.now {
         Some(Wall::from_nanos(clock.wall.as_nanos().saturating_add(at.saturating_since(clock.now).as_nanos())))
@@ -143,7 +143,7 @@ fn wall_deadline(clock: Option<DocumentClock>, at: Time) -> Option<Wall> {
         Some(Wall::from_nanos(clock.wall.as_nanos().saturating_sub(clock.now.saturating_since(at).as_nanos())))
     }
 }
-fn account_state(state: accounts::State, clock: Option<DocumentClock>) -> AccountState {
+pub(super) fn account_state(state: accounts::State, clock: Option<DocumentClock>) -> AccountState {
     match state {
         accounts::State::Asking => AccountState::Asking,
         accounts::State::Granted => AccountState::Granted,
@@ -448,6 +448,14 @@ pub fn make_with_clock(
     clock: DocumentClock,
 ) -> Result<super::Document, Missing> {
     match subject {
+        super::Subject::Accounts { party: owner } => Ok(super::Document::Accounts(Box::new(super::accounts::make(
+            core,
+            limits,
+            party,
+            *owner,
+            window,
+            Some(clock),
+        )?))),
         super::Subject::Deployment => {
             core.people.identity(party).ok_or(Missing::Unknown)?;
             if super::document_worst_case(&limits.documents).is_none() || window.rows > limits.documents.rows {

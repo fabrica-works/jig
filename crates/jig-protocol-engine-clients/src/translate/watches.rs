@@ -124,6 +124,7 @@ pub(crate) fn delivery(
         | d::Document::PersonTask(_)
         | d::Document::Result(_)
         | d::Document::Project(_)
+        | d::Document::Accounts(_)
         | d::Document::Note(_) => return Err(super::problem(skein_codec::Reason::Tag)),
     })
 }

@@ -163,6 +163,7 @@ pub(super) fn subject(
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
+        | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
         | Subject::Deployment
@@ -317,6 +318,7 @@ fn effect(core: &Core, limits: &Limits, act: Act, subject: &Subject) -> Option<a
         | Subject::Tree { .. }
         | Subject::Chips { .. }
         | Subject::Inbox { .. }
+        | Subject::Accounts { .. }
         | Subject::Query { .. }
         | Subject::Run { .. }
         | Subject::Deployment

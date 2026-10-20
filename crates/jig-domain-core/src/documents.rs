@@ -27,6 +27,8 @@ mod endings;
 pub use chip_phase::{ChipDetails, ChipObservation, ChipWork};
 mod inbox_deployment;
 pub use inbox_deployment::{Inbox, InboxEntry, InboxObject};
+mod accounts;
+pub use accounts::{AccountLine, Accounts, LastEnd, SignInLine, SourceLine};
 mod deployment;
 pub use deployment::{
     Account, AccountState, Capacity, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun, ProjectCapacity,
@@ -132,6 +134,8 @@ pub enum Subject {
     Chips { tasks: List<u64> },
     /// The party's waiting objects and unread updates.
     Inbox { party: u64 },
+    /// The party's accounts.
+    Accounts { party: u64 },
     /// Filtered live tasks in one project, newest change first.
     /// A fixed task query, independent of any application shape.
     Query { query: TaskQuery },
@@ -165,6 +169,7 @@ pub enum Watched {
     Tree { task: u64 },
     Chips { tasks: List<u64> },
     Inbox,
+    Accounts,
     Query { query: TaskQuery },
     Run { task: u64 },
     Deployment,
@@ -310,6 +315,8 @@ pub enum Document {
     Note(Note),
     /// Party-only bounded waiting and unread groups.
     Inbox(Inbox),
+    /// The party's own accounts and sign-ins.
+    Accounts(Box<Accounts>),
     /// Fleet placement, accounts and finite capacities.
     Deployment(Box<Deployment>),
 }
@@ -364,6 +371,9 @@ pub fn make(
                 return Err(Missing::NotAllowed);
             }
             Ok(Document::Inbox(inbox_deployment::inbox(core, limits, party, window)?))
+        }
+        Subject::Accounts { party: owner } => {
+            Ok(Document::Accounts(Box::new(accounts::make(core, limits, party, *owner, window, None)?)))
         }
         Subject::Deployment => Ok(Document::Deployment(Box::new(deployment::deployment(core, limits, party, None)?))),
         Subject::Proposal { proposer, number } => {
@@ -422,7 +432,8 @@ pub fn document_worst_case(limits: &DocumentLimits) -> Option<u64> {
             .max(task_query::worst_case(limits)?)
             .max(objects::worst_case(limits)?)
             .max(project_note::worst_case(limits)?)
-            .max(deployment::worst_case(limits)?),
+            .max(deployment::worst_case(limits)?)
+            .max(accounts::worst_case(limits)?),
     )
 }
 
@@ -441,6 +452,7 @@ pub(crate) fn document_scratch_worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(List::<people::Entry>::worst_case(crate::inbox::waiting_capacity(limits)?)?)?;
     Some(
         deployment::scratch_worst_case(limits)?
+            .max(List::<jig_domain_accounts::Pending>::worst_case(limits.accounts.sign_ins)?)
             .max(List::<crate::Template>::worst_case(limits.templates)?)
             .max(task_query::scratch_worst_case(limits)?.checked_add(waits)?),
     )

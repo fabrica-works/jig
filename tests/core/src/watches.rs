@@ -329,6 +329,9 @@ impl Parties {
                     panic!("watch durable prerequisite {watcher:?} at {durable}: {why}; {document:?}")
                 });
                 match document.as_ref() {
+                    Document::Accounts(_) => {
+                        unreachable!("Parties open no accounts watch; the accounts story uses the client peer")
+                    }
                     Document::Task(row) => {
                         self.task_projects.insert(row.chip.number, row.project);
                     }
@@ -432,6 +435,9 @@ fn task_subject(watched: &Watched, task: u64) -> bool {
         Watched::Application { .. } => return false,
     };
     match subject {
+        Subject::Accounts { .. } => {
+            unreachable!("Parties open no accounts watch; the accounts story uses the client peer")
+        }
         Subject::Task { task: watched }
         | Subject::Tree { task: watched }
         | Subject::Run { task: watched }
@@ -462,6 +468,9 @@ fn project_subject(
         return false;
     };
     match subject {
+        Subject::Accounts { .. } => {
+            unreachable!("Parties open no accounts watch; the accounts story uses the client peer")
+        }
         Subject::Project { project: owned } => *owned == project,
         Subject::Query { query } => query.project == Some(project),
         Subject::Note { .. } => true,
@@ -501,6 +510,9 @@ fn party_subject(watched: &Watched, party: u64) -> bool {
         Watched::Application { .. } => return false,
     };
     match subject {
+        Subject::Accounts { .. } => {
+            unreachable!("Parties open no accounts watch; the accounts story uses the client peer")
+        }
         Subject::Frame { party: watched } | Subject::Inbox { party: watched } => *watched == party,
         Subject::Task { .. }
         | Subject::Tree { .. }
@@ -595,6 +607,7 @@ pub(crate) fn named_subject(value: &core::documents::Watched, party: u64) -> Sub
         W::Tree { task } => Subject::Tree { task: *task },
         W::Chips { tasks } => Subject::Chips { tasks: tasks.clone() },
         W::Inbox => Subject::Inbox { party },
+        W::Accounts => unreachable!("Parties open no accounts watch; the accounts story uses the client peer"),
         W::Query { query } => Subject::Query { query: *query },
         W::Run { task } => Subject::Run { task: *task },
         W::Deployment => Subject::Deployment,

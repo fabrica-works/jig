@@ -127,6 +127,7 @@ pub fn document(
         | jig_domain_core::documents::Document::PersonTask(_)
         | jig_domain_core::documents::Document::Result(_)
         | jig_domain_core::documents::Document::Project(_)
+        | jig_domain_core::documents::Document::Accounts(_)
         | jig_domain_core::documents::Document::Note(_) => return Err(Invalid::PendingDocument),
     }
     .map_err(Invalid::Document)?;

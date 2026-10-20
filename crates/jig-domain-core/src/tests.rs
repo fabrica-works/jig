@@ -1761,7 +1761,7 @@ fn watch_outputs(core: &mut Core, limits: &Limits, event: Event) -> Box<[Request
     }
 }
 
-fn watch_subjects() -> [(&'static str, Watched, Subject); 8] {
+fn watch_subjects() -> [(&'static str, Watched, Subject); 9] {
     let mut chips = List::with_capacity(1);
     chips.push(1).unwrap();
     let query = TaskQuery {
@@ -1781,6 +1781,7 @@ fn watch_subjects() -> [(&'static str, Watched, Subject); 8] {
         ("Tree", Watched::Tree { task: 1 }, Subject::Tree { task: 1 }),
         ("Chips", Watched::Chips { tasks: chips.clone() }, Subject::Chips { tasks: chips }),
         ("Inbox", Watched::Inbox, Subject::Inbox { party: 1 }),
+        ("Accounts", Watched::Accounts, Subject::Accounts { party: 1 }),
         ("Tasks", Watched::Query { query }, Subject::Query { query }),
         ("Run", Watched::Run { task: 1 }, Subject::Run { task: 1 }),
         ("Deployment", Watched::Deployment, Subject::Deployment),
@@ -1810,7 +1811,7 @@ fn an_unkeyed_watch_on_each_subject_makes_its_first_document_as_a_held_output() 
 fn watch_admission_checks_each_subjects_project_or_owner() {
     for (label, subject, _) in watch_subjects() {
         match subject {
-            Watched::Frame | Watched::Inbox => continue,
+            Watched::Frame | Watched::Inbox | Watched::Accounts => continue,
             Watched::Task { .. }
             | Watched::Tree { .. }
             | Watched::Chips { .. }

@@ -24,7 +24,8 @@ impl Core {
             let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
             let touched = match subject {
                 Subject::Frame { party: owner } | Subject::Inbox { party: owner } => *owner == party,
-                Subject::Task { .. }
+                Subject::Accounts { .. }
+                | Subject::Task { .. }
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Query { .. }
@@ -56,6 +57,7 @@ impl Core {
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
+                | Subject::Accounts { .. }
                 | Subject::Query { .. }
                 | Subject::Run { .. }
                 | Subject::Proposal { .. }
@@ -84,6 +86,7 @@ impl Core {
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
+                | Subject::Accounts { .. }
                 | Subject::Query { .. }
                 | Subject::Run { .. }
                 | Subject::Proposal { .. }
@@ -150,9 +153,11 @@ impl Core {
                     }
                     touched
                 }
-                Subject::Frame { .. } | Subject::Inbox { .. } | Subject::Deployment | Subject::Application { .. } => {
-                    false
-                }
+                Subject::Accounts { .. }
+                | Subject::Frame { .. }
+                | Subject::Inbox { .. }
+                | Subject::Deployment
+                | Subject::Application { .. } => false,
             };
             if touched {
                 let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
@@ -203,7 +208,8 @@ pub(super) fn touch_task(core: &mut Core, limits: &Limits, row: &tasks::TaskReco
             }
             Subject::Chips { tasks } => tasks.as_slice().contains(&row.number),
             Subject::Inbox { party } => core.people.role(*party, row.project).is_some(),
-            Subject::Frame { .. }
+            Subject::Accounts { .. }
+            | Subject::Frame { .. }
             | Subject::Deployment
             | Subject::Note { .. }
             | Subject::Application { .. }
@@ -435,7 +441,7 @@ fn visibility_end(core: &Core, binding: &crate::WatchBinding) -> Option<views::E
                 Some(views::End::NotAllowed)
             }
         }
-        Subject::Frame { .. } | Subject::Inbox { .. } => None,
+        Subject::Frame { .. } | Subject::Inbox { .. } | Subject::Accounts { .. } => None,
         Subject::Proposal { .. }
         | Subject::Escalation { .. }
         | Subject::Question { .. }

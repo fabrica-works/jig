@@ -113,6 +113,7 @@ pub fn read_with_codec(
             | documents::Document::Tree(_)
             | documents::Document::Lines(_)
             | documents::Document::Note(_)
+            | documents::Document::Accounts(_)
             | documents::Document::Inbox(_) => return Err(Invalid::PendingValue),
         },
         reads::Answer::Historical(value) => {
