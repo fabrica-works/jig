@@ -181,8 +181,8 @@ pub fn held(story: crate::world::Story) -> Option<Box<[u8]>> {
             record.expires_at = Wall::EPOCH;
             Some(oauth::encode_record(&record, &limits().client.document).expect("expired record"))
         }
-        Story::NoRecord => None,
-        Story::HandedIn { .. }
+        Story::NoRecord
+        | Story::HandedIn { .. }
         | Story::HandedInRejected
         | Story::SignIn
         | Story::AccountSignInMissingScope

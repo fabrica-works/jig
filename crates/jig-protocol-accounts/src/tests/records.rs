@@ -160,10 +160,11 @@ fn an_acknowledged_erase_forgets_the_record_and_retains_its_place() {
         records.kept(ACCOUNT_CHAT)
             == Some(driver::Request::Kept { account: ACCOUNT_CHAT, generation: 3, keeping: driver::Keeping::Kept })
     );
-    assert!(matches!(
-        records.up(fixtures::granted(ACCOUNT_CHAT, TOKEN_SECOND, 3, Duration::from_secs(60)), fixtures::NOW, b""),
-        Up::Granted { generation: 3, .. }
-    ));
+    let Up::Granted { generation: 3, .. } =
+        records.up(fixtures::granted(ACCOUNT_CHAT, TOKEN_SECOND, 3, Duration::from_secs(60)), fixtures::NOW, b"")
+    else {
+        panic!("a fresh kept record grants normally");
+    };
     assert!(records.load(ACCOUNT_CHAT, b"unread", &limits()).is_none());
     records.erased(ACCOUNT_CHAT);
     assert_eq!(

@@ -458,3 +458,37 @@ fn serves_work_follows_the_uses() {
     drop(step(&mut core, &env, Event::Account(accounts::Event::Limited { account: 41, reset: None })));
     assert!(!document(&core, &env, ALICE).usable);
 }
+
+#[test]
+fn needs_sign_in_retains_party_and_deployment_source_lines() {
+    let (mut core, env) = fixture(mixed());
+    for source in [FIRST_SOURCE, 41] {
+        grant(&mut core, &env, source);
+        drop(step(
+            &mut core,
+            &env,
+            Event::Account(accounts::Event::Component(accounts::FromComponent::Failed {
+                account: source,
+                failure: accounts::Failure::SignInAgain,
+            })),
+        ));
+    }
+    let party = document(&core, &env, ALICE);
+    let Document::Deployment(deployment) =
+        make(&core, &env.limits, ALICE, &Subject::Deployment, &window(), env.wall).unwrap()
+    else {
+        panic!("deployment document")
+    };
+    for (source, line) in [
+        (FIRST_SOURCE, party.accounts.get(0).unwrap().sources.get(0).unwrap()),
+        (41, deployment.accounts.get(0).unwrap().sources.get(0).unwrap()),
+    ] {
+        assert_eq!(line.number, source);
+        assert_eq!(line.kind, accounts::Kind::SignIn);
+        assert_eq!(line.state, AccountState::SignInAgain);
+        assert!(line.attention);
+        assert!(!line.usable);
+    }
+    assert_eq!(party.accounts.len(), 1);
+    assert_eq!(deployment.accounts.len(), 1);
+}
