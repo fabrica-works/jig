@@ -11,7 +11,7 @@ pub struct Limits {
     pub holder_accounts: u32,
     /// Sources one account keeps, in its holder's order.
     pub sources: u32,
-    /// Sign-ins under way at once; skein's driver admits as many redirect listeners.
+    /// Sign-ins and LLM-key keeps under way at once; the driver admits as many redirect listeners.
     pub sign_ins: u32,
     pub credentials: u32,
     pub backoff_base: Duration,
@@ -24,7 +24,8 @@ pub struct Limits {
 /// Accounts hold bounded names and times; every secret is below them. Each bound is at least
 /// one, and a holder's accounts are within the deployment's. The configured providers are the
 /// configuration's, outside this bound. Sign-ins under way are within `sign_ins`, sign-outs the
-/// component has not answered within the sources' bound, and sign-ins' ends within `facts`.
+/// component has not answered within the sources' bound, removals within `accounts`,
+/// LLM-key keeps sharing `sign_ins`, and sign-ins' ends within `facts`.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.accounts == 0

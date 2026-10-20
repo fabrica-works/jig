@@ -161,6 +161,9 @@ pub fn deployment_document() -> d::Deployment {
         }]),
         attempts: list([host_run()]),
         accounts: list([d::Account {
+            place: 0,
+            uses: None,
+            plan: false,
             number: 41,
             provider: Some(3),
             display: d::Text { bytes: b"Deployment account".as_slice().into(), cut: false },

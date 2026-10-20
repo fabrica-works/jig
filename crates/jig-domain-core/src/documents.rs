@@ -29,6 +29,7 @@ mod inbox_deployment;
 pub use inbox_deployment::{Inbox, InboxEntry, InboxObject};
 mod accounts;
 pub use accounts::{AccountLine, Accounts, LastEnd, SignInLine, SourceLine};
+pub use jig_domain_accounts::Use;
 mod deployment;
 pub use deployment::{
     Account, AccountState, Capacity, Deployment, DocumentClock, HelloRefusalLine, Host, HostRun, ProjectCapacity,

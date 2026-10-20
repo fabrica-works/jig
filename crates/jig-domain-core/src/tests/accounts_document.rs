@@ -166,6 +166,9 @@ fn a_partys_accounts_document_lists_its_own_accounts_with_their_sources_in_order
     assert_eq!(
         document(&core, &env, ALICE).accounts.as_slice(),
         &[AccountLine {
+            place: 0,
+            uses: None,
+            plan: true,
             number: OWN,
             provider: Some(PROVIDER),
             display: Text { bytes: b"Name".as_slice().into(), cut: false },
@@ -328,4 +331,127 @@ fn the_deployment_document_lists_only_the_deployments_accounts_with_their_source
     assert_eq!(account.holder, accounts::Holder::Deployment);
     assert_eq!(account.sources.as_slice(), &[line(0, 41, accounts::Kind::SignIn)]);
     assert!(!doc.cut, "the two parties' accounts do not count against deployment's bound");
+}
+
+fn change_account(core: &mut Core, env: &Env<Limits>, holder: accounts::Holder, change: accounts::Change) {
+    let mut out = Queue::with_capacity(accounts::max_out(&env.limits.accounts));
+    accounts::step(
+        &mut core.accounts,
+        &Env { now: env.now, wall: env.wall, limits: env.limits.accounts },
+        accounts::Event::Change { request: Token::new(70), holder, change },
+        &mut out,
+    );
+    assert!(out.iter().any(|r| matches!(r, accounts::Request::Answer { answer: accounts::Answer::Done, .. })));
+}
+#[test]
+fn the_accounts_document_shows_uses_and_order() {
+    let mut records = own_records();
+    records.extend([
+        account(25, accounts::Holder::Party(ALICE)),
+        source(25, 26, 0, accounts::Kind::Key),
+        account(DEPLOYMENT, accounts::Holder::Deployment),
+        source(DEPLOYMENT, 41, 0, accounts::Kind::Key),
+    ]);
+    let (mut core, env) = fixture(records);
+    let uses = Box::new([accounts::Use::Party(BOB), accounts::Use::Project(0)]);
+    change_account(
+        &mut core,
+        &env,
+        accounts::Holder::Party(ALICE),
+        accounts::Change::SetUses { account: 25, uses: Some(uses) },
+    );
+    change_account(
+        &mut core,
+        &env,
+        accounts::Holder::Party(ALICE),
+        accounts::Change::MoveAccount { account: 25, place: 0 },
+    );
+    let result = document(&core, &env, ALICE);
+    let rows = result.accounts.as_slice();
+    assert_eq!(
+        rows.iter().map(|r| (r.number, r.place, r.plan)).collect::<Vec<_>>(),
+        vec![(25, 0, false), (OWN, 1, true)]
+    );
+    assert_eq!(
+        rows[0].uses.as_ref().expect("explicit uses").as_slice(),
+        &[accounts::Use::Party(BOB), accounts::Use::Project(0)]
+    );
+    assert_eq!(rows[1].uses, None);
+    change_account(
+        &mut core,
+        &env,
+        accounts::Holder::Deployment,
+        accounts::Change::SetUses { account: DEPLOYMENT, uses: Some(Box::new([accounts::Use::Party(ALICE)])) },
+    );
+    let Document::Deployment(deployment) =
+        make(&core, &env.limits, ALICE, &Subject::Deployment, &window(), env.wall).expect("owner deployment")
+    else {
+        panic!("deployment")
+    };
+    let row = deployment.accounts.get(0).expect("deployment account");
+    assert_eq!((row.number, row.place, row.plan), (DEPLOYMENT, 0, false));
+    assert_eq!(row.uses.as_ref().expect("deployment uses").as_slice(), &[accounts::Use::Party(ALICE)]);
+    let mut short = env;
+    short.limits.documents.lines = 1;
+    let cut = document(&core, &short, ALICE);
+    assert!(cut.cut);
+    assert_eq!(cut.accounts.get(0).expect("first account").number, 25);
+}
+#[test]
+fn serves_work_follows_the_uses() {
+    let (mut core, env) = fixture(vec![
+        account(OWN, accounts::Holder::Party(ALICE)),
+        source(OWN, FIRST_SOURCE, 0, accounts::Kind::Key),
+        account(DEPLOYMENT, accounts::Holder::Deployment),
+        source(DEPLOYMENT, 41, 0, accounts::Kind::Key),
+    ]);
+    for source in [FIRST_SOURCE, 41] {
+        drop(step(
+            &mut core,
+            &env,
+            Event::Account(accounts::Event::Component(accounts::FromComponent::Granted {
+                form: accounts::Form::Credential(accounts::Scheme::Key),
+                account: source,
+                generation: 1,
+                valid: Duration::from_secs(60),
+            })),
+        ));
+    }
+    change_account(
+        &mut core,
+        &env,
+        accounts::Holder::Deployment,
+        accounts::Change::SetUses { account: DEPLOYMENT, uses: Some(Box::new([])) },
+    );
+    for (uses, alice, bob) in [
+        (None, true, false),
+        (Some(vec![accounts::Use::Party(BOB)]), false, true),
+        (Some(vec![accounts::Use::Project(0)]), false, false),
+        (Some(vec![]), false, false),
+    ] {
+        change_account(
+            &mut core,
+            &env,
+            accounts::Holder::Party(ALICE),
+            accounts::Change::SetUses { account: OWN, uses: uses.map(Vec::into_boxed_slice) },
+        );
+        assert_eq!((document(&core, &env, ALICE).usable, document(&core, &env, BOB).usable), (alice, bob));
+    }
+    change_account(
+        &mut core,
+        &env,
+        accounts::Holder::Deployment,
+        accounts::Change::SetUses { account: DEPLOYMENT, uses: None },
+    );
+    assert!(document(&core, &env, ALICE).usable && document(&core, &env, BOB).usable);
+    change_account(
+        &mut core,
+        &env,
+        accounts::Holder::Deployment,
+        accounts::Change::SetUses { account: DEPLOYMENT, uses: Some(Box::new([accounts::Use::Party(ALICE)])) },
+    );
+    assert!(document(&core, &env, ALICE).usable);
+    assert!(!document(&core, &env, BOB).usable);
+    drop(step(&mut core, &env, Event::Account(accounts::Event::Limited { account: 41, reset: None })));
+    assert!(!document(&core, &env, ALICE).usable);
 }

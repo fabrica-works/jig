@@ -20,6 +20,9 @@ pub struct SourceLine {
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct AccountLine {
     pub number: u32,
+    pub place: u32,
+    pub uses: Option<List<accounts::Use>>,
+    pub plan: bool,
     pub provider: Option<u32>,
     pub display: Text,
     pub holder: accounts::Holder,
@@ -38,9 +41,9 @@ pub struct LastEnd {
     pub end: accounts::End,
 }
 /// Secret-free facts of the party's accounts. The providers' terms facts await
-/// configuration's plan/manage-usage facts and provider names (r2 OP1); uses and
-/// account order await T8, and program per-host state and checks await T12.
-/// `usable` is the staged approximation in `serves_work`, replaced by T8's uses;
+/// configuration's plan/manage-usage facts and provider names (r2 OP1);
+/// program per-host state and checks await T12. Uses name explicit payers,
+/// or leave the default; `usable` follows those uses for this party;
 /// `settled` currently counts only sign-ins the party asked for.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Accounts {
@@ -99,11 +102,12 @@ pub(super) fn make(
     }
     let mut accounts = List::with_capacity(limits.documents.lines);
     let mut cut = false;
-    for fact in &core.accounts.account_views() {
-        let account = core.accounts.account(fact.account).expect("an account view names its account");
-        if account.holder() != accounts::Holder::Party(party) {
-            continue;
-        }
+    let views = core.accounts.account_views();
+    let mut after = None;
+    for _ in 0..views.len() {
+        let Some((place, number)) = next_account(core, &views, accounts::Holder::Party(party), after) else { break };
+        after = Some((place, number));
+        let account = core.accounts.account(number).expect("a selected account");
         if accounts.room() == 0 {
             cut = true;
             continue;
@@ -111,7 +115,10 @@ pub(super) fn make(
         let sources = source_lines(core, limits, account, clock);
         accounts
             .push(AccountLine {
-                number: fact.account,
+                number,
+                place: account.place(),
+                uses: uses(account),
+                plan: account.plan(),
                 provider: account.provider(),
                 display: super::small::text(account.display(), limits.documents.text_bytes),
                 holder: account.holder(),
@@ -142,26 +149,81 @@ pub(super) fn make(
     Ok(Accounts { accounts, signing, last_end, usable: serves_work(core, party), settled, cut })
 }
 
-/// Staged until T8 supplies uses: own accounts and the deployment's serve this party's work.
+/// A usable account serves its explicit party payers, or its default holder/deployment uses.
 fn serves_work(core: &Core, party: u64) -> bool {
     for fact in &core.accounts.account_views() {
         let account = core.accounts.account(fact.account).expect("an account view names its account");
-        if fact.usable
-            && (account.holder() == accounts::Holder::Party(party) || account.holder() == accounts::Holder::Deployment)
-        {
-            return true;
+        if !fact.usable {
+            continue;
+        }
+        match account.uses() {
+            Some(uses) => {
+                for payer in uses {
+                    if *payer == accounts::Use::Party(party) {
+                        return true;
+                    }
+                }
+            }
+            None => {
+                if account.holder() == accounts::Holder::Party(party)
+                    || account.holder() == accounts::Holder::Deployment
+                {
+                    return true;
+                }
+            }
         }
     }
     false
 }
 
 pub(super) fn worst_case(limits: &DocumentLimits) -> Option<u64> {
-    let account_heap = List::<SourceLine>::worst_case(limits.lines)?.checked_add(u64::from(limits.text_bytes))?;
+    let account_heap = List::<SourceLine>::worst_case(limits.lines)?
+        .checked_add(u64::from(limits.text_bytes))?
+        .checked_add(List::<accounts::Use>::worst_case(accounts::USES)?)?;
     u64::try_from(size_of::<Accounts>())
         .ok()?
         .checked_add(List::<AccountLine>::worst_case(limits.lines)?)?
         .checked_add(u64::from(limits.lines).checked_mul(account_heap)?)?
         .checked_add(List::<SignInLine>::worst_case(limits.lines)?)
+}
+
+/// Copy an account's explicit uses without changing the default/empty distinction.
+pub(super) fn uses(account: &accounts::Account) -> Option<List<accounts::Use>> {
+    let uses = account.uses()?;
+    let mut result = List::with_capacity(accounts::USES);
+    for payer in uses {
+        result.push(*payer).expect("the child bounds uses");
+    }
+    Some(result)
+}
+
+/// The next holder account by place, with its number breaking ties deterministically.
+pub(super) fn next_account(
+    core: &Core,
+    views: &List<accounts::Fact>,
+    holder: accounts::Holder,
+    after: Option<(u32, u32)>,
+) -> Option<(u32, u32)> {
+    let mut next = None;
+    for fact in views {
+        let account = core.accounts.account(fact.account).expect("an account view names its account");
+        let position = (account.place(), fact.account);
+        if account.holder() != holder
+            || match after {
+                Some(old) => position <= old,
+                None => false,
+            }
+        {
+            continue;
+        }
+        if match next {
+            Some(old) => position < old,
+            None => true,
+        } {
+            next = Some(position);
+        }
+    }
+    next
 }
 
 #[cfg(test)]

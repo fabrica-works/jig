@@ -72,6 +72,9 @@ pub enum AccountState {
 #[expect(clippy::struct_excessive_bools, reason = "independent child-owned flags plus document truncation")]
 pub struct Account {
     pub number: u32,
+    pub place: u32,
+    pub uses: Option<List<accounts::Use>>,
+    pub plan: bool,
     pub provider: Option<u32>,
     pub display: super::Text,
     pub holder: accounts::Holder,
@@ -285,11 +288,22 @@ pub(super) fn deployment(
     let rows = core.tasks.view_tasks();
     let mut accounts = List::with_capacity(limits.documents.lines);
     let source_accounts = core.accounts.account_views();
-    for value in &source_accounts {
-        let account = core.accounts.account(value.account).expect("an account view names its account");
-        if account.holder() != accounts::Holder::Deployment {
-            continue;
+    let mut after = None;
+    for _ in 0..source_accounts.len() {
+        let Some((place, number)) =
+            super::accounts::next_account(core, &source_accounts, accounts::Holder::Deployment, after)
+        else {
+            break;
+        };
+        after = Some((place, number));
+        let account = core.accounts.account(number).expect("a selected deployment account");
+        let mut selected = None;
+        for fact in &source_accounts {
+            if fact.account == number {
+                selected = Some(*fact);
+            }
         }
+        let value = selected.expect("a selected account view");
         if accounts.room() == 0 {
             cut = true;
             continue;
@@ -340,6 +354,9 @@ pub(super) fn deployment(
         accounts
             .push(Account {
                 number: value.account,
+                place: account.place(),
+                uses: super::accounts::uses(account),
+                plan: account.plan(),
                 provider: account.provider(),
                 display: super::small::text(account.display(), limits.documents.text_bytes),
                 holder: account.holder(),
@@ -504,8 +521,9 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
         .checked_add(4)?;
     // One nested host-run/task/account carrier is smaller than a task page,
     // whose bound prices all its chip/part/list children. Hosts nest run lists.
-    let account_heap =
-        List::<super::SourceLine>::worst_case(limits.lines)?.checked_add(u64::from(limits.text_bytes))?;
+    let account_heap = List::<super::SourceLine>::worst_case(limits.lines)?
+        .checked_add(u64::from(limits.text_bytes))?
+        .checked_add(List::<accounts::Use>::worst_case(accounts::USES)?)?;
     super::task_tree::worst_case(limits)?
         .checked_mul(carriers)?
         .checked_add(List::<Account>::worst_case(limits.lines)?)?

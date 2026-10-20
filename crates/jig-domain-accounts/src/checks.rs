@@ -1,5 +1,5 @@
 //! The checks a sign-in and a new source make (accounts.md, 3.3 and 3.6), as functions of the
-//! child's state alone; a party's sign-in makes them (`signing`), and adding keys will.
+//! child's state alone, shared by sign-ins and LLM-key keeps.
 use crate::records::within;
 use crate::{Domain, Holder, Kind, Limits, SUBJECT};
 

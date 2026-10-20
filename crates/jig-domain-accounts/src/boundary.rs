@@ -228,7 +228,7 @@ pub enum Signing {
     },
 }
 
-/// The child's answer to a party's sign-in or sign-out.
+/// The child's answer to a holder's sign-in, sign-out or account change.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Answer {
     KeyKept {

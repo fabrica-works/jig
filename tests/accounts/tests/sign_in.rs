@@ -136,7 +136,6 @@ fn a_sign_in_to_a_held_subject_renews_its_account() {
         world.step(signed_in(12, b"alice", b"other", false)),
         vec![
             Request::Erase { key: Key::Source { account: 5, number: 6 } },
-            save(source(5, 7, 0, Kind::Key)),
             Request::Signing(Signing::Replaced { source: 6, by: 12 }),
             save(source(5, 12, 0, Kind::SignIn)),
             want(12),

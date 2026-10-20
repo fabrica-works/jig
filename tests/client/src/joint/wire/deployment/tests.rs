@@ -52,6 +52,9 @@ pub(crate) fn source() -> documents::Deployment {
         accounts: rows(
             3,
             [documents::Account {
+                place: 0,
+                uses: None,
+                plan: false,
                 provider: None,
                 display: documents::Text { bytes: Box::new([]), cut: false },
                 holder: jig_domain_accounts::Holder::Deployment,

@@ -29,10 +29,9 @@ fn add(world: &mut World, join: Option<u32>) -> u32 {
     let outputs = change(world, Change::AddKey { provider: PROVIDER, join, carried: CARRIED });
     outputs
         .iter()
-        .find_map(|request| match request {
-            Request::Signing(Signing::Keep { source, .. }) => Some(*source),
-            _ => None,
-        })
+        .find_map(
+            |request| if let Request::Signing(Signing::Keep { source, .. }) = request { Some(*source) } else { None },
+        )
         .expect("an admitted LLM key keep")
 }
 fn grant(world: &mut World, source: u32, generation: u64) -> Vec<Request> {
@@ -108,6 +107,7 @@ fn a_key_is_granted_generation_one_and_a_replaced_key_the_next() {
     let account = account_of(&world, source);
     let first = world.domain.grant(account, world.now).expect("first grant");
     assert_eq!((first.account, first.generation, first.valid), (source, 1, KEY_VALID));
+    assert_eq!(first.form, jig_domain_accounts::Form::Credential(jig_domain_accounts::Scheme::Key));
     assert_eq!(
         change(&mut world, Change::ReplaceKey { source, carried: CARRIED + 1 }),
         vec![Request::Signing(Signing::Keep { source, carried: CARRIED + 1, replaces: true })]
@@ -271,16 +271,15 @@ fn uses_are_bounded_saved_and_restored() {
     let mut world = fresh();
     let first = kept(&mut world, None);
     let account = account_of(&world, first);
-    let uses: Box<[_]> = (0..USES).map(|n| Use::Project(n)).collect();
+    let uses: Box<[_]> = (0..USES).map(Use::Project).collect();
     let outputs = change(&mut world, Change::SetUses { account, uses: Some(uses.clone()) });
     assert_eq!(outputs.last(), Some(&done()));
     assert_eq!(world.domain.account(account).expect("account").uses(), Some(uses.as_ref()));
     let saved = outputs
         .iter()
-        .find_map(|r| match r {
-            Request::Save { record: row @ Stored::Account { .. } } => Some(row.clone()),
-            _ => None,
-        })
+        .find_map(
+            |r| if let Request::Save { record: row @ Stored::Account { .. } } = r { Some(row.clone()) } else { None },
+        )
         .expect("account saved");
     for invalid in [vec![Use::Party(7); 2], (0..=USES).map(Use::Project).collect()] {
         assert_eq!(
