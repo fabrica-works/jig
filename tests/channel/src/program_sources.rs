@@ -10,10 +10,14 @@ use jig_domain_fleet as fleet;
 use jig_domain_host as host;
 use jig_protocol_worker_wire as wire;
 use skein_fake_machine::{How, Item, Opened};
-use skein_io::kernel;
+use skein_io::{self as io, kernel};
 use skein_lib::{Duration, Queue, Reader, ReplyTo, Time, Token};
+use skein_shell::Host;
 use skein_world::{HostedProgram, Machine};
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 
 struct Files {
     files: skein_fake_machine::Machine,
@@ -49,6 +53,7 @@ enum Phase {
     New,
     Sources,
     Asked,
+    Login,
     Done,
 }
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -63,56 +68,14 @@ struct Judge {
     phase: Phase,
     sign_out: bool,
     lost: bool,
+    login: Option<Rc<Cell<LoginPhase>>>,
     ended: Option<SignOutAnswer>,
     states: Vec<host::LoginState>,
     observed: usize,
 }
 impl skein_world::Referee<Proc> for Judge {
     fn act(&mut self, now: Time, procs: &mut [Proc]) {
-        let mut snapshots = Vec::new();
-        let mut hellos = 0;
-        for proc in &*procs {
-            if let Proc::Worker(worker) = proc {
-                hellos = worker.wire.frames.iter().filter(|(_, kind, _)| *kind == 0x0100).count();
-                for (_, kind, bytes) in worker.wire.frames.iter().skip(self.observed) {
-                    if *kind == 0x0108 {
-                        let record =
-                            wire::Logins::decode(&wire::CEILINGS, &mut Reader::new(bytes)).expect("whole login bytes");
-                        if record.logins().len() == 1 {
-                            snapshots.push(record);
-                        }
-                    }
-                }
-                self.observed = worker.wire.frames.len();
-            }
-        }
-        for snapshot in snapshots {
-            let row = snapshot.into_parts().logins.into_boxed().into_iter().next().expect("one source").into_parts();
-            assert_eq!(row.name.as_ref(), b"alice");
-            self.states.push(match row.state {
-                wire::LoginState::Usable => host::LoginState::Usable,
-                wire::LoginState::NotSignedIn => host::LoginState::NotSignedIn,
-                wire::LoginState::SignedInOtherwise(method) => {
-                    host::LoginState::SignedInOtherwise(host::LoginMethod::new(method.method()).expect("method"))
-                }
-                wire::LoginState::Failed(failure) => {
-                    let failure = failure.into_parts();
-                    assert!(failure.detail.len() <= 4096);
-                    host::LoginState::Failed {
-                        reason: match failure.reason {
-                            wire::SourceFailure::Missing => host::SourceFailure::Missing,
-                            wire::SourceFailure::Deadline => host::SourceFailure::Deadline,
-                            wire::SourceFailure::Unreadable => host::SourceFailure::Unreadable,
-                            wire::SourceFailure::Exited => host::SourceFailure::Exited,
-                            wire::SourceFailure::Unconfigured => host::SourceFailure::Unconfigured,
-                            wire::SourceFailure::Unknown => host::SourceFailure::Unknown,
-                            wire::SourceFailure::Closed => host::SourceFailure::Closed,
-                        },
-                        detail: failure.detail,
-                    }
-                }
-            });
-        }
+        let hellos = self.observe_wire(procs);
         for proc in procs {
             if self.phase == Phase::Done {
                 match proc {
@@ -156,6 +119,19 @@ impl skein_world::Referee<Proc> for Judge {
                                 name: fleet::SourceName::new(b"alice").expect("name"),
                             }));
                         }
+                        if let Some(login) = &self.login {
+                            login.set(LoginPhase::Start);
+                            self.phase = Phase::Login;
+                        } else {
+                            self.phase = Phase::Asked;
+                        }
+                    }
+                    if self.phase == Phase::Login && self.login.as_ref().expect("login story").get() == LoginPhase::Done
+                    {
+                        engine.parties_in().push(core::Event::Fleet(fleet::Event::Check {
+                            channel: Token::new(1),
+                            name: fleet::SourceName::new(b"alice").expect("name"),
+                        }));
                         self.phase = Phase::Asked;
                     }
                 }
@@ -180,12 +156,60 @@ impl skein_world::Referee<Proc> for Judge {
     }
 }
 impl Judge {
+    fn observe_wire(&mut self, procs: &[Proc]) -> usize {
+        let mut snapshots = Vec::new();
+        let mut hellos = 0;
+        for proc in procs {
+            if let Proc::Worker(worker) = proc {
+                hellos = worker.wire.frames.iter().filter(|(_, kind, _)| *kind == 0x0100).count();
+                for (_, kind, bytes) in worker.wire.frames.iter().skip(self.observed) {
+                    if *kind == wire::Kind::Logins.number() {
+                        let record =
+                            wire::Logins::decode(&wire::CEILINGS, &mut Reader::new(bytes)).expect("whole login bytes");
+                        if record.logins().len() == 1 {
+                            snapshots.push(record);
+                        }
+                    }
+                }
+                self.observed = worker.wire.frames.len();
+            }
+        }
+        for snapshot in snapshots {
+            let row = snapshot.into_parts().logins.into_boxed().into_iter().next().expect("one source").into_parts();
+            assert_eq!(row.name.as_ref(), b"alice");
+            self.states.push(match row.state {
+                wire::LoginState::Usable => host::LoginState::Usable,
+                wire::LoginState::NotSignedIn => host::LoginState::NotSignedIn,
+                wire::LoginState::SignedInOtherwise(method) => {
+                    host::LoginState::SignedInOtherwise(host::LoginMethod::new(method.method()).expect("method"))
+                }
+                wire::LoginState::Failed(failure) => {
+                    let failure = failure.into_parts();
+                    assert!(failure.detail.len() <= 4096);
+                    host::LoginState::Failed {
+                        reason: match failure.reason {
+                            wire::SourceFailure::Missing => host::SourceFailure::Missing,
+                            wire::SourceFailure::Deadline => host::SourceFailure::Deadline,
+                            wire::SourceFailure::Unreadable => host::SourceFailure::Unreadable,
+                            wire::SourceFailure::Exited => host::SourceFailure::Exited,
+                            wire::SourceFailure::Unconfigured => host::SourceFailure::Unconfigured,
+                            wire::SourceFailure::Unknown => host::SourceFailure::Unknown,
+                            wire::SourceFailure::Closed => host::SourceFailure::Closed,
+                        },
+                        detail: failure.detail,
+                    }
+                }
+            });
+        }
+        hellos
+    }
     fn record(&mut self, hellos: usize) {
         self.shared.borrow_mut().states.clone_from(&self.states);
         self.shared.borrow_mut().ended.clone_from(&self.ended);
         if self.phase == Phase::Asked
             && (!self.sign_out || self.ended.is_some())
             && (!self.lost || hellos >= 2 && self.states.len() >= 2)
+            && (self.login.is_none() || self.states.last() == Some(&host::LoginState::Usable))
         {
             self.phase = Phase::Done;
         }
@@ -197,6 +221,12 @@ pub struct Run {
     pub ended: Option<SignOutAnswer>,
     pub observations: Vec<smith_fake_claude::Observation>,
 }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FollowUp {
+    Observe,
+    LoginThenCheck,
+}
+
 #[must_use]
 fn run_inner(
     login: Option<&[u8]>,
@@ -204,7 +234,9 @@ fn run_inner(
     sign_out: bool,
     lost: bool,
     configured: bool,
+    follow_up: FollowUp,
 ) -> Run {
+    let login_then_check = follow_up == FollowUp::LoginThenCheck;
     let mut items = vec![
         Item::directory(b"state"),
         Item::directory(b"private"),
@@ -223,6 +255,8 @@ fn run_inner(
     let base = files.lay(&items);
     let root = files.open(base, b".", How::Directory).expect("private worker root");
     let shared = Rc::new(RefCell::new(Run::default()));
+    let login_driver = login_then_check.then(|| Rc::new(Cell::new(LoginPhase::Idle)));
+    let login_root = login_then_check.then(|| files.open(base, b".", How::Directory).expect("login launcher root"));
     let judge = Judge {
         shared: shared.clone(),
         store: Store::default(),
@@ -230,6 +264,7 @@ fn run_inner(
         phase: Phase::New,
         sign_out,
         lost,
+        login: login_driver.clone(),
         ended: None,
         states: Vec::new(),
         observed: 0,
@@ -256,9 +291,18 @@ fn run_inner(
         skein_sim::Handle::new(root.raw()),
         if configured { processes::worker_programs } else { processes::worker },
     );
+    if let (Some(state), Some(root)) = (login_driver, login_root) {
+        world.spawn_root(skein_sim::Handle::new(root.raw()), |root| Proc::Auth(Box::new(Login::new(root, state))));
+    }
     let mut reset = false;
     let mut outcome = world.run_with_faults(|_, _, submissions| {
-        let cut = lost && !reset && submissions.iter().any(|submit| matches!(&submit.kind, kernel::Op::Send { bytes, from: 0, .. } if bytes.len() >= 8 && skein_channel::parse_header(&bytes[..8]).is_ok_and(|header| header.kind == 0x0109)));
+        let cut = lost && !reset && submissions.iter().any(|submit| {
+            if sign_out {
+                matches!(&submit.kind, kernel::Op::Send { bytes, from: 0, .. } if bytes.len() >= 8 && skein_channel::parse_header(&bytes[..8]).is_ok_and(|header| header.kind == wire::Kind::SignedOut.number()))
+            } else {
+                !shared.borrow().states.is_empty() && matches!(&submit.kind, kernel::Op::Send { .. })
+            }
+        });
         reset |= cut;
         Some(skein_sim::Faults { reset: if cut { 1000 } else { 0 }, ..config.faults })
     });
@@ -280,9 +324,144 @@ fn run_inner(
 
 #[must_use]
 pub fn run(login: Option<&[u8]>, story: &smith_fake_claude::Story, sign_out: bool, lost: bool) -> Run {
-    run_inner(login, story, sign_out, lost, true)
+    run_inner(login, story, sign_out, lost, true, FollowUp::Observe)
 }
 #[must_use]
 pub fn unconfigured() -> Run {
-    run_inner(None, &smith_fake_claude::Story::default(), false, false, false)
+    run_inner(None, &smith_fake_claude::Story::default(), false, false, false, FollowUp::Observe)
+}
+
+#[must_use]
+pub fn login_then_check() -> Run {
+    run_inner(None, &smith_fake_claude::Story::default(), false, false, true, FollowUp::LoginThenCheck)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LoginPhase {
+    Idle,
+    Start,
+    Running,
+    Closing,
+    Done,
+}
+
+const LOGIN_ROOT_CLOSE: Token = Token::new(u64::MAX);
+
+// An independent user runs the hosted fake's real auth login. The worker only
+// learns of that change when the engine asks it to check the source again.
+struct Login {
+    root: kernel::Fd,
+    state: Rc<Cell<LoginPhase>>,
+    command: Option<smith_protocol_program::Command>,
+    io: io::Io,
+    env: skein_lib::Env<io::Limits>,
+    completions: Queue<kernel::Complete>,
+    submissions: Queue<kernel::Submit>,
+    above: Queue<io::Event>,
+    below: Queue<io::Request>,
+}
+impl Login {
+    fn new(root: kernel::Fd, state: Rc<Cell<LoginPhase>>) -> Self {
+        let limits = io::Limits { sockets: 3, ..smith_agent_process_world::limits().io };
+        Self {
+            root,
+            state,
+            command: None,
+            io: io::Io::new(&limits),
+            env: skein_lib::Env { now: Time::ZERO, wall: skein_lib::Wall::EPOCH, limits },
+            completions: Queue::with_capacity(128),
+            submissions: Queue::with_capacity(128),
+            above: Queue::with_capacity(128),
+            below: Queue::with_capacity(128),
+        }
+    }
+}
+impl Host for Login {
+    fn iterate(&mut self, now: Time, wall: skein_lib::Wall) {
+        self.env.now = now;
+        self.env.wall = wall;
+        if self.state.get() == LoginPhase::Start {
+            self.state.set(LoginPhase::Running);
+            self.command = Some(smith_protocol_program::Command::new(
+                Token::new(1),
+                smith_protocol_program::Launch {
+                    program: b"claude".as_slice().into(),
+                    arguments: smith_protocol_program::SIGN_IN.iter().map(|arg| Box::from(*arg)).collect(),
+                    environment: Box::new([Box::from(b"CLAUDE_CONFIG_DIR=/private/programs/alice".as_slice())]),
+                    root: self.root,
+                    directory: b".".as_slice().into(),
+                },
+                now.saturating_add(Duration::from_secs(5)),
+                64,
+                &mut self.below,
+            ));
+        }
+        while let Some(complete) = self.completions.pop() {
+            if complete.op == LOGIN_ROOT_CLOSE {
+                assert_eq!(complete.result, Ok(kernel::Done::Nothing));
+                self.state.set(LoginPhase::Done);
+            } else {
+                io::up(&mut self.io, &self.env, complete, &mut self.above, &mut self.submissions);
+            }
+        }
+        while self.io.is_ready() {
+            io::resume(&mut self.io, &self.env, &mut self.above, &mut self.submissions);
+        }
+        while self.io.is_due(now) {
+            io::fire(&mut self.io, &self.env, &mut self.above, &mut self.submissions);
+        }
+        if let Some(command) = &mut self.command {
+            while let Some(event) = self.above.pop() {
+                command.from_io(event, &mut self.below);
+            }
+            command.fire(now, &mut self.below);
+            if let Some(ended) = command.ended()
+                && self.state.get() == LoginPhase::Running
+            {
+                assert!(
+                    matches!(ended, smith_protocol_program::Ended::Exited { exit: kernel::Exit::Code(0), .. }),
+                    "{ended:?}"
+                );
+                self.submissions
+                    .push(kernel::Submit { op: LOGIN_ROOT_CLOSE, kind: kernel::Op::Close { fd: self.root } });
+                self.state.set(LoginPhase::Closing);
+            }
+        }
+        while let Some(request) = self.below.pop() {
+            io::down(&mut self.io, &self.env, request, &mut self.submissions);
+        }
+        self.io.reclaim();
+    }
+    fn completions(&mut self) -> &mut Queue<kernel::Complete> {
+        &mut self.completions
+    }
+    fn submissions(&mut self) -> &mut Queue<kernel::Submit> {
+        &mut self.submissions
+    }
+    fn work_pending(&self, now: Time) -> bool {
+        self.state.get() == LoginPhase::Start
+            || !self.completions.is_empty()
+            || !self.above.is_empty()
+            || !self.below.is_empty()
+            || self.io.is_ready()
+            || self.io.is_due(now)
+    }
+    fn next_deadline(&self) -> Option<Time> {
+        [self.io.next_deadline(), self.command.as_ref().and_then(smith_protocol_program::Command::next_deadline)]
+            .into_iter()
+            .flatten()
+            .min()
+    }
+    fn next_policy_deadline(&self) -> Option<Time> {
+        None
+    }
+    fn is_empty(&self) -> bool {
+        self.state.get() == LoginPhase::Done && self.io.is_empty()
+    }
+    fn worst_case(&self) -> u64 {
+        4_194_304
+    }
+    fn operations(&self) -> u32 {
+        io::operations(&self.env.limits).expect("login launcher io").checked_add(1).expect("root close operation")
+    }
 }

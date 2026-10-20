@@ -66,3 +66,21 @@ fn an_unconfigured_worker_reports_failure_without_starting_a_program() {
     );
     assert!(result.observations.is_empty());
 }
+
+#[test]
+fn a_fake_login_then_check_publishes_the_fresh_status() {
+    let result = program_sources::login_then_check();
+    assert_eq!(result.states, [LoginState::NotSignedIn, LoginState::Usable]);
+    assert_eq!(
+        result.observations.iter().map(|row| row.arguments.clone()).collect::<Vec<_>>(),
+        [["auth", "status"], ["auth", "login"], ["auth", "status"]]
+    );
+}
+
+#[test]
+fn sources_after_a_redial_are_checked_again_without_a_sign_out() {
+    let result = program_sources::run(Some(b"claude.ai"), &Story::default(), false, true);
+    assert_eq!(result.states, [LoginState::Usable, LoginState::Usable]);
+    assert_eq!(result.observations.len(), 2);
+    assert!(result.observations.iter().all(|row| row.arguments == ["auth", "status"]));
+}

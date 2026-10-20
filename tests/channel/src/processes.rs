@@ -9,7 +9,7 @@ use smith_agent_process_world as agent_fixture;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) enum Proc {
-    Auth(Box<smith_fake_claude::Fake>),
+    Auth(Box<dyn Host>),
     Engine(Box<ServiceHost>),
     Worker(Box<ServiceHost>),
     Agent { host: Box<PipeHost<smith_agent_shell::Agent>>, errors: agent_fixture::AgentErrors },
