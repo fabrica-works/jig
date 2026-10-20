@@ -72,6 +72,7 @@ pub enum Event {
     SignIn {
         request: Token,
         holder: Holder,
+        by: u64,
         provider: u32,
     },
     SignOut {
@@ -185,7 +186,17 @@ pub enum Answer {
 pub struct Ended {
     pub request: Token,
     pub source: u32,
+    pub by: u64,
     pub end: End,
+}
+
+/// A sign-in under way, including the person who asked for it.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Pending {
+    pub source: u32,
+    pub provider: u32,
+    pub holder: Holder,
+    pub by: u64,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

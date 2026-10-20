@@ -1,7 +1,7 @@
 use crate::signing::UnderWay;
 use crate::{
-    Configured, Ended, Event, Fact, Failure, FromComponent, Grant, GrantTable, Held, Holder, Kind, Limits, Providers,
-    Request, State, Stored, ToComponent, Turned,
+    Configured, Ended, Event, Fact, Failure, FromComponent, Grant, GrantTable, Held, Holder, Kind, Limits, Pending,
+    Providers, Request, State, Stored, ToComponent, Turned,
 };
 use alloc::boxed::Box;
 use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time, Token, Wall};
@@ -229,9 +229,13 @@ impl Domain {
         self.phase == Phase::Wanted
     }
     pub(crate) fn end(&mut self, ended: Ended) {
-        if self.ended.try_push(ended).is_err() {
-            self.lost = self.lost.saturating_add(1);
+        if self.ended.capacity() == 0 {
+            return;
         }
+        if self.ended.room() == 0 {
+            let _oldest = self.ended.pop();
+        }
+        self.ended.push(ended);
     }
     #[must_use]
     pub fn account(&self, number: u32) -> Option<&Account> {
@@ -386,7 +390,28 @@ impl Domain {
     pub fn pop_fact(&mut self) -> Option<Fact> {
         self.facts.pop()
     }
-    /// How each party's sign-in ended, oldest first.
+    /// Sign-ins under way, in source-number order.
+    #[must_use]
+    pub fn pending(&self) -> List<Pending> {
+        let mut result = List::with_capacity(self.signing.capacity());
+        for (source, under_way) in &self.signing {
+            let pending = under_way.pending(*source);
+            result.push(pending).expect("one pending entry per sign-in");
+        }
+        result
+    }
+    /// The newest retained end asked by this person; forgotten at restart.
+    #[must_use]
+    pub fn last_end(&self, by: u64) -> Option<Ended> {
+        for ended in self.ended.iter().rev() {
+            if ended.by == by {
+                return Some(*ended);
+            }
+        }
+        None
+    }
+    /// How each party's sign-in ended, oldest first. The core does not call this:
+    /// it reads the retained history through `last_end`.
     pub fn pop_ended(&mut self) -> Option<Ended> {
         self.ended.pop()
     }
@@ -466,8 +491,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 resume(domain, env, account, out);
             }
         }
-        Event::SignIn { request, holder, provider } => {
-            crate::signing::sign_in(domain, env, request, holder, provider, out);
+        Event::SignIn { request, holder, by, provider } => {
+            crate::signing::sign_in(domain, env, request, holder, by, provider, out);
         }
         Event::SignOut { request, holder, source } => crate::signing::sign_out(domain, request, holder, source, out),
         Event::Visited { source, address } => {

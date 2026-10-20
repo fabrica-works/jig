@@ -302,7 +302,7 @@ pub(super) fn tag_people(
                     },
                     people::Ask::AccountSignIn { holder, provider } => {
                         let holder = super::account_requests::holder(holder, person);
-                        work.push(Event::Account(accounts::Event::SignIn { request, holder, provider }));
+                        work.push(Event::Account(accounts::Event::SignIn { request, holder, by: person, provider }));
                     }
                     people::Ask::AccountSignOut { holder, source } => {
                         let holder = super::account_requests::holder(holder, person);

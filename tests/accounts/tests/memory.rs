@@ -172,7 +172,12 @@ impl Run {
     }
     /// The account's holder signs in at provider 1: the started source's number.
     fn sign_in(&mut self, domain: &mut Domain, account: u32) -> u32 {
-        let event = Event::SignIn { request: self.token(), holder: Holder::Party(u64::from(account)), provider: 1 };
+        let event = Event::SignIn {
+            request: self.token(),
+            holder: Holder::Party(u64::from(account)),
+            by: u64::from(account),
+            provider: 1,
+        };
         let Some(Signing::SignIn { source, .. }) = self.step(domain, event, "sign in") else {
             panic!("a sign-in started");
         };

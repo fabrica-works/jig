@@ -24,6 +24,13 @@ pub(crate) struct UnderWay {
     holder: Holder,
     provider: u32,
     visited: bool,
+    by: u64,
+}
+
+impl UnderWay {
+    pub(crate) fn pending(&self, source: u32) -> crate::Pending {
+        crate::Pending { source, provider: self.provider, holder: self.holder, by: self.by }
+    }
 }
 
 /// An account sign-in starts within its bound; its visit answers the party.
@@ -32,6 +39,7 @@ pub(crate) fn sign_in(
     env: &Env<Limits>,
     request: Token,
     holder: Holder,
+    by: u64,
     provider: u32,
     out: &mut Queue<Request>,
 ) {
@@ -41,7 +49,7 @@ pub(crate) fn sign_in(
     }
     let source = domain.take();
     domain.counted(out);
-    let entry = UnderWay { request, holder, provider, visited: false };
+    let entry = UnderWay { request, holder, provider, visited: false, by };
     assert!(domain.signing.insert(source, entry) == Ok(None), "a new number, within the sign-ins' bound");
     out.push(Request::Signing(Signing::SignIn { source, provider }));
 }
@@ -128,14 +136,14 @@ pub(crate) fn signed_in(
             End::Refused { refusal }
         }
     };
-    domain.end(Ended { request: under_way.request, source, end });
+    domain.end(Ended { request: under_way.request, source, by: under_way.by, end });
 }
 
 /// The component's sign-in failed or was cancelled: it ends, with nothing made.
 pub(crate) fn failed(domain: &mut Domain, source: u32, failure: Failure, out: &mut Queue<Request>) {
     let Some(under_way) = domain.signing.remove(&source) else { return };
     not_started(&under_way, out);
-    domain.end(Ended { request: under_way.request, source, end: End::Failed { failure } });
+    domain.end(Ended { request: under_way.request, source, by: under_way.by, end: End::Failed { failure } });
 }
 
 /// Where a renewal's source goes: its account's signed-in source's place, or, with none, the

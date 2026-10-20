@@ -23,7 +23,7 @@ fn started(records: Vec<Stored>) -> World {
     world
 }
 fn sign_in(request: u64, holder: Holder, provider: u32) -> Event {
-    Event::SignIn { request: Token::new(request), holder, provider }
+    Event::SignIn { request: Token::new(request), holder, by: request, provider }
 }
 fn sign_out(request: u64, holder: Holder, source: u32) -> Event {
     Event::SignOut { request: Token::new(request), holder, source }
@@ -41,7 +41,7 @@ fn refused(request: u64, refusal: Refusal) -> Vec<Request> {
     vec![answer(request, Answer::Refused { refusal })]
 }
 fn ended(request: u64, source: u32, end: End) -> Vec<Ended> {
-    vec![Ended { request: Token::new(request), source, end }]
+    vec![Ended { request: Token::new(request), source, by: request, end }]
 }
 fn save(record: Stored) -> Request {
     Request::Save { record }
