@@ -458,6 +458,14 @@ pub(super) fn route_activate(
 ) -> Requests {
     let number = context.task;
     let mut out = Queue::with_capacity(2);
+    let Some(context) = core.tasks.run_context(number) else {
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    };
+    if core.tasks.task(number).expect("current activation").phase != tasks::Phase::Active(tasks::Active::Due) {
+        out.push(Request::Decided);
+        return Requests::Out(out);
+    }
     if !ready || core.restart_step().is_some() || core.restart_failure().is_some() {
         remember_due(core, context);
     } else if core.tasks.recurring_template(number).is_none() {

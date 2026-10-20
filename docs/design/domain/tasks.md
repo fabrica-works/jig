@@ -403,7 +403,10 @@ which may amend, cancel or re-address it.
   failure: the task claims again after a pause. Nor is a run ended
   because its LLM account's source turned limited, refused or in need of
   a sign-in: its task waits for its account, saying why (accounts.md,
-  3.5 and 4.3). Every attempt, a failed one included, takes a new
+  3.5 and 4.3). Such a terminal, or a checked placement losing its room,
+  returns the task to due without a retry counter or polling timer, retaining
+  its account and committed conversation. Stale asynchronous preparation also
+  returns to due without a timer. Every attempt, a failed one included, takes a new
   attempt number.
 - **Past its tries, a task is held.** So it is when its executor stalls
   past its bound, a dependency fails or is cancelled, drift breaks a

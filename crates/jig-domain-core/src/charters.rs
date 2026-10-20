@@ -157,6 +157,9 @@ impl Core {
 
     fn context_ready(&self, context: &tasks::RunContext) -> bool {
         let Some(current) = self.tasks.task(context.task) else { return false };
+        if current.phase != tasks::Phase::Active(tasks::Active::Due) {
+            return false;
+        }
         match current.executor {
             tasks::Executor::Agent { .. } => match self.run_admission(context, self.run_wall, Box::new([])) {
                 crate::RunAdmission::Allow(_) | crate::RunAdmission::Hold(_) => true,
@@ -173,7 +176,7 @@ impl Core {
         for _ in 0..self.due.len() {
             let context = self.due.pop().expect("due count");
             if taken.is_none() && self.context_ready(&context) {
-                taken = Some(context);
+                taken = self.tasks.run_context(context.task);
             } else {
                 self.due.push(context);
             }

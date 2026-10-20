@@ -62,6 +62,48 @@ fn a_crash_at_each_operation_of_a_plain_commit_keeps_a_whole_prefix() {
     }
 }
 
+fn account_claim() -> Box<[Write]> {
+    use jig_domain_core::{CoreRecord, Record};
+    let Record::Tasks(jig_domain_tasks::Stored::Live(mut task)) = root::live_task(LIVE + 1) else {
+        unreachable!("live task fixture")
+    };
+    task.kept_account = Some(7);
+    let Record::Core(CoreRecord::RunProof(mut proof)) = root::run_proof(LIVE + 1) else {
+        unreachable!("claim fixture")
+    };
+    proof.accounts = Box::new([jig_domain_authority::AccountBinding { provider: 2, account: 7, source: 9 }]);
+    proof.placement = Some(skein_lib::Token::new(3));
+    Box::new([
+        Write::Save(root::header(2)),
+        Write::Save(Record::Tasks(jig_domain_tasks::Stored::Live(task))),
+        Write::Save(Record::Core(CoreRecord::RunProof(proof))),
+    ])
+}
+
+#[test]
+fn a_crash_keeps_the_task_pin_and_claim_bindings_together() {
+    use jig_domain_core::{CoreKey, Key};
+    let count = operations(account_claim());
+    let writes = account_claim();
+    let [_, Write::Save(task), Write::Save(proof)] = writes.as_ref() else {
+        unreachable!("claim writes")
+    };
+    for cut in 0..=count {
+        let (restored, acknowledged) = checked_cut(cut, account_claim(), "account claim");
+        assert_eq!(
+            restored.rows.get(&Key::Tasks(jig_domain_tasks::Key::Live(LIVE + 1))),
+            (restored.last == 2).then_some(task),
+            "task pin, cut {cut}"
+        );
+        assert_eq!(
+            restored.rows.get(&Key::Core(CoreKey::RunProof(LIVE + 1))),
+            (restored.last == 2).then_some(proof),
+            "claim bindings, cut {cut}"
+        );
+        assert!(acknowledged.is_none() || restored.last == 2, "acknowledged claim, cut {cut}");
+    }
+}
+
 #[test]
 fn a_frame_past_its_commit_is_cut_at_open() {
     let mut complete = committed(18);

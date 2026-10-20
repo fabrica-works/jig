@@ -500,6 +500,13 @@ the reserve's time against the checks' timeout (engine.md, section 8). A
 start the agent refuses all the same fails its attempt as an assignment
 its host found invalid, naming why (tasks.md, 5.5).
 
+The run-specific answer retains the exact provider/account/source evidence and
+checked spend. Account checks include source usability and host eligibility;
+application credentials are an independent bounded set. Missing main evidence,
+an unusable source, an ineligible host or an unavailable application credential
+waits. Duplicate providers and either set past its bound refuse before allowing.
+The shared verdict used by other checks carries no run payload.
+
 ### 8.4 Parties' requests
 
 Before a party's request is acted on (people.md, section 5): their role

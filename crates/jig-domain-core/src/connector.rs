@@ -592,8 +592,8 @@ impl Core {
         authority::check_run(
             &self.authority,
             &authority::RunAsk {
-                project: context.project,
-                authority: translate::authority_value(&context.authority),
+                project: current.project,
+                authority: translate::authority_value(&current.authority),
                 numbers,
                 budget: authority::left(numbers).min(self.authority.rules().maximum_run_spend),
                 reserve: self.run_reserve(context.task),
@@ -602,7 +602,7 @@ impl Core {
                 accounts: accounts.into_boxed(),
                 credentials: self.run_credentials_check(context.task),
                 writes: Box::new([authority::Write {
-                    effect: crate::resources::effect(self, context.project, effect),
+                    effect: crate::resources::effect(self, current.project, effect),
                     held: authority::Writer::Task,
                 }]),
             },

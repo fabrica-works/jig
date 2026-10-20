@@ -303,3 +303,15 @@ fn a_terminal_limit_with_a_zero_reset_spares_tries() {
 fn a_recovered_notice_preserves_an_ordinary_failure() {
     assert_eq!(terminal_after_zero_reset(false).run, 1);
 }
+
+#[test]
+fn a_retained_due_context_is_refreshed_before_preparation() {
+    let (mut core, _) = ready(false);
+    let mut stale = core.tasks.run_context(TASK).unwrap();
+    stale.payer = tasks::Payer::Party(999);
+    stale.numbers.budget = 1;
+    core.due.push(stale);
+    let current = core.take_due().unwrap();
+    assert_eq!(current.payer, tasks::Payer::Project(1));
+    assert_eq!(current.numbers.budget, 100);
+}

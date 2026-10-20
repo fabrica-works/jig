@@ -410,6 +410,21 @@ and refuse unknown or cyclic task chains without writing anything.
   over as for another LLM provider (smith's `protocol/transcript.md`,
   section 4).
 
+The task's creator preference and the account kept by a successful claim are
+separate. Clearing the former retains the latter. Current payer, membership,
+uses and provider facts are joined at every check; a context retained during
+preparation is not authority for a later claim. Account/source waits retain the
+source's typed reason and optional reset, separately from host and application
+credential waits. With no reset, no polling deadline is invented.
+
+The grant number passed as smith's account is the selected **source** number.
+Changing sources within one billing account therefore conservatively causes
+smith's carry-over too: it preserves plain history, discards opaque replay and
+compacts on the new LLM before opening its new window (smith's
+`protocol/transcript.md`, section 4). Jig keeps the committed conversation and
+passes the actual new grant. A separate stable billing-account replay identity
+is a later decision for smith.
+
 ## 5. What people do
 
 Each is a party's request through the client (people.md, 5.1), checked

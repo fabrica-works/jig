@@ -528,6 +528,37 @@ When an agent task is due (tasks.md, 5.2), the core:
      Each names its form; the form selects the table the protocol layer
      fills its value from (`../protocol/channel.md`, section 8).
 
+The check's allowance carries its checked spend, retained models, a concrete
+channel and kind, and one provider/account/source binding per retained provider.
+Main and same-provider sub-agents share their binding. A provider with no usable
+serving account contributes no optional models; a usable optional provider's
+retained models constrain the same host as main. Fleet preserves affinity and
+free-slot preference among those hosts. An undeclared unused alternative does
+not block the run; a declared model with inadequate bounds still refuses hello.
+
+Preparation facts are read again after asynchronous work and before the claim.
+The successful task claim keeps main's account in the same commit as the core's
+complete bindings. A changed selection abandons preparation without a retry
+timer. Start and queued placement retain the selected channel; loss of room
+returns the claim for a fresh check, releasing its reservation without a failed
+try. Source failures are authenticated against that claim, and their ordinary
+terminal charges actual spend once and releases writers. A recovered refresh
+cannot turn an unrelated later failure into an account wait.
+
+Restoration refuses duplicate provider bindings and a surviving source whose
+account or provider disagrees. Removed rows remain legitimate history. Adoption
+offers grants only from the recorded surviving sources, never replacements;
+an unavailable recorded grant can renew on its original source, and an absent
+worker settles through fleet's existing grace. A new assignment rechecks the
+recorded bindings and current coverage.
+
+The current program seam accepts positive login and holder facts in fleet's
+pure predicates. No program source is eligible in the live check without those
+facts. If program rows exist, unknown retained-login facts also hold direct runs
+off workers; engine hosts never retain program logins. T12 supplies the host half and its exchange. Until configuration's
+providers-only conversion, legacy model account fields seed deployment-held
+accounts only; neither admission nor the per-run charter routes by them.
+
 ### 7.2 Transcripts
 
 - **A transcript belongs to its task,** whichever runs added to it. Its

@@ -593,3 +593,124 @@ fn a_carried_llm_key_is_returned_unused_while_stopping() {
     unused_before_answer(&world, before, 1_u64 << 63);
     assert_eq!(world.people_answers.last(), Some(&people::Reply::Again(people::Again::NotReady)));
 }
+
+fn own_key_run(seed: u64) -> (World, u32, u32) {
+    const LEGACY_INPUT: u32 = 99;
+    let (mut config, limits) = signing_configuration(seed);
+    config.core.settings.models[0].account = LEGACY_INPUT;
+    config.core.settings.charters[0].policy.model.account = LEGACY_INPUT;
+    let mut world = World::configured_unassigned(seed, false, config, limits);
+    carry(&mut world, 40, llm_key(7), 1_u64 << 63, 7);
+    let Some(people::Reply::Outcome(people::Outcome::AccountKeyKept { source })) = world.people_answers.last().cloned()
+    else {
+        panic!("own LLM key")
+    };
+    let account = world.domain.accounts().source(source).expect("own LLM key source").account;
+    (world, account, source)
+}
+
+#[test]
+fn a_source_switch_keeps_the_account_and_committed_conversation() {
+    let (mut world, account, first) = own_key_run(180);
+    let assignment = world.assigned.as_ref().expect("own LLM key assigns the task");
+    let task = assignment.task;
+    let conversation = assignment.conversation;
+    assert_eq!(
+        assignment.run.accounts.as_ref(),
+        [jig_domain_authority::AccountBinding { provider: PROVIDER, account, source: first }]
+    );
+    world.turn(1, 1, None, b"committed plain and opaque conversation");
+    world.end(jig_domain_tasks::End::Parked, 1);
+    carry(
+        &mut world,
+        41,
+        people::Ask::AccountChange {
+            holder: people::AccountHolder::Own,
+            change: people::AccountChange::AddKey { provider: PROVIDER, join: Some(account), digest: [8; 32] },
+        },
+        (1_u64 << 63) + 1,
+        8,
+    );
+    let Some(people::Reply::Outcome(people::Outcome::AccountKeyKept { source: second })) =
+        world.people_answers.last().cloned()
+    else {
+        panic!("joined source")
+    };
+    ask(
+        &mut world,
+        42,
+        people::Ask::AccountChange {
+            holder: people::AccountHolder::Own,
+            change: people::AccountChange::MoveSource { account, source: second, place: 0 },
+        },
+    );
+    world.say(91);
+    let assignment = world.assigned.as_ref().expect("own LLM key assigns the task");
+    assert_eq!(assignment.run.sources.as_ref(), [Some(second)]);
+    assert_eq!(
+        assignment.run.accounts.as_ref(),
+        [jig_domain_authority::AccountBinding { provider: PROVIDER, account, source: second }]
+    );
+    assert_eq!(assignment.conversation, conversation);
+    assert_eq!(
+        assignment.transcript.as_ref(),
+        [Box::<[u8]>::from(b"committed plain and opaque conversation".as_slice())]
+    );
+    let root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Live(row))) =
+        &world.store.rows[&root::Key::Core(core::Key::Tasks(jig_domain_tasks::Key::Live(task)))]
+    else {
+        panic!("task pin")
+    };
+    assert_eq!(row.kept_account, Some(account));
+    let root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))) =
+        &world.store.rows[&root::Key::Core(core::Key::Core(core::CoreKey::RunProof(task)))]
+    else {
+        panic!("claim bindings")
+    };
+    assert_eq!(proof.accounts, assignment.run.accounts);
+    assert!(claim_keeps_pin_and_bindings(&world, task, assignment.attempt, account, second));
+}
+
+#[test]
+fn a_terminal_source_limit_waits_without_a_try_until_resume() {
+    let (mut world, _, source) = own_key_run(181);
+    let (task, attempt) = {
+        let assigned = world.assigned.as_ref().expect("own LLM key assigns the task");
+        (assigned.task, assigned.attempt)
+    };
+    let count = world.assignments.len();
+    world.send(root::Event::Core(core::Event::Fleet(fleet::Event::Limited {
+        channel: Token::new(7),
+        run: Token::new(task),
+        attempt: Token::new(attempt),
+        account: source,
+        reset: None,
+    })));
+    world.end(jig_domain_tasks::End::Failed(jig_domain_tasks::Class::Run), 1);
+    assert_eq!(world.assignments.len(), count);
+    let row = jig_core_world::fixtures::live_row(&world, task);
+    assert_eq!(row.tries, jig_domain_tasks::Tries::NONE);
+    assert_eq!((row.run_reserved, row.numbers.spent), (0, 1));
+    ask(
+        &mut world,
+        41,
+        people::Ask::AccountChange {
+            holder: people::AccountHolder::Own,
+            change: people::AccountChange::Resume { source },
+        },
+    );
+    assert_eq!(world.assignments.len(), count + 1);
+}
+
+fn claim_keeps_pin_and_bindings(world: &World, task: u64, attempt: u64, account: u32, source: u32) -> bool {
+    world.commits.iter().any(|writes| {
+        let pin = writes.iter().any(|write| matches!(write,
+            root::Write::Save(root::Record::Core(core::Record::Tasks(jig_domain_tasks::Stored::Live(row))))
+            if row.number == task && row.attempt == attempt && row.kept_account == Some(account)));
+        let bindings = writes.iter().any(|write| matches!(write,
+            root::Write::Save(root::Record::Core(core::Record::Core(core::CoreRecord::RunProof(proof))))
+            if proof.task == task && proof.attempt == attempt
+                && proof.accounts.as_ref() == [jig_domain_authority::AccountBinding { provider: PROVIDER, account, source }]));
+        pin && bindings
+    })
+}

@@ -433,6 +433,8 @@ pub fn step(core: &mut Core, env: &Env<Limits>, event: Event) -> Requests {
 
 /// Want every configured account once, after the restart has restored the core's own ranges.
 pub fn want_accounts(core: &mut Core, env: &Env<Limits>) -> Requests {
+    core.run_now = env.now;
+    core.run_wall = env.wall;
     let mut work = Queue::with_capacity(0);
     let requests = route_account(core, env, &mut work, accounts::Event::Want);
     assert!(work.is_empty(), "wanting the accounts answers no party");
@@ -441,6 +443,8 @@ pub fn want_accounts(core: &mut Core, env: &Env<Limits>) -> Requests {
 
 /// Resume the fleet's next held placement or relay through the core's sibling routes.
 pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
+    core.run_now = env.now;
+    core.run_wall = env.wall;
     if core.stopping {
         return crate::stopping::empty();
     }
