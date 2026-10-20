@@ -136,10 +136,12 @@ impl Records {
     }
 
     /// Translates the driver's event (llm.md 5.2); a source whose stored
-    /// record could not be read fails as unloaded, saying where and why.
+    /// record could not be read fails as unloaded, saying where and why,
+    /// where the driver, holding no record for it, fails its grant as
+    /// expired.
     #[must_use]
     pub fn up(&self, event: driver::Event, now: Time) -> Up {
-        if let driver::Event::Refused { account, asked: driver::Asked::Grant, why: driver::Refusal::NoRecord } = event
+        if let driver::Event::Failed { account, ends: driver::Ends::Grant, failure: driver::Failure::Expired } = event
             && let Some(slot) = self.slots.get(account)
             && slot.unread
         {

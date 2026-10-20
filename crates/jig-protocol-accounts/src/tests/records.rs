@@ -34,8 +34,9 @@ fn keep(records: &mut Records, record: oauth::SavedToken) -> Keep {
     keep
 }
 
+/// The driver's answer to a grant for a source it holds no record for.
 fn no_record() -> driver::Event {
-    driver::Event::Refused { account: ACCOUNT_CHAT, asked: driver::Asked::Grant, why: driver::Refusal::NoRecord }
+    driver::Event::Failed { account: ACCOUNT_CHAT, ends: driver::Ends::Grant, failure: driver::Failure::Expired }
 }
 
 #[test]
