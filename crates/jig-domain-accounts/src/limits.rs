@@ -1,7 +1,8 @@
-use skein_lib::{Deadlines, Duration, List, Map, Queue};
+use skein_lib::{Deadlines, Duration, List, Map, Queue, Token};
 
 use crate::domain::{Account, Granted, Source};
-use crate::{DISPLAY, Fact, NAME, SUBJECT};
+use crate::signing::UnderWay;
+use crate::{DISPLAY, Ended, Fact, NAME, SUBJECT};
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Limits {
@@ -22,7 +23,8 @@ pub struct Limits {
 
 /// Accounts hold bounded names and times; every secret is below them. Each bound is at least
 /// one, and a holder's accounts are within the deployment's. The configured providers are the
-/// configuration's, outside this bound.
+/// configuration's, outside this bound. Sign-ins under way are within `sign_ins`, sign-outs the
+/// component has not answered within the sources' bound, and sign-ins' ends within `facts`.
 #[must_use]
 pub fn worst_case(limits: &Limits) -> Option<u64> {
     if limits.accounts == 0
@@ -51,5 +53,8 @@ pub fn worst_case(limits: &Limits) -> Option<u64> {
         .checked_add(Deadlines::<u32>::worst_case(limits.credentials)?)?
         .checked_add(List::<u32>::worst_case(sources)?)?
         .checked_add(Deadlines::<u32>::worst_case(sources)?)?
-        .checked_add(Queue::<Fact>::worst_case(limits.facts)?)
+        .checked_add(Queue::<Fact>::worst_case(limits.facts)?)?
+        .checked_add(Map::<u32, UnderWay>::worst_case(limits.sign_ins)?)?
+        .checked_add(Map::<u32, Token>::worst_case(sources)?)?
+        .checked_add(Queue::<Ended>::worst_case(limits.facts)?)
 }

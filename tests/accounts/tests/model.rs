@@ -226,7 +226,11 @@ fn commit(store: &mut BTreeMap<Key, Stored>, requests: Vec<Request>) {
         match request {
             Request::Save { record } => drop(store.insert(record.key(), record)),
             Request::Erase { key } => drop(store.remove(&key)),
-            Request::Component(_) | Request::Granted { .. } | Request::Closed => {}
+            Request::Component(_)
+            | Request::Signing(_)
+            | Request::Answer { .. }
+            | Request::Granted { .. }
+            | Request::Closed => {}
         }
     }
 }

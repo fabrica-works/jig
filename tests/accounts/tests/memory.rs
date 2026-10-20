@@ -1,8 +1,9 @@
 use jig_accounts_world::{LIMITS, provider, providers};
 use jig_domain_accounts::{
-    DISPLAY, Domain, Event, FromComponent, Held, Holder, Kind, NAME, SUBJECT, Stored, max_out, step, worst_case,
+    DISPLAY, Domain, Event, Failure, FromComponent, Held, Holder, Kind, Limits, NAME, Request, SUBJECT, Signing,
+    Stored, max_out, step, worst_case,
 };
-use skein_lib::{Duration, Env, Queue, Time, Wall};
+use skein_lib::{Duration, Env, Queue, Time, Token, Wall};
 use skein_world::domain::heap::{self, Meter};
 #[global_allocator]
 static HEAP: heap::Counting = heap::Counting;
@@ -26,7 +27,9 @@ fn kind(place: u32) -> Kind {
 }
 /// Every account with its longest names, every source of each, a program's name at its longest,
 /// a limit on each key, a grant for each signed-in source, and every credential. Each record is
-/// made inside its step, as the store's decoding would make it.
+/// made inside its step, as the store's decoding would make it. Then a sign-out pending for as
+/// many sources as are kept, each account's signed-in source renewed and signed out in turn, every
+/// sign-in's end kept, and a sign-in under way.
 #[test]
 fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
     let mut out = Queue::with_capacity(max_out(&LIMITS));
@@ -101,4 +104,72 @@ fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
     assert_eq!(domain.accounts(), LIMITS.accounts);
     assert_eq!(domain.source_views().len(), LIMITS.accounts * LIMITS.sources);
     assert!(domain.usable(number(0, None)));
+    let mut run = Run { meter, env, bound, out, request: 0 };
+    for account in 0..LIMITS.accounts {
+        run.sign_out(&mut domain, account, number(account, Some(0)));
+    }
+    let mut ends = 0;
+    for _ in 1..LIMITS.sources {
+        for account in 0..LIMITS.accounts {
+            let source = run.sign_in(&mut domain, account);
+            let event = Event::SignedIn {
+                source,
+                subject: longest(SUBJECT, account),
+                display: longest(DISPLAY, account),
+                declined: false,
+            };
+            run.step(&mut domain, event, "renewed");
+            ends += 1;
+            run.sign_out(&mut domain, account, source);
+        }
+    }
+    while ends < LIMITS.facts {
+        let source = run.sign_in(&mut domain, 0);
+        run.step(&mut domain, Event::SignInFailed { source, failure: Failure::Cancelled }, "failed");
+        ends += 1;
+    }
+    run.sign_in(&mut domain, 0);
+    assert_eq!(domain.facts_lost(), 0, "every end kept");
+}
+
+/// Each step metered, its asks taken.
+struct Run {
+    meter: Meter,
+    env: Env<Limits>,
+    bound: u64,
+    out: Queue<Request>,
+    request: u64,
+}
+impl Run {
+    /// The step's last ask of the component, its asks dropped before the check, as the core
+    /// takes them.
+    fn step(&mut self, domain: &mut Domain, event: Event, label: &str) -> Option<Signing> {
+        self.meter.start();
+        step(domain, &self.env, event, &mut self.out);
+        let measured = self.meter.end();
+        let mut signing = None;
+        while let Some(request) = self.out.pop() {
+            if let Request::Signing(asked) = request {
+                signing = Some(asked);
+            }
+        }
+        self.meter.check(measured, self.bound, &label);
+        signing
+    }
+    fn token(&mut self) -> Token {
+        self.request += 1;
+        Token::new(self.request)
+    }
+    /// The account's holder signs in at provider 1: the started source's number.
+    fn sign_in(&mut self, domain: &mut Domain, account: u32) -> u32 {
+        let event = Event::SignIn { request: self.token(), holder: Holder::Party(u64::from(account)), provider: 1 };
+        let Some(Signing::SignIn { source, .. }) = self.step(domain, event, "sign in") else {
+            panic!("a sign-in started");
+        };
+        source
+    }
+    fn sign_out(&mut self, domain: &mut Domain, account: u32, source: u32) {
+        let event = Event::SignOut { request: self.token(), holder: Holder::Party(u64::from(account)), source };
+        assert_eq!(self.step(domain, event, "sign out"), Some(Signing::SignOut { source }));
+    }
 }

@@ -1,7 +1,7 @@
 //! Tiny world scripting the accounts component on the driver's terms.
 use jig_domain_accounts::{
-    self as accounts, Configured, Domain, Event, Fact, Holder, Kind, Limits, Offers, Provider, Providers, Request,
-    Stored,
+    self as accounts, Configured, Domain, Ended, Event, Fact, Holder, Kind, Limits, Offers, Provider, Providers,
+    Request, Stored,
 };
 use skein_lib::{Duration, Env, Queue, Time, Wall};
 pub const ANALYST: u32 = 7;
@@ -79,6 +79,14 @@ impl World {
         let mut result = Vec::new();
         while let Some(fact) = self.domain.pop_fact() {
             result.push(fact);
+        }
+        result
+    }
+    /// How each party's sign-in ended since the last call.
+    pub fn ended(&mut self) -> Vec<Ended> {
+        let mut result = Vec::new();
+        while let Some(ended) = self.domain.pop_ended() {
+            result.push(ended);
         }
         result
     }

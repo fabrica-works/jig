@@ -20,6 +20,8 @@ fn respond(world: &mut World, rng: &mut Rng, requests: Vec<Request>, trace: &mut
             }
             Request::Component(ToComponent::Close) => Some(FromComponent::Closed),
             Request::Component(ToComponent::Release { .. })
+            | Request::Signing(_)
+            | Request::Answer { .. }
             | Request::Granted { .. }
             | Request::Save { .. }
             | Request::Erase { .. }

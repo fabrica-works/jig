@@ -1,5 +1,5 @@
 //! The checks a sign-in and a new source make (accounts.md, 3.3 and 3.6), as functions of the
-//! child's state alone; the requests that make them come with signing in and adding keys.
+//! child's state alone; a party's sign-in makes them (`signing`), and adding keys will.
 use crate::records::within;
 use crate::{Domain, Holder, Kind, Limits, SUBJECT};
 
@@ -24,10 +24,14 @@ pub enum Refusal {
     Provider { provider: u32 },
     /// A subject empty, or longer than `SUBJECT`.
     Subject,
-    /// No account of this number.
+    /// No account or source of this number, or none of the holder's.
     Unknown,
     /// The counter has no numbers left for it.
     Numbers,
+    /// A source of a kind this request does not serve: a sign-out serves a signed-in source.
+    Kind { kind: Kind },
+    /// The child takes no request before its start, nor once closing.
+    Closing,
 }
 
 /// The bounds of accounts.md, 3.6 that the child keeps.

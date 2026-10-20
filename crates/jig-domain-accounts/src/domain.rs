@@ -1,19 +1,28 @@
+use crate::signing::UnderWay;
 use crate::{
-    Configured, Event, Fact, Failure, FromComponent, Grant, GrantTable, Held, Holder, Kind, Limits, Providers, Request,
-    State, Stored, ToComponent, Turned,
+    Configured, Ended, Event, Fact, Failure, FromComponent, Grant, GrantTable, Held, Holder, Kind, Limits, Providers,
+    Request, State, Stored, ToComponent, Turned,
 };
 use alloc::boxed::Box;
-use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time, Wall};
+use skein_lib::{Deadlines, Duration, Env, List, Map, Queue, Time, Token, Wall};
 
 /// The most one step asks: at the start, an account's want or its `none` account's two saves,
-/// each account's, and the counter's save; at close, a release an account and the close.
+/// each account's, and the counter's save; at close, a release an account and the close; and
+/// a sign-in's end, at most the four of `SIGNED_IN`.
 #[must_use]
 pub fn max_out(limits: &Limits) -> u32 {
     out_bound(limits.accounts).expect("account output bound")
 }
+/// A sign-in's end asks the most: the counter's save, the new account's and its source's, and
+/// the source's want; or a renewal's erase, its replacement, its save and its want.
+const SIGNED_IN: u32 = 4;
 pub(crate) const fn out_bound(accounts: u32) -> Option<u32> {
     match accounts.checked_mul(2) {
-        Some(both) => both.checked_add(1),
+        Some(both) => match both.checked_add(1) {
+            Some(most) if most < SIGNED_IN => Some(SIGNED_IN),
+            Some(most) => Some(most),
+            None => None,
+        },
         None => None,
     }
 }
@@ -134,8 +143,14 @@ pub struct Domain {
     pub(crate) providers: Providers,
     credentials: Map<u32, Granted>,
     credential_alarms: Deadlines<u32>,
-    alarms: Deadlines<u32>,
+    pub(crate) alarms: Deadlines<u32>,
+    /// Sign-ins under way, by the number their source will have, within `Limits::sign_ins`.
+    pub(crate) signing: Map<u32, UnderWay>,
+    /// Sign-outs the component has not answered, by source; a source signed out holds its room
+    /// at the component until then, so they are within the sources' bound.
+    pub(crate) signing_out: Map<u32, Token>,
     facts: Queue<Fact>,
+    ended: Queue<Ended>,
     lost: u64,
     pub(crate) unrestored: u64,
     now: Time,
@@ -157,7 +172,10 @@ impl Domain {
             credentials: Map::with_capacity(limits.credentials),
             credential_alarms: Deadlines::with_capacity(limits.credentials),
             alarms: Deadlines::with_capacity(sources),
+            signing: Map::with_capacity(limits.sign_ins),
+            signing_out: Map::with_capacity(sources),
             facts: Queue::with_capacity(limits.facts),
+            ended: Queue::with_capacity(limits.facts),
             lost: 0,
             unrestored: 0,
             now: Time::ZERO,
@@ -192,10 +210,26 @@ impl Domain {
     pub(crate) const fn numbers_left(&self) -> u32 {
         u32::MAX.saturating_sub(self.next)
     }
-    fn take(&mut self) -> u32 {
+    pub(crate) fn take(&mut self) -> u32 {
         let number = self.next;
         self.next = self.next.checked_add(1).expect("a number checked left");
         number
+    }
+    /// Once started, the counter is saved whenever it moves.
+    pub(crate) fn counted(&mut self, out: &mut Queue<Request>) {
+        if self.next != self.kept {
+            self.kept = self.next;
+            out.push(Request::Save { record: Stored::Next { number: self.next } });
+        }
+    }
+    /// Started and not closing: the child takes a party's request.
+    pub(crate) fn wanted(&self) -> bool {
+        self.phase == Phase::Wanted
+    }
+    pub(crate) fn end(&mut self, ended: Ended) {
+        if self.ended.try_push(ended).is_err() {
+            self.lost = self.lost.saturating_add(1);
+        }
     }
     #[must_use]
     pub fn account(&self, number: u32) -> Option<&Account> {
@@ -350,6 +384,10 @@ impl Domain {
     pub fn pop_fact(&mut self) -> Option<Fact> {
         self.facts.pop()
     }
+    /// How each party's sign-in ended, oldest first.
+    pub fn pop_ended(&mut self) -> Option<Ended> {
+        self.ended.pop()
+    }
     #[must_use]
     pub const fn facts_lost(&self) -> u64 {
         self.lost
@@ -371,30 +409,14 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             domain.phase = Phase::Wanted;
             crate::restore::finish(domain, env);
             none_accounts(domain, env, out);
-            if domain.next != domain.kept {
-                domain.kept = domain.next;
-                out.push(Request::Save { record: Stored::Next { number: domain.next } });
-            }
+            domain.counted(out);
             for (number, source) in &domain.sources {
                 if source.kind == Kind::SignIn {
                     out.push(Request::Component(ToComponent::Want { account: *number }));
                 }
             }
         }
-        Event::Credential { number, generation, valid } => {
-            match domain.phase {
-                Phase::Closing | Phase::Closed => return,
-                Phase::New | Phase::Wanted => {}
-            }
-            let expires = env.now.saturating_add(valid);
-            if domain.credentials.insert(number, Granted { generation, expires }).is_err() {
-                return;
-            }
-            domain.credential_alarms.arm(number, expires).expect("credential alarm room");
-            out.push(Request::Granted {
-                grant: Grant { table: GrantTable::Application, account: number, generation, valid },
-            });
-        }
+        Event::Credential { number, generation, valid } => credential(domain, env, number, generation, valid, out),
         Event::Close => close(domain, env, out),
         Event::Component(FromComponent::Closed) => {
             if domain.phase != Phase::Closing {
@@ -403,6 +425,8 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
             domain.phase = Phase::Closed;
             domain.accounts = Map::with_capacity(env.limits.accounts);
             domain.sources = Map::with_capacity(domain.sources.capacity());
+            domain.signing = Map::with_capacity(env.limits.sign_ins);
+            domain.signing_out = Map::with_capacity(domain.sources.capacity());
             out.push(Request::Closed);
         }
         Event::Component(event) => {
@@ -440,7 +464,46 @@ pub fn step(domain: &mut Domain, env: &Env<Limits>, event: Event, out: &mut Queu
                 resume(domain, env, account, out);
             }
         }
+        Event::SignIn { request, holder, provider } => {
+            crate::signing::sign_in(domain, env, request, holder, provider, out);
+        }
+        Event::SignOut { request, holder, source } => crate::signing::sign_out(domain, request, holder, source, out),
+        Event::SignedIn { source, subject, display, declined } => {
+            if domain.phase == Phase::Wanted {
+                crate::signing::signed_in(domain, env, source, subject, display, declined, out);
+            }
+        }
+        Event::SignInFailed { source, failure } => {
+            if domain.phase == Phase::Wanted {
+                crate::signing::failed(domain, source, failure);
+            }
+        }
+        Event::SignedOut { source, confirmed } => {
+            if domain.phase == Phase::Wanted {
+                crate::signing::signed_out(domain, source, confirmed, out);
+            }
+        }
     }
+}
+/// An application's credential, granted on until it lapses.
+fn credential(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    number: u32,
+    generation: u64,
+    valid: Duration,
+    out: &mut Queue<Request>,
+) {
+    match domain.phase {
+        Phase::Closing | Phase::Closed => return,
+        Phase::New | Phase::Wanted => {}
+    }
+    let expires = env.now.saturating_add(valid);
+    if domain.credentials.insert(number, Granted { generation, expires }).is_err() {
+        return;
+    }
+    domain.credential_alarms.arm(number, expires).expect("credential alarm room");
+    out.push(Request::Granted { grant: Grant { table: GrantTable::Application, account: number, generation, valid } });
 }
 /// The deployment's account of each provider offering no source, made at the first start that
 /// configures it (accounts.md, 3.1), while the accounts' bound and the counter leave room; the
@@ -745,7 +808,13 @@ fn fact(number: u32, entry: &Source) -> Fact {
 }
 /// A source changed: it settles and its fact is queued; once started, a hold that changed from
 /// `before`, set, moved or lifted, saves the source's record.
-fn changed(domain: &mut Domain, env: &Env<Limits>, source: u32, before: Option<Hold>, out: &mut Queue<Request>) {
+pub(crate) fn changed(
+    domain: &mut Domain,
+    env: &Env<Limits>,
+    source: u32,
+    before: Option<Hold>,
+    out: &mut Queue<Request>,
+) {
     let view = settle(domain, env, source);
     if domain.facts.try_push(view).is_err() {
         domain.lost = domain.lost.saturating_add(1);
@@ -757,7 +826,7 @@ fn changed(domain: &mut Domain, env: &Env<Limits>, source: u32, before: Option<H
 }
 /// A source's record: its place in its account's order, and a limit's reset on the wall clock,
 /// so that it means the same after a restart (engine.md, 5.4).
-fn stored(domain: &Domain, env: &Env<Limits>, number: u32) -> Stored {
+pub(crate) fn stored(domain: &Domain, env: &Env<Limits>, number: u32) -> Stored {
     let entry = domain.sources.get(&number).expect("a kept source");
     let account = domain.accounts.get(&entry.account).expect("a source's account is kept");
     let mut place = None;

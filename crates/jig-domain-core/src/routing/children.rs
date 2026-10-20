@@ -385,6 +385,9 @@ pub(super) fn tag_account(core: &mut Core, env: &Env<Limits>, mut child: Queue<a
             // decision that changes it.
             accounts::Request::Save { record } => out.push(Request::Write(Write::Save(Record::Accounts(record)))),
             accounts::Request::Erase { key } => out.push(Request::Write(Write::Erase(Key::Accounts(key)))),
+            // No party asks the child to sign in or out yet, so it asks nothing of the component
+            // and answers no one.
+            accounts::Request::Signing(_) | accounts::Request::Answer { .. } => {}
         }
     }
     out.push(Request::Decided);

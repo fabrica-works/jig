@@ -1,6 +1,6 @@
-use crate::{Key, Kind, Stored};
+use crate::{Holder, Key, Kind, Refusal, Stored};
 use alloc::boxed::Box;
-use skein_lib::{Duration, Time};
+use skein_lib::{Duration, Time, Token};
 
 /// The protocol layer's table that holds a grant (protocol/channel.md, section 8).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -26,6 +26,14 @@ pub struct Grant {
 /// refused. The component and a notice name a source by its number, the grant's, in
 /// the field named `account`; the child finds its account. The store's records are
 /// restored before `Want`, which starts the child.
+///
+/// A party's sign-in at an LLM provider and sign-out of a signed-in source (accounts.md,
+/// section 5) come for the holder people admitted them for (3.2), with the request's token,
+/// which the child echoes in its answer and in a sign-in's end. The component's sign-in,
+/// failure and sign-out name the source by the number the child gave it: `SignedIn` carries the
+/// provider's subject and display name, `declined` when plan usage was declined (providers.md,
+/// 2.2); `SignedOut` says the record is revoked and forgotten, `confirmed` when the provider
+/// confirmed the revocation (2.3).
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Event {
     Restore { record: Stored },
@@ -37,6 +45,11 @@ pub enum Event {
     RunFailed { account: u32, turned: Turned },
     Resume { account: u32 },
     Credential { number: u32, generation: u64, valid: Duration },
+    SignIn { request: Token, holder: Holder, provider: u32 },
+    SignOut { request: Token, holder: Holder, source: u32 },
+    SignedIn { source: u32, subject: Box<[u8]>, display: Box<[u8]>, declined: bool },
+    SignInFailed { source: u32, failure: Failure },
+    SignedOut { source: u32, confirmed: bool },
     Close,
 }
 
@@ -87,12 +100,78 @@ pub enum ToComponent {
     Close,
 }
 
+/// What the child asks of the component for a party's sign-in and sign-out (protocol/llm.md,
+/// 5.2), each naming a source by the number the child gives it.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Signing {
+    /// Start the provider's sign-in; its visit carries the address the party goes to (JP6).
+    SignIn { source: u32, provider: u32 },
+    /// Revoke the source's record at its provider and forget it: a party's sign-out, or a
+    /// sign-in refused (accounts.md, 3.3).
+    SignOut { source: u32 },
+    /// A renewal replaced the source by another: forget its record, revoking its refresh token
+    /// where the provider issued the renewal another client id (accounts.md, 3.3).
+    Replaced { source: u32, by: u32 },
+}
+
+/// The child's answer to a party's sign-in or sign-out.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum Answer {
+    /// The sign-in started under this source's number; its end is a fact (`Ended`).
+    Started {
+        source: u32,
+    },
+    /// The source is signed out and removed; unconfirmed, its holder disconnects the
+    /// application in the provider's settings (providers.md, 2.3).
+    SignedOut {
+        confirmed: bool,
+    },
+    Refused {
+        refusal: Refusal,
+    },
+}
+
+/// How a party's sign-in ended (accounts.md, 3.3), a fact for the accounts' watch.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Ended {
+    pub request: Token,
+    pub source: u32,
+    pub end: End,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub enum End {
+    /// A new account, with the signed-in source; declined, the source is refused (section 5).
+    Made {
+        account: u32,
+        declined: bool,
+    },
+    /// The holder's account of the subject, its signed-in source replaced by this one.
+    Renewed {
+        account: u32,
+        declined: bool,
+    },
+    /// Refused, and its new record revoked.
+    Refused {
+        refusal: Refusal,
+    },
+    Failed {
+        failure: Failure,
+    },
+}
+
 /// What the child asks of its parent. A save or an erase is part of the decision that makes
-/// the change (engine.md, 5.6): each account and source the child makes or whose hold changes,
-/// and the counter whenever it moves.
+/// the change (engine.md, 5.6): each account and source the child makes, removes or whose hold
+/// changes, and the counter whenever it moves.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum Request {
     Component(ToComponent),
+    Signing(Signing),
+    /// Answer a party's request.
+    Answer {
+        request: Token,
+        answer: Answer,
+    },
     Granted {
         grant: Grant,
     },

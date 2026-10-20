@@ -13,8 +13,10 @@ mod limits;
 mod providers;
 mod records;
 mod restore;
+mod signing;
 pub use boundary::{
-    Event, Fact, Failure, FromComponent, Grant, GrantTable, Place, Request, State, ToComponent, Turned, Unread,
+    Answer, End, Ended, Event, Fact, Failure, FromComponent, Grant, GrantTable, Place, Request, Signing, State,
+    ToComponent, Turned, Unread,
 };
 pub use checks::{Bound, Refusal, SignIn, room_for_sign_in};
 pub use domain::{Account, Domain, fire, max_out, step};
