@@ -221,6 +221,7 @@ impl Owner {
                     event
                 }
                 Up::Child(event) => event,
+                Up::Keep { account: _, record: _ } => unreachable!("the private keeper keeps its own records"),
             };
             let heard = match event {
                 child::FromComponent::Granted { account, generation, valid: _ } => {

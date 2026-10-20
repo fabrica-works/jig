@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 extern crate alloc;
 pub mod handed_in;
+pub mod records;
 pub mod table;
 #[cfg(test)]
 mod tests;

@@ -333,6 +333,9 @@ impl Accounts {
                     event
                 }
                 translate::Up::Child(event) => event,
+                translate::Up::Keep { account: _, record: _ } => {
+                    unreachable!("the private keeper keeps its own records")
+                }
             };
             match &event {
                 domain::FromComponent::Granted { .. }

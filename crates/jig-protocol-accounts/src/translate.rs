@@ -4,11 +4,34 @@ use skein_lib::{Secret, Time};
 use skein_oauth as oauth;
 use skein_oauth_accounts as driver;
 
-/// A grant's value travels beside the child's secret-free event.
+/// A grant's value travels beside the child's secret-free event; a record
+/// to keep goes to the owner's store, never to the child.
 #[derive(PartialEq, Eq, Debug)]
 pub enum Up {
-    Granted { event: accounts::FromComponent, account: u32, generation: u64, value: Secret, expires: Time },
+    Granted {
+        event: accounts::FromComponent,
+        account: u32,
+        generation: u64,
+        value: Secret,
+        expires: Time,
+    },
     Child(accounts::FromComponent),
+    /// A renewed record for the secrets' store; nothing new is lent until
+    /// the store's answer goes back as `Kept` (llm.md 5.2).
+    Keep {
+        account: u32,
+        record: Candidate,
+    },
+}
+
+/// A record on its way to the store; printed, it shows only its generation.
+#[derive(PartialEq, Eq)]
+pub struct Candidate(pub oauth::SavedToken);
+
+impl core::fmt::Debug for Candidate {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Candidate").field("generation", &self.0.generation).finish_non_exhaustive()
+    }
 }
 
 #[must_use]
@@ -60,11 +83,13 @@ pub fn up(event: driver::Event, now: Time) -> Up {
         driver::Event::Visit { account: _, url: _ } | driver::Event::SignedIn { .. } => {
             unreachable!("the engine runs no sign-in")
         }
-        driver::Event::Removed { .. }
-        | driver::Event::SignedOut { .. }
-        | driver::Event::Lock { .. }
-        | driver::Event::Unlock { .. }
-        | driver::Event::Keep { account: _, record: _ } => unreachable!("the engine's accounts use the private keeper"),
+        driver::Event::Keep { account, record } => Up::Keep { account, record: Candidate(record) },
+        driver::Event::Lock { .. } | driver::Event::Unlock { .. } => {
+            unreachable!("no record is shared: each source's record has one keeper, the engine's store")
+        }
+        driver::Event::Removed { .. } | driver::Event::SignedOut { .. } => {
+            unreachable!("the engine neither signs a source out nor removes one")
+        }
     }
 }
 

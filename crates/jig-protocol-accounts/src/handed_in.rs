@@ -16,6 +16,19 @@ pub fn hand_in(
     account_id: Option<Box<[u8]>>,
     limits: &oauth::Limits,
 ) -> Result<driver::Request, Unfit> {
+    let record = record(account, token, lapses, account_id, limits)?;
+    Ok(driver::Request::HandIn { account, record })
+}
+
+/// The access-only record a handed-in file states, checked against the
+/// driver's limits; it is kept in the secrets' store before it is handed in.
+pub fn record(
+    account: u32,
+    token: Secret,
+    lapses: Wall,
+    account_id: Option<Box<[u8]>>,
+    limits: &oauth::Limits,
+) -> Result<oauth::SavedToken, Unfit> {
     let record = oauth::SavedToken {
         key: account,
         generation: 1,
@@ -33,5 +46,5 @@ pub fn hand_in(
         Ok(encoded) => drop(encoded),
         Err(_) => return Err(Unfit),
     }
-    Ok(driver::Request::HandIn { account, record })
+    Ok(record)
 }
