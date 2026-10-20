@@ -15,7 +15,6 @@ pub enum SignIn {
 /// Why a sign-in or a new source is refused, naming what refuses it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum Refusal {
-    Configured,
     NotLimited,
     Uses,
     NotKept {

@@ -200,30 +200,8 @@ fn account_endpoint(
     })
 }
 fn accounts(engine: &config::Engine) -> Result<service::AccountsRuntime, String> {
-    let mut issuers = List::with_capacity(u32::try_from(engine.llm.accounts.len()).expect("account count"));
     let mut trust_roots = 0_u32;
     let mut trust_root_bytes = 0_u32;
-    for account in &engine.llm.accounts {
-        if let config::Source::SignIn(source) = &account.source {
-            let address = match &source.endpoint {
-                config::Address::Addr(address) => {
-                    address.socket().ok_or("an account issuer requires a socket address")?
-                }
-                config::Address::Host { name, port } => {
-                    let name = std::str::from_utf8(name).map_err(|why| why.to_string())?;
-                    (name, *port)
-                        .to_socket_addrs()
-                        .map_err(|why| why.to_string())?
-                        .next()
-                        .ok_or("account endpoint has no address")?
-                }
-            };
-            let transport = account_transport(&source.transport, &mut trust_roots, &mut trust_root_bytes)?;
-            issuers
-                .push((account.number, skein_oauth_accounts::Endpoint { address, transport }))
-                .expect("configured account count");
-        }
-    }
     let mut providers = List::with_capacity(u32::try_from(engine.llm.providers.len()).expect("provider count"));
     for provider in &engine.llm.providers {
         if let Some(registration) = &provider.sign_in {
@@ -247,7 +225,7 @@ fn accounts(engine: &config::Engine) -> Result<service::AccountsRuntime, String>
             providers.push((provider.number, endpoint, origins)).expect("configured provider count");
         }
     }
-    Ok(service::AccountsRuntime { issuers, providers, trust_roots, trust_root_bytes })
+    Ok(service::AccountsRuntime { providers, trust_roots, trust_root_bytes })
 }
 fn prepare(bytes: &[u8], owned: &mut Vec<Fd>) -> Result<service::Service, String> {
     let document =

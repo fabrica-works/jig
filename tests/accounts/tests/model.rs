@@ -2,7 +2,7 @@
 //! kept by the store: each change saved in the step that makes it, and restored at the start.
 use jig_accounts_world::{LIMITS, World, account, provider, providers, source};
 use jig_domain_accounts::{
-    Bound, Configured, Event, Form, FromComponent, Held, Holder, Key, Kind, Refusal, Request, Scheme, SignIn, State,
+    Bound, Event, Form, FromComponent, Held, Holder, Key, Kind, Refusal, Request, Scheme, SignIn, State,
     Stored, ToComponent, room_for_sign_in,
 };
 use skein_lib::{Duration, Time, Wall};
@@ -37,27 +37,10 @@ fn signed_in(number: u32, provider: u32, holder: Holder, subject: &[u8]) -> Vec<
 }
 
 #[test]
-fn configured_accounts_are_the_deployments_with_one_signed_in_source() {
-    let mut world = World::with(
-        providers(vec![provider(1, true, false)]),
-        &[Configured { number: 7, provider: Some(1) }, Configured { number: 8, provider: None }],
-    );
-    let analyst = world.domain.account(7).expect("configured");
-    assert_eq!((analyst.holder(), analyst.provider(), analyst.subject()), (Holder::Deployment, Some(1), &b""[..]));
-    assert_eq!(analyst.sources().iter().collect::<Vec<_>>(), vec![(&0, &7)]);
-    assert_eq!(world.domain.account(8).expect("configured").provider(), None);
-    assert_eq!(world.domain.source(8).expect("its source").kind, Kind::SignIn);
-    assert_eq!(world.domain.next_number(), 9);
-    assert_eq!(
-        world.step(Event::Want),
-        vec![
-            save(Stored::Next { number: 9 }),
-            Request::Signing(jig_domain_accounts::Signing::Restored),
-            want(7),
-            want(8)
-        ],
-        "the counter is kept past the configured numbers, so that none is given again once dropped"
-    );
+fn an_unstarted_child_has_no_accounts_from_configuration() {
+    let world = World::with(providers(vec![provider(1, true, false)]), &[]);
+    assert_eq!(world.domain.accounts(), 0);
+    assert_eq!(world.domain.next_number(), 0);
 }
 
 #[test]
@@ -258,7 +241,7 @@ fn commit(store: &mut BTreeMap<Key, Stored>, requests: Vec<Request>) {
 
 #[test]
 fn each_record_restores_to_the_same_model() {
-    let configured = [Configured { number: 7, provider: Some(1) }];
+    let configured = [account(7, 1, Holder::Deployment, b""), source(7, 8, 0, Kind::SignIn)];
     let start = |store: &BTreeMap<Key, Stored>| {
         let mut world = World::with(
             providers(vec![provider(1, true, true), provider(2, true, false), provider(3, false, false)]),
@@ -353,18 +336,17 @@ fn a_record_breaking_a_rule_is_counted_and_dropped() {
         account(9, 5, BOB, b"bob"),
         source(9, 10, 0, Kind::SignIn),
     ];
-    let configured = [Configured { number: 7, provider: Some(1) }];
-    let mut world = World::with(providers(vec![provider(1, true, true)]), &configured);
+    let mut world = World::with(providers(vec![provider(1, true, true)]), &[]);
     world.restore(records.clone());
-    assert_eq!(world.domain.unrestored(), 4, "a configured number's account and source; an unknown provider's");
-    let analyst = world.domain.account(7).expect("configured");
-    assert_eq!((analyst.holder(), analyst.subject()), (Holder::Deployment, &b""[..]), "the configured one is kept");
-    assert_eq!(analyst.sources().iter().collect::<Vec<_>>(), vec![(&0, &7)]);
-    assert_eq!(world.domain.source(7).expect("configured").state, State::Refused, "its own record gives its hold");
+    assert_eq!(world.domain.unrestored(), 3, "an account and source cannot share a number; an unknown provider's rows wait");
+    let alice = world.domain.account(7).expect("restored");
+    assert_eq!((alice.holder(), alice.subject()), (ALICE, &b"alice"[..]));
+    assert_eq!(alice.sources().iter().collect::<Vec<_>>(), vec![(&1, &8)]);
+    assert!(world.domain.source(7).is_none());
     assert!(world.domain.account(9).is_none());
     assert_eq!(world.domain.next_number(), 11, "a record dropped still passes its numbers");
-    let mut again = World::with(providers(vec![provider(1, true, true), provider(5, true, false)]), &configured);
+    let mut again = World::with(providers(vec![provider(1, true, true), provider(5, true, false)]), &[]);
     again.restore(records);
-    assert_eq!(again.domain.unrestored(), 2, "an account waits for its provider to be configured again");
+    assert_eq!(again.domain.unrestored(), 1);
     assert_eq!(again.domain.account(9).expect("restored").sources().len(), 1);
 }

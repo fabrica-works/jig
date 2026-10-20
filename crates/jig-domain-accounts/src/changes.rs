@@ -22,9 +22,6 @@ pub(crate) fn account(domain: &Domain, holder: Holder, number: u32) -> Result<()
     if account.holder != holder {
         return Err(Refusal::Unknown);
     }
-    if crate::ordering::configured(domain, number) {
-        return Err(Refusal::Configured);
-    }
     Ok(())
 }
 pub(crate) fn source(domain: &Domain, holder: Holder, number: u32) -> Result<u32, Refusal> {

@@ -313,7 +313,6 @@ pub struct RestoringProof {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Model {
     pub dialect: u32,
-    pub account: u32,
     pub endpoint: u32,
     pub name: Box<[u8]>,
     /// The input tokens a conversation's window may hold on this model.

@@ -170,7 +170,6 @@ pub fn run() -> Box<core::RunCharter> {
             reserve_time: Duration::from_secs(10),
             model: core::Model {
                 dialect: 1,
-                account: 1,
                 endpoint: 1,
                 name: b"small".as_slice().into(),
                 window: 1024,

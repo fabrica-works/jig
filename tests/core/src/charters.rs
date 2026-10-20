@@ -13,7 +13,6 @@ pub fn research_charter() -> core::Charter {
     let mut charter = crate::world::config(0).core.settings.charters[0].clone();
     charter.number = 2;
     charter.policy.instructions = b"Research the question.".as_slice().into();
-    charter.policy.model.account = 2;
     charter.policy.model.name = b"research".as_slice().into();
     charter
 }

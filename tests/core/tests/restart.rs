@@ -640,15 +640,6 @@ fn a_restart_sends_an_adopted_chat_its_current_grant() {
 fn a_generation_renewed_while_the_assignment_is_held_reaches_the_attempt_after_it() {
     const SECOND_ANALYST: u32 = 2;
     let (mut config, limits) = jig_core_world::effects::fixture(163, false);
-    for model in &mut config.core.settings.models {
-        model.account = SECOND_ANALYST;
-    }
-    for charter in &mut config.core.settings.charters {
-        charter.policy.model.account = SECOND_ANALYST;
-        for model in &mut charter.policy.alternatives {
-            model.account = SECOND_ANALYST;
-        }
-    }
     let mut world = World::configured_unassigned(163, false, config, limits);
     assert!(world.assigned.is_none());
     world.renew_on_assignment(

@@ -3,8 +3,7 @@ use super::*;
 #[test]
 fn a_charter_whose_alternative_names_another_account_is_allowed() {
     let mut config = config(1);
-    let mut alternative = config.settings.charters[0].policy.model.clone();
-    alternative.account = 2;
+    let alternative = config.settings.charters[0].policy.model.clone();
     config.settings.charters[0].policy.alternatives = Box::new([alternative]);
     let mut bounds = limits();
     bounds.run_bytes = 1024;

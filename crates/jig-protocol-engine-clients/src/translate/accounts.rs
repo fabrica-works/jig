@@ -49,7 +49,6 @@ fn key_failure(value: a::KeyFailure) -> w::OwnerAccountKeyFailure {
 }
 pub fn refusal(value: a::Refusal, limits: &w::Limits) -> Result<w::OwnerAccountRefusal, w::Problem> {
     Ok(match value {
-        a::Refusal::Configured => w::OwnerAccountRefusal::Configured,
         a::Refusal::NotLimited => w::OwnerAccountRefusal::NotLimited,
         a::Refusal::Uses => w::OwnerAccountRefusal::Uses,
         a::Refusal::NotKept { why } => w::OwnerAccountRefusal::NotKept(w::OwnerAccountRefusalNotKept::new(

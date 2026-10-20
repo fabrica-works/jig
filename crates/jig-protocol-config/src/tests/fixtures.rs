@@ -17,11 +17,11 @@ pub fn path(segments: &[&[u8]]) -> Path {
 pub const ENGINE_SMALL: &[u8] = br#"{
 "limits": {"profile": "small"},
 "llm": {
+"providers": [{"name":"Fake","number":1,"models":["small"],"sources":{}}],
 "endpoints": [{
 "name": "fake",
 "number": 1,
 "dialect": 0,
-"account": 1,
 "provider": "fake-provider",
 "address": {"socket": "127.0.0.1:7101"},
 "transport": "plaintext",
@@ -35,10 +35,6 @@ pub const ENGINE_SMALL: &[u8] = br#"{
 "window": 8192,
 "output": 1024,
 "prices": {"input": 1, "cached": 1, "output": 1, "unit": 1000}
-}],
-"accounts": [{
-"number": 1,
-"source": {"handed_in": {"file": "accounts/chat.json"}}
 }]
 },
 "hosts": {

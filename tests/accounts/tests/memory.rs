@@ -46,7 +46,7 @@ fn full_account_source_and_deadline_tables_stay_within_the_worst_case() {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS };
     let bound = worst_case(&LIMITS).expect("world limits fit");
     let meter = Meter::new();
-    let mut domain = Domain::new(&LIMITS, providers, Box::new([]));
+    let mut domain = Domain::new(&LIMITS, providers);
     for account in 0..LIMITS.accounts {
         meter.start();
         let record = Stored::Account {
@@ -207,7 +207,7 @@ fn pending_llm_key_keeps_and_account_removals_stay_within_the_worst_case() {
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: LIMITS };
     let bound = worst_case(&LIMITS).expect("world limits");
     let mut run = Run { meter: Meter::new(), env, bound, out: Queue::with_capacity(max_out(&LIMITS)), request: 0 };
-    let mut domain = Domain::new(&LIMITS, providers, Box::new([]));
+    let mut domain = Domain::new(&LIMITS, providers);
     for number in 0..LIMITS.accounts {
         let account = jig_accounts_world::account(number * 2, 1, Holder::Party(u64::from(number)), b"subject");
         // Each subscription has its own subject.

@@ -1,5 +1,5 @@
 use super::fixtures;
-use crate::{Directories, Directory, Engine, Path, Problem, Problems, Segment, Source, Transport, What, Worker};
+use crate::{Directories, Directory, Engine, Path, Problem, Problems, Segment, Transport, What, Worker};
 
 // configuration.md, 10: both a path and a given directory are at most 4096 bytes.
 const BOUND: usize = 4096;
@@ -106,12 +106,11 @@ fn given_directories_are_absolute_and_bounded() {
 }
 
 const TLS: &[u8] = br#""transport":"tls","server_name":"issuer.example","trust":"certs/endpoint""#;
-const SIGNED: &[u8] = br#"{"number":2,"source":{"sign_in":{"client":"client-a","secret":"secrets/client","authorization":"https://issuer.example/authorize","token":"https://issuer.example/token","endpoint":{"socket":"127.0.0.1:7102"},"transport":"tls","server_name":"issuer.example","trust":"certs/sign-in","redirect":"http://127.0.0.1:7103/callback","scope":"chat"}}}"#;
 const PROVIDERS: &[u8] = br#""providers":[{"name":"Fake","number":1,"models":["small"],"sources":{"sign_in":{"issuer":"https://issuer.example","client":"client-a","scopes":["chat"],"authorization":"https://issuer.example/authorize","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","trust":"certs/registration","must_grant":["chat"],"redirect_path":"callback"}}}],"endpoints":"#;
 fn engine_bytes() -> Box<[u8]> {
     let bytes = fixtures::with(fixtures::ENGINE_SMALL, br#""transport": "plaintext""#, TLS);
-    let signed = joined(&[b"}}},", SIGNED, b"]"]);
-    let bytes = fixtures::with(&bytes, b"}}\n}]", &signed);
+    let bytes =
+        fixtures::with(&bytes, br#""providers": [{"name":"Fake","number":1,"models":["small"],"sources":{}}],"#, b"");
     fixtures::with(&bytes, br#""endpoints":"#, PROVIDERS)
 }
 fn document(bytes: &[u8]) -> skein_json::Document {
@@ -161,14 +160,6 @@ fn file_paths(files: &[crate::File], expected: &[(Path, &[u8])]) {
 }
 fn engine_paths() {
     let engine = engine(&engine_bytes()).unwrap();
-    let handed = match engine.llm.accounts.first().unwrap().source {
-        Source::HandedIn { ref file } => file.as_ref(),
-        Source::SignIn(_) => panic!("handed-in fixture"),
-    };
-    let signed = match &engine.llm.accounts.get(1).unwrap().source {
-        Source::SignIn(signed) => signed,
-        Source::HandedIn { .. } => panic!("sign-in fixture"),
-    };
     let registration = engine.llm.providers.first().unwrap().sign_in.as_ref().unwrap();
     let rows: &[(&str, &[u8], &[u8])] = &[
         ("deployment", &engine.deployment.directory, b"/d/state"),
@@ -176,9 +167,6 @@ fn engine_paths() {
         ("worker a digest", &engine.hosts.workers.first().unwrap().digest, b"/d/secrets/worker-a.digest"),
         ("worker b digest", &engine.hosts.workers.get(1).unwrap().digest, b"/d/secrets/worker-b.digest"),
         ("endpoint trust", trust(&engine.llm.endpoints.first().unwrap().transport), b"/c/certs/endpoint"),
-        ("handed in", handed, b"/d/accounts/chat.json"),
-        ("sign-in secret", signed.secret.as_deref().unwrap(), b"/d/secrets/client"),
-        ("sign-in trust", trust(&signed.transport), b"/c/certs/sign-in"),
         ("registration trust", trust(&registration.endpoint_transport), b"/c/certs/registration"),
     ];
     for (label, value, expected) in rows {
@@ -191,18 +179,6 @@ fn engine_paths() {
             (item(&[b"hosts", b"workers"], 0).member(b"digest"), b"/d/secrets/worker-a.digest"),
             (item(&[b"hosts", b"workers"], 1).member(b"digest"), b"/d/secrets/worker-b.digest"),
             (item(&[b"llm", b"endpoints"], 0).member(b"trust"), b"/c/certs/endpoint"),
-            (
-                item(&[b"llm", b"accounts"], 0).member(b"source").member(b"handed_in").member(b"file"),
-                b"/d/accounts/chat.json",
-            ),
-            (
-                item(&[b"llm", b"accounts"], 1).member(b"source").member(b"sign_in").member(b"secret"),
-                b"/d/secrets/client",
-            ),
-            (
-                item(&[b"llm", b"accounts"], 1).member(b"source").member(b"sign_in").member(b"trust"),
-                b"/c/certs/sign-in",
-            ),
             (
                 item(&[b"llm", b"providers"], 0).member(b"sources").member(b"sign_in").member(b"trust"),
                 b"/c/certs/registration",
@@ -242,21 +218,6 @@ fn engine_refusals() {
         ("instructions", b"charters/chat.txt", item(&[b"charters"], 0).member(b"instructions")),
         ("digest", b"secrets/worker-a.digest", item(&[b"hosts", b"workers"], 0).member(b"digest")),
         ("endpoint trust", b"certs/endpoint", item(&[b"llm", b"endpoints"], 0).member(b"trust")),
-        (
-            "handed in",
-            b"accounts/chat.json",
-            item(&[b"llm", b"accounts"], 0).member(b"source").member(b"handed_in").member(b"file"),
-        ),
-        (
-            "sign-in secret",
-            b"secrets/client",
-            item(&[b"llm", b"accounts"], 1).member(b"source").member(b"sign_in").member(b"secret"),
-        ),
-        (
-            "sign-in trust",
-            b"certs/sign-in",
-            item(&[b"llm", b"accounts"], 1).member(b"source").member(b"sign_in").member(b"trust"),
-        ),
         (
             "registration trust",
             b"certs/registration",

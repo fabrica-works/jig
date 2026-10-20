@@ -151,6 +151,7 @@ fn with_models(alternatives: &[u8], llm: &[u8]) -> Box<[u8]> {
 }, {"name": "large", "endpoint": "fake", "window": 8192, "output": 1024,
 "prices": {"input": 1, "cached": 1, "output": 1, "unit": 1000}}]"#,
     );
+    let large = fixtures::with(&large, br#""models":["small"]"#, br#""models":["small","large"]"#);
     let charter = fixtures::with(&large, br#""alternatives": []"#, alternatives);
     fixtures::with(&charter, br#""grace_ms": 5000, "llm": null"#, llm)
 }
@@ -339,4 +340,14 @@ fn table<const N: usize>(cases: [Case; N]) {
         }
     }
     assert!(passed, "{failures:?}");
+}
+
+#[test]
+fn configuration_templates_refuse_an_account_at_its_exact_path() {
+    refuses_choice(
+        br#""alternatives": []"#,
+        br#""grace_ms":5000,"llm":{"main":{"model":"small","effort":"low"},"sub_agents":[],"account":1}"#,
+        chat_llm().member(b"account"),
+        What::Unknown,
+    );
 }

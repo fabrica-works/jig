@@ -15,16 +15,6 @@ pub(crate) fn account_record(domain: &Domain, number: u32) -> Stored {
     }
 }
 
-pub(crate) fn configured(domain: &Domain, number: u32) -> bool {
-    let account = domain.accounts.get(&number).expect("a kept account");
-    for (_, source) in &account.sources {
-        if *source == number || domain.sources.get(source).expect("a kept source").kind == crate::Kind::None {
-            return true;
-        }
-    }
-    false
-}
-
 pub(crate) fn accounts(domain: &Domain, holder: Holder) -> List<u32> {
     let mut order = List::with_capacity(domain.accounts.capacity());
     let mut after = None;
@@ -60,9 +50,7 @@ pub(crate) fn save_accounts(domain: &mut Domain, order: &List<u32>, out: &mut Qu
         let entry = domain.accounts.get_mut(number).expect("a listed account");
         if entry.place != place {
             entry.place = place;
-            if !configured(domain, *number) {
-                out.push(Request::Save { record: account_record(domain, *number) });
-            }
+            out.push(Request::Save { record: account_record(domain, *number) });
         }
     }
 }

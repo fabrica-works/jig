@@ -1,6 +1,6 @@
 //! Tiny world scripting the accounts component on the driver's terms.
 use jig_domain_accounts::{
-    self as accounts, Configured, Domain, Ended, Event, Fact, Holder, Kind, Limits, Offers, Provider, Providers,
+    self as accounts, Domain, Ended, Event, Fact, Holder, Kind, Limits, Offers, Provider, Providers,
     Request, Stored,
 };
 use skein_lib::{Duration, Env, Queue, Time, Wall};
@@ -27,26 +27,31 @@ pub struct World {
 }
 impl Default for World {
     fn default() -> World {
-        World::configured(&[ANALYST])
+        World::restoring(&[ANALYST])
     }
 }
 impl World {
-    /// Configured accounts whose model no configured provider serves.
+    /// Explicit durable rows for the source-state stories.
     #[must_use]
-    pub fn configured(accounts: &[u32]) -> World {
-        let mut configured = Vec::new();
-        for number in accounts {
-            configured.push(Configured { number: *number, provider: None });
+    pub fn restoring(sources: &[u32]) -> World {
+        let mut rows = Vec::new();
+        for (place, number) in sources.iter().enumerate() {
+            let mut row = account(1_000 + number, 1, Holder::Deployment, b"");
+            if let Stored::Account { place: at, .. } = &mut row { *at = u32::try_from(place).unwrap(); }
+            rows.push(row);
+            rows.push(source(1_000 + number, *number, 0, Kind::SignIn));
         }
-        World::with(Providers::none(), &configured)
+        Self::with(providers(vec![provider(1, true, false)]), &rows)
     }
     #[must_use]
-    pub fn with(providers: Providers, configured: &[Configured]) -> World {
-        World { domain: Domain::new(&LIMITS, providers, configured.into()), now: Time::ZERO, wall: Wall::EPOCH }
+    pub fn with(providers: Providers, records: &[Stored]) -> World {
+        let mut world = World { domain: Domain::new(&LIMITS, providers), now: Time::ZERO, wall: Wall::EPOCH };
+        world.restore(records.to_vec());
+        world
     }
     #[must_use]
     pub fn wanting(accounts: &[u32]) -> World {
-        let mut world = Self::configured(accounts);
+        let mut world = Self::restoring(accounts);
         world.step(Event::Want);
         world
     }

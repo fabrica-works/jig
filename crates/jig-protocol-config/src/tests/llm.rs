@@ -4,9 +4,6 @@ use crate::{What, files};
 fn model(bytes: &[u8]) -> jig_domain_core::Model {
     fixtures::engine(bytes).unwrap().llm.models.first().unwrap().clone()
 }
-fn engine() -> crate::Engine {
-    fixtures::engine(fixtures::ENGINE_SMALL).unwrap()
-}
 fn model_path(name: &[u8]) -> crate::Path {
     fixtures::path(&[b"llm", b"models"]).child(crate::Segment::Index(0)).member(name)
 }
@@ -24,18 +21,26 @@ fn named_file<'a>(files: &'a [crate::File], name: &[u8]) -> &'a crate::File {
 fn a_model_naming_an_unknown_endpoint_is_refused() {
     fixtures::refuses(br#""endpoint": "fake""#, br#""endpoint": "nowhere""#, model_path(b"endpoint"), What::Refers);
 }
-fn an_endpoint_naming_an_unknown_account_is_refused() {
-    fixtures::refuses(br#""account": 1"#, br#""account": 2"#, endpoint_path(b"account"), What::Refers);
+#[test]
+fn an_endpoint_account_is_unknown_at_its_exact_path() {
+    fixtures::refuses(br#""dialect": 0,"#, br#""dialect": 0, "account": 1,"#, endpoint_path(b"account"), What::Unknown);
 }
 fn two_endpoints_with_one_name_are_refused() {
-    let endpoint = br#"{"name":"fake","number":2,"dialect":0,"account":1,"provider":"fake","address":{"socket":"127.0.0.1:7102"},"transport":"plaintext","headers":[],"connect_ms":10000,"handshake_ms":10000}"#;
-    let mut writer = skein_lib::Writer::new(endpoint.len().checked_add(4).expect("small endpoint fixture"));
-    writer.put(b"},").unwrap();
+    let endpoint = br#"{"name":"fake","number":2,"dialect":0,"provider":"fake","address":{"socket":"127.0.0.1:7102"},"transport":"plaintext","headers":[],"connect_ms":10000,"handshake_ms":10000}"#;
+    let mut writer = skein_lib::Writer::new(
+        endpoint
+            .len()
+            .checked_add(b"\"handshake_ms\": 10000\n},".len())
+            .expect("small endpoint fixture")
+            .checked_add(2)
+            .expect("small endpoint fixture"),
+    );
+    writer.put(b"\"handshake_ms\": 10000\n},").unwrap();
     writer.put(endpoint).unwrap();
     writer.put(b"],").unwrap();
     let added = writer.finish();
     fixtures::refuses(
-        b"}],",
+        b"\"handshake_ms\": 10000\n}],",
         &added,
         fixtures::path(&[b"llm", b"endpoints"]).child(crate::Segment::Index(1)).member(b"name"),
         What::Unique,
@@ -45,17 +50,12 @@ fn plaintext_to_a_public_address_is_refused() {
     fixtures::refuses(b"127.0.0.1:7101", b"192.0.2.1:7101", endpoint_path(b"address"), What::Plaintext);
 }
 #[test]
-fn a_handed_in_account_names_its_private_file() {
-    let files = files(&engine());
-    let file = named_file(&files, b"accounts/chat.json");
-    assert!(file.private);
-    assert_eq!(
-        file.at,
-        fixtures::path(&[b"llm", b"accounts"])
-            .child(crate::Segment::Index(0))
-            .member(b"source")
-            .member(b"handed_in")
-            .member(b"file")
+fn configured_accounts_are_unknown_at_their_exact_path() {
+    fixtures::refuses(
+        br#""llm": {"#,
+        br#""llm": {"accounts":[{"number":1,"source":{"handed_in":{"file":"old.json"}}}],"#,
+        fixtures::path(&[b"llm", b"accounts"]),
+        What::Unknown,
     );
 }
 #[test]
@@ -114,34 +114,11 @@ fn efforts_that_are_not_a_list_are_refused() {
     refuses_efforts(br#""low""#, model_path(b"efforts"), What::Kind);
 }
 #[test]
-fn a_model_uses_its_endpoints_number_dialect_and_account() {
+fn a_model_uses_its_endpoints_number_and_dialect() {
     let model = model(fixtures::ENGINE_SMALL);
-    assert_eq!((model.endpoint, model.dialect, model.account), (1, 0, 1));
+    assert_eq!((model.endpoint, model.dialect), (1, 0));
 }
 
-const SIGN_IN: &[u8] = br#"{"sign_in":{"client":"client-a","secret":"secrets/client","authorization":"https://issuer.example/authorize","token":"https://issuer.example/token","endpoint":{"socket":"127.0.0.1:7102"},"transport":"plaintext","redirect":"http://127.0.0.1:7103/callback","scope":"chat"}}"#;
-fn signed_engine(source: &[u8]) -> crate::Engine {
-    let bytes = fixtures::with(fixtures::ENGINE_SMALL, br#"{"handed_in": {"file": "accounts/chat.json"}}"#, source);
-    fixtures::engine(&bytes).unwrap()
-}
-#[test]
-fn a_sign_in_account_names_its_private_client_secret() {
-    let files = files(&signed_engine(SIGN_IN));
-    assert!(named_file(&files, b"secrets/client").private);
-}
-fn a_sign_in_plaintext_refusal_names_its_endpoint() {
-    let source = fixtures::with(SIGN_IN, b"127.0.0.1:7102", b"192.0.2.1:7102");
-    fixtures::refuses(
-        br#"{"handed_in": {"file": "accounts/chat.json"}}"#,
-        &source,
-        fixtures::path(&[b"llm", b"accounts"])
-            .child(crate::Segment::Index(0))
-            .member(b"source")
-            .member(b"sign_in")
-            .member(b"endpoint"),
-        What::Plaintext,
-    );
-}
 #[test]
 fn a_tls_endpoint_names_its_trust_file() {
     let bytes = fixtures::with(
@@ -176,10 +153,8 @@ fn endpoint_headers_are_retained() {
 fn llm_configuration_problems_name_the_invalid_fields() {
     table([
         ("a_model_naming_an_unknown_endpoint_is_refused", a_model_naming_an_unknown_endpoint_is_refused),
-        ("an_endpoint_naming_an_unknown_account_is_refused", an_endpoint_naming_an_unknown_account_is_refused),
         ("two_endpoints_with_one_name_are_refused", two_endpoints_with_one_name_are_refused),
         ("plaintext_to_a_public_address_is_refused", plaintext_to_a_public_address_is_refused),
-        ("a_sign_in_plaintext_refusal_names_its_endpoint", a_sign_in_plaintext_refusal_names_its_endpoint),
         ("an_in_process_llm_endpoint_is_refused", an_in_process_llm_endpoint_is_refused),
         ("more_efforts_than_the_bound_are_refused", more_efforts_than_the_bound_are_refused),
         ("an_effort_longer_than_smiths_bound_is_refused", an_effort_longer_than_smiths_bound_is_refused),

@@ -31,19 +31,15 @@ fn a_charter_naming_an_unknown_model_is_refused() {
 }
 
 #[test]
-fn a_charter_whose_models_name_two_accounts_is_read() {
+fn a_charter_may_name_models_at_two_endpoints() {
     let alternative = br#""models": [{"name":"other", "endpoint":"second", "window":8192,
         "output":1024, "prices":{"input":1,"cached":1,"output":1,"unit":1000}},"#;
-    let endpoint = br#""endpoints": [{"name":"second", "number":2, "dialect":0,"account":2,
+    let endpoint = br#""endpoints": [{"name":"second", "number":2, "dialect":0,
         "provider":"fake-provider", "address":{"socket":"127.0.0.1:7102"},"transport":"plaintext",
         "headers":[],"connect_ms":10000,"handshake_ms":10000},"#;
     let document = fixtures::with(fixtures::ENGINE_SMALL, br#""models": ["#, alternative);
     let document = fixtures::with(&document, br#""endpoints": ["#, endpoint);
-    let document = fixtures::with(
-        &document,
-        br#""accounts": ["#,
-        br#""accounts": [{"number":2,"source":{"handed_in":{"file":"accounts/other.json"}}},"#,
-    );
+    let document = fixtures::with(&document, br#""models":["small"]"#, br#""models":["small","other"]"#);
     let document = fixtures::with(&document, br#""alternatives": []"#, br#""alternatives": ["other"]"#);
     let engine = fixtures::engine(&document).expect("runtime accounts are selected per provider");
     assert_eq!(engine.charters[0].policy.alternatives.len(), 1);

@@ -6,7 +6,6 @@ const ENGINE: &[u8] = br#"{
 "name": "fake",
 "number": 1,
 "dialect": 0,
-"account": 1,
 "provider": "fake-provider",
 "address": {"socket": "127.0.0.1:7101"},
 "transport": "plaintext",
@@ -20,10 +19,6 @@ const ENGINE: &[u8] = br#"{
 "window": 8192,
 "output": 1024,
 "prices": {"input": 1, "cached": 1, "output": 1, "unit": 1000}
-}],
-"accounts": [{
-"number": 1,
-"source": {"handed_in": {"file": "accounts/chat.json"}}
 }]
 },
 "hosts": {

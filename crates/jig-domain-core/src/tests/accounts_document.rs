@@ -41,7 +41,7 @@ pub(super) fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
     };
     let mut core = Core::new(config, &limits);
     core.connectors = Box::new([]);
-    core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone(), Box::new([]));
+    core.accounts = accounts::Domain::new(&limits.accounts, core.settings.llm_providers.clone());
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     let mut out = Queue::with_capacity(people::max_out(&limits.people));
     let people_env = Env { now: env.now, wall: env.wall, limits: limits.people };

@@ -37,15 +37,6 @@ pub enum Kind {
     None,
 }
 
-/// An account the configuration names (D1, until accounts are chosen by their uses): held by
-/// the deployment, with one signed-in source numbered as the account, and the provider serving
-/// its charters' model where one does.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-pub struct Configured {
-    pub number: u32,
-    pub provider: Option<u32>,
-}
-
 /// What runs' agents noticed of a source, kept with a wall reset so that it means the same
 /// after a restart (engine.md, 5.4). The component says the rest of a source's state again.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]

@@ -71,7 +71,6 @@ fn ends() -> Box<[a::End]> {
     Box::new([
         a::End::Made { account: 7, declined: false },
         a::End::Renewed { account: 7, declined: true },
-        a::End::Refused { refusal: a::Refusal::Configured },
         a::End::Refused { refusal: a::Refusal::NotLimited },
         a::End::Refused { refusal: a::Refusal::Uses },
         a::End::Refused { refusal: a::Refusal::NotKept { why: a::KeyFailure::NotStored } },

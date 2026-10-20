@@ -56,9 +56,6 @@ pub enum What {
     Budget {
         charter: u32,
     },
-    Accounts {
-        charter: u32,
-    },
     Grace {
         template: u32,
     },

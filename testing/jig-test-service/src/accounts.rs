@@ -24,7 +24,6 @@ const KEY_EXCHANGE: u64 = PREFIX | (1_u64 << 33);
 const LOAD: Token = Token::new(PREFIX | (1_u64 << 32_u32));
 #[derive(Debug)]
 pub struct AccountsRuntime {
-    pub issuers: List<(u32, driver::Endpoint)>,
     /// LLM account sign-in endpoints and origins, keyed by provider number.
     pub providers: List<(u32, driver::Endpoint, List<driver::Origin>)>,
     /// Bounds of all prepared trust roots, supplied by their shell owner.
@@ -38,7 +37,7 @@ pub struct AccountsRuntime {
     reason = "one phase per service, and the sources it loads move once into the driver"
 )]
 enum Phase {
-    Loading { configured: Map<u32, driver::Account>, crypto: CryptoRng, after: Option<u64>, asked: bool },
+    Loading { crypto: CryptoRng, after: Option<u64>, asked: bool },
     HandingIn,
     Running,
 }
@@ -96,30 +95,6 @@ impl Files {
         None
     }
 }
-fn issuers(
-    runtime: Option<&mut AccountsRuntime>,
-    limits: &driver::Limits,
-) -> Result<Map<u32, driver::Endpoint>, Problems> {
-    let mut issuers = Map::with_capacity(limits.accounts);
-    let Some(runtime) = runtime else {
-        return Ok(issuers);
-    };
-    if runtime.issuers.len() > limits.accounts {
-        return Err(problem(0, What::Bound));
-    }
-    for (_, issuer) in &runtime.issuers {
-        if let driver::Transport::Tls { .. } = issuer.transport
-            && (runtime.trust_roots == 0 || runtime.trust_root_bytes == 0)
-        {
-            return Err(problem(0, What::Bound));
-        }
-    }
-    for (number, endpoint) in ::core::mem::replace(&mut runtime.issuers, List::with_capacity(0)).into_boxed() {
-        issuers.insert(number, endpoint).or(Err(problem(0, What::Bound)))?;
-    }
-    Ok(issuers)
-}
-/// The host resolves transports; the component owns its public registration vocabulary.
 fn registration_input(
     configured: &config::llm::Registration,
     endpoint_transport: &driver::Transport,
@@ -225,7 +200,7 @@ impl Accounts {
     /// driver is made once the secrets' store's records are read.
     pub fn new(
         config: &config::Engine,
-        files: &Files,
+        _files: &Files,
         seeds: &Seeds,
         mut runtime: Option<AccountsRuntime>,
         room: u32,
@@ -235,87 +210,14 @@ impl Accounts {
         if limits.client.document.record_bytes > secrets.value {
             return Err(problem(0, What::Bound));
         }
-        let mut issuers = issuers(runtime.as_mut(), &limits)?;
-        let mut configured = Map::with_capacity(limits.accounts);
-        let mut ids = Map::with_capacity(limits.accounts);
-        let mut handed = Queue::with_capacity(limits.accounts);
-        for (index, account) in config.llm.accounts.iter().enumerate() {
-            let mut account_id = Secret::new(Box::default());
-            let source = match &account.source {
-                config::Source::HandedIn { file } => {
-                    let value = files.contents(file).ok_or(problem(index, What::Unreadable))?;
-                    let bounds = config::DocumentLimits {
-                        bytes: limits.client.document.record_bytes,
-                        tokens: limits.client.document.tokens,
-                        depth: limits.client.document.depth,
-                    };
-                    let record = config::handed_in(value, &bounds).or(Err(problem(index, What::Form)))?;
-                    if let Some(id) = &record.account_id {
-                        if id.len() > usize::try_from(table::ACCOUNT_ID_BYTES).expect("id bound") {
-                            return Err(problem(index, What::Bound));
-                        }
-                        account_id = Secret::new(id.clone());
-                    }
-                    let record = handed_in::record(
-                        account.number,
-                        record.token,
-                        record.lapses,
-                        record.account_id,
-                        &limits.client.document,
-                    )
-                    .or(Err(problem(index, What::Bound)))?;
-                    handed.push((account.number, record));
-                    driver::Account::HandedIn
-                }
-                config::Source::SignIn(source) => {
-                    let endpoint = issuers.remove(&account.number).ok_or(problem(index, What::Refers))?;
-                    let secret = match &source.secret {
-                        Some(path) => Some(files.contents(path).ok_or(problem(index, What::Unreadable))?.into()),
-                        None => None,
-                    };
-                    driver::Account::SignIn {
-                        shared: false,
-                        origins: List::with_capacity(0),
-                        registration: oauth::Registration {
-                            authorization_url: source.authorization.clone(),
-                            token_endpoint: source.token.clone(),
-                            client_id: source.client.clone(),
-                            redirect_uri: source.redirect.clone(),
-                            scope: source.scope.clone(),
-                            wire: oauth::WireFormat::Form,
-                            client_secret: secret,
-                            pkce_for_confidential: false,
-                            metadata_claim: None,
-                            // The drawn identifier, for the check at start; every
-                            // identifier formats to the same length, and the
-                            // kept one replaces it once the store is open.
-                            terms: Some(installation::terms(&seeds.installation)),
-                        },
-                        endpoint,
-                        keeper: driver::Keeper::Owner { kept: None },
-                    }
-                }
-            };
-            configured.insert(account.number, source).or(Err(problem(index, What::Bound)))?;
-            ids.insert(account.number, account_id).expect("configured account id place");
-        }
         let crypto = CryptoRng::new(&seeds.crypto, 1).ok_or(problem(0, What::Bound))?;
-        let mut check = List::with_capacity(limits.accounts);
-        for (_, account) in &configured {
-            check.push(unkept(account)).or(Err(problem(0, What::Bound)))?;
-        }
-        let checked = driver::Component::new(check, &limits, crypto.clone()).or(Err(problem(0, What::Form)))?;
-        drop(checked);
         let providers = provider_templates(config, runtime.as_mut(), &limits, &crypto, &seeds.installation)?;
-        let mut inventory = restart::Inventory::new(limits.accounts, secrets.page.rows);
-        for (number, _) in &configured {
-            inventory.name(*number);
-        }
+        let inventory = restart::Inventory::new(limits.accounts, secrets.page.rows);
         Ok(Self {
             component: None,
-            phase: Phase::Loading { configured, crypto, after: None, asked: false },
+            phase: Phase::Loading { crypto, after: None, asked: false },
             env: Env { now: Time::ZERO, wall: Wall::EPOCH, limits },
-            ids,
+            ids: Map::with_capacity(limits.accounts),
             providers,
             required: Map::with_capacity(limits.accounts),
             erasing: Map::with_capacity(limits.accounts),
@@ -325,7 +227,7 @@ impl Accounts {
             key_out: Queue::with_capacity(room),
             key_events: Queue::with_capacity(room),
             forgotten: Queue::with_capacity(room),
-            handed,
+            handed: Queue::with_capacity(limits.accounts),
             early: Queue::with_capacity(room),
             io: Queue::with_capacity(room),
             above: Queue::with_capacity(room),
@@ -896,52 +798,20 @@ impl Accounts {
     /// from them (llm.md 5.1), each sign-in sending the installation's
     /// identifier the store keeps (llm.md 5.4).
     fn loaded(&mut self, rows: Box<[store::SecretRow]>, next: Option<u64>, kept: &[u8; 16]) {
-        let Phase::Loading { configured, after, asked, .. } = &mut self.phase else {
-            return;
-        };
-        for row in rows {
-            if row.owner != store::SecretOwner::Source {
-                continue;
-            }
-            let Ok(account) = u32::try_from(row.number) else {
-                continue;
-            };
-            if !configured.contains_key(&account) {
-                continue;
-            }
-            let Some(record) = self.records.load(account, row.value.expose(), &self.env.limits.client.document) else {
-                continue;
-            };
-            if let Some(driver::Account::SignIn { keeper, .. }) = configured.get_mut(&account) {
-                let id = match &record.metadata {
-                    Some(id) => Secret::new(id.clone()),
-                    None => Secret::new(Box::default()),
-                };
-                *self.ids.get_mut(&account).expect("configured account id slot") = id;
-                *keeper = driver::Keeper::Owner { kept: Some(record) };
-            }
-        }
+        let Phase::Loading { after, asked, .. } = &mut self.phase else { return; };
+        // Source values are loaded only when the restored child names their real source.
+        drop(rows);
         if let Some(next) = next {
             *after = Some(next);
             *asked = false;
             return;
         }
-        let Phase::Loading { mut configured, crypto, .. } = ::core::mem::replace(&mut self.phase, Phase::HandingIn)
+        let Phase::Loading { crypto, .. } = ::core::mem::replace(&mut self.phase, Phase::HandingIn)
         else {
             unreachable!("loading");
         };
-        let mut component =
+        let component =
             driver::Component::new(List::with_capacity(0), &self.env.limits, crypto).expect("startup checked driver");
-        for _ in 0..configured.len() {
-            let (&number, _) = configured.first().expect("configured sources");
-            let mut account = configured.remove(&number).expect("configured source");
-            if let driver::Account::SignIn { registration, .. } = &mut account {
-                registration.terms = Some(installation::terms(kept));
-            }
-            component.add(&self.env, number, account, &mut self.above);
-            assert!(self.above.is_empty(), "startup checked configured source");
-            self.records.admit(number).expect("configured record place");
-        }
         // The stored installation id, rather than this start's draw, goes on account sign-ins.
         let mut after = 0;
         for _ in 0..self.providers.len() {

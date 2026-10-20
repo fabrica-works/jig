@@ -308,27 +308,10 @@ fn uses_are_bounded_saved_and_restored() {
     }
 }
 #[test]
-fn a_configured_account_refuses_order_uses_and_removal() {
-    let mut world = World::wanting(&[7]);
-    for change in [
-        Change::MoveAccount { account: 7, place: 0 },
-        Change::MoveSource { account: 7, source: 7, place: 0 },
-        Change::SetUses { account: 7, uses: None },
-        Change::Remove { account: 7 },
-        Change::RemoveKey { source: 7 },
-        Change::ReplaceKey { source: 7, carried: CARRIED },
-    ] {
-        assert_eq!(
-            world.step(Event::Change { request: REQUEST, holder: Holder::Deployment, change }),
-            vec![refused(Refusal::Configured)]
-        );
-    }
-}
-#[test]
 fn a_restart_names_each_party_source_before_wanting_it() {
     let mut world = World::with(
         providers(vec![provider(PROVIDER, true, true)]),
-        &[jig_domain_accounts::Configured { number: 1, provider: Some(PROVIDER) }],
+        &[account(1, PROVIDER, Holder::Deployment, b""), source(1, 2, 0, Kind::Key)],
     );
     world.restore(vec![
         account(10, PROVIDER, HOLDER, b"subject"),
@@ -340,6 +323,7 @@ fn a_restart_names_each_party_source_before_wanting_it() {
     assert_eq!(
         names,
         vec![
+            Request::Signing(Signing::Restore { source: 2, provider: PROVIDER, kind: Kind::Key }),
             Request::Signing(Signing::Restore { source: 11, provider: PROVIDER, kind: Kind::SignIn }),
             Request::Signing(Signing::Restore { source: 12, provider: PROVIDER, kind: Kind::Key }),
             Request::Signing(Signing::Restored)

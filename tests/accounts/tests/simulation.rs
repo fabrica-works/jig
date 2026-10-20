@@ -36,7 +36,7 @@ fn at(seconds: u64) -> Time {
 /// The analyst's source's record, saved in the step that changes its hold.
 fn kept(held: Option<Held>) -> Request {
     let record =
-        Stored::Source { account: ANALYST, number: ANALYST, place: 0, kind: Kind::SignIn, name: Box::new([]), held };
+        Stored::Source { account: 1_000 + ANALYST, number: ANALYST, place: 0, kind: Kind::SignIn, name: Box::new([]), held };
     Request::Save { record }
 }
 /// Limited until a reset, on the world's wall clock, which starts at its epoch.
@@ -44,29 +44,27 @@ fn until(seconds: u64) -> Held {
     Held::Limited { reset: Some(Wall::from_nanos(seconds * 1_000_000_000)) }
 }
 #[test]
-fn every_configured_account_is_wanted_at_the_start() {
-    let mut world = World::configured(&[ANALYST, 8]);
-    assert_eq!(
-        world.step(Event::Want),
-        vec![
-            Request::Save { record: Stored::Next { number: 9 } },
-            Request::Signing(jig_domain_accounts::Signing::Restored),
-            want(),
-            Request::Component(ToComponent::Want { account: 8 })
-        ],
-        "the counter has moved past the configured accounts"
-    );
+fn every_restored_source_is_named_before_it_is_wanted() {
+    let mut world = World::restoring(&[ANALYST, 8]);
+    let outputs = world.step(Event::Want);
+    assert_eq!(outputs, vec![
+        Request::Save { record: Stored::Next { number: 1_009 } },
+        Request::Signing(jig_domain_accounts::Signing::Restore { source: ANALYST, provider: 1, kind: Kind::SignIn }),
+        Request::Signing(jig_domain_accounts::Signing::Restore { source: 8, provider: 1, kind: Kind::SignIn }),
+        Request::Signing(jig_domain_accounts::Signing::Restored),
+        want(), Request::Component(ToComponent::Want { account: 8 }),
+    ]);
     assert_eq!(world.step(Event::Want), vec![]);
 }
 #[test]
 fn a_grant_is_usable_until_its_token_lapses() {
     let mut world = granted();
-    assert!(world.domain.usable(ANALYST));
+    assert!(world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.fire_at(99), vec![]);
-    assert!(world.domain.grant(ANALYST, world.now).is_some());
+    assert!(world.domain.grant(1_000 + ANALYST, world.now).is_some());
     assert_eq!(world.fire_at(100), vec![]);
-    assert!(!world.domain.usable(ANALYST));
-    assert!(world.domain.grant(ANALYST, world.now).is_none());
+    assert!(!world.domain.usable(1_000 + ANALYST));
+    assert!(world.domain.grant(1_000 + ANALYST, world.now).is_none());
 }
 #[test]
 fn later_asks_again_after_the_drivers_delay() {
@@ -90,7 +88,7 @@ fn later_without_a_delay_waits_the_childs_backoff() {
 fn sign_in_again_is_unusable_and_asked_again_at_the_retry_interval() {
     let mut world = granted();
     assert_eq!(failed(&mut world, Failure::SignInAgain), vec![]);
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.views()[0].state, State::NeedsSignIn);
     assert_eq!(world.fire_at(29), vec![]);
     assert_eq!(world.fire_at(30), vec![want()]);
@@ -99,7 +97,7 @@ fn sign_in_again_is_unusable_and_asked_again_at_the_retry_interval() {
 fn misconfigured_is_never_asked_again() {
     let mut world = granted();
     failed(&mut world, Failure::Misconfigured);
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.views()[0].state, State::Misconfigured);
     assert_eq!(world.fire_at(1000), vec![]);
     assert_eq!(world.domain.next_deadline(), None);
@@ -110,7 +108,7 @@ fn unloaded_says_where_and_why_and_is_asked_again() {
     failed(&mut world, Failure::Unloaded { at: Place::File, why: Unread::Refused });
     assert_eq!(world.views()[0].state, State::Unloaded { at: Place::File, why: Unread::Refused });
     assert!(world.views()[0].attention);
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.fire_at(29), vec![]);
     assert_eq!(world.fire_at(30), vec![want()]);
 }
@@ -118,10 +116,10 @@ fn unloaded_says_where_and_why_and_is_asked_again() {
 fn expiring_stays_usable_and_says_a_newer_record_is_needed() {
     let mut world = granted();
     assert_eq!(world.step(Event::Component(FromComponent::Expiring { account: ANALYST, generation: 4 })), vec![]);
-    assert!(world.domain.usable(ANALYST));
+    assert!(world.domain.usable(1_000 + ANALYST));
     assert!(world.views()[0].expiring && world.views()[0].attention);
     world.fire_at(100);
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
 }
 #[test]
 fn the_first_unauthorized_of_a_generation_renews_and_the_second_needs_sign_in() {
@@ -135,7 +133,7 @@ fn the_first_unauthorized_of_a_generation_renews_and_the_second_needs_sign_in() 
     assert_eq!(world.step(Event::Unauthorized { account: ANALYST, generation: 4 }), vec![]);
     assert_eq!(world.views()[0].state, State::NeedsSignIn);
     assert!(world.views()[0].attention);
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.domain.next_deadline(), None);
 }
 #[test]
@@ -149,19 +147,19 @@ fn an_unauthorized_generation_already_renewed_asks_nothing() {
         valid: Duration::from_secs(100),
     }));
     assert_eq!(world.step(Event::Unauthorized { account: ANALYST, generation: 4 }), vec![]);
-    assert!(world.domain.usable(ANALYST));
+    assert!(world.domain.usable(1_000 + ANALYST));
 }
 #[test]
 fn a_limit_with_a_reset_ends_at_it_and_asks_nothing() {
     let mut world = granted();
     assert_eq!(world.step(Event::Limited { account: ANALYST, reset: Some(at(30)) }), vec![kept(Some(until(30)))]);
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.views()[0].state, State::Limited { until: Some(at(30)) });
     assert!(world.views()[0].attention);
     assert_eq!(world.fire_at(29), vec![]);
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.fire_at(30), vec![kept(None)], "the lifted limit is saved");
-    assert!(world.domain.usable(ANALYST));
+    assert!(world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.views()[0].state, State::Granted);
     assert!(!world.views()[0].attention);
 }
@@ -174,7 +172,7 @@ fn a_limit_without_a_reset_holds_until_resumed() {
     assert!(world.views()[0].attention);
     assert_eq!(world.step(Event::Limited { account: ANALYST, reset: Some(at(10)) }), vec![], "a hold unchanged");
     assert_eq!(world.fire_at(10), vec![]);
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(
         world.step(Event::Change {
             request: skein_lib::Token::new(0),
@@ -186,7 +184,7 @@ fn a_limit_without_a_reset_holds_until_resumed() {
             Request::Answer { request: skein_lib::Token::new(0), answer: jig_domain_accounts::Answer::Done }
         ]
     );
-    assert!(world.domain.usable(ANALYST));
+    assert!(world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.views()[0].state, State::Granted);
 }
 #[test]
@@ -200,7 +198,7 @@ fn a_refused_account_holds_and_asks_nothing() {
     assert_eq!(world.step(refused), vec![kept(Some(Held::Refused))]);
     assert_eq!(world.views()[0].state, State::Refused);
     assert!(world.views()[0].attention);
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(
         world.step(Event::Change {
             request: skein_lib::Token::new(0),
@@ -221,9 +219,9 @@ fn a_failed_runs_limited_account_marks_it_limited() {
     let failed = Event::RunFailed { account: ANALYST, turned: Turned::Limited { reset: Some(at(12)) } };
     assert_eq!(world.step(failed), vec![kept(Some(until(12)))]);
     assert_eq!(world.views()[0].state, State::Limited { until: Some(at(12)) });
-    assert!(!world.domain.usable(ANALYST));
+    assert!(!world.domain.usable(1_000 + ANALYST));
     assert_eq!(world.fire_at(12), vec![kept(None)]);
-    assert!(world.domain.usable(ANALYST));
+    assert!(world.domain.usable(1_000 + ANALYST));
 }
 #[test]
 fn close_releases_every_account_and_ends_on_closed() {
@@ -286,7 +284,7 @@ fn a_sign_in_sources_grant_carries_the_form_its_component_announced() {
                 })),
                 vec![Request::Granted { grant }]
             );
-            assert_eq!(world.domain.grant(ANALYST, world.now), Some(grant));
+            assert_eq!(world.domain.grant(1_000 + ANALYST, world.now), Some(grant));
         }
     }
 }
@@ -304,7 +302,7 @@ fn a_component_grant_in_the_application_form_is_ignored() {
             }))
             .is_empty()
     );
-    assert!(!world.domain.usable(ANALYST));
-    assert_eq!(world.domain.grant(ANALYST, world.now), None);
+    assert!(!world.domain.usable(1_000 + ANALYST));
+    assert_eq!(world.domain.grant(1_000 + ANALYST, world.now), None);
     assert_eq!(world.views()[0].state, State::Asking);
 }

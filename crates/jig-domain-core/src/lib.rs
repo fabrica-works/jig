@@ -386,27 +386,6 @@ fn assert_connector_registry(connectors: &[u16]) {
     }
 }
 
-/// The accounts the charters name, each the deployment's until accounts are chosen by their
-/// uses (accounts.md, 3.1), with the provider serving its charter's model where one does.
-fn configured_accounts(settings: &Settings, limits: &Limits) -> Box<[accounts::Configured]> {
-    let mut configured = List::<accounts::Configured>::with_capacity(limits.accounts.accounts);
-    'models: for model in &settings.models {
-        let number = model.account;
-        for kept in &configured {
-            if kept.number == number {
-                continue 'models;
-            }
-        }
-        let provider = match settings.llm_providers.serving(&model.name) {
-            Some(provider) if provider.offers.none() => continue,
-            Some(provider) => Some(provider.number),
-            None => None,
-        };
-        configured.push(accounts::Configured { number, provider }).expect("configured accounts fit their bound");
-    }
-    configured.into_boxed()
-}
-
 impl Core {
     /// Earliest absolute wall time among retained effect reply rights
     /// (`domain/engine.md`, 4.4). Stale rights remain visible until the
@@ -559,7 +538,6 @@ impl Core {
                 "core prices configured permission roles"
             );
         }
-        let configured_accounts = configured_accounts(&config.settings, limits);
         let fleet_needs = fleet_needs::configured(&config, limits);
         Core {
             fill: 0,
@@ -660,7 +638,6 @@ impl Core {
             accounts: accounts::Domain::new(
                 &limits.accounts,
                 config.settings.llm_providers.clone(),
-                configured_accounts,
             ),
             brief: brief::GatherDomain::new(&limits.brief),
             notes: notes::Domain::new(&limits.notes),

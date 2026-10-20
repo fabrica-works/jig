@@ -12,7 +12,12 @@ fn with_providers(list: &[u8]) -> Box<[u8]> {
     writer.put(b"\"providers\": ").unwrap();
     writer.put(list).unwrap();
     writer.put(b",\n").unwrap();
-    fixtures::with(fixtures::ENGINE_SMALL, LLM, &writer.finish())
+    let base = fixtures::with(
+        fixtures::ENGINE_SMALL,
+        br#""providers": [{"name":"Fake","number":1,"models":["small"],"sources":{}}],"#,
+        b"",
+    );
+    fixtures::with(&base, LLM, &writer.finish())
 }
 /// One provider: `PROVIDER` with `from` replaced by `to`.
 fn one(from: &[u8], to: &[u8]) -> Box<[u8]> {
@@ -67,9 +72,37 @@ fn providers_reach_the_accounts_settings() {
     );
 }
 #[test]
-fn no_providers_section_and_an_empty_one_name_none() {
-    assert_eq!(settings(fixtures::ENGINE_SMALL), accounts::Providers::none());
-    assert_eq!(settings(&with_providers(b"[]")), accounts::Providers::none());
+fn a_model_without_a_provider_is_refused_even_when_providers_is_omitted_or_empty() {
+    let omitted = fixtures::with(
+        fixtures::ENGINE_SMALL,
+        br#""providers": [{"name":"Fake","number":1,"models":["small"],"sources":{}}],"#,
+        b"",
+    );
+    for bytes in [omitted, with_providers(b"[]")] {
+        first_problem(
+            &bytes,
+            fixtures::path(&[b"llm", b"models"]).child(Segment::Index(0)).member(b"name"),
+            What::NoProvider,
+        );
+    }
+}
+#[test]
+fn no_models_need_no_providers() {
+    // Parse just the LLM value: the deployment's charter still requires its model.
+    for value in [br#"{"endpoints":[],"models":[]}"#.as_slice(), br#"{"providers":[],"endpoints":[],"models":[]}"#] {
+        let doc = fixtures::document(value);
+        let mut problems = crate::Problems::empty();
+        let llm = crate::llm::parse(
+            &doc,
+            0,
+            &Path::root(),
+            &fixtures::engine(fixtures::ENGINE_SMALL).unwrap().limits,
+            &crate::Directories::working(),
+            &mut problems,
+        );
+        assert!(llm.unwrap().providers.is_empty());
+        assert!(problems.problems.is_empty());
+    }
 }
 #[test]
 fn a_provider_may_offer_no_source() {

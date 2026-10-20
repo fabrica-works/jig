@@ -41,7 +41,6 @@ pub(super) fn key_failure(value: a::KeyFailure) -> c::OwnerAccountKeyFailure {
 }
 pub(super) fn refusal(value: a::Refusal) -> c::OwnerAccountRefusal {
     match value {
-        a::Refusal::Configured => c::OwnerAccountRefusal::Configured,
         a::Refusal::NotLimited => c::OwnerAccountRefusal::NotLimited,
         a::Refusal::Uses => c::OwnerAccountRefusal::Uses,
         a::Refusal::NotKept { why } => c::OwnerAccountRefusal::NotKept { why: self::key_failure(why) },

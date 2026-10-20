@@ -8,7 +8,6 @@ use skein_lib::{Duration, Env, List, Map, ReplyTo, Time, Token, Wall};
 fn model() -> core::Model {
     core::Model {
         dialect: 1,
-        account: 1,
         endpoint: 1,
         name: Box::from(b"scripted".as_slice()),
         window: 8192,

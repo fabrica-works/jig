@@ -1,8 +1,5 @@
 //! Startup file names and bounds; this crate performs no reads (configuration.md, 7).
-use crate::{
-    Engine, Path, Segment, Worker,
-    llm::{Source, Transport},
-};
+use crate::{Engine, Path, Segment, Worker, llm::Transport};
 use alloc::boxed::Box;
 use skein_lib::{List, bytes};
 #[derive(Debug)]
@@ -16,12 +13,8 @@ pub struct File {
 pub fn files(engine: &Engine) -> Box<[File]> {
     let max = engine
         .llm
-        .accounts
+        .providers
         .len()
-        .checked_mul(3)
-        .expect("bounded accounts")
-        .checked_add(engine.llm.providers.len())
-        .expect("bounded LLM providers")
         .checked_add(engine.llm.endpoints.len())
         .expect("bounded endpoints")
         .checked_add(engine.hosts.workers.len())
@@ -44,23 +37,6 @@ pub fn files(engine: &Engine) -> Box<[File]> {
             .member(b"endpoints")
             .child(Segment::Index(u32::try_from(index).expect("bounded endpoints")));
         trust(&mut files, &endpoint.transport, &at);
-    }
-    for (index, account) in engine.llm.accounts.iter().enumerate() {
-        let at = Path::root()
-            .member(b"llm")
-            .member(b"accounts")
-            .child(Segment::Index(u32::try_from(index).expect("bounded accounts")))
-            .member(b"source");
-        match &account.source {
-            Source::HandedIn { file } => push(&mut files, at.member(b"handed_in").member(b"file"), file, 65_536, true),
-            Source::SignIn(sign_in) => {
-                let at = at.member(b"sign_in");
-                if let Some(secret) = &sign_in.secret {
-                    push(&mut files, at.member(b"secret"), secret, engine.limits.token, true);
-                }
-                trust(&mut files, &sign_in.transport, &at);
-            }
-        }
     }
     for (index, provider) in engine.llm.providers.iter().enumerate() {
         if let Some(registration) = &provider.sign_in {

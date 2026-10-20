@@ -68,7 +68,6 @@ fn ready(none: bool) -> (Core, Limits) {
     same.name = b"same".as_slice().into();
     let mut other = scripted_model();
     other.name = b"other".as_slice().into();
-    other.account = 2;
     config.settings.models = Box::new([scripted_model(), same.clone(), other.clone()]);
     config.settings.charters[0].policy.alternatives = Box::new([same, other]);
     config.settings.llm_providers.providers[0].models =
@@ -223,7 +222,6 @@ fn unknown_program_login_facts_also_hold_a_direct_run_off_workers() {
     core.accounts = accounts::Domain::new(
         &limits.accounts,
         core.settings.llm_providers.clone(),
-        Box::new([accounts::Configured { number: 1, provider: Some(1) }]),
     );
     account(
         &mut core,

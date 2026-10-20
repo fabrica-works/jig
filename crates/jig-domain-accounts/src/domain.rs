@@ -1,6 +1,6 @@
 use crate::signing::UnderWay;
 use crate::{
-    Configured, Ended, Event, Fact, Failure, Form, FromComponent, Grant, Held, Holder, Kind, Limits, Pending,
+    Ended, Event, Fact, Failure, Form, FromComponent, Grant, Held, Holder, Kind, Limits, Pending,
     Providers, Request, Signing, State, Stored, ToComponent, Turned, Use,
 };
 use alloc::boxed::Box;
@@ -34,7 +34,7 @@ pub struct Account {
     pub(crate) plan: bool,
 }
 impl Account {
-    /// None only for a configured account whose model no configured provider serves (D1).
+    /// The numbered provider whose account was restored or admitted.
     #[must_use]
     pub const fn provider(&self) -> Option<u32> {
         self.provider
@@ -168,13 +168,12 @@ pub struct Domain {
     phase: Phase,
 }
 impl Domain {
-    /// Each configured account is the deployment's, with one signed-in source numbered as it
-    /// is, so that its grants keep their number; the counter starts past them.
+    /// Providers are configuration; accounts and sources are durable runtime records.
     #[must_use]
-    pub fn new(limits: &Limits, providers: Providers, configured: Box<[Configured]>) -> Domain {
+    pub fn new(limits: &Limits, providers: Providers) -> Domain {
         assert!(crate::worst_case(limits).is_some(), "account limits are valid");
         let sources = limits.accounts.checked_mul(limits.sources).expect("checked by the worst case");
-        let mut domain = Domain {
+        Domain {
             accounts: Map::with_capacity(limits.accounts),
             sources: Map::with_capacity(sources),
             next: 0,
@@ -193,30 +192,7 @@ impl Domain {
             unrestored: 0,
             now: Time::ZERO,
             phase: Phase::New,
-        };
-        for entry in &configured {
-            let mut places = Map::with_capacity(limits.sources);
-            assert!(places.insert(0, entry.number) == Ok(None), "a first place");
-            let account = Account {
-                provider: entry.provider,
-                holder: Holder::Deployment,
-                subject: Box::new([]),
-                display: Box::new([]),
-                sources: places,
-                place: domain.accounts.len(),
-                uses: None,
-                plan: false,
-            };
-            let fresh = match domain.accounts.insert(entry.number, account) {
-                Ok(old) => old.is_none(),
-                Err(_) => false,
-            };
-            assert!(fresh, "configured accounts fit and are distinct");
-            let source = Source::new(entry.number, Kind::SignIn, Box::new([]), limits);
-            assert!(domain.sources.insert(entry.number, source) == Ok(None), "configured sources fit");
-            domain.past(entry.number);
         }
-        domain
     }
     pub(crate) fn last_place(&self, holder: Holder) -> u32 {
         let mut next = 0;
@@ -541,7 +517,7 @@ fn want(domain: &mut Domain, env: &Env<Limits>, out: &mut Queue<Request>) {
     none_accounts(domain, env, out);
     domain.counted(out);
     for (number, source) in &domain.sources {
-        if (source.kind == Kind::SignIn || source.kind == Kind::Key) && source.account != *number {
+        if source.kind == Kind::SignIn || source.kind == Kind::Key {
             let account = domain.accounts.get(&source.account).expect("a source's account");
             out.push(Request::Signing(Signing::Restore {
                 source: *number,

@@ -51,8 +51,7 @@ struct Sources {
 /// The longest program name (accounts.md, 3.4).
 const PROGRAM: usize = 32;
 
-/// Read `providers`, absent for none. Once any provider is named, each configured model is in
-/// exactly one: a model in none is refused at its name.
+/// Every configured model belongs to exactly one provider, even when none are named.
 pub(super) fn parse(
     object: &mut read::Object,
     document: &Document,
@@ -63,6 +62,9 @@ pub(super) fn parse(
 ) -> List<Provider> {
     let mut providers = List::<Provider>::with_capacity(document.len());
     let Some(at) = object.member(document, b"providers") else {
+        for (index, _) in models.iter().enumerate() {
+            problems.push(check::index(&path.member(b"models"), index).member(b"name"), What::NoProvider);
+        }
         return providers;
     };
     let items = match read::list(document, at, document.len()) {
@@ -90,11 +92,9 @@ pub(super) fn parse(
             providers.push(value).expect("input count bounded");
         }
     }
-    if !items.is_empty() {
-        for (index, claimed) in claimed.iter().enumerate() {
-            if !claimed {
-                problems.push(check::index(&path.member(b"models"), index).member(b"name"), What::NoProvider);
-            }
+    for (index, claimed) in claimed.iter().enumerate() {
+        if !claimed {
+            problems.push(check::index(&path.member(b"models"), index).member(b"name"), What::NoProvider);
         }
     }
     providers

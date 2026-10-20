@@ -316,15 +316,6 @@ fn the_deployment_watch_shows_the_deployments_accounts_and_not_a_partys_own() {
 fn a_sources_form_reaches_the_fleet_as_the_component_named_it() {
     const SECOND_ANALYST: u32 = 2;
     let (mut config, limits) = jig_core_world::effects::fixture(166, false);
-    for model in &mut config.core.settings.models {
-        model.account = SECOND_ANALYST;
-    }
-    for charter in &mut config.core.settings.charters {
-        charter.policy.model.account = SECOND_ANALYST;
-        for model in &mut charter.policy.alternatives {
-            model.account = SECOND_ANALYST;
-        }
-    }
     let mut world = World::configured_unassigned(166, false, config, limits);
     world.announce_grant(SECOND_ANALYST, 1, accounts::Form::Credential(accounts::Scheme::Key));
     assert_eq!(
@@ -597,8 +588,6 @@ fn a_carried_llm_key_is_returned_unused_while_stopping() {
 fn own_key_run(seed: u64) -> (World, u32, u32) {
     const CONFIGURED_ACCOUNT: u32 = 99;
     let (mut config, limits) = signing_configuration(seed);
-    config.core.settings.models[0].account = CONFIGURED_ACCOUNT;
-    config.core.settings.charters[0].policy.model.account = CONFIGURED_ACCOUNT;
     let mut world = World::configured_unassigned(seed, false, config, limits);
     carry(&mut world, 40, llm_key(7), 1_u64 << 63, 7);
     let Some(people::Reply::Outcome(people::Outcome::AccountKeyKept { source })) = world.people_answers.last().cloned()

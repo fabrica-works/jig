@@ -57,8 +57,7 @@
           "name": "fake",
           "number": 1,
           "dialect": 0,
-          "account": 1,
-          "provider": "fake-provider",
+                    "provider": "fake-provider",
           "address": {
             "socket": "127.0.0.1:7101"
           },

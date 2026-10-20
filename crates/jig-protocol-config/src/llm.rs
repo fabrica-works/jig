@@ -1,4 +1,4 @@
-//! Engine endpoint, model and account values (llm.md, 4 and 5).
+//! Engine endpoint, model values (llm.md, 4 and 5).
 use crate::{Address, Directories, Directory, Limits, Path, Problems, Segment, What, check, read};
 use alloc::boxed::Box;
 use jig_domain_core::Model;
@@ -11,9 +11,8 @@ pub(crate) const MODELS: u32 = 64;
 pub struct Llm {
     pub endpoints: Box<[Endpoint]>,
     pub models: Box<[Model]>,
-    /// LLM providers, absent for none (configuration.md, 3).
+    /// Every model belongs to one numbered provider (configuration.md, 3).
     pub providers: Box<[Provider]>,
-    pub accounts: Box<[Account]>,
 }
 mod providers;
 pub use providers::{Provider, Registration};
@@ -22,7 +21,6 @@ pub struct Endpoint {
     pub name: Box<[u8]>,
     pub number: u32,
     pub dialect: u32,
-    pub account: u32,
     pub provider: Box<[u8]>,
     pub address: Address,
     pub transport: Transport,
@@ -40,37 +38,15 @@ pub enum Transport {
     Tls { server_name: Box<[u8]>, trust: Option<Box<[u8]>> },
     Plaintext,
 }
-#[derive(Debug)]
-pub struct Account {
-    pub number: u32,
-    pub source: Source,
-}
-#[derive(Debug)]
-pub enum Source {
-    SignIn(SignIn),
-    HandedIn { file: Box<[u8]> },
-}
-#[derive(Debug)]
-pub struct SignIn {
-    pub client: Box<[u8]>,
-    pub secret: Option<Box<[u8]>>,
-    pub authorization: Box<[u8]>,
-    pub token: Box<[u8]>,
-    pub endpoint: Address,
-    pub transport: Transport,
-    pub redirect: Box<[u8]>,
-    pub scope: Box<[u8]>,
-}
 pub(crate) fn parse(
     document: &Document,
     at: u32,
     path: &Path,
-    limits: &Limits,
+    _limits: &Limits,
     directories: &Directories,
     problems: &mut Problems,
 ) -> Option<Llm> {
     let mut object = check::object(document, at, path, problems)?;
-    let max = limits.core.accounts.accounts;
     let mut endpoints = List::<Endpoint>::with_capacity(document.len());
     if let Some(items) = check::list(&mut object, document, b"endpoints", document.len(), path, problems) {
         for (index, at) in items.iter().enumerate() {
@@ -87,39 +63,6 @@ pub(crate) fn parse(
                 }
                 endpoints.push(value).expect("input count bounded");
             }
-        }
-    }
-    let mut accounts = List::<Account>::with_capacity(max);
-    if let Some(items) = check::list(&mut object, document, b"accounts", max, path, problems) {
-        for (index, at) in items.iter().enumerate() {
-            let path =
-                path.member(b"accounts").child(Segment::Index(u32::try_from(index).expect("list bounded by u32")));
-            if let Some(value) = account(document, *at, &path, directories, problems) {
-                for previous in &accounts {
-                    if previous.number == value.number {
-                        problems.push(path.member(b"number"), What::Unique);
-                        break;
-                    }
-                }
-                accounts.push(value).expect("input count bounded");
-            }
-        }
-    }
-    for (index, endpoint) in endpoints.iter().enumerate() {
-        let mut found = false;
-        for account in &accounts {
-            if account.number == endpoint.account {
-                found = true;
-                break;
-            }
-        }
-        if !found {
-            problems.push(
-                path.member(b"endpoints")
-                    .child(Segment::Index(u32::try_from(index).expect("bounded")))
-                    .member(b"account"),
-                What::Refers,
-            );
         }
     }
     let mut models = List::<Model>::with_capacity(document.len());
@@ -139,12 +82,7 @@ pub(crate) fn parse(
     }
     let providers = providers::parse(&mut object, document, path, models.as_slice(), directories, problems);
     object.finish(document, path, problems);
-    Some(Llm {
-        endpoints: endpoints.into_boxed(),
-        models: models.into_boxed(),
-        providers: providers.into_boxed(),
-        accounts: accounts.into_boxed(),
-    })
+    Some(Llm { endpoints: endpoints.into_boxed(), models: models.into_boxed(), providers: providers.into_boxed() })
 }
 fn endpoint(
     document: &Document,
@@ -157,7 +95,6 @@ fn endpoint(
     let name = check::text(&mut object, document, b"name", path, problems);
     let number = check::count(&mut object, document, b"number", path, problems);
     let dialect = check::count(&mut object, document, b"dialect", path, problems);
-    let account = check::count(&mut object, document, b"account", path, problems);
     let provider = check::text(&mut object, document, b"provider", path, problems);
     let address = check::address(&mut object, document, b"address", path, problems);
     if let Some(address) = &address {
@@ -172,7 +109,6 @@ fn endpoint(
         name: name?,
         number: number?,
         dialect: dialect?,
-        account: account?,
         provider: provider?,
         address: address?,
         transport: transport?,
@@ -245,83 +181,6 @@ fn headers(object: &mut read::Object, document: &Document, path: &Path, problems
     }
     result
 }
-fn account(
-    document: &Document,
-    at: u32,
-    path: &Path,
-    directories: &Directories,
-    problems: &mut Problems,
-) -> Option<Account> {
-    let mut object = check::object(document, at, path, problems)?;
-    let number = check::count(&mut object, document, b"number", path, problems);
-    let mut parsed_source = None;
-    if let Some(at) = object.required(document, b"source", path, problems) {
-        parsed_source = source(document, at, &path.member(b"source"), directories, problems);
-    }
-    object.finish(document, path, problems);
-    Some(Account { number: number?, source: parsed_source? })
-}
-fn source(
-    document: &Document,
-    at: u32,
-    path: &Path,
-    directories: &Directories,
-    problems: &mut Problems,
-) -> Option<Source> {
-    let mut object = check::object(document, at, path, problems)?;
-    let handed = object.member(document, b"handed_in");
-    let signed = object.member(document, b"sign_in");
-    let mut result = None;
-    if handed.is_some() == signed.is_some() {
-        problems.push(path.clone(), What::Form);
-    } else if let Some(at) = handed {
-        let path = path.member(b"handed_in");
-        if let Some(mut object) = check::object(document, at, &path, problems) {
-            let file = check::path(&mut object, document, b"file", &path, Directory::Data, directories, problems);
-            object.finish(document, &path, problems);
-            if let Some(file) = file {
-                result = Some(Source::HandedIn { file });
-            }
-        }
-    } else if let Some(at) = signed
-        && let Some(value) = sign_in(document, at, &path.member(b"sign_in"), directories, problems)
-    {
-        result = Some(Source::SignIn(value));
-    }
-    object.finish(document, path, problems);
-    result
-}
-fn sign_in(
-    document: &Document,
-    at: u32,
-    path: &Path,
-    directories: &Directories,
-    problems: &mut Problems,
-) -> Option<SignIn> {
-    let mut object = check::object(document, at, path, problems)?;
-    let client = check::text(&mut object, document, b"client", path, problems);
-    let secret = check::optional_path(&mut object, document, b"secret", path, Directory::Data, directories, problems);
-    let authorization = check::text(&mut object, document, b"authorization", path, problems);
-    let token = check::text(&mut object, document, b"token", path, problems);
-    let endpoint = check::address(&mut object, document, b"endpoint", path, problems);
-    if let Some(address) = &endpoint {
-        network_address(address, &path.member(b"endpoint"), problems);
-    }
-    let transport = transport(&mut object, document, path, b"endpoint", endpoint.as_ref(), directories, problems);
-    let redirect = check::text(&mut object, document, b"redirect", path, problems);
-    let scope = check::text(&mut object, document, b"scope", path, problems);
-    object.finish(document, path, problems);
-    Some(SignIn {
-        client: client?,
-        secret,
-        authorization: authorization?,
-        token: token?,
-        endpoint: endpoint?,
-        transport: transport?,
-        redirect: redirect?,
-        scope: scope?,
-    })
-}
 fn model(document: &Document, at: u32, path: &Path, endpoints: &[Endpoint], problems: &mut Problems) -> Option<Model> {
     let mut object = check::object(document, at, path, problems)?;
     let mut name = None;
@@ -359,7 +218,6 @@ fn model(document: &Document, at: u32, path: &Path, endpoints: &[Endpoint], prob
     let mut model = prices?;
     model.name = name?;
     model.dialect = endpoint.dialect;
-    model.account = endpoint.account;
     model.endpoint = endpoint.number;
     model.window = window?;
     model.output = output?;
@@ -417,7 +275,6 @@ fn price(document: &Document, at: u32, path: &Path, problems: &mut Problems) -> 
     Some(Model {
         name: Box::default(),
         dialect: 0,
-        account: 0,
         endpoint: 0,
         window: 0,
         output: 0,

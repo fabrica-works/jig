@@ -27,5 +27,5 @@ pub use domain::{Account, Domain, fire, max_out, step};
 pub use keys::KEY_VALID;
 pub use limits::{Limits, worst_case};
 pub use providers::{Offers, Provider, Providers};
-pub use records::{Configured, DISPLAY, Held, Holder, Key, Kind, NAME, SUBJECT, Stored, USES, Use};
+pub use records::{DISPLAY, Held, Holder, Key, Kind, NAME, SUBJECT, Stored, USES, Use};
 pub use selection::{Coverage, Excluded, HostSource, Selection, WaitWhy};
