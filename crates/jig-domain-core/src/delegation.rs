@@ -128,6 +128,14 @@ impl Core {
         .answer
             == authority::Answer::Allow
     }
+    /// A delegate's models are its creator's, as a batch names none; a procedure's delegates take
+    /// those it keeps, though it names none itself (domain/authority.md, sections 3 and 5).
+    pub(crate) fn take_models(&self, task: u64, batch: &mut [Delegate]) {
+        let models = self.kept_models(task);
+        for member in batch {
+            member.authority.models = models;
+        }
+    }
     /// Check a named task delegation before any historical input load or connector handoff.
     pub fn delegate_preflight(&self, limits: &tasks::Limits, key: CallKey, batch: &[Delegate]) -> Result<(), CallPart> {
         if !self.current_proof(key.task, key.attempt) {

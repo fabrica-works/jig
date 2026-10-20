@@ -9,7 +9,7 @@
 )]
 use crate::{
     Amendment, Authority, Budget, Contract, Control, Delegation, Domain, EscalationDecision, EscalationHolder,
-    EscalationOutcome, Event, Executor, Funder, Hold, Key, Limits, MessageKind, New, Numbers, Parameter, Party,
+    EscalationOutcome, Event, Executor, Funder, Hold, Key, Limits, MessageKind, Models, New, Numbers, Parameter, Party,
     PersonAddress, Request, Retries, Retry, Revisions, Scopes, Spec, Stored, TaskResult, Tools, WakePolicy, max_out,
     step,
 };
@@ -70,6 +70,7 @@ pub(super) const LIMITS: Limits = Limits {
 fn authority() -> Authority {
     Authority {
         tools: Tools(0),
+        models: Models(0),
         grants: Box::new([]),
         delegation: Delegation { kinds: Box::new([]), tasks: 16, depth: 4 },
         budget: Budget { spend: 100, deadline: None },

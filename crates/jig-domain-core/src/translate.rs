@@ -71,8 +71,7 @@ pub(crate) fn authority_value(value: &tasks::Authority) -> authority::Authority 
     }
     authority::Authority {
         tools: authority::Tools(value.tools.0),
-        // A task keeps no models yet; an effect's needs name none either.
-        models: authority::Models::NONE,
+        models: authority::Models(value.models.0),
         grants: grants.into_boxed(),
         delegation: authority::Delegation {
             kinds: kinds.into_boxed(),
@@ -130,6 +129,7 @@ pub fn task_authority(value: &authority::Authority) -> tasks::Authority {
     }
     tasks::Authority {
         tools: tasks::Tools(value.tools.0),
+        models: tasks::Models(value.models.0),
         grants: grants.into_boxed(),
         delegation: tasks::Delegation {
             kinds: kinds.into_boxed(),

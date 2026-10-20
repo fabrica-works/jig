@@ -56,6 +56,7 @@ pub(super) fn delegate_validated(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
+    core.take_models(key.task, &mut batch);
     if let Err(why) = core.task_as_allowed(key.task, &mut batch) {
         return delegate_refused(core, to, key, None, why);
     }
@@ -274,6 +275,7 @@ pub(super) fn propose_batch(
     if batch.is_empty() || batch.len() > usize::try_from(env.limits.tasks.batch).expect("u32 fits usize") {
         return proposal_refused(core, to, key, tasks::Refusal::Batch);
     }
+    core.take_models(key.task, &mut batch);
     if let Err(why) = core.task_as_allowed(key.task, &mut batch) {
         return proposal_refused(core, to, key, why);
     }
@@ -387,6 +389,7 @@ pub(super) fn procedure_step(
         out.push(Request::Decided);
         return Requests::Out(out);
     }
+    core.take_models(task, &mut decision.batch);
     if let Err(why) = core.task_as_allowed(task, &mut decision.batch) {
         return super::procedure_steps::refused(core, task, step, super::procedure_steps::problem(task, why));
     }
@@ -607,8 +610,12 @@ pub(super) fn start_recurring(
     work: &mut Queue<Event>,
     project: u32,
     authority: tasks::Authority,
-    template: tasks::RecurringTemplate,
+    mut template: tasks::RecurringTemplate,
 ) {
+    // Its members are its delegates, so they take its models (domain/authority.md, section 5).
+    for member in &mut template.batch {
+        member.authority.models = authority.models;
+    }
     if !core.recurring_admit(project, &authority, &template) {
         return;
     }

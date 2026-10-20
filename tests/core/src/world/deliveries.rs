@@ -80,6 +80,7 @@ impl World {
                     Scenario::Goal | Scenario::Batch => {
                         let authority = tasks::Authority {
                             tools: tasks::Tools(0),
+                            models: tasks::Models::NONE,
                             grants: Box::new([]),
                             delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
                             budget: tasks::Budget { spend: 0, deadline: None },

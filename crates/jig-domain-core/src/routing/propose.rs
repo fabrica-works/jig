@@ -186,7 +186,7 @@ fn offer_amendment(
     value: Edit,
 ) -> Result<(), people::Refusal> {
     let Edit { request, person, project, role, task, revision, amendment, reason } = value;
-    let amendment = crate::amendments::translate(amendment, &env.limits.tasks)
+    let amendment = crate::amendments::translate(amendment, core.kept_models(task), &env.limits.tasks)
         .ok_or(people::Refusal::Limit { which: people::LimitKind::Words })?;
     match core.amend_admit(person, role, project, task, &amendment, env.limits.tasks.depth, &env.limits.tasks) {
         Ok(_) | Err(people::Refusal::Authority { proposable: Some(people::Accepter::Role(_)), .. }) => {}

@@ -278,6 +278,7 @@ pub(crate) fn named_propose(
     if let tasks::ProposalAction::Widen { task, .. } = &mut action {
         *task = key.task;
     }
+    core.keep_proposal_models(key.task, &mut action);
     if let tasks::ProposalAction::Amend { task, revision, amendment } = &action
         && let Err(jig_domain_people::Refusal::Moved { now }) = core.party_amend_revision(*task, *revision, amendment)
     {
@@ -573,7 +574,8 @@ pub(super) fn named_action(
         NamedAction::Control { target, control } => {
             return super::run_controls::control(core, work, ReplyTo::new(token), key, target, control);
         }
-        NamedAction::Amend { target, revision, amendment } => {
+        NamedAction::Amend { target, revision, mut amendment } => {
+            core.keep_models(target, &mut amendment);
             let stop_run =
                 match core.task_amend_admit(key.task, target, &amendment, env.limits.tasks.depth, &env.limits.tasks) {
                     Ok(stop_run) => stop_run,

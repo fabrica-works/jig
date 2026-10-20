@@ -132,9 +132,12 @@ pub fn task_writer() -> jig_domain_tasks::WriterSlot {
     }
 }
 pub fn task_authority() -> jig_domain_tasks::Authority {
-    use jig_domain_tasks::{Authority, AuthorityExecutor, Budget, Delegation, Grant, Last, Pattern, Scopes, Tools};
+    use jig_domain_tasks::{
+        Authority, AuthorityExecutor, Budget, Delegation, Grant, Last, Models, Pattern, Scopes, Tools,
+    };
     Authority {
         tools: Tools(u64::MAX),
+        models: Models(u64::MAX),
         grants: Box::new([
             Grant {
                 connector: 2,

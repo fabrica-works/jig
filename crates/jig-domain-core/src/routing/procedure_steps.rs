@@ -29,8 +29,10 @@ pub(super) fn parts(
     let mut amendments = List::with_capacity(env.limits.tasks.batch);
     let mut messages = List::with_capacity(env.limits.tasks.batch);
     for part in &step.amendments {
+        let mut amendment = part.amendment.clone();
+        core.keep_models(part.task, &mut amendment);
         let stop_run =
-            match core.task_amend_admit(task, part.task, &part.amendment, env.limits.tasks.depth, &env.limits.tasks) {
+            match core.task_amend_admit(task, part.task, &amendment, env.limits.tasks.depth, &env.limits.tasks) {
                 Ok(stop_run) => stop_run,
                 Err(crate::TaskAmendDenied::Refused { task, why }) => return Err(problem(task, why)),
                 Err(crate::TaskAmendDenied::Denied(answer)) => {
@@ -38,17 +40,14 @@ pub(super) fn parts(
                 }
             };
         if let Err(jig_domain_people::Refusal::Moved { now }) =
-            core.party_amend_revision(part.task, part.revision, &part.amendment)
+            core.party_amend_revision(part.task, part.revision, &amendment)
         {
             return Err(StepRefusal::Moved { task: part.task, now });
         }
         let Some(message) = crate::fresh(&mut core.counters, crate::Family::Message) else {
             return Err(problem(task, tasks::Refusal::Busy));
         };
-        if amendments
-            .push(tasks::ProcedureAmendment { task: part.task, message, stop_run, amendment: part.amendment.clone() })
-            .is_err()
-        {
+        if amendments.push(tasks::ProcedureAmendment { task: part.task, message, stop_run, amendment }).is_err() {
             return Err(problem(task, tasks::Refusal::Batch));
         }
     }
@@ -176,7 +175,9 @@ fn proposals(
     }
     let mut proposals = List::with_capacity(1);
     for action in actions {
-        match action {
+        let mut action = action.clone();
+        core.keep_proposal_models(task, &mut action);
+        match &action {
             tasks::ProposalAction::Batch(_)
             | tasks::ProposalAction::Amend { .. }
             | tasks::ProposalAction::Widen { .. } => {}
@@ -186,15 +187,15 @@ fn proposals(
                 return Err(problem(task, tasks::Refusal::Unproposable));
             }
         }
-        if let tasks::ProposalAction::Amend { amendment, .. } = action
+        if let tasks::ProposalAction::Amend { amendment, .. } = &action
             && (amendment.authority.is_none() || amendment.release.is_some())
         {
             return Err(problem(task, tasks::Refusal::AuthorityShape));
         }
-        if let Err(why) = core.proposal_admit_action(context.project, action, env.wall) {
+        if let Err(why) = core.proposal_admit_action(context.project, &action, env.wall) {
             return Err(problem(task, why));
         }
-        let Some(holder) = core.proposal_holder(&env.limits, task, action, None, env.wall) else {
+        let Some(holder) = core.proposal_holder(&env.limits, task, &action, None, env.wall) else {
             return Err(problem(task, tasks::Refusal::Reference));
         };
         if !crate::acts::bounds::proposal_has_recipient(core, holder) {
@@ -208,7 +209,7 @@ fn proposals(
                 number,
                 proposer: task,
                 project: context.project,
-                action: action.clone(),
+                action,
                 reason: Box::new([]),
                 as_holder: false,
                 state: tasks::ProposalState::Pending { holder, since: env.wall },

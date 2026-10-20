@@ -77,7 +77,7 @@ pub(super) fn checked(
             .push(authority::Delegate {
                 executor,
                 authority: super::deadlines::authority(
-                    &crate::amendments::granted(member.authority.clone(), &env.limits.tasks)
+                    &crate::amendments::granted(member.authority.clone(), new.authority.models, &env.limits.tasks)
                         .expect("member authority checked"),
                     new.deadline,
                     env.wall,
@@ -148,9 +148,10 @@ fn new_task(
     first: u64,
     at: u32,
 ) -> Result<tasks::New, people::Refusal> {
-    let Creation { person, project, batch, .. } = creation;
+    let Creation { person, project, role, batch, .. } = creation;
     let executor = executor(core, member.executor)?;
-    let Some(given) = crate::amendments::granted(member.authority.clone(), &env.limits.tasks) else {
+    let models = given_models(core, *project, *role);
+    let Some(given) = crate::amendments::granted(member.authority.clone(), models, &env.limits.tasks) else {
         return Err(people::Refusal::Limit { which: people::LimitKind::Authority });
     };
     let spec = crate::amendments::spec(
@@ -319,10 +320,19 @@ fn executor(core: &Core, executor: people::TaskExecutor) -> Result<tasks::Execut
         }),
     })
 }
+/// The models a party's created task takes: its creator's role's in the project, whatever runs it
+/// (domain/authority.md, sections 3 and 6). A procedure keeps them too, though it names no model,
+/// so that its agent delegates may: as with tools, only the goal judge empties a procedure's.
+fn given_models(core: &Core, project: u32, role: people::Role) -> tasks::Models {
+    match core.authority.models(project, role.number()) {
+        Some(models) => tasks::Models(models.0),
+        None => tasks::Models::NONE,
+    }
+}
 fn named(member: &people::Member, env: &Env<Limits>) -> Result<Box<[tasks::Grant]>, people::Refusal> {
     let mut authority = member.authority.clone();
     authority.grants.clone_from(&member.named);
-    match crate::amendments::granted(authority, &env.limits.tasks) {
+    match crate::amendments::granted(authority, tasks::Models::NONE, &env.limits.tasks) {
         Some(value) => Ok(value.grants),
         None => Err(people::Refusal::Limit { which: people::LimitKind::Authority }),
     }

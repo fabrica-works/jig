@@ -15,6 +15,8 @@ use skein_lib::Wall;
 pub struct Authority {
     /// Configured permitted tool-family bits; no tool is served by tasks.
     pub tools: Tools,
+    /// Configured models the task's LLM choice may name (domain/authority.md, section 3).
+    pub models: Models,
     /// Owned resource grants, bounded by `Limits::authority_grants` and the aggregate authority-
     /// byte limit.
     pub grants: Box<[Grant]>,
@@ -32,6 +34,17 @@ pub struct Authority {
 /// (domain/tasks.md, sections 2–3). (domain/authority.md, sections 3–7).
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Tools(/** Up to 64 configured family bits; tasks assigns no family meanings. */ pub u64);
+
+/// Configured-model bit set carried with a task, in configuration's order: bit `i` is the `i`th
+/// configured model (domain/tasks.md, section 3; domain/authority.md, section 3).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct Models(/** Up to 64 configured model bits. */ pub u64);
+
+impl Models {
+    /// No model: a goal judge's authority, and the placeholder a sender fills where the core sets
+    /// the models from the creator (domain/authority.md, section 3).
+    pub const NONE: Models = Models(0);
+}
 
 /// Task-relative note-scope bits carried as semantic data; the authority child checks scope
 /// permission through the root. (domain/tasks.md, sections 2–3). (domain/authority.md,

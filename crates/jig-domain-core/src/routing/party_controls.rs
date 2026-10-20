@@ -22,7 +22,7 @@ pub(super) fn amend_route(
     amendment: people::Amendment,
     release: Option<u64>,
 ) {
-    let Some(mut amendment) = crate::amendments::translate(amendment, &env.limits.tasks) else {
+    let Some(mut amendment) = crate::amendments::translate(amendment, core.kept_models(task), &env.limits.tasks) else {
         pool_refused(work, request, people::Refusal::Limit { which: people::LimitKind::Words });
         return;
     };

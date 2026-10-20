@@ -574,7 +574,7 @@ pub fn read_pattern(value: wire::Pattern) -> domain::Pattern {
 /// Translate authority, checking bytes shared by grants and note resources.
 pub fn authority(value: &domain::Authority, limits: &wire::Limits) -> Result<wire::Authority, wire::Problem> {
     check_authority(value, limits)?;
-    let domain::Authority { tools, grants, delegation, budget, notes, note_resources } = value;
+    let domain::Authority { tools, models, grants, delegation, budget, notes, note_resources } = value;
     let mut translated_grants = List::with_capacity(limits.authority_grants);
     for grant in grants {
         let domain::Grant { connector, kind, pattern: value } = grant;
@@ -610,6 +610,7 @@ pub fn authority(value: &domain::Authority, limits: &wire::Limits) -> Result<wir
         limits,
         wire::AuthorityParts {
             tools: wire::Tools::new(limits, wire::ToolsParts { bits: tools.0 })?,
+            models: wire::Models::new(limits, wire::ModelsParts { bits: models.0 })?,
             grants: translated_grants,
             delegation: wire::Delegation::new(
                 limits,
@@ -623,7 +624,7 @@ pub fn authority(value: &domain::Authority, limits: &wire::Limits) -> Result<wir
 }
 /// Read authority, checking bytes shared by grants and note resources.
 pub fn read_authority(value: wire::Authority, limits: &wire::Limits) -> Result<domain::Authority, wire::Problem> {
-    let wire::AuthorityParts { tools, grants, delegation, budget, notes, note_resources } = value.into_parts();
+    let wire::AuthorityParts { tools, models, grants, delegation, budget, notes, note_resources } = value.into_parts();
     let mut translated_grants = List::with_capacity(grants.len());
     for grant in grants.into_boxed() {
         let wire::GrantParts { connector, kind, pattern } = grant.into_parts();
@@ -646,6 +647,7 @@ pub fn read_authority(value: wire::Authority, limits: &wire::Limits) -> Result<d
     let wire::BudgetParts { spend, deadline } = budget.into_parts();
     let value = domain::Authority {
         tools: domain::Tools(tools.into_parts().bits),
+        models: domain::Models(models.into_parts().bits),
         grants: translated_grants.into_boxed(),
         delegation: domain::Delegation { kinds: executors.into_boxed(), tasks, depth },
         budget: domain::Budget { spend, deadline: read_wall(deadline) },

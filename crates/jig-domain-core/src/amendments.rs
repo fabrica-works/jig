@@ -8,6 +8,43 @@ use skein_lib::List;
 use crate::{Core, translate};
 
 impl Core {
+    /// The models a task keeps through an amendment of its authority, which names none; none for
+    /// an unknown task, which the amendment's admission refuses (domain/authority.md, section 3).
+    #[must_use]
+    pub(crate) fn kept_models(&self, task: u64) -> tasks::Models {
+        match self.tasks.task(task) {
+            Some(row) => row.authority.models,
+            None => tasks::Models::NONE,
+        }
+    }
+
+    /// A task-origin amendment's authority keeps its target's models, as it names none
+    /// (domain/authority.md, section 3).
+    pub(crate) fn keep_models(&self, target: u64, amendment: &mut tasks::Amendment) {
+        if let Some(authority) = &mut amendment.authority {
+            authority.models = self.kept_models(target);
+        }
+    }
+
+    /// A proposed action keeps the models its proposer names none of: a batch's members take the
+    /// proposer's, an amendment or a widening keeps its task's, and an effect's needs name none
+    /// (domain/authority.md, sections 3 and 5).
+    pub(crate) fn keep_proposal_models(&self, proposer: u64, action: &mut tasks::ProposalAction) {
+        match action {
+            tasks::ProposalAction::Batch(batch) => {
+                let models = self.kept_models(proposer);
+                for member in batch.iter_mut() {
+                    member.authority.models = models;
+                }
+            }
+            tasks::ProposalAction::Amend { task, amendment, .. } => self.keep_models(*task, amendment),
+            tasks::ProposalAction::Widen { task, authority } => authority.models = self.kept_models(*task),
+            tasks::ProposalAction::Effect { .. }
+            | tasks::ProposalAction::ProcedureEffect { .. }
+            | tasks::ProposalAction::Release { .. } => {}
+        }
+    }
+
     /// Admit a task-origin amendment, including ancestry and widening.
     pub fn task_amend_admit(
         &self,
@@ -181,7 +218,14 @@ pub(crate) fn spec(value: people::Spec, limits: &tasks::Limits) -> Option<tasks:
     Some(tasks::Spec { words: value.words, parameters: parameters.into_boxed(), inputs: value.inputs })
 }
 
-pub(crate) fn granted(value: people::Authority, limits: &tasks::Limits) -> Option<tasks::Authority> {
+/// A party's given authority in the task vocabulary, with the models the task takes: a party names
+/// none, so a created task takes its creator's role's and an amended one keeps its own
+/// (domain/authority.md, sections 3 and 6).
+pub(crate) fn granted(
+    value: people::Authority,
+    models: tasks::Models,
+    limits: &tasks::Limits,
+) -> Option<tasks::Authority> {
     let mut grants = List::with_capacity(limits.authority_grants);
     for grant in value.grants {
         let mut segments = List::with_capacity(limits.authority_segments);
@@ -229,6 +273,7 @@ pub(crate) fn granted(value: people::Authority, limits: &tasks::Limits) -> Optio
     }
     Some(tasks::Authority {
         tools: tasks::Tools(value.tools),
+        models,
         grants: grants.into_boxed(),
         delegation: tasks::Delegation {
             kinds: kinds.into_boxed(),
@@ -241,8 +286,13 @@ pub(crate) fn granted(value: people::Authority, limits: &tasks::Limits) -> Optio
     })
 }
 
+/// A party's amendment in the task vocabulary; a changed authority keeps the task's `models`.
 #[expect(clippy::manual_map, reason = "the step subset spells out both option cases without a closure")]
-pub(crate) fn translate(value: people::Amendment, limits: &tasks::Limits) -> Option<tasks::Amendment> {
+pub(crate) fn translate(
+    value: people::Amendment,
+    models: tasks::Models,
+    limits: &tasks::Limits,
+) -> Option<tasks::Amendment> {
     Some(tasks::Amendment {
         tracked: match value.tracked {
             Some(people::Tracking::Tracked { priority }) => Some(tasks::Tracking::Tracked { priority }),
@@ -271,7 +321,7 @@ pub(crate) fn translate(value: people::Amendment, limits: &tasks::Limits) -> Opt
         },
         dependencies: value.dependencies,
         authority: match value.authority {
-            Some(authority) => Some(granted(authority, limits)?),
+            Some(authority) => Some(granted(authority, models, limits)?),
             None => None,
         },
         reason: value.reason,

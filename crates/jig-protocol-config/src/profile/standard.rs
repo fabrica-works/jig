@@ -163,14 +163,14 @@ const JOURNAL: skein_lib::JournalLimits =
     skein_lib::JournalLimits { commits: 3, writes: 142_684, held: 428_052, now: 1024, release: 1024 };
 // Same 19.s3 composition as small; the standard domain supplies the larger value and operation bounds.
 const STORE_KV: skein_kv::Limits = skein_kv::Limits {
-    value: 10_396_559,
+    value: 10_396_759,
     ops: 285_370,
     commit: 864_288_042,
     queued_bytes: 2_592_864_126,
     segment: 1_728_576_084,
     snapshot_after: 864_288_042,
-    chunk: 10_398_658,
-    page: skein_kv::Page { rows: 2, bytes: 10_398_638 },
+    chunk: 10_398_858,
+    page: skein_kv::Page { rows: 2, bytes: 10_398_838 },
     ..small::STORE_KV
 };
 const STORE: jig_protocol_store::Limits = jig_protocol_store::Limits {

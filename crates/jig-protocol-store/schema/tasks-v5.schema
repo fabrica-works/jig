@@ -31,6 +31,7 @@ record Choices { choices: list 64 Verdict }
 record ChangeContract { connector: u16 kind: u16 words: u32 }
 enum Contract { approval: Approval, report: Report, verdict: Choices, change: ChangeContract }
 record Tools { bits: u64 }
+record Models { bits: u64 }
 record Scopes { bits: u8 }
 record AuthoritySegment { bytes: bytes 4096 }
 enum Last { exact: AuthoritySegment, open: AuthoritySegment }
@@ -44,6 +45,7 @@ record Delegation { kinds: list 64 AuthorityExecutor tasks: u32 depth: u32 }
 record Budget { spend: u64 deadline: option u64 }
 record Authority {
     tools: Tools
+    models: Models
     grants: list 64 Grant
     delegation: Delegation
     budget: Budget

@@ -6,7 +6,7 @@ use crate::stories::{ChildResult, Restart, RetryEnd, Story, TurnState};
 use crate::trace::Trace;
 use jig_domain_tasks::{
     self as tasks, Accepted, Authority, Budget, Cause, Contract, Delegation, Domain, End, Ending, Event, Executor,
-    Fact, Funder, Key, Limits, MessageKind, New, Numbers, Party, Problem, Request, ResultKind, Retries, Retry,
+    Fact, Funder, Key, Limits, MessageKind, Models, New, Numbers, Party, Problem, Request, ResultKind, Retries, Retry,
     RunContext, Scopes, Spec, Stored, TaskResult, Tools, Word,
 };
 use skein_lib::{Duration, Env, Queue, ReplyTo, Rng, Time, Token, Wall};
@@ -63,6 +63,7 @@ pub const LIMITS: Limits = Limits {
 pub fn authority() -> Authority {
     Authority {
         tools: Tools(0),
+        models: Models(0),
         grants: Box::new([]),
         delegation: Delegation { kinds: Box::new([]), tasks: 16, depth: 4 },
         budget: Budget { spend: 100, deadline: None },

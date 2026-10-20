@@ -265,6 +265,8 @@ pub(crate) fn authority(value: &Value) -> Result<tasks::Authority, Problem> {
     };
     Ok(tasks::Authority {
         tools,
+        // A delegate names no models: the core gives it its creator's (domain/authority.md, 3).
+        models: tasks::Models::NONE,
         grants,
         delegation: tasks::Delegation {
             kinds: permitted.into_boxed(),

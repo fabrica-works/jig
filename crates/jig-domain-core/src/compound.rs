@@ -177,7 +177,7 @@ fn check(
         people::Operation::Amend { revision, amendment, release, .. } => {
             crate::acts::bounds::amend_preflight_in(core, &env.limits, route.person, task, route.role, admission)?;
             crate::acts::mutable_phase(&row.phase)?;
-            let mut amendment = crate::amendments::translate(*amendment, &env.limits.tasks)
+            let mut amendment = crate::amendments::translate(*amendment, row.authority.models, &env.limits.tasks)
                 .ok_or(people::Refusal::Limit { which: people::LimitKind::Words })?;
             let stop_run = crate::acts::bounds::amendment_admit_in(
                 core,

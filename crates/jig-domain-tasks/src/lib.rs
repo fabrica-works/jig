@@ -146,8 +146,8 @@ pub use proposals::{
 };
 pub use runtime::RetryNotice;
 pub use value::{
-    Authority, AuthorityExecutor, Budget, Delegation, Funder, Grant, Last, Numbers, Pattern, ResourceScope, Scopes,
-    Tools,
+    Authority, AuthorityExecutor, Budget, Delegation, Funder, Grant, Last, Models, Numbers, Pattern, ResourceScope,
+    Scopes, Tools,
 };
 
 pub use run::run_attempt;

@@ -296,6 +296,7 @@ pub fn task_authority(spend: u64) -> tasks::Authority {
     let value = authority(spend, false);
     tasks::Authority {
         tools: tasks::Tools(value.tools.0),
+        models: tasks::Models(value.models.0),
         grants: value
             .grants
             .into_iter()

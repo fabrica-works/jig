@@ -391,6 +391,7 @@ pub fn assignment(config: &jig_protocol_config::Engine) -> jig_test_domain::Assi
             contract: jig_domain_tasks::Contract::Report { words: 64 },
             authority: jig_domain_tasks::Authority {
                 tools: jig_domain_tasks::Tools(1023),
+                models: jig_domain_tasks::Models(1),
                 grants: Box::default(),
                 delegation: jig_domain_tasks::Delegation { kinds: Box::default(), tasks: 0, depth: 0 },
                 budget: jig_domain_tasks::Budget { spend: 20, deadline: None },

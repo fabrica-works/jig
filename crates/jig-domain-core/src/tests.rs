@@ -2999,6 +2999,7 @@ mod read_activity;
 mod own_watches;
 
 mod goal_of;
+mod kept_models;
 mod task_query;
 
 mod brief_revisions;

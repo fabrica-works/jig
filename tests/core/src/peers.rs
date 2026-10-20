@@ -427,6 +427,7 @@ fn role_number(role: parties::Role) -> u32 {
 fn authority(budget: u64, agent: bool) -> tasks::Authority {
     tasks::Authority {
         tools: tasks::Tools(if agent { 1023 } else { 0 }),
+        models: tasks::Models::NONE,
         grants: Box::new([]),
         delegation: tasks::Delegation { kinds: Box::new([]), tasks: 0, depth: 0 },
         budget: tasks::Budget { spend: budget, deadline: None },
