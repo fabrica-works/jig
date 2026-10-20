@@ -155,7 +155,12 @@ fn link_notice(worker: &mut Worker) -> Option<host::LinkUp> {
 
 #[test]
 fn each_account_notice_reaches_the_link_as_its_own_notice() {
-    let grant = smith::Grant { account: 0, generation: 1, valid: skein_lib::Duration::from_secs(60) };
+    let grant = smith::Grant {
+        account: 0,
+        generation: 1,
+        valid: skein_lib::Duration::from_secs(60),
+        form: smith::Form::Credential(smith::Scheme::Bearer),
+    };
     let (run, attempt) = (fixtures::RUN, fixtures::ATTEMPT);
     let reset = Some(skein_lib::Duration::from_secs(30));
     let (code, reason) = (Box::<[u8]>::from(&b"forbidden"[..]), Box::<[u8]>::from(&b"suspended"[..]));

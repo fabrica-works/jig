@@ -86,6 +86,17 @@ impl Host for Process {
 }
 fn issuer(story: Story) -> Process {
     let profile = fixtures::limits();
+    let limits = fake::Limits {
+        document: profile.client.document,
+        uri_bytes: 256,
+        request_bytes: 1024,
+        codes: 1,
+        rotations: 2,
+        // The registration's one parameter, `ext_agent_host_id`.
+        carried: 1,
+        plans: 2,
+    };
+    let response = peer::least_response(&limits).expect("issuer response bound");
     let mut peer = peer::Peer::new(
         (Ipv4Addr::LOCALHOST, 31000).into(),
         Transport::Plaintext,
@@ -107,24 +118,8 @@ fn issuer(story: Story) -> Process {
             redirect_uri: bytes::copy_of(fixtures::REDIRECT),
             refresh_token: bytes::copy_of(b"seed"),
         },
-        fake::Limits {
-            document: profile.client.document,
-            uri_bytes: 256,
-            request_bytes: 1024,
-            codes: 1,
-            rotations: 2,
-            // The registration's one parameter, `ext_agent_host_id`.
-            carried: 1,
-            plans: 2,
-        },
-        skein_http::server::Limits {
-            // skein-fake-peers' issuer response bounds the redirect URL,
-            // six escaped strings, and 267 bytes of framing.
-            response: profile.client.uri_bytes
-                + profile.client.document.string_bytes * fixtures::ISSUER_ESCAPED_STRINGS
-                + fixtures::ISSUER_REDIRECT_FRAMING_BYTES,
-            ..profile.server
-        },
+        limits,
+        skein_http::server::Limits { response, ..profile.server },
     )
     .expect("issuer");
     for plan in fixtures::issuer_plans(story) {

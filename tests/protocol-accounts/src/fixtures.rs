@@ -4,9 +4,6 @@ use skein_io as io;
 use skein_lib::{Duration, Wall, bytes};
 use skein_oauth as oauth;
 use skein_oauth_accounts as accounts;
-// skein-fake-peers' OAuth response bound: six escaped strings and redirect framing.
-pub const ISSUER_ESCAPED_STRINGS: u32 = 6;
-pub const ISSUER_REDIRECT_FRAMING_BYTES: u32 = 267;
 pub const ACCOUNT_CHAT: u32 = 0;
 pub const ROOM: u32 = 64;
 pub const TOKEN_FIRST: &[u8] = b"access-first";

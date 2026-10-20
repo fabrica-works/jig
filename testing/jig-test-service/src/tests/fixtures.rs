@@ -579,11 +579,11 @@ pub fn concrete_turn() -> smith_host_domain::Turn {
         endpoint: Some(llm::Endpoint(1)),
         dialect: 1,
         sequence: 1,
-        kind: record::Kind::First {
+        kind: record::Kind::First(Box::new(record::Opener {
             affinity: llm::Affinity { key: [3; 16], thread: 1 },
             account: Some(1),
             backend: record::Backend::Direct,
-        },
+        })),
         usage: llm::Usage {
             input_tokens: Some(1),
             output_tokens: Some(1),

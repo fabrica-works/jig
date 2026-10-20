@@ -399,10 +399,14 @@ impl Worker {
         }
         self.io.push(request);
     }
-    fn process_send(&mut self, owner: Token, message: smith::Down) {
-        let values = match &message {
-            smith::Down::Start { start, .. } => start_values(&self.values, &start.grants, self.env.now),
-            smith::Down::Grant { grant } => grant_value(&self.values, *grant, self.env.now),
+    fn process_send(&mut self, owner: Token, mut message: smith::Down) {
+        // interim: removed by g2-grant-form (the domain's grant names its form).
+        // The test worker's grants carry a placeholder form, and smith's protocol
+        // refuses a grant unlike its value, so each grant here takes the form of
+        // the table's value it hands over (`account`).
+        let values = match &mut message {
+            smith::Down::Start { start, .. } => start_values(&self.values, &mut start.grants, self.env.now),
+            smith::Down::Grant { grant } => grant_value(&self.values, grant, self.env.now),
             smith::Down::Message { .. }
             | smith::Down::Answer { .. }
             | smith::Down::Acknowledge { .. }
@@ -607,13 +611,19 @@ fn worker_prefix(index: u64) -> Option<u64> {
     }
     (3_u64 << 60).checked_add(index.checked_shl(48)?)
 }
-fn grant_value(table: &Table, grant: smith::Grant, now: Time) -> Option<host::Values> {
+fn grant_value(table: &Table, grant: &mut smith::Grant, now: Time) -> Option<host::Values> {
     let value = account(table, grant, now)?;
     Some(host::Values { paths: Box::default(), credentials: Box::new([value]) })
 }
-fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
+fn account(table: &Table, grant: &mut smith::Grant, now: Time) -> Option<smith_protocol_channel::GrantValue> {
     let value = table.value(grant.account, grant.generation, now)?;
     let token = value.token.expose().into();
+    // interim: removed by g2-grant-form (the domain's grant names its form).
+    grant.form = match &value.scheme {
+        Scheme::Bearer => smith::Form::Credential(smith::Scheme::Bearer),
+        Scheme::Key => smith::Form::Credential(smith::Scheme::Key),
+        Scheme::Withdrawn { .. } => smith::Form::Withdrawn,
+    };
     Some(match &value.scheme {
         Scheme::Bearer => smith_protocol_channel::GrantValue::Bearer(token),
         Scheme::Key => smith_protocol_channel::GrantValue::Key(token),
@@ -622,10 +632,10 @@ fn account(table: &Table, grant: smith::Grant, now: Time) -> Option<smith_protoc
         }
     })
 }
-fn start_values(table: &Table, grants: &[smith::Grant], now: Time) -> Option<host::Values> {
+fn start_values(table: &Table, grants: &mut [smith::Grant], now: Time) -> Option<host::Values> {
     let mut values = List::with_capacity(u32::try_from(grants.len()).ok()?);
     for grant in grants {
-        values.push(account(table, *grant, now)?).ok()?;
+        values.push(account(table, grant, now)?).ok()?;
     }
     Some(host::Values { paths: Box::default(), credentials: values.into_boxed() })
 }
