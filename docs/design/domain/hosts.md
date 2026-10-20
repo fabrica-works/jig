@@ -123,10 +123,10 @@ Between the core's fleet and a host, whatever its shape:
     message it read (the unread fence, section 9), the messages refused
     since its last turn, what it left on resources (the application's
     part), and how its save went;
-  - **notices,** relayed from the run's agent: a source *limited*, until
-    a time where its LLM provider gave one, or *refused*, and a
-    generation *unauthorized* (accounts.md, 3.5; smith's
-    `protocol/channel.md`, section 4);
+  - **notices,** relayed from the run's agent: a source *limited*,
+    with how long until its limit resets where its LLM provider gave
+    that, or *refused*, and a generation *unauthorized* (accounts.md,
+    3.5; smith's `protocol/channel.md`, section 4);
   - **logins,** from a worker, after its hello: the state of each
     program source's login on it, as the check of the sources the engine
     sent answered (the fleet places no run on the worker until the

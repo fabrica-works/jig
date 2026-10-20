@@ -129,10 +129,11 @@ translates between them with small total functions.
 - **from hosts:** a host's hello with its slots, what it hosts and its
   agent's bounds; turns, with the messages a run refused, calls, answers
   and facts of runs; notices relayed from a run's agent, a source
-  limited (until a time, where its LLM provider gives one) or refused, or
-  a generation unauthorized (accounts.md, 3.5); each program source's
-  login on a worker, which follows its hello and which its half checks
-  (section 8); a host lost or back;
+  limited (with how long until its limit resets, where its LLM provider
+  gives that, which the core makes a time on its clock as it hears it)
+  or refused, or a generation unauthorized (accounts.md, 3.5); each
+  program source's login on a worker, which follows its hello and which
+  its half checks (section 8); a host lost or back;
 - **from parties:** sign-ins and their ends, a credential to mint for an
   identity the application's server verified (people.md, section 3);
   keyed requests, each one operation or a compound request of several

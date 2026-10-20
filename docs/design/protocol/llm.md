@@ -203,10 +203,11 @@ engine's protocol layer
   no client secret.
 - **Sources come and go while it runs.** A sign-in adds an account to
   the driver, within its limit; a sign-out or a removal takes one out
-  (skein's `oauth.md`, 6.2). Every signed-in source is wanted from the
-  restart's first step to the close, so the driver refreshes each before
-  it lapses whether or not a run holds it, and an idle source keeps its
-  refresh token (`../domain/providers.md`, 2.3).
+  (skein's `oauth.md`, 6.2). Every signed-in source is wanted once the
+  restart has restored the core's records (`../domain/engine.md`,
+  section 6, item 1), and until the close, so the driver refreshes each
+  before it lapses whether or not a run holds it, and an idle source
+  keeps its refresh token (`../domain/providers.md`, 2.3).
 - **What it does, and jig does not:** sign-in, with its loopback
   redirect and the ID token's checks; one exchange per account at a time;
   a held account refreshed its refresh lead before expiry, each new

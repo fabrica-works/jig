@@ -156,7 +156,7 @@ The first byte of every key names its owner:
 | Tag | Owner | Then |
 |---|---|---|
 | 0 | the component's own rows | its family: the format row (5.3), transcripts' places (8.1) |
-| 1 | jig | the child's tag, in the order of the core's key: the core's own, then each child's; then the family's key |
+| 1 | jig | the child's tag, in the order of the core's key: the core's own, then each child's; then the family's key; and one row of the component's, the installation's identifier, after the accounts child's rows (4.4) |
 | 2 | the application | its own key bytes, which it encodes by the same rule, so that bytes sort as its keys do |
 
 - **The application's bytes stay under its tag.** The component prefixes
@@ -190,6 +190,7 @@ child puts live first.
 | Owner | Family | Key | Loaded |
 |---|---|---|---|
 | component | the format row | none: one row | at open |
+| component | the installation's identifier, in the accounts' family after the child's rows (01 04 03): drawn by the shell at each start (`configuration.md`, section 8) and kept by the store's first commit, beside the format row (5.3), so that each later start's draw is ignored | none: one row | at open, handed up as the store opens, never by the restart's ranges (7.2) |
 | component | transcripts' places: each task's committed length and its current window's start; each attempt's first turn | task; task, attempt | at open, the run proofs' tasks' lengths (8.4); the rest when read |
 | core | the deployment: its id, its numbers, the last commit | none: one row | at start |
 | core | goals' projections (feed, plan rows, pending milestones), run proofs, calls committed since a live task's last turn, live agent tasks' conversations (their first attempt, their current window's start) | a goal's, then its own; task; task, attempt, completion, position; task | at start |
@@ -198,7 +199,7 @@ child puts live first.
 | tasks | ended tasks, past periods, decided proposals, history, milestones, activity | task, then a position or revision; funder, period; proposal | on demand |
 | people | parties, sign-ins (no secret), roles, projects' policies (their overrides of templates among them), read positions over results and over live conversations, answered keys within the retention | as the people child keys them; a live conversation's position by party, then task | at start |
 | people | ended conversations' read positions (7.4) | task, then party | at start, by the census, every row (7.2); otherwise on demand |
-| accounts | LLM accounts: each one's holder, LLM provider, subject and display name, its sources in their holder's order (each with its kind, its name for a program's, and its state, but not per host) and its uses; the installation's identifier, drawn at the first start (`configuration.md`, section 8) | account; account, source; none: one row | at start |
+| accounts | the next number the accounts child gives, below which it gives none again; LLM accounts: each one's holder, LLM provider, subject and display name, and its uses; their sources, each at its place in its holder's order, with its kind, its name for a program's, and its hold: limited, with its reset as a wall time where it has one, or refused. The rest of a source's state is heard again at each start, and none is kept per host (`../domain/accounts.md`, 3.5) | none: one row; account; account, source | at start |
 | notes | entries, and an index line per entry per scope | name; scope, name | when a scope is in use; entries on demand |
 | tasks | the results' index, the inbox's census's (7.2): a row per result of a task a party requested, at its position among that party's results, past the tasks child's live families | party, position | at start, by the census, past each party's read position over results |
 | tasks, people | indexes for parties' reads (7.4): each party's inbox by time; ended tasks by requester party and by project; ended delegates; a subtree's delegates | the index's own, newest first where it reads so: an ended index's by party or project, then label, ended at reversed and task | on demand |
@@ -260,12 +261,16 @@ secrets' store (section 9).
 
 - **What it records:** the version of the component's format (its keys'
   encoding, its frames, its own rows), the version of each of jig's
-  families, the application's store version, and the deployment's id.
+  families (the accounts' among them), the application's store version,
+  and the deployment's id.
 - **Written in the first commit,** with the deployment's header, by the
-  component.
+  component, and the installation's identifier with it (4.4), so that a
+  crash keeps both rows or neither, and the identifier is durable before
+  any sign-in sends it.
 - **Checked at open:** a store whose row names another version of
   anything, or another deployment than its header, refuses to open,
-  saying which. Pre-release, nothing is translated (`README.md`,
+  saying which; so does one whose installation's identifier is missing
+  or unreadable. Pre-release, nothing is translated (`README.md`,
   section 7).
 
 ### 5.4 Sizes
@@ -359,11 +364,15 @@ The core's restart script (`../domain/engine.md`, section 6) asks the
 root for one step at a time, and the root asks the store:
 
 - **the core's live ranges,** in the order the core restores them: the
-  deployment's header first, then people's families (live
+  deployment's header first, then the accounts' family (its counter,
+  accounts and sources: the interval stops before the installation's
+  identifier, which the component keeps), then people's families (live
   conversations' read positions among them, ended ones never), then the
   tasks child's live families, then the core's own live rows (goals'
   projections, run proofs, calls, agents' conversations). It is a fixed
-  list of intervals, in that order, paged and handed up typed;
+  list of intervals, in that order, paged and handed up typed. The root
+  has the accounts child want its sources only once these are restored
+  (`../domain/accounts.md`, 3.5);
 - **the inbox's census,** a step of its own once people's read positions
   are restored: the family of ended read positions, one row per ended
   conversation not yet erased (7.4), then the results' index from each
@@ -666,10 +675,14 @@ Removing a missing file is not a failure.
   or expired, or a service was removed; and when the accounts child
   says a source was signed out or removed, a key replaced, or a record
   revoked. A crash between that commit and the erase leaves a value
-  nobody names, which the restart sweeps: once people's and the
-  accounts' families are restored, the component erases each of jig's
-  digests whose sign-in or service, and each record or key whose
-  source, it did not hand up.
+  nobody names, which the restart sweeps: once people's families are
+  restored, the component erases each of jig's digests whose sign-in or
+  service it did not hand up. Sources' records and keys are not swept
+  yet: the accounts' family keeps no row for a configured account's
+  signed-in source before it is first limited or refused, though its
+  record is kept here, so the sources handed up do not name every
+  source that holds one. They join the sweep with the requests that end
+  a source, the first to ask for their erase.
 - **A failure stops the engine,** as the store's does (section 6): what a
   failed commit of the secrets' store was keeping is never handed out.
 - **Read at start,** whole: small, with its own limits and worst case.
@@ -682,13 +695,17 @@ Removing a missing file is not a failure.
 2. **The component reads its own rows,** and the core's that it checks:
    the format row, refusing another version or deployment (5.3); the
    deployment's header, refusing a last commit other than skein-kv's
-   recovered one (section 6); and the run proofs' tasks' committed
-   lengths, cutting each file to its length (8.4). An empty store gets
-   its format row in the root's first commit, with the deployment's
-   header.
+   recovered one (section 6); the run proofs' tasks' committed lengths,
+   cutting each file to its length (8.4); and the installation's
+   identifier, which replaces the one the shell drew (4.4). An empty
+   store gets its format row and the installation's identifier in the
+   root's first commit, with the deployment's header.
 3. **The root starts** (`service.md`, section 3): the core's restart
    script asks for one step at a time, and the store serves each step's
-   ranges (7.2).
+   ranges (7.2). A first start makes a second commit after the first
+   start's decision: the accounts child's want, which saves its counter,
+   moved past the configured accounts' numbers, and the accounts it
+   makes for the LLM providers whose source is none.
 4. **Secrets are served** to the protocol layer's other components once
    the secrets' store is open: each signed-in source's record to make
    skein's driver with, and each key to the accounts' table, before the
@@ -835,11 +852,15 @@ section 2).
      people child's family, loaded at start; moved, by the decision that
      ends its task, to the family of ended read positions, read on
      demand; erased with the task (7.4, 11.1).
-  9. **the accounts' family:** each account with its holder, LLM
-     provider, subject, display name, sources, order and uses, and the
-     installation's identifier, restored at start; a source's record or
-     key named by its number or its request, and erased when the source
-     goes (4.4, section 9; `../domain/accounts.md`).
+  9. **the accounts' family:** the next number; each account with its
+     holder, LLM provider, subject, display name and uses; each source
+     with its place in its holder's order, kind, name for a program's,
+     and its hold, limited with its reset or refused; restored at start,
+     a record breaking the child's rules counted and left in the store;
+     a source's record or key named by its number or its request, and
+     erased when the source goes (4.4, section 9;
+     `../domain/accounts.md`, 3.5). The installation's identifier is the
+     component's (4.4, 5.3).
 - **skein owes:** io's `OpenWrite` and `Cut` (skein's `io.md`, section
   5), for 8.2 and 8.4. skein-kv serves as it is: its in-memory
   mode, its key writer, its fill. Its accounts driver takes the owner's

@@ -265,10 +265,11 @@ How the accounts child keeps them, from what the accounts' component
 says (`../protocol/llm.md`, section 5) and what runs' agents notice
 (hosts.md, section 2):
 
-- **Every signed-in source is wanted,** from the restart's first step
-  (engine.md, section 6) to the close, so the component refreshes each
-  before its access token lapses whether or not a run holds it, and
-  answers each new generation, granted; an idle account keeps its
+- **Every signed-in source is wanted,** once the restart has restored
+  the core's records, its accounts' among them (engine.md, section 6,
+  item 1), to the close, so the component refreshes each before its
+  access token lapses whether or not a run holds it, and answers each
+  new generation, granted; an idle account keeps its
   refresh token (providers.md, 2.3; skein's `oauth.md`, section 6.3). A
   key is granted once it is kept, a replaced key as its next generation.
 - **Every live attempt hears each new generation** of its source, on
@@ -282,9 +283,10 @@ says (`../protocol/llm.md`, section 5) and what runs' agents notice
   host's half checks the login again, and the source needs sign-in on
   that host when it fails.
 - **Limited:** a run's agent says its source is spent (skein's
-  `exhausted`, or the program's usage limit), until a time where it
-  gives one. The child marks the source limited until then, or until
-  its holder resumes it, and asks nothing of the component.
+  `exhausted`, or the program's usage limit), with how long until it
+  resets where it gives that; the core makes it a time on its clock as
+  it hears the notice. The child marks the source limited until then,
+  or until its holder resumes it, and asks nothing of the component.
 - **Refused:** a run's agent says the LLM provider refused the account
   for what it asked, or a sign-in's answer does (section 5). The child
   marks the source refused, and asks nothing of the component.
@@ -306,9 +308,11 @@ says (`../protocol/llm.md`, section 5) and what runs' agents notice
 - **Close** releases every source, and ends once the component has
   closed.
 - **What the store keeps** of each source is its kind, its name, its
-  state, and a limit's reset (engine.md, 5.4). A program's login on a
-  worker is not stored: its half reports it as `logins`, which follow the
-  worker's hello (`../protocol/channel.md`, 4.3).
+  state, and a limit's reset as a wall time (engine.md, 5.4): a restart
+  lifts a limit whose reset passed while the engine was down, and holds
+  a later one until it. A program's login on a worker is not stored: its
+  half reports it as `logins`, which follow the worker's hello
+  (`../protocol/channel.md`, 4.3).
 
 ### 3.6 Bounds
 

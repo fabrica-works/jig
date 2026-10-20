@@ -116,11 +116,12 @@ it is live:
 - **Its references:** tasks it may message beyond its requester and its
   delegates (8.5).
 - **Its executor** (2) and, for an agent, its **charter**: the role's
-  instructions, the models it allows, in order, each with an effort, or
-  every configured one, the tools, the outcome it must produce, its
-  default wake policy and waiting time, whether a run resumes its
-  transcript or starts fresh, and which hosts may run it (engine.md,
-  7.1).
+  instructions, the models it allows, in order, or every configured
+  one, the tools, the outcome it must produce, its default wake policy
+  and waiting time, whether a run resumes its transcript or starts
+  fresh, and which hosts may run it (engine.md, 7.1). It names no
+  effort: each model declares its efforts, in order, in the deployment's
+  configuration (`../protocol/configuration.md`, section 3).
 - **Its LLM choice,** for an agent task, what its runs' LLMs are:
   - *main:* a configured model, and an effort among those the model
     declares (`../protocol/configuration.md`, section 3); its runs use
@@ -137,8 +138,10 @@ it is live:
   authority (authority.md, section 3). A task given none takes its
   charter's default as its batch is checked: the first of the charter's
   models, in its order, whose LLM provider has an account usable now and
-  serving its payer, with its charter's effort, or the charter's first
-  when none has; its run then waits for an account (accounts.md, 4.3).
+  serving its payer, or the charter's first when none has, its run then
+  waiting for an account (accounts.md, 4.3); each model the default
+  names takes the first effort it declares, or none where it declares
+  none, which leaves its LLM provider's default.
   The task keeps the choice it was given, and only an amendment changes
   it (section 7).
 - **Its account:** the LLM account its runs use for its main model's LLM
