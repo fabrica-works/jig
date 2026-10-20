@@ -76,8 +76,14 @@ pub fn owner_with_account(until: Option<u64>) -> w::OwnerDeployment {
     let account = w::OwnerAccount::new(
         &lim,
         w::OwnerAccountParts {
-            skein_bools: [true, false, true, false],
+            skein_bools: [false, true, false, true, false],
             number: 1,
+            place: 0,
+            uses: None,
+            provider: None,
+            display: w::DocumentText::new(&lim, w::DocumentTextParts { bytes: Box::from([]), cut: false }).unwrap(),
+            holder: w::OwnerAccountHolder::Deployment,
+            sources: Box::from([]),
             generation: Some(0),
             state: w::OwnerAccountState::Later(
                 w::OwnerAccountStateLater::new(&lim, w::OwnerAccountStateLaterParts { until }).unwrap(),
@@ -109,6 +115,13 @@ pub fn owner_account_expected(until: Option<u64>) -> c::OwnerDeployment {
         .accounts
         .push(c::OwnerAccount {
             number: 1,
+            place: 0,
+            uses: None,
+            plan: false,
+            provider: None,
+            display: c::DocumentText { bytes: c::Text::new(Box::from([]), 32).unwrap(), cut: false },
+            holder: c::OwnerAccountHolder::Deployment,
+            sources: List::with_capacity(0),
             generation: Some(0),
             state: c::OwnerAccountState::Later { until },
             usable: true,

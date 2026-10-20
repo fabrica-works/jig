@@ -37,6 +37,7 @@ pub fn subject(value: &c::Subject, limits: &w::Limits) -> Result<w::Subject, w::
             w::Subject::Run(w::SubjectRun::new(limits, w::SubjectRunParts { task: *task, turn, offset: *offset })?)
         }
         c::Subject::Deployment => w::Subject::Deployment,
+        c::Subject::Accounts => w::Subject::Accounts,
     })
 }
 pub fn owned(value: Watchable, limits: &w::Limits) -> Result<w::Owned, w::Problem> {
@@ -91,9 +92,14 @@ pub fn delivery(bytes: &[u8], limits: &Limits) -> Result<c::Delivery, Undecodabl
         Err(problem) => return Err(documents::classify(problem)),
     };
     Ok(match value {
-        w::DeliveryValue::OwnerAccounts(_) => return Err(Undecodable::Malformed),
         w::DeliveryValue::OwnerProject(value) => {
             c::Delivery::OwnerProject(Box::new(documents::owner_project(value, limits)?))
+        }
+        w::DeliveryValue::OwnerAccounts(value) => {
+            c::Delivery::OwnerAccounts(Box::new(match documents::owner_accounts(value, &receiving) {
+                Ok(value) => value,
+                Err(problem) => return Err(documents::classify(problem)),
+            }))
         }
         w::DeliveryValue::Me(value) => c::Delivery::Me(Box::new(documents::frame(value, limits)?)),
         w::DeliveryValue::Task(value) => c::Delivery::Task(Box::new(documents::task(*value, limits)?)),

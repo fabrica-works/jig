@@ -89,6 +89,13 @@ pub struct OwnerHostRun {
 #[expect(clippy::struct_excessive_bools, reason = "independent account flags and owner list loss")]
 pub struct OwnerAccount {
     pub number: u32,
+    pub place: u32,
+    pub uses: Option<List<super::OwnerAccountUse>>,
+    pub plan: bool,
+    pub provider: Option<u32>,
+    pub display: super::DocumentText,
+    pub holder: super::OwnerAccountHolder,
+    pub sources: List<super::OwnerAccountSource>,
     pub generation: Option<u64>,
     pub state: OwnerAccountState,
     pub usable: bool,

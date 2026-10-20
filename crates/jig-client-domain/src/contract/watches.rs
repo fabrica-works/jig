@@ -23,6 +23,8 @@ pub enum Subject {
     Run { task: u64, turn: Option<ProvisionalTurnName>, offset: u32 },
     /// Deployment capacity.
     Deployment,
+    /// The signed-in party's accounts.
+    Accounts,
 }
 
 /// A whole current watch value, except the run text stream.
@@ -56,6 +58,8 @@ pub enum Delivery {
     Deployment(Box<Deployment>),
     /// Whole deployment-owned facts and diagnostics.
     OwnerDeployment(Box<super::OwnerDeployment>),
+    /// Whole party account facts.
+    OwnerAccounts(Box<super::OwnerAccounts>),
 }
 
 /// Current owner run state; absent writing does not assert a call ended.

@@ -107,6 +107,9 @@ pub mod owner_escalation;
 pub use owner_escalation::*;
 mod owner_project;
 pub use owner_project::*;
+pub mod owner_accounts;
+pub use owner_accounts::*;
+
 pub mod owner_deployment;
 pub use owner_deployment::*;
 pub mod owner_historical;

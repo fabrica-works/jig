@@ -15,6 +15,13 @@ pub(crate) fn owner_account_fields(value: &w::OwnerAccount, limits: &Limits) -> 
     };
     Ok(c::OwnerAccount {
         number: value.number(),
+        place: value.place(),
+        uses: super::owner_account_uses(value.uses().as_ref()),
+        plan: value.plan(),
+        provider: *value.provider(),
+        display: crate::translate::facts::document_text(value.display(), limits)?,
+        holder: super::owner_account_holder(value.holder()),
+        sources: super::owner_account_source_piece(value.sources(), limits)?,
         generation: opt0,
         state: owner_account_state_fields(value.state(), limits),
         usable: value.usable(),

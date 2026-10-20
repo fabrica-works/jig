@@ -5,8 +5,11 @@ use alloc::boxed::Box;
 use jig_client_domain::contract as c;
 use jig_client_protocol_wire::v10 as w;
 use skein_lib::{List, Reader, Wall, bytes};
+#[path = "accounts.rs"]
+mod accounts;
 #[path = "documents_part0.rs"]
 mod part0;
+pub(crate) use accounts::*;
 pub(crate) use part0::*;
 #[path = "documents_part1.rs"]
 mod part1;
@@ -268,6 +271,16 @@ fn receiving_part1(checked: &mut Limits, limits: &Limits) {
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
     checked.wire.owner_deployment_accounts =
         u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
+    checked.wire.owner_accounts_accounts =
+        u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
+    checked.wire.owner_accounts_signing =
+        u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
+    checked.wire.owner_account_line_sources =
+        u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
+    checked.wire.owner_account_sources =
+        u32::try_from(limits.client.document_bytes).expect("validated receiving bytes");
+    checked.wire.owner_account_line_uses_some = w::CEILINGS.owner_account_line_uses_some;
+    checked.wire.owner_account_uses_some = w::CEILINGS.owner_account_uses_some;
     checked.wire.owner_deployment_projects = limits.client.rows;
     checked.wire.owner_deployment_hello_refusals = limits.client.rows;
     checked.wire.owner_deployment_person_room_refusals = limits.client.rows;
