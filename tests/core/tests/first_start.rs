@@ -110,3 +110,50 @@ fn a_restart_does_not_grant_new_configured_owners() {
     assert_eq!(person, 2);
     assert_eq!(world.store.rows[&roles], expected);
 }
+
+fn model(name: &[u8]) -> core::Model {
+    core::Model { name: name.into(), ..world::scripted_model() }
+}
+
+/// The fixture deployment under `models`, its owner's role naming `role` of them.
+fn with_models(seed: u64, models: Box<[core::Model]>, role: authority::Models) -> root::Config {
+    let mut configuration = world::config(seed);
+    configuration.core.settings.models = models;
+    let mut policy = configuration.core.authority.policy(1).expect("configured policy").clone();
+    let mut roles = policy.roles.into_vec();
+    roles[0].authority.models = role;
+    policy.roles = roles.into_boxed_slice();
+    let mut facts = Queue::with_capacity(authority::POLICY_MAX_OUT);
+    authority::step(&mut configuration.core.authority, authority::Event::Policy { project: 1, policy }, &mut facts);
+    assert_eq!(facts.pop(), Some(authority::PolicyFact::Changed { project: 1 }));
+    configuration
+}
+
+fn frame_models(world: &mut World, sign_in: u64) -> authority::Models {
+    world.send(root::Event::Core(core::Event::Read {
+        reply: ReplyTo::new(Token::new(11_003)),
+        sign_in,
+        read: reads::Read::Frame,
+    }));
+    let (_, root::Delivery::Core(core::Held::Read { answer: reads::Answer::Document(document), .. })) =
+        world.client_peer.as_mut().expect("client peer").delivered.pop().expect("frame read reply")
+    else {
+        panic!("frame document reply")
+    };
+    let documents::Document::Frame(frame) = *document else { panic!("frame document") };
+    frame.projects.as_slice()[0].models
+}
+
+#[test]
+fn a_roles_models_follow_their_names_across_restarts() {
+    let named = || Box::new([world::scripted_model(), model(b"research"), model(b"review")]);
+    let mut world = World::first_start(with_models(11_004, named(), authority::Models(0b101)), world::limits());
+    world.client_peer = Some(ClientPeer::default());
+    let (_, signed) = sign_in(&mut world, 7);
+    assert_eq!(frame_models(&mut world, signed), authority::Models(0b101), "scripted and review, seeded");
+    world.restart_with(with_models(11_005, named(), authority::Models::ALL));
+    assert_eq!(frame_models(&mut world, signed), authority::Models(0b101), "the saved role, not configuration's");
+    let today = Box::new([model(b"research"), world::scripted_model()]);
+    world.restart_with(with_models(11_006, today, authority::Models::ALL));
+    assert_eq!(frame_models(&mut world, signed), authority::Models(0b10), "scripted moves; review drops out");
+}
