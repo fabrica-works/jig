@@ -1808,6 +1808,8 @@ pub enum Cause {
 /// (domain/engine.md, sections 7.1 and 9).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct RunContext {
+    /// Current financial payer; preparations must recheck it before admission.
+    pub payer: crate::Payer,
     pub task: u64,
     /// Newest admitted inbox identity, including words already taken.
     pub last_message: u64,

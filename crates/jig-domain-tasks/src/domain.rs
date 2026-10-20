@@ -830,6 +830,7 @@ pub(crate) fn activate(domain: &mut Domain, number: u64, out: &mut Queue<Request
     }
     out.push(Request::Activate {
         context: Box::new(crate::RunContext {
+            payer: domain.payer(number).expect("admitted financial chain has a payer"),
             task: number,
             last_message: match inbox.last() {
                 Some(word) => task.last_message.max(word.number),
