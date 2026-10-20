@@ -76,6 +76,7 @@ fn template() -> Template {
         flags: tasks::Flags { conversation: false, listed: true, retention: tasks::Retention::Kept },
         label: 2,
         grace: None,
+        llm: None,
     }
 }
 

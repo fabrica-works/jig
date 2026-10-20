@@ -17,6 +17,9 @@ pub struct Template {
     pub flags: Flags,
     pub label: u32,
     pub grace: Option<Duration>,
+    /// The LLM choice a task filled from it carries, each model configured with an effort it
+    /// takes; none for its charter's default (configuration.md, 3.1; domain/tasks.md, 3).
+    pub llm: Option<jig_domain_tasks::LlmChoice>,
 }
 
 /// Apply the project's named overrides in configuration order (configuration.md, 3.1).
@@ -56,8 +59,11 @@ pub(crate) fn list_worst_case(limits: &crate::Limits) -> Option<u64> {
         .checked_mul(u64::try_from(size_of::<jig_domain_tasks::FieldRule>()).ok()?.checked_add(1)?)?;
     let choices = skein_lib::List::<jig_domain_tasks::Verdict>::worst_case(limits.tasks.contract_choices)?
         .checked_add(u64::from(limits.tasks.contract_choices).checked_mul(fields)?)?;
+    let models = u64::from(jig_domain_tasks::MODELS)
+        .checked_mul(u64::try_from(size_of::<jig_domain_tasks::ModelEffort>()).ok()?)?;
     skein_lib::List::<Template>::worst_case(limits.templates)?.checked_add(
-        u64::from(limits.templates).checked_mul(u64::from(limits.documents.text_bytes).checked_add(choices)?)?,
+        u64::from(limits.templates)
+            .checked_mul(u64::from(limits.documents.text_bytes).checked_add(choices)?.checked_add(models)?)?,
     )
 }
 
@@ -72,6 +78,16 @@ pub(crate) fn assert_configured(config: &crate::Config, limits: &crate::Limits) 
             "core prices template names"
         );
         assert!(jig_domain_tasks::valid_contract(&limits.tasks, &template.contract), "core prices template contracts");
+        if let Some(choice) = &template.llm {
+            assert!(
+                choice.subagents.len() <= usize::try_from(jig_domain_tasks::MODELS).expect("model bound"),
+                "core prices a template's sub-agents"
+            );
+            assert!(takes(&config.settings, choice.main), "a template's model configured with an effort it takes");
+            for chosen in &choice.subagents {
+                assert!(takes(&config.settings, *chosen), "a template's model configured with an effort it takes");
+            }
+        }
     }
     assert!(config.template_overrides.capacity() <= limits.authority.projects, "core prices project overrides");
     for (_, overrides) in &config.template_overrides {
@@ -79,5 +95,17 @@ pub(crate) fn assert_configured(config: &crate::Config, limits: &crate::Limits) 
             overrides.len() <= usize::try_from(limits.templates).expect("template bound"),
             "core prices policy overrides"
         );
+    }
+}
+
+/// Whether `chosen` names a configured model and an effort it takes: one it declares, or none
+/// for a model that declares none (configuration.md, 3.1).
+fn takes(settings: &crate::Settings, chosen: jig_domain_tasks::ModelEffort) -> bool {
+    let Some(model) = settings.models.get(usize::from(chosen.model)) else {
+        return false;
+    };
+    match chosen.effort {
+        Some(effort) => usize::from(effort) < model.efforts.len(),
+        None => model.efforts.is_empty(),
     }
 }

@@ -1,7 +1,7 @@
 //! Configured defaults for client shapes of work (configuration.md, 3.1).
 use crate::{Limits, Path, Problems, What, check, read};
 use alloc::boxed::Box;
-use jig_domain_core::{Charter, Template};
+use jig_domain_core::{Charter, Model, Template};
 use jig_domain_people::{TemplateBudget, TemplateDeadline, TemplateExecutor};
 use jig_domain_tasks as tasks;
 use skein_json::{Document, document::Kind};
@@ -12,6 +12,7 @@ pub(crate) fn templates(
     at: u32,
     path: &Path,
     charters: &[Charter],
+    models: &[Model],
     limits: &Limits,
     problems: &mut Problems,
 ) -> Option<Box<[Template]>> {
@@ -19,7 +20,7 @@ pub(crate) fn templates(
     let mut templates = List::<Template>::with_capacity(items.len());
     for (index, at) in items.iter().enumerate() {
         let path = check::index(path, index);
-        if let Some(template) = template(document, *at, &path, limits, problems) {
+        if let Some(template) = template(document, *at, &path, models, limits, problems) {
             for previous in &templates {
                 if previous.number == template.number {
                     problems.push(path.member(b"number"), What::Unique);
@@ -28,12 +29,18 @@ pub(crate) fn templates(
             }
             match template.executor {
                 TemplateExecutor::Charter(number) => {
-                    let mut configured = false;
+                    let mut configured = None;
                     for charter in charters {
-                        configured |= charter.number == number;
+                        if charter.number == number {
+                            configured = Some(charter);
+                        }
                     }
-                    if !configured {
-                        problems.push(path.member(b"executor"), What::Refers);
+                    match (configured, &template.llm) {
+                        (None, _) => problems.push(path.member(b"executor"), What::Refers),
+                        (Some(charter), Some(choice)) => {
+                            charters_models(charter, choice, models, &path.member(b"llm"), problems);
+                        }
+                        (Some(_), None) => {}
                     }
                 }
                 TemplateExecutor::Chosen => {}
@@ -63,7 +70,14 @@ fn report_list(value: Result<List<u32>, What>, path: &Path, problems: &mut Probl
         }
     }
 }
-fn template(document: &Document, at: u32, path: &Path, limits: &Limits, problems: &mut Problems) -> Option<Template> {
+fn template(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    models: &[Model],
+    limits: &Limits,
+    problems: &mut Problems,
+) -> Option<Template> {
     let mut object = check::object(document, at, path, problems)?;
     let number = check::count(&mut object, document, b"number", path, problems);
     let name = match object.required(document, b"name", path, problems) {
@@ -105,6 +119,10 @@ fn template(document: &Document, at: u32, path: &Path, limits: &Limits, problems
         Some(at) => grace(document, at, &path.member(b"grace_ms"), problems),
         None => Err(What::Missing),
     };
+    let llm = match object.required(document, b"llm", path, problems) {
+        Some(at) => choice(document, at, &path.member(b"llm"), models, problems),
+        None => Err(What::Missing),
+    };
     object.finish(document, path, problems);
     let retention = match retention?.as_ref() {
         b"kept" => tasks::Retention::Kept,
@@ -126,6 +144,7 @@ fn template(document: &Document, at: u32, path: &Path, limits: &Limits, problems
         flags: tasks::Flags { conversation: conversation?, listed: listed?, retention },
         label: label?,
         grace: grace.ok()?,
+        llm: llm.ok()?,
     };
     if template.number == 0 {
         problems.push(path.member(b"number"), What::Bound);
@@ -231,6 +250,139 @@ fn priority(document: &Document, at: u32, path: &Path, problems: &mut Problems) 
     let value = check::count(&mut object, document, b"priority", path, problems);
     object.finish(document, path, problems);
     Ok(Some(value.ok_or(What::Bound)?))
+}
+
+/// A template's LLM choice: `null` for its charter's default, or a main model and the models its
+/// run's sub-agents may use, each named once (configuration.md, 3.1; domain/tasks.md, 3).
+fn choice(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    models: &[Model],
+    problems: &mut Problems,
+) -> Result<Option<tasks::LlmChoice>, What> {
+    if null(document, at) {
+        return Ok(None);
+    }
+    let mut object = check::object(document, at, path, problems).ok_or(What::Kind)?;
+    let main = match object.required(document, b"main", path, problems) {
+        Some(at) => model_effort(document, at, &path.member(b"main"), models, problems),
+        None => None,
+    };
+    let items = check::list(&mut object, document, b"sub_agents", tasks::MODELS, path, problems);
+    object.finish(document, path, problems);
+    let items = items.ok_or(What::Kind)?;
+    let mut subagents = List::<tasks::ModelEffort>::with_capacity(items.len());
+    let mut whole = true;
+    for (index, at) in items.iter().enumerate() {
+        let path = check::index(&path.member(b"sub_agents"), index);
+        let Some(chosen) = model_effort(document, *at, &path, models, problems) else {
+            whole = false;
+            continue;
+        };
+        let mut repeated = false;
+        for earlier in &subagents {
+            repeated |= earlier.model == chosen.model;
+        }
+        if repeated {
+            problems.push(path.member(b"model"), What::Unique);
+            whole = false;
+        } else {
+            subagents.push(chosen).expect("sub-agents bounded by the list");
+        }
+    }
+    match main {
+        Some(main) if whole => Ok(Some(tasks::LlmChoice { main, subagents: subagents.into_boxed() })),
+        Some(_) | None => Err(What::Refers),
+    }
+}
+/// One model a template's choice names, with an effort it takes: `null` only for a model that
+/// declares none (configuration.md, 3.1 and 8).
+fn model_effort(
+    document: &Document,
+    at: u32,
+    path: &Path,
+    models: &[Model],
+    problems: &mut Problems,
+) -> Option<tasks::ModelEffort> {
+    let mut object = check::object(document, at, path, problems)?;
+    let name = check::text(&mut object, document, b"model", path, problems);
+    let effort = match object.required(document, b"effort", path, problems) {
+        Some(at) if null(document, at) => Some(None),
+        Some(at) => match read::text(document, at, jig_domain_core::EFFORT_BYTES) {
+            Ok(effort) => Some(Some(effort)),
+            Err(what) => {
+                problems.push(path.member(b"effort"), what);
+                None
+            }
+        },
+        None => None,
+    };
+    object.finish(document, path, problems);
+    let name = name?;
+    let mut configured = None;
+    for (index, model) in models.iter().enumerate() {
+        if model.name == name {
+            configured = Some((index, model));
+            break;
+        }
+    }
+    let Some((index, model)) = configured else {
+        problems.push(path.member(b"model"), What::Refers);
+        return None;
+    };
+    let effort = match effort? {
+        Some(effort) => {
+            let mut taken = None;
+            for (at, declared) in model.efforts.iter().enumerate() {
+                if *declared == effort {
+                    taken = Some(at);
+                    break;
+                }
+            }
+            match taken {
+                Some(at) => Some(u8::try_from(at).expect("efforts bounded by `EFFORTS`")),
+                None => {
+                    problems.push(path.member(b"effort"), What::Refers);
+                    return None;
+                }
+            }
+        }
+        None if model.efforts.is_empty() => None,
+        None => {
+            problems.push(path.member(b"effort"), What::Refers);
+            return None;
+        }
+    };
+    Some(tasks::ModelEffort { model: u8::try_from(index).expect("models bounded by `MODELS`"), effort })
+}
+/// Refuse each model a template's choice names that its charter does not: its main model or one
+/// of its alternatives (configuration.md, 3 and 3.1).
+fn charters_models(
+    charter: &Charter,
+    choice: &tasks::LlmChoice,
+    models: &[Model],
+    path: &Path,
+    problems: &mut Problems,
+) {
+    if !among(charter, models, choice.main) {
+        problems.push(path.member(b"main").member(b"model"), What::Refers);
+    }
+    for (index, chosen) in choice.subagents.iter().enumerate() {
+        if !among(charter, models, *chosen) {
+            problems.push(check::index(&path.member(b"sub_agents"), index).member(b"model"), What::Refers);
+        }
+    }
+}
+fn among(charter: &Charter, models: &[Model], chosen: tasks::ModelEffort) -> bool {
+    let Some(model) = models.get(usize::from(chosen.model)) else {
+        return false;
+    };
+    let mut listed = charter.policy.model.name == model.name;
+    for alternative in &charter.policy.alternatives {
+        listed |= alternative.name == model.name;
+    }
+    listed
 }
 
 fn contract(

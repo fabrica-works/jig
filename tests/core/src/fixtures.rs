@@ -85,6 +85,7 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             flags: Flags { conversation: true, listed: false, retention: Retention::Kept },
             label: jig_client_test_records::CHAT,
             grace: Some(skein_lib::Duration::from_millis(5000)),
+            llm: None,
         },
         jig_domain_core::Template {
             number: 2,
@@ -98,6 +99,7 @@ pub fn templates() -> Box<[jig_domain_core::Template]> {
             flags: Flags { conversation: false, listed: true, retention: Retention::Kept },
             label: jig_client_test_records::GOAL,
             grace: None,
+            llm: None,
         },
     ])
 }

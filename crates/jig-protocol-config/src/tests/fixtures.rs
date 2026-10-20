@@ -55,8 +55,8 @@ pub const ENGINE_SMALL: &[u8] = br#"{
 "inspect": true, "modify": false, "shell": false, "agents": false, "call_timeout_ms": 10000
 }],
 "templates": [
-{"number": 1, "name": "chat", "executor": {"charter": 1}, "contract": {"report": {"words": 512}}, "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none", "tracked": null, "conversation": true, "listed": false, "retention": "kept", "label": 1, "grace_ms": 5000},
-{"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 512}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null}
+{"number": 1, "name": "chat", "executor": {"charter": 1}, "contract": {"report": {"words": 512}}, "shallower": 1, "budget": {"as_allowed": null}, "deadline": "none", "tracked": null, "conversation": true, "listed": false, "retention": "kept", "label": 1, "grace_ms": 5000, "llm": null},
+{"number": 2, "name": "goal", "executor": "chosen", "contract": {"report": {"words": 512}}, "shallower": 1, "budget": "given", "deadline": "given", "tracked": {"priority": 1}, "conversation": false, "listed": true, "retention": "kept", "label": 2, "grace_ms": null, "llm": null}
 ],
 "clients": {
 "heartbeat_ms": 10000,

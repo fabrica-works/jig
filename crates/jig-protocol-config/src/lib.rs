@@ -90,11 +90,15 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
     {
         charters = charters::parse(document, at, &path.member(b"charters"), llm, &limits, &mut problems);
     }
-    let at = object.required(document, b"templates", &path, &mut problems);
+    let configured = match &llm {
+        Some(llm) => &*llm.models,
+        None => &[],
+    };
     let mut templates = None;
-    if let Some(at) = at {
+    if let Some(at) = object.required(document, b"templates", &path, &mut problems) {
         let offered = charters.as_deref().unwrap_or(&[]);
-        templates = templates::templates(document, at, &path.member(b"templates"), offered, &limits, &mut problems);
+        let path = path.member(b"templates");
+        templates = templates::templates(document, at, &path, offered, configured, &limits, &mut problems);
     }
     let mut deployment = None;
     if let Some(at) = object.required(document, b"deployment", &path, &mut problems) {
@@ -104,10 +108,6 @@ pub fn engine(document: &skein_json::Document, at: u32) -> Result<Engine, Proble
     if let Some(at) = object.required(document, b"providers", &path, &mut problems) {
         providers = domain::providers(document, at, &path.member(b"providers"), &mut problems);
     }
-    let configured = match &llm {
-        Some(llm) => &*llm.models,
-        None => &[],
-    };
     let mut rules = None;
     if let Some(at) = object.required(document, b"rules", &path, &mut problems) {
         let authority = &limits.core.authority;

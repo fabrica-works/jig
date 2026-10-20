@@ -110,5 +110,6 @@ pub fn template() -> jig_domain_core::Template {
         flags: t::Flags::PLAIN,
         label: 0,
         grace: None,
+        llm: None,
     }
 }
