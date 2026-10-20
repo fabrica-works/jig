@@ -87,6 +87,10 @@ pub(crate) fn owner_outcome(value: &w::OwnerOutcome, limits: &Limits) -> c::Owne
         w::OwnerOutcome::Withdrawn(row) => c::OwnerOutcome::Withdrawn { proposal: row.proposal() },
         w::OwnerOutcome::RolesSet(row) => c::OwnerOutcome::RolesSet { project: row.project() },
         w::OwnerOutcome::PolicyChanged(row) => c::OwnerOutcome::PolicyChanged { project: row.project() },
+        w::OwnerOutcome::AccountSignInStarted(row) => {
+            c::OwnerOutcome::AccountSignInStarted { source: row.source(), address: bytes::copy_of(row.address()) }
+        }
+        w::OwnerOutcome::AccountSignedOut(row) => c::OwnerOutcome::AccountSignedOut { confirmed: row.confirmed() },
         w::OwnerOutcome::PoolSet(row) => c::OwnerOutcome::PoolSet { project: row.project(), person: row.person() },
         w::OwnerOutcome::EscalationDecided(row) => c::OwnerOutcome::EscalationDecided {
             task: row.task(),
@@ -333,6 +337,10 @@ pub(crate) fn admission_limit(value: &w::AdmissionLimit, _limits: &Limits) -> c:
         w::AdmissionLimit::Policy => c::AdmissionLimit::Policy,
         w::AdmissionLimit::Resource => c::AdmissionLimit::Resource,
         w::AdmissionLimit::Service => c::AdmissionLimit::Service,
+        w::AdmissionLimit::Accounts => c::AdmissionLimit::Accounts,
+        w::AdmissionLimit::HolderAccounts => c::AdmissionLimit::HolderAccounts,
+        w::AdmissionLimit::Sources => c::AdmissionLimit::Sources,
+        w::AdmissionLimit::SignIns => c::AdmissionLimit::SignIns,
     }
 }
 

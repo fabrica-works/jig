@@ -56,9 +56,9 @@ pub(super) fn ask(project: u32, values: &List<client::Operation>) -> Result<peop
             | people::Ask::Amend { .. }
             | people::Ask::SetRoles { .. }
             | people::Ask::ChangePolicy { .. }
-            | people::Ask::SetPool { .. }
             | people::Ask::AccountSignIn { .. }
             | people::Ask::AccountSignOut { .. }
+            | people::Ask::SetPool { .. }
             | people::Ask::DecideEscalation { .. } => return Err(Invalid::CompoundProject),
         };
         operations.push(operation).expect("same capacity");

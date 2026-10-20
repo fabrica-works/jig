@@ -6,7 +6,7 @@ use jig_client_domain::contract::{
 use skein_lib::Wall;
 use std::mem::size_of;
 
-fn maximum_outcomes() -> [OwnerOutcome; 22] {
+fn maximum_outcomes() -> [OwnerOutcome; 24] {
     [
         OwnerOutcome::MarkedSeen { seen: SeenThrough::Results { through: u64::MAX } },
         OwnerOutcome::MarkedSeen { seen: SeenThrough::Conversation { task: u64::MAX, through: u64::MAX } },
@@ -34,6 +34,8 @@ fn maximum_outcomes() -> [OwnerOutcome; 22] {
         OwnerOutcome::RolesSet { project: u32::MAX },
         OwnerOutcome::PolicyChanged { project: u32::MAX },
         OwnerOutcome::PoolSet { project: u32::MAX, person: u64::MAX },
+        OwnerOutcome::AccountSignedOut { confirmed: false },
+        OwnerOutcome::AccountSignedOut { confirmed: true },
         OwnerOutcome::EscalationDecided {
             task: u64::MAX,
             revision: Revision { value: u64::MAX },
@@ -114,4 +116,22 @@ fn durable_owner_answers_are_admitted_only_with_the_complete_answer_envelope() {
         assert!(fits(&answer, &exact));
         assert!(!fits(&answer, &short));
     }
+}
+
+#[test]
+fn an_account_sign_in_address_is_admitted_only_at_its_complete_bound() {
+    let inline = u64::try_from(size_of::<OwnerOutcome>()).unwrap();
+    for length in [0_u64, 1, 2048] {
+        let value = OwnerOutcome::AccountSignInStarted {
+            source: u32::MAX,
+            address: vec![b'a'; usize::try_from(length).unwrap()].into(),
+        };
+        let exact = Bounds { text: 0, document_bytes: inline + length, ..Bounds::default() };
+        assert_eq!(owner_outcome_bytes(&value, &exact), Some(inline + length));
+        assert_eq!(admit_owner_outcome(&value, &exact), Ok(()));
+        let short = Bounds { document_bytes: inline + length - 1, ..exact };
+        assert_eq!(admit_owner_outcome(&value, &short), Err(Invalid::Payload));
+    }
+    let value = OwnerOutcome::AccountSignInStarted { source: 7, address: vec![b'a'; 2049].into() };
+    assert_eq!(admit_owner_outcome(&value, &Bounds::default()), Err(Invalid::Payload));
 }

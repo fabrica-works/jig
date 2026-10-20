@@ -149,6 +149,8 @@ impl Offers {
             | Ask::Move { .. }
             | Ask::Seen { .. }
             | Ask::EditNote { .. }
+            | Ask::SignIn { .. }
+            | Ask::SignOut { .. }
             | Ask::DeleteNote { .. }
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }

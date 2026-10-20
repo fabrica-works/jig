@@ -55,6 +55,8 @@ fn operation(value: &c::Operation, limits: &w::Limits) -> Result<w::Operation, w
         | w::Ask::ChangePolicy(_)
         | w::Ask::SetRoles(_)
         | w::Ask::MakeService(_)
+        | w::Ask::SignIn(_)
+        | w::Ask::SignOut(_)
         | w::Ask::SetPool(_) => return Err(problem()),
     })
 }
@@ -101,6 +103,8 @@ pub(super) fn restore(value: w::Compound, limits: &Limits) -> Result<c::Ask, w::
             | c::Ask::ChangePolicy { .. }
             | c::Ask::SetRoles { .. }
             | c::Ask::MakeService { .. }
+            | c::Ask::SignIn { .. }
+            | c::Ask::SignOut { .. }
             | c::Ask::SetPool { .. } => return Err(problem()),
         };
         operations.push(operation).expect("same capacity");

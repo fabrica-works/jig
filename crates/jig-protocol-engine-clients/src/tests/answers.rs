@@ -106,19 +106,46 @@ fn a_service_result_contains_its_party_and_no_credential() {
     assert_eq!(out.finish().as_ref(), &f::SERVICE_ANSWER);
 }
 #[test]
-fn an_account_answer_or_bound_is_not_carried_to_a_client_before_jp10() {
-    let limits = f::wire();
-    let not_carried = w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Tag };
-    for outcome in [
-        p::Outcome::AccountSignInStarted { source: 4, address: b"https://issuer.test/visit".as_slice().into() },
-        p::Outcome::AccountSignedOut { confirmed: true },
-    ] {
-        let answer = crate::translate::answers::answer(&p::Reply::Outcome(outcome), &f::models(), &limits);
-        assert_eq!(answer.err().as_ref(), Some(&not_carried));
+fn an_account_sign_in_is_answered_with_its_source_and_address() {
+    let limits = w::Limits { owned_record: 4096, ..f::wire() };
+    for length in [0, 1, usize::try_from(p::ADDRESS).unwrap()] {
+        let address: Box<[u8]> = skein_lib::bytes::zeroed(length);
+        let outcome = p::Outcome::AccountSignInStarted { source: u32::MAX, address: address.clone() };
+        let expected = w::OwnerOutcome::AccountSignInStarted(
+            w::OwnerOutcomeAccountSignInStarted::new(
+                &limits,
+                w::OwnerOutcomeAccountSignInStartedParts { source: u32::MAX, address },
+            )
+            .unwrap(),
+        );
+        assert_eq!(f::translated(&p::Reply::Outcome(outcome), &limits), account_sign_in_done(expected, &limits));
     }
-    for which in [p::LimitKind::Accounts, p::LimitKind::HolderAccounts, p::LimitKind::Sources, p::LimitKind::SignIns] {
-        let refused = crate::translate::refusals::refusal(p::Refusal::Limit { which }, &limits);
-        assert_eq!(refused.err().as_ref(), Some(&not_carried));
+}
+#[test]
+fn an_account_sign_out_is_answered_with_whether_it_was_confirmed() {
+    let limits = f::wire();
+    for confirmed in [false, true] {
+        let expected = w::OwnerOutcome::AccountSignedOut(
+            w::OwnerOutcomeAccountSignedOut::new(&limits, w::OwnerOutcomeAccountSignedOutParts { confirmed }).unwrap(),
+        );
+        assert_eq!(
+            f::translated(&p::Reply::Outcome(p::Outcome::AccountSignedOut { confirmed }), &limits),
+            account_sign_in_done(expected, &limits)
+        );
+    }
+}
+#[test]
+fn the_account_bounds_are_admission_limits() {
+    for (source, expected) in [
+        (p::LimitKind::Accounts, w::AdmissionLimit::Accounts),
+        (p::LimitKind::HolderAccounts, w::AdmissionLimit::HolderAccounts),
+        (p::LimitKind::Sources, w::AdmissionLimit::Sources),
+        (p::LimitKind::SignIns, w::AdmissionLimit::SignIns),
+    ] {
+        assert_eq!(
+            crate::translate::refusals::refusal(p::Refusal::Limit { which: source }, &f::wire()).unwrap(),
+            f::admission_refusal(expected)
+        );
     }
 }
 fn unanswered(exchange: &Exchange, owner: Token) -> bool {
@@ -285,4 +312,19 @@ fn an_opening_outside_its_owners_range_is_answered_not_served() {
         Ok(w::OpenAnswer::NotServed(f::not_served(w::Owner::Jig)))
     );
     assert!(exchange.out.is_empty());
+}
+
+fn account_sign_in_done(value: w::OwnerOutcome, limits: &w::Limits) -> w::Final {
+    let outcome = w::Outcome::Owner(w::OutcomeOwner::new(limits, w::OutcomeOwnerParts { value }).unwrap());
+    w::Final::Done(w::Done::new(limits, w::DoneParts { outcome }).unwrap())
+}
+
+#[test]
+fn an_account_sign_in_answer_over_the_address_bound_is_refused_at_its_address() {
+    let outcome = p::Outcome::AccountSignInStarted { source: 7, address: skein_lib::bytes::zeroed(2049) };
+    let result = crate::translate::answers::answer(&p::Reply::Outcome(outcome), &f::models(), &f::wire());
+    assert_eq!(
+        result.err(),
+        Some(w::Problem { path: w::Path::OwnerOutcomeAccountSignInStartedAddress, reason: skein_codec::Reason::Bound })
+    );
 }

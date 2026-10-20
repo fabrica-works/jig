@@ -39,6 +39,8 @@ pub(crate) fn route(outcome: &Outcome) -> Route {
             | OwnerOutcome::Amended { .. }
             | OwnerOutcome::RolesSet { .. }
             | OwnerOutcome::PolicyChanged { .. }
+            | OwnerOutcome::AccountSignInStarted { .. }
+            | OwnerOutcome::AccountSignedOut { .. }
             | OwnerOutcome::PoolSet { .. }
             | OwnerOutcome::EscalationDecided { .. } => Route::Other,
         },

@@ -425,3 +425,18 @@ fn created_case() -> (OwnerOutcome, &'static [&'static [u8]]) {
         ],
     )
 }
+
+#[test]
+fn the_account_sign_in_outcomes_say_their_phrases() {
+    let words = words();
+    expect_lines(
+        &render(
+            &OwnerOutcome::AccountSignInStarted { source: 7, address: b"http://issuer/visit".as_slice().into() },
+            &words,
+        ),
+        &[b"LLM account sign-in started"],
+    );
+    for confirmed in [false, true] {
+        expect_lines(&render(&OwnerOutcome::AccountSignedOut { confirmed }, &words), &[b"LLM account signed out"]);
+    }
+}

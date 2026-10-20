@@ -359,6 +359,15 @@ pub fn language() -> Language {
             JigPhrase::EngineLimitPolicy => Box::new([Segment::Text(copy_of(b"Engine admission limit: policy"))]),
             JigPhrase::EngineLimitResource => Box::new([Segment::Text(copy_of(b"Engine admission limit: resource"))]),
             JigPhrase::EngineLimitService => Box::new([Segment::Text(copy_of(b"Engine admission limit: service"))]),
+            JigPhrase::EngineLimitAccounts => Box::new([Segment::Text(copy_of(b"Engine admission limit: accounts"))]),
+            JigPhrase::EngineLimitHolderAccounts => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: holder accounts"))])
+            }
+            JigPhrase::EngineLimitSources => Box::new([Segment::Text(copy_of(b"Engine admission limit: sources"))]),
+            JigPhrase::EngineLimitSignIns => {
+                Box::new([Segment::Text(copy_of(b"Engine admission limit: account sign-ins"))])
+            }
+
             JigPhrase::DecidedBare => Box::new([Segment::Text(copy_of(b"Decided"))]),
             JigPhrase::DeletedEnding => Box::new([Segment::Text(copy_of(b"Deleted"))]),
             JigPhrase::ByProjectDeployment => Box::new([

@@ -107,9 +107,11 @@ pub enum OutcomePhrase {
     ResultsThrough,
     /// The replies seen through saying.
     RepliesThrough,
+    AccountSignInStarted,
+    AccountSignedOut,
 }
 /// Every outcome phrase in stable owner order.
-pub const ALL: [OutcomePhrase; 50] = [
+pub const ALL: [OutcomePhrase; 52] = [
     OutcomePhrase::Created,
     OutcomePhrase::FirstTask,
     OutcomePhrase::LastTask,
@@ -160,6 +162,8 @@ pub const ALL: [OutcomePhrase; 50] = [
     OutcomePhrase::Revision,
     OutcomePhrase::ResultsThrough,
     OutcomePhrase::RepliesThrough,
+    OutcomePhrase::AccountSignInStarted,
+    OutcomePhrase::AccountSignedOut,
 ];
 impl OutcomePhrase {
     /// Stable identity for checked language composition.
@@ -216,6 +220,8 @@ impl OutcomePhrase {
             Self::Revision => 6445,
             Self::ResultsThrough => 6448,
             Self::RepliesThrough => 6449,
+            Self::AccountSignInStarted => 6457,
+            Self::AccountSignedOut => 6458,
         };
         PhraseId { owner: Owner::Jig.opaque(), number }
     }
@@ -270,6 +276,8 @@ impl OutcomePhrase {
             | Self::Passed
             | Self::Withdrawn
             | Self::Stale
+            | Self::AccountSignInStarted
+            | Self::AccountSignedOut
             | Self::ReleaseChoice => None,
         }
     }
@@ -343,6 +351,8 @@ pub fn english() -> Language {
             OutcomePhrase::Revision => b"Hold revision: ",
             OutcomePhrase::ResultsThrough => b"Results seen through: ",
             OutcomePhrase::RepliesThrough => b"Replies seen through: ",
+            OutcomePhrase::AccountSignInStarted => b"LLM account sign-in started",
+            OutcomePhrase::AccountSignedOut => b"LLM account signed out",
         };
         let segments: Box<[Segment]> = match phrase.hole() {
             Some(kind) => Box::new([Segment::Text(copy_of(text)), Segment::Hole { index: 0, kind }]),

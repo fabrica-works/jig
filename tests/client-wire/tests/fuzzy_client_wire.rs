@@ -347,6 +347,9 @@ fn records_7(bytes: &[u8]) {
     check!(Retention, bytes);
     check!(CreatedGiven, bytes);
     check!(OwnerOutcomeCreated, bytes);
+    check!(AccountHolder, bytes);
+    check!(AskSignIn, bytes);
+    check!(AskSignOut, bytes);
     check!(Ask, bytes);
 }
 
@@ -372,6 +375,8 @@ fn records_8(bytes: &[u8]) {
     check!(OwnerOutcomeWithdrawn, bytes);
     check!(OwnerOutcomeRolesSet, bytes);
     check!(OwnerOutcomePolicyChanged, bytes);
+    check!(OwnerOutcomeAccountSignInStarted, bytes);
+    check!(OwnerOutcomeAccountSignedOut, bytes);
     check!(OwnerOutcomePoolSet, bytes);
     check!(OwnerOutcomeEscalationDecided, bytes);
     check!(OwnerOutcome, bytes);

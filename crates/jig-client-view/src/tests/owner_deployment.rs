@@ -305,7 +305,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 225);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 229);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -702,7 +702,7 @@ fn deployment_view_configured_empty_and_clipped_catalogues_are_distinct_and_slot
 fn store_words() -> Words {
     let limits = PhraseLimits {
         languages: 1,
-        phrases: 227,
+        phrases: u32::try_from(crate::owner_deployment_words::ALL.len()).unwrap(),
         holes: 1,
         segments: 512,
         text_bytes: 16_384,

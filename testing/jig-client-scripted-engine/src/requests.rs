@@ -101,7 +101,9 @@ impl<A: crate::Application> Engine<A> {
         {
             return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
         }
-        let (project, object, kind, revision) = target(ask);
+        let Some((project, object, kind, revision)) = target(ask) else {
+            return Ok((Answer::Refused { refusal: Refusal::NotOffered, at: None }, Vec::new()));
+        };
         if project.is_some_and(|project| !self.truth.visible(party, project)) {
             return Ok((Answer::Refused { refusal: Refusal::Unknown, at: None }, Vec::new()));
         }
@@ -291,6 +293,8 @@ impl<A: crate::Application> Engine<A> {
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
             | Ask::MakeService { .. }
+            | Ask::SignIn { .. }
+            | Ask::SignOut { .. }
             | Ask::SetPool { .. } => None,
         };
         let offer = note_offers.or_else(|| {
@@ -337,6 +341,8 @@ impl<A: crate::Application> Engine<A> {
                 | Ask::Move { .. }
                 | Ask::Seen { .. }
                 | Ask::EditNote { .. }
+                | Ask::SignIn { .. }
+                | Ask::SignOut { .. }
                 | Ask::DeleteNote { .. }
                 | Ask::ChangePolicy { .. }
                 | Ask::SetRoles { .. }
@@ -425,6 +431,8 @@ impl<A: crate::Application> Engine<A> {
             | Ask::Move { .. }
             | Ask::Seen { .. }
             | Ask::EditNote { .. }
+            | Ask::SignIn { .. }
+            | Ask::SignOut { .. }
             | Ask::DeleteNote { .. }
             | Ask::ChangePolicy { .. }
             | Ask::SetRoles { .. }
@@ -611,8 +619,9 @@ fn decision_kind(decision: &Decision) -> ActKind {
     }
 }
 type Target = (Option<u32>, Option<ObjectKey>, ActKind, Option<(Revision, Moved)>);
-fn target(ask: &Ask) -> Target {
-    match ask {
+fn target(ask: &Ask) -> Option<Target> {
+    Some(match ask {
+        Ask::SignIn { .. } | Ask::SignOut { .. } => return None,
         Ask::Compound { project, operations } => {
             compound_target(*project, operations).unwrap_or((Some(*project), None, ActKind::Message, None))
         }
@@ -663,7 +672,7 @@ fn target(ask: &Ask) -> Target {
         Ask::SetRoles { project, .. } => (Some(*project), None, ActKind::SetRoles, None),
         Ask::MakeService { project, .. } => (Some(*project), None, ActKind::MakeService, None),
         Ask::SetPool { project, .. } => (Some(*project), None, ActKind::SetPool, None),
-    }
+    })
 }
 
 fn compound_target(project: u32, operations: &List<Operation>) -> Option<Target> {

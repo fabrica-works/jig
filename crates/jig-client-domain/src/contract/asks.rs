@@ -164,6 +164,17 @@ pub enum Ask {
     MakeService { project: u32, name: Text, role: HeldRole },
     /// Set a party pool preserving spend and reservations.
     SetPool { project: u32, party: u64, budget: u64 },
+    /// Start an LLM account sign-in.
+    SignIn { holder: AccountHolder, provider: u32 },
+    /// End an LLM account sign-in for a source.
+    SignOut { holder: AccountHolder, source: u32 },
+}
+
+/// The holder of an LLM account sign-in.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum AccountHolder {
+    Own,
+    Deployment,
 }
 
 /// The durable result of one ask.

@@ -138,6 +138,10 @@ impl Words {
             AdmissionLimit::Policy => JigPhrase::EngineLimitPolicy,
             AdmissionLimit::Resource => JigPhrase::EngineLimitResource,
             AdmissionLimit::Service => JigPhrase::EngineLimitService,
+            AdmissionLimit::Accounts => JigPhrase::EngineLimitAccounts,
+            AdmissionLimit::HolderAccounts => JigPhrase::EngineLimitHolderAccounts,
+            AdmissionLimit::Sources => JigPhrase::EngineLimitSources,
+            AdmissionLimit::SignIns => JigPhrase::EngineLimitSignIns,
         };
         self.text(b, phrase, &[]);
     }

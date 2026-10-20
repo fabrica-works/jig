@@ -39,6 +39,10 @@ disallowed_types = "deny"
 disallowed_methods = "deny"
 
 [dev-dependencies]
+jig-protocol-accounts-world = { path = "../../tests/protocol-accounts" }
+jig-client = { path = "../../crates/jig-client" }
+skein-fake-oauth.workspace = true
+skein-http.workspace = true
 jig-client-protocol-world = { path = "../../tests/client-protocol" }
 jig-channel-world = { path = "../../tests/channel" }
 jig-client-shell-native = { path = "../../crates/jig-client-shell-native" }

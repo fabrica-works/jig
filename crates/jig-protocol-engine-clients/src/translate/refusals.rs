@@ -24,7 +24,7 @@ pub(crate) fn refusal(value: p::Refusal, limits: &w::Limits) -> Result<w::Refusa
         )?),
         p::Refusal::Limit { which } => {
             let which =
-                w::Limit::Admission(w::LimitAdmission::new(limits, w::LimitAdmissionParts { which: limit(which)? })?);
+                w::Limit::Admission(w::LimitAdmission::new(limits, w::LimitAdmissionParts { which: limit(which) })?);
             w::Refusal::Limit(w::RefusalLimit::new(limits, w::RefusalLimitParts { which })?)
         }
         p::Refusal::Moved { now } => moved(now, limits)?,
@@ -114,8 +114,8 @@ fn lack(value: p::Lack, limits: &w::Limits) -> Result<w::Lacking, w::Problem> {
         }
     })
 }
-pub(super) fn limit(value: p::LimitKind) -> Result<w::AdmissionLimit, w::Problem> {
-    Ok(match value {
+pub(super) fn limit(value: p::LimitKind) -> w::AdmissionLimit {
+    match value {
         p::LimitKind::Words => w::AdmissionLimit::Words,
         p::LimitKind::Identity => w::AdmissionLimit::Identity,
         p::LimitKind::Roles => w::AdmissionLimit::Roles,
@@ -154,15 +154,11 @@ pub(super) fn limit(value: p::LimitKind) -> Result<w::AdmissionLimit, w::Problem
         p::LimitKind::Policy => w::AdmissionLimit::Policy,
         p::LimitKind::Resource => w::AdmissionLimit::Resource,
         p::LimitKind::Service => w::AdmissionLimit::Service,
-        p::LimitKind::Accounts | p::LimitKind::HolderAccounts | p::LimitKind::Sources | p::LimitKind::SignIns => {
-            return Err(account_not_carried());
-        }
-    })
-}
-/// An LLM account's answer or bound, which client-v10 has no case for: JP10 carries the
-/// accounts' requests and their answers (contract.md, 3.2 and 4), and no client asks one before.
-pub(super) const fn account_not_carried() -> w::Problem {
-    w::Problem { path: w::Path::OwnedRecord, reason: skein_codec::Reason::Tag }
+        p::LimitKind::Accounts => w::AdmissionLimit::Accounts,
+        p::LimitKind::HolderAccounts => w::AdmissionLimit::HolderAccounts,
+        p::LimitKind::Sources => w::AdmissionLimit::Sources,
+        p::LimitKind::SignIns => w::AdmissionLimit::SignIns,
+    }
 }
 fn moved(value: p::Moved, limits: &w::Limits) -> Result<w::Refusal, w::Problem> {
     let (revision, what) = match value {

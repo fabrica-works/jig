@@ -211,13 +211,18 @@ pub enum DeploymentPhrase {
     AdmissionPolicy,
     AdmissionResource,
     AdmissionService,
+    AdmissionAccounts,
+    AdmissionHolderAccounts,
+    AdmissionSources,
+    AdmissionSignIns,
+
     Connectors,
     ConnectorsCut,
     ConnectorsEmpty,
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 225] = [
+pub const ALL: [DeploymentPhrase; 229] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -438,6 +443,10 @@ pub const ALL: [DeploymentPhrase; 225] = [
     DeploymentPhrase::AdmissionPolicy,
     DeploymentPhrase::AdmissionResource,
     DeploymentPhrase::AdmissionService,
+    DeploymentPhrase::AdmissionAccounts,
+    DeploymentPhrase::AdmissionHolderAccounts,
+    DeploymentPhrase::AdmissionSources,
+    DeploymentPhrase::AdmissionSignIns,
     DeploymentPhrase::Connectors,
     DeploymentPhrase::ConnectorsCut,
     DeploymentPhrase::ConnectorsEmpty,
@@ -650,6 +659,11 @@ impl DeploymentPhrase {
                 Self::AdmissionPolicy => 9393,
                 Self::AdmissionResource => 9394,
                 Self::AdmissionService => 9395,
+                Self::AdmissionAccounts => 9425,
+                Self::AdmissionHolderAccounts => 9426,
+                Self::AdmissionSources => 9427,
+                Self::AdmissionSignIns => 9428,
+
                 Self::Connectors => 9396,
                 Self::ConnectorsCut => 9397,
                 Self::ConnectorsEmpty => 9398,
@@ -818,6 +832,10 @@ impl DeploymentPhrase {
             | Self::AdmissionPriority
             | Self::AdmissionPolicy
             | Self::AdmissionResource
+            | Self::AdmissionAccounts
+            | Self::AdmissionHolderAccounts
+            | Self::AdmissionSources
+            | Self::AdmissionSignIns
             | Self::AdmissionService
             | Self::Connectors
             | Self::ConnectorsCut
@@ -1067,6 +1085,11 @@ impl DeploymentPhrase {
             Self::AdmissionPolicy => b"Structural limit: policy",
             Self::AdmissionResource => b"Structural limit: resource",
             Self::AdmissionService => b"Structural limit: service",
+            Self::AdmissionAccounts => b"Structural limit: accounts",
+            Self::AdmissionHolderAccounts => b"Structural limit: holder accounts",
+            Self::AdmissionSources => b"Structural limit: sources",
+            Self::AdmissionSignIns => b"Structural limit: account sign-ins",
+
             Self::Connectors => b"Configured connectors",
             Self::ConnectorsCut => b"Some configured connectors omitted",
             Self::ConnectorsEmpty => b"No configured connectors",

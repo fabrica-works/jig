@@ -53,6 +53,8 @@ fn header(value: &OwnerOutcome) -> P {
         OwnerOutcome::Withdrawn { .. } => P::Withdrawn,
         OwnerOutcome::RolesSet { .. } => P::RolesSet,
         OwnerOutcome::PolicyChanged { .. } => P::PolicyChanged,
+        OwnerOutcome::AccountSignInStarted { .. } => P::AccountSignInStarted,
+        OwnerOutcome::AccountSignedOut { .. } => P::AccountSignedOut,
         OwnerOutcome::PoolSet { .. } => P::PoolSet,
         OwnerOutcome::EscalationDecided { .. } => P::EscalationDecided,
     }
@@ -112,6 +114,7 @@ fn escalation(
 }
 fn details(b: &mut Builder, value: &OwnerOutcome, words: &Words) {
     match value {
+        OwnerOutcome::AccountSignInStarted { .. } | OwnerOutcome::AccountSignedOut { .. } => {}
         OwnerOutcome::Created { first, last, given } => created(b, *first, *last, *given, words),
         OwnerOutcome::MarkedSeen { seen: position } => seen(b, position, words),
         OwnerOutcome::NoteEdited { name } => number(b, words, P::Note, *name),

@@ -96,8 +96,11 @@ pub fn outcome(value: &people::Outcome) -> Outcome {
         people::Outcome::Again(why) => return Outcome::Again(*why),
         people::Outcome::SignedOut => return Outcome::SignedOut,
         people::Outcome::Refused(why) => return Outcome::Refused(*why),
-        people::Outcome::AccountSignInStarted { .. } | people::Outcome::AccountSignedOut { .. } => {
-            unreachable!("no v10 ask is an account request")
+        people::Outcome::AccountSignInStarted { source, address } => {
+            client::OwnerOutcome::AccountSignInStarted { source: *source, address: address.clone() }
+        }
+        people::Outcome::AccountSignedOut { confirmed } => {
+            client::OwnerOutcome::AccountSignedOut { confirmed: *confirmed }
         }
     };
     Outcome::Owner(owner)

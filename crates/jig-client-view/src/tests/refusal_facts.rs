@@ -231,3 +231,16 @@ fn outbox_hold_facts_show_the_actual_entry_scope_without_a_proposal_identity() {
         }
     }
 }
+
+#[test]
+fn the_account_sign_in_limits_name_each_refusal() {
+    for (which, words) in [
+        (AdmissionLimit::Accounts, b"Engine admission limit: accounts".as_slice()),
+        (AdmissionLimit::HolderAccounts, b"Engine admission limit: holder accounts".as_slice()),
+        (AdmissionLimit::Sources, b"Engine admission limit: sources".as_slice()),
+        (AdmissionLimit::SignIns, b"Engine admission limit: account sign-ins".as_slice()),
+    ] {
+        let tree = render(Refusal::Limit { which: Limit::Admission { which } });
+        assert!(contains(&tree, words));
+    }
+}

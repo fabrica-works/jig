@@ -17,7 +17,7 @@ const CLOSE: Token = Token::new(u64::MAX - 1);
 pub fn scratch() -> tempfile::TempDir {
     tempfile::tempdir().expect("scratch directory")
 }
-fn private(path: &Path, bytes: &[u8]) {
+pub(super) fn private(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).expect("fixture file");
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).expect("private fixture");
 }
@@ -78,7 +78,7 @@ pub fn printed_link(bytes: &[u8]) -> Option<&[u8]> {
     let end = bytes.iter().position(|byte| *byte == b'\n')?;
     Some(&bytes[..end])
 }
-fn client_settings(address: std::net::SocketAddr) -> jig_client_shell_native::Settings {
+pub(super) fn client_settings(address: std::net::SocketAddr) -> jig_client_shell_native::Settings {
     jig_client_shell_native::Settings {
         engine: skein_io::Addr::Ip(address),
         directory: b"private".as_slice().into(),
@@ -98,17 +98,18 @@ fn client_settings(address: std::net::SocketAddr) -> jig_client_shell_native::Se
         },
     }
 }
-struct Person {
-    client: Option<NativeClient>,
-    root: Option<Fd>,
-    script: Option<Script>,
-    input: Option<Fd>,
-    output: Option<Fd>,
-    reading: bool,
-    closing: u32,
-    bytes: Vec<u8>,
-    completions: Queue<Complete>,
-    submissions: Queue<Submit>,
+pub(super) struct Person {
+    pub(super) client: Option<NativeClient>,
+    pub(super) root: Option<Fd>,
+    pub(super) script: Option<Script>,
+    pub(super) account_sign_in: bool,
+    pub(super) input: Option<Fd>,
+    pub(super) output: Option<Fd>,
+    pub(super) reading: bool,
+    pub(super) closing: u32,
+    pub(super) bytes: Vec<u8>,
+    pub(super) completions: Queue<Complete>,
+    pub(super) submissions: Queue<Submit>,
 }
 impl Person {
     fn submit(&mut self, token: Token, kind: Op) {
@@ -164,6 +165,9 @@ impl Host for Person {
                 7,
                 self.script.take().expect("person script"),
             );
+            if self.account_sign_in {
+                client.hold_for_account_sign_in();
+            }
             client.sign_in(link).expect("printed sign-in link");
             self.client = Some(client);
         }
@@ -316,6 +320,7 @@ pub fn run(directory: &Path, script: Script, peer: Option<skein_fake_peers::llm:
             client: None,
             root: Some(root),
             script: Some(script),
+            account_sign_in: false,
             input: Some(input),
             output: Some(output),
             reading: false,

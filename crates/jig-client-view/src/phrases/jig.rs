@@ -948,6 +948,11 @@ pub enum JigPhrase {
     EngineLimitPolicy,
     EngineLimitResource,
     EngineLimitService,
+    EngineLimitAccounts,
+    EngineLimitHolderAccounts,
+    EngineLimitSources,
+    EngineLimitSignIns,
+
     FailedBare,
     CancelledBare,
     DecidedBare,
@@ -1545,6 +1550,11 @@ impl JigPhrase {
             Self::EngineLimitPolicy => 445,
             Self::EngineLimitResource => 446,
             Self::EngineLimitService => 447,
+            Self::EngineLimitAccounts => 565,
+            Self::EngineLimitHolderAccounts => 566,
+            Self::EngineLimitSources => 567,
+            Self::EngineLimitSignIns => 568,
+
             Self::FailedBare => 448,
             Self::CancelledBare => 449,
             Self::DecidedBare => 450,
@@ -1693,6 +1703,10 @@ impl JigPhrase {
             | Self::EngineLimitPriority
             | Self::EngineLimitPolicy
             | Self::EngineLimitResource
+            | Self::EngineLimitAccounts
+            | Self::EngineLimitHolderAccounts
+            | Self::EngineLimitSources
+            | Self::EngineLimitSignIns
             | Self::EngineLimitService
             | Self::FailedBare
             | Self::CancelledBare
@@ -2222,7 +2236,7 @@ impl JigPhrase {
     }
 }
 /// Every jig phrase; loading checks this whole contract.
-pub const ALL: [JigPhrase; 583] = [
+pub const ALL: [JigPhrase; 587] = [
     JigPhrase::NoticesPart,
     JigPhrase::NothingKnown,
     JigPhrase::LinkPart,
@@ -2758,6 +2772,10 @@ pub const ALL: [JigPhrase; 583] = [
     JigPhrase::EngineLimitPolicy,
     JigPhrase::EngineLimitResource,
     JigPhrase::EngineLimitService,
+    JigPhrase::EngineLimitAccounts,
+    JigPhrase::EngineLimitHolderAccounts,
+    JigPhrase::EngineLimitSources,
+    JigPhrase::EngineLimitSignIns,
     JigPhrase::FailedBare,
     JigPhrase::CancelledBare,
     JigPhrase::DecidedBare,

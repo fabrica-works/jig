@@ -61,3 +61,18 @@ fn jig_test_serves_its_bundle_s_page_under_the_reference_policy() {
     assert_eq!(browser::field(&headers, "content-security-policy"), Some(browser::POLICY));
     assert_eq!(body, browser::PAGE);
 }
+
+#[test]
+fn a_party_signs_in_through_a_client_and_opens_the_address_at_the_issuer() {
+    let directory = support::scratch();
+    accounts::configuration(directory.path());
+    accounts::run(directory.path());
+}
+
+// Reuse the account sign-in world's browser source; it remains a private test helper.
+use jig_protocol_accounts_world::fixtures;
+#[path = "../../../tests/protocol-accounts/src/visitor.rs"]
+mod account_sign_in_visitor;
+
+#[path = "support/accounts.rs"]
+mod accounts;

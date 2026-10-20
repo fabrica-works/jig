@@ -121,6 +121,10 @@ pub fn store_asks() -> List<c::Ask> {
         },
         c::Ask::MakeService { project: 7, name: store_text(), role: c::HeldRole::Member },
         c::Ask::SetPool { project: 7, party: u64::MAX, budget: u64::MAX },
+        c::Ask::SignIn { holder: c::AccountHolder::Own, provider: u32::MAX },
+        c::Ask::SignIn { holder: c::AccountHolder::Deployment, provider: u32::MAX },
+        c::Ask::SignOut { holder: c::AccountHolder::Own, source: u32::MAX },
+        c::Ask::SignOut { holder: c::AccountHolder::Deployment, source: u32::MAX },
     ])
 }
 pub fn list<T, const N: usize>(values: [T; N]) -> List<T> {

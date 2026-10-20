@@ -23,7 +23,13 @@ impl Payload for OwnerEscalationChoice {
 impl Payload for OwnerOutcome {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Created { .. } | Self::Compound { .. } => Some(0),
+            Self::Created { .. } | Self::Compound { .. } | Self::AccountSignedOut { .. } => Some(0),
+            Self::AccountSignInStarted { address, .. } => {
+                if address.len() > 2048 {
+                    return None;
+                }
+                u64::try_from(address.len()).ok()
+            }
             Self::MarkedSeen { seen } => seen.heap(bounds),
             Self::NoteEdited { name } => name.heap(bounds),
             Self::ServiceMade { person } => person.heap(bounds),

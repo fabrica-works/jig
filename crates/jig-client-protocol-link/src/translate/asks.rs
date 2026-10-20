@@ -665,9 +665,24 @@ pub fn ask(value: &c::Ask, limits: &w::Limits) -> Result<w::Ask, w::Problem> {
                 role: wire_held_role(*role, limits)?,
             },
         )?),
+        c::Ask::SignIn { holder, provider } => w::Ask::SignIn(w::AskSignIn::new(
+            limits,
+            w::AskSignInParts { holder: account_holder(*holder), provider: *provider },
+        )?),
+        c::Ask::SignOut { holder, source } => w::Ask::SignOut(w::AskSignOut::new(
+            limits,
+            w::AskSignOutParts { holder: account_holder(*holder), source: *source },
+        )?),
         c::Ask::SetPool { project, party, budget } => w::Ask::SetPool(w::SetPool::new(
             limits,
             w::SetPoolParts { project: *project, party: *party, budget: *budget },
         )?),
     })
+}
+
+fn account_holder(value: c::AccountHolder) -> w::AccountHolder {
+    match value {
+        c::AccountHolder::Own => w::AccountHolder::Own,
+        c::AccountHolder::Deployment => w::AccountHolder::Deployment,
+    }
 }

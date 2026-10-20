@@ -118,6 +118,8 @@ pub fn client_sent(request: &ClientRequest) -> Option<Sent> {
                 | w::Ask::ChangePolicy(_)
                 | w::Ask::SetRoles(_)
                 | w::Ask::MakeService(_)
+                | w::Ask::SignIn(_)
+                | w::Ask::SignOut(_)
                 | w::Ask::SetPool(_) => None,
             };
             if let Some((key, kind, revision)) = decided {

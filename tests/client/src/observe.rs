@@ -99,6 +99,8 @@ pub fn jig_sent(attempt: skein_lib::Token, request_key: [u8; 16], ask: &Ask) -> 
         | Ask::ChangePolicy { .. }
         | Ask::SetRoles { .. }
         | Ask::MakeService { .. }
+        | Ask::SignIn { .. }
+        | Ask::SignOut { .. }
         | Ask::SetPool { .. } => (None, None, None),
     };
     Sent { attempt, key: request_key, card, revision, words }

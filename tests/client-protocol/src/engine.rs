@@ -11,6 +11,7 @@ use skein_lib::{Env, Queue, Time, Token, Wall};
 use std::collections::{BTreeMap, BTreeSet};
 pub(super) struct Engine {
     pub driver: Driver,
+    pub account_sign_in_burst: Option<Vec<root::Event>>,
     pub component: clients::Component,
     pub server: jig_test_service::server::Server,
     server_out: Queue<jig_test_service::server::Routed>,
@@ -58,6 +59,7 @@ impl Engine {
             .expect("bounded clients component");
         Self {
             driver,
+            account_sign_in_burst: None,
             component,
             server: crate::fixtures::server(),
             server_out: Queue::with_capacity(256),
@@ -242,6 +244,17 @@ impl Engine {
         peer.clear_replies();
         for token in &self.replies {
             peer.register_reply(*token);
+        }
+        if matches!(
+            &event,
+            root::Event::Core(core::Event::People(jig_domain_people::Event::Ask {
+                ask: jig_domain_people::Ask::AccountSignIn { .. },
+                ..
+            }))
+        ) && let Some(burst) = &mut self.account_sign_in_burst
+        {
+            burst.push(event);
+            return;
         }
         self.driver.world.send(event);
         let refused = self.deliveries(watcher);

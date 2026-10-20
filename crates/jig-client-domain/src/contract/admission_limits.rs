@@ -40,4 +40,8 @@ pub enum AdmissionLimit {
     Policy,
     Resource,
     Service,
+    Accounts,
+    HolderAccounts,
+    Sources,
+    SignIns,
 }

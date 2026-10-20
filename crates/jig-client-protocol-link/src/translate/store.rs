@@ -61,6 +61,7 @@ fn policy_edit(value: &w::PolicyEdit, limits: &Limits) -> Result<c::PolicyEdit, 
 }
 
 #[expect(clippy::manual_map, reason = "step code matches optional fields without closures")]
+#[expect(clippy::too_many_lines, reason = "one total match restores every client ask")]
 pub(crate) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::Problem> {
     Ok(match value {
         w::Ask::Propose(value) => super::operations::restore_propose(&value, limits)?,
@@ -158,6 +159,8 @@ pub(crate) fn restore_ask(value: w::Ask, limits: &Limits) -> Result<c::Ask, w::P
             name: text(value.name(), limits)?,
             role: answers::held_role(value.role(), limits),
         },
+        w::Ask::SignIn(value) => c::Ask::SignIn { holder: account_holder(value.holder()), provider: value.provider() },
+        w::Ask::SignOut(value) => c::Ask::SignOut { holder: account_holder(value.holder()), source: value.source() },
         w::Ask::SetPool(value) => {
             c::Ask::SetPool { project: value.project(), party: value.party(), budget: value.budget() }
         }
@@ -232,4 +235,11 @@ pub fn restore_table(
             request,
         },
     })
+}
+
+fn account_holder(value: &w::AccountHolder) -> c::AccountHolder {
+    match value {
+        w::AccountHolder::Own => c::AccountHolder::Own,
+        w::AccountHolder::Deployment => c::AccountHolder::Deployment,
+    }
 }

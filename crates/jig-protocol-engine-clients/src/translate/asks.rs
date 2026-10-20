@@ -68,6 +68,12 @@ pub(crate) fn ask(record: w::Ask, models: &[crate::Model], limits: &w::Limits) -
             let v = value.into_parts();
             p::Ask::MakeService { project: v.project, name: v.name, role: role(v.role) }
         }
+        w::Ask::SignIn(value) => {
+            p::Ask::AccountSignIn { holder: account_holder(value.holder()), provider: value.provider() }
+        }
+        w::Ask::SignOut(value) => {
+            p::Ask::AccountSignOut { holder: account_holder(value.holder()), source: value.source() }
+        }
         w::Ask::SetPool(value) => {
             let v = value.into_parts();
             p::Ask::SetPool { project: v.project, person: v.party, budget: v.budget }
@@ -489,4 +495,11 @@ fn pattern_bytes(value: &p::Pattern, fixed: usize) -> Option<u64> {
     bytes.checked_add(match &value.last {
         p::Last::Exact(bytes) | p::Last::Open(bytes) => u64::try_from(bytes.len()).ok()?,
     })
+}
+
+fn account_holder(value: &w::AccountHolder) -> p::AccountHolder {
+    match value {
+        w::AccountHolder::Own => p::AccountHolder::Own,
+        w::AccountHolder::Deployment => p::AccountHolder::Deployment,
+    }
 }

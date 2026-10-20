@@ -83,6 +83,12 @@ pub fn ask(value: &client::Ask) -> Result<people::Ask, Invalid> {
             people::Ask::Move { project: *project, task: *task, reason: Box::from(reason.bytes()) }
         }
         client::Ask::Seen { through: seen } => people::Ask::MarkSeen { seen: request_arguments::seen(*seen) },
+        client::Ask::SignIn { holder, provider } => {
+            people::Ask::AccountSignIn { holder: account_holder(*holder), provider: *provider }
+        }
+        client::Ask::SignOut { holder, source } => {
+            people::Ask::AccountSignOut { holder: account_holder(*holder), source: *source }
+        }
         client::Ask::SetPool { project, party, budget } => {
             people::Ask::SetPool { project: *project, person: *party, budget: *budget }
         }
@@ -264,6 +270,13 @@ fn escalation_decision(value: &client::Decision) -> Result<people::EscalationDec
         }
         client::Decision::PassedUp => Ok(people::EscalationDecision::Pass),
         client::Decision::Accepted | client::Decision::Released { again: Some(_) } => Err(Invalid::Decision),
+    }
+}
+
+fn account_holder(value: client::AccountHolder) -> people::AccountHolder {
+    match value {
+        client::AccountHolder::Own => people::AccountHolder::Own,
+        client::AccountHolder::Deployment => people::AccountHolder::Deployment,
     }
 }
 

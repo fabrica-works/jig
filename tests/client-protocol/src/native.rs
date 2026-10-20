@@ -12,6 +12,11 @@ pub struct Script {
     steps: Box<[Step<client::Address>]>,
 }
 impl Script {
+    /// Empty UI script for a referee-controlled LLM account sign-in story.
+    #[must_use]
+    pub fn account_sign_in() -> Self {
+        Self { steps: Box::new([]) }
+    }
     /// Start a chat and keep reading until its answer is visible.
     #[must_use]
     pub fn answered_chat(words: &[u8], answer: &[u8]) -> Self {
@@ -80,6 +85,10 @@ pub enum Received {
     Read(jig_client_domain::contract::ReadResult),
 }
 /// A native client as a process of a skein world.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent native lifecycle and externally driven account sign-in script"
+)]
 pub struct NativeClient {
     shell: Shell,
     wire: wire::Wire,
@@ -97,6 +106,7 @@ pub struct NativeClient {
     address: client::Address,
     started: bool,
     person_done: bool,
+    account_sign_in_controlled: bool,
     wake: Option<Time>,
     closing: bool,
     pub received: Vec<Received>,
@@ -128,12 +138,35 @@ impl NativeClient {
             address: jig_client_world::stories::conversation(),
             started: false,
             person_done: false,
+            account_sign_in_controlled: false,
             wake: None,
             closing: false,
             received: Vec::new(),
             signed_in: 0,
             chats_made: 0,
         }
+    }
+    /// Keep the native client open while a process referee drives LLM account sign-in asks.
+    pub fn hold_for_account_sign_in(&mut self) {
+        self.account_sign_in_controlled = true;
+    }
+    /// The own `me` watch confirmed this account sign-in client's party.
+    #[must_use]
+    pub fn account_sign_in_ready(&self) -> bool {
+        self.root.client().link().state == jig_client::Link::Live
+    }
+    /// Supply an LLM account sign-in ask through the real client's request table and link.
+    pub fn ask_account_sign_in(&mut self, key: jig_client::Key, ask: jig_client::contract::Ask) {
+        self.callback(client::Event::Client {
+            event: jig_client::Event::Send { key, name: None, request: jig_client::Ask::Jig(Box::new(ask)) },
+        });
+        self.wake = Some(self.env.now);
+    }
+    /// Drain the native client after the account sign-in referee saw its answers.
+    pub fn finish_account_sign_in(&mut self) {
+        self.account_sign_in_controlled = false;
+        self.person_done = true;
+        self.wake = Some(self.env.now);
     }
     /// # Errors
     /// Refuses a link outside the configured loopback engine's address.
@@ -267,13 +300,16 @@ impl Host for NativeClient {
         }
         self.outputs();
         if !self.closing && self.started {
+            if self.account_sign_in_controlled {
+                self.wake = None;
+            }
             Test::fire(&mut self.root, &self.env, &mut self.out);
             Test::take(&mut self.root, &self.env, &mut self.out);
             self.outputs();
             Test::build(&mut self.view, &self.root, &mut self.patches);
             changed = !self.patches.is_empty();
             while self.patches.pop().is_some() {}
-            if self.terminal.is_none() {
+            if self.terminal.is_none() && !self.account_sign_in_controlled {
                 self.wake = None;
                 let before = self.person.at();
                 match self.person.next(&mut TreeFace::new(Test::tree(&self.view)), now) {

@@ -1,4 +1,5 @@
 //! The application-held client against the real engine over native HTTP bytes.
+mod accounts;
 mod facts;
 mod operations;
 mod shapes;

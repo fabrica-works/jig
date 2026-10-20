@@ -2,6 +2,7 @@
 //! Keeps only the owner's supplied numbers, choices and clocks. Retry,
 //! signed-out, refusal and connector answers are separate boundary routes.
 use super::{ProposalKey, Revision, SeenThrough};
+use alloc::boxed::Box;
 use skein_lib::Wall;
 
 /// The retained decision for a proposal, without an inferred explanation.
@@ -79,4 +80,8 @@ pub enum OwnerOutcome {
     PoolSet { project: u32, person: u64 },
     /// A hold revision's current or historical decision names its winner.
     EscalationDecided { task: u64, revision: Revision, by: u64, at: Wall, choice: OwnerEscalationChoice },
+    /// An LLM account sign-in's address to open on the engine's machine.
+    AccountSignInStarted { source: u32, address: Box<[u8]> },
+    /// Whether the issuer confirmed the end of the LLM account sign-in.
+    AccountSignedOut { confirmed: bool },
 }

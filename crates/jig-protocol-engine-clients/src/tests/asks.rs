@@ -257,3 +257,22 @@ fn a_propose_of_an_amendment_reaches_the_people_child_with_its_reason() {
         })
     );
 }
+
+#[test]
+fn a_sign_in_ask_is_made_a_people_ask_for_its_holder() {
+    let limits = f::wire();
+    for (holder, expected) in
+        [(w::AccountHolder::Own, p::AccountHolder::Own), (w::AccountHolder::Deployment, p::AccountHolder::Deployment)]
+    {
+        let wire = w::Ask::SignIn(
+            w::AskSignIn::new(&limits, w::AskSignInParts { holder: holder.clone(), provider: u32::MAX }).unwrap(),
+        );
+        assert_eq!(
+            ask(wire, &f::models(), &limits),
+            Ok(p::Ask::AccountSignIn { holder: expected, provider: u32::MAX })
+        );
+        let wire =
+            w::Ask::SignOut(w::AskSignOut::new(&limits, w::AskSignOutParts { holder, source: u32::MAX }).unwrap());
+        assert_eq!(ask(wire, &f::models(), &limits), Ok(p::Ask::AccountSignOut { holder: expected, source: u32::MAX }));
+    }
+}

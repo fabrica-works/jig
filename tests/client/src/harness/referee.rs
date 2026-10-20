@@ -523,6 +523,8 @@ fn decisions(ask: &Ask) -> Vec<(ObjectKey, ActKind)> {
         | Ask::ChangePolicy { .. }
         | Ask::SetRoles { .. }
         | Ask::MakeService { .. }
+        | Ask::SignIn { .. }
+        | Ask::SignOut { .. }
         | Ask::SetPool { .. } => Vec::new(),
     }
 }

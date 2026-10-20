@@ -1,3 +1,5 @@
+#[path = "client/accounts.rs"]
+mod accounts;
 #[path = "client/carried.rs"]
 mod carried;
 #[path = "client/llm.rs"]
