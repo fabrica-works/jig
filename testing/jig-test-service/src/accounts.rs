@@ -4,7 +4,7 @@ use crate::{Files, Seeds, values::Values};
 use alloc::boxed::Box;
 use jig_domain_accounts as domain;
 use jig_domain_core as core;
-use jig_protocol_accounts::{handed_in, records, table, translate};
+use jig_protocol_accounts::{handed_in, installation, records, table, translate};
 use jig_protocol_config::{self as config, Path, Problems, Segment, What};
 use jig_protocol_store as store;
 use jig_test_domain as root;
@@ -201,7 +201,10 @@ impl Accounts {
                             client_secret: secret,
                             pkce_for_confidential: false,
                             metadata_claim: None,
-                            terms: None,
+                            // The drawn identifier, for the check at start; every
+                            // identifier formats to the same length, and the
+                            // kept one replaces it once the store is open.
+                            terms: Some(installation::terms(&seeds.installation)),
                         },
                         endpoint,
                         keeper: driver::Keeper::Owner { kept: None },
@@ -394,7 +397,7 @@ impl Accounts {
                 break;
             }
             match store.sources.pop().expect("source answers") {
-                store::Event::SecretsLoaded { owner: _, rows, next } => self.loaded(rows, next),
+                store::Event::SecretsLoaded { owner: _, rows, next } => self.loaded(rows, next, &store.installation),
                 store::Event::Kept { owner } => {
                     if let Some(request) = self.records.kept(source(owner)) {
                         self.down(request);
@@ -425,8 +428,9 @@ impl Accounts {
         }
     }
     /// One page of the store's records; after the last, the driver starts
-    /// from them (llm.md 5.1).
-    fn loaded(&mut self, rows: Box<[store::SecretRow]>, next: Option<u64>) {
+    /// from them (llm.md 5.1), each sign-in sending the installation's
+    /// identifier the store keeps (llm.md 5.4).
+    fn loaded(&mut self, rows: Box<[store::SecretRow]>, next: Option<u64>, kept: &[u8; 16]) {
         let Phase::Loading { configured, after, asked, .. } = &mut self.phase else {
             return;
         };
@@ -454,9 +458,15 @@ impl Accounts {
             *asked = false;
             return;
         }
-        let Phase::Loading { configured, crypto, .. } = ::core::mem::replace(&mut self.phase, Phase::HandingIn) else {
+        let Phase::Loading { mut configured, crypto, .. } = ::core::mem::replace(&mut self.phase, Phase::HandingIn)
+        else {
             unreachable!("loading");
         };
+        for account in 0..configured.len() {
+            if let Some(driver::Account::SignIn { registration, .. }) = configured.get_mut(account) {
+                registration.terms = Some(installation::terms(kept));
+            }
+        }
         let Ok(component) = driver::Component::new(configured, &self.env.limits, crypto) else {
             unreachable!("startup checked the sources, and each record read encodes");
         };
@@ -471,7 +481,7 @@ impl Accounts {
                     *asked = true;
                     let load = store::Secrets::Load { owner: store::SecretOwner::Source, after: *after };
                     if let Some(store::Event::SecretsLoaded { owner: _, rows, next }) = store.secrets(LOAD, load) {
-                        self.loaded(rows, next);
+                        self.loaded(rows, next, &store.installation);
                     }
                 }
             }

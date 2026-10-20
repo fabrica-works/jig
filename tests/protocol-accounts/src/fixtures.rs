@@ -17,6 +17,9 @@ pub const VALUES: [&[u8]; 4] = [TOKEN_FIRST, TOKEN_SECOND, b"seed", b"next"];
 pub const AUTHORIZE: &[u8] = b"http://127.0.0.1:31000/authorize";
 pub const TOKEN: &[u8] = b"http://127.0.0.1:31000/token";
 pub const REDIRECT: &[u8] = b"http://localhost:31234/callback";
+/// The deployment's identifier in the header the owner commits at an empty
+/// store.
+pub const DEPLOYMENT: [u8; 16] = [18; 16];
 /// The store's application bounds: this world keeps no application rows.
 pub const APPLICATION: jig_protocol_store::sizes::Application =
     jig_protocol_store::sizes::Application { version: 1, key: 16, value: 64 };
@@ -63,7 +66,7 @@ pub fn limits() -> accounts::Limits {
             code_bytes: 64,
             url_bytes: 1024,
             request_bytes: 1024,
-            parameter_bytes: 0,
+            parameter_bytes: jig_protocol_accounts::installation::PARAMETER_BYTES,
             resource_bytes: 0,
             nonce_bytes: 0,
             metadata_bytes: 0,
@@ -110,8 +113,9 @@ pub fn child_limits() -> child::Limits {
         facts: 16,
     }
 }
+/// The registration, its terms the installation's identifier's.
 #[must_use]
-pub fn registration() -> oauth::Registration {
+pub fn registration(terms: oauth::Terms) -> oauth::Registration {
     oauth::Registration {
         authorization_url: bytes::copy_of(AUTHORIZE),
         token_endpoint: bytes::copy_of(TOKEN),
@@ -122,7 +126,7 @@ pub fn registration() -> oauth::Registration {
         client_secret: None,
         pkce_for_confidential: false,
         metadata_claim: None,
-        terms: None,
+        terms: Some(terms),
     }
 }
 #[must_use]
@@ -175,7 +179,7 @@ pub fn held(story: crate::world::Story) -> Option<Box<[u8]>> {
     use crate::world::Story;
     match story {
         Story::DamagedRecord => Some(bytes::copy_of(b"damaged record")),
-        Story::HandedIn { .. } | Story::HandedInRejected => None,
+        Story::HandedIn { .. } | Story::HandedInRejected | Story::SignIn => None,
         Story::Granted
         | Story::Refreshed
         | Story::Closed
@@ -200,7 +204,8 @@ pub fn handed_lapse(story: crate::world::Story) -> Option<Duration> {
         | crate::world::Story::RefusedRefresh
         | crate::world::Story::RejectedClient
         | crate::world::Story::DamagedRecord
-        | crate::world::Story::ClosedExchange => None,
+        | crate::world::Story::ClosedExchange
+        | crate::world::Story::SignIn => None,
     }
 }
 #[must_use]
@@ -219,6 +224,8 @@ pub fn rejects(story: crate::world::Story) -> bool {
 pub fn wanted(story: crate::world::Story) -> usize {
     match story {
         crate::world::Story::HandedIn { .. } => 3,
+        // The visit's answer closes a sign-in's story.
+        crate::world::Story::SignIn => 0,
         crate::world::Story::Granted | crate::world::Story::Closed | crate::world::Story::DamagedRecord => 1,
         crate::world::Story::Refreshed
         | crate::world::Story::HandedInRejected
@@ -267,6 +274,7 @@ pub fn expected(story: crate::world::Story) -> Vec<crate::owner::Heard> {
         Story::Granted | Story::Closed | Story::ClosedExchange => {
             vec![Heard::Granted { account: ACCOUNT_CHAT, generation: 1 }]
         }
+        Story::SignIn => vec![],
     }
 }
 
@@ -288,6 +296,7 @@ pub fn issuer_plans(story: crate::world::Story) -> Vec<fake::Plan> {
         | Story::HandedIn { .. }
         | Story::HandedInRejected
         | Story::DamagedRecord => vec![rotate()],
+        Story::SignIn => vec![],
     }
 }
 fn rate_limit() -> fake::Plan {

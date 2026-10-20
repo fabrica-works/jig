@@ -313,7 +313,10 @@ pub(super) const DRIVER: skein_oauth_accounts::Limits = skein_oauth_accounts::Li
         code_bytes: 4096,
         url_bytes: 16384,
         request_bytes: 65536,
-        parameter_bytes: 0,
+        // The registration's one parameter, the installation's identifier
+        // (providers.md 2.2): `ext_agent_host_id`'s 17 bytes and a
+        // `urn:uuid:`'s 45.
+        parameter_bytes: 62,
         resource_bytes: 0,
         nonce_bytes: 0,
         metadata_bytes: 0,

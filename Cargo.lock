@@ -1087,6 +1087,7 @@ name = "jig-protocol-accounts-world"
 version = "0.0.0"
 dependencies = [
  "jig-domain-accounts",
+ "jig-domain-core",
  "jig-protocol-accounts",
  "jig-protocol-config",
  "jig-protocol-store",

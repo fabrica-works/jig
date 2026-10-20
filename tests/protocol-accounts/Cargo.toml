@@ -11,6 +11,7 @@ publish.workspace = true
 skein-lib.workspace = true
 skein-world.workspace = true
 jig-domain-accounts.workspace = true
+jig-domain-core.workspace = true
 jig-protocol-accounts.workspace = true
 jig-protocol-config.workspace = true
 jig-protocol-store.workspace = true

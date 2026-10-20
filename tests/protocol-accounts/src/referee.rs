@@ -31,10 +31,16 @@ impl Referee<Process> for Judge {
         self.deadline.get_or_insert(now.saturating_add(Duration::from_secs(180)));
         let address = processes.iter().find_map(|process| match process {
             Process::Issuer(peer) => peer.address(),
-            Process::Owner(_) => None,
+            Process::Owner(_) | Process::Visitor(_) => None,
+        });
+        let visit = processes.iter().find_map(|process| match process {
+            Process::Owner(owner) => owner.visit().map(Box::<[u8]>::from),
+            Process::Issuer(_) | Process::Visitor(_) => None,
         });
         let close_exchange = self.story == Story::ClosedExchange && crate::world::exchange_seen(processes);
-        let settled = processes.iter().any(|process| matches!(process, Process::Owner(owner) if owner.is_empty()));
+        let answered = visit_answered(processes);
+        let settled = processes.iter().any(|process| matches!(process, Process::Owner(owner) if owner.is_empty()))
+            && processes.iter().all(|process| !matches!(process, Process::Visitor(visitor) if !visitor.is_empty()));
         for process in processes {
             match process {
                 Process::Owner(owner) => {
@@ -43,8 +49,7 @@ impl Referee<Process> for Judge {
                         owner.reject();
                         self.rejected = true;
                     }
-                    let wanted = fixtures::wanted(self.story);
-                    if (owner.child_heard().len() >= wanted || close_exchange) && !self.closing {
+                    if ends(self.story, owner, close_exchange, answered) && !self.closing {
                         owner.close();
                         self.closing = true;
                     }
@@ -54,6 +59,13 @@ impl Referee<Process> for Judge {
                     self.shutdown = true;
                 }
                 Process::Issuer(_) => (),
+                Process::Visitor(visitor) => {
+                    if let Some(url) = &visit
+                        && !visitor.handed()
+                    {
+                        visitor.hand(url);
+                    }
+                }
             }
         }
     }
@@ -62,7 +74,7 @@ impl Referee<Process> for Judge {
             .iter()
             .find_map(|process| match process {
                 Process::Owner(owner) => Some(owner),
-                Process::Issuer(_) => None,
+                Process::Issuer(_) | Process::Visitor(_) => None,
             })
             .expect("owner");
         kept_before_lent(owner);
@@ -81,9 +93,15 @@ impl Referee<Process> for Judge {
             assert_eq!(owner.trace().last(), Some(&Trace::Closed), "Closed is last");
             assert_eq!(
                 owner.became_usable(),
-                self.story != Story::DamagedRecord,
+                !matches!(self.story, Story::DamagedRecord | Story::SignIn),
                 "the real child accepted its grant only with a readable record"
             );
+            if self.story == Story::SignIn {
+                let account = fixtures::ACCOUNT_CHAT;
+                let visit = owner.trace().iter().position(|entry| *entry == Trace::Visit { account });
+                let cancelled = owner.trace().iter().position(|entry| *entry == Trace::SignInCancelled { account });
+                assert!(visit.is_some() && visit < cancelled, "the sign-in asked its visit, then ended cancelled");
+            }
             if self.story == Story::ClosedExchange {
                 assert!(crate::world::exchange_finished(processes), "Closed follows the exchange's successful answer");
             }
@@ -94,7 +112,10 @@ impl Referee<Process> for Judge {
         self.wake = ((owner.unstarted()
             && processes.iter().any(|process| matches!(process, Process::Issuer(peer) if peer.address().is_some())))
             || (owner.is_empty() && !self.shutdown)
-            || (owner.child_heard().len() >= fixtures::wanted(self.story) && !self.closing)
+            || (ends(self.story, owner, crate::world::exchange_seen(processes), visit_answered(processes))
+                && !self.closing)
+            || (owner.visit().is_some()
+                && processes.iter().any(|process| matches!(process, Process::Visitor(visitor) if !visitor.handed())))
             || (self.story == Story::ClosedExchange && crate::world::exchange_seen(processes) && !self.closing)
             || (owner.child_heard().len() == 1 && !self.rejected && fixtures::rejects(self.story)))
         .then_some(now);
@@ -110,6 +131,28 @@ impl Referee<Process> for Judge {
     fn passed(&self) -> bool {
         self.passed.is_some()
     }
+}
+/// Whether the owner's story is done and it may close: a sign-in's once its
+/// visit is answered, an exchange's once it is seen, any other once the
+/// child heard what it wanted.
+fn ends(story: Story, owner: &Owner, exchange_seen: bool, answered: bool) -> bool {
+    match story {
+        Story::SignIn => answered,
+        Story::ClosedExchange => exchange_seen || owner.child_heard().len() >= fixtures::wanted(story),
+        Story::Granted
+        | Story::Refreshed
+        | Story::Closed
+        | Story::HandedIn { .. }
+        | Story::HandedInRejected
+        | Story::RateLimitedRefresh
+        | Story::RefusedRefresh
+        | Story::RejectedClient
+        | Story::DamagedRecord => owner.child_heard().len() >= fixtures::wanted(story),
+    }
+}
+/// Whether the visitor's visit has its answer.
+fn visit_answered(processes: &[Process]) -> bool {
+    processes.iter().any(|process| matches!(process, Process::Visitor(visitor) if visitor.status().is_some()))
 }
 /// Each granted generation's record was read from the store at start, or
 /// the store answered that it is durable, before the grant was heard.

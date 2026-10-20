@@ -1,11 +1,12 @@
 //! One process composing the real child, translation, table and driver,
 //! and the secrets' store that keeps the driver's records (llm.md 5 and 8;
-//! store.md 9).
+//! store.md 9) and the installation's identifier (store.md 4.4 item 9).
 use crate::fixtures::{self, ACCOUNT_CHAT, ROOM};
-use crate::world::Story;
+use crate::world::{Installation, Story};
 use jig_domain_accounts as child;
+use jig_domain_core as core;
 use jig_protocol_accounts::{
-    handed_in,
+    handed_in, installation,
     records::{self, Records},
     table::{Table, Value},
     translate::{self, Up},
@@ -16,6 +17,18 @@ use skein_lib::{Env, List, Queue, Secret, Time, Token, Wall, bytes, sha256};
 use skein_oauth_accounts as driver;
 use skein_world::Host;
 use std::net::SocketAddr;
+
+/// A store component over empty memory stores.
+fn memory(limits: &store::Limits) -> store::Store {
+    store::Store::over(
+        limits,
+        fixtures::APPLICATION,
+        store::Stores {
+            store: skein_kv::Store::memory(&limits.store),
+            secrets: skein_kv::Store::memory(&limits.secrets),
+        },
+    )
+}
 
 /// The store's answers, by what was asked; a replace is answered under its
 /// source's number.
@@ -44,6 +57,14 @@ pub enum Trace {
         generation: u64,
     },
     Heard(Heard),
+    /// The driver asked for a sign-in's visit.
+    Visit {
+        account: u32,
+    },
+    /// The driver ended a sign-in, cancelled.
+    SignInCancelled {
+        account: u32,
+    },
     Closed,
 }
 /// A value the table lent a run, by its digest.
@@ -87,6 +108,10 @@ pub struct Owner {
     now: Time,
     story: Story,
     account: u32,
+    /// The installation's identifier the store answered at open.
+    installation: [u8; 16],
+    /// The URL the driver asked to be visited.
+    visit: Option<Box<[u8]>>,
 }
 impl std::fmt::Debug for Owner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -99,8 +124,9 @@ impl std::fmt::Debug for Owner {
 }
 impl Owner {
     /// The owner over an open memory store holding `held` as its source's
-    /// record, as an earlier run left it.
-    pub(crate) fn new(story: Story, held: Option<&[u8]>) -> Self {
+    /// record, as an earlier run left it, and `installation.kept` as the
+    /// installation's identifier if an earlier start kept one.
+    pub(crate) fn new(story: Story, held: Option<&[u8]>, installation: Installation) -> Self {
         let limits = fixtures::limits();
         let child_limits = fixtures::child_limits();
         let account = if matches!(story, Story::HandedIn { .. } | Story::HandedInRejected) {
@@ -126,14 +152,7 @@ impl Owner {
             above: Queue::with_capacity(ROOM),
             completions: Queue::with_capacity(ROOM),
             submissions: Queue::with_capacity(ROOM),
-            store: store::Store::over(
-                &store_limits,
-                fixtures::APPLICATION,
-                store::Stores {
-                    store: skein_kv::Store::memory(&store_limits.store),
-                    secrets: skein_kv::Store::memory(&store_limits.secrets),
-                },
-            ),
+            store: memory(&store_limits),
             store_limits,
             store_above: Queue::with_capacity(store::MAX_OUT_DOWN),
             below: store::Below {
@@ -157,15 +176,17 @@ impl Owner {
             now: Time::ZERO,
             story,
             account,
+            installation: [0; 16],
+            visit: None,
         };
-        // Memory stores open no file: the root is never read.
-        let root = store::Root { token: OPEN, fd: kernel::Fd::new(3) };
-        owner.ask(Time::ZERO, Wall::EPOCH, store::Request::Open { owner: OPEN, root, installation: [0; 16] });
-        let opened = owner.store_above.pop();
-        assert!(
-            matches!(opened, Some(store::Event::Opened { owner: OPEN, last: 0, .. })),
-            "the memory store opens at once"
-        );
+        if let Some(kept) = installation.kept {
+            // An earlier start kept its draw with its first commit; this
+            // start opens the same stores again.
+            assert_eq!(owner.open(kept), kept, "an empty store answers this start's draw");
+            let stores = std::mem::replace(&mut owner.store, memory(&owner.store_limits)).into_stores();
+            owner.store = store::Store::over(&owner.store_limits, fixtures::APPLICATION, stores);
+        }
+        owner.installation = owner.open(installation.drawn);
         if let Some(held) = held {
             let value = Secret::new(bytes::copy_of(held));
             owner.secrets(Time::ZERO, Wall::EPOCH, source_token(account), replace(account, value, None));
@@ -173,6 +194,52 @@ impl Owner {
             assert!(matches!(kept, Some(store::Event::Kept { .. })), "the store keeps the record held before the run");
         }
         owner
+    }
+    /// Opens the store, as this start drew `drawn`, and answers the
+    /// installation's identifier it keeps. At an empty store the owner, as
+    /// the core's stand-in, commits the deployment's header first, which
+    /// keeps the identifier.
+    fn open(&mut self, drawn: [u8; 16]) -> [u8; 16] {
+        // Memory stores open no file: the root is never read.
+        let root = store::Root { token: OPEN, fd: kernel::Fd::new(3) };
+        self.ask(Time::ZERO, Wall::EPOCH, store::Request::Open { owner: OPEN, root, installation: drawn });
+        let Some(store::Event::Opened { owner: OPEN, last, installation }) = self.store_above.pop() else {
+            panic!("the memory store opens at once");
+        };
+        if last == 0 {
+            let header = core::Record::Core(core::CoreRecord::Deployment(core::Deployment {
+                id: fixtures::DEPLOYMENT,
+                tasks: 0,
+                people: 0,
+                sign_ins: 0,
+                messages: 0,
+                runs: 0,
+                calls: 0,
+                connector_rows: 0,
+                applications: 0,
+                commits: 1,
+            }));
+            self.ask(
+                Time::ZERO,
+                Wall::EPOCH,
+                store::Request::Commit { number: 1, writes: Box::new([store::Write::Save(header)]) },
+            );
+            assert!(
+                matches!(self.store_above.pop(), Some(store::Event::Committed { number: 1, .. })),
+                "the memory store commits at once"
+            );
+        }
+        installation
+    }
+    /// The installation's identifier the store answered at this start.
+    #[must_use]
+    pub fn installation(&self) -> [u8; 16] {
+        self.installation
+    }
+    /// The URL the driver asked to be visited for a sign-in.
+    #[must_use]
+    pub fn visit(&self) -> Option<&[u8]> {
+        self.visit.as_deref()
     }
     #[must_use]
     pub fn child_heard(&self) -> &[Heard] {
@@ -237,7 +304,7 @@ impl Owner {
                     driver::Account::SignIn {
                         shared: false,
                         origins: List::with_capacity(0),
-                        registration: fixtures::registration(),
+                        registration: fixtures::registration(installation::terms(&self.installation)),
                         endpoint: driver::Endpoint {
                             address: self.address.expect("issuer address"),
                             transport: driver::Transport::Plaintext,
@@ -266,7 +333,13 @@ impl Owner {
                 records::Next::Store(keep) => self.replace(env, keep),
             }
         }
-        self.child_event(env.now, env.wall, child::Event::Want);
+        if self.story == Story::SignIn {
+            // The owner asks the driver itself: the child wants no source
+            // in this story.
+            self.driver(env, driver::Request::SignIn { account: self.account, subject: None });
+        } else {
+            self.child_event(env.now, env.wall, child::Event::Want);
+        }
     }
     /// Reads the store's records, page by page, into the configured sources.
     fn load(&mut self, env: &Env<driver::Limits>, configured: &mut List<driver::Account>) {
@@ -382,6 +455,35 @@ impl Owner {
     }
     fn observe(&mut self, env: &Env<driver::Limits>) {
         while let Some(event) = self.above.pop() {
+            // A sign-in's events stop here: the child asks for none.
+            let event = match event {
+                driver::Event::Visit { account, url } => {
+                    self.trace.push(Trace::Visit { account });
+                    self.visit = Some(url);
+                    continue;
+                }
+                driver::Event::Failed {
+                    account,
+                    ends: driver::Ends::SignIn,
+                    failure: driver::Failure::Exchange(skein_oauth::Failure::Cancelled),
+                } => {
+                    self.trace.push(Trace::SignInCancelled { account });
+                    continue;
+                }
+                driver::Event::Failed { ends: driver::Ends::SignIn, .. }
+                | driver::Event::Refused { asked: driver::Asked::SignIn, .. }
+                | driver::Event::SignedIn { .. } => panic!("a sign-in ends only cancelled here"),
+                other @ (driver::Event::Removed { .. }
+                | driver::Event::SignedOut { .. }
+                | driver::Event::Granted { .. }
+                | driver::Event::Expiring { .. }
+                | driver::Event::Keep { .. }
+                | driver::Event::Failed { .. }
+                | driver::Event::Refused { .. }
+                | driver::Event::Lock { .. }
+                | driver::Event::Unlock { .. }
+                | driver::Event::Closed) => other,
+            };
             let event = match self.records.up(event, env.now) {
                 Up::Granted { event, account, generation, value, expires } => {
                     self.lent.push(Lent { account, generation, digest: sha256::digest(value.expose()) });
@@ -452,6 +554,9 @@ impl Host for Owner {
         }
         if self.close_requested.take().is_some() && !self.closing {
             self.closing = true;
+            if self.story == Story::SignIn {
+                self.driver(&env, driver::Request::Cancel { account: self.account });
+            }
             self.child_event(now, wall, child::Event::Close);
         }
         if self.reject_requested.take().is_some() {

@@ -1,5 +1,5 @@
 //! The simulated io world; the owner's records live in its secrets' store.
-use crate::{fixtures, owner::Owner, referee::Judge};
+use crate::{fixtures, owner::Owner, referee::Judge, visitor::Visitor};
 use skein_fake_oauth as fake;
 use skein_fake_peers::{Transport, oauth as peer};
 use skein_io::kernel;
@@ -12,29 +12,46 @@ pub enum Story {
     Granted,
     Refreshed,
     Closed,
-    HandedIn { lapses_in: skein_lib::Duration },
+    HandedIn {
+        lapses_in: skein_lib::Duration,
+    },
     HandedInRejected,
     RateLimitedRefresh,
     RefusedRefresh,
     RejectedClient,
     DamagedRecord,
     ClosedExchange,
+    /// A sign-in asked of the driver, its visit made by the visitor up to
+    /// the issuer's redirect, then cancelled.
+    SignIn,
 }
+/// The installation's identifier at a start (configuration.md 8): the one
+/// this start drew, and the one an earlier start kept in the store, if any.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Installation {
+    pub drawn: [u8; 16],
+    pub kept: Option<[u8; 16]>,
+}
+/// A first start's: nothing kept yet.
+pub const FIRST_START: Installation = Installation { drawn: [5; 16], kept: None };
 pub enum Process {
     Owner(Box<Owner>),
     Issuer(Box<peer::Peer>),
+    Visitor(Box<Visitor>),
 }
 impl Process {
     fn host(&self) -> &dyn Host {
         match self {
             Self::Owner(owner) => owner.as_ref(),
             Self::Issuer(peer) => peer.as_ref(),
+            Self::Visitor(visitor) => visitor.as_ref(),
         }
     }
     fn host_mut(&mut self) -> &mut dyn Host {
         match self {
             Self::Owner(owner) => owner.as_mut(),
             Self::Issuer(peer) => peer.as_mut(),
+            Self::Visitor(visitor) => visitor.as_mut(),
         }
     }
 }
@@ -96,7 +113,8 @@ fn issuer(story: Story) -> Process {
             request_bytes: 1024,
             codes: 1,
             rotations: 2,
-            carried: 0,
+            // The registration's one parameter, `ext_agent_host_id`.
+            carried: 1,
             plans: 2,
         },
         skein_http::server::Limits {
@@ -123,11 +141,20 @@ pub fn run(seed: u64, story: Story) -> Outcome<Process> {
 /// start after a restart.
 #[must_use]
 pub fn run_from(seed: u64, story: Story, held: Option<&[u8]>) -> Outcome<Process> {
+    start(seed, story, held, FIRST_START)
+}
+/// A story from `held` and the installation's identifier as `installation`
+/// finds it.
+#[must_use]
+pub fn start(seed: u64, story: Story, held: Option<&[u8]>, installation: Installation) -> Outcome<Process> {
     let mut config = skein_sim::Config::calm();
     config.wall = Wall::EPOCH;
     let mut world = World::new(seed, config, Judge::new(story), Memory::Checked);
     world.spawn(|| issuer(story));
-    world.spawn(|| Process::Owner(Box::new(Owner::new(story, held))));
+    world.spawn(|| Process::Owner(Box::new(Owner::new(story, held, installation))));
+    if story == Story::SignIn {
+        world.spawn(|| Process::Visitor(Box::default()));
+    }
     world.run()
 }
 #[must_use]
@@ -137,9 +164,32 @@ pub fn owner(outcome: &Outcome<Process>) -> &Owner {
         .iter()
         .find_map(|process| match process {
             Process::Owner(owner) => Some(owner.as_ref()),
-            Process::Issuer(_) => None,
+            Process::Issuer(_) | Process::Visitor(_) => None,
         })
         .expect("owner process")
+}
+/// What the issuer saw, in order.
+#[must_use]
+pub fn issuer_saw(outcome: &Outcome<Process>) -> &[peer::Observation] {
+    outcome
+        .procs
+        .iter()
+        .find_map(|process| match process {
+            Process::Issuer(peer) => Some(peer.observations()),
+            Process::Owner(_) | Process::Visitor(_) => None,
+        })
+        .expect("issuer process")
+}
+#[must_use]
+pub fn visitor(outcome: &Outcome<Process>) -> &Visitor {
+    outcome
+        .procs
+        .iter()
+        .find_map(|process| match process {
+            Process::Visitor(visitor) => Some(visitor.as_ref()),
+            Process::Owner(_) | Process::Issuer(_) => None,
+        })
+        .expect("visitor process")
 }
 
 pub(crate) fn exchange_seen(processes: &[Process]) -> bool {
