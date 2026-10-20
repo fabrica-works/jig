@@ -279,8 +279,16 @@ fn memory_below_the_components_sum_is_refused() {
     // JP10c-b adds 248 bytes over f448c8d4: 240 inline bytes for the parser and
     // two runtime provider copies, plus 8 bytes for their two "Fake" names.
     // This fixture has no manage address; supplied addresses cost three copies.
-    // x1d's public account preferences and separate task pin/wait facts add 345,296 bytes:
-    // people's retained requests and copies, task documents, and their routed output room.
+    // Over 3ca78043, x1d adds 345,296 bytes (people LlmChoice 24 -> 32; Member 360 -> 368;
+    // Amendment 320 -> 328; Ask 360 -> 368; Task 1,464 -> 1,504). The pin was already priced.
+    // People: 1 * 8 amendment scratch + 48 * (8 * 8) compound-ask payload copies
+    // (32 answered + 2 * 8 pending), + 77 * 8 answered B-tree slots (7 nodes * 11),
+    // + 8 * 16 pending inline asks = 3,824.
+    // Documents: 20 * (56 * 40) = 44,800: one construction + 4 watches + 4 loads
+    // + (4 rows + 3) read-answer copies + 4 act scratch; each Project envelope
+    // prices (4 lines squared + 8 * 4 + 8) task carriers, each gaining the 40-byte wait.
+    // Routed/load payloads: (18,538 writes + 4 loads) * (2 members * 8) = 296,672.
+    // 3,824 + 44,800 + 296,672 = 345,296; hub unchanged.
     assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_677_344_295 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {

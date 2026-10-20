@@ -94,6 +94,12 @@ fn wait(value: documents::TaskRunWait) -> client::TaskRunWait {
                 documents::TaskWaitWhy::Refreshing => client::TaskWaitWhy::Refreshing,
                 documents::TaskWaitWhy::Host => client::TaskWaitWhy::Host,
                 documents::TaskWaitWhy::Empty => client::TaskWaitWhy::Empty,
+                documents::TaskWaitWhy::Invalid(why) => client::TaskWaitWhy::Invalid(match why {
+                    jig_domain_tasks::AccountWhy::Unknown => client::AccountWhy::Unknown,
+                    jig_domain_tasks::AccountWhy::Provider => client::AccountWhy::Provider,
+                    jig_domain_tasks::AccountWhy::Uses => client::AccountWhy::Uses,
+                    jig_domain_tasks::AccountWhy::Limited => client::AccountWhy::Limited,
+                }),
                 documents::TaskWaitWhy::Source(state) => client::TaskWaitWhy::Source(match state {
                     documents::TaskSourceState::Asking => client::TaskSourceState::Asking,
                     documents::TaskSourceState::Granted => client::TaskSourceState::Granted,

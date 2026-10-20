@@ -335,7 +335,7 @@ fn a_held_tasks_due_context_leaves_the_queue() {
 }
 
 #[test]
-fn a_task_document_exposes_an_account_wait_with_no_guessed_reset() {
+fn a_task_document_preserves_an_unknown_account_reset() {
     let (mut core, limits) = ready(false);
     account(&mut core, &limits, accounts::Event::Limited { account: 1, reset: None });
     let row = core.tasks.task(TASK).unwrap();
@@ -356,4 +356,57 @@ fn a_task_document_distinguishes_an_application_credential_wait() {
     core.workspace_credentials.insert(TASK, Box::new([7])).unwrap();
     let document = task_from_row(&core, &limits, 1, core.tasks.task(TASK).unwrap(), Wall::EPOCH).unwrap();
     assert_eq!(document.run_wait, Some(TaskRunWait::Credential));
+}
+
+#[test]
+fn a_progress_count_leaves_due_task_watches_unmarked() {
+    let (mut core, mut limits) = ready(false);
+    limits.fleet.engine_slots = 1;
+    core.fleet = fleet::Domain::new(&limits.fleet, fixtures::needs());
+    let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits: limits.fleet };
+    let mut out = Queue::with_capacity(fleet::max_out(&limits.fleet));
+    fleet::step(
+        &mut core.fleet,
+        &env,
+        fleet::Event::Start {
+            placement: None,
+            charter: 1,
+            grants: Box::new([]),
+            reply_to: ReplyTo::new(Token::new(1)),
+            run: Token::new(2),
+            attempt: Token::new(7),
+            workstream: 1,
+            kinds: fleet::Kinds::Engine,
+            assignment: fleet::Assignment { turns: Token::new(0), answered: Token::new(0) },
+        },
+        &mut out,
+    );
+    fleet::resume(&mut core.fleet, &env, &mut out);
+    fleet::step(
+        &mut core.fleet,
+        &env,
+        fleet::Event::Observe {
+            channel: Token::new(0),
+            run: Token::new(2),
+            attempt: Token::new(7),
+            report: fleet::Report::Started,
+        },
+        &mut out,
+    );
+    let subject =
+        core.view_names.insert(WatchedSubject { subject: Subject::Task { task: TASK }, watchers: 1 }).unwrap();
+    core.view_subjects
+        .insert(Token::new(99), WatchBinding { party: 1, sign_in: 10, subject, window: window() })
+        .unwrap();
+    step(
+        &mut core,
+        &Env { now: Time::ZERO, wall: Wall::from_nanos(1), limits },
+        Event::Fleet(fleet::Event::Observe {
+            channel: Token::new(0),
+            run: Token::new(2),
+            attempt: Token::new(7),
+            report: fleet::Report::Count { kind: fleet::CountKind::TextArrived, elapsed: Duration::ZERO, count: 1 },
+        }),
+    );
+    assert!(core.changed_views.is_empty());
 }

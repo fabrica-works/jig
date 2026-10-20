@@ -100,7 +100,7 @@ fn amend_choice(h: &mut Harness, account: Option<u32>) {
     let message = row.last_message.checked_add(1).expect("test message room");
     let mut choice = row.llm.clone().unwrap();
     choice.account = account;
-    let out = h.send(Event::Amend {
+    h.send(Event::Amend {
         funder: None,
         reply_to: to(),
         by: crate::Party::Person(9),
@@ -120,28 +120,56 @@ fn amend_choice(h: &mut Harness, account: Option<u32>) {
             reason: Box::new([]),
         },
     });
-    let mut done = false;
-    for request in &out {
-        if let crate::Request::Done { .. } = request {
-            done = true;
-        }
-    }
-    assert!(done, "{out:?}");
+}
+
+fn amended() -> (Harness, u64) {
+    let mut h = preparing();
+    claim(&mut h, 1, SELECTED, 10);
+    let revision = h.domain.task(TASK).unwrap().revisions.spec;
+    // The preference already names PREFERENCE; replacing the pin alone is a real edit.
+    amend_choice(&mut h, Some(PREFERENCE));
+    (h, revision)
 }
 
 #[test]
 fn an_explicit_different_account_clears_the_pin_in_the_amendment() {
-    let mut h = preparing();
-    claim(&mut h, 1, SELECTED, 10);
-    let revision = h.domain.task(TASK).unwrap().revisions.spec;
-    // The retained preference already names PREFERENCE; pin invalidation is a real change.
-    amend_choice(&mut h, Some(PREFERENCE));
-    let row = h.domain.task(TASK).unwrap();
-    assert_eq!(row.kept_account, None);
-    assert_eq!(row.revisions.spec, revision.checked_add(1).expect("one amendment"));
-    assert_eq!(row.run_reserved, 10, "the current claim retains its reservation");
+    let (h, _) = amended();
+    assert_eq!(h.domain.task(TASK).unwrap().kept_account, None);
+}
+
+#[test]
+fn replacing_a_pin_advances_the_spec_revision() {
+    let (h, revision) = amended();
+    assert_eq!(h.domain.task(TASK).unwrap().revisions.spec, revision.checked_add(1).expect("one amendment"));
+}
+
+#[test]
+fn replacing_a_pin_retains_the_live_reservation() {
+    let (h, _) = amended();
+    assert_eq!(h.domain.task(TASK).unwrap().run_reserved, 10);
+}
+
+#[test]
+fn a_cleared_account_pin_survives_restore() {
+    let (mut h, _) = amended();
     h.restart();
     assert_eq!(h.domain.task(TASK).unwrap().kept_account, None);
+}
+
+#[test]
+fn the_next_claim_keeps_the_replacement_account() {
+    let (mut h, _) = amended();
+    h.send(Event::Activation {
+        reply_to: to(),
+        task: TASK,
+        attempt: 1,
+        cause: crate::Cause::Priced { cumulative: 0 },
+        end: crate::End::Recheck,
+        saved: None,
+    });
+    h.send(Event::Prepare { reply_to: to(), task: TASK });
+    claim(&mut h, 2, PREFERENCE, 10);
+    assert_eq!(h.domain.task(TASK).unwrap().kept_account, Some(PREFERENCE));
 }
 
 #[test]

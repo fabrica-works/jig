@@ -405,13 +405,17 @@ fn llm(value: Option<&Value>) -> Result<Option<tasks::LlmChoice>, Problem> {
     let mut subagents = List::with_capacity(0);
     if let Some(values) = value.field(b"subagents")? {
         let items = values.array()?;
-        let count = u32::try_from(items.len()).expect("JSON input count fits u32");
+        let Ok(count) = u32::try_from(items.len()) else {
+            return Err(Problem { field: b"subagents", why: crate::Why::TooLarge });
+        };
         if count > tasks::MODELS {
             return Err(Problem { field: b"subagents", why: crate::Why::TooLarge });
         }
         subagents = List::with_capacity(count);
         for item in items {
-            subagents.push(model_effort(item)?).expect("bounded sub-agent choices");
+            let Ok(()) = subagents.push(model_effort(item)?) else {
+                return Err(Problem { field: b"subagents", why: crate::Why::TooLarge });
+            };
         }
     }
     Ok(Some(tasks::LlmChoice {

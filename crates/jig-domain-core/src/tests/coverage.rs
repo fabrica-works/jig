@@ -111,7 +111,7 @@ fn with_model(core: &mut Core) {
 }
 
 #[test]
-fn a_named_account_refusal_keeps_the_number_with_its_reason() {
+fn a_named_account_refusal_keeps_its_number() {
     let (mut core, _) = prepared(false, accounts::Holder::Party(ALICE), None);
     with_model(&mut core);
     assert_eq!(

@@ -48,7 +48,7 @@ fn an_amendment_parses_its_explicit_llm_choice() {
     assert_eq!(amendment.llm, Some(chosen()));
 }
 #[test]
-fn a_choice_with_an_invalid_field_is_refused_during_parsing() {
+fn an_invalid_choice_field_is_refused_during_parsing() {
     for (choice, field, why) in [
         (r#"{"account":42}"#, b"main".as_slice(), Why::Missing),
         (r#"{"main":{"model":256}}"#, b"model", Why::Range),
@@ -81,7 +81,7 @@ fn subagent_choice_count_is_bounded_before_allocation() {
     }
 }
 #[test]
-fn an_account_refusal_renders_its_number_with_its_reason() {
+fn an_account_refusal_renders_its_number() {
     for (why, reason) in [
         (tasks::AccountWhy::Unknown, "account not found"),
         (tasks::AccountWhy::Provider, "account belongs to another provider"),
@@ -101,7 +101,7 @@ fn an_account_refusal_renders_its_number_with_its_reason() {
 }
 
 #[test]
-fn an_llm_amendment_with_a_priority_still_needs_its_revision() {
+fn an_llm_amendment_still_needs_its_revision_despite_a_priority() {
     let input = br#"{"target":3,"amendment":{"tracked":{"priority":1},"llm":{"main":{"model":0}},"reason":"choose"}}"#;
     let Decoded::Problem(problem) = crate::decode(b"amend", input, &fixtures::LIMITS) else {
         panic!("revision required")

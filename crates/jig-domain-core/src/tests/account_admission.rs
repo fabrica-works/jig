@@ -215,7 +215,10 @@ fn narrowed_recurring() -> (Core, Limits, u64) {
 #[test]
 fn a_recurring_occurrence_waits_for_its_narrowed_account() {
     let (core, _, number) = narrowed_recurring();
-    assert_eq!(core.run_choice(number), Err(RunWait::InvalidAccount { account: ACCOUNT, why: tasks::AccountWhy::Uses }));
+    assert_eq!(
+        core.run_choice(number),
+        Err(RunWait::InvalidAccount { account: ACCOUNT, why: tasks::AccountWhy::Uses })
+    );
 }
 
 #[test]

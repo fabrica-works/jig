@@ -160,7 +160,6 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
             }
             fleet::Request::Observed { run, attempt: _ } => {
                 core.touch_deployment();
-                core.touch_run_waits();
                 super::view_routes::touch_number(core, &env.limits, run.raw());
                 continue;
             }

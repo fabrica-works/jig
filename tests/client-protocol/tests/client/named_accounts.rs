@@ -111,7 +111,7 @@ fn amend(story: &mut Story, number: u64, account: u32) {
     );
 }
 #[test]
-fn a_client_creates_with_an_explicit_account() {
+fn a_client_names_an_explicit_account_at_creation() {
     let (story, _, first, _) = prepared();
     let task = task(&story).expect("bounded account story fixture");
     assert_eq!(task.llm.as_ref().expect("bounded account story fixture").account, Some(first.0));
