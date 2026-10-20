@@ -5,6 +5,7 @@ use fixtures::list;
 use jig_client_protocol_wire::v10 as w;
 use jig_domain_accounts as a;
 use jig_domain_core::documents as d;
+use jig_domain_people::CapacityAction as A;
 use skein_lib::{Duration, List, Wall};
 fn source_lines() -> List<d::SourceLine> {
     list([
@@ -35,6 +36,8 @@ fn document(end: Option<a::End>) -> d::Accounts {
     d::Accounts {
         accounts: list([
             d::AccountLine {
+                provider_name: None,
+                manage_usage: None,
                 number: 7,
                 place: 3,
                 uses: Some(list([a::Use::Party(23), a::Use::Project(29)])),
@@ -46,6 +49,8 @@ fn document(end: Option<a::End>) -> d::Accounts {
                 cut: true,
             },
             d::AccountLine {
+                provider_name: None,
+                manage_usage: None,
                 number: 9,
                 place: 4,
                 uses: None,
@@ -155,4 +160,46 @@ fn deployment_accounts_keep_identity_uses_and_ordered_sources() {
         crate::translate::deployment::account(account, &bound),
         Err(w::Problem { path: w::Path::OwnerAccountSources, reason: skein_codec::Reason::Bound })
     );
+}
+
+fn deployment_terms() -> d::Account {
+    let mut source = fixtures::deployment_document();
+    let account = source.accounts.get_mut(0).unwrap();
+    account.provider_name = Some(d::Text { bytes: Box::from(b"Arbitrary provider".as_slice()), cut: true });
+    account.manage_usage = Some(Box::from(b"https://usage.example/".as_slice()));
+    account.clone()
+}
+#[test]
+fn deployment_terms_reach_the_wire() {
+    let limits = jig_client_test_records::limits();
+    let encoded = crate::translate::deployment::account(&deployment_terms(), &limits).unwrap();
+    assert_eq!(encoded.provider_name().as_ref().unwrap().bytes(), b"Arbitrary provider");
+    assert!(encoded.provider_name().as_ref().unwrap().cut());
+    assert_eq!(encoded.manage_usage().as_deref(), Some(b"https://usage.example/".as_slice()));
+}
+#[test]
+fn account_line_terms_reach_the_wire() {
+    let limits = jig_client_test_records::limits();
+    let account = deployment_terms();
+    let mut account_line = document(None).accounts.get(0).unwrap().clone();
+    account_line.provider_name = account.provider_name;
+    account_line.manage_usage = account.manage_usage;
+    let line = accounts::line(&account_line, &limits).unwrap();
+    assert_eq!(line.provider_name().as_ref().unwrap().bytes(), b"Arbitrary provider");
+    assert!(line.provider_name().as_ref().unwrap().cut());
+    assert_eq!(line.manage_usage().as_deref(), Some(b"https://usage.example/".as_slice()));
+}
+#[test]
+fn account_capacity_actions_reach_the_wire() {
+    let limits = jig_client_test_records::limits();
+    let source = fixtures::deployment_document();
+    for (action, expected) in [
+        (A::AccountSignIn, w::OwnerPersonCapacityAction::AccountSignIn),
+        (A::AccountSignOut, w::OwnerPersonCapacityAction::AccountSignOut),
+        (A::AccountChange, w::OwnerPersonCapacityAction::AccountChange),
+    ] {
+        let mut refusal = *source.person_room_refusals.get(0).unwrap();
+        refusal.action = action;
+        assert_eq!(crate::translate::deployment::person_refusal(&refusal, &limits).unwrap().action(), &expected);
+    }
 }

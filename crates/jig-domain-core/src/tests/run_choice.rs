@@ -73,6 +73,9 @@ fn ready(none: bool) -> (Core, Limits) {
     config.settings.llm_providers.providers[0].models =
         Box::new([b"scripted".as_slice().into(), b"same".as_slice().into()]);
     let provider = accounts::Provider {
+        name: b"Fake".as_slice().into(),
+        signed_in_plan: !none,
+        manage_usage: Some(b"https://usage.example/".as_slice().into()),
         number: 2,
         models: Box::new([b"other".as_slice().into()]),
         offers: accounts::Offers { sign_in: !none, key: false, programs: Box::new([]) },

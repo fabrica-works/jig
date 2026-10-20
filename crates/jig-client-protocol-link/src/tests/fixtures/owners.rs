@@ -77,6 +77,8 @@ pub fn owner_with_account(until: Option<u64>) -> w::OwnerDeployment {
     let account = w::OwnerAccount::new(
         &lim,
         w::OwnerAccountParts {
+            provider_name: None,
+            manage_usage: None,
             skein_bools: [false, true, false, true, false],
             number: 1,
             place: 0,
@@ -115,6 +117,8 @@ pub fn owner_account_expected(until: Option<u64>) -> c::OwnerDeployment {
     owner
         .accounts
         .push(c::OwnerAccount {
+            provider_name: None,
+            manage_usage: None,
             number: 1,
             place: 0,
             uses: None,

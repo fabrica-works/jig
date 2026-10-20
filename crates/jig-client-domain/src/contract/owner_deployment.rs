@@ -3,6 +3,7 @@
 //! client/domain/contract.md, 5 and 7.1;
 //! client/domain/pages.md, 7.
 use super::{AdmissionLimit, Chip, Funder, OwnerRequester, OwnerTaskLink, Proposer, SeenThrough};
+use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
 
 /// Whole supplied deployment facts with independent bounded loss counters.
@@ -93,6 +94,8 @@ pub struct OwnerAccount {
     pub uses: Option<List<super::OwnerAccountUse>>,
     pub plan: bool,
     pub provider: Option<u32>,
+    pub provider_name: Option<super::DocumentText>,
+    pub manage_usage: Option<Box<[u8]>>,
     pub display: super::DocumentText,
     pub holder: super::OwnerAccountHolder,
     pub sources: List<super::OwnerAccountSource>,
@@ -273,6 +276,12 @@ pub enum OwnerPersonCapacityAction {
     Release { task: u64 },
     /// `MarkSeen` as supplied by its owner.
     MarkSeen { seen: SeenThrough },
+    /// An account sign-in, without the request's provider or holder.
+    AccountSignIn,
+    /// An account sign-out, without the request's source or holder.
+    AccountSignOut,
+    /// An account change, without its credential or subject payload.
+    AccountChange,
 }
 
 /// The supplied closed personcapacitycause vocabulary.

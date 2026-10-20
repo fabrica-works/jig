@@ -100,6 +100,8 @@ fn account(value: &documents::Account, limits: &Limits) -> Result<client::OwnerA
         uses: super::accounts::uses(value.uses.as_ref()),
         plan: value.plan,
         provider: value.provider,
+        provider_name: value.provider_name.as_ref().map(|name| owner::text(name, limits)).transpose()?,
+        manage_usage: value.manage_usage.clone(),
         display: owner::text(&value.display, limits)?,
         holder: super::accounts::holder(value.holder),
         sources: super::accounts::sources(&value.sources, limits)?,
@@ -202,6 +204,9 @@ fn hello(value: fleet::HelloRefusal) -> client::OwnerHelloRefusal {
 
 fn person_action(value: people::CapacityAction) -> client::OwnerPersonCapacityAction {
     match value {
+        people::CapacityAction::AccountSignIn => client::OwnerPersonCapacityAction::AccountSignIn,
+        people::CapacityAction::AccountSignOut => client::OwnerPersonCapacityAction::AccountSignOut,
+        people::CapacityAction::AccountChange => client::OwnerPersonCapacityAction::AccountChange,
         people::CapacityAction::Create => client::OwnerPersonCapacityAction::Create,
         people::CapacityAction::Compound => client::OwnerPersonCapacityAction::Compound,
         people::CapacityAction::Application { connector } => {

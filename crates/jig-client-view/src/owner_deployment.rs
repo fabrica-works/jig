@@ -202,6 +202,9 @@ fn show_funder(b: &mut Builder, words: &Words, value: Funder) {
 }
 fn person_action(b: &mut Builder, words: &Words, value: OwnerPersonCapacityAction) {
     match value {
+        OwnerPersonCapacityAction::AccountSignIn => text(b, words, P::PersonCapacityActionAccountSignIn, &[]),
+        OwnerPersonCapacityAction::AccountSignOut => text(b, words, P::PersonCapacityActionAccountSignOut, &[]),
+        OwnerPersonCapacityAction::AccountChange => text(b, words, P::PersonCapacityActionAccountChange, &[]),
         OwnerPersonCapacityAction::Create => text(b, words, P::PersonCapacityActionCreate, &[]),
         OwnerPersonCapacityAction::Compound => text(b, words, P::PersonCapacityActionCompound, &[]),
         OwnerPersonCapacityAction::Application { connector } => {
@@ -670,7 +673,7 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
         .checked_mul(l.rows)?
         .checked_mul(2)?
         .checked_add(l.rows.checked_mul(12)?)?
-        .checked_add(64)?
+        .checked_add(68)?
         .checked_mul(l.rows)?;
     hosts
         .checked_add(attempts)?
@@ -684,7 +687,11 @@ pub fn max_nodes(l: &Limits) -> Option<u32> {
 pub fn limits(l: &Limits, words: &Words) -> Option<skein_ui::Limits> {
     let nodes = max_nodes(l)?;
     let phrase = words.jig_capacity()?;
-    let text_per_node = phrase.max(crate::literal_segment::max_bytes(l.text)?).max(64).checked_mul(2)?;
+    let text_per_node = phrase
+        .max(crate::literal_segment::max_bytes(l.text)?)
+        .max(64)
+        .checked_mul(2)?
+        .max(jig_client::contract::ACCOUNT_MANAGE_USAGE.checked_add(phrase)?);
     Some(skein_ui::Limits {
         nodes,
         depth: l.rows.checked_add(32)?,
@@ -782,6 +789,17 @@ pub fn required(value: &OwnerDeployment, l: &Limits, words: &Words) -> Option<sk
             || account.waiting.capacity() > l.rows
             || account.sources.capacity() > l.rows
             || !account.display.bytes.fits(l.text)
+        {
+            return None;
+        }
+        if let Some(name) = &account.provider_name
+            && !name.bytes.fits(l.text)
+        {
+            return None;
+        }
+        if let Some(address) = &account.manage_usage
+            && (address.len() > usize::try_from(jig_client::contract::ACCOUNT_MANAGE_USAGE).ok()?
+                || !skein_ui::markdown::safe_url(address))
         {
             return None;
         }

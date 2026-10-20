@@ -130,6 +130,9 @@ pub fn domain() -> Domain {
                     tools: core::ToolFamilies::JIG,
                     llm_providers: jig_domain_accounts::Providers {
                         providers: Box::new([jig_domain_accounts::Provider {
+                            name: b"Fake".as_slice().into(),
+                            signed_in_plan: true,
+                            manage_usage: Some(b"https://usage.example/".as_slice().into()),
                             number: 1,
                             models: Box::new([b"small".as_slice().into()]),
                             offers: jig_domain_accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },

@@ -782,8 +782,9 @@ fn full_cursor() -> Cursor {
 
 #[test]
 fn each_page_bound_keeps_its_value_at_the_client_limits() {
-    // Two account rows each add two 12-node sources and 48 identity/use nodes.
-    const DEPLOYMENT_NODES: u32 = 2873;
+    // Two account rows each add two 12-node sources and 48 identity/use nodes,
+    // and four nodes for the provider name, its cut mark and manage link.
+    const DEPLOYMENT_NODES: u32 = 2_881;
     assert_eq!(
         [
             crate::inbox_nodes(&CLIENT, 0),

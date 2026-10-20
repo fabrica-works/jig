@@ -7,6 +7,18 @@ pub(super) fn details(b: &mut Builder, words: &Words, account: &OwnerAccount) {
     if let Some(provider) = account.provider {
         field_number(b, words, P::AccountDetail(A::Provider), u64::from(provider));
     }
+    if let Some(name) = &account.provider_name {
+        crate::literal_segment::render(b, name.bytes());
+        if name.cut {
+            text(b, words, P::Cut, &[]);
+        }
+    }
+    if let Some(address) = &account.manage_usage {
+        b.open(Role::Link);
+        b.external(address);
+        text(b, words, P::AccountDetail(A::ManageUsage), &[]);
+        b.close();
+    }
     crate::literal_segment::render(b, account.display.bytes());
     if account.display.cut {
         text(b, words, P::Cut, &[]);

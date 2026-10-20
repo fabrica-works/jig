@@ -140,6 +140,9 @@ pub enum DeploymentPhrase {
     PersonCapacityActionCancel,
     PersonCapacityActionRelease,
     PersonCapacityActionMarkSeen,
+    PersonCapacityActionAccountSignIn,
+    PersonCapacityActionAccountSignOut,
+    PersonCapacityActionAccountChange,
     PersonCapacityCauseRequests,
     PersonCapacityCausePending,
     PersonCapacityCauseWaiters,
@@ -222,7 +225,7 @@ pub enum DeploymentPhrase {
     StoreBytes,
     StoreMark,
 }
-pub const ALL: [DeploymentPhrase; 242] = [
+pub const ALL: [DeploymentPhrase; 246] = [
     DeploymentPhrase::Agent(AgentPhrase::Model),
     DeploymentPhrase::Agent(AgentPhrase::Window),
     DeploymentPhrase::Agent(AgentPhrase::Output),
@@ -359,6 +362,7 @@ pub const ALL: [DeploymentPhrase; 242] = [
     DeploymentPhrase::AccountDetail(AccountPhrase::DefaultUses),
     DeploymentPhrase::AccountDetail(AccountPhrase::PaysParty),
     DeploymentPhrase::AccountDetail(AccountPhrase::PaysProject),
+    DeploymentPhrase::AccountDetail(AccountPhrase::ManageUsage),
     DeploymentPhrase::AccountStateClosing,
     DeploymentPhrase::HelloRefusalReservedChannel,
     DeploymentPhrase::HelloRefusalWorkers,
@@ -385,6 +389,9 @@ pub const ALL: [DeploymentPhrase; 242] = [
     DeploymentPhrase::PersonCapacityActionCancel,
     DeploymentPhrase::PersonCapacityActionRelease,
     DeploymentPhrase::PersonCapacityActionMarkSeen,
+    DeploymentPhrase::PersonCapacityActionAccountSignIn,
+    DeploymentPhrase::PersonCapacityActionAccountSignOut,
+    DeploymentPhrase::PersonCapacityActionAccountChange,
     DeploymentPhrase::PersonCapacityCauseRequests,
     DeploymentPhrase::PersonCapacityCausePending,
     DeploymentPhrase::PersonCapacityCauseWaiters,
@@ -601,6 +608,9 @@ impl DeploymentPhrase {
                 Self::PersonCapacityActionCancel => 9325,
                 Self::PersonCapacityActionRelease => 9326,
                 Self::PersonCapacityActionMarkSeen => 9327,
+                Self::PersonCapacityActionAccountSignIn => 9470,
+                Self::PersonCapacityActionAccountSignOut => 9471,
+                Self::PersonCapacityActionAccountChange => 9472,
                 Self::PersonCapacityCauseRequests => 9328,
                 Self::PersonCapacityCausePending => 9329,
                 Self::PersonCapacityCauseWaiters => 9330,
@@ -773,6 +783,9 @@ impl DeploymentPhrase {
             | Self::PersonCapacityActionCancel
             | Self::PersonCapacityActionRelease
             | Self::PersonCapacityActionMarkSeen
+            | Self::PersonCapacityActionAccountSignIn
+            | Self::PersonCapacityActionAccountSignOut
+            | Self::PersonCapacityActionAccountChange
             | Self::PersonCapacityCauseRequests
             | Self::PersonCapacityCausePending
             | Self::PersonCapacityCauseWaiters
@@ -1025,6 +1038,9 @@ impl DeploymentPhrase {
             Self::PersonCapacityActionCancel => b"Person Capacity Action Cancel",
             Self::PersonCapacityActionRelease => b"Person Capacity Action Release",
             Self::PersonCapacityActionMarkSeen => b"Person Capacity Action Mark SeenThrough",
+            Self::PersonCapacityActionAccountSignIn => b"Sign in to an account",
+            Self::PersonCapacityActionAccountSignOut => b"Sign out of an account",
+            Self::PersonCapacityActionAccountChange => b"Change an account",
             Self::PersonCapacityCauseRequests => b"Person Capacity Cause Requests",
             Self::PersonCapacityCausePending => b"Person Capacity Cause Pending",
             Self::PersonCapacityCauseWaiters => b"Person Capacity Cause Waiters",

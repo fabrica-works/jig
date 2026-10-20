@@ -168,6 +168,8 @@ pub fn owner_account(limits: &Limits, state: OwnerAccountState) -> OwnerAccount 
     OwnerAccount::new(
         limits,
         OwnerAccountParts {
+            provider_name: None,
+            manage_usage: None,
             number: u32::MAX,
             place: 0,
             uses: None,

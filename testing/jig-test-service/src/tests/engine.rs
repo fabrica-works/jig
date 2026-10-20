@@ -375,7 +375,12 @@ fn a_result_that_does_not_decode_fails_its_attempt_as_invalid() {
 }
 #[test]
 fn a_provider_registration_without_runtime_is_refused() {
-    let document = fixtures::with(&fixtures::accounts_document(), br#""keys":true"#, br#""keys":true,"sign_in":{"issuer":"https://issuer.example","client":"client","scopes":["openid"],"authorization":"https://issuer.example/authorize","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","must_grant":["openid"],"redirect_path":"callback"}"#);
+    let configured = fixtures::with(
+        &fixtures::accounts_document(),
+        br#""name":"fake-provider""#,
+        br#""name":"fake-provider","signed_in_plan":false"#,
+    );
+    let document = fixtures::with(&configured, br#""keys":true"#, br#""keys":true,"sign_in":{"issuer":"https://issuer.example","client":"client","scopes":["openid"],"authorization":"https://issuer.example/authorize","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","must_grant":["openid"],"redirect_path":"callback"}"#);
     let found = crate::startup(&document, &fixtures::files(&document), None, &fixtures::seeds(), None, None)
         .err()
         .expect("runtime absent");

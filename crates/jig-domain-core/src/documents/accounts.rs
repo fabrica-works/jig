@@ -3,6 +3,7 @@ use super::deployment::{AccountState, DocumentClock, account_state, wall_deadlin
 use super::inbox_deployment::line_bound;
 use super::{DocumentLimits, Missing, Text, Window};
 use crate::{Core, Limits};
+use alloc::boxed::Box;
 use jig_domain_accounts as accounts;
 use skein_lib::{List, Wall};
 
@@ -24,6 +25,8 @@ pub struct AccountLine {
     pub uses: Option<List<accounts::Use>>,
     pub plan: bool,
     pub provider: Option<u32>,
+    pub provider_name: Option<Text>,
+    pub manage_usage: Option<Box<[u8]>>,
     pub display: Text,
     pub holder: accounts::Holder,
     pub sources: List<SourceLine>,
@@ -40,9 +43,8 @@ pub struct LastEnd {
     pub source: u32,
     pub end: accounts::End,
 }
-/// Secret-free facts of the party's accounts. The providers' terms facts await
-/// configuration's plan/manage-usage facts and provider names (r2 OP1);
-/// program per-host state and checks await T12. Uses name explicit payers,
+/// Secret-free facts of the party's accounts, including configured provider terms.
+/// Program per-host state and checks await T12. Uses name explicit payers,
 /// or leave the default; `usable` follows those uses for this party;
 /// `settled` currently counts only sign-ins the party asked for.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -120,6 +122,8 @@ pub(super) fn make(
                 uses: uses(account),
                 plan: account.plan(),
                 provider: Some(account.provider()),
+                provider_name: provider_name(core, account, limits.documents.text_bytes),
+                manage_usage: manage_usage(core, account),
                 display: super::small::text(account.display(), limits.documents.text_bytes),
                 holder: account.holder(),
                 cut: sources.len() < account.sources().len(),
@@ -165,7 +169,8 @@ fn serves_work(core: &Core, party: u64) -> bool {
 
 pub(super) fn worst_case(limits: &DocumentLimits) -> Option<u64> {
     let account_heap = List::<SourceLine>::worst_case(limits.lines)?
-        .checked_add(u64::from(limits.text_bytes))?
+        .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?
+        .checked_add(u64::from(accounts::MANAGE_USAGE))?
         .checked_add(List::<accounts::Use>::worst_case(accounts::USES)?)?;
     u64::try_from(size_of::<Accounts>())
         .ok()?
@@ -221,4 +226,13 @@ mod tests {
         let accounts = super::worst_case(&limits.documents).expect("accounts bound");
         assert!(accounts <= crate::documents::document_worst_case(&limits.documents).expect("document bound"));
     }
+}
+
+/// Public configuration is independent of the holder's private account document.
+pub(super) fn provider_name(core: &Core, account: &accounts::Account, bytes: u32) -> Option<Text> {
+    let provider = core.settings.llm_providers.get(account.provider())?;
+    Some(super::small::text(&provider.name, bytes))
+}
+pub(super) fn manage_usage(core: &Core, account: &accounts::Account) -> Option<Box<[u8]>> {
+    core.settings.llm_providers.get(account.provider())?.manage_usage.clone()
 }

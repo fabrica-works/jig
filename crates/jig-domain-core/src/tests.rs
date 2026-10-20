@@ -329,6 +329,9 @@ fn config(seed: u64) -> Config {
             tools: ToolFamilies::JIG,
             llm_providers: accounts::Providers {
                 providers: Box::new([accounts::Provider {
+                    name: b"Fake".as_slice().into(),
+                    signed_in_plan: true,
+                    manage_usage: Some(b"https://usage.example/".as_slice().into()),
                     number: 1,
                     models: Box::new([b"scripted".as_slice().into()]),
                     offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },

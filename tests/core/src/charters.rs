@@ -44,6 +44,9 @@ pub fn two_charters(seed: u64) -> (root::Config, root::Limits) {
     config.core.settings.llm_providers.providers = Box::new([
         config.core.settings.llm_providers.providers[0].clone(),
         accounts::Provider {
+            name: b"Fake".as_slice().into(),
+            signed_in_plan: true,
+            manage_usage: Some(b"https://usage.example/".as_slice().into()),
             number: 2,
             models: Box::new([b"research".as_slice().into()]),
             offers: accounts::Offers { sign_in: true, key: false, programs: Box::new([]) },

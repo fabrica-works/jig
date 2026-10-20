@@ -8,6 +8,9 @@ impl Story {
         let mut config = jig_core_world::world::config(seed);
         config.core.settings.llm_providers = accounts::Providers {
             providers: Box::new([accounts::Provider {
+                name: b"Fake".as_slice().into(),
+                signed_in_plan: true,
+                manage_usage: Some(b"https://usage.example/".as_slice().into()),
                 number: 3,
                 models: Box::new([]),
                 offers: accounts::Offers { sign_in: offered, key: false, programs: Box::new([]) },

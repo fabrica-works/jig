@@ -28,6 +28,11 @@ pub(crate) fn owner_account_fields(
         uses: super::owner_account_uses(value.uses().as_ref()),
         plan: value.plan(),
         provider: *value.provider(),
+        provider_name: match value.provider_name() {
+            Some(name) => Some(crate::translate::facts::document_text(name, limits)?),
+            None => None,
+        },
+        manage_usage: super::checked_manage_usage(value.manage_usage().as_deref(), w::Path::OwnerAccountManageUsage)?,
         display: crate::translate::facts::document_text(value.display(), limits)?,
         holder: super::owner_account_holder(value.holder()),
         sources: super::owner_account_source_piece(value.sources(), limits, room)?,
@@ -130,6 +135,9 @@ pub(crate) fn owner_person_capacity_action_fields(
     limits: &Limits,
 ) -> c::OwnerPersonCapacityAction {
     match value {
+        w::OwnerPersonCapacityAction::AccountSignIn => c::OwnerPersonCapacityAction::AccountSignIn,
+        w::OwnerPersonCapacityAction::AccountSignOut => c::OwnerPersonCapacityAction::AccountSignOut,
+        w::OwnerPersonCapacityAction::AccountChange => c::OwnerPersonCapacityAction::AccountChange,
         w::OwnerPersonCapacityAction::Create => c::OwnerPersonCapacityAction::Create,
         w::OwnerPersonCapacityAction::Compound => c::OwnerPersonCapacityAction::Compound,
         w::OwnerPersonCapacityAction::Application(row) => {

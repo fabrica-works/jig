@@ -31,6 +31,9 @@ pub enum CapacityAction {
     Cancel { task: u64 },
     Release { task: u64 },
     MarkSeen { seen: crate::Seen },
+    AccountSignIn,
+    AccountSignOut,
+    AccountChange,
 }
 
 /// Exact entrance pressure, or a retained permanent room-limit answer.
@@ -53,10 +56,9 @@ pub struct CapacityRefusal {
     pub cause: CapacityCause,
 }
 
-/// The refused operation's action; none for an account request, which the deployment's page
-/// has no action for until the client wire carries account requests (JP10).
-pub(crate) fn action(ask: &Ask, person: u64) -> Option<CapacityAction> {
-    Some(match ask {
+/// The refused operation's content-free action.
+pub(crate) fn action(ask: &Ask, person: u64) -> CapacityAction {
+    match ask {
         Ask::Compound { .. } => CapacityAction::Compound,
         Ask::Application { connector, .. } => CapacityAction::Application { connector: *connector },
         Ask::EditNote { name, .. } => CapacityAction::Note { name: *name },
@@ -84,8 +86,10 @@ pub(crate) fn action(ask: &Ask, person: u64) -> Option<CapacityAction> {
         Ask::Cancel { task, .. } => CapacityAction::Cancel { task: *task },
         Ask::Release { task, .. } => CapacityAction::Release { task: *task },
         Ask::MarkSeen { seen } => CapacityAction::MarkSeen { seen: *seen },
-        Ask::AccountSignIn { .. } | Ask::AccountSignOut { .. } | Ask::AccountChange { .. } => return None,
-    })
+        Ask::AccountSignIn { .. } => CapacityAction::AccountSignIn,
+        Ask::AccountSignOut { .. } => CapacityAction::AccountSignOut,
+        Ask::AccountChange { .. } => CapacityAction::AccountChange,
+    }
 }
 
 pub(crate) fn project(ask: &Ask) -> Option<u32> {
@@ -171,6 +175,10 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
             | LimitKind::LiveDelegates
             | LimitKind::Holds
             | LimitKind::InboxFull
+            | LimitKind::Accounts
+            | LimitKind::HolderAccounts
+            | LimitKind::Sources
+            | LimitKind::SignIns
             | LimitKind::Notes => Some(CapacityCause::Limit { which }),
             LimitKind::Operations
             | LimitKind::Words
@@ -200,11 +208,7 @@ fn room(refusal: Refusal) -> Option<CapacityCause> {
             | LimitKind::Priority
             | LimitKind::Policy
             | LimitKind::Resource
-            | LimitKind::Service
-            | LimitKind::Accounts
-            | LimitKind::HolderAccounts
-            | LimitKind::Sources
-            | LimitKind::SignIns => None,
+            | LimitKind::Service => None,
         },
         Refusal::NotWellFormed { .. }
         | Refusal::Role { .. }

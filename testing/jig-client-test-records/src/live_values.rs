@@ -341,6 +341,8 @@ pub fn deployment_rows_record() -> w::OwnerDeployment {
     let account = w::OwnerAccount::new(
         &l,
         w::OwnerAccountParts {
+            provider_name: None,
+            manage_usage: None,
             number: 41,
             place: 0,
             uses: None,

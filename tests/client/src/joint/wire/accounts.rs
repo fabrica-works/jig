@@ -124,6 +124,8 @@ pub(super) fn document(value: &d::Accounts, limits: &Limits) -> Result<c::OwnerA
                 uses: uses(row.uses.as_ref()),
                 plan: row.plan,
                 provider: row.provider,
+                provider_name: row.provider_name.as_ref().map(|name| owner::text(name, limits)).transpose()?,
+                manage_usage: row.manage_usage.clone(),
                 display: owner::text(&row.display, limits)?,
                 holder: holder(row.holder),
                 sources: sources(&row.sources, limits)?,

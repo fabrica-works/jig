@@ -122,6 +122,8 @@ fn waiting_account(until: Option<Wall>) -> OwnerDeployment {
     value
         .accounts
         .push(OwnerAccount {
+            provider_name: None,
+            manage_usage: None,
             place: 0,
             uses: None,
             plan: false,
@@ -196,6 +198,8 @@ fn deployment_view_all_attempt_account_hello_states_clocks_keys_and_independent_
         value
             .accounts
             .push(OwnerAccount {
+                provider_name: None,
+                manage_usage: None,
                 place: 0,
                 uses: None,
                 plan: false,
@@ -319,7 +323,7 @@ fn deployment_view_normal_words_select_second_language_and_reject_missing_or_wro
     let tree = build(&client, &words, maximum);
     assert!(contains(&tree, b"selected "));
     assert!(!contains(&tree, b"Deployment diagnostics"));
-    assert_eq!(crate::owner_deployment_words::ALL.len(), 242);
+    assert_eq!(crate::owner_deployment_words::ALL.len(), 246);
     let mut wrong = crate::owner_deployment_words::language();
     let phrase = wrong.phrases.iter_mut().find(|p| p.id == P::Host.id()).unwrap();
     phrase.forms[0].segments = Box::new([Segment::Text(copy_of(b"host without number"))]);
@@ -370,6 +374,8 @@ fn deployment_view_all_outer_and_nested_lists_fill_together_with_exact_and_one_u
         value
             .accounts
             .push(OwnerAccount {
+                provider_name: None,
+                manage_usage: None,
                 place: 0,
                 uses: None,
                 plan: false,
@@ -547,6 +553,9 @@ fn deployment_view_person_actions_four_causes_all_structural_limits_and_opaque_r
     use AdmissionLimit as L;
     use OwnerPersonCapacityAction as A;
     let actions = [
+        A::AccountSignIn,
+        A::AccountSignOut,
+        A::AccountChange,
         A::Create,
         A::Compound,
         A::Application { connector: u16::MAX },
@@ -849,5 +858,58 @@ fn account_uses_have_their_constant_bound_and_sources_have_rows() {
     assert!(view::required(&value, &CLIENT, shared_words()).is_none());
     value.accounts.get_mut(0).unwrap().uses = None;
     value.accounts.get_mut(0).unwrap().sources = List::with_capacity(CLIENT.rows + 1);
+    assert!(view::required(&value, &CLIENT, shared_words()).is_none());
+}
+
+fn deployment_terms() -> OwnerDeployment {
+    let mut value = waiting_account(None);
+    let account = value.accounts.get_mut(0).unwrap();
+    account.provider_name =
+        Some(DocumentText { bytes: Text::new(copy_of(b"Arbitrary provider"), CLIENT.text).unwrap(), cut: true });
+    account.manage_usage = Some(copy_of(b"https://usage.example/account"));
+    value
+}
+#[test]
+fn deployment_shows_the_supplied_provider_name() {
+    assert!(contains(&round_trip(deployment_terms()), b"Arbitrary provider"));
+}
+#[test]
+fn deployment_marks_a_cut_provider_name() {
+    assert!(contains(&round_trip(deployment_terms()), b"Some rows were omitted"));
+}
+#[test]
+fn deployment_links_the_whole_manage_address() {
+    let tree = round_trip(deployment_terms());
+    assert!(
+        tree.nodes().iter().any(|node| node.role == Role::Link
+            && node.external.as_deref() == Some(b"https://usage.example/account".as_slice()))
+    );
+}
+#[test]
+fn admitted_manage_targets_are_safe_for_rendering() {
+    for address in [b"https://usage.example/".as_slice(), b"https://[::1]/", b"https://localhost:443/path"] {
+        assert!(valid_manage_usage(address));
+        assert!(skein_ui::markdown::safe_url(address));
+    }
+}
+#[test]
+fn deployment_manage_addresses_hold_at_the_whole_address_bound() {
+    let mut value = waiting_account(None);
+    let mut address = b"https://usage.example/".to_vec();
+    address.resize(usize::try_from(ACCOUNT_MANAGE_USAGE).unwrap(), b'a');
+    value.accounts.get_mut(0).unwrap().manage_usage = Some(address.into_boxed_slice());
+    let client = domain(value.clone());
+    let tree = super::page_capacity::render(&client, shared_words());
+    assert!(tree.nodes().iter().any(|node| {
+        node.external.as_ref().is_some_and(|address| address.len() == usize::try_from(ACCOUNT_MANAGE_USAGE).unwrap())
+    }));
+    round_trip(value);
+}
+#[test]
+fn deployment_manage_addresses_one_past_the_bound_are_refused() {
+    let mut value = waiting_account(None);
+    let mut address = b"https://usage.example/".to_vec();
+    address.resize(usize::try_from(ACCOUNT_MANAGE_USAGE).unwrap() + 1, b'a');
+    value.accounts.get_mut(0).unwrap().manage_usage = Some(address.into_boxed_slice());
     assert!(view::required(&value, &CLIENT, shared_words()).is_none());
 }

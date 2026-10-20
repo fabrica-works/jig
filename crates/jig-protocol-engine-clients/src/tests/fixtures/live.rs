@@ -161,6 +161,8 @@ pub fn deployment_document() -> d::Deployment {
         }]),
         attempts: list([host_run()]),
         accounts: list([d::Account {
+            provider_name: None,
+            manage_usage: None,
             place: 0,
             uses: None,
             plan: false,

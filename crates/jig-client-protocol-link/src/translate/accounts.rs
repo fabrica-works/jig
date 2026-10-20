@@ -1,6 +1,7 @@
 #![expect(clippy::manual_map, reason = "step code translates optional facts without closures")]
 //! Accounts watch decoding and shared deployment source facts (contract.md, 5.1).
 use super::{Limits, List, Reader, Wall, c, piece_problem, too_large, w};
+use alloc::boxed::Box;
 pub(crate) fn owner_account_use(value: &w::OwnerAccountUse) -> c::OwnerAccountUse {
     match value {
         w::OwnerAccountUse::Party(row) => c::OwnerAccountUse::Party(row.party()),
@@ -140,6 +141,11 @@ pub(crate) fn owner_account_line(
         uses: owner_account_uses(value.uses().as_ref()),
         plan: value.plan(),
         provider: *value.provider(),
+        provider_name: match value.provider_name() {
+            Some(name) => Some(crate::translate::facts::document_text(name, limits)?),
+            None => None,
+        },
+        manage_usage: checked_manage_usage(value.manage_usage().as_deref(), w::Path::OwnerAccountLineManageUsage)?,
         display: crate::translate::facts::document_text(value.display(), limits)?,
         holder: owner_account_holder(value.holder()),
         sources: owner_account_source_piece(value.sources(), limits, room)?,
@@ -252,4 +258,17 @@ pub(crate) fn owner_account_sign_in_piece(
         rows.push(owner_account_sign_in(&row)).expect("counted pieces fit");
     }
     Ok(rows)
+}
+
+/// Both account document forms reject targets outside the contract's renderable set.
+pub(crate) fn checked_manage_usage(value: Option<&[u8]>, path: w::Path) -> Result<Option<Box<[u8]>>, w::Problem> {
+    match value {
+        Some(address) => {
+            if !c::valid_manage_usage(address) {
+                return Err(w::Problem { path, reason: skein_codec::Reason::Malformed });
+            }
+            Ok(Some(skein_lib::bytes::copy_of(address)))
+        }
+        None => Ok(None),
+    }
 }

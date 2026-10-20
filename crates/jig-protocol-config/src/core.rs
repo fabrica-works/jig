@@ -48,7 +48,14 @@ pub fn core(engine: &Engine, deployment: [u8; 16], seed: u64) -> domain::Config 
             key: provider.keys,
             programs: provider.programs.clone(),
         };
-        let value = accounts::Provider { number: provider.number, models: provider.models.clone(), offers };
+        let value = accounts::Provider {
+            number: provider.number,
+            name: provider.name.clone(),
+            signed_in_plan: provider.signed_in_plan,
+            manage_usage: provider.manage_usage.clone(),
+            models: provider.models.clone(),
+            offers,
+        };
         llm_providers.push(value).expect("one per configured provider");
     }
     let mut workers_in_process = false;

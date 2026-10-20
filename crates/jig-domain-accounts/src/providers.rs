@@ -2,6 +2,11 @@
 //! configuration.md, 3). Numbered apart from identity providers (people.md, 3).
 use alloc::boxed::Box;
 
+/// Maximum UTF-8 bytes in a configured provider name.
+pub const PROVIDER_NAME: u32 = 256;
+/// Maximum bytes in a public manage-usage HTTPS address.
+pub const MANAGE_USAGE: u32 = 2_048;
+
 /// Every configured LLM provider; empty when the configuration names none.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Providers {
@@ -43,6 +48,9 @@ impl Providers {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Provider {
     pub number: u32,
+    pub name: Box<[u8]>,
+    pub signed_in_plan: bool,
+    pub manage_usage: Option<Box<[u8]>>,
     /// Configured model names; each configured model is in at most one provider.
     pub models: Box<[Box<[u8]>]>,
     pub offers: Offers,
@@ -64,5 +72,17 @@ impl Offers {
     #[must_use]
     pub fn none(&self) -> bool {
         !self.sign_in && !self.key && self.programs.is_empty()
+    }
+}
+
+impl Provider {
+    /// Program sources remain plans independently of the signed-in source's terms.
+    #[must_use]
+    pub const fn plan(&self, kind: crate::Kind) -> bool {
+        match kind {
+            crate::Kind::SignIn => self.signed_in_plan,
+            crate::Kind::Program => true,
+            crate::Kind::Key | crate::Kind::None => false,
+        }
     }
 }

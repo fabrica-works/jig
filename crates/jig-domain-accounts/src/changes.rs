@@ -134,7 +134,7 @@ pub(crate) fn detach(domain: &mut Domain, env: &Env<Limits>, account: u32, numbe
         let mut plan = false;
         for (_, source) in &entry.sources {
             let kind = domain.sources.get(source).expect("a kept source").kind;
-            plan |= kind == Kind::SignIn || kind == Kind::Program;
+            plan |= domain.providers.get(entry.provider).expect("a kept provider").plan(kind);
         }
         entry.plan = plan;
         let order = crate::ordering::sources(domain, account);

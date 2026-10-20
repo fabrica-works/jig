@@ -200,7 +200,7 @@ fn make(
         subject: made.subject,
         display,
         sources: Map::with_capacity(env.limits.sources),
-        plan: true,
+        plan: domain.providers.get(made.provider).expect("a checked provider").signed_in_plan,
     };
     let fresh = match domain.accounts.insert(account, entry) {
         Ok(old) => old.is_none(),
@@ -251,7 +251,7 @@ fn join(
     let hold = entry.hold;
     assert!(domain.sources.insert(source, entry) == Ok(None), "a new number, within the sources' bound");
     let account_entry = domain.accounts.get_mut(&account).expect("a joined account is kept");
-    account_entry.plan = true;
+    account_entry.plan |= domain.providers.get(account_entry.provider).expect("a configured provider").signed_in_plan;
     let places = &mut account_entry.sources;
     assert!(places.insert(place, source).is_ok(), "a place checked within the sources' bound");
     out.push(Request::Save { record: stored(domain, env, source) });

@@ -45,7 +45,12 @@ fn with_phrase_bytes(
     slot_depth: u32,
 ) -> Option<Limits> {
     let mut limits = envelope(client, phrase, arrangement, application_nodes, slot_nodes, slot_depth)?;
-    limits.text_bytes = limits.nodes.checked_mul(limits.text_per_node)?;
+    // Only the deployment's account links carry the whole public addresses;
+    // other nodes retain the existing display/phrase envelope.
+    limits.text_bytes = limits
+        .nodes
+        .checked_mul(node_text(client.text, phrase)?)?
+        .checked_add(client.rows.checked_mul(jig_client::contract::ACCOUNT_MANAGE_USAGE)?)?;
     limits.patches = limits.nodes.checked_mul(5)?;
     Some(limits)
 }
@@ -71,7 +76,9 @@ pub fn envelope(
         .checked_add(3)?;
     // A field carries a saying as its name and the full domain value.
     // Markdown links may carry both label and external target.
-    let text_per_node = node_text(client.text, phrase)?;
+    // Public manage addresses stay whole even with a smaller display-text bound.
+    let text_per_node =
+        node_text(client.text, phrase)?.max(jig_client::contract::ACCOUNT_MANAGE_USAGE.checked_add(phrase)?);
     Some(Limits {
         nodes,
         // Page, card/input result, verdict proposal, and its deepest

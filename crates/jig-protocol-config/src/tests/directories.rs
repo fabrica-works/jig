@@ -106,7 +106,7 @@ fn given_directories_are_absolute_and_bounded() {
 }
 
 const TLS: &[u8] = br#""transport":"tls","server_name":"issuer.example","trust":"certs/endpoint""#;
-const PROVIDERS: &[u8] = br#""providers":[{"name":"Fake","number":1,"models":["small"],"sources":{"sign_in":{"issuer":"https://issuer.example","client":"client-a","scopes":["chat"],"authorization":"https://issuer.example/authorize","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","trust":"certs/registration","must_grant":["chat"],"redirect_path":"callback"}}}],"endpoints":"#;
+const PROVIDERS: &[u8] = br#""providers":[{"name":"Fake","signed_in_plan":true,"manage_usage":"https://usage.example/","number":1,"models":["small"],"sources":{"sign_in":{"issuer":"https://issuer.example","client":"client-a","scopes":["chat"],"authorization":"https://issuer.example/authorize","token":"https://issuer.example/token","keys":"https://issuer.example/keys","transport":"tls","server_name":"issuer.example","trust":"certs/registration","must_grant":["chat"],"redirect_path":"callback"}}}],"endpoints":"#;
 fn engine_bytes() -> Box<[u8]> {
     let bytes = fixtures::with(fixtures::ENGINE_SMALL, br#""transport": "plaintext""#, TLS);
     let bytes =

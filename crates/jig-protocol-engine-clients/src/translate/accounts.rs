@@ -171,6 +171,11 @@ pub fn line(value: &d::AccountLine, limits: &w::Limits) -> Result<w::OwnerAccoun
             uses: uses(value.uses.as_ref(), limits)?,
             plan: value.plan,
             provider: value.provider,
+            provider_name: match &value.provider_name {
+                Some(name) => Some(owner::text(name, limits)?),
+                None => None,
+            },
+            manage_usage: value.manage_usage.clone(),
             display: owner::text(&value.display, limits)?,
             holder: holder(value.holder, limits)?,
             sources: source_pieces(

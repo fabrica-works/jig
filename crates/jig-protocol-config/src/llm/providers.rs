@@ -12,6 +12,8 @@ pub struct Provider {
     /// Its name for showing.
     pub name: Box<[u8]>,
     pub number: u32,
+    pub signed_in_plan: bool,
+    pub manage_usage: Option<Box<[u8]>>,
     /// Configured models' names; each configured model is in one provider.
     pub models: Box<[Box<[u8]>]>,
     /// The sign-in it offers, with its public registration.
@@ -110,7 +112,32 @@ fn provider(
     problems: &mut Problems,
 ) -> Option<Provider> {
     let mut object = check::object(document, at, path, problems)?;
-    let name = check::text(&mut object, document, b"name", path, problems);
+    let name = public_text(&mut object, document, b"name", jig_domain_accounts::PROVIDER_NAME, path, problems);
+    let signed_at = object.member(document, b"signed_in_plan");
+    let signed_in_plan = match signed_at {
+        Some(at) => match read::boolean(document, at) {
+            Ok(value) => value,
+            Err(what) => {
+                problems.push(path.member(b"signed_in_plan"), what);
+                false
+            }
+        },
+        None => false,
+    };
+    let manage_usage = match object.member(document, b"manage_usage") {
+        Some(at) => match read::text(document, at, jig_domain_accounts::MANAGE_USAGE) {
+            Ok(value) if public_address(&value) => Some(value),
+            Ok(_) => {
+                problems.push(path.member(b"manage_usage"), What::Form);
+                None
+            }
+            Err(what) => {
+                problems.push(path.member(b"manage_usage"), what);
+                None
+            }
+        },
+        None => None,
+    };
     let number = check::count(&mut object, document, b"number", path, problems);
     let mut served = None;
     if let Some(items) = check::list(&mut object, document, b"models", document.len(), path, problems) {
@@ -122,9 +149,20 @@ fn provider(
     }
     object.finish(document, path, problems);
     let offered = offered?;
+    if offered.sign_in.is_some() && signed_at.is_none() {
+        problems.push(path.member(b"signed_in_plan"), What::Missing);
+    }
+    if signed_in_plan && offered.sign_in.is_none() {
+        problems.push(path.member(b"signed_in_plan"), What::Form);
+    }
+    if (signed_in_plan || !offered.programs.is_empty()) && manage_usage.is_none() {
+        problems.push(path.member(b"manage_usage"), What::Missing);
+    }
     Some(Provider {
         name: name?,
         number: number?,
+        signed_in_plan,
+        manage_usage,
         models: served?,
         sign_in: offered.sign_in,
         keys: offered.keys,
@@ -387,4 +425,154 @@ fn present(value: Option<Box<[u8]>>, name: &[u8], path: &Path, problems: &mut Pr
         return None;
     }
     Some(value)
+}
+
+/// Text is nonempty, UTF-8, and free of control characters; diagnostics name its exact field.
+#[expect(clippy::disallowed_methods, reason = "configuration validates public UTF-8 text (configuration.md, 3)")]
+fn public_text(
+    object: &mut read::Object,
+    document: &Document,
+    name: &[u8],
+    max: u32,
+    path: &Path,
+    problems: &mut Problems,
+) -> Option<Box<[u8]>> {
+    let at = object.required(document, name, path, problems)?;
+    let value = match read::text(document, at, max) {
+        Ok(value) => value,
+        Err(what) => {
+            problems.push(path.member(name), what);
+            return None;
+        }
+    };
+    if value.is_empty() || core::str::from_utf8(&value).is_err() {
+        problems.push(path.member(name), What::Form);
+        return None;
+    }
+    // Match complete UTF-8 encodings of controls and invisible display formatting.
+    let mut before = 0_u8;
+    let mut earlier = 0_u8;
+    for byte in &value {
+        let format = (before == 0xd8 && *byte == 0x9c)
+            || (before == 0xc2 && *byte == 0xad)
+            || (earlier == 0xe2 && before == 0x80 && ((0x8b..=0x8f).contains(byte) || (0xaa..=0xae).contains(byte)))
+            || (earlier == 0xe2 && before == 0x81 && (0xa0..=0xaf).contains(byte))
+            || (earlier == 0xe1 && before == 0xa0 && *byte == 0x8e)
+            || (earlier == 0xef && before == 0xbb && *byte == 0xbf)
+            || (earlier == 0xef && before == 0xbf && (0xb9..=0xbb).contains(byte));
+        if *byte < b' ' || *byte == 0x7f || (before == 0xc2 && (0x80..=0x9f).contains(byte)) || format {
+            problems.push(path.member(name), What::Form);
+            return None;
+        }
+        earlier = before;
+        before = *byte;
+    }
+    Some(value)
+}
+
+/// Public HTTPS address with an ASCII authority and no credentials, query or fragment.
+fn public_address(value: &[u8]) -> bool {
+    let Some(rest) = value.strip_prefix(b"https://") else {
+        return false;
+    };
+    for byte in rest {
+        if *byte <= b' ' || *byte >= 127 || [b'@', b'?', b'#', b'\\', b'"', b'\'', b'<', b'>'].contains(byte) {
+            return false;
+        }
+    }
+    let end = match skein_lib::bytes::find(rest, b"/") {
+        Some(end) => end,
+        None => rest.len(),
+    };
+    public_authority(rest.get(..end).expect("address authority prefix"))
+}
+
+#[derive(Clone, Copy)]
+enum LabelByte {
+    Label,
+    Dash,
+    Dot,
+    Other,
+}
+
+#[expect(clippy::disallowed_methods, reason = "configuration parses an address's IPv6 literal (configuration.md, 3)")]
+fn public_authority(authority: &[u8]) -> bool {
+    if let Some(rest) = authority.strip_prefix(b"[") {
+        let Some(end) = skein_lib::bytes::find(rest, b"]") else {
+            return false;
+        };
+        let host = rest.get(..end).expect("IPv6 host prefix");
+        let Ok(host) = core::str::from_utf8(host) else {
+            return false;
+        };
+        if host.parse::<core::net::Ipv6Addr>().is_err() {
+            return false;
+        }
+        return public_port(rest.get(end.saturating_add(1)..).expect("suffix after bracket"));
+    }
+    let end = match skein_lib::bytes::find(authority, b":") {
+        Some(end) => end,
+        None => authority.len(),
+    };
+    let host = authority.get(..end).expect("host prefix");
+    let mut label = 0_u32;
+    let mut dash = false;
+    for byte in host {
+        let class = if byte.is_ascii_alphanumeric() {
+            LabelByte::Label
+        } else if *byte == b'-' {
+            LabelByte::Dash
+        } else if *byte == b'.' {
+            LabelByte::Dot
+        } else {
+            LabelByte::Other
+        };
+        match class {
+            LabelByte::Label => {
+                label = label.saturating_add(1);
+                dash = false;
+            }
+            LabelByte::Dash => {
+                if label == 0 {
+                    return false;
+                }
+                label = label.saturating_add(1);
+                dash = true;
+            }
+            LabelByte::Dot => {
+                if label == 0 || dash {
+                    return false;
+                }
+                label = 0;
+            }
+            LabelByte::Other => return false,
+        }
+        if label > 63 {
+            return false;
+        }
+    }
+    label > 0 && !dash && public_port(authority.get(end..).expect("port suffix"))
+}
+fn public_port(suffix: &[u8]) -> bool {
+    if suffix.is_empty() {
+        return true;
+    }
+    let Some(port) = suffix.strip_prefix(b":") else {
+        return false;
+    };
+    let mut value = 0_u32;
+    for byte in port {
+        if !byte.is_ascii_digit() {
+            return false;
+        }
+        let digit = u32::from(byte.checked_sub(b'0').expect("ASCII digit"));
+        let Some(next) = value.checked_mul(10) else {
+            return false;
+        };
+        let Some(next) = next.checked_add(digit) else {
+            return false;
+        };
+        value = next;
+    }
+    (1..=65_535).contains(&value)
 }

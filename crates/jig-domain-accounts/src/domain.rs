@@ -51,7 +51,8 @@ impl Account {
     pub fn uses(&self) -> Option<&[Use]> {
         self.uses.as_deref()
     }
-    /// A signed-in or program source makes this a plan's account (accounts.md, 3.2).
+    /// A source classified as a plan by configuration, or any program source, makes
+    /// this a plan's account (accounts.md, 3.2; configuration.md, 3).
     #[must_use]
     pub const fn plan(&self) -> bool {
         self.plan

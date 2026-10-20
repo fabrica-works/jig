@@ -121,8 +121,8 @@ fn source(domain: &mut Domain, env: &Env<Limits>, number: u32, place: u32, entry
             }
         }
     }
+    let plan = domain.providers.get(account.provider).expect("a restored provider").plan(entry.kind);
     let account = entry.account;
-    let plan = entry.kind == Kind::SignIn || entry.kind == Kind::Program;
     if domain.sources.insert(number, entry) != Ok(None) {
         return false;
     }

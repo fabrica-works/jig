@@ -151,6 +151,8 @@ fn deployment_accounts_five_states_independent_flags_spend_overlay_and_generatio
             value
                 .accounts
                 .push(OwnerAccount {
+                    provider_name: None,
+                    manage_usage: None,
                     place: 0,
                     uses: None,
                     plan: false,
@@ -413,6 +415,8 @@ fn deployment_heap_counts_every_reserved_list_box_chip_text_and_exact_carrier_th
     value
         .accounts
         .push(OwnerAccount {
+            provider_name: None,
+            manage_usage: None,
             place: 0,
             uses: None,
             plan: false,

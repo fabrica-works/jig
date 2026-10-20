@@ -47,6 +47,8 @@ impl Payload for OwnerAccount {
         total = total.checked_add(self.runs.heap(bounds)?)?;
         total = total.checked_add(self.waiting.heap(bounds)?)?;
         total = total.checked_add(self.display.heap(bounds)?)?;
+        total = total.checked_add(self.provider_name.heap(bounds)?)?;
+        total = total.checked_add(self.manage_usage.heap(&Bounds { text: 2048, ..*bounds })?)?;
         total = total.checked_add(self.sources.heap(bounds)?)?;
         total = total.checked_add(self.uses.heap(&Bounds { rows: 16, ..*bounds })?)?;
         Some(total)
@@ -131,7 +133,10 @@ impl Payload for OwnerHelloRefusal {
 impl Payload for OwnerPersonCapacityAction {
     fn heap(&self, _bounds: &Bounds) -> Option<u64> {
         match self {
-            Self::Create
+            Self::AccountSignIn
+            | Self::AccountSignOut
+            | Self::AccountChange
+            | Self::Create
             | Self::Compound
             | Self::Application { .. }
             | Self::Note { .. }
@@ -240,6 +245,8 @@ impl Payload for jig_client_domain::contract::OwnerAccountLine {
     fn heap(&self, bounds: &Bounds) -> Option<u64> {
         self.display
             .heap(bounds)?
+            .checked_add(self.provider_name.heap(bounds)?)?
+            .checked_add(self.manage_usage.heap(&Bounds { text: 2048, ..*bounds })?)?
             .checked_add(self.sources.heap(bounds)?)?
             .checked_add(self.uses.heap(&Bounds { rows: 16, ..*bounds })?)
     }

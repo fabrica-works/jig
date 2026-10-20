@@ -6,15 +6,23 @@ use super::*;
 const PARTY: accounts::Holder = accounts::Holder::Party(1);
 const SIGN_IN: u64 = 9;
 
-/// A provider offering a sign-in, room for one account beside the configured one, and person 1
+/// A provider offering a sign-in, room for two runtime accounts, and person 1
 /// signed in.
 fn signing_core() -> (Core, Env<Limits>) {
     let mut limits = limits();
     limits.accounts.accounts = 2;
     let mut config = config(73);
     let offers = accounts::Offers { sign_in: true, key: true, programs: Box::new([]) };
-    config.settings.llm_providers =
-        accounts::Providers { providers: Box::new([accounts::Provider { number: 3, models: Box::new([]), offers }]) };
+    config.settings.llm_providers = accounts::Providers {
+        providers: Box::new([accounts::Provider {
+            name: b"Fake".as_slice().into(),
+            signed_in_plan: true,
+            manage_usage: Some(b"https://usage.example/".as_slice().into()),
+            number: 3,
+            models: Box::new([]),
+            offers,
+        }]),
+    };
     let mut core = Core::new(config, &limits);
     let env = Env { now: Time::ZERO, wall: Wall::EPOCH, limits };
     signed_in(&mut core, &env);

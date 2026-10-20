@@ -76,6 +76,8 @@ pub struct Account {
     pub uses: Option<List<accounts::Use>>,
     pub plan: bool,
     pub provider: Option<u32>,
+    pub provider_name: Option<super::Text>,
+    pub manage_usage: Option<Box<[u8]>>,
     pub display: super::Text,
     pub holder: accounts::Holder,
     pub sources: List<super::SourceLine>,
@@ -359,6 +361,8 @@ pub(super) fn deployment(
                 uses: super::accounts::uses(account),
                 plan: account.plan(),
                 provider: Some(account.provider()),
+                provider_name: super::accounts::provider_name(core, account, limits.documents.text_bytes),
+                manage_usage: super::accounts::manage_usage(core, account),
                 display: super::small::text(account.display(), limits.documents.text_bytes),
                 holder: account.holder(),
                 sources,
@@ -523,7 +527,8 @@ pub(super) fn worst_case(limits: &super::DocumentLimits) -> Option<u64> {
     // One nested host-run/task/account carrier is smaller than a task page,
     // whose bound prices all its chip/part/list children. Hosts nest run lists.
     let account_heap = List::<super::SourceLine>::worst_case(limits.lines)?
-        .checked_add(u64::from(limits.text_bytes))?
+        .checked_add(u64::from(limits.text_bytes).checked_mul(2)?)?
+        .checked_add(u64::from(accounts::MANAGE_USAGE))?
         .checked_add(List::<accounts::Use>::worst_case(accounts::USES)?)?;
     super::task_tree::worst_case(limits)?
         .checked_mul(carriers)?

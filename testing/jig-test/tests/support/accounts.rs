@@ -24,7 +24,7 @@ pub fn configuration(directory: &Path) {
     let path = directory.join("config.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("configuration")).expect("JSON");
     value["engine"]["llm"]["providers"] = serde_json::json!([{
-        "name":"Fake", "number":3, "models":["fake"], "sources":{"sign_in":{
+        "name":"Fake", "signed_in_plan":true, "manage_usage":"https://usage.example/", "number":3, "models":["fake"], "sources":{"sign_in":{
             "issuer":"http://127.0.0.1:31000", "client":"client", "scopes":["openid","read"],
             "name_hint":"jig-test", "authorization":"http://127.0.0.1:31000/authorize",
             "token":"http://127.0.0.1:31000/token", "revocation":"http://127.0.0.1:31000/revoke",

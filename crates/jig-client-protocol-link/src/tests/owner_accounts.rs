@@ -41,6 +41,8 @@ fn document(end: Option<c::OwnerAccountEnd>) -> c::OwnerAccounts {
     c::OwnerAccounts {
         accounts: list([
             c::OwnerAccountLine {
+                provider_name: None,
+                manage_usage: None,
                 number: 7,
                 place: 3,
                 uses: Some(list([c::OwnerAccountUse::Party(23), c::OwnerAccountUse::Project(29)])),
@@ -55,6 +57,8 @@ fn document(end: Option<c::OwnerAccountEnd>) -> c::OwnerAccounts {
                 cut: true,
             },
             c::OwnerAccountLine {
+                provider_name: None,
+                manage_usage: None,
                 number: 9,
                 place: 4,
                 uses: None,
@@ -242,4 +246,102 @@ fn a_deployment_keeps_more_accounts_than_the_receiving_rows() {
     let account = expected.accounts.get(0).unwrap().clone();
     expected.accounts = list([account.clone(), account.clone(), account]);
     assert_eq!(crate::translate::documents::owner_deployment(record, &limits), Ok(expected));
+}
+
+fn configured_line() -> c::OwnerAccountLine {
+    let limits = fixtures::limits();
+    let mut line = jig_client_test_records::account_line_record().into_parts();
+    line.provider_name = Some(
+        w::DocumentText::new(
+            &limits.wire,
+            w::DocumentTextParts { bytes: Box::from(b"Arbitrary provider".as_slice()), cut: true },
+        )
+        .unwrap(),
+    );
+    line.manage_usage = Some(Box::from(b"https://usage.example/".as_slice()));
+    let line = w::OwnerAccountLine::new(&limits.wire, line).unwrap();
+    let encoded = {
+        let mut writer = Writer::new(usize::try_from(line.measure()).unwrap());
+        line.encode(&mut writer).unwrap();
+        writer.finish()
+    };
+    let mut record = jig_client_test_records::accounts_record(None).into_parts();
+    record.accounts = {
+        let mut writer = Writer::new(encoded.len().checked_add(4).unwrap());
+        skein_codec::piece::write(&mut writer, &encoded).unwrap();
+        writer.finish()
+    };
+    let record = w::OwnerAccounts::new(&limits.wire, record).unwrap();
+    let c::Delivery::OwnerAccounts(value) = watches::delivery(&delivery(record), &limits).unwrap() else {
+        panic!("accounts delivery")
+    };
+    value.accounts.get(0).unwrap().clone()
+}
+#[test]
+fn configured_provider_name_reaches_accounts_client() {
+    assert_eq!(configured_line().provider_name.unwrap().bytes(), b"Arbitrary provider");
+}
+#[test]
+fn provider_name_cut_reaches_accounts_client() {
+    assert!(configured_line().provider_name.unwrap().cut);
+}
+#[test]
+fn configured_manage_address_reaches_accounts_client() {
+    assert_eq!(configured_line().manage_usage.as_deref(), Some(b"https://usage.example/".as_slice()));
+}
+
+#[test]
+fn account_capacity_labels_decode_without_account_payloads() {
+    let limits = fixtures::limits();
+    for (wire, expected) in [
+        (w::OwnerPersonCapacityAction::AccountSignIn, c::OwnerPersonCapacityAction::AccountSignIn),
+        (w::OwnerPersonCapacityAction::AccountSignOut, c::OwnerPersonCapacityAction::AccountSignOut),
+        (w::OwnerPersonCapacityAction::AccountChange, c::OwnerPersonCapacityAction::AccountChange),
+    ] {
+        let mut writer = Writer::new(usize::try_from(wire.measure()).unwrap());
+        wire.encode(&mut writer).unwrap();
+        let bytes = writer.finish();
+        let decoded = w::OwnerPersonCapacityAction::decode(&limits.wire, &mut skein_lib::Reader::new(&bytes)).unwrap();
+        assert_eq!(crate::translate::documents::owner_person_capacity_action_fields(&decoded, &limits), expected);
+    }
+}
+
+fn unsafe_manage_addresses() -> [&'static [u8]; 5] {
+    [b"ftp://x", b"https://", b"https:///x", b"https://usage.example/a b", b"https://usage.example/\""]
+}
+#[test]
+fn unsafe_manage_addresses_refuse_accounts_frames() {
+    let limits = fixtures::limits();
+    for address in unsafe_manage_addresses() {
+        let mut line = jig_client_test_records::account_line_record().into_parts();
+        line.manage_usage = Some(Box::from(address));
+        let line = w::OwnerAccountLine::new(&limits.wire, line).unwrap();
+        let mut record = jig_client_test_records::accounts_record(None).into_parts();
+        record.accounts = line_piece(&line);
+        let record = w::OwnerAccounts::new(&limits.wire, record).unwrap();
+        assert_eq!(watches::delivery(&delivery(record), &limits), Err(Undecodable::Malformed));
+    }
+}
+#[test]
+fn unsafe_manage_addresses_refuse_deployment_frames() {
+    let limits = fixtures::limits();
+    for address in unsafe_manage_addresses() {
+        let record = fixtures::owner_with_account(Some(5));
+        let bytes = skein_codec::piece::split(&mut skein_lib::Reader::new(record.accounts())).unwrap().unwrap();
+        let mut account =
+            w::OwnerAccount::decode(&limits.wire, &mut skein_lib::Reader::new(&bytes)).unwrap().into_parts();
+        account.manage_usage = Some(Box::from(address));
+        let account = w::OwnerAccount::new(&limits.wire, account).unwrap();
+        let mut out = Writer::new(usize::try_from(account.measure()).unwrap());
+        account.encode(&mut out).unwrap();
+        let bytes = out.finish();
+        let mut pieces = Writer::new(bytes.len().checked_add(4).unwrap());
+        skein_codec::piece::write(&mut pieces, &bytes).unwrap();
+        let mut record = record.into_parts();
+        record.accounts = pieces.finish();
+        let value = w::DeliveryValue::OwnerDeployment(w::OwnerDeployment::new(&limits.wire, record).unwrap());
+        let mut out = Writer::new(usize::try_from(value.measure()).unwrap());
+        value.encode(&mut out).unwrap();
+        assert_eq!(watches::delivery(&out.finish(), &limits), Err(Undecodable::Malformed));
+    }
 }

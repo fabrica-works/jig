@@ -325,6 +325,9 @@ fn d2_fixture(restore: bool) -> D2Fixture {
     .unwrap();
     let providers = domain::Providers {
         providers: Box::new([domain::Provider {
+            name: b"Fake".as_slice().into(),
+            signed_in_plan: false,
+            manage_usage: Some(b"https://usage.example/".as_slice().into()),
             number: 1,
             models: Box::new([]),
             offers: domain::Offers { sign_in: false, key: true, programs: Box::new([]) },

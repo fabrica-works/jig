@@ -1,8 +1,29 @@
 //! Secret-free party account facts (client/domain/contract.md, 5.1; domain/accounts.md, 3–5).
 use super::{DocumentText, OwnerAccountPlace, OwnerAccountState, OwnerAccountUnread};
+use alloc::boxed::Box;
 use skein_lib::{Duration, List, Wall};
 /// An account's payers at most: `jig_domain_accounts::USES` (domain/accounts.md, 3).
 pub const ACCOUNT_USES: u32 = 16;
+/// Whole public manage-usage addresses, matching configuration.md, section 3.
+pub const ACCOUNT_MANAGE_USAGE: u32 = 2_048;
+/// A whole ASCII HTTPS manage target safe for client rendering (contract.md, 5.1).
+/// Configuration additionally checks host labels and ports; it accepts a subset.
+#[must_use]
+pub fn valid_manage_usage(value: &[u8]) -> bool {
+    if value.len() > usize::try_from(ACCOUNT_MANAGE_USAGE).expect("the address bound fits usize") {
+        return false;
+    }
+    let Some(host) = value.strip_prefix(b"https://") else { return false };
+    if host.is_empty() || host.first() == Some(&b'/') {
+        return false;
+    }
+    for byte in value {
+        if *byte <= b' ' || *byte >= 127 || [b'@', b'?', b'#', b'\\', b'"', b'\'', b'<', b'>'].contains(byte) {
+            return false;
+        }
+    }
+    true
+}
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OwnerAccounts {
     pub accounts: List<OwnerAccountLine>,
@@ -19,6 +40,8 @@ pub struct OwnerAccountLine {
     pub uses: Option<List<OwnerAccountUse>>,
     pub plan: bool,
     pub provider: Option<u32>,
+    pub provider_name: Option<DocumentText>,
+    pub manage_usage: Option<Box<[u8]>>,
     pub display: DocumentText,
     pub holder: OwnerAccountHolder,
     pub sources: List<OwnerAccountSource>,

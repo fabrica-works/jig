@@ -59,12 +59,13 @@ pub struct Settings {
     pub limits: Limits,
     pub authority_refuses: bool,
     pub facts: bool,
+    pub account_limit: Option<people::LimitKind>,
 }
 
 impl Settings {
     #[must_use]
     pub const fn calm(seed: u64) -> Settings {
-        Settings { seed, limits: LIMITS, authority_refuses: false, facts: true }
+        Settings { seed, limits: LIMITS, authority_refuses: false, facts: true, account_limit: None }
     }
 
     #[must_use]
@@ -444,6 +445,20 @@ impl World {
         call
     }
 
+    #[must_use]
+    pub fn capacity_refusals(&self) -> skein_lib::List<people::CapacityRefusal> {
+        self.domain.capacity_refusals()
+    }
+    #[must_use]
+    pub fn capacity_forgotten(&self) -> u64 {
+        self.domain.capacity_refusals_lost()
+    }
+    pub fn finish_account_deferred(&mut self) {
+        for (request, _) in std::mem::take(&mut self.deferred) {
+            self.send(Event::Decided { request, outcome: Outcome::AccountChanged });
+        }
+    }
+
     pub fn defer_routes(&mut self, defer: bool) {
         self.defer_route = defer;
     }
@@ -564,8 +579,22 @@ impl World {
                     }
                     self.stats.routes += 1;
                     self.observe(Seen::Routed { role: role.unwrap_or(Role::Observer), kind, service });
+                    if kind == RouteKind::Account
+                        && let Some(which) = self.settings.account_limit
+                    {
+                        people::step(
+                            &mut self.domain,
+                            &self.env,
+                            Event::Decided { request, outcome: Outcome::Refused(Refusal::Limit { which }) },
+                            &mut self.out,
+                        );
+                        continue;
+                    }
                     if self.defer_route {
-                        assert_eq!(kind, RouteKind::Goal, "only creation uses the deferred script");
+                        assert!(
+                            kind == RouteKind::Goal || kind == RouteKind::Account,
+                            "creation or account deferred script"
+                        );
                         self.deferred.push((request, key));
                     } else {
                         match *ask {

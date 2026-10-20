@@ -229,9 +229,8 @@ impl Domain {
         let mut ordered = Map::with_capacity(capacity);
         let mut ordinal = 0_u32;
         for (key, answer) in &self.answers {
-            if let Some(cause) = crate::capacity::permanent(&answer.outcome)
-                && let Some(action) = crate::capacity::action(&answer.ask, key.person)
-            {
+            if let Some(cause) = crate::capacity::permanent(&answer.outcome) {
+                let action = crate::capacity::action(&answer.ask, key.person);
                 let value = crate::CapacityRefusal {
                     key: *key,
                     project: crate::capacity::project(&answer.ask),
@@ -1458,7 +1457,7 @@ fn admit_ask(
 }
 
 fn room_pressure(domain: &mut Domain, env: &Env<Limits>, key: RequestKey, ask: &Ask, cause: crate::CapacityCause) {
-    let Some(action) = crate::capacity::action(ask, key.person) else { return };
+    let action = crate::capacity::action(ask, key.person);
     if domain.room_refusals.capacity() == 0 {
         domain.room_refusals_lost = domain.room_refusals_lost.saturating_add(1);
         return;

@@ -276,7 +276,10 @@ fn memory_below_the_components_sum_is_refused() {
     // retained-storage and queue envelopes. People's pending clone is priced there.
     // x1c adds 0 bytes here: Account's alignment absorbs its now-required provider's
     // removed Option tag. Provider registrations and the D2 input are priced by the service.
-    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_676_998_751 });
+    // JP10c-b adds 248 bytes over f448c8d4: 240 inline bytes for the parser and
+    // two runtime provider copies, plus 8 bytes for their two "Fake" names.
+    // This fixture has no manage address; supplied addresses cost three copies.
+    assert_eq!(problems.problems.get(0).unwrap().what, What::Memory { over: 18_676_998_999 });
 }
 fn instruction_file(files: &[crate::File]) -> &crate::File {
     for file in files {

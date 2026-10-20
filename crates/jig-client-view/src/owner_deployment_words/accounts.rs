@@ -25,6 +25,7 @@ pub enum AccountPhrase {
     DefaultUses,
     PaysParty,
     PaysProject,
+    ManageUsage,
 }
 impl AccountPhrase {
     pub(super) const fn hole(self) -> Option<skein_ui::phrases::HoleKind> {
@@ -34,7 +35,8 @@ impl AccountPhrase {
             Self::Provider | Self::HeldByParty | Self::Source | Self::PaysParty | Self::PaysProject => {
                 Some(HoleKind::Number)
             }
-            Self::LaterUnknown
+            Self::ManageUsage
+            | Self::LaterUnknown
             | Self::Unloaded
             | Self::Cancelled
             | Self::Directory
@@ -80,6 +82,7 @@ impl AccountPhrase {
             Self::DefaultUses => 9462,
             Self::PaysParty => 9463,
             Self::PaysProject => 9464,
+            Self::ManageUsage => 9473,
         }
     }
     pub(super) const fn label(self) -> &'static [u8] {
@@ -95,6 +98,7 @@ impl AccountPhrase {
             Self::Failed => b"Record failed",
             Self::Stalled => b"Record stalled",
             Self::TooLarge => b"Record too large",
+            Self::ManageUsage => b"Manage usage",
             Self::Provider => b"LLM provider ",
             Self::HeldByDeployment => b"Held by the deployment",
             Self::HeldByParty => b"Held by party ",

@@ -117,3 +117,22 @@ fn payer(core: &crate::Core, holder: accounts::Holder, plan: bool, party: u64) -
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn typed_account_room_answers_preserve_their_permanent_limit() {
+        for (bound, which) in [
+            (accounts::Bound::Accounts, people::LimitKind::Accounts),
+            (accounts::Bound::HolderAccounts, people::LimitKind::HolderAccounts),
+            (accounts::Bound::Sources, people::LimitKind::Sources),
+            (accounts::Bound::SignIns, people::LimitKind::SignIns),
+        ] {
+            assert_eq!(
+                outcome(accounts::Answer::Refused { refusal: accounts::Refusal::Limit { bound } }),
+                people::Outcome::Refused(people::Refusal::Limit { which })
+            );
+        }
+    }
+}

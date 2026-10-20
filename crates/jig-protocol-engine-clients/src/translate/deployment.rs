@@ -108,6 +108,9 @@ fn person_action(
     limits: &w::Limits,
 ) -> Result<w::OwnerPersonCapacityAction, w::Problem> {
     Ok(match value {
+        people::CapacityAction::AccountSignIn => w::OwnerPersonCapacityAction::AccountSignIn,
+        people::CapacityAction::AccountSignOut => w::OwnerPersonCapacityAction::AccountSignOut,
+        people::CapacityAction::AccountChange => w::OwnerPersonCapacityAction::AccountChange,
         people::CapacityAction::Create => w::OwnerPersonCapacityAction::Create,
         people::CapacityAction::Compound => w::OwnerPersonCapacityAction::Compound,
         people::CapacityAction::Service => w::OwnerPersonCapacityAction::Service,
@@ -400,6 +403,11 @@ pub fn account(value: &d::Account, limits: &w::Limits) -> Result<w::OwnerAccount
             place: value.place,
             uses: super::accounts::uses(value.uses.as_ref(), limits)?,
             provider: value.provider,
+            provider_name: match &value.provider_name {
+                Some(name) => Some(owner::text(name, limits)?),
+                None => None,
+            },
+            manage_usage: value.manage_usage.clone(),
             display: owner::text(&value.display, limits)?,
             holder: super::accounts::holder(value.holder, limits)?,
             sources: super::accounts::source_pieces(

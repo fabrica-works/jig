@@ -34,6 +34,9 @@ pub(super) fn fixture(records: Vec<accounts::Stored>) -> (Core, Env<Limits>) {
     }]);
     config.settings.llm_providers = accounts::Providers {
         providers: Box::new([accounts::Provider {
+            name: b"Fake".as_slice().into(),
+            signed_in_plan: true,
+            manage_usage: Some(b"https://usage.example/".as_slice().into()),
             number: PROVIDER,
             models: Box::new([]),
             offers: accounts::Offers { sign_in: true, key: true, programs: Box::new([]) },
@@ -167,6 +170,8 @@ fn a_partys_accounts_document_lists_its_own_accounts_with_their_sources_in_order
     assert_eq!(
         document(&core, &env, ALICE).accounts.as_slice(),
         &[AccountLine {
+            provider_name: Some(Text { bytes: b"Fake".as_slice().into(), cut: false }),
+            manage_usage: Some(b"https://usage.example/".as_slice().into()),
             place: 0,
             uses: None,
             plan: true,

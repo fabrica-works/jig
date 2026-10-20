@@ -53,6 +53,8 @@ pub(crate) fn source() -> documents::Deployment {
         accounts: rows(
             3,
             [documents::Account {
+                provider_name: None,
+                manage_usage: None,
                 place: 0,
                 uses: None,
                 plan: false,

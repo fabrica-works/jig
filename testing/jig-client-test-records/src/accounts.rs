@@ -47,6 +47,8 @@ pub fn account_line_record() -> w::OwnerAccountLine {
     w::OwnerAccountLine::new(
         &l,
         w::OwnerAccountLineParts {
+            provider_name: None,
+            manage_usage: None,
             number: 7,
             place: 3,
             uses: Some(rows([
@@ -81,6 +83,8 @@ pub fn accounts_record(end: Option<w::OwnerAccountEnd>) -> w::OwnerAccounts {
     let other = w::OwnerAccountLine::new(
         &l,
         w::OwnerAccountLineParts {
+            provider_name: None,
+            manage_usage: None,
             number: 9,
             place: 4,
             uses: None,
