@@ -102,9 +102,7 @@ pub enum SecretOwner {
     Service,
     /// The application's own record, under its tag, by its number.
     Application,
-    /// A signed-in source's record, as skein's accounts driver hands it to
-    /// keep, by the source's number: today the account's, one source to
-    /// each account.
+    /// A signed-in source's record or an LLM key's value, by the source's number.
     Source,
 }
 
@@ -128,6 +126,14 @@ pub enum Secrets {
         owner: SecretOwner,
         number: u64,
         value: Secret,
+        replaces: Option<[u8; 32]>,
+    },
+    /// Atomically move a carried value into its owner's row, conditional on
+    /// the target's digest as in `Replace`. Missing carried values are stale.
+    Adopt {
+        carried: u64,
+        owner: SecretOwner,
+        number: u64,
         replaces: Option<[u8; 32]>,
     },
     /// Keep a value a client's request carried, under the next number of

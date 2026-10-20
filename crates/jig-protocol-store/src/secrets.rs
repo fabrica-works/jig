@@ -20,6 +20,12 @@ enum Pending {
         holds: [u8; 32],
         number: u64,
     },
+    Adopt {
+        owner: Token,
+        key: Box<[u8]>,
+        holds: [u8; 32],
+        carried: Box<[u8]>,
+    },
     Sweep,
 }
 #[derive(Debug)]
@@ -48,7 +54,7 @@ impl State {
 }
 pub(crate) fn worst_case(limits: &Limits) -> Option<u64> {
     Map::<u64, Pending>::worst_case(limits.secrets.queued)?
-        .checked_add(u64::from(limits.secrets.key).checked_mul(u64::from(limits.secrets.queued))?)?
+        .checked_add(u64::from(limits.secrets.key).checked_mul(2)?.checked_mul(u64::from(limits.secrets.queued))?)?
         .checked_add(u64::from(limits.secrets.key))?
         .checked_add(List::<SecretRow>::worst_case(limits.secrets.page.rows)?)?
         .checked_add(List::<skein_kv::Row>::worst_case(limits.secrets.page.rows)?)?
@@ -159,7 +165,9 @@ pub(crate) fn committed(store: &mut Store, owner: Token, above: &mut Queue<Event
         return;
     };
     match pending {
-        Pending::Write { owner, holds: Some(_), .. } => above.push(Event::Kept { owner }),
+        Pending::Write { owner, holds: Some(_), .. } | Pending::Adopt { owner, .. } => {
+            above.push(Event::Kept { owner });
+        }
         Pending::Write { owner, holds: None, .. } => above.push(Event::Erased { owner }),
         Pending::Carry { owner, number, .. } => above.push(Event::Carried { owner, number }),
         Pending::Sweep => store.secret_state.waiting = false,
@@ -196,7 +204,9 @@ fn held(store: &mut Store, env: &Env<Limits>, key: &[u8], below: &mut Below) -> 
         match pending {
             Pending::Write { key: written, holds, .. } if **written == *key => return Ok(*holds),
             Pending::Carry { key: written, holds, .. } if **written == *key => return Ok(Some(*holds)),
-            Pending::Write { .. } | Pending::Carry { .. } | Pending::Sweep => {}
+            Pending::Adopt { key: written, holds, .. } if **written == *key => return Ok(Some(*holds)),
+            Pending::Adopt { carried, .. } if **carried == *key => return Ok(None),
+            Pending::Write { .. } | Pending::Carry { .. } | Pending::Adopt { .. } | Pending::Sweep => {}
         }
     }
     match durable(store, env, Box::from(key), below)? {
@@ -236,6 +246,9 @@ pub(crate) fn secrets(
             } else {
                 above.push(Event::Stale { owner });
             }
+        }
+        Secrets::Adopt { carried, owner: kind, number, replaces } => {
+            adopt(store, env, owner, (kind, number), (carried, replaces), above, below);
         }
         Secrets::Carry { value } => carry(store, env, owner, value, above, below),
         Secrets::Erase { owner: kind, number } => {
@@ -293,6 +306,56 @@ pub(crate) fn secrets(
             });
         }
     }
+}
+/// Both rows change in one secrets commit; pending digests guard concurrent adopts.
+fn adopt(
+    store: &mut Store,
+    env: &Env<Limits>,
+    owner: Token,
+    (kind, number): (SecretOwner, u64),
+    (carried, replaces): (u64, Option<[u8; 32]>),
+    above: &mut Queue<Event>,
+    below: &mut Below,
+) {
+    let Some(target) = key(kind, number, store.limits.secrets.key) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    let Some(carried) = key(SecretOwner::Application, carried, store.limits.secrets.key) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    let Ok(target_digest) = held(store, env, &target, below) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    let Ok(carried_digest) = held(store, env, &carried, below) else {
+        store.phase = Phase::Stopped;
+        return;
+    };
+    if target == carried || target_digest != replaces || carried_digest.is_none() {
+        above.push(Event::Stale { owner });
+        return;
+    }
+    let value = match durable(store, env, carried.clone(), below) {
+        Ok(Some(value)) => value,
+        Ok(None) => {
+            above.push(Event::Stale { owner });
+            return;
+        }
+        Err(()) => {
+            store.phase = Phase::Stopped;
+            return;
+        }
+    };
+    let holds = sha256::digest(&value);
+    if Some(holds) != carried_digest {
+        above.push(Event::Stale { owner });
+        return;
+    }
+    let ops =
+        Box::new([skein_kv::Op::Put { key: target.clone(), value }, skein_kv::Op::Erase { key: carried.clone() }]);
+    submit(store, env, ops, Pending::Adopt { owner, key: target, holds, carried }, above, below);
 }
 fn too_large(store: &Store, value: &Secret) -> bool {
     value.len() > usize::try_from(store.limits.secrets.value).expect("secret limit fits usize")
@@ -403,10 +466,9 @@ pub(crate) fn sweep(store: &mut Store, env: &Env<Limits>, above: &mut Queue<Even
     if !store.secret_state.sweeping || store.secret_state.waiting || store.phase == Phase::Stopped {
         return;
     }
-    // People's family alone. The accounts' family keeps no row for a
-    // configured account's signed-in source until its hold changes, though
-    // its record is kept here, so the sources handed up do not name every
-    // source that holds a record (store.md 9).
+    // People's family alone. The accounts component sweeps unnamed Source
+    // rows after its restart inventory, preserving configured sources.
+    // Application values remain: a carried number can hold a kept value.
     let mut range = skein_kv::Range::prefix(&[1]);
     if let Some(after) = store.secret_state.after.take() {
         range.start = after;

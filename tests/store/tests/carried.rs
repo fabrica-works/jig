@@ -74,3 +74,37 @@ fn an_erased_carried_value_stays_erased_and_its_number_is_never_reused() {
     assert_eq!(found(&mut world, CARRIED + 1), None, "erased for good");
     assert_eq!(carry(&mut world, 3), Some(CARRIED + 2), "the highest number erased is not drawn again");
 }
+
+#[test]
+fn adopt_moves_a_carried_value_in_one_commit() {
+    fn adopt(world: &mut World, carried: u64) -> bool {
+        matches!(
+            world.secret(Secrets::Adopt { carried, owner: SecretOwner::Source, number: 7, replaces: None }).as_slice(),
+            [Event::Kept { .. }]
+        )
+    }
+    let count = {
+        let mut world = opened(18);
+        let carried = carry(&mut world, 7).expect("carried LLM key");
+        assert!(adopt(&mut world, carried));
+        world.operation_count()
+    };
+    for cut in 0..=count {
+        let mut world = opened(u64::from(cut));
+        let carried = carry(&mut world, 7).expect("carried LLM key");
+        world.cut_at(cut);
+        let kept = adopt(&mut world, carried);
+        world.crash(u64::from(cut));
+        world.reopen();
+        let original = found(&mut world, carried);
+        let target = world.secret(Secrets::Get { owner: SecretOwner::Source, number: 7 });
+        let [Event::Secret { value: target, .. }] = target.as_slice() else { panic!("source LLM key") };
+        assert!(
+            (original == Some(value(7)) && target.is_none()) || (original.is_none() && *target == Some(value(7))),
+            "adoption changes both rows together, cut {cut}"
+        );
+        if kept {
+            assert_eq!(*target, Some(value(7)), "answered only once durable");
+        }
+    }
+}

@@ -174,6 +174,7 @@ impl Store {
         let immediate = match &request {
             protocol::Secrets::Get { .. } | protocol::Secrets::Load { .. } => true,
             protocol::Secrets::Keep { .. }
+            | protocol::Secrets::Adopt { .. }
             | protocol::Secrets::Replace { .. }
             | protocol::Secrets::Erase { .. }
             | protocol::Secrets::Carry { .. } => false,

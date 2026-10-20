@@ -248,3 +248,70 @@ fn a_carry_past_its_value_bound_stops_before_its_number_is_drawn() {
     assert!(carry(&mut store, 1).is_empty());
     assert_eq!(store.phase, Phase::Stopped);
 }
+
+fn carry_llm_key(store: &mut Store) -> u64 {
+    let events = ask(store, Secrets::Carry { value: Secret::new(Box::new([73; 32])) });
+    let [Event::Carried { number, .. }] = &*events else { panic!("carried LLM key") };
+    *number
+}
+fn adopt_llm_key(store: &mut Store, carried: u64, replaces: Option<[u8; 32]>) -> Box<[Event]> {
+    ask(store, Secrets::Adopt { carried, owner: SecretOwner::Source, number: 7, replaces })
+}
+#[test]
+fn adopt_moves_a_carried_value_in_one_commit() {
+    let mut store = fixtures::opened();
+    let carried = carry_llm_key(&mut store);
+    let before = store.stores.secrets.last();
+    let [Event::Kept { owner: OWNER }] = &*adopt_llm_key(&mut store, carried, None) else {
+        panic!("durable LLM key adoption")
+    };
+    assert_eq!(store.stores.secrets.last(), before + 1);
+    assert_eq!(get(&mut store, SecretOwner::Application, carried), None);
+    assert_eq!(get(&mut store, SecretOwner::Source, 7), Some(Secret::new(Box::new([73; 32]))));
+}
+#[test]
+fn adopt_is_stale_for_another_digest() {
+    let mut store = fixtures::opened();
+    ask(&mut store, Secrets::Keep { owner: SecretOwner::Source, number: 7, value: Secret::new(Box::new([19; 32])) });
+    let carried = carry_llm_key(&mut store);
+    let before = store.stores.secrets.last();
+    let [Event::Stale { .. }] = &*adopt_llm_key(&mut store, carried, Some([0; 32])) else {
+        panic!("stale LLM key adoption")
+    };
+    assert_eq!(store.stores.secrets.last(), before);
+    assert_eq!(get(&mut store, SecretOwner::Application, carried), Some(Secret::new(Box::new([73; 32]))));
+    assert_eq!(get(&mut store, SecretOwner::Source, 7), Some(Secret::new(Box::new([19; 32]))));
+    let digest = skein_lib::sha256::digest(&[19; 32]);
+    let [Event::Kept { .. }] = &*adopt_llm_key(&mut store, carried, Some(digest)) else {
+        panic!("matching digest permits LLM key adoption")
+    };
+}
+#[test]
+fn adopt_is_stale_for_a_missing_carried_row() {
+    let mut store = fixtures::opened();
+    let [Event::Stale { .. }] = &*adopt_llm_key(&mut store, CARRIED, None) else {
+        panic!("missing carried LLM key is stale")
+    };
+    assert_eq!(store.stores.secrets.last(), 0);
+    assert_eq!(get(&mut store, SecretOwner::Source, 7), None);
+}
+#[test]
+fn an_erase_after_an_adopt_is_a_no_op() {
+    let mut store = fixtures::opened();
+    let carried = carry_llm_key(&mut store);
+    adopt_llm_key(&mut store, carried, None);
+    let [Event::Erased { .. }] = &*ask(&mut store, Secrets::Erase { owner: SecretOwner::Application, number: carried })
+    else {
+        panic!("absent carried row is erased idempotently")
+    };
+    assert_eq!(get(&mut store, SecretOwner::Source, 7), Some(Secret::new(Box::new([73; 32]))));
+    restore_people(&mut store);
+    assert_eq!(get(&mut store, SecretOwner::Source, 7), Some(Secret::new(Box::new([73; 32]))));
+}
+#[test]
+fn the_restart_spares_kept_and_orphaned_carried_values() {
+    let mut store = fixtures::opened();
+    let carried = carry_llm_key(&mut store);
+    restore_people(&mut store);
+    assert_eq!(get(&mut store, SecretOwner::Application, carried), Some(Secret::new(Box::new([73; 32]))));
+}
