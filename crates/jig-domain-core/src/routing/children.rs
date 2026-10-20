@@ -160,6 +160,7 @@ pub(super) fn tag_fleet(core: &mut Core, env: &Env<Limits>, mut child: Queue<fle
             }
             fleet::Request::Observed { run, attempt: _ } => {
                 core.touch_deployment();
+                core.touch_run_waits();
                 super::view_routes::touch_number(core, &env.limits, run.raw());
                 continue;
             }
@@ -537,6 +538,7 @@ pub(super) fn route_account(
         &mut out,
     );
     core.touch_deployment();
+    core.touch_run_waits();
     core.touch_accounts(party);
     tag_account(core, env, work, out)
 }
@@ -619,6 +621,7 @@ pub(super) fn route_fleet(core: &mut Core, env: &Env<Limits>, mut event: fleet::
     };
     if touched {
         core.touch_deployment();
+        core.touch_run_waits();
     }
     let mut out = Queue::with_capacity(fleet::max_out(&env.limits.fleet));
     fleet::step(&mut core.fleet, &Env { now: env.now, wall: env.wall, limits: env.limits.fleet }, event, &mut out);

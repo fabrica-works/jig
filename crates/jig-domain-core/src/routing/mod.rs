@@ -452,6 +452,7 @@ pub fn resume_fleet(core: &mut Core, env: &Env<Limits>) -> Requests {
     fleet::resume(&mut core.fleet, &Env { now: env.now, wall: env.wall, limits: env.limits.fleet }, &mut child);
     if !child.is_empty() {
         core.touch_deployment();
+        core.touch_run_waits();
     }
     tag_fleet(core, env, child, fleet::max_out(&env.limits.fleet))
 }
@@ -635,6 +636,7 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
             fleet::fire(&mut core.fleet, &Env { now: env.now, wall: env.wall, limits: env.limits.fleet }, &mut out);
             if !out.is_empty() {
                 core.touch_deployment();
+                core.touch_run_waits();
             }
             tag_fleet(core, env, out, fleet::max_out(&env.limits.fleet))
         }
@@ -655,6 +657,7 @@ pub fn fire(core: &mut Core, env: &Env<Limits>, timer: Timer) -> Requests {
                 &mut out,
             );
             core.touch_deployment();
+            core.touch_run_waits();
             core.touch_accounts(None);
             let mut work = Queue::with_capacity(0);
             let requests = tag_account(core, env, &mut work, out);

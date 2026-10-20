@@ -75,13 +75,14 @@ impl Core {
         }
     }
 
-    /// Gather deployment and task run-wait facts after host, account or capacity changes.
+    /// Gather deployment facts after host, account or capacity changes.
     pub fn touch_deployment(&mut self) {
         for (_, binding) in &self.view_subjects {
             let subject = &self.view_names.get(binding.subject).expect("bound subject").subject;
             let touched = match subject {
-                Subject::Deployment | Subject::Task { .. } => true,
+                Subject::Deployment => true,
                 Subject::Frame { .. }
+                | Subject::Task { .. }
                 | Subject::Tree { .. }
                 | Subject::Chips { .. }
                 | Subject::Inbox { .. }
@@ -98,6 +99,21 @@ impl Core {
                 | Subject::Application { .. } => false,
             };
             if touched {
+                let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
+            }
+        }
+    }
+
+    /// Host or account changes can replace a due agent's next-run wait.
+    pub(crate) fn touch_run_waits(&mut self) {
+        for (_, binding) in &self.view_subjects {
+            let Subject::Task { task } = &self.view_names.get(binding.subject).expect("bound subject").subject else {
+                continue;
+            };
+            let Some(row) = self.tasks.task(*task) else { continue };
+            if let tasks::Executor::Agent { .. } = row.executor
+                && let tasks::Phase::Active(tasks::Active::Due | tasks::Active::Preparing) = row.phase
+            {
                 let _new = self.changed_views.insert(binding.subject).expect("bounded watched marks");
             }
         }
