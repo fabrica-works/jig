@@ -4,7 +4,7 @@ use alloc::boxed::Box;
 use jig_client_protocol_link::{Heard, Streamed};
 use skein_lib::Queue;
 const CUTS: [usize; 2] = [fixtures::WHOLE_STREAM.len(), 1];
-const STATUSES: [u16; 3] = [201, 401, 503];
+const STATUSES: [u16; 3] = [201, 409, 503];
 #[test]
 fn the_body_cut_at_each_byte_gives_the_same_records() {
     for cut in 0..=fixtures::WHOLE_STREAM.len() {
@@ -53,7 +53,17 @@ fn a_comment_line_is_a_heartbeat() {
     assert!(out.is_empty());
 }
 #[test]
-fn a_status_other_than_200_ends_the_stream() {
+fn a_401_is_the_stream_refused_signed_out() {
+    let mut stream = Stream::new(&fixtures::stream_limits());
+    let mut out = Queue::with_capacity(4);
+    stream.opened(401, &mut out);
+    assert_eq!(out.pop(), Some(Heard::Streamed { message: Streamed::SignedOut }));
+    stream.body(fixtures::WHOLE_STREAM, &mut out);
+    stream.ended(&mut out);
+    assert!(out.is_empty());
+}
+#[test]
+fn another_status_other_than_200_ends_the_stream() {
     for status in STATUSES {
         let mut stream = Stream::new(&fixtures::stream_limits());
         let mut out = Queue::with_capacity(4);

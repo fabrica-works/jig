@@ -133,6 +133,7 @@ fn platform_reports_keep_their_contents() {
         Heard::Answered { exchange: ID, status: 200, body: b"ok".as_slice().into() }
     );
     assert_eq!(adapter::fetched(fetch::Report::StreamOpened), Heard::StreamOpened);
+    assert_eq!(adapter::fetched(fetch::Report::StreamRefused { status: 401 }), Heard::StreamRefused { status: 401 });
     assert_eq!(adapter::fetched(fetch::Report::StreamEnded), Heard::StreamEnded);
     assert_eq!(
         adapter::carried(transport::Carried::Written { key: b"k".as_slice().into() }),

@@ -36,8 +36,12 @@ impl Stream {
         stream.demand(sse::Request::Next);
         stream
     }
+    /// A 401 is the stream refused signed out; any other status but 200 ends it.
     pub fn opened(&mut self, status: u16, out: &mut Queue<Heard>) {
-        if status != 200 {
+        if status == 401 && self.active {
+            self.active = false;
+            out.push(Heard::Streamed { message: Streamed::SignedOut });
+        } else if status != 200 {
             self.ended(out);
         }
     }

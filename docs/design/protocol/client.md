@@ -334,7 +334,8 @@ heard:    Reply { exchange, message } | Lost { exchange } | Streamed { message }
 - **The stream:** its hello judged against the client's versions
   (section 9); each delivery and run's text routed to its watch by name;
   heartbeats keeping the watches alive; `StreamGone`, or silence past
-  twice the heartbeat, dropping it.
+  twice the heartbeat, dropping it; the stream refused signed out, a
+  `Streamed` message the transport makes, ending the sign-in.
 - **The predecessor's stream:** the stream's name saved at each hello;
   the name kept at start sent gone before the first `OpenStream`, which
   waits for that exchange's terminal (section 4).
@@ -884,8 +885,10 @@ prefix; jig's test application mounts it at `/jig`.
   more is handed out until it drains.
 - **The client end** reads the body as it comes, a piece at a time;
   skein's server-sent events reader cuts it into events, each decoded
-  from base64 into a `Streamed` message. The body's end, or a failure,
-  is `StreamGone`.
+  from base64 into a `Streamed` message. A `401` to its `GET` is the
+  stream refused signed out, the engine end's `StreamEnded` signed out
+  before the stream opened (4.2); any other status but `200`, the
+  body's end, or a failure, is `StreamGone`.
 
 ### 17.3 The credential
 

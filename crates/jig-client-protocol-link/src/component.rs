@@ -585,6 +585,11 @@ impl Link {
                 self.watches.alive(out);
                 return;
             }
+            Streamed::SignedOut => {
+                self.end_sign_in(out);
+                out.push(Request::Signing { signing: crate::Signing::SignedOut });
+                return;
+            }
             Streamed::Record(record) => match translate::pages::receiving(&self.limits) {
                 Ok(receiving) => {
                     let mut reader = Reader::new(&record);

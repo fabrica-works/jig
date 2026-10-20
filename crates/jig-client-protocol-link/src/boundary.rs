@@ -180,4 +180,6 @@ pub enum Heard {
 pub enum Streamed {
     Record(Box<[u8]>),
     Heartbeat,
+    /// The stream refused, its opening answered signed out.
+    SignedOut,
 }

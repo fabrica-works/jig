@@ -17,6 +17,7 @@ pub enum Heard {
     Answered { exchange: u32, status: u16, body: Box<[u8]> },
     Failed { exchange: u32 },
     StreamOpened,
+    StreamRefused { status: u16 },
     Piece { bytes: Box<[u8]> },
     StreamEnded,
     Stored { key: Box<[u8]> },
@@ -67,6 +68,7 @@ pub fn fetched(report: fetch::Report) -> Heard {
         fetch::Report::Answered { exchange, status, body } => Heard::Answered { exchange, status, body },
         fetch::Report::Failed { exchange } => Heard::Failed { exchange },
         fetch::Report::StreamOpened => Heard::StreamOpened,
+        fetch::Report::StreamRefused { status } => Heard::StreamRefused { status },
         fetch::Report::StreamPiece { bytes } => Heard::Piece { bytes },
         fetch::Report::StreamEnded => Heard::StreamEnded,
     }

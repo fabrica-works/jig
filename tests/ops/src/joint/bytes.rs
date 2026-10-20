@@ -305,7 +305,7 @@ fn callback(event: &Event) -> Option<Callback> {
         Event::Reply { exchange, .. } => Some(Callback::Reply(*exchange)),
         Event::Streamed { message: Streamed::Record(bytes) } => Some(Callback::Record(bytes.clone())),
         Event::Streamed { message: Streamed::Heartbeat } => Some(Callback::Heartbeat),
-        Event::StreamGone => Some(Callback::Gone),
+        Event::Streamed { message: Streamed::SignedOut } | Event::StreamGone => Some(Callback::Gone),
         Event::Start { .. }
         | Event::StartUnlinked { .. }
         | Event::SignIn { .. }

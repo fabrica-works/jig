@@ -165,6 +165,16 @@ fn a_stream_end_drops_all_watches_once() {
     assert_eq!(harness.closed_count(), 2);
 }
 #[test]
+fn a_stream_refused_signed_out_ends_the_sign_in() {
+    let mut harness = fixtures::Harness::new(&fixtures::limits());
+    harness.open(fixtures::WATCH, fixtures::family_subject());
+    harness.link.step(Time::ZERO, Event::Streamed { message: Streamed::SignedOut }, &mut harness.out);
+    assert_eq!(harness.ended(fixtures::WATCH), Some(c::WatchEnd::SignedOut));
+    assert!(harness.has(&Request::Signing { signing: Signing::SignedOut }));
+    assert!(harness.has(&Request::CloseStream));
+    assert!(!harness.has(&Request::Fact { fact: Fact::StreamDropped }));
+}
+#[test]
 fn a_stream_drop_tells_the_engine_which_stream_is_gone() {
     let mut harness = fixtures::Harness::streaming(fixtures::frame_subject());
     harness.link.step(Time::ZERO, Event::StreamGone, &mut harness.out);
